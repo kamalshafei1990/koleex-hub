@@ -34,7 +34,7 @@ const KIND_ICON: Record<Entity, RrIconName> = {
   expense: "receipt", payment: "money", bill: "file-invoice", journal: "books",
 };
 const STATUS_BADGE: Record<Status, string> = {
-  draft:     "bg-white/[0.06] text-gray-300 border-white/[0.08]",
+  draft:     "bg-[var(--bg-surface-hover)] text-[var(--text-highlight)] border-[var(--border-subtle)]",
   submitted: "bg-amber-400/[0.10] text-amber-200/90 border-amber-400/30",
   pending:   "bg-amber-400/[0.10] text-amber-200/90 border-amber-400/30",
   approved:  "bg-emerald-400/[0.10] text-emerald-200/90 border-emerald-400/30",
@@ -121,13 +121,13 @@ export default function FinanceApprovals() {
       backHref="/finance/workspace"
       action={
         <Link href="/finance/workspace"
-              className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] hover:bg-white/[0.06]">
+              className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface-hover)]">
           <RrIcon name="arrow-left" size={12} />
           {t("approvals.workspace", "Workspace")}
         </Link>
       }
     >
-      {loading && <div className="text-sm text-gray-500">{t("common.loading", "Loading…")}</div>}
+      {loading && <div className="text-sm text-[var(--text-dim)]">{t("common.loading", "Loading…")}</div>}
       {error && <div className="text-sm text-rose-300">{error}</div>}
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
@@ -136,28 +136,28 @@ export default function FinanceApprovals() {
           <div className="mb-2 flex items-baseline justify-between">
             <ErpEyebrow>{t("approvals.pendingCount", "Pending ({n})").replace("{n}", String(items.length))}</ErpEyebrow>
             {!canApprove && (
-              <span className="text-[10.5px] text-gray-500">{t("approvals.readOnly", "Read-only · approver permission required")}</span>
+              <span className="text-[10.5px] text-[var(--text-dim)]">{t("approvals.readOnly", "Read-only · approver permission required")}</span>
             )}
           </div>
           <ErpPanel>
             {items.length === 0 ? (
-              <div className="px-4 py-8 text-center text-[11.5px] text-gray-500">{t("approvals.empty", "No items awaiting action.")}</div>
+              <div className="px-4 py-8 text-center text-[11.5px] text-[var(--text-dim)]">{t("approvals.empty", "No items awaiting action.")}</div>
             ) : (
               <ul>
                 {items.map((it) => {
                   const id = `${it.kind}-${it.id}`;
                   const busy = busyId === id;
                   return (
-                    <li key={id} className="border-b border-white/[0.025] last:border-b-0">
+                    <li key={id} className="border-b border-[var(--border-faint)] last:border-b-0">
                       <div className="flex items-center gap-3 px-3 py-2">
                         <RrIcon name={KIND_ICON[it.kind]} size={12} />
                         <Link href={it.href} className="min-w-0 flex-1 hover:underline">
                           <div className="truncate text-[12.5px] font-medium">{it.ref}</div>
-                          <div className="text-[10.5px] text-gray-500">
+                          <div className="text-[10.5px] text-[var(--text-dim)]">
                             {kindLabel(it.kind)} · {it.party_name ?? "—"} · {fmtTime(it.submitted_at)}
                           </div>
                         </Link>
-                        <div className="font-mono text-[12px] tabular-nums text-gray-300">
+                        <div className="font-mono text-[12px] tabular-nums text-[var(--text-highlight)]">
                           {it.amount === 0 && it.kind === "journal" ? "—" : fmtAmt(it.amount, it.currency)}
                         </div>
                         <span className={`rounded-md border px-2 py-0.5 text-[10px] uppercase tracking-[0.10em] ${STATUS_BADGE[it.status]}`}>
@@ -190,22 +190,22 @@ export default function FinanceApprovals() {
         <div>
           <div className="mb-2 flex items-baseline justify-between">
             <ErpEyebrow>{t("approvals.activity", "Activity")}</ErpEyebrow>
-            <span className="text-[10.5px] text-gray-500">{t("approvals.lastEvents", "Last {n} events").replace("{n}", String(activity.length))}</span>
+            <span className="text-[10.5px] text-[var(--text-dim)]">{t("approvals.lastEvents", "Last {n} events").replace("{n}", String(activity.length))}</span>
           </div>
           <ErpPanel>
             {activity.length === 0 ? (
-              <div className="px-4 py-8 text-center text-[11.5px] text-gray-500">{t("approvals.activityEmpty", "No activity yet.")}</div>
+              <div className="px-4 py-8 text-center text-[11.5px] text-[var(--text-dim)]">{t("approvals.activityEmpty", "No activity yet.")}</div>
             ) : (
               <ul>
                 {activity.map((a) => (
-                  <li key={a.id} className="border-b border-white/[0.025] last:border-b-0 px-3 py-2">
+                  <li key={a.id} className="border-b border-[var(--border-faint)] last:border-b-0 px-3 py-2">
                     <div className="flex items-baseline justify-between text-[11.5px]">
                       <span className="font-medium">
-                        {a.actor_label ?? t("approvals.system", "system")} <span className="text-gray-500">· {a.action}</span>
+                        {a.actor_label ?? t("approvals.system", "system")} <span className="text-[var(--text-dim)]">· {a.action}</span>
                       </span>
-                      <span className="text-[10px] text-gray-500">{fmtTime(a.created_at)}</span>
+                      <span className="text-[10px] text-[var(--text-dim)]">{fmtTime(a.created_at)}</span>
                     </div>
-                    <div className="text-[10.5px] text-gray-500">
+                    <div className="text-[10.5px] text-[var(--text-dim)]">
                       {kindLabel(a.entity_kind)} · {a.entity_id.slice(0, 8)}
                       {a.note ? ` · ${a.note}` : ""}
                     </div>
@@ -227,7 +227,7 @@ function ActionBtn({ label, onClick, tone, disabled }: {
   const cls =
     tone === "positive" ? "border-emerald-300/40 hover:bg-emerald-300/[0.06] text-emerald-200" :
     tone === "warning"  ? "border-rose-300/40 hover:bg-rose-300/[0.06] text-rose-200" :
-                          "border-white/[0.10] hover:bg-white/[0.06] text-gray-200";
+                          "border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] text-[var(--text-highlight)]";
   return (
     <button type="button" onClick={onClick} disabled={disabled}
             className={`rounded-md border px-2.5 py-1 text-[11px] disabled:opacity-50 ${cls}`}>

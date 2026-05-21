@@ -300,10 +300,10 @@ export default function FinanceDashboard() {
             that used to live here has been promoted to the new
             /finance landing so the dense Intelligence view stays
             calm. */}
-        <div className="mt-3 flex items-center gap-1.5 text-[11px] text-gray-500">
+        <div className="mt-3 flex items-center gap-1.5 text-[11px] text-[var(--text-dim)]">
           <RrIcon name="arrow-left" size={10} />
-          <Link href="/finance" className="hover:text-gray-300">{t("dash.backHome", "Back to Finance Home")}</Link>
-          <span className="text-gray-700">·</span>
+          <Link href="/finance" className="hover:text-[var(--text-highlight)]">{t("dash.backHome", "Back to Finance Home")}</Link>
+          <span className="text-[var(--text-whisper)]">·</span>
           <span>{t("dash.backHint", "You're in the deep analytics view; every section below is preserved.")}</span>
         </div>
 
@@ -768,7 +768,7 @@ function ExecutiveView({
       {/* ── 1. Executive read — a single narrative line below the
             SystemHealth rail. No box; just typography. */}
       <div className="mt-8 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-        <p className="max-w-[820px] text-[13px] leading-[1.55] text-gray-300">{liquidity.narrative}</p>
+        <p className="max-w-[820px] text-[13px] leading-[1.55] text-[var(--text-highlight)]">{liquidity.narrative}</p>
         <PressurePill pressure={pressure} t={t} />
       </div>
 

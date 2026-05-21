@@ -108,13 +108,13 @@ export default function FinanceWorkspace() {
             <RrIcon name="plus" size={12} /> {t("header.create", "Create")}
           </button>
           <FocusToggle />
-          <Link href="/reports" className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] hover:bg-white/[0.06]">
+          <Link href="/reports" className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface-hover)]">
             <RrIcon name="newspaper" size={12} /> {t("workspace.reports", "Reports")}
           </Link>
         </div>
       }
     >
-      {loading && <div className="text-sm text-gray-500">{t("workspace.loading", "Loading…")}</div>}
+      {loading && <div className="text-sm text-[var(--text-dim)]">{t("workspace.loading", "Loading…")}</div>}
       {error && <div className="text-sm text-rose-300">{error}</div>}
       {snap && (
         <>
@@ -136,7 +136,7 @@ export default function FinanceWorkspace() {
             <div className="lg:col-span-2">
               <div className="mb-2 flex items-baseline justify-between">
                 <ErpEyebrow>{t("workspace.pendingQueue", "Pending Queue")}</ErpEyebrow>
-                <Link href="/finance/approvals" className="text-[11px] text-gray-400 hover:text-gray-200">
+                <Link href="/finance/approvals" className="text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-highlight)]">
                   {t("workspace.viewAll", "View all")}{totalPending > 0 ? ` (${totalPending})` : ""} →
                 </Link>
               </div>
@@ -152,13 +152,13 @@ export default function FinanceWorkspace() {
                 ) : (
                   <ul>
                     {snap.pending.slice(0, 10).map((p) => (
-                      <li key={`${p.kind}-${p.id}`} className="border-b border-white/[0.025] last:border-b-0">
-                        <Link href={p.href} className="flex items-center gap-3 px-3 py-2 hover:bg-white/[0.02]">
+                      <li key={`${p.kind}-${p.id}`} className="border-b border-[var(--border-faint)] last:border-b-0">
+                        <Link href={p.href} className="flex items-center gap-3 px-3 py-2 hover:bg-[var(--bg-secondary)]">
                           <ErpStatusDot status={statusFromApproval(p.status)} />
                           <RrIcon name={KIND_ICON[p.kind]} size={12} />
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-[12.5px] font-medium">{p.ref}</div>
-                            <div className="text-[10.5px] text-gray-500">
+                            <div className="text-[10.5px] text-[var(--text-dim)]">
                               {t(KIND_LABEL_KEY[p.kind].key, KIND_LABEL_KEY[p.kind].en)} · {p.party_name ?? t("workspace.unspecified", "Unspecified")} · {fmtDay(p.submitted_at)}
                             </div>
                           </div>
@@ -175,7 +175,7 @@ export default function FinanceWorkspace() {
             <div>
               <div className="mb-2 flex items-baseline justify-between">
                 <ErpEyebrow>{t("workspace.banks", "Bank Accounts")}</ErpEyebrow>
-                <Link href="/finance/bank-accounts" className="text-[11px] text-gray-400 hover:text-gray-200">{t("workspace.manage", "Manage →")}</Link>
+                <Link href="/finance/bank-accounts" className="text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-highlight)]">{t("workspace.manage", "Manage →")}</Link>
               </div>
               <ErpPanel>
                 {snap.banks.length === 0 ? (
@@ -187,12 +187,12 @@ export default function FinanceWorkspace() {
                 ) : (
                   <ul>
                     {snap.banks.map((b) => (
-                      <li key={b.id} className="border-b border-white/[0.025] last:border-b-0">
+                      <li key={b.id} className="border-b border-[var(--border-faint)] last:border-b-0">
                         <Link href={`/finance/bank-accounts?id=${b.id}`}
-                              className="flex items-center justify-between gap-3 px-3 py-2 hover:bg-white/[0.02]">
+                              className="flex items-center justify-between gap-3 px-3 py-2 hover:bg-[var(--bg-secondary)]">
                           <div className="min-w-0">
                             <div className="truncate text-[12.5px] font-medium">{b.label}</div>
-                            <div className="text-[10.5px] text-gray-500">{b.currency}</div>
+                            <div className="text-[10.5px] text-[var(--text-dim)]">{b.currency}</div>
                           </div>
                           <div className="font-mono text-[12px] tabular-nums">
                             {vis?.can_see_bank_balances ? fmtAmt(b.current_balance, b.currency) : "•••"}
@@ -211,7 +211,7 @@ export default function FinanceWorkspace() {
           <section>
             <div className="mb-2 flex items-baseline justify-between">
               <ErpEyebrow>{t("workspace.recent", "Recent Activity")}</ErpEyebrow>
-              <span className="text-[10.5px] text-gray-500">{t("workspace.lastEvents", "Last {n} events").replace("{n}", String(snap.recent.length))}</span>
+              <span className="text-[10.5px] text-[var(--text-dim)]">{t("workspace.lastEvents", "Last {n} events").replace("{n}", String(snap.recent.length))}</span>
             </div>
             <ErpPanel>
               {snap.recent.length === 0 ? (
@@ -222,19 +222,19 @@ export default function FinanceWorkspace() {
               ) : (
                 <ol className="relative">
                   {snap.recent.map((r, idx) => (
-                    <li key={`${r.kind}-${r.id}`} className="relative border-b border-white/[0.025] last:border-b-0">
-                      <Link href={r.href} className="flex items-center gap-3 px-3 py-2 hover:bg-white/[0.02]">
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.02] text-gray-300">
+                    <li key={`${r.kind}-${r.id}`} className="relative border-b border-[var(--border-faint)] last:border-b-0">
+                      <Link href={r.href} className="flex items-center gap-3 px-3 py-2 hover:bg-[var(--bg-secondary)]">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-highlight)]">
                           <RrIcon name={KIND_ICON[r.kind]} size={12} />
                         </span>
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-[12.5px] font-medium">{r.ref}</div>
-                          <div className="text-[10.5px] text-gray-500">
+                          <div className="text-[10.5px] text-[var(--text-dim)]">
                             {t(KIND_LABEL_KEY[r.kind].key, KIND_LABEL_KEY[r.kind].en)} · {r.party_name ?? r.occurred_at}
                           </div>
                         </div>
                         <div className="font-mono text-[12px] tabular-nums">{fmtAmt(r.amount, r.currency)}</div>
-                        <div className="text-[10.5px] text-gray-500">{fmtDay(r.occurred_at)}</div>
+                        <div className="text-[10.5px] text-[var(--text-dim)]">{fmtDay(r.occurred_at)}</div>
                       </Link>
                       {idx === 0 && <span aria-hidden className="absolute left-[15px] top-0 h-2 w-px bg-emerald-400/40" />}
                     </li>
@@ -273,14 +273,14 @@ function EmptyState({ icon, title, body, actionHref, actionLabel }: {
 }) {
   return (
     <div className="flex flex-col items-center justify-center px-4 py-8 text-center">
-      <span className="mb-2 flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.06] bg-white/[0.02] text-gray-400">
+      <span className="mb-2 flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-secondary)]">
         <RrIcon name={icon} size={16} />
       </span>
       <div className="text-[12.5px] font-medium">{title}</div>
-      <div className="mt-1 text-[10.5px] text-gray-500">{body}</div>
+      <div className="mt-1 text-[10.5px] text-[var(--text-dim)]">{body}</div>
       {actionHref && actionLabel && (
         <Link href={actionHref}
-              className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.06] px-3 py-1.5 text-[11.5px] hover:bg-white/[0.10]">
+              className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface-hover)] px-3 py-1.5 text-[11.5px] hover:bg-[var(--bg-surface-hover)]">
           <RrIcon name="plus" size={10} />
           {actionLabel}
         </Link>
@@ -295,14 +295,14 @@ function NavCard({ href, icon, label, count }: {
   const { t } = useTranslation(financeT);
   return (
     <Link href={href} className="block">
-      <ErpPanel className="px-3 py-3.5 transition-colors hover:bg-white/[0.025]">
+      <ErpPanel className="px-3 py-3.5 transition-colors hover:bg-[var(--bg-surface-subtle)]">
         <div className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.02] text-gray-300">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-highlight)]">
             <RrIcon name={icon} size={14} />
           </span>
           <div className="min-w-0 flex-1">
             <div className="text-[12.5px] font-medium">{label}</div>
-            {count !== null && <div className="text-[10.5px] text-gray-500">{t("workspace.openLabel", "{n} open").replace("{n}", String(count))}</div>}
+            {count !== null && <div className="text-[10.5px] text-[var(--text-dim)]">{t("workspace.openLabel", "{n} open").replace("{n}", String(count))}</div>}
           </div>
           <ErpHairline className="hidden" />
         </div>

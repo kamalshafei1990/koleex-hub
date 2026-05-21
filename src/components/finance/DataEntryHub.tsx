@@ -102,14 +102,14 @@ export default function DataEntryHub() {
       <section>
         <div className="mb-2 flex items-baseline justify-between">
           <ErpEyebrow>{t("dataEntry.section.starting", "① Starting Data · one-time")}</ErpEyebrow>
-          <Link href="/finance/setup" className="text-[11px] text-gray-400 hover:text-gray-200">{t("dataEntry.openSetup", "Open Finance Setup →")}</Link>
+          <Link href="/finance/setup" className="text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-highlight)]">{t("dataEntry.openSetup", "Open Finance Setup →")}</Link>
         </div>
         <ErpPanel>
           <ul>
             {STARTING_DATA.map((r) => <EntryRowItem key={r.href} row={r} />)}
           </ul>
         </ErpPanel>
-        <p className="mt-2 text-[10.5px] text-gray-500">
+        <p className="mt-2 text-[10.5px] text-[var(--text-dim)]">
           {t("dataEntry.startingFootnote", "You only enter starting data once — when you first set up the company in Koleex. The system uses it as the day-zero snapshot.")}
         </p>
       </section>
@@ -119,14 +119,14 @@ export default function DataEntryHub() {
       <section>
         <div className="mb-2 flex items-baseline justify-between">
           <ErpEyebrow>{t("dataEntry.section.daily", "② Day-to-Day Entries · ongoing")}</ErpEyebrow>
-          <Link href="/create" className="text-[11px] text-gray-400 hover:text-gray-200">{t("dataEntry.openAllCreate", "Open all create flows →")}</Link>
+          <Link href="/create" className="text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-highlight)]">{t("dataEntry.openAllCreate", "Open all create flows →")}</Link>
         </div>
         <ErpPanel>
           <ul>
             {DAILY_ENTRIES.map((r) => <EntryRowItem key={r.href} row={r} />)}
           </ul>
         </ErpPanel>
-        <p className="mt-2 text-[10.5px] text-gray-500">
+        <p className="mt-2 text-[10.5px] text-[var(--text-dim)]">
           {t("dataEntry.dailyFootnote", "These you enter as the company operates — every day, every week. Each one feeds straight into the books, AR/AP balances, and statements.")}
         </p>
       </section>
@@ -141,16 +141,16 @@ function EntryRowItem({ row }: { row: EntryRow }) {
   const tagCls =
     row.tag === "required"    ? "border-rose-300/40 bg-rose-300/[0.08] text-rose-100" :
     row.tag === "recommended" ? "border-amber-300/40 bg-amber-300/[0.08] text-amber-100" :
-                                "border-white/[0.10] bg-white/[0.04] text-gray-300";
+                                "border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-highlight)]";
   const tagLabel =
     row.tag === "required"    ? t("dataEntry.tier.required",    "Required") :
     row.tag === "recommended" ? t("dataEntry.tier.recommended", "Recommended") :
     row.tag === "optional"    ? t("dataEntry.tier.optional",    "Optional") :
     null;
   return (
-    <li className="border-b border-white/[0.025] last:border-b-0">
-      <Link href={row.href} className="flex items-center gap-3 px-3 py-2.5 hover:bg-white/[0.025]">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.02] text-gray-300">
+    <li className="border-b border-[var(--border-faint)] last:border-b-0">
+      <Link href={row.href} className="flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--bg-surface-subtle)]">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-highlight)]">
           <RrIcon name={row.icon} size={14} />
         </span>
         <div className="min-w-0 flex-1">
@@ -162,9 +162,9 @@ function EntryRowItem({ row }: { row: EntryRow }) {
               </span>
             )}
           </div>
-          <div className="text-[10.5px] text-gray-500">{t(row.meaningKey, row.meaningFallback)}</div>
+          <div className="text-[10.5px] text-[var(--text-dim)]">{t(row.meaningKey, row.meaningFallback)}</div>
         </div>
-        <RrIcon name="arrow-up-right" size={11} className="text-gray-500" />
+        <RrIcon name="arrow-up-right" size={11} className="text-[var(--text-dim)]" />
       </Link>
     </li>
   );

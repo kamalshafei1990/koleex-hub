@@ -86,19 +86,19 @@ export default function FinanceProfitLoss() {
         />
 
         {/* Period filter */}
-        <div className="rounded-xl border border-white/[0.05] bg-white/[0.012] p-4">
+        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
           <div className="flex flex-wrap items-end gap-3">
             <Field label="From">
-              <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
+              <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
             </Field>
             <Field label="To">
-              <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
+              <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
             </Field>
-            <label className="flex items-center gap-2 text-[12px] text-gray-300">
-              <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} className="rounded border-white/[0.10]" />
+            <label className="flex items-center gap-2 text-[12px] text-[var(--text-highlight)]">
+              <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} className="rounded border-[var(--border-color)]" />
               Compare to prior period
             </label>
-            <div className="ml-auto text-[10px] uppercase tracking-[0.18em] text-gray-500">
+            <div className="ml-auto text-[10px] uppercase tracking-[0.18em] text-[var(--text-dim)]">
               {loading ? "Loading…" : data ? `${data.currency} · ${data.period.from} → ${data.period.to}` : ""}
             </div>
           </div>
@@ -109,10 +109,10 @@ export default function FinanceProfitLoss() {
         )}
 
         {data && (
-          <div className="rounded-xl border border-white/[0.05] bg-white/[0.012]">
+          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
             <table className="min-w-full text-[12.5px]">
               <thead>
-                <tr className="border-b border-white/[0.06] text-[9px] uppercase tracking-[0.12em] text-gray-500">
+                <tr className="border-b border-[var(--border-subtle)] text-[9px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
                   <th className="px-4 py-2 text-left">Section</th>
                   <th className="px-4 py-2 text-right">Current</th>
                   {data.comparison && (
@@ -142,7 +142,7 @@ export default function FinanceProfitLoss() {
         <Hairline />
         <div>
           <Eyebrow>Method</Eyebrow>
-          <p className="mt-2 max-w-prose text-[11.5px] leading-relaxed text-gray-500">
+          <p className="mt-2 max-w-prose text-[11.5px] leading-relaxed text-[var(--text-dim)]">
             Revenue is the net credit on accounts 4000-4999. Cost of sales captures direct costs (freight, customs). Operating expenses cover everything else in the 5xxx range. Net profit currently equals operating profit; tax + financial-charges entries flow through operating expenses until the dedicated tax engine ships.
           </p>
         </div>
@@ -154,7 +154,7 @@ export default function FinanceProfitLoss() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">{label}</div>
+      <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{label}</div>
       {children}
     </label>
   );
@@ -171,42 +171,42 @@ function SectionRows({
   const compareByCode = new Map<string, number>((compareSection?.accounts ?? []).map((a) => [a.code, a.amount]));
   return (
     <>
-      <tr className="bg-white/[0.02]">
-        <td className="px-4 py-1.5 text-[10px] uppercase tracking-[0.12em] text-gray-400" colSpan={2 + (compareSection ? 3 : 0) + 1}>{section.label}</td>
+      <tr className="bg-[var(--bg-secondary)]">
+        <td className="px-4 py-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--text-secondary)]" colSpan={2 + (compareSection ? 3 : 0) + 1}>{section.label}</td>
       </tr>
       {section.accounts.map((a) => {
         const prior = compareByCode.get(a.code) ?? 0;
         const vAmt = a.amount - prior;
         const vPct = prior !== 0 ? (vAmt / Math.abs(prior)) * 100 : 0;
         return (
-          <tr key={a.code} className="border-b border-white/[0.03]">
+          <tr key={a.code} className="border-b border-[var(--border-faint)]">
             <td className="px-4 py-1.5">
-              <span className="font-mono text-gray-500">{a.code} </span>
-              <span className="text-gray-300">{a.name}</span>
+              <span className="font-mono text-[var(--text-dim)]">{a.code} </span>
+              <span className="text-[var(--text-highlight)]">{a.name}</span>
             </td>
             <td className="px-4 py-1.5 text-right tabular-nums font-mono">{fmt(a.amount)}</td>
             {compareSection && (
               <>
-                <td className="px-4 py-1.5 text-right tabular-nums font-mono text-gray-500">{fmt(prior)}</td>
-                <td className="px-4 py-1.5 text-right tabular-nums font-mono text-gray-500">{fmt(vAmt)}</td>
-                <td className="px-4 py-1.5 text-right tabular-nums font-mono text-gray-500">{pct(vPct)}</td>
+                <td className="px-4 py-1.5 text-right tabular-nums font-mono text-[var(--text-dim)]">{fmt(prior)}</td>
+                <td className="px-4 py-1.5 text-right tabular-nums font-mono text-[var(--text-dim)]">{fmt(vAmt)}</td>
+                <td className="px-4 py-1.5 text-right tabular-nums font-mono text-[var(--text-dim)]">{pct(vPct)}</td>
               </>
             )}
-            <td className="px-4 py-1.5 text-right tabular-nums font-mono text-gray-500">{revenue > 0 ? pct((a.amount / revenue) * 100) : "—"}</td>
+            <td className="px-4 py-1.5 text-right tabular-nums font-mono text-[var(--text-dim)]">{revenue > 0 ? pct((a.amount / revenue) * 100) : "—"}</td>
           </tr>
         );
       })}
-      <tr className="border-b border-white/[0.08]">
-        <td className="px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-400">Total {section.label.toLowerCase()}</td>
+      <tr className="border-b border-[var(--border-subtle)]">
+        <td className="px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-secondary)]">Total {section.label.toLowerCase()}</td>
         <td className="px-4 py-1.5 text-right tabular-nums font-mono font-medium">{fmt(section.amount)}</td>
         {compareSection && (
           <>
-            <td className="px-4 py-1.5 text-right tabular-nums font-mono text-gray-500">{fmt(compareSection.amount)}</td>
-            <td className="px-4 py-1.5 text-right tabular-nums font-mono text-gray-500">{fmt(section.amount - compareSection.amount)}</td>
-            <td className="px-4 py-1.5 text-right tabular-nums font-mono text-gray-500">{compareSection.amount !== 0 ? pct(((section.amount - compareSection.amount) / Math.abs(compareSection.amount)) * 100) : "—"}</td>
+            <td className="px-4 py-1.5 text-right tabular-nums font-mono text-[var(--text-dim)]">{fmt(compareSection.amount)}</td>
+            <td className="px-4 py-1.5 text-right tabular-nums font-mono text-[var(--text-dim)]">{fmt(section.amount - compareSection.amount)}</td>
+            <td className="px-4 py-1.5 text-right tabular-nums font-mono text-[var(--text-dim)]">{compareSection.amount !== 0 ? pct(((section.amount - compareSection.amount) / Math.abs(compareSection.amount)) * 100) : "—"}</td>
           </>
         )}
-        <td className="px-4 py-1.5 text-right tabular-nums font-mono text-gray-500">{revenue > 0 ? pct((section.amount / revenue) * 100) : "—"}</td>
+        <td className="px-4 py-1.5 text-right tabular-nums font-mono text-[var(--text-dim)]">{revenue > 0 ? pct((section.amount / revenue) * 100) : "—"}</td>
       </tr>
     </>
   );
@@ -226,14 +226,14 @@ function SummaryRow({
 }) {
   void priorPct; void revenue;
   return (
-    <tr className={`${grand ? "border-t-2 border-white/20" : "border-t border-white/[0.08]"}`}>
+    <tr className={`${grand ? "border-t-2 border-white/20" : "border-t border-[var(--border-subtle)]"}`}>
       <td className={`px-4 py-2 ${grand ? "text-[14px] font-bold" : "text-[12.5px] font-medium"}`}>{label}</td>
       <td className={`px-4 py-2 text-right tabular-nums font-mono ${grand ? "text-[14px] font-bold" : "font-medium"}`}>{fmt(current)}</td>
       {prior !== undefined && variance && (
         <>
-          <td className="px-4 py-2 text-right tabular-nums font-mono text-gray-400">{fmt(prior)}</td>
-          <td className="px-4 py-2 text-right tabular-nums font-mono text-gray-400">{fmt(variance.amount)}</td>
-          <td className="px-4 py-2 text-right tabular-nums font-mono text-gray-400">{pct(variance.pct)}</td>
+          <td className="px-4 py-2 text-right tabular-nums font-mono text-[var(--text-secondary)]">{fmt(prior)}</td>
+          <td className="px-4 py-2 text-right tabular-nums font-mono text-[var(--text-secondary)]">{fmt(variance.amount)}</td>
+          <td className="px-4 py-2 text-right tabular-nums font-mono text-[var(--text-secondary)]">{pct(variance.pct)}</td>
         </>
       )}
       <td className={`px-4 py-2 text-right tabular-nums font-mono ${grand ? "text-[14px] font-bold" : ""}`}>{pct(pctOf)}</td>

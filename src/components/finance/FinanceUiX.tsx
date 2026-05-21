@@ -85,10 +85,10 @@ export function HeroKpiCard({
        the gradient background, the hover y-lift, and the drop shadow
        all removed. The card now reads as data printed on dark paper:
        a hairline border, a flat surface, typography that breathes. */
-    <div className="group relative isolate overflow-hidden rounded-2xl border border-white/[0.05] bg-white/[0.012] p-5 transition-colors duration-200 hover:border-white/[0.09]">
+    <div className="group relative isolate overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 transition-colors duration-200 hover:border-[var(--border-subtle)]">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">
+          <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-dim)]">
             <span>{label}</span>
             {helpId && <GuidanceTip guidanceId={helpId} />}
           </div>
@@ -100,7 +100,7 @@ export function HeroKpiCard({
                 <span className={`text-[32px] leading-none font-medium tracking-tight tabular-nums ${TONE_TEXT[tone]}`}>
                   {display}
                 </span>
-                {unit && <span className="text-sm font-medium text-gray-500">{unit}</span>}
+                {unit && <span className="text-sm font-medium text-[var(--text-dim)]">{unit}</span>}
               </>
             )}
           </div>
@@ -125,7 +125,7 @@ export function HeroKpiCard({
                   {deltaSign === 0 ? "—" : deltaSign > 0 ? "↑" : "↓"} {fmtPct(delta)}
                 </span>
               )}
-              {hint && <span className="text-gray-500">{hint}</span>}
+              {hint && <span className="text-[var(--text-dim)]">{hint}</span>}
             </div>
           )}
         </div>
@@ -168,8 +168,8 @@ export function MetricCard({
   const display = typeof value === "string" ? value : formatCompact(value);
   const deltaSign = delta == null ? 0 : delta > 0 ? 1 : delta < 0 ? -1 : 0;
   return (
-    <div className="rounded-xl border border-white/[0.04] bg-white/[0.018] p-3.5 transition hover:border-white/[0.08]">
-      <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+    <div className="rounded-xl border border-[var(--border-faint)] bg-[var(--bg-secondary)] p-3.5 transition hover:border-[var(--border-subtle)]">
+      <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-dim)]">
         <span>{label}</span>
         {helpId && <GuidanceTip guidanceId={helpId} />}
       </div>
@@ -179,7 +179,7 @@ export function MetricCard({
         ) : (
           <>
             <span className={`text-[18px] leading-none font-medium tracking-tight tabular-nums ${TONE_TEXT[tone]}`}>{display}</span>
-            {unit && <span className="text-[11px] text-gray-500">{unit}</span>}
+            {unit && <span className="text-[11px] text-[var(--text-dim)]">{unit}</span>}
           </>
         )}
       </div>
@@ -192,7 +192,7 @@ export function MetricCard({
               {deltaSign === 0 ? "—" : deltaSign > 0 ? "↑" : "↓"} {fmtPct(delta)}
             </span>
           )}
-          {hint && <span className="text-gray-500">{hint}</span>}
+          {hint && <span className="text-[var(--text-dim)]">{hint}</span>}
         </div>
       )}
     </div>
@@ -212,28 +212,28 @@ export type InsightSeverity = "positive" | "neutral" | "watch" | "risk" | "criti
    glow, no edge pulse. */
 const SEVERITY_FRAME: Record<InsightSeverity, { border: string; bg: string; rail: string }> = {
   positive: {
-    border: "border-white/[0.05]",
-    bg:     "bg-white/[0.02]",
+    border: "border-[var(--border-subtle)]",
+    bg:     "bg-[var(--bg-secondary)]",
     rail:   "bg-emerald-300/55",
   },
   neutral: {
-    border: "border-white/[0.04]",
-    bg:     "bg-white/[0.018]",
-    rail:   "bg-white/[0.10]",
+    border: "border-[var(--border-faint)]",
+    bg:     "bg-[var(--bg-secondary)]",
+    rail:   "bg-[var(--bg-surface-hover)]",
   },
   watch: {
     border: "border-amber-500/[0.18]",
-    bg:     "bg-white/[0.018]",
+    bg:     "bg-[var(--bg-secondary)]",
     rail:   "bg-amber-300/65",
   },
   risk: {
     border: "border-rose-500/[0.22]",
-    bg:     "bg-white/[0.018]",
+    bg:     "bg-[var(--bg-secondary)]",
     rail:   "bg-rose-300/65",
   },
   critical: {
     border: "border-rose-500/[0.30]",
-    bg:     "bg-white/[0.020]",
+    bg:     "bg-[var(--bg-secondary)]",
     rail:   "bg-rose-300/80",
   },
 };
@@ -276,7 +276,7 @@ export function InsightCard({
           without colouring the whole card. */}
       <div aria-hidden className={`absolute left-0 top-3 bottom-3 w-[2px] rounded-r ${sev.rail}`} />
       {icon && (
-        <div className="ml-1.5 mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] text-base">
+        <div className="ml-1.5 mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-surface)] text-base">
           {icon}
         </div>
       )}
@@ -289,7 +289,7 @@ export function InsightCard({
             </span>
           )}
         </div>
-        <p className="mt-1 text-[12px] leading-relaxed text-gray-400">{description}</p>
+        <p className="mt-1 text-[12px] leading-relaxed text-[var(--text-secondary)]">{description}</p>
         {cta && (
           <button
             type="button"
@@ -329,14 +329,14 @@ export function ChartCard({
        single hairline border on a flat slightly-tinted surface, so
        the chart-data inside reads as the loud element, not the
        wrapper. */
-    <div className="relative isolate overflow-hidden rounded-2xl border border-white/[0.05] bg-white/[0.012] p-5">
+    <div className="relative isolate overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="flex items-center gap-1.5 text-[13px] font-semibold tracking-tight text-[var(--text-primary)]">
             <span>{title}</span>
             {helpId && <GuidanceTip guidanceId={helpId} />}
           </h3>
-          {subtitle && <p className="mt-0.5 text-[11px] text-gray-500">{subtitle}</p>}
+          {subtitle && <p className="mt-0.5 text-[11px] text-[var(--text-dim)]">{subtitle}</p>}
         </div>
         {controls}
       </div>
@@ -401,7 +401,7 @@ export function WorkflowRail({
                   the layout matches across cards with/without badges. */}
               <div className="flex items-center justify-between gap-2">
                 {it.icon ? (
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.05] text-gray-300 transition-colors group-hover:bg-white/[0.10] group-hover:text-gray-100">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-surface)] text-[var(--text-highlight)] transition-colors group-hover:bg-[var(--bg-surface-hover)] group-hover:text-[var(--text-primary)]">
                     {it.icon}
                   </span>
                 ) : (
@@ -423,11 +423,11 @@ export function WorkflowRail({
                   lines so 'Follow up collection' doesn't get truncated.
                   Hint clamps to 2 lines so the card height stays bounded. */}
               <div className="mt-2 min-w-0">
-                <div className="line-clamp-2 text-[12.5px] font-semibold leading-tight text-gray-100 group-hover:text-white">
+                <div className="line-clamp-2 text-[12.5px] font-semibold leading-tight text-[var(--text-primary)] group-hover:text-white">
                   {it.label}
                 </div>
                 {it.hint && (
-                  <div className="mt-0.5 line-clamp-2 text-[10.5px] leading-snug text-gray-500">
+                  <div className="mt-0.5 line-clamp-2 text-[10.5px] leading-snug text-[var(--text-dim)]">
                     {it.hint}
                   </div>
                 )}
@@ -436,7 +436,7 @@ export function WorkflowRail({
           );
 
           const cls =
-            "group flex w-[200px] shrink-0 flex-col rounded-xl border border-white/[0.05] bg-white/[0.02] px-3 py-2.5 transition-all duration-200 hover:-translate-y-[1px] hover:border-white/[0.12] hover:bg-white/[0.04] sm:w-auto " +
+            "group flex w-[200px] shrink-0 flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2.5 transition-all duration-200 hover:-translate-y-[1px] hover:border-[var(--border-color)] hover:bg-[var(--bg-surface)] sm:w-auto " +
             (it.disabled ? "pointer-events-none opacity-50" : "");
 
           if (it.href) {
@@ -472,25 +472,25 @@ export function SegmentedNav({
 }) {
   return (
     <nav aria-label="Section navigation" className="overflow-x-auto">
-      <div className="relative inline-flex items-center gap-0.5 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-1 backdrop-blur-md">
+      <div className="relative inline-flex items-center gap-0.5 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-1 backdrop-blur-md">
         {items.map((it) => {
           const active = it.key === activeKey;
           const cls =
             "relative flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-[12px] font-medium whitespace-nowrap transition-colors " +
             (active
               ? "text-[var(--text-primary)]"
-              : "text-gray-400 hover:text-gray-100");
+              : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]");
           const inner = (
             <>
               {active && (
-                <span aria-hidden className="absolute inset-0 -z-10 rounded-xl bg-white/[0.07] shadow-[0_1px_0_rgba(255,255,255,0.06)_inset,0_8px_24px_-12px_rgba(0,0,0,0.6)]" />
+                <span aria-hidden className="absolute inset-0 -z-10 rounded-xl bg-[var(--bg-surface-hover)] shadow-[0_1px_0_rgba(255,255,255,0.06)_inset,0_8px_24px_-12px_rgba(0,0,0,0.6)]" />
               )}
               {it.icon && <span className="opacity-80">{it.icon}</span>}
               <span>{it.label}</span>
               {it.count != null && (
                 <span className={
                   "rounded-full px-1.5 py-0.5 text-[10px] tabular-nums " +
-                  (active ? "bg-white/[0.10] text-gray-200" : "bg-white/[0.04] text-gray-500")
+                  (active ? "bg-[var(--bg-surface-hover)] text-[var(--text-highlight)]" : "bg-[var(--bg-surface)] text-[var(--text-dim)]")
                 }>
                   {it.count}
                 </span>
@@ -537,13 +537,13 @@ export function SectionTitle({
   return (
     <div className="mt-7 mb-3">
       {eyebrow && (
-        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">{eyebrow}</div>
+        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-dim)]">{eyebrow}</div>
       )}
       <h2 className="mt-1 flex items-center gap-1.5 text-[14px] font-semibold tracking-tight text-[var(--text-primary)]">
         <span>{title}</span>
         {helpId && <GuidanceTip guidanceId={helpId} size="sm" />}
       </h2>
-      {description && <p className="mt-0.5 text-[11.5px] text-gray-500">{description}</p>}
+      {description && <p className="mt-0.5 text-[11.5px] text-[var(--text-dim)]">{description}</p>}
     </div>
   );
 }
@@ -588,7 +588,7 @@ export function ModeToggle({
     <div
       role="tablist"
       aria-label={t("uix.mode.aria", "Finance view mode")}
-      className="relative inline-flex items-center gap-0.5 rounded-xl border border-white/[0.06] bg-white/[0.02] p-1 backdrop-blur-md"
+      className="relative inline-flex items-center gap-0.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-1 backdrop-blur-md"
     >
       {opts.map((o) => {
         const active = o.key === value;
@@ -601,12 +601,12 @@ export function ModeToggle({
             onClick={() => onChange(o.key)}
             className={
               "relative rounded-lg px-3 py-1.5 text-[11px] font-medium transition-colors " +
-              (active ? "text-[var(--text-primary)]" : "text-gray-400 hover:text-gray-200")
+              (active ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)] hover:text-[var(--text-highlight)]")
             }
             title={o.hint}
           >
             {active && (
-              <span aria-hidden className="absolute inset-0 -z-10 rounded-lg bg-white/[0.07] shadow-[0_1px_0_rgba(255,255,255,0.06)_inset,0_8px_24px_-12px_rgba(0,0,0,0.6)]" />
+              <span aria-hidden className="absolute inset-0 -z-10 rounded-lg bg-[var(--bg-surface-hover)] shadow-[0_1px_0_rgba(255,255,255,0.06)_inset,0_8px_24px_-12px_rgba(0,0,0,0.6)]" />
             )}
             {o.label}
           </button>
@@ -635,7 +635,7 @@ export function AnomalyChip({
   const cls =
     severity === "risk"  ? "bg-rose-500/[0.12] text-rose-300 border border-rose-500/[0.18]"
   : severity === "watch" ? "bg-amber-500/[0.12] text-amber-300 border border-amber-500/[0.18]"
-  :                        "bg-white/[0.05] text-gray-300 border border-white/[0.06]";
+  :                        "bg-[var(--bg-surface)] text-[var(--text-highlight)] border border-[var(--border-subtle)]";
   return (
     <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums ${cls}`}>
       {direction === "up" ? "▲" : direction === "down" ? "▼" : "•"}
@@ -669,10 +669,10 @@ export function LiquidityMeter({
   const tone = (v: number): string =>
     v >= 0 ? "text-emerald-300" : "text-rose-300";
   return (
-    <div className="rounded-2xl border border-white/[0.05] bg-white/[0.018] p-4">
+    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
       <div className="flex items-baseline justify-between">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">{t("uix.liquidity.pressure", "Liquidity pressure")}</div>
-        <div className="text-[10px] text-gray-500">{t("uix.liquidity.inflow", "Inflow {pct}%").replace("{pct}", inflowPct.toFixed(0))}</div>
+        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-dim)]">{t("uix.liquidity.pressure", "Liquidity pressure")}</div>
+        <div className="text-[10px] text-[var(--text-dim)]">{t("uix.liquidity.inflow", "Inflow {pct}%").replace("{pct}", inflowPct.toFixed(0))}</div>
       </div>
       {/* Inflow-vs-outflow ratio bar */}
       <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-rose-500/[0.18]">
@@ -685,8 +685,8 @@ export function LiquidityMeter({
           { d: "30 d", v: d30 },
           { d: "60 d", v: d60 },
         ] as const).map((w) => (
-          <div key={w.d} className="rounded-lg border border-white/[0.04] bg-white/[0.01] py-2">
-            <div className="text-[9px] uppercase tracking-[0.18em] text-gray-500">{w.d}</div>
+          <div key={w.d} className="rounded-lg border border-[var(--border-faint)] bg-[var(--bg-secondary)] py-2">
+            <div className="text-[9px] uppercase tracking-[0.18em] text-[var(--text-dim)]">{w.d}</div>
             <div className={`mt-0.5 text-[14px] font-medium tabular-nums tracking-tight ${tone(w.v)}`}>
               {w.v >= 0 ? "+" : "−"}{formatCompact(Math.abs(w.v))}
             </div>
@@ -731,16 +731,16 @@ export function AgingTable({
   const critical = (k: AgingBucketView["key"]) => k === "61_90" || k === "90_plus";
   const watch    = (k: AgingBucketView["key"]) => k === "31_60";
   return (
-    <div className="rounded-2xl border border-white/[0.05] bg-white/[0.018] p-4">
+    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
       <div className="flex items-baseline justify-between gap-3">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">{title}</div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-dim)]">{title}</div>
           <div className="mt-0.5 flex items-baseline gap-1.5">
             <span className="text-[20px] font-medium tabular-nums tracking-tight text-[var(--text-primary)]">{formatCompact(total)}</span>
-            <span className="text-[11px] text-gray-500">{currency} · {totalCount} {totalCount === 1 ? t("uix.aging.line", "line") : t("uix.aging.lines", "lines")}</span>
+            <span className="text-[11px] text-[var(--text-dim)]">{currency} · {totalCount} {totalCount === 1 ? t("uix.aging.line", "line") : t("uix.aging.lines", "lines")}</span>
           </div>
         </div>
-        {totalLabel && <span className="text-[10px] text-gray-600">{totalLabel}</span>}
+        {totalLabel && <span className="text-[10px] text-[var(--text-ghost)]">{totalLabel}</span>}
       </div>
       <div className="mt-3 grid grid-cols-5 gap-2">
         {buckets.map((b) => {
@@ -750,13 +750,13 @@ export function AgingTable({
                        : "bg-white/40";
           const valueCls = critical(b.key) ? "text-rose-300"
                          : watch(b.key)    ? "text-amber-200"
-                         : "text-gray-200";
+                         : "text-[var(--text-highlight)]";
           return (
-            <div key={b.key} className="rounded-lg border border-white/[0.04] bg-white/[0.01] px-2 py-2">
-              <div className="text-[9px] uppercase tracking-[0.16em] text-gray-500">{b.label}</div>
+            <div key={b.key} className="rounded-lg border border-[var(--border-faint)] bg-[var(--bg-secondary)] px-2 py-2">
+              <div className="text-[9px] uppercase tracking-[0.16em] text-[var(--text-dim)]">{b.label}</div>
               <div className={`mt-1 text-[13px] font-medium tabular-nums tracking-tight ${valueCls}`}>{formatCompact(b.amount)}</div>
-              <div className="mt-1 text-[9px] text-gray-600">{b.count} {b.count === 1 ? t("uix.aging.line", "line") : t("uix.aging.lines", "lines")} · {share.toFixed(0)}%</div>
-              <div className="mt-1.5 h-0.5 w-full overflow-hidden rounded-full bg-white/[0.04]">
+              <div className="mt-1 text-[9px] text-[var(--text-ghost)]">{b.count} {b.count === 1 ? t("uix.aging.line", "line") : t("uix.aging.lines", "lines")} · {share.toFixed(0)}%</div>
+              <div className="mt-1.5 h-0.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
                 <div className={`h-full ${barCls}`} style={{ width: `${Math.max(3, (b.amount / max) * 100)}%` }} />
               </div>
             </div>
@@ -801,26 +801,26 @@ export function TimelineStrip({
   const overdueCount = events.filter((e) => e.state === "overdue").length;
   const dueSoonCount = events.filter((e) => e.state === "due_soon").length;
   return (
-    <div className="rounded-2xl border border-white/[0.05] bg-white/[0.018] p-4">
+    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
       <div className="flex items-baseline justify-between gap-3">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">{title}</div>
-          <div className="mt-0.5 text-[11px] text-gray-500">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-dim)]">{title}</div>
+          <div className="mt-0.5 text-[11px] text-[var(--text-dim)]">
             {overdueCount > 0 && (
               <span className="mr-2 text-rose-300/90">{t("uix.timeline.overdueN", "{n} overdue").replace("{n}", String(overdueCount))}</span>
             )}
             {dueSoonCount > 0 && (
               <span className="mr-2 text-amber-300/90">{t("uix.timeline.dueSoonN", "{n} due ≤ 7d").replace("{n}", String(dueSoonCount))}</span>
             )}
-            <span className="text-gray-600">{(events.length === 1
+            <span className="text-[var(--text-ghost)]">{(events.length === 1
               ? t("uix.timeline.onRadarOne", "{n} line on radar")
               : t("uix.timeline.onRadar", "{n} lines on radar")).replace("{n}", String(events.length))}</span>
           </div>
         </div>
-        <span className="text-[10px] text-gray-600">{direction === "incoming" ? "AR" : "AP"}</span>
+        <span className="text-[10px] text-[var(--text-ghost)]">{direction === "incoming" ? "AR" : "AP"}</span>
       </div>
       {top.length === 0 ? (
-        <div className="mt-3 flex h-20 items-center justify-center text-[11px] text-gray-500">
+        <div className="mt-3 flex h-20 items-center justify-center text-[11px] text-[var(--text-dim)]">
           {t("uix.timeline.nothingHere", "Nothing scheduled on this horizon.")}
         </div>
       ) : (
@@ -829,19 +829,19 @@ export function TimelineStrip({
             const stateCls =
               e.state === "overdue"  ? { dot: "bg-rose-400",  text: "text-rose-300/90",  label: t("uix.event.overdue", "Overdue") }
             : e.state === "due_soon" ? { dot: "bg-amber-300", text: "text-amber-200/90", label: t("uix.timeline.dueShort", "≤ 7 d") }
-            : e.state === "settled"  ? { dot: "bg-white/30",  text: "text-gray-400",     label: t("uix.event.settled", "Settled") }
-            :                          { dot: "bg-white/50",  text: "text-gray-300",     label: e.daysFromNow >= 9_000 ? t("uix.event.unscheduled", "Unscheduled") : `${e.daysFromNow}d` };
+            : e.state === "settled"  ? { dot: "bg-white/30",  text: "text-[var(--text-secondary)]",     label: t("uix.event.settled", "Settled") }
+            :                          { dot: "bg-white/50",  text: "text-[var(--text-highlight)]",     label: e.daysFromNow >= 9_000 ? t("uix.event.unscheduled", "Unscheduled") : `${e.daysFromNow}d` };
             return (
-              <li key={e.key} className="flex items-center gap-3 py-2 transition-colors hover:bg-white/[0.02]">
+              <li key={e.key} className="flex items-center gap-3 py-2 transition-colors hover:bg-[var(--bg-secondary)]">
                 <span aria-hidden className={`h-1.5 w-1.5 shrink-0 rounded-full ${stateCls.dot}`} />
                 <span className={`w-14 shrink-0 text-[10px] tabular-nums ${stateCls.text}`}>{stateCls.label}</span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[12px] text-gray-200">{e.party}</span>
-                  {e.reference && <span className="block truncate font-mono text-[9px] text-gray-600">{e.reference}</span>}
+                  <span className="block truncate text-[12px] text-[var(--text-highlight)]">{e.party}</span>
+                  {e.reference && <span className="block truncate font-mono text-[9px] text-[var(--text-ghost)]">{e.reference}</span>}
                 </span>
                 <span className={`shrink-0 text-[12px] font-medium tabular-nums ${direction === "incoming" ? "text-emerald-300/90" : "text-rose-300/90"}`}>
                   {direction === "incoming" ? "+" : "−"}{formatCompact(e.amount)}
-                  <span className="ml-1 text-[9px] text-gray-600">{currency}</span>
+                  <span className="ml-1 text-[9px] text-[var(--text-ghost)]">{currency}</span>
                 </span>
               </li>
             );
@@ -877,19 +877,19 @@ export function ConcentrationBar({
   : severity === "watch" ? "bg-amber-300/65"
   :                        "bg-white/45";
   return (
-    <div className="rounded-2xl border border-white/[0.05] bg-white/[0.018] p-4">
+    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
       <div className="flex items-baseline justify-between">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">{label}</div>
+        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-dim)]">{label}</div>
         <div className={
           "text-[10px] tabular-nums " +
-          (severity === "risk" ? "text-rose-300" : severity === "watch" ? "text-amber-300" : "text-gray-500")
+          (severity === "risk" ? "text-rose-300" : severity === "watch" ? "text-amber-300" : "text-[var(--text-dim)]")
         }>{share.toFixed(0)}%</div>
       </div>
       <div className="mt-2 truncate text-[13px] font-medium text-[var(--text-primary)]">{party}</div>
-      <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/[0.04]">
+      <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
         <div className={`h-full ${fillCls}`} style={{ width: `${Math.max(2, Math.min(100, share))}%` }} />
       </div>
-      {hint && <div className="mt-2 text-[10px] text-gray-500">{hint}</div>}
+      {hint && <div className="mt-2 text-[10px] text-[var(--text-dim)]">{hint}</div>}
     </div>
   );
 }
@@ -909,15 +909,15 @@ export function StatRow({
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
       {stats.map((s, i) => (
-        <div key={i} className="rounded-xl border border-white/[0.04] bg-white/[0.012] p-3">
+        <div key={i} className="rounded-xl border border-[var(--border-faint)] bg-[var(--bg-secondary)] p-3">
           <div className={`text-[16px] font-medium tabular-nums tracking-tight ${TONE_TEXT[s.tone ?? "neutral"]}`}>
             {s.value}
           </div>
-          <div className="mt-0.5 flex items-center gap-1 text-[10px] uppercase tracking-[0.16em] text-gray-500">
+          <div className="mt-0.5 flex items-center gap-1 text-[10px] uppercase tracking-[0.16em] text-[var(--text-dim)]">
             <span>{s.label}</span>
             {s.helpId && <GuidanceTip guidanceId={s.helpId} />}
           </div>
-          {s.hint && <div className="mt-1 text-[10px] text-gray-600">{s.hint}</div>}
+          {s.hint && <div className="mt-1 text-[10px] text-[var(--text-ghost)]">{s.hint}</div>}
         </div>
       ))}
     </div>

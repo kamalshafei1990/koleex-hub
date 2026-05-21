@@ -244,10 +244,10 @@ export default function FinanceTreasuryPlans() {
           <div className="mt-5 space-y-5">
             {groups.map((g) => g.items.length === 0 ? null : (
               <section key={g.key}>
-                <div className="mb-2 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">
+                <div className="mb-2 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-dim)]">
                   <StatusDot status={g.key} />
                   {g.label}
-                  <span className="rounded-full bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-medium text-gray-400">{g.items.length}</span>
+                  <span className="rounded-full bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-secondary)]">{g.items.length}</span>
                 </div>
                 <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
                   {/* Phase S.4 — pass stable togglePlan callback so
@@ -310,30 +310,30 @@ const PlanCard = memo(function PlanCard({ plan, active, onOpen }: { plan: Treasu
     <button
       onClick={() => onOpen(plan.id)}
       className={`flex flex-col gap-3 rounded-2xl border bg-[var(--bg-secondary)] p-4 text-left transition ${
-        active ? "border-white/[0.18] bg-white/[0.03]" : "border-white/[0.06] hover:border-white/[0.12]"
+        active ? "border-[var(--border-strong)] bg-[var(--bg-surface-subtle)]" : "border-[var(--border-subtle)] hover:border-[var(--border-color)]"
       }`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <StatusDot status={plan.status} />
-            <span className="text-[12px] font-bold uppercase tracking-wider text-gray-500">{plan.status.replace("_", " ")}</span>
+            <span className="text-[12px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{plan.status.replace("_", " ")}</span>
           </div>
           <div className="mt-1 truncate text-[14px] font-bold text-[var(--text-primary)]">{plan.name}</div>
           {plan.description && (
-            <div className="mt-0.5 line-clamp-2 text-[11px] text-gray-400">{plan.description}</div>
+            <div className="mt-0.5 line-clamp-2 text-[11px] text-[var(--text-secondary)]">{plan.description}</div>
           )}
         </div>
-        <span className="shrink-0 rounded-full bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-medium text-gray-300">{plan.forecast_window_days}d</span>
+        <span className="shrink-0 rounded-full bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-highlight)]">{plan.forecast_window_days}d</span>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 rounded-lg border border-white/[0.04] bg-[var(--bg-primary)]/40 px-3 py-2.5">
+      <div className="grid grid-cols-3 gap-2 rounded-lg border border-[var(--border-faint)] bg-[var(--bg-primary)]/40 px-3 py-2.5">
         <Stat label={t("treasuryPlans.card.stat.start", "Start")} value={fmtCompactUsd(m.startingCash)} />
         <Stat label="90d"   value={fmtCompactUsd(m.d90)}            tone={m.d90 < 0 ? "rose" : "neutral"} />
         <Stat label={t("treasuryPlans.card.stat.runway", "Runway")} value={m.runwayDays != null ? `${m.runwayDays}d` : "—"} tone={m.runwayDays != null && m.runwayDays <= 14 ? "rose" : m.runwayDays != null && m.runwayDays <= 30 ? "amber" : "neutral"} />
       </div>
 
-      <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-gray-500">
+      <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-[var(--text-dim)]">
         {m.firstNegativeDate && (
           <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 font-semibold text-rose-300">
             <RrIcon name="info" size={9} />
@@ -341,7 +341,7 @@ const PlanCard = memo(function PlanCard({ plan, active, onOpen }: { plan: Treasu
           </span>
         )}
         {plan.confidence != null && (
-          <span className="rounded-full bg-white/[0.04] px-1.5 py-0.5 font-medium text-gray-400">{t("treasuryPlans.card.confidence", "{pct}% confidence").replace("{pct}", String(Math.round(plan.confidence * 100)))}</span>
+          <span className="rounded-full bg-[var(--bg-surface)] px-1.5 py-0.5 font-medium text-[var(--text-secondary)]">{t("treasuryPlans.card.confidence", "{pct}% confidence").replace("{pct}", String(Math.round(plan.confidence * 100)))}</span>
         )}
         <span className="ml-auto">{reviewLabel}</span>
       </div>
@@ -353,7 +353,7 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "ro
   const cls = tone === "rose" ? "text-rose-300" : tone === "amber" ? "text-amber-300" : "text-[var(--text-primary)]";
   return (
     <div>
-      <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-gray-500">{label}</div>
+      <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--text-dim)]">{label}</div>
       <div className={`mt-0.5 text-[13px] font-bold tabular-nums ${cls}`}>{value}</div>
     </div>
   );
@@ -397,13 +397,13 @@ function PlanDetail({
   const canArchive = p.status !== "archived";
 
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-[var(--bg-secondary)] p-5">
+    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">{t("treasuryPlans.detail.title", "Plan detail")}</div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-dim)]">{t("treasuryPlans.detail.title", "Plan detail")}</div>
           <h2 className="mt-1 text-[18px] font-bold tracking-tight">{p.name}</h2>
-          {p.description && <div className="mt-1 max-w-prose text-[12px] text-gray-300">{p.description}</div>}
-          <div className="mt-1 text-[10px] text-gray-500">
+          {p.description && <div className="mt-1 max-w-prose text-[12px] text-[var(--text-highlight)]">{p.description}</div>}
+          <div className="mt-1 text-[10px] text-[var(--text-dim)]">
             {p.status === "approved" && p.approved_at
               ? <>{t("treasuryPlans.detail.approvedOn", "Approved {date}").replace("{date}", new Date(p.approved_at).toLocaleDateString())} · </>
               : null}
@@ -428,7 +428,7 @@ function PlanDetail({
             <button
               onClick={onRequestChanges}
               disabled={actionBusy}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-gray-300 hover:border-amber-500/30 hover:text-amber-300 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-[var(--text-highlight)] hover:border-amber-500/30 hover:text-amber-300 disabled:opacity-50"
             >
               <RrIcon name="pencil" size={11} />
               {t("treasuryPlans.detail.requestChanges", "Request changes")}
@@ -438,7 +438,7 @@ function PlanDetail({
             <button
               onClick={onArchive}
               disabled={actionBusy}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-gray-300 hover:border-rose-500/30 hover:text-rose-300 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-[var(--text-highlight)] hover:border-rose-500/30 hover:text-rose-300 disabled:opacity-50"
             >
               <RrIcon name="trash" size={11} />
               {t("treasuryPlans.detail.archive", "Archive")}
@@ -446,7 +446,7 @@ function PlanDetail({
           )}
           <button
             onClick={onClose}
-            className="inline-flex items-center gap-1 rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-2.5 py-2 text-xs text-gray-300 hover:border-white/[0.18]"
+            className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2.5 py-2 text-xs text-[var(--text-highlight)] hover:border-[var(--border-strong)]"
           >
             <RrIcon name="cross" size={11} />
           </button>
@@ -481,7 +481,7 @@ function PlanDetail({
             <button
               onClick={onCompareCurrent}
               disabled={compareBusy}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-gray-300 hover:border-white/[0.18] disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-[var(--text-highlight)] hover:border-[var(--border-strong)] disabled:opacity-50"
             >
               {compareBusy ? <RrIcon name="loading" size={11} className="animate-spin" /> : <RrIcon name="recycle" size={11} />}
               {t("treasuryPlans.compare.recompare", "Re-compare")}
@@ -489,7 +489,7 @@ function PlanDetail({
           }
         >
           {!comparison ? (
-            <div className="py-2 text-[11px] text-gray-500">{t("treasuryPlans.compare.notRun", "Comparison not run yet. Click \"Re-compare\" to evaluate this plan against today's treasury state.")}</div>
+            <div className="py-2 text-[11px] text-[var(--text-dim)]">{t("treasuryPlans.compare.notRun", "Comparison not run yet. Click \"Re-compare\" to evaluate this plan against today's treasury state.")}</div>
           ) : (
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-5 text-[11px]">
               <Diff label="d7"  value={comparison.diff.d7Delta}  />
@@ -505,7 +505,7 @@ function PlanDetail({
                 </div>
               )}
               {comparison.diff.runwayDelta != null && (
-                <div className="col-span-full text-[11px] text-gray-400">
+                <div className="col-span-full text-[11px] text-[var(--text-secondary)]">
                   {t("treasuryPlans.compare.runwayDelta", "Runway: {sign}{n} days vs the plan.")
                     .replace("{sign}", comparison.diff.runwayDelta > 0 ? "+" : "")
                     .replace("{n}", String(comparison.diff.runwayDelta))}
@@ -520,16 +520,16 @@ function PlanDetail({
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <SectionCard title={t("treasuryPlans.assumptions.title", "Applied assumptions")} subtitle={t("treasuryPlans.assumptions.subtitle", "What was locked into this plan.")}>
           {assumptions.length === 0 ? (
-            <div className="py-2 text-[11px] text-gray-500">{t("treasuryPlans.assumptions.empty", "Base case — no scenario assumptions applied.")}</div>
+            <div className="py-2 text-[11px] text-[var(--text-dim)]">{t("treasuryPlans.assumptions.empty", "Base case — no scenario assumptions applied.")}</div>
           ) : (
             <ul className="space-y-1.5">
               {assumptions.map((a) => (
-                <li key={a.key} className="flex items-center justify-between gap-2 rounded-lg border border-white/[0.05] bg-[var(--bg-primary)]/40 px-3 py-2 text-[11px]">
+                <li key={a.key} className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]/40 px-3 py-2 text-[11px]">
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[12px] font-semibold text-[var(--text-primary)]">{a.label}</span>
-                    <span className="block text-[10px] text-gray-500">{t("forecast.assumptions.affected", "Affected events: {n}").replace("{n}", String(a.affectedEventCount))}</span>
+                    <span className="block text-[10px] text-[var(--text-dim)]">{t("forecast.assumptions.affected", "Affected events: {n}").replace("{n}", String(a.affectedEventCount))}</span>
                   </span>
-                  <span className="shrink-0 text-[11px] font-semibold tabular-nums text-gray-300">{fmtCompactUsd(a.cashImpact)}</span>
+                  <span className="shrink-0 text-[11px] font-semibold tabular-nums text-[var(--text-highlight)]">{fmtCompactUsd(a.cashImpact)}</span>
                 </li>
               ))}
             </ul>
@@ -556,7 +556,7 @@ function PlanDetail({
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <SectionCard title={t("treasuryPlans.reviews.title", "Review history")} subtitle={t("treasuryPlans.reviews.subtitle", "Every approve / request-changes / archive decision.")}>
           {detail.reviews.length === 0 ? (
-            <div className="py-2 text-[11px] text-gray-500">{t("treasuryPlans.reviews.empty", "No reviews yet.")}</div>
+            <div className="py-2 text-[11px] text-[var(--text-dim)]">{t("treasuryPlans.reviews.empty", "No reviews yet.")}</div>
           ) : (
             <ul className="divide-y divide-white/[0.04]">
               {detail.reviews.map((rev) => (
@@ -569,9 +569,9 @@ function PlanDetail({
                     }`}>
                       {rev.decision.replace("_", " ")}
                     </span>
-                    <span className="text-gray-500">{new Date(rev.created_at).toLocaleString()}</span>
+                    <span className="text-[var(--text-dim)]">{new Date(rev.created_at).toLocaleString()}</span>
                   </div>
-                  {rev.notes && <div className="mt-1 truncate text-[11px] text-gray-300">{rev.notes}</div>}
+                  {rev.notes && <div className="mt-1 truncate text-[11px] text-[var(--text-highlight)]">{rev.notes}</div>}
                 </li>
               ))}
             </ul>
@@ -580,7 +580,7 @@ function PlanDetail({
 
         <SectionCard title={t("treasuryPlans.versions.title", "Version history")} subtitle={t("treasuryPlans.versions.subtitle", "Assumption + metric changes captured automatically.")}>
           {detail.versions.length === 0 ? (
-            <div className="py-2 text-[11px] text-gray-500">{t("treasuryPlans.versions.empty", "No edits since the plan was first saved.")}</div>
+            <div className="py-2 text-[11px] text-[var(--text-dim)]">{t("treasuryPlans.versions.empty", "No edits since the plan was first saved.")}</div>
           ) : (
             <ul className="divide-y divide-white/[0.04]">
               {detail.versions.map((v) => {
@@ -588,10 +588,10 @@ function PlanDetail({
                 return (
                   <li key={v.id} className="py-2.5 text-[11px]">
                     <div className="flex items-center gap-2">
-                      <span className="text-gray-500">{new Date(v.changed_at).toLocaleString()}</span>
+                      <span className="text-[var(--text-dim)]">{new Date(v.changed_at).toLocaleString()}</span>
                     </div>
                     {d.d90Delta != null && (
-                      <div className="mt-1 text-gray-400">{t("treasuryPlans.versions.deltaLine", "d90 Δ {value} USD · Runway Δ {runway}d")
+                      <div className="mt-1 text-[var(--text-secondary)]">{t("treasuryPlans.versions.deltaLine", "d90 Δ {value} USD · Runway Δ {runway}d")
                         .replace("{value}", fmtCompactUsd(d.d90Delta as number))
                         .replace("{runway}", String(d.runwayDelta ?? "—"))}</div>
                     )}
@@ -608,10 +608,10 @@ function PlanDetail({
 
 function Diff({ label, value }: { label: string; value: number }) {
   const sign = value > 0 ? "+" : "";
-  const tone = Math.abs(value) < 1 ? "text-gray-400" : value < 0 ? "text-rose-300" : "text-emerald-300";
+  const tone = Math.abs(value) < 1 ? "text-[var(--text-secondary)]" : value < 0 ? "text-rose-300" : "text-emerald-300";
   return (
-    <div className="rounded-lg border border-white/[0.05] bg-[var(--bg-primary)]/40 px-2.5 py-2">
-      <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-gray-500">{label}</div>
+    <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]/40 px-2.5 py-2">
+      <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--text-dim)]">{label}</div>
       <div className={`mt-0.5 text-[13px] font-bold tabular-nums ${tone}`}>{sign}{fmtCompactUsd(value)}</div>
     </div>
   );
@@ -628,15 +628,15 @@ function DriverList({
   const accent = tone === "positive" ? "text-emerald-300" : "text-rose-300";
   return (
     <div>
-      <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-500">{title}</div>
+      <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--text-dim)]">{title}</div>
       {items.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-white/[0.05] px-3 py-3 text-[11px] text-gray-500">{t("forecast.drivers.noItems", "No material items.")}</div>
+        <div className="rounded-lg border border-dashed border-[var(--border-subtle)] px-3 py-3 text-[11px] text-[var(--text-dim)]">{t("forecast.drivers.noItems", "No material items.")}</div>
       ) : (
         <ul className="space-y-1">
           {items.map((it, i) => (
-            <li key={it.key ?? i} className="flex items-center gap-2 rounded-lg border border-white/[0.05] bg-[var(--bg-primary)]/40 px-2.5 py-1.5 text-[11px]">
-              <span className="text-gray-500 tabular-nums w-10">d+{it.daysFromNow ?? "—"}</span>
-              <span className="min-w-0 flex-1 truncate text-gray-300">{it.party ?? "—"}</span>
+            <li key={it.key ?? i} className="flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]/40 px-2.5 py-1.5 text-[11px]">
+              <span className="text-[var(--text-dim)] tabular-nums w-10">d+{it.daysFromNow ?? "—"}</span>
+              <span className="min-w-0 flex-1 truncate text-[var(--text-highlight)]">{it.party ?? "—"}</span>
               <span className={`tabular-nums font-semibold ${accent}`}>{fmtCompactUsd(it.amountReporting)}</span>
             </li>
           ))}

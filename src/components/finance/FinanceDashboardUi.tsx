@@ -32,8 +32,8 @@ export const TYPE = {
   display:  "text-[40px] font-medium leading-[1.05] tracking-[-0.02em] tabular-nums",
   headline: "text-[22px] font-medium leading-[1.15] tracking-[-0.01em] tabular-nums",
   body:     "text-[13px] font-normal leading-[1.45]",
-  caption:  "text-[11px] font-normal leading-[1.45] text-gray-500",
-  eyebrow:  "text-[10px] font-semibold leading-none uppercase tracking-[0.18em] text-gray-500",
+  caption:  "text-[11px] font-normal leading-[1.45] text-[var(--text-dim)]",
+  eyebrow:  "text-[10px] font-semibold leading-none uppercase tracking-[0.18em] text-[var(--text-dim)]",
 } as const;
 
 /* ─── Tonal accent map ─────────────────────────────────────────────
@@ -68,7 +68,7 @@ export function Eyebrow({ children }: { children: ReactNode }) {
    sections. No background tint, no padding — pure horizontal rule
    at very low opacity. */
 export function Hairline({ className = "" }: { className?: string }) {
-  return <div className={`h-px w-full bg-white/[0.05] ${className}`} aria-hidden />;
+  return <div className={`h-px w-full bg-[var(--bg-surface)] ${className}`} aria-hidden />;
 }
 
 /* ─── DashboardSection ────────────────────────────────────────────
@@ -106,7 +106,7 @@ export function DashboardSection({
             {helpId && <GuidanceTip guidanceId={helpId} />}
           </div>
           {title && <h2 className="mt-1 text-[15px] font-medium tracking-tight text-[var(--text-primary)]">{title}</h2>}
-          {description && <p className="mt-1 max-w-prose text-[12px] text-gray-500">{description}</p>}
+          {description && <p className="mt-1 max-w-prose text-[12px] text-[var(--text-dim)]">{description}</p>}
         </div>
         {action}
       </div>
@@ -145,9 +145,9 @@ export function DisplayKpi({
         {helpId && <GuidanceTip guidanceId={helpId} />}
       </div>
       <div className={`mt-2 ${TYPE.display} ${TONE_TEXT[tone]}`}>
-        {loading ? <span className="text-gray-700">—</span> : value}
+        {loading ? <span className="text-[var(--text-whisper)]">—</span> : value}
       </div>
-      {hint && <div className="mt-1 text-[11px] text-gray-500">{hint}</div>}
+      {hint && <div className="mt-1 text-[11px] text-[var(--text-dim)]">{hint}</div>}
     </div>
   );
 }
@@ -181,11 +181,11 @@ export function OperationalKpi({
 }) {
   const delta = deltaPct ?? null;
   const deltaSign = delta == null ? null : delta > 0 ? "▲" : delta < 0 ? "▼" : "·";
-  const deltaCls = delta == null ? "text-gray-500"
+  const deltaCls = delta == null ? "text-[var(--text-dim)]"
     : tone === "warning" ? "text-amber-300/80"
     : (tone === "positive" && delta >= 0) || (tone === "negative" && delta < 0) ? "text-emerald-300/80"
     : (tone === "positive" && delta < 0) || (tone === "negative" && delta >= 0) ? "text-rose-300/80"
-    : "text-gray-400";
+    : "text-[var(--text-secondary)]";
   const body = (
     <>
       <div className="flex items-center gap-1.5">
@@ -193,7 +193,7 @@ export function OperationalKpi({
         {helpId && <GuidanceTip guidanceId={helpId} />}
       </div>
       <div className={`mt-1.5 ${TYPE.headline} ${TONE_TEXT[tone]}`}>
-        {loading ? <span className="text-gray-700">—</span> : value}
+        {loading ? <span className="text-[var(--text-whisper)]">—</span> : value}
       </div>
       <div className="mt-1 flex items-center gap-2">
         {delta != null && (
@@ -202,7 +202,7 @@ export function OperationalKpi({
             {Math.abs(delta).toFixed(1)}%
           </span>
         )}
-        {hint && <span className="text-[10px] text-gray-500">{hint}</span>}
+        {hint && <span className="text-[10px] text-[var(--text-dim)]">{hint}</span>}
       </div>
     </>
   );
@@ -237,7 +237,7 @@ export function IntelligenceLine({
   return (
     <div className="flex items-baseline gap-2.5">
       <span aria-hidden className={`mt-1.5 h-1 w-1 shrink-0 rounded-full ${dotCls}`} />
-      <div className="flex-1 text-[12.5px] leading-[1.55] text-gray-300">
+      <div className="flex-1 text-[12.5px] leading-[1.55] text-[var(--text-highlight)]">
         {prefix && <span className="font-medium text-[var(--text-primary)]">{prefix} </span>}
         {text}
       </div>
@@ -279,9 +279,9 @@ export function HealthRail({
           </div>
           <div className="mt-2 flex items-baseline gap-3">
             <div className={`${TYPE.display} ${TONE_TEXT[compositeTone]}`}>{composite}</div>
-            <div className="text-[11px] uppercase tracking-[0.18em] text-gray-500">{pressureLabel}</div>
+            <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-dim)]">{pressureLabel}</div>
           </div>
-          <p className="mt-2 text-[12.5px] leading-[1.55] text-gray-400">{headline}</p>
+          <p className="mt-2 text-[12.5px] leading-[1.55] text-[var(--text-secondary)]">{headline}</p>
         </div>
         {/* Right: per-module thin bars */}
         <div className="grid w-full max-w-[560px] grid-cols-5 gap-x-3 gap-y-1.5">
@@ -294,11 +294,11 @@ export function HealthRail({
             const pct = Math.max(4, Math.min(100, m.score));
             return (
               <div key={m.key} className="flex flex-col gap-1.5">
-                <div className="text-[10px] uppercase tracking-[0.10em] text-gray-500">{m.label}</div>
-                <div className="relative h-[3px] w-full overflow-hidden rounded-full bg-white/[0.05]">
+                <div className="text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">{m.label}</div>
+                <div className="relative h-[3px] w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
                   <div className={`absolute inset-y-0 left-0 ${fillCls}`} style={{ width: `${pct}%` }} />
                 </div>
-                <div className="text-[10px] tabular-nums text-gray-400">{m.score}</div>
+                <div className="text-[10px] tabular-nums text-[var(--text-secondary)]">{m.score}</div>
               </div>
             );
           })}
@@ -347,12 +347,12 @@ export function OperationsDigest({
                 <Eyebrow>{p.label}</Eyebrow>
               </div>
               <div className={`mt-1.5 ${TYPE.headline} ${TONE_TEXT[tone]}`}>{p.score}</div>
-              {p.hint && <div className="mt-1 text-[10px] text-gray-500">{p.hint}</div>}
+              {p.hint && <div className="mt-1 text-[10px] text-[var(--text-dim)]">{p.hint}</div>}
             </div>
           );
         })}
       </div>
-      {note && <p className="mt-5 max-w-[680px] text-[12.5px] leading-[1.55] text-gray-400">{note}</p>}
+      {note && <p className="mt-5 max-w-[680px] text-[12.5px] leading-[1.55] text-[var(--text-secondary)]">{note}</p>}
     </div>
   );
 }
@@ -370,7 +370,7 @@ export function CalmTag({
     : tone === "warning" ? "bg-amber-300"
     : "bg-gray-500";
   return (
-    <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-gray-400">
+    <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--text-secondary)]">
       <span aria-hidden className={`h-1 w-1 rounded-full ${dot}`} />
       {text}
     </span>

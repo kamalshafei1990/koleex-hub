@@ -208,10 +208,10 @@ export default function FinanceBankAccounts() {
             {groups.map(([ccy, list]) => (
               <div key={ccy}>
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <span className="inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">
+                  <span className="inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-dim)]">
                     <RrIcon name="bank" size={11} />
                     {t("bankAccounts.group.accounts", "{ccy} accounts").replace("{ccy}", ccy)}
-                    <span className="rounded-full bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-medium text-gray-400">{list.length}</span>
+                    <span className="rounded-full bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-secondary)]">{list.length}</span>
                   </span>
                 </div>
                 <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
@@ -308,7 +308,7 @@ function AccountCard({
   return (
     <div
       className={`relative flex flex-col gap-3 rounded-2xl border bg-[var(--bg-secondary)] p-4 transition ${
-        active ? "border-white/[0.18] bg-white/[0.03]" : "border-white/[0.06] hover:border-white/[0.12]"
+        active ? "border-[var(--border-strong)] bg-[var(--bg-surface-subtle)]" : "border-[var(--border-subtle)] hover:border-[var(--border-color)]"
       } ${inactive ? "opacity-70" : ""}`}
     >
       {/* Header row */}
@@ -323,18 +323,18 @@ function AccountCard({
               <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-300">{t("bankAccounts.badge.frozen", "Frozen")}</span>
             )}
             {(status === "archived" || status === "closed") && (
-              <span className="rounded-full bg-gray-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-gray-300">{status}</span>
+              <span className="rounded-full bg-gray-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--text-highlight)]">{status}</span>
             )}
           </div>
-          <div className="mt-0.5 truncate text-[12px] text-gray-300">{account.account_name}</div>
-          <div className="mt-0.5 inline-flex items-center gap-2 text-[10px] text-gray-500">
+          <div className="mt-0.5 truncate text-[12px] text-[var(--text-highlight)]">{account.account_name}</div>
+          <div className="mt-0.5 inline-flex items-center gap-2 text-[10px] text-[var(--text-dim)]">
             <span className="font-mono">{maskAccountNumber(account.account_number)}</span>
             {account.country && <span>· {account.country}</span>}
           </div>
         </div>
         <button
           onClick={onOpen}
-          className="inline-flex shrink-0 items-center gap-1 rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1 text-[10px] font-medium text-gray-300 hover:border-white/[0.18]"
+          className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1 text-[10px] font-medium text-[var(--text-highlight)] hover:border-[var(--border-strong)]"
         >
           {active ? t("bankAccounts.action.close", "Close") : t("bankAccounts.action.open", "Open")}
           <RrIcon name={active ? "cross" : "arrow-up-right"} size={9} />
@@ -342,7 +342,7 @@ function AccountCard({
       </div>
 
       {/* Balance grid */}
-      <div className="grid grid-cols-3 gap-2 rounded-lg border border-white/[0.04] bg-[var(--bg-primary)]/40 px-3 py-2.5">
+      <div className="grid grid-cols-3 gap-2 rounded-lg border border-[var(--border-faint)] bg-[var(--bg-primary)]/40 px-3 py-2.5">
         <BalanceCell label={t("bankAccounts.balance.available", "Available")} value={account.available_balance} ccy={account.currency} tone={lowCash ? "warning" : "neutral"} />
         <BalanceCell label={t("bankAccounts.balance.pending", "Pending")}   value={account.pending_balance}   ccy={account.currency} tone="neutral" />
         <BalanceCell label={t("bankAccounts.balance.restricted", "Restricted")} value={account.restricted_balance} ccy={account.currency} tone="neutral" />
@@ -363,17 +363,17 @@ function AccountCard({
           </span>
         )}
         {dsReconciled != null && (
-          <span className="text-gray-500">
+          <span className="text-[var(--text-dim)]">
             {t("bankAccounts.reconciledAgo", "Reconciled {ago}").replace("{ago}", dsReconciled === 0 ? t("bankAccounts.today", "today") : t("bankAccounts.daysAgo", "{n}d ago").replace("{n}", String(dsReconciled)))}
           </span>
         )}
         {dsImport != null && (
-          <span className="text-gray-500">
+          <span className="text-[var(--text-dim)]">
             · {t("bankAccounts.importedAgo", "Imported {ago}").replace("{ago}", dsImport === 0 ? t("bankAccounts.today", "today") : t("bankAccounts.daysAgo", "{n}d ago").replace("{n}", String(dsImport)))}
           </span>
         )}
         {dsImport == null && (
-          <span className="text-gray-500">· {t("bankAccounts.noImport", "No import yet")}</span>
+          <span className="text-[var(--text-dim)]">· {t("bankAccounts.noImport", "No import yet")}</span>
         )}
       </div>
 
@@ -381,21 +381,21 @@ function AccountCard({
       <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
         <Link
           href={`/finance/bank-imports?account=${account.id}`}
-          className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1 font-medium text-gray-300 hover:border-white/[0.18]"
+          className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1 font-medium text-[var(--text-highlight)] hover:border-[var(--border-strong)]"
         >
           <RrIcon name="upload" size={9} />
           {t("bankAccounts.action.import", "Import statement")}
         </Link>
         <button
           onClick={onAddMovement}
-          className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1 font-medium text-gray-300 hover:border-white/[0.18]"
+          className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1 font-medium text-[var(--text-highlight)] hover:border-[var(--border-strong)]"
         >
           <RrIcon name="plus" size={9} />
           {t("bankAccounts.action.manual", "Manual movement")}
         </button>
         <button
           onClick={onEdit}
-          className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1 font-medium text-gray-300 hover:border-white/[0.18]"
+          className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1 font-medium text-[var(--text-highlight)] hover:border-[var(--border-strong)]"
         >
           <RrIcon name="pencil" size={9} />
           {t("bankAccounts.action.edit", "Edit")}
@@ -403,7 +403,7 @@ function AccountCard({
         {!account.is_primary && status === "active" && (
           <button
             onClick={onSetPrimary}
-            className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1 font-medium text-gray-300 hover:border-emerald-500/30 hover:text-emerald-300"
+            className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1 font-medium text-[var(--text-highlight)] hover:border-emerald-500/30 hover:text-emerald-300"
           >
             <RrIcon name="check" size={9} />
             {t("bankAccounts.action.makePrimary", "Make primary")}
@@ -412,7 +412,7 @@ function AccountCard({
         {status === "active" && (
           <button
             onClick={onArchive}
-            className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1 font-medium text-gray-300 hover:border-rose-500/30 hover:text-rose-300"
+            className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1 font-medium text-[var(--text-highlight)] hover:border-rose-500/30 hover:text-rose-300"
           >
             <RrIcon name="trash" size={9} />
             {t("bankAccounts.action.archive", "Archive")}
@@ -427,7 +427,7 @@ function BalanceCell({ label, value, ccy, tone }: { label: string; value: number
   const cls = tone === "warning" ? "text-amber-300" : "text-[var(--text-primary)]";
   return (
     <div className="min-w-0">
-      <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-gray-500">{label}</div>
+      <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--text-dim)]">{label}</div>
       <div className={`mt-0.5 truncate text-[14px] font-bold tabular-nums ${cls}`}>{fmtMoney(value, ccy, { compact: true })}</div>
     </div>
   );
@@ -452,12 +452,12 @@ function AccountDetail({
   const idleCash = a.available_balance > 250_000 && counters.unreconciled_count === 0;
 
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-[var(--bg-secondary)] p-5">
+    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">{t("bankAccounts.detail.eyebrow", "Account detail")}</div>
-          <h2 className="mt-1 text-[18px] font-bold tracking-tight">{a.bank_name} · <span className="font-medium text-gray-300">{a.account_name}</span></h2>
-          <div className="mt-1 text-[11px] text-gray-500">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-dim)]">{t("bankAccounts.detail.eyebrow", "Account detail")}</div>
+          <h2 className="mt-1 text-[18px] font-bold tracking-tight">{a.bank_name} · <span className="font-medium text-[var(--text-highlight)]">{a.account_name}</span></h2>
+          <div className="mt-1 text-[11px] text-[var(--text-dim)]">
             <span className="font-mono">{maskAccountNumber(a.account_number)}</span>
             {a.iban && <span> · IBAN {maskAccountNumber(a.iban)}</span>}
             {a.swift_code && <span> · SWIFT {a.swift_code}</span>}
@@ -475,21 +475,21 @@ function AccountDetail({
           </Link>
           <button
             onClick={onAddMovement}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-gray-300 hover:border-white/[0.18]"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-[var(--text-highlight)] hover:border-[var(--border-strong)]"
           >
             <RrIcon name="plus" size={11} />
             {t("bankAccounts.action.manual", "Manual movement")}
           </button>
           <button
             onClick={onEdit}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-gray-300 hover:border-white/[0.18]"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-[var(--text-highlight)] hover:border-[var(--border-strong)]"
           >
             <RrIcon name="pencil" size={11} />
             {t("bankAccounts.action.edit", "Edit")}
           </button>
           <button
             onClick={onClose}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-2.5 py-2 text-xs text-gray-300 hover:border-rose-500/30 hover:text-rose-300"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2.5 py-2 text-xs text-[var(--text-highlight)] hover:border-rose-500/30 hover:text-rose-300"
             aria-label={t("bankAccounts.detail.closeAria", "Close detail")}
           >
             <RrIcon name="cross" size={11} />
@@ -506,7 +506,7 @@ function AccountDetail({
       </div>
 
       {/* Risk + activity strip */}
-      <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-white/[0.05] bg-[var(--bg-primary)]/40 px-3 py-2 text-[11px]">
+      <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]/40 px-3 py-2 text-[11px]">
         {lowCash && (
           <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-rose-300">
             <RrIcon name="info" size={9} /> {t("bankAccounts.risk.lowCash", "Low available cash")}
@@ -527,7 +527,7 @@ function AccountDetail({
             <RrIcon name="coins" size={9} /> {t("bankAccounts.risk.fx", "FX exposure ({ccy})").replace("{ccy}", a.currency)}
           </span>
         )}
-        <span className="ml-auto text-gray-500">
+        <span className="ml-auto text-[var(--text-dim)]">
           {a.last_reconciled_at
             ? <>{t("bankAccounts.activity.lastReconciled", "Last reconciled {date}").replace("{date}", new Date(a.last_reconciled_at).toLocaleDateString())} · </>
             : <>{t("bankAccounts.activity.neverReconciled", "Never reconciled")} · </>}
@@ -564,13 +564,13 @@ function AccountDetail({
               <ReconStat label={t("bankAccounts.recon.verified", "Verified")}       value={reconciliation.verified}       tone="emerald" />
               <ReconStat label={t("bankAccounts.recon.disputed", "Disputed")}       value={reconciliation.disputed}       tone="rose" />
             </div>
-            <div className="mt-3 flex items-center justify-between rounded-lg border border-white/[0.05] bg-[var(--bg-primary)]/40 px-3 py-2 text-[11px]">
-              <span className="text-gray-400">{t("bankAccounts.recon.pending", "Pending candidates")}</span>
+            <div className="mt-3 flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]/40 px-3 py-2 text-[11px]">
+              <span className="text-[var(--text-secondary)]">{t("bankAccounts.recon.pending", "Pending candidates")}</span>
               <span className="font-semibold tabular-nums text-[var(--text-primary)]">{reconciliation.pending_candidates}</span>
             </div>
             <Link
               href="/finance/reconciliation"
-              className="mt-2 inline-flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-200"
+              className="mt-2 inline-flex items-center gap-1 text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-highlight)]"
             >
               {t("bankAccounts.recon.openQueue", "Open reconciliation queue")}
               <RrIcon name="arrow-up-right-from-square" size={9} />
@@ -597,8 +597,8 @@ function AccountDetail({
 function ReconStat({ label, value, tone }: { label: string; value: number; tone: "emerald" | "amber" | "rose" }) {
   const cls = tone === "emerald" ? "text-emerald-300" : tone === "amber" ? "text-amber-300" : "text-rose-300";
   return (
-    <div className="rounded-lg border border-white/[0.05] bg-[var(--bg-primary)]/40 px-2.5 py-2">
-      <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-gray-500">{label}</div>
+    <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]/40 px-2.5 py-2">
+      <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--text-dim)]">{label}</div>
       <div className={`mt-0.5 text-[13px] font-bold tabular-nums ${cls}`}>{value}</div>
     </div>
   );
@@ -612,22 +612,22 @@ function MovementRow({ movement, accountCurrency }: { movement: CashMovement; ac
   const sign = movement.direction === "inflow" ? "+" : "−";
   return (
     <li className="flex items-start gap-3 py-2.5">
-      <span className="mt-0.5 text-[10px] uppercase tracking-wider text-gray-500 tabular-nums">{movement.movement_date}</span>
+      <span className="mt-0.5 text-[10px] uppercase tracking-wider text-[var(--text-dim)] tabular-nums">{movement.movement_date}</span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className={`text-[11px] font-semibold uppercase ${dirTone}`}>{dirLabel}</span>
           <span className="text-[12px] font-bold tabular-nums">{sign}{fmtMoney(movement.amount, ccy, { compact: true })}</span>
-          <span className="rounded bg-white/[0.04] px-1.5 py-0.5 text-[10px] text-gray-300">{movement.movement_type}</span>
-          {movement.bank_reference && <span className="rounded bg-white/[0.04] px-1.5 py-0.5 text-[10px] text-gray-300">{movement.bank_reference}</span>}
+          <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] text-[var(--text-highlight)]">{movement.movement_type}</span>
+          {movement.bank_reference && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] text-[var(--text-highlight)]">{movement.bank_reference}</span>}
           <span className="ml-auto inline-flex items-center gap-1">
             <ReconciliationBadge status={movement.reconciliation_status as ReconciliationStatus} compact />
           </span>
         </div>
         {movement.counterparty_name && (
-          <div className="mt-0.5 truncate text-[11px] text-gray-400">{movement.counterparty_name}</div>
+          <div className="mt-0.5 truncate text-[11px] text-[var(--text-secondary)]">{movement.counterparty_name}</div>
         )}
         {movement.notes && (
-          <div className="mt-0.5 truncate text-[10.5px] text-gray-500">{movement.notes}</div>
+          <div className="mt-0.5 truncate text-[10.5px] text-[var(--text-dim)]">{movement.notes}</div>
         )}
       </div>
     </li>
@@ -638,7 +638,7 @@ function ImportRow({ imp }: { imp: BankStatementImport }) {
   const { t } = useTranslation(financeT);
   return (
     <li className="flex items-start gap-2 py-2">
-      <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-white/[0.04]">
+      <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[var(--bg-surface)]">
         <RrIcon name="upload" size={9} />
       </span>
       <div className="min-w-0 flex-1">
@@ -646,7 +646,7 @@ function ImportRow({ imp }: { imp: BankStatementImport }) {
           <span className="truncate text-[11.5px] font-semibold text-[var(--text-primary)]">{imp.file_name}</span>
           <ImportStatusChip status={imp.status} />
         </div>
-        <div className="mt-0.5 text-[10px] text-gray-500">
+        <div className="mt-0.5 text-[10px] text-[var(--text-dim)]">
           {new Date(imp.uploaded_at).toLocaleDateString()} · {t("bankAccounts.imports.rows", "{n} rows").replace("{n}", String(imp.row_count))}
           {imp.duplicate_count > 0 && <> · {t("bankAccounts.imports.dups", "{n} duplicates").replace("{n}", String(imp.duplicate_count))}</>}
           {imp.error_count > 0 && <> · {t("bankAccounts.imports.errors", "{n} errors").replace("{n}", String(imp.error_count))}</>}
@@ -663,8 +663,8 @@ function ImportStatusChip({ status }: { status: BankStatementImport["status"] })
     status === "confirmed" ? "bg-emerald-500/15 text-emerald-300" :
     status === "parsed"    ? "bg-amber-500/15 text-amber-300" :
     status === "failed"    ? "bg-rose-500/15 text-rose-300" :
-    status === "cancelled" ? "bg-gray-500/15 text-gray-300" :
-                              "bg-gray-500/15 text-gray-300";
+    status === "cancelled" ? "bg-gray-500/15 text-[var(--text-highlight)]" :
+                              "bg-gray-500/15 text-[var(--text-highlight)]";
   const label =
     status === "confirmed" ? t("bankImports.impStatus.confirmed", "Confirmed") :
     status === "parsed"    ? t("bankImports.impStatus.parsed", "Parsed") :

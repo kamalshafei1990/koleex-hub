@@ -228,7 +228,7 @@ export default function FinanceOrders() {
 
         <div className="mt-6">
           {loading ? (
-            <SectionCard><div className="py-8 text-center text-sm text-gray-500">{t("orders.loading", "Loading orders…")}</div></SectionCard>
+            <SectionCard><div className="py-8 text-center text-sm text-[var(--text-dim)]">{t("orders.loading", "Loading orders…")}</div></SectionCard>
           ) : orders.length === 0 ? (
             <EmptyState
               title={t("orders.emptyTitle", "No orders yet")}
@@ -314,12 +314,12 @@ function OrderRowCard({ order, onEdit, onDelete }: { order: FinanceOrder; onEdit
   const collectionPct = sellingPrice > 0 ? Math.min(100, (collected / sellingPrice) * 100) : 0;
 
   return (
-    <div className="group overflow-hidden rounded-2xl border border-white/[0.05] bg-[var(--bg-secondary)] transition-colors hover:border-white/[0.10]">
+    <div className="group overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] transition-colors hover:border-[var(--border-color)]">
       {/* ── HEADER STRIP ─────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/[0.04] px-5 py-4">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border-faint)] px-5 py-4">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-[12px] font-medium tracking-tight text-gray-300">{order.order_no}</span>
+            <span className="font-mono text-[12px] font-medium tracking-tight text-[var(--text-highlight)]">{order.order_no}</span>
             <StatusBadge status={order.status} />
             <StatusBadge status={order.payment_status} />
             <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${riskChip}`}>
@@ -327,7 +327,7 @@ function OrderRowCard({ order, onEdit, onDelete }: { order: FinanceOrder; onEdit
             </span>
           </div>
           <div className="mt-2 truncate text-[15px] font-medium">{order.customer_name || "—"}</div>
-          <p className="mt-1 text-[11px] text-gray-500">
+          <p className="mt-1 text-[11px] text-[var(--text-dim)]">
             {order.order_date}
             {order.payment_due_date && <span>{`  ·  ${t("orders.due.prefix", "Due")} ${order.payment_due_date}`}</span>}
           </p>
@@ -335,7 +335,7 @@ function OrderRowCard({ order, onEdit, onDelete }: { order: FinanceOrder; onEdit
         {/* Headline net profit + progress ring + actions */}
         <div className="flex items-center gap-4">
           <div className="text-right">
-            <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500">{t("orders.netProfit.label", "Net profit")}</div>
+            <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-dim)]">{t("orders.netProfit.label", "Net profit")}</div>
             <div className={`text-[22px] font-medium leading-none tabular-nums ${netProfit >= 0 ? "text-[var(--text-primary)]" : "text-rose-300"}`}>
               {fmtMoney(netProfit, ccy, { compact: true })}
             </div>
@@ -345,8 +345,8 @@ function OrderRowCard({ order, onEdit, onDelete }: { order: FinanceOrder; onEdit
           </div>
           <ProgressRing pct={collectionPct} label={`${collectionPct.toFixed(0)}%`} sub={t("orders.collected.label", "collected")} />
           <div className="flex items-center gap-2">
-            <button type="button" onClick={onEdit} className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-gray-300 transition hover:border-white/[0.12]">{t("common.edit", "Edit")}</button>
-            <button type="button" onClick={onDelete} className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-rose-400 transition hover:border-rose-500/40">{t("common.delete", "Delete")}</button>
+            <button type="button" onClick={onEdit} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-[var(--text-highlight)] transition hover:border-[var(--border-color)]">{t("common.edit", "Edit")}</button>
+            <button type="button" onClick={onDelete} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-rose-400 transition hover:border-rose-500/40">{t("common.delete", "Delete")}</button>
           </div>
         </div>
       </div>
@@ -380,8 +380,8 @@ function OrderRowCard({ order, onEdit, onDelete }: { order: FinanceOrder; onEdit
           <div className="mt-1.5">
             <ProgressBar value={collected} max={sellingPrice} color={collected >= sellingPrice ? "emerald" : "amber"} />
           </div>
-          <div className="mt-3 flex items-center justify-between rounded-lg border border-white/[0.04] bg-white/[0.015] px-3 py-2">
-            <span className="text-[11px] text-gray-400">{t("orders.risk.level", "Risk level")}</span>
+          <div className="mt-3 flex items-center justify-between rounded-lg border border-[var(--border-faint)] bg-[var(--bg-secondary)] px-3 py-2">
+            <span className="text-[11px] text-[var(--text-secondary)]">{t("orders.risk.level", "Risk level")}</span>
             <span className={`text-[11px] font-medium uppercase tracking-wide ${
               risk === "alert" ? "text-rose-300"
               : risk === "watch" ? "text-amber-300"
@@ -393,17 +393,17 @@ function OrderRowCard({ order, onEdit, onDelete }: { order: FinanceOrder; onEdit
 
       {/* ── SUPPLIERS STRIP ──────────────────────────────────────── */}
       {order.suppliers && order.suppliers.length > 0 && (
-        <div className="border-t border-white/[0.04] bg-[var(--bg-primary)]/40 px-5 py-3">
-          <div className="mb-2 text-[10px] font-medium uppercase tracking-[0.16em] text-gray-500">{t("orders.suppliers.count", "Suppliers · {n}").replace("{n}", String(order.suppliers.length))}</div>
+        <div className="border-t border-[var(--border-faint)] bg-[var(--bg-primary)]/40 px-5 py-3">
+          <div className="mb-2 text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--text-dim)]">{t("orders.suppliers.count", "Suppliers · {n}").replace("{n}", String(order.suppliers.length))}</div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {order.suppliers.map((s) => {
               const supplierPct = s.supplier_cost > 0 ? Math.min(100, (s.paid_amount / s.supplier_cost) * 100) : 0;
               return (
-                <div key={s.id} className="rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] px-3 py-2">
+                <div key={s.id} className="rounded-lg border border-[var(--border-faint)] bg-[var(--bg-primary)] px-3 py-2">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="truncate text-xs font-medium text-gray-200">{s.supplier_name || t("orders.supplier.unnamed", "Unnamed supplier")}</div>
-                      <div className="text-[10px] text-gray-500">{fmtMoney(s.paid_amount, s.currency, { compact: true })} {t("orders.suppliers.of", "of")} {fmtMoney(s.supplier_cost, s.currency, { compact: true })}</div>
+                      <div className="truncate text-xs font-medium text-[var(--text-highlight)]">{s.supplier_name || t("orders.supplier.unnamed", "Unnamed supplier")}</div>
+                      <div className="text-[10px] text-[var(--text-dim)]">{fmtMoney(s.paid_amount, s.currency, { compact: true })} {t("orders.suppliers.of", "of")} {fmtMoney(s.supplier_cost, s.currency, { compact: true })}</div>
                     </div>
                     <StatusBadge status={s.payment_status} />
                   </div>
@@ -427,10 +427,10 @@ function OrderRowCard({ order, onEdit, onDelete }: { order: FinanceOrder; onEdit
    reserved for the zone TOTAL line. */
 function Zone({ label, subtitle, children }: { label: string; subtitle?: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-white/[0.04] bg-[var(--bg-primary)] p-4">
+    <div className="rounded-xl border border-[var(--border-faint)] bg-[var(--bg-primary)] p-4">
       <div className="flex items-baseline justify-between gap-2">
-        <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-gray-400">{label}</div>
-        {subtitle && <div className="text-[10px] text-gray-600">{subtitle}</div>}
+        <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--text-secondary)]">{label}</div>
+        {subtitle && <div className="text-[10px] text-[var(--text-ghost)]">{subtitle}</div>}
       </div>
       <div className="mt-3 space-y-1.5">{children}</div>
     </div>
@@ -454,10 +454,10 @@ function ZoneRow({
     positive ? "text-emerald-300"
     : negative ? "text-rose-300/90"
     : warning  ? "text-amber-300"
-    : "text-gray-200";
+    : "text-[var(--text-highlight)]";
   return (
     <div className="flex items-baseline justify-between gap-3 text-[12px]">
-      <span className="text-gray-500">{k}</span>
+      <span className="text-[var(--text-dim)]">{k}</span>
       <span className={`font-medium tabular-nums ${cls}`}>{text}</span>
     </div>
   );
@@ -466,8 +466,8 @@ function ZoneRow({
 function ZoneTotal({ label, v, ccy, tone }: { label: string; v: number; ccy: string; tone: "info" | "negative" }) {
   const cls = tone === "info" ? "text-sky-300" : "text-rose-300";
   return (
-    <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-white/[0.04] pt-2">
-      <span className="text-[11px] font-medium text-gray-300">{label}</span>
+    <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-[var(--border-faint)] pt-2">
+      <span className="text-[11px] font-medium text-[var(--text-highlight)]">{label}</span>
       <span className={`text-[14px] font-medium tabular-nums ${cls}`}>
         {v < 0 ? "−" : ""}{fmtMoney(Math.abs(v), ccy, { compact: true })}
       </span>
@@ -503,8 +503,8 @@ function ProgressRing({ pct, label, sub }: { pct: number; label: string; sub: st
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center leading-none">
-        <span className="text-[10px] font-semibold text-gray-200">{label}</span>
-        <span className="text-[7px] uppercase tracking-wide text-gray-500">{sub}</span>
+        <span className="text-[10px] font-semibold text-[var(--text-highlight)]">{label}</span>
+        <span className="text-[7px] uppercase tracking-wide text-[var(--text-dim)]">{sub}</span>
       </div>
     </div>
   );
@@ -517,10 +517,10 @@ function Stat({ label, value, negative, accent }: { label: string; value: string
     : accent === "amber" ? "text-amber-400"
     : accent === "sky"   ? "text-sky-400"
     : accent === "violet"? "text-violet-400"
-    : negative ? "text-gray-300" : "text-[var(--text-primary)]";
+    : negative ? "text-[var(--text-highlight)]" : "text-[var(--text-primary)]";
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-wider text-gray-500">{label}</div>
+      <div className="text-[10px] uppercase tracking-wider text-[var(--text-dim)]">{label}</div>
       <div className={`mt-1 text-sm font-semibold tabular-nums ${color}`}>{negative && !value.startsWith("0") ? "−" + value : value}</div>
     </div>
   );
@@ -679,7 +679,7 @@ function OrderEditor({
           subtitle={t("orders.editor.subtitle", "Capture the selling price, every supplier cost, and let Koleex compute the profit automatically.")}
           action={
             <div className="flex gap-2">
-              <button type="button" onClick={onCancel} className="rounded-xl border border-white/[0.06] bg-[var(--bg-secondary)] px-4 py-2 text-sm font-medium text-gray-300 hover:border-white/[0.12]">{t("orders.editor.cancel", "Cancel")}</button>
+              <button type="button" onClick={onCancel} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-2 text-sm font-medium text-[var(--text-highlight)] hover:border-[var(--border-color)]">{t("orders.editor.cancel", "Cancel")}</button>
               <button type="button" onClick={onSave} className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-400 hover:bg-emerald-500/30">{t("orders.editor.save", "Save Order")}</button>
             </div>
           }
@@ -693,7 +693,7 @@ function OrderEditor({
             { n: 3, label: t("orders.step.tax", "Tax & Charges"),       done: !!draft.order.tax_refund_pct || !!draft.order.tax_refund_value,                            active: false },
             { n: 4, label: t("orders.step.save", "Save & Track"),       done: !!draft.order.id,                                                                          active: false },
           ].map((s) => (
-            <div key={s.n} className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-medium ${s.done ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : s.active ? "border-sky-500/40 bg-sky-500/10 text-sky-300" : "border-white/[0.06] bg-[var(--bg-secondary)] text-gray-400"}`}>
+            <div key={s.n} className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-medium ${s.done ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : s.active ? "border-sky-500/40 bg-sky-500/10 text-sky-300" : "border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-secondary)]"}`}>
               <span className={`flex h-5 w-5 items-center justify-center rounded-full ${s.done ? "bg-emerald-500/30" : "bg-white/5"}`}>
                 {s.done ? <RrIcon name="check" size={10} /> : s.n}
               </span>
@@ -773,7 +773,7 @@ function OrderEditor({
             <div className="my-1.5 border-t border-white/5" />
             <PreviewRow label={t("orders.preview.net", "= Net profit")}       value={profit.net_profit} currency={draft.order.currency} accent="violet" />
             <PreviewRow label={t("orders.preview.margin", "Margin")}             value={profit.net_profit_pct} currency="%" accent={profit.net_profit_pct >= 15 ? "emerald" : profit.net_profit_pct >= 0 ? "amber" : "rose"} percent />
-            <p className="mt-3 rounded-md bg-white/5 px-2 py-1.5 text-[10px] leading-relaxed text-gray-400">
+            <p className="mt-3 rounded-md bg-white/5 px-2 py-1.5 text-[10px] leading-relaxed text-[var(--text-secondary)]">
               {t("orders.editor.previewNote", "This is the expected profit (booked). The realized cash result is tracked on the order card after save — it uses actual collected payments and paid costs, not a ratio.")}
             </p>
           </SectionCard>
@@ -785,11 +785,11 @@ function OrderEditor({
             title={t("orders.step2.title", "Step 2 · Suppliers & Costs")}
             subtitle={t("orders.editor.step2.subtitle", "Pick each supplier from Contacts. The total supplier cost is the sum of these lines — gross profit updates live.")}
             action={
-              <button type="button" onClick={addSupplier} className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-gray-200 hover:border-white/[0.12]">{t("orders.editor.addSupplier", "+ Add Supplier")}</button>
+              <button type="button" onClick={addSupplier} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-[var(--text-highlight)] hover:border-[var(--border-color)]">{t("orders.editor.addSupplier", "+ Add Supplier")}</button>
             }
           >
             {draft.suppliers.length === 0 ? (
-              <div className="py-6 text-center text-sm text-gray-500">{t("orders.editor.noSuppliers", "No suppliers yet. Click + Add Supplier to record a cost.")}</div>
+              <div className="py-6 text-center text-sm text-[var(--text-dim)]">{t("orders.editor.noSuppliers", "No suppliers yet. Click + Add Supplier to record a cost.")}</div>
             ) : (
               <div className="space-y-3">
                 {draft.suppliers.map((s, i) => {
@@ -800,10 +800,10 @@ function OrderEditor({
                         : { name: s.supplier_name })
                     : null;
                   return (
-                    <div key={i} className="rounded-xl border border-white/[0.04] bg-[var(--bg-primary)] p-3">
+                    <div key={i} className="rounded-xl border border-[var(--border-faint)] bg-[var(--bg-primary)] p-3">
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-6">
                         <div className="sm:col-span-2">
-                          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">{t("orders.editor.supplier", "Supplier")}</div>
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("orders.editor.supplier", "Supplier")}</div>
                           <div className="mt-1">
                             <PartyChip
                               party={sChip}
@@ -847,7 +847,7 @@ function OrderEditor({
               onChange={(e) => updateOrder("notes", e.target.value)}
               rows={3}
               placeholder={t("orders.editor.notesPlaceholder", "Internal notes — only visible to your team.")}
-              className="w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-emerald-500/50 focus:outline-none"
+              className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-[var(--text-ghost)] focus:border-emerald-500/50 focus:outline-none"
             />
           </SectionCard>
         </div>
@@ -856,12 +856,12 @@ function OrderEditor({
   );
 }
 
-const INPUT = "w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-emerald-500/50 focus:outline-none";
+const INPUT = "w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-[var(--text-ghost)] focus:border-emerald-500/50 focus:outline-none";
 
 function Field({ label, children, wide }: { label: string; children: React.ReactNode; wide?: boolean }) {
   return (
     <label className={`flex flex-col gap-1 ${wide ? "col-span-2" : ""}`}>
-      <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">{label}</span>
+      <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-dim)]">{label}</span>
       {children}
     </label>
   );
@@ -877,7 +877,7 @@ function PreviewRow({ label, value, currency, accent, negative, percent }: { lab
   const display = percent ? `${value.toFixed(1)}%` : fmtMoney(value, currency, { compact: true });
   return (
     <div className="flex items-center justify-between py-1 text-sm">
-      <span className="text-gray-400">{label}</span>
+      <span className="text-[var(--text-secondary)]">{label}</span>
       <span className={`tabular-nums font-semibold ${color}`}>{negative && value > 0 ? "−" : ""}{display}</span>
     </div>
   );

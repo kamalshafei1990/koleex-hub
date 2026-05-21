@@ -197,7 +197,7 @@ export default function FinanceAccountingQueue() {
           action={
             <Link
               href="/finance/accounting/trial-balance"
-              className="inline-flex items-center gap-2 rounded-md border border-white/[0.10] bg-[var(--bg-primary)] px-3 py-1.5 text-[12px] font-semibold transition hover:border-white/[0.20]"
+              className="inline-flex items-center gap-2 rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-1.5 text-[12px] font-semibold transition hover:border-[var(--border-strong)]"
             >
               <RrIcon name="badge-check" size={12} />
               {t("accounting.queue.trialBalance", "Trial Balance")}
@@ -206,7 +206,7 @@ export default function FinanceAccountingQueue() {
         />
 
         {/* Status tabs — calm, no chrome */}
-        <div className="flex flex-wrap items-center gap-1 border-b border-white/[0.05] pb-2">
+        <div className="flex flex-wrap items-center gap-1 border-b border-[var(--border-subtle)] pb-2">
           {TABS.map((t) => {
             const isActive = active === t.key;
             const count = counts[t.key];
@@ -218,12 +218,12 @@ export default function FinanceAccountingQueue() {
                 className={`relative inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] transition-colors ${
                   isActive
                     ? "font-medium text-[var(--text-primary)]"
-                    : "text-gray-500 hover:text-gray-300"
+                    : "text-[var(--text-dim)] hover:text-[var(--text-highlight)]"
                 }`}
               >
                 {isActive && <span aria-hidden className="pointer-events-none absolute inset-x-1 -bottom-px h-[2px] rounded-full bg-white/40" />}
                 {t.label}
-                <span className="text-[10px] tabular-nums text-gray-500">{count}</span>
+                <span className="text-[10px] tabular-nums text-[var(--text-dim)]">{count}</span>
               </button>
             );
           })}
@@ -235,20 +235,20 @@ export default function FinanceAccountingQueue() {
 
         {/* Table + drawer */}
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="rounded-xl border border-white/[0.05] bg-white/[0.012]">
+          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
             {loading ? (
-              <div className="px-4 py-8 text-center text-[11px] text-gray-500">{t("accounting.queue.loading", "Loading…")}</div>
+              <div className="px-4 py-8 text-center text-[11px] text-[var(--text-dim)]">{t("accounting.queue.loading", "Loading…")}</div>
             ) : visibleItems.length === 0 ? (
               <div className="px-4 py-12 text-center">
                 <Eyebrow>{t("accounting.queue.emptyTitle", "No {status} items").replace("{status}", active)}</Eyebrow>
-                <p className="mt-2 text-[12px] text-gray-500">
+                <p className="mt-2 text-[12px] text-[var(--text-dim)]">
                   {active === "pending" ? t("accounting.queue.empty.pending", "All operational events have been recognised or drafted.") : t("accounting.queue.empty.other", "Nothing to review in this state.")}
                 </p>
               </div>
             ) : (
               <table className="min-w-full text-[12.5px]">
                 <thead>
-                  <tr className="border-b border-white/[0.05] text-[9px] uppercase tracking-[0.12em] text-gray-500">
+                  <tr className="border-b border-[var(--border-subtle)] text-[9px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
                     <th className="px-3 py-2 text-left">{t("accounting.queue.col.kind", "Kind")}</th>
                     <th className="px-3 py-2 text-left">{t("accounting.queue.col.desc", "Description")}</th>
                     <th className="px-3 py-2 text-left">{t("accounting.queue.col.party", "Party")}</th>
@@ -265,16 +265,16 @@ export default function FinanceAccountingQueue() {
                       <tr
                         key={`${it.kind}-${it.source_id}`}
                         onClick={() => setSelected(it)}
-                        className={`cursor-pointer border-b border-white/[0.03] transition-colors ${
-                          isSelected ? "bg-white/[0.04]" : "hover:bg-white/[0.02]"
+                        className={`cursor-pointer border-b border-[var(--border-faint)] transition-colors ${
+                          isSelected ? "bg-[var(--bg-surface)]" : "hover:bg-[var(--bg-secondary)]"
                         }`}
                       >
-                        <td className="px-3 py-2 text-[11px] uppercase tracking-[0.10em] text-gray-400">{KIND_LABEL[it.kind]}</td>
+                        <td className="px-3 py-2 text-[11px] uppercase tracking-[0.10em] text-[var(--text-secondary)]">{KIND_LABEL[it.kind]}</td>
                         <td className="px-3 py-2">{it.description}</td>
-                        <td className="px-3 py-2 text-gray-400">{it.party_name ?? "—"}</td>
+                        <td className="px-3 py-2 text-[var(--text-secondary)]">{it.party_name ?? "—"}</td>
                         <td className="px-3 py-2 text-right tabular-nums font-mono">{fmtMoney(it.amount, it.currency)}</td>
-                        <td className="px-3 py-2 font-mono text-gray-400">{it.source_date}</td>
-                        <td className="px-3 py-2 text-[10px] text-gray-500">{relativeAge(it.created_at)}</td>
+                        <td className="px-3 py-2 font-mono text-[var(--text-secondary)]">{it.source_date}</td>
+                        <td className="px-3 py-2 text-[10px] text-[var(--text-dim)]">{relativeAge(it.created_at)}</td>
                         <td className="px-3 py-2 text-right">
                           <ActionButtons
                             item={it}
@@ -303,9 +303,9 @@ export default function FinanceAccountingQueue() {
               callAction={callAction}
             />
           ) : (
-            <div className="hidden rounded-xl border border-white/[0.05] bg-white/[0.012] px-4 py-12 text-center lg:block">
+            <div className="hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-12 text-center lg:block">
               <Eyebrow>{t("accounting.queue.review.panel", "Review panel")}</Eyebrow>
-              <p className="mt-2 text-[12px] text-gray-500">{t("accounting.queue.review.empty", "Select an item to view its operational source and journal draft.")}</p>
+              <p className="mt-2 text-[12px] text-[var(--text-dim)]">{t("accounting.queue.review.empty", "Select an item to view its operational source and journal draft.")}</p>
             </div>
           )}
         </div>
@@ -322,11 +322,11 @@ export default function FinanceAccountingQueue() {
         </DashboardSection>
 
         <DashboardSection eyebrow={t("accounting.workflow.eyebrow", "Workflow")} title={t("accounting.workflow.title", "How recognition works")}>
-          <ol className="grid gap-3 text-[12px] text-gray-400 sm:grid-cols-2 lg:grid-cols-4">
-            <li><strong className="text-gray-300">{t("accounting.workflow.s1", "1. Pending")}</strong> — {t("accounting.workflow.s1Hint", "operational event happened; no journal yet.")}</li>
-            <li><strong className="text-gray-300">{t("accounting.workflow.s2", "2. Drafted")}</strong> — {t("accounting.workflow.s2Hint", "entry created in draft status, balanced, awaiting review.")}</li>
-            <li><strong className="text-gray-300">{t("accounting.workflow.s3", "3. Posted")}</strong> — {t("accounting.workflow.s3Hint", "entry hit the GL and is now immutable.")}</li>
-            <li><strong className="text-gray-300">{t("accounting.workflow.s4", "4. Voided")}</strong> — {t("accounting.workflow.s4Hint", "original posted entry reversed by a new opposite-side entry.")}</li>
+          <ol className="grid gap-3 text-[12px] text-[var(--text-secondary)] sm:grid-cols-2 lg:grid-cols-4">
+            <li><strong className="text-[var(--text-highlight)]">{t("accounting.workflow.s1", "1. Pending")}</strong> — {t("accounting.workflow.s1Hint", "operational event happened; no journal yet.")}</li>
+            <li><strong className="text-[var(--text-highlight)]">{t("accounting.workflow.s2", "2. Drafted")}</strong> — {t("accounting.workflow.s2Hint", "entry created in draft status, balanced, awaiting review.")}</li>
+            <li><strong className="text-[var(--text-highlight)]">{t("accounting.workflow.s3", "3. Posted")}</strong> — {t("accounting.workflow.s3Hint", "entry hit the GL and is now immutable.")}</li>
+            <li><strong className="text-[var(--text-highlight)]">{t("accounting.workflow.s4", "4. Voided")}</strong> — {t("accounting.workflow.s4Hint", "original posted entry reversed by a new opposite-side entry.")}</li>
           </ol>
         </DashboardSection>
         <Hairline />
@@ -416,10 +416,10 @@ function InventoryCogsSection() {
       {error && (
         <div className="mb-3 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">{error}</div>
       )}
-      <div className="overflow-hidden rounded-xl border border-white/[0.05] bg-white/[0.012]">
+      <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
         <table className="min-w-full text-[12.5px]">
           <thead>
-            <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.10em] text-gray-500">
+            <tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
               <th className="px-4 py-2 text-left">{t("accounting.cogs.col.journal", "Journal #")}</th>
               <th className="px-4 py-2 text-left">{t("accounting.cogs.col.shipment", "Shipment #")}</th>
               <th className="px-4 py-2 text-left">{t("accounting.cogs.col.date", "Date")}</th>
@@ -430,30 +430,30 @@ function InventoryCogsSection() {
           </thead>
           <tbody>
             {loading && rows.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-6 text-center text-[11px] text-gray-600">{t("accounting.queue.loading", "Loading…")}</td></tr>
+              <tr><td colSpan={6} className="px-4 py-6 text-center text-[11px] text-[var(--text-ghost)]">{t("accounting.queue.loading", "Loading…")}</td></tr>
             ) : rows.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-6 text-center text-[11px] text-gray-600">
+              <tr><td colSpan={6} className="px-4 py-6 text-center text-[11px] text-[var(--text-ghost)]">
                 {t("accounting.cogs.empty", "No COGS drafts yet. They appear here automatically once a sales shipment is shipped and the operator drafts the entry.")}
               </td></tr>
             ) : (
               rows.map((r) => (
-                <tr key={r.id} className="border-b border-white/[0.03] last:border-b-0 hover:bg-white/[0.02]">
-                  <td className="px-4 py-2 font-mono text-[11.5px] text-gray-300">{r.journal_no}</td>
-                  <td className="px-4 py-2 text-gray-300">
+                <tr key={r.id} className="border-b border-[var(--border-faint)] last:border-b-0 hover:bg-[var(--bg-secondary)]">
+                  <td className="px-4 py-2 font-mono text-[11.5px] text-[var(--text-highlight)]">{r.journal_no}</td>
+                  <td className="px-4 py-2 text-[var(--text-highlight)]">
                     {r.sales_order_id ? (
                       <Link href={`/sales/orders/${r.sales_order_id}`} className="font-mono hover:text-[var(--text-primary)]">{r.shipment_no ?? "—"}</Link>
                     ) : (
                       <span className="font-mono">{r.shipment_no ?? "—"}</span>
                     )}
                   </td>
-                  <td className="px-4 py-2 text-[11px] text-gray-500">{r.entry_date}</td>
+                  <td className="px-4 py-2 text-[11px] text-[var(--text-dim)]">{r.entry_date}</td>
                   <td className="px-4 py-2 text-right tabular-nums font-mono">
                     {Number(r.total_cost).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                   <td className="px-4 py-2">
                     <span className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.10em] ${
                       r.status === "posted" ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200" :
-                      r.status === "voided" ? "border-gray-500/30 bg-gray-500/10 text-gray-400" :
+                      r.status === "voided" ? "border-gray-500/30 bg-gray-500/10 text-[var(--text-secondary)]" :
                                               "border-amber-400/30 bg-amber-500/10 text-amber-200"
                     }`}>{r.status}</span>
                   </td>
@@ -506,7 +506,7 @@ function ActionButtons({
   if (item.accounting_status === "pending") {
     return (
       <button type="button" onClick={(e) => { stop(e); onDraft(); }} disabled={isBusy}
-        className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-2 py-1 text-[11px] hover:border-white/[0.20] disabled:opacity-50">
+        className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-2 py-1 text-[11px] hover:border-[var(--border-strong)] disabled:opacity-50">
         {t("accounting.queue.btn.draft", "Create draft")}
       </button>
     );
@@ -530,12 +530,12 @@ function ActionButtons({
   if (item.accounting_status === "posted") {
     return (
       <button type="button" onClick={(e) => { stop(e); onVoid(); }} disabled={isBusy}
-        className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.02] px-2 py-1 text-[11px] text-gray-400 hover:border-rose-500/30 hover:text-rose-200 disabled:opacity-50">
+        className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-[var(--text-secondary)] hover:border-rose-500/30 hover:text-rose-200 disabled:opacity-50">
         {t("accounting.queue.btn.void", "Void")}
       </button>
     );
   }
-  return <span className="text-[10px] text-gray-600">—</span>;
+  return <span className="text-[10px] text-[var(--text-ghost)]">—</span>;
 }
 
 function ReviewDrawer({
@@ -576,18 +576,18 @@ function ReviewDrawer({
   const balanced = Math.abs(totalDr - totalCr) < 0.005;
 
   return (
-    <aside className="rounded-xl border border-white/[0.05] bg-white/[0.012] p-4">
+    <aside className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
       <div className="flex items-center justify-between">
         <Eyebrow>{t("accounting.queue.review.title", "Review · {kind}").replace("{kind}", KIND_LABEL[item.kind])}</Eyebrow>
-        <button type="button" onClick={onClose} className="text-[10px] text-gray-500 hover:text-gray-300">{t("accounting.queue.review.close", "Close")}</button>
+        <button type="button" onClick={onClose} className="text-[10px] text-[var(--text-dim)] hover:text-[var(--text-highlight)]">{t("accounting.queue.review.close", "Close")}</button>
       </div>
       <div className="mt-3 text-[13px] font-medium">{item.description}</div>
-      <div className="mt-1 text-[11px] text-gray-500">
+      <div className="mt-1 text-[11px] text-[var(--text-dim)]">
         {item.party_name ?? "—"} · {item.source_date}
       </div>
       <div className="mt-2 font-mono text-[13px] tabular-nums">{fmtMoney(item.amount, item.currency)}</div>
 
-      <div className="mt-3 inline-flex rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-gray-400">
+      <div className="mt-3 inline-flex rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-secondary)]">
         {item.accounting_status}
       </div>
 
@@ -600,18 +600,18 @@ function ReviewDrawer({
       <div className="mt-5">
         <Eyebrow>{t("accounting.queue.review.journalPreview", "Journal preview")}</Eyebrow>
         {drawerLoading ? (
-          <div className="mt-2 text-[11px] text-gray-500">{t("accounting.queue.review.loadingJournal", "Loading journal…")}</div>
+          <div className="mt-2 text-[11px] text-[var(--text-dim)]">{t("accounting.queue.review.loadingJournal", "Loading journal…")}</div>
         ) : !data?.entry ? (
-          <div className="mt-2 text-[11px] text-gray-500">{t("accounting.queue.review.noDraft", "No draft yet. Create one from the row above.")}</div>
+          <div className="mt-2 text-[11px] text-[var(--text-dim)]">{t("accounting.queue.review.noDraft", "No draft yet. Create one from the row above.")}</div>
         ) : (
           <div className="mt-2 space-y-1.5">
-            <div className="text-[10px] text-gray-500">
+            <div className="text-[10px] text-[var(--text-dim)]">
               {data.entry.journal_no} · {data.entry.status}
               {data.entry.posted_at && ` · ${t("accounting.queue.review.postedOn", "posted {date}").replace("{date}", data.entry.posted_at.slice(0, 10))}`}
             </div>
             <table className="w-full text-[11.5px]">
               <thead>
-                <tr className="border-b border-white/[0.05] text-[9px] uppercase tracking-[0.10em] text-gray-500">
+                <tr className="border-b border-[var(--border-subtle)] text-[9px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
                   <th className="py-1 text-left">{t("accounting.queue.review.col.account", "Account")}</th>
                   <th className="py-1 text-right">{t("accounting.queue.review.col.debit", "Debit")}</th>
                   <th className="py-1 text-right">{t("accounting.queue.review.col.credit", "Credit")}</th>
@@ -619,9 +619,9 @@ function ReviewDrawer({
               </thead>
               <tbody>
                 {data.lines.map((l) => (
-                  <tr key={l.id} className="border-b border-white/[0.03]">
+                  <tr key={l.id} className="border-b border-[var(--border-faint)]">
                     <td className="py-1">
-                      <span className="font-mono text-gray-500">{l.account?.code} </span>
+                      <span className="font-mono text-[var(--text-dim)]">{l.account?.code} </span>
                       {l.account?.name}
                     </td>
                     <td className="py-1 text-right tabular-nums font-mono">{Number(l.debit) > 0 ? fmtMoney(Number(l.debit), l.currency).split(" ")[0] : "—"}</td>
@@ -630,8 +630,8 @@ function ReviewDrawer({
                 ))}
               </tbody>
               <tfoot>
-                <tr className="border-t border-white/[0.10]">
-                  <td className="pt-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">{t("accounting.queue.review.totals", "Totals")}</td>
+                <tr className="border-t border-[var(--border-color)]">
+                  <td className="pt-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("accounting.queue.review.totals", "Totals")}</td>
                   <td className="pt-1 text-right tabular-nums font-mono">{totalDr.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   <td className="pt-1 text-right tabular-nums font-mono">{totalCr.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 </tr>
@@ -650,7 +650,7 @@ function ReviewDrawer({
         {item.accounting_status === "pending" && (
           <button type="button" disabled={busy !== null}
             onClick={async () => { if (await callAction("draft", { kind: item.kind, source_id: item.source_id })) await onAction(); }}
-            className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[11px] hover:border-white/[0.20] disabled:opacity-50">
+            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[11px] hover:border-[var(--border-strong)] disabled:opacity-50">
             {t("accounting.queue.btn.draft", "Create draft")}
           </button>
         )}
@@ -671,7 +671,7 @@ function ReviewDrawer({
         {data?.entry && (
           <Link
             href={`/finance/accounting/general-ledger?account_id=${data.lines[0]?.account?.code ?? ""}`}
-            className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.06] px-3 py-1.5 text-[11px] text-gray-400 hover:border-white/[0.15] hover:text-gray-200"
+            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] px-3 py-1.5 text-[11px] text-[var(--text-secondary)] hover:border-[var(--border-color)] hover:text-[var(--text-highlight)]"
           >
             {t("accounting.queue.review.openGL", "Open in GL →")}
           </Link>
@@ -762,10 +762,10 @@ function SalesRevenueSection() {
       {error && (
         <div className="mb-3 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">{error}</div>
       )}
-      <div className="overflow-hidden rounded-xl border border-white/[0.05] bg-white/[0.012]">
+      <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
         <table className="min-w-full text-[12.5px]">
           <thead>
-            <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.10em] text-gray-500">
+            <tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
               <th className="px-4 py-2 text-left">{t("accounting.cogs.col.journal", "Journal #")}</th>
               <th className="px-4 py-2 text-left">{t("accounting.revenue.col.invoice", "Invoice #")}</th>
               <th className="px-4 py-2 text-left">{t("accounting.revenue.col.customer", "Customer")}</th>
@@ -777,25 +777,25 @@ function SalesRevenueSection() {
           </thead>
           <tbody>
             {loading && rows.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-6 text-center text-[11px] text-gray-600">{t("accounting.queue.loading", "Loading…")}</td></tr>
+              <tr><td colSpan={7} className="px-4 py-6 text-center text-[11px] text-[var(--text-ghost)]">{t("accounting.queue.loading", "Loading…")}</td></tr>
             ) : rows.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-6 text-center text-[11px] text-gray-600">
+              <tr><td colSpan={7} className="px-4 py-6 text-center text-[11px] text-[var(--text-ghost)]">
                 {t("accounting.revenue.empty", "No revenue drafts yet. They appear here once a confirmed invoice is drafted via the API.")}
               </td></tr>
             ) : (
               rows.map((r) => (
-                <tr key={r.id} className="border-b border-white/[0.03] last:border-b-0 hover:bg-white/[0.02]">
-                  <td className="px-4 py-2 font-mono text-[11.5px] text-gray-300">{r.journal_no}</td>
-                  <td className="px-4 py-2 font-mono text-[11.5px] text-gray-300">{r.invoice_no ?? "—"}</td>
-                  <td className="px-4 py-2 text-gray-300">{r.customer_name ?? "—"}</td>
-                  <td className="px-4 py-2 text-[11px] text-gray-500">{r.entry_date}</td>
+                <tr key={r.id} className="border-b border-[var(--border-faint)] last:border-b-0 hover:bg-[var(--bg-secondary)]">
+                  <td className="px-4 py-2 font-mono text-[11.5px] text-[var(--text-highlight)]">{r.journal_no}</td>
+                  <td className="px-4 py-2 font-mono text-[11.5px] text-[var(--text-highlight)]">{r.invoice_no ?? "—"}</td>
+                  <td className="px-4 py-2 text-[var(--text-highlight)]">{r.customer_name ?? "—"}</td>
+                  <td className="px-4 py-2 text-[11px] text-[var(--text-dim)]">{r.entry_date}</td>
                   <td className="px-4 py-2 text-right tabular-nums font-mono">
                     {Number(r.total).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                   <td className="px-4 py-2">
                     <span className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.10em] ${
                       r.status === "posted" ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200" :
-                      r.status === "voided" ? "border-gray-500/30 bg-gray-500/10 text-gray-400" :
+                      r.status === "voided" ? "border-gray-500/30 bg-gray-500/10 text-[var(--text-secondary)]" :
                                               "border-amber-400/30 bg-amber-500/10 text-amber-200"
                     }`}>{r.status}</span>
                   </td>

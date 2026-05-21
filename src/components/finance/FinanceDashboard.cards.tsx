@@ -45,25 +45,25 @@ export function ProfitFlow({
         const valueCls =
           isTotal && s.tone === "info"     ? "text-sky-300"
           : isTotal && s.tone === "negative" ? "text-rose-300"
-          : "text-gray-200";
+          : "text-[var(--text-highlight)]";
         const surface =
           isTotal
-            ? "border-white/[0.08] bg-gradient-to-br from-white/[0.04] to-transparent"
-            : "border-white/[0.04] bg-white/[0.015]";
+            ? "border-[var(--border-subtle)] bg-gradient-to-br from-white/[0.04] to-transparent"
+            : "border-[var(--border-faint)] bg-[var(--bg-secondary)]";
         return (
           <div key={i} className={`rounded-2xl border ${surface} p-3.5`}>
             <div className="flex items-baseline justify-between gap-1.5">
-              <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+              <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-dim)]">
                 <span>{s.label}</span>
                 <GuidanceTip guidanceId={s.helpId} />
               </div>
               {s.sign === -1 && !isTotal && (
-                <span className="text-[10px] text-gray-600">−</span>
+                <span className="text-[10px] text-[var(--text-ghost)]">−</span>
               )}
             </div>
             <div className={`mt-1.5 text-[17px] font-medium tabular-nums tracking-tight ${valueCls}`}>
               {s.sign === -1 && s.value !== 0 ? "−" : ""}{formatCompact(Math.abs(s.value))}
-              <span className="ml-1 text-[11px] text-gray-500">{currency}</span>
+              <span className="ml-1 text-[11px] text-[var(--text-dim)]">{currency}</span>
             </div>
           </div>
         );
@@ -78,16 +78,16 @@ export function TopOrdersCard({ kpi, currency }: { kpi: DashboardKpi | null; cur
   return (
     <ChartCard title={t("topOrders.title", "Top profitable orders")} subtitle={t("topOrders.subtitle", "Ranked by net profit this period.")} helpId="finance.topOrders">
       {rows.length === 0 ? (
-        <div className="py-6 text-center text-sm text-gray-500">{t("topOrders.empty", "No orders yet for this period.")}</div>
+        <div className="py-6 text-center text-sm text-[var(--text-dim)]">{t("topOrders.empty", "No orders yet for this period.")}</div>
       ) : (
         <ol className="space-y-1.5">
           {rows.map((o, idx) => (
-            <li key={o.id} className="flex items-center justify-between rounded-xl border border-white/[0.04] bg-white/[0.015] px-4 py-2.5 transition hover:border-white/[0.08]">
+            <li key={o.id} className="flex items-center justify-between rounded-xl border border-[var(--border-faint)] bg-[var(--bg-secondary)] px-4 py-2.5 transition hover:border-[var(--border-subtle)]">
               <div className="flex min-w-0 items-center gap-3">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.06] text-[11px] font-medium text-gray-300">{idx + 1}</span>
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--bg-surface-hover)] text-[11px] font-medium text-[var(--text-highlight)]">{idx + 1}</span>
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium">{o.customer_name || "—"}</div>
-                  <div className="mt-0.5 flex items-center gap-2 font-mono text-[10px] text-gray-500">
+                  <div className="mt-0.5 flex items-center gap-2 font-mono text-[10px] text-[var(--text-dim)]">
                     <span>{o.order_no}</span><span>·</span><span>{formatCompact(o.selling_price)} {currency}</span>
                   </div>
                 </div>
@@ -114,13 +114,13 @@ export function TopCategoriesCard({ kpi, currency }: { kpi: DashboardKpi | null;
   return (
     <ChartCard title={t("topCategories.title", "Top expense categories")} subtitle={t("topCategories.subtitle", "Biggest spend buckets this period.")} helpId="finance.topCategories">
       {rows.length === 0 ? (
-        <div className="py-6 text-center text-sm text-gray-500">{t("topCategories.empty", "No expenses recorded for this period.")}</div>
+        <div className="py-6 text-center text-sm text-[var(--text-dim)]">{t("topCategories.empty", "No expenses recorded for this period.")}</div>
       ) : (
         <ul className="space-y-1.5">
           {rows.map((c) => {
             const style = styleForCategory(c.name);
             return (
-              <li key={c.name} className="rounded-xl border border-white/[0.04] bg-white/[0.015] px-4 py-2.5">
+              <li key={c.name} className="rounded-xl border border-[var(--border-faint)] bg-[var(--bg-secondary)] px-4 py-2.5">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <RrIcon name={style.icon} size={14} className="opacity-80" />
@@ -128,10 +128,10 @@ export function TopCategoriesCard({ kpi, currency }: { kpi: DashboardKpi | null;
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-medium tabular-nums">{formatCompact(c.total)} {currency}</div>
-                    <div className="text-[10px] text-gray-500">{c.share_pct.toFixed(0)}% · {c.count} {c.count === 1 ? t("topCategories.itemOne", "item") : t("topCategories.itemMany", "items")}</div>
+                    <div className="text-[10px] text-[var(--text-dim)]">{c.share_pct.toFixed(0)}% · {c.count} {c.count === 1 ? t("topCategories.itemOne", "item") : t("topCategories.itemMany", "items")}</div>
                   </div>
                 </div>
-                <div className="mt-2 h-0.5 w-full overflow-hidden rounded-full bg-white/[0.04]">
+                <div className="mt-2 h-0.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
                   <div className="h-full bg-white/40" style={{ width: `${Math.max(3, c.share_pct)}%` }} />
                 </div>
               </li>

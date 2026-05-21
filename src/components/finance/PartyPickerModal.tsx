@@ -28,7 +28,7 @@ import { financeT } from "@/lib/translations/finance";
 export type { FinancePartyRow };
 
 const TIER_COLORS: Record<NonNullable<FinancePartyRow["customer_tier"]>, string> = {
-  end_user: "bg-gray-500/15 text-gray-300",
+  end_user: "bg-gray-500/15 text-[var(--text-highlight)]",
   silver:   "bg-zinc-400/15 text-zinc-200",
   gold:     "bg-amber-500/15 text-amber-300",
   platinum: "bg-sky-500/15 text-sky-300",
@@ -117,22 +117,22 @@ export default function PartyPickerModal({
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm px-4 py-12" onClick={onClose}>
       <div
-        className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-white/[0.08] bg-[var(--bg-secondary)] shadow-2xl"
+        className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-4">
+        <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-4">
           <div>
             <h2 className="text-sm font-semibold text-[var(--text-primary)]">
               {type === "customer" ? t("party.pickCustomer", "Pick a customer") : t("party.pickSupplier", "Pick a supplier")}
             </h2>
-            <p className="mt-0.5 text-[11px] text-gray-500">
+            <p className="mt-0.5 text-[11px] text-[var(--text-dim)]">
               {type === "customer"
                 ? t("party.customerHint", "Linked from the Contacts app. Type to filter.")
                 : t("party.supplierHint", "Linked from the Contacts app — suppliers only.")}
             </p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-gray-400 hover:bg-white/5 hover:text-gray-200">
+          <button onClick={onClose} className="rounded-lg p-1 text-[var(--text-secondary)] hover:bg-white/5 hover:text-[var(--text-highlight)]">
             <RrIcon name="cross" size={14} />
           </button>
         </div>
@@ -144,21 +144,21 @@ export default function PartyPickerModal({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={type === "customer" ? t("party.searchCustomer", "Search by name, company, or email…") : t("party.searchSupplier", "Search by supplier name or company…")}
-            className="w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder-gray-600 focus:border-emerald-500/50 focus:outline-none"
+            className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-ghost)] focus:border-emerald-500/50 focus:outline-none"
           />
         </div>
 
         {/* List */}
         <div className="max-h-[420px] overflow-y-auto px-2 pb-3">
           {loading && rows.length === 0 ? (
-            <div className="flex items-center justify-center py-10 text-gray-500">
+            <div className="flex items-center justify-center py-10 text-[var(--text-dim)]">
               <RrIcon name="loading" size={14} className="animate-spin" />
               <span className="ml-2 text-sm">{t("party.searching", "Searching contacts…")}</span>
             </div>
           ) : error ? (
             <div className="px-3 py-6 text-sm text-rose-400">{error}</div>
           ) : sorted.length === 0 ? (
-            <div className="px-3 py-10 text-center text-sm text-gray-500">
+            <div className="px-3 py-10 text-center text-sm text-[var(--text-dim)]">
               {query
                 ? t("party.noMatches", "No matches. Try a different search.")
                 : type === "customer"
@@ -174,10 +174,10 @@ export default function PartyPickerModal({
                     <button
                       type="button"
                       onClick={() => onPick(row)}
-                      className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-left transition hover:border-white/[0.08] hover:bg-white/[0.03]"
+                      className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-left transition hover:border-[var(--border-subtle)] hover:bg-[var(--bg-surface-subtle)]"
                     >
                       {/* Avatar / logo */}
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/[0.06] bg-[var(--bg-primary)] text-[11px] font-semibold text-gray-300">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[11px] font-semibold text-[var(--text-highlight)]">
                         {row.photo_url ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={row.photo_url} alt="" className="h-full w-full object-cover" />
@@ -202,7 +202,7 @@ export default function PartyPickerModal({
                             </span>
                           )}
                         </div>
-                        <div className="mt-0.5 truncate text-[11px] text-gray-500">
+                        <div className="mt-0.5 truncate text-[11px] text-[var(--text-dim)]">
                           {row.company && row.company !== row.display_name ? row.company + " · " : ""}
                           {flag && <span className="mr-1">{flag}</span>}
                           {row.country || row.email || row.phone || ""}

@@ -208,7 +208,7 @@ export default function FinanceReports({
                 busy={busy}
               />
             ) : (
-              <div className="py-12 text-center text-sm text-gray-500">{t("reports.pickPrompt", "Pick a report type to begin.")}</div>
+              <div className="py-12 text-center text-sm text-[var(--text-dim)]">{t("reports.pickPrompt", "Pick a report type to begin.")}</div>
             )}
           </SectionCard>
 
@@ -218,14 +218,14 @@ export default function FinanceReports({
                 printed / downloaded. White paper, black ink, A4
                 proportions. */}
           <SectionCard>
-            <div className="flex items-center justify-between border-b border-white/[0.06] pb-2 mb-3">
-              <div className="text-xs font-semibold uppercase tracking-wider text-gray-400">{t("reports.preview.title", "Document preview")}</div>
-              {previewLoading && <span className="text-[10px] text-gray-500">{t("reports.preview.updating", "Updating…")}</span>}
+            <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2 mb-3">
+              <div className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{t("reports.preview.title", "Document preview")}</div>
+              {previewLoading && <span className="text-[10px] text-[var(--text-dim)]">{t("reports.preview.updating", "Updating…")}</span>}
             </div>
             {previewError ? (
               <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">{previewError}</div>
             ) : previewHtml ? (
-              <div className="overflow-hidden rounded-md border border-white/[0.04] bg-white" style={{ aspectRatio: "210 / 297" }}>
+              <div className="overflow-hidden rounded-md border border-[var(--border-faint)] bg-white" style={{ aspectRatio: "210 / 297" }}>
                 <iframe
                   title={t("reports.preview.iframeTitle", "Report preview")}
                   srcDoc={previewHtml}
@@ -268,7 +268,7 @@ function PickerSection({
   const dotColor = accent === "emerald" ? "bg-emerald-500" : "bg-rose-500";
   return (
     <div>
-      <div className="mb-2 flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-gray-500">
+      <div className="mb-2 flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-[var(--text-dim)]">
         <span className={`h-1.5 w-1.5 rounded-full ${dotColor}`} />
         {title}
       </div>
@@ -282,15 +282,15 @@ function PickerSection({
               onClick={() => onPick(t.type)}
               className={`w-full rounded-lg border px-3 py-2 text-left text-[12px] transition ${
                 isActive
-                  ? "border-white/15 bg-white/[0.06]"
-                  : "border-white/[0.04] bg-[var(--bg-primary)] hover:border-white/[0.10]"
+                  ? "border-white/15 bg-[var(--bg-surface-hover)]"
+                  : "border-[var(--border-faint)] bg-[var(--bg-primary)] hover:border-[var(--border-color)]"
               }`}
             >
               <div className="flex items-center gap-2">
                 <RrIcon name={t.icon as RrIconName} size={14} />
                 <span className="font-semibold">{t.title}</span>
               </div>
-              <div className="mt-1 text-[10px] text-gray-500">{t.description}</div>
+              <div className="mt-1 text-[10px] text-[var(--text-dim)]">{t.description}</div>
             </button>
           );
         })}
@@ -318,7 +318,7 @@ function FiltersPanel({
 
   return (
     <div>
-      <div className="text-[11px] uppercase tracking-[0.16em] text-gray-500">{t("reports.filters.title", "Filters")}</div>
+      <div className="text-[11px] uppercase tracking-[0.16em] text-[var(--text-dim)]">{t("reports.filters.title", "Filters")}</div>
       <div className="mt-3 space-y-3">
         {allFilterKeys.includes("customer_id") && (
           <Field label={t("reports.filters.customer", "Customer")} required={descriptor.required_filters.includes("customer_id")}>
@@ -357,7 +357,7 @@ function FiltersPanel({
           type="button"
           onClick={onPrint}
           disabled={busy !== null}
-          className="rounded-lg border border-white/[0.10] bg-[var(--bg-primary)] px-3 py-2 text-[12px] font-semibold transition hover:border-white/[0.20] disabled:opacity-50"
+          className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-[12px] font-semibold transition hover:border-[var(--border-strong)] disabled:opacity-50"
         >
           {busy === "print" ? t("reports.btn.printing", "Preparing…") : t("reports.btn.print", "Print")}
         </button>
@@ -371,7 +371,7 @@ function FiltersPanel({
         </button>
       </div>
 
-      <div className="mt-3 rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] px-3 py-2 text-[10px] text-gray-500">
+      <div className="mt-3 rounded-lg border border-[var(--border-faint)] bg-[var(--bg-primary)] px-3 py-2 text-[10px] text-[var(--text-dim)]">
         {descriptor.visibility === "external"
           ? t("reports.external.note", "Safe to send — this report excludes profit, cost, intelligence, and internal notes.")
           : t("reports.internal.note", "Internal only — contains operator data. Never share with customers or suppliers.")}
@@ -383,7 +383,7 @@ function FiltersPanel({
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <label className="block">
-      <div className="mb-1 flex items-center gap-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">
+      <div className="mb-1 flex items-center gap-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
         {label} {required && <span className="text-rose-400">*</span>}
       </div>
       {children}
@@ -396,7 +396,7 @@ function Select({ value, onChange, options, placeholder }: { value: string; onCh
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] text-[var(--text-primary)] focus:border-white/20 focus:outline-none"
+      className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] text-[var(--text-primary)] focus:border-white/20 focus:outline-none"
     >
       {placeholder && <option value="">{placeholder}</option>}
       {options.map((o) => <option key={o.id || "__all"} value={o.id}>{o.name}</option>)}
@@ -411,7 +411,7 @@ function Input({ type = "text", value, onChange, placeholder }: { type?: string;
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] text-[var(--text-primary)] focus:border-white/20 focus:outline-none"
+      className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] text-[var(--text-primary)] focus:border-white/20 focus:outline-none"
     />
   );
 }

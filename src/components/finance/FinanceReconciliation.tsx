@@ -145,7 +145,7 @@ export default function FinanceReconciliation() {
               type="button"
               onClick={rescan}
               disabled={rescanBusy}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/[0.06] bg-[var(--bg-surface)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] transition hover:border-white/[0.18] disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] transition hover:border-[var(--border-strong)] disabled:opacity-60"
             >
               {rescanBusy ? (
                 <>
@@ -178,14 +178,14 @@ export default function FinanceReconciliation() {
               onClick={() => setFilter(k)}
               className={`h-7 rounded-full border px-3 text-[11px] font-semibold capitalize transition ${
                 filter === k
-                  ? "border-white/[0.18] bg-white/[0.08] text-[var(--text-primary)]"
-                  : "border-white/[0.06] bg-transparent text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                  ? "border-[var(--border-strong)] bg-[var(--bg-surface-hover)] text-[var(--text-primary)]"
+                  : "border-[var(--border-subtle)] bg-transparent text-[var(--text-dim)] hover:text-[var(--text-primary)]"
               }`}
             >
               {t(`reconciliation.filter.${k}`, k)}
             </button>
           ))}
-          <span className="ml-auto inline-flex items-center gap-1 text-[11px] text-gray-500">
+          <span className="ml-auto inline-flex items-center gap-1 text-[11px] text-[var(--text-dim)]">
             <span>{t("reconciliation.howWorks", "How matching works")}</span>
             <GuidanceTip guidanceId="treasury.unreconciled" />
           </span>
@@ -285,23 +285,23 @@ const CandidateRow = memo(function CandidateRow({
   return (
     <div className={`rounded-2xl border bg-[var(--bg-secondary)] p-4 transition ${
       isActive
-        ? "border-white/[0.06] hover:border-white/[0.12]"
-        : "border-white/[0.04] opacity-90"
+        ? "border-[var(--border-subtle)] hover:border-[var(--border-color)]"
+        : "border-[var(--border-faint)] opacity-90"
     }`}
     >
       {/* Top row: confidence + candidate type + status */}
       <div className="flex flex-wrap items-center gap-2">
         <ConfidencePill level={confLevel} pct={conf} />
         <TypeChip type={candidate.candidate_type} />
-        <span className="text-[11px] uppercase tracking-wider text-gray-500">{typeLabel}</span>
+        <span className="text-[11px] uppercase tracking-wider text-[var(--text-dim)]">{typeLabel}</span>
         {candidate.status !== "suggested" && (
           <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
             candidate.status === "confirmed" ? "bg-emerald-500/15 text-emerald-300"
             : candidate.status === "rejected" ? "bg-rose-500/15 text-rose-300"
-            : "bg-gray-500/15 text-gray-300"
+            : "bg-gray-500/15 text-[var(--text-highlight)]"
           }`}>{candidate.status}</span>
         )}
-        <span className="ml-auto text-[10px] text-gray-500">
+        <span className="ml-auto text-[10px] text-[var(--text-dim)]">
           {new Date(candidate.suggested_at).toLocaleString()}
         </span>
       </div>
@@ -332,8 +332,8 @@ const CandidateRow = memo(function CandidateRow({
 
       {/* Difference bar — only when there's a real gap */}
       {Math.abs(diff) > 0.005 && (
-        <div className="mt-3 flex items-center justify-between rounded-lg border border-white/[0.04] bg-[var(--bg-primary)]/40 px-3 py-2 text-[11px]">
-          <span className="text-gray-500">{t("reconciliation.diff", "Difference")}</span>
+        <div className="mt-3 flex items-center justify-between rounded-lg border border-[var(--border-faint)] bg-[var(--bg-primary)]/40 px-3 py-2 text-[11px]">
+          <span className="text-[var(--text-dim)]">{t("reconciliation.diff", "Difference")}</span>
           <span className={`tabular-nums font-semibold ${diff > 0 ? "text-amber-300" : "text-rose-300"}`}>
             {diff > 0 ? "+" : "−"}{fmtMoney(Math.abs(diff), m?.currency ?? p?.currency ?? "USD", { compact: true })}
           </span>
@@ -355,7 +355,7 @@ const CandidateRow = memo(function CandidateRow({
               className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${
                 w.severity === "risk"  ? "border-rose-500/25 bg-rose-500/10 text-rose-300" :
                 w.severity === "watch" ? "border-amber-500/25 bg-amber-500/10 text-amber-300" :
-                                          "border-white/[0.08] bg-white/[0.03] text-gray-400"
+                                          "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]"
               }`}
               title={w.message}
             >
@@ -382,18 +382,18 @@ const CandidateRow = memo(function CandidateRow({
             type="button"
             onClick={() => onReject(candidate.id)}
             disabled={busy}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-[12px] font-medium text-gray-300 transition hover:border-rose-500/30 hover:text-rose-300 disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-highlight)] transition hover:border-rose-500/30 hover:text-rose-300 disabled:opacity-60"
           >
             <RrIcon name="cross" size={11} />
             {t("reconciliation.reject", "Reject")}
           </button>
-          <span className="ml-auto flex items-center gap-2 text-[11px] text-gray-500">
-            <Link href="/finance/payments" className="inline-flex items-center gap-1 hover:text-gray-200">
+          <span className="ml-auto flex items-center gap-2 text-[11px] text-[var(--text-dim)]">
+            <Link href="/finance/payments" className="inline-flex items-center gap-1 hover:text-[var(--text-highlight)]">
               <RrIcon name="arrow-up-right-from-square" size={10} />
               {t("reconciliation.openPayment", "Open payment")}
             </Link>
-            <span className="text-gray-700">·</span>
-            <Link href="/finance/payments" className="inline-flex items-center gap-1 hover:text-gray-200">
+            <span className="text-[var(--text-whisper)]">·</span>
+            <Link href="/finance/payments" className="inline-flex items-center gap-1 hover:text-[var(--text-highlight)]">
               <RrIcon name="arrow-up-right-from-square" size={10} />
               {t("reconciliation.openMovement", "Open movement")}
             </Link>
@@ -429,7 +429,7 @@ function TypeChip({ type }: { type: ReconciliationCandidateType }) {
     type === "overpayment"    ? "bg-sky-500/15 text-sky-300"          :
     type === "fee_adjusted"   ? "bg-violet-500/15 text-violet-300"    :
     type === "duplicate_risk" ? "bg-rose-500/15 text-rose-300"        :
-                                "bg-gray-500/15 text-gray-300";
+                                "bg-gray-500/15 text-[var(--text-highlight)]";
   const label =
     type === "duplicate_risk" ? t("reconciliation.typeChip.dup", "duplicate risk") :
     type === "fee_adjusted"   ? t("reconciliation.typeChip.fee", "fee adjusted")   :
@@ -454,17 +454,17 @@ function SideCard({
   const { t } = useTranslation(financeT);
   const accent = accentTone === "positive" ? "text-emerald-300" : "text-rose-300";
   return (
-    <div className="rounded-xl border border-white/[0.05] bg-[var(--bg-primary)]/40 px-3 py-2.5">
+    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)]/40 px-3 py-2.5">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">{eyebrow}</span>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-dim)]">{eyebrow}</span>
         {href && (
-          <Link href={href} className="text-[10px] text-gray-500 hover:text-gray-200 inline-flex items-center gap-0.5">
+          <Link href={href} className="text-[10px] text-[var(--text-dim)] hover:text-[var(--text-highlight)] inline-flex items-center gap-0.5">
             {t("reconciliation.open", "Open")} <RrIcon name="arrow-up-right-from-square" size={9} />
           </Link>
         )}
       </div>
       <div className="mt-1 truncate text-[13px] font-semibold text-[var(--text-primary)]">{title}</div>
-      <div className="mt-0.5 truncate text-[11px] text-gray-400">{line1}</div>
+      <div className="mt-0.5 truncate text-[11px] text-[var(--text-secondary)]">{line1}</div>
       {line2 && <div className={`mt-0.5 text-[11px] font-medium tabular-nums ${accent}`}>{line2}</div>}
     </div>
   );

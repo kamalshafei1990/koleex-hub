@@ -227,7 +227,7 @@ export default function FinanceTreasuryForecast() {
               </button>
               <Link
                 href="/finance/treasury-plans"
-                className="inline-flex items-center gap-2 rounded-xl border border-white/[0.06] bg-[var(--bg-surface)] px-3 py-2 text-sm font-medium text-gray-300 hover:border-white/[0.18]"
+                className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-sm font-medium text-[var(--text-highlight)] hover:border-[var(--border-strong)]"
               >
                 <RrIcon name="file-invoice" size={12} />
                 {t("forecast.plans", "Plans")}
@@ -235,7 +235,7 @@ export default function FinanceTreasuryForecast() {
               <button
                 onClick={() => onPreset("base")}
                 disabled={loading}
-                className="inline-flex items-center gap-2 rounded-xl border border-white/[0.06] bg-[var(--bg-surface)] px-3 py-2 text-sm font-medium text-[var(--text-primary)] hover:border-white/[0.18] disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-sm font-medium text-[var(--text-primary)] hover:border-[var(--border-strong)] disabled:opacity-60"
               >
                 {loading ? <RrIcon name="loading" size={12} className="animate-spin" /> : <RrIcon name="recycle" size={12} />}
                 {t("forecast.resetToBase", "Reset to base")}
@@ -247,36 +247,36 @@ export default function FinanceTreasuryForecast() {
         {/* Save-as-plan drawer */}
         {saveDraft && base && (
           <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-md sm:items-center sm:px-4 sm:py-8" onClick={() => setSaveDraft(null)}>
-            <div className="relative w-full max-w-md rounded-t-2xl border border-white/[0.08] bg-[var(--bg-secondary)] shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-3.5">
+            <div className="relative w-full max-w-md rounded-t-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-3.5">
                 <div>
                   <h2 className="text-[14px] font-semibold">{t("forecast.save.title", "Save scenario as plan")}</h2>
-                  <p className="mt-0.5 text-[11px] text-gray-500">{t("forecast.save.subtitle", "Locks the current assumptions + forecast snapshot for executive review.")}</p>
+                  <p className="mt-0.5 text-[11px] text-[var(--text-dim)]">{t("forecast.save.subtitle", "Locks the current assumptions + forecast snapshot for executive review.")}</p>
                 </div>
-                <button onClick={() => setSaveDraft(null)} className="rounded-lg p-1.5 text-gray-400 hover:bg-white/[0.06] hover:text-gray-100">
+                <button onClick={() => setSaveDraft(null)} className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]">
                   <RrIcon name="cross" size={12} />
                 </button>
               </div>
               <div className="space-y-3 px-5 py-4">
                 <label className="block">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">{t("forecast.save.planName", "Plan name")}</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-dim)]">{t("forecast.save.planName", "Plan name")}</span>
                   <input
-                    className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-white/[0.22] focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-[var(--text-ghost)] focus:border-[var(--border-strong)] focus:outline-none"
                     value={saveDraft.name}
                     onChange={(e) => setSaveDraft({ ...saveDraft, name: e.target.value })}
                   />
                 </label>
                 <label className="block">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">{t("forecast.save.description", "Description")}</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-dim)]">{t("forecast.save.description", "Description")}</span>
                   <textarea
                     rows={3}
-                    className="mt-1 w-full resize-none rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-white/[0.22] focus:outline-none"
+                    className="mt-1 w-full resize-none rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-[var(--text-ghost)] focus:border-[var(--border-strong)] focus:outline-none"
                     value={saveDraft.description}
                     placeholder={t("forecast.save.descPlaceholder", "Why are we saving this scenario? Operator can revisit this later.")}
                     onChange={(e) => setSaveDraft({ ...saveDraft, description: e.target.value })}
                   />
                 </label>
-                <div className="rounded-lg border border-white/[0.05] bg-[var(--bg-primary)]/40 px-3 py-2 text-[11px] text-gray-400">
+                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]/40 px-3 py-2 text-[11px] text-[var(--text-secondary)]">
                   <div className="font-semibold text-[var(--text-primary)]">{t("forecast.save.snapshot", "Snapshot captured")}</div>
                   <div className="mt-1">{t("forecast.save.snapshotLine", "Starting cash · {start} USD · d90 {d90} USD · Runway {runway}d")
                     .replace("{start}", (stress ?? base).startingCash.toFixed(0))
@@ -285,9 +285,9 @@ export default function FinanceTreasuryForecast() {
                   <div className="mt-1">{t("forecast.save.assumptions", "Assumptions: {value}").replace("{value}", (stress ?? base).assumptions.length === 0 ? t("forecast.save.baseCase", "Base case") : (stress ?? base).assumptions.map((a) => a.label).join("; "))}</div>
                 </div>
               </div>
-              <div className="border-t border-white/[0.06] px-5 py-3">
+              <div className="border-t border-[var(--border-subtle)] px-5 py-3">
                 <div className="flex items-center justify-end gap-2">
-                  <button onClick={() => setSaveDraft(null)} className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-gray-300 hover:border-white/[0.18]">{t("forecast.save.cancel", "Cancel")}</button>
+                  <button onClick={() => setSaveDraft(null)} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-[var(--text-highlight)] hover:border-[var(--border-strong)]">{t("forecast.save.cancel", "Cancel")}</button>
                   <button
                     disabled={saveBusy || !saveDraft.name.trim()}
                     onClick={async () => {
@@ -332,7 +332,7 @@ export default function FinanceTreasuryForecast() {
         )}
 
         {/* Safety disclaimer */}
-        <div className="mt-4 flex items-center gap-2 rounded-lg border border-white/[0.05] bg-white/[0.018] px-3 py-2 text-[11px] text-gray-400">
+        <div className="mt-4 flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2 text-[11px] text-[var(--text-secondary)]">
           <RrIcon name="info" size={11} />
           <span>{t("forecast.disclaimer", "This is a deterministic forecast based on current records and selected assumptions. It is not a guarantee.")}</span>
         </div>
@@ -379,7 +379,7 @@ export default function FinanceTreasuryForecast() {
                     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                       diff.direction === "deteriorates" ? "bg-rose-500/15 text-rose-300" :
                       diff.direction === "improves"     ? "bg-emerald-500/15 text-emerald-300" :
-                      "bg-gray-500/15 text-gray-300"
+                      "bg-gray-500/15 text-[var(--text-highlight)]"
                     }`}>
                       {t("forecast.chart.impact", "Impact at 90d: {value} USD").replace("{value}", fmtCompactUsd(diff.d90Delta))}
                     </span>
@@ -459,7 +459,7 @@ export default function FinanceTreasuryForecast() {
                         className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition disabled:opacity-50 ${
                           active
                             ? "border-amber-500/40 bg-amber-500/15 text-amber-200"
-                            : "border-white/[0.06] bg-[var(--bg-primary)] text-gray-300 hover:border-white/[0.18]"
+                            : "border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-highlight)] hover:border-[var(--border-strong)]"
                         }`}
                       >
                         {opt.label}
@@ -481,15 +481,15 @@ export default function FinanceTreasuryForecast() {
                 ) : (
                   <ul className="space-y-1.5">
                     {risks.slice(0, 6).map((r) => (
-                      <li key={r.key} className="flex items-start gap-2 rounded-lg border border-white/[0.05] bg-[var(--bg-primary)]/40 px-3 py-2 text-[11px]">
+                      <li key={r.key} className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]/40 px-3 py-2 text-[11px]">
                         <span className={`mt-0.5 inline-block h-2 w-2 shrink-0 rounded-full ${
                           r.severity === "risk" ? "bg-rose-400" : r.severity === "watch" ? "bg-amber-300" : "bg-gray-400"
                         }`} />
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-[12px] font-semibold text-[var(--text-primary)]">{r.label}</div>
-                          <div className="mt-0.5 text-[10.5px] text-gray-400">{r.detail}</div>
+                          <div className="mt-0.5 text-[10.5px] text-[var(--text-secondary)]">{r.detail}</div>
                         </div>
-                        <span className="shrink-0 text-[11px] font-semibold tabular-nums text-gray-300">{fmtCompactUsd(r.amountReporting)}</span>
+                        <span className="shrink-0 text-[11px] font-semibold tabular-nums text-[var(--text-highlight)]">{fmtCompactUsd(r.amountReporting)}</span>
                       </li>
                     ))}
                   </ul>
@@ -511,16 +511,16 @@ export default function FinanceTreasuryForecast() {
             <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
               <SectionCard title={t("forecast.assumptions.title", "Applied assumptions")} subtitle={t("forecast.assumptions.subtitle", "Knobs the scenario adjusted; cash impact in USD.")}>
                 {(stress ?? base).assumptions.length === 0 ? (
-                  <div className="py-2 text-[11px] text-gray-500">{t("forecast.assumptions.empty", "No assumptions applied. Showing base case as it stands.")}</div>
+                  <div className="py-2 text-[11px] text-[var(--text-dim)]">{t("forecast.assumptions.empty", "No assumptions applied. Showing base case as it stands.")}</div>
                 ) : (
                   <ul className="space-y-1.5">
                     {(stress ?? base).assumptions.map((a) => (
-                      <li key={a.key} className="flex items-center justify-between gap-2 rounded-lg border border-white/[0.05] bg-[var(--bg-primary)]/40 px-3 py-2 text-[11px]">
+                      <li key={a.key} className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]/40 px-3 py-2 text-[11px]">
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[12px] font-semibold text-[var(--text-primary)]">{a.label}</span>
-                          <span className="block text-[10px] text-gray-500">{t("forecast.assumptions.affected", "Affected events: {n}").replace("{n}", String(a.affectedEventCount))}</span>
+                          <span className="block text-[10px] text-[var(--text-dim)]">{t("forecast.assumptions.affected", "Affected events: {n}").replace("{n}", String(a.affectedEventCount))}</span>
                         </span>
-                        <span className="shrink-0 text-[11px] font-semibold tabular-nums text-gray-300">{fmtCompactUsd(a.cashImpact)}</span>
+                        <span className="shrink-0 text-[11px] font-semibold tabular-nums text-[var(--text-highlight)]">{fmtCompactUsd(a.cashImpact)}</span>
                       </li>
                     ))}
                   </ul>
@@ -528,7 +528,7 @@ export default function FinanceTreasuryForecast() {
               </SectionCard>
 
               <SectionCard title={t("forecast.limitations.title", "Forecast limitations")} subtitle={t("forecast.limitations.subtitle", "What this engine can and cannot tell you.")}>
-                <ul className="space-y-1.5 text-[11px] text-gray-400">
+                <ul className="space-y-1.5 text-[11px] text-[var(--text-secondary)]">
                   {(stress ?? base).limitations.map((l, i) => (
                     <li key={i} className="flex items-start gap-2">
                       <RrIcon name="info" size={9} className="mt-0.5 shrink-0 opacity-70" />
@@ -552,16 +552,16 @@ export default function FinanceTreasuryForecast() {
                   <ul className="divide-y divide-white/[0.04]">
                     {(stress ?? base).events.slice(0, 30).map((e) => (
                       <li key={e.key} className="flex items-center gap-3 py-2 text-[11px]">
-                        <span className="text-gray-500 tabular-nums w-14">d+{e.daysFromNow}</span>
-                        <span className="text-gray-500 tabular-nums">{e.date}</span>
+                        <span className="text-[var(--text-dim)] tabular-nums w-14">d+{e.daysFromNow}</span>
+                        <span className="text-[var(--text-dim)] tabular-nums">{e.date}</span>
                         <span className={`rounded px-1.5 py-0.5 font-semibold uppercase tracking-wider ${e.direction === "inflow" ? "bg-emerald-500/15 text-emerald-300" : "bg-rose-500/15 text-rose-300"}`}>
                           {e.direction === "inflow" ? t("forecast.events.in", "In") : t("forecast.events.out", "Out")}
                         </span>
-                        <span className="text-gray-400">{e.source.replace(/_/g, " ")}</span>
-                        <span className="min-w-0 flex-1 truncate text-gray-300">{e.party}</span>
-                        <span className="tabular-nums font-semibold text-gray-200">{fmtCompactUsd(e.amount * (e.confidence || 1))} {e.currency}</span>
-                        <span className="text-gray-500">·</span>
-                        <span className="text-[10px] text-gray-500">{Math.round(e.confidence * 100)}%</span>
+                        <span className="text-[var(--text-secondary)]">{e.source.replace(/_/g, " ")}</span>
+                        <span className="min-w-0 flex-1 truncate text-[var(--text-highlight)]">{e.party}</span>
+                        <span className="tabular-nums font-semibold text-[var(--text-highlight)]">{fmtCompactUsd(e.amount * (e.confidence || 1))} {e.currency}</span>
+                        <span className="text-[var(--text-dim)]">·</span>
+                        <span className="text-[10px] text-[var(--text-dim)]">{Math.round(e.confidence * 100)}%</span>
                       </li>
                     ))}
                   </ul>
@@ -570,13 +570,13 @@ export default function FinanceTreasuryForecast() {
             </div>
 
             {/* Deep link to reconciliation queue when there's overdue activity. */}
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-gray-400">
-              <Link href="/finance/reconciliation" className="inline-flex items-center gap-1 hover:text-gray-200">
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-[var(--text-secondary)]">
+              <Link href="/finance/reconciliation" className="inline-flex items-center gap-1 hover:text-[var(--text-highlight)]">
                 <RrIcon name="arrow-up-right-from-square" size={9} />
                 {t("forecast.links.reconciliation", "Reconciliation queue")}
               </Link>
-              <span className="text-gray-700">·</span>
-              <Link href="/finance/bank-accounts" className="inline-flex items-center gap-1 hover:text-gray-200">
+              <span className="text-[var(--text-whisper)]">·</span>
+              <Link href="/finance/bank-accounts" className="inline-flex items-center gap-1 hover:text-[var(--text-highlight)]">
                 <RrIcon name="arrow-up-right-from-square" size={9} />
                 {t("forecast.links.bankAccounts", "Bank accounts")}
               </Link>
@@ -599,15 +599,15 @@ function DriverList({
   const accent = tone === "positive" ? "text-emerald-300" : "text-rose-300";
   return (
     <div>
-      <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-500">{title}</div>
+      <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--text-dim)]">{title}</div>
       {items.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-white/[0.05] px-3 py-3 text-[11px] text-gray-500">{t("forecast.drivers.noItems", "No material items.")}</div>
+        <div className="rounded-lg border border-dashed border-[var(--border-subtle)] px-3 py-3 text-[11px] text-[var(--text-dim)]">{t("forecast.drivers.noItems", "No material items.")}</div>
       ) : (
         <ul className="space-y-1">
           {items.map((it) => (
-            <li key={it.key} className="flex items-center gap-2 rounded-lg border border-white/[0.05] bg-[var(--bg-primary)]/40 px-2.5 py-1.5 text-[11px]">
-              <span className="text-gray-500 tabular-nums w-10">d+{it.daysFromNow}</span>
-              <span className="min-w-0 flex-1 truncate text-gray-300">{it.party}</span>
+            <li key={it.key} className="flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]/40 px-2.5 py-1.5 text-[11px]">
+              <span className="text-[var(--text-dim)] tabular-nums w-10">d+{it.daysFromNow}</span>
+              <span className="min-w-0 flex-1 truncate text-[var(--text-highlight)]">{it.party}</span>
               <span className={`tabular-nums font-semibold ${accent}`}>{fmtCompactUsd(it.amountReporting)}</span>
             </li>
           ))}

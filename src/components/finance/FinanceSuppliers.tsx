@@ -77,16 +77,16 @@ export default function FinanceSuppliers() {
 
         <div className="mt-6">
           {loading ? (
-            <div className="py-8 text-center text-sm text-gray-500">{t("suppliers.loading", "Loading suppliers…")}</div>
+            <div className="py-8 text-center text-sm text-[var(--text-dim)]">{t("suppliers.loading", "Loading suppliers…")}</div>
           ) : rows.length === 0 ? (
             <EmptyState title={t("suppliers.emptyTitle", "No suppliers yet")} hint={t("suppliers.emptyHint", "Suppliers appear here as soon as you add supplier costs to an order or link a supplier to an expense.")} />
           ) : (
             <div className="grid gap-3 md:grid-cols-2">
               {rows.map((r) => (
-                <div key={r.supplier_id} className="rounded-2xl border border-white/[0.06] bg-[var(--bg-secondary)] p-5 transition hover:border-white/[0.10]">
+                <div key={r.supplier_id} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 transition hover:border-[var(--border-color)]">
                   <div>
                     <div className="text-base font-semibold">{r.supplier_name || "—"}</div>
-                    <div className="mt-1 text-[11px] text-gray-500">{r.payment_terms ?? t("suppliers.noTerms", "No payment terms set")}</div>
+                    <div className="mt-1 text-[11px] text-[var(--text-dim)]">{r.payment_terms ?? t("suppliers.noTerms", "No payment terms set")}</div>
                   </div>
                   <div className="mt-4 grid grid-cols-3 gap-3">
                     <Mini label={t("suppliers.mini.purchases", "Purchases")} value={fmtMoney(r.total_purchases ?? 0,    r.default_currency, { compact: true })} accent="default" />
@@ -94,7 +94,7 @@ export default function FinanceSuppliers() {
                     <Mini label={t("suppliers.mini.toPay",     "To pay")}    value={fmtMoney(r.outstanding_payable ?? 0,r.default_currency, { compact: true })} accent="amber" />
                   </div>
                   <div className="mt-3">
-                    <div className="flex items-center justify-between text-[10px] text-gray-500">
+                    <div className="flex items-center justify-between text-[10px] text-[var(--text-dim)]">
                       <span>{t("suppliers.paymentProgress", "Payment progress")}</span>
                       <span>{r.total_purchases ? (((r.paid_amount ?? 0) / r.total_purchases) * 100).toFixed(0) : 0}%</span>
                     </div>
@@ -105,7 +105,7 @@ export default function FinanceSuppliers() {
                       type="button"
                       onClick={() => void generateStatement(r.supplier_id)}
                       disabled={generating === r.supplier_id}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-white/[0.10] bg-[var(--bg-primary)] px-3 py-1.5 text-[11px] font-semibold transition hover:border-white/[0.20] disabled:opacity-50"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-1.5 text-[11px] font-semibold transition hover:border-[var(--border-strong)] disabled:opacity-50"
                     >
                       <RrIcon name="file-invoice" size={12} />
                       {generating === r.supplier_id ? t("suppliers.preparing", "Preparing…") : t("suppliers.generate", "Generate Supplier Statement")}
@@ -124,8 +124,8 @@ export default function FinanceSuppliers() {
 function Mini({ label, value, accent }: { label: string; value: string; accent: "emerald" | "amber" | "default" }) {
   const color = accent === "emerald" ? "text-emerald-400" : accent === "amber" ? "text-amber-400" : "text-[var(--text-primary)]";
   return (
-    <div className="rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] p-2">
-      <div className="text-[9px] uppercase tracking-wider text-gray-500">{label}</div>
+    <div className="rounded-lg border border-[var(--border-faint)] bg-[var(--bg-primary)] p-2">
+      <div className="text-[9px] uppercase tracking-wider text-[var(--text-dim)]">{label}</div>
       <div className={`mt-1 text-sm font-semibold tabular-nums ${color}`}>{value}</div>
     </div>
   );

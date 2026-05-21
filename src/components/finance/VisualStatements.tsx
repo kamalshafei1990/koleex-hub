@@ -176,7 +176,7 @@ export function StatementsDashboard() {
       </div>
 
       {loading && (
-        <div className="text-center text-[12px] text-gray-500">{t("visual.loading", "Loading statements…")}</div>
+        <div className="text-center text-[12px] text-[var(--text-dim)]">{t("visual.loading", "Loading statements…")}</div>
       )}
 
       {/* ── Statement body ──────────────────────────────────────────── */}
@@ -202,7 +202,7 @@ export default function VisualStatements() {
       icon="balance-scale-left"
       backHref="/finance"
       action={
-        <Link href="/reports/statements" className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] hover:bg-white/[0.06]">
+        <Link href="/reports/statements" className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface-hover)]">
           <RrIcon name="newspaper" size={12} /> {t("visual.printVersion", "Print version")}
         </Link>
       }
@@ -230,9 +230,9 @@ function KpiHero({
 
   return (
     <div className="text-center">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gray-500">{label}</div>
+      <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-dim)]">{label}</div>
       <div className={`mt-3 font-mono text-[34px] leading-none tabular-nums tracking-[-0.01em] sm:text-[42px] ${main}`}>
-        {ccy && <span className="mr-1 text-[16px] text-gray-500">{ccy}</span>}
+        {ccy && <span className="mr-1 text-[16px] text-[var(--text-dim)]">{ccy}</span>}
         {fmtFull(value)}
       </div>
       {delta !== null && pct !== null && (
@@ -292,7 +292,7 @@ function PillToggle<T extends string>({
 }) {
   const pad = size === "sm" ? "px-3 py-1 text-[11.5px]" : "px-4 py-1.5 text-[12.5px]";
   return (
-    <div className="flex gap-1 rounded-full border border-white/[0.08] bg-white/[0.02] p-1">
+    <div className="flex gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-1">
       {options.map((o) => (
         <button
           key={o.k}
@@ -300,8 +300,8 @@ function PillToggle<T extends string>({
           onClick={() => onChange(o.k)}
           className={`rounded-full transition-colors ${pad} ${
             o.k === value
-              ? "bg-white/[0.12] text-white"
-              : "text-gray-400 hover:text-gray-200"
+              ? "bg-[var(--bg-surface-active)] text-white"
+              : "text-[var(--text-secondary)] hover:text-[var(--text-highlight)]"
           }`}
         >
           {o.label}
@@ -316,7 +316,7 @@ function PillToggle<T extends string>({
 function PeriodHeaders({ curLabel, priorLabel }: { curLabel: string; priorLabel: string }) {
   const { t } = useTranslation(financeT);
   return (
-    <div className="grid grid-cols-[1fr_auto_auto] items-baseline gap-x-8 border-b border-white/[0.08] pb-1.5 text-[10px] uppercase tracking-[0.16em] text-gray-500">
+    <div className="grid grid-cols-[1fr_auto_auto] items-baseline gap-x-8 border-b border-[var(--border-subtle)] pb-1.5 text-[10px] uppercase tracking-[0.16em] text-[var(--text-dim)]">
       <span />
       <span className="text-right">{priorLabel || t("visual.prior", "Prior")}</span>
       <span className="text-right">{curLabel || t("visual.current", "Current")}</span>
@@ -327,7 +327,7 @@ function PeriodHeaders({ curLabel, priorLabel }: { curLabel: string; priorLabel:
 function SingleColHeader({ curLabel }: { curLabel: string }) {
   const { t } = useTranslation(financeT);
   return (
-    <div className="grid grid-cols-[1fr_auto] items-baseline gap-x-8 border-b border-white/[0.08] pb-1.5 text-[10px] uppercase tracking-[0.16em] text-gray-500">
+    <div className="grid grid-cols-[1fr_auto] items-baseline gap-x-8 border-b border-[var(--border-subtle)] pb-1.5 text-[10px] uppercase tracking-[0.16em] text-[var(--text-dim)]">
       <span />
       <span className="text-right">{curLabel || t("visual.current", "Current")}</span>
     </div>
@@ -336,15 +336,15 @@ function SingleColHeader({ curLabel }: { curLabel: string }) {
 
 function SectionTitle({ label }: { label: string }) {
   return (
-    <div className="mt-6 mb-2 first:mt-0 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">{label}</div>
+    <div className="mt-6 mb-2 first:mt-0 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">{label}</div>
   );
 }
 
 function TwoColRow({ label, prior, cur }: { label: string; prior: number; cur: number }) {
   return (
-    <div className="grid grid-cols-[1fr_auto_auto] items-baseline gap-x-8 border-b border-white/[0.04] py-1.5 text-[12.5px] last:border-b-0">
-      <span className="text-gray-200">{label}</span>
-      <span className="font-mono tabular-nums text-gray-400">{fmtSigned(prior)}</span>
+    <div className="grid grid-cols-[1fr_auto_auto] items-baseline gap-x-8 border-b border-[var(--border-faint)] py-1.5 text-[12.5px] last:border-b-0">
+      <span className="text-[var(--text-highlight)]">{label}</span>
+      <span className="font-mono tabular-nums text-[var(--text-secondary)]">{fmtSigned(prior)}</span>
       <span className="font-mono tabular-nums text-[var(--text-primary)]">{fmtSigned(cur)}</span>
     </div>
   );
@@ -352,8 +352,8 @@ function TwoColRow({ label, prior, cur }: { label: string; prior: number; cur: n
 
 function SingleRow({ label, amount }: { label: string; amount: number }) {
   return (
-    <div className="grid grid-cols-[1fr_auto] items-baseline gap-x-8 border-b border-white/[0.04] py-1.5 text-[12.5px] last:border-b-0">
-      <span className="text-gray-200">{label}</span>
+    <div className="grid grid-cols-[1fr_auto] items-baseline gap-x-8 border-b border-[var(--border-faint)] py-1.5 text-[12.5px] last:border-b-0">
+      <span className="text-[var(--text-highlight)]">{label}</span>
       <span className="font-mono tabular-nums text-[var(--text-primary)]">{fmtSigned(amount)}</span>
     </div>
   );
@@ -378,15 +378,15 @@ function TotalRow({
     tone === "warning"  ? "text-amber-200"   :
                           "text-[var(--text-primary)]";
   const border =
-    strength === "headline" ? "border-t-2 border-white/[0.20]" :
-    strength === "total"    ? "border-t border-white/[0.14]" :
-                              "border-t border-white/[0.08]";
+    strength === "headline" ? "border-t-2 border-[var(--border-strong)]" :
+    strength === "total"    ? "border-t border-[var(--border-color)]" :
+                              "border-t border-[var(--border-subtle)]";
 
   return (
     <div className={`mt-2 grid items-baseline gap-x-8 py-2 ${border} ${text} ${showPrior ? "grid-cols-[1fr_auto_auto]" : "grid-cols-[1fr_auto]"}`}>
-      <span className="uppercase tracking-[0.04em] text-gray-300">{label}</span>
+      <span className="uppercase tracking-[0.04em] text-[var(--text-highlight)]">{label}</span>
       {showPrior && (
-        <span className="font-mono tabular-nums text-gray-500">{prior !== undefined ? fmtSigned(prior) : ""}</span>
+        <span className="font-mono tabular-nums text-[var(--text-dim)]">{prior !== undefined ? fmtSigned(prior) : ""}</span>
       )}
       <span className={`font-mono tabular-nums ${valueTone}`}>{fmtSigned(cur)}</span>
     </div>
@@ -394,7 +394,7 @@ function TotalRow({
 }
 
 function MutedRow({ label }: { label: string }) {
-  return <div className="border-b border-white/[0.04] py-1.5 text-[11px] text-gray-500 last:border-b-0">{label}</div>;
+  return <div className="border-b border-[var(--border-faint)] py-1.5 text-[11px] text-[var(--text-dim)] last:border-b-0">{label}</div>;
 }
 
 /* ───── Income view ───── */

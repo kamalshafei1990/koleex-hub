@@ -96,7 +96,7 @@ function SetupHealthBanner({ health }: { health: SetupHealth }) {
               ? t("home.banner.oneMissing", "1 setup item is empty — your KPIs may understate cash and AR/AP until it's filled.")
               : t("home.banner.manyMissing", "{n} setup items are empty — your KPIs may understate cash and AR/AP until they're filled.").replace("{n}", String(health.missingCount))}
           </div>
-          <div className="mt-1 truncate text-[11px] text-gray-400">{items}{more}</div>
+          <div className="mt-1 truncate text-[11px] text-[var(--text-secondary)]">{items}{more}</div>
         </div>
         <RrIcon name="arrow-up-right" size={11} className="mt-1 text-amber-300/70 transition-colors group-hover:text-amber-200" />
       </Link>

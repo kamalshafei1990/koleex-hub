@@ -127,7 +127,7 @@ export default function FinancePayments() {
               title={editing.direction === "in" ? t("payments.editor.titleIn", "Record customer payment") : t("payments.editor.titleOut", "Record supplier payment")}
               action={
                 <div className="flex gap-2">
-                  <button onClick={() => setEditing(null)} className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-gray-300 hover:border-white/[0.12]">{t("payments.editor.cancel", "Cancel")}</button>
+                  <button onClick={() => setEditing(null)} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-[var(--text-highlight)] hover:border-[var(--border-color)]">{t("payments.editor.cancel", "Cancel")}</button>
                   <button onClick={save} className="rounded-lg bg-emerald-500/20 px-3 py-1.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/30">{t("payments.editor.save", "Save Payment")}</button>
                 </div>
               }
@@ -170,7 +170,7 @@ export default function FinancePayments() {
 
         <div className="mt-6">
           {loading ? (
-            <SectionCard><div className="py-8 text-center text-sm text-gray-500">{t("payments.loading", "Loading payments…")}</div></SectionCard>
+            <SectionCard><div className="py-8 text-center text-sm text-[var(--text-dim)]">{t("payments.loading", "Loading payments…")}</div></SectionCard>
           ) : rows.length === 0 ? (
             <EmptyState
               title={t("payments.emptyTitle", "No payments recorded yet")}
@@ -181,7 +181,7 @@ export default function FinancePayments() {
             <SectionCard>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="text-left text-[10px] uppercase tracking-wider text-gray-500">
+                  <thead className="text-left text-[10px] uppercase tracking-wider text-[var(--text-dim)]">
                     <tr>
                       <th className="py-2 pr-3">{t("payments.col.date", "Date")}</th>
                       <th className="py-2 pr-3">
@@ -215,17 +215,17 @@ export default function FinancePayments() {
                     {rows.map((p) => (
                       <tr
                         key={p.id}
-                        className="cursor-pointer border-t border-white/[0.04] transition hover:bg-white/[0.02]"
+                        className="cursor-pointer border-t border-[var(--border-faint)] transition hover:bg-[var(--bg-secondary)]"
                         onClick={() => setReviewPayment(p)}
                       >
-                        <td className="py-3 pr-3 text-gray-400 tabular-nums">{p.payment_date}</td>
+                        <td className="py-3 pr-3 text-[var(--text-secondary)] tabular-nums">{p.payment_date}</td>
                         <td className="py-3 pr-3">
                           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${p.direction === "in" ? "bg-emerald-500/15 text-emerald-400" : "bg-rose-500/15 text-rose-400"}`}>
                             {p.direction === "in" ? t("payments.row.in", "Money in") : t("payments.row.out", "Money out")}
                           </span>
                         </td>
                         <td className="py-3 pr-3 font-medium">{p.party_name || "—"}</td>
-                        <td className="py-3 pr-3 text-gray-400">{p.payment_method ?? "—"}</td>
+                        <td className="py-3 pr-3 text-[var(--text-secondary)]">{p.payment_method ?? "—"}</td>
                         <td className={`py-3 pr-3 text-right tabular-nums font-semibold ${p.direction === "in" ? "text-emerald-400" : "text-rose-400"}`}>
                           {p.direction === "in" ? "+" : "−"}{fmtMoney(Number(p.amount) || 0, p.currency, { compact: true })}
                         </td>
@@ -260,12 +260,12 @@ export default function FinancePayments() {
   );
 }
 
-const INPUT = "w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-emerald-500/50 focus:outline-none";
+const INPUT = "w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-[var(--text-ghost)] focus:border-emerald-500/50 focus:outline-none";
 
 function Field({ label, children, wide }: { label: string; children: React.ReactNode; wide?: boolean }) {
   return (
     <label className={`flex flex-col gap-1 ${wide ? "col-span-2" : ""}`}>
-      <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">{label}</span>
+      <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-dim)]">{label}</span>
       {children}
     </label>
   );

@@ -33,7 +33,7 @@ import { useTranslation } from "@/lib/i18n";
 import { financeT } from "@/lib/translations/finance";
 
 export const INPUT =
-  "w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-gray-600 transition focus:border-white/[0.22] focus:outline-none focus:ring-1 focus:ring-white/[0.08]";
+  "w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-[var(--text-ghost)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-1 focus:ring-[var(--border-subtle)]";
 
 export function Field({
   label, required, hint, children,
@@ -45,12 +45,12 @@ export function Field({
 }) {
   return (
     <label className="block">
-      <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-dim)]">
         <span>{label}</span>
         {required && <span className="text-rose-400">*</span>}
       </span>
       <span className="mt-1 block">{children}</span>
-      {hint && <span className="mt-1 block text-[10px] text-gray-500">{hint}</span>}
+      {hint && <span className="mt-1 block text-[10px] text-[var(--text-dim)]">{hint}</span>}
     </label>
   );
 }
@@ -101,16 +101,16 @@ export function EditDrawer({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-md sm:items-center sm:px-4 sm:py-8" onClick={onClose}>
       <div
-        className="relative flex w-full max-w-xl flex-col overflow-hidden rounded-t-2xl border border-white/[0.08] bg-[var(--bg-secondary)] shadow-2xl sm:rounded-2xl"
+        className="relative flex w-full max-w-xl flex-col overflow-hidden rounded-t-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl sm:rounded-2xl"
         style={{ maxHeight: "min(92vh, 800px)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-3.5">
+        <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-3.5">
           <div>
             <h2 className="text-[14px] font-semibold">{isEdit ? t("bank.edit.title", "Edit bank account") : t("bank.new.title", "New bank account")}</h2>
-            <p className="mt-0.5 text-[11px] text-gray-500">{t("bank.edit.subtitle", "Treasury-grade entry. Account number is masked in list views.")}</p>
+            <p className="mt-0.5 text-[11px] text-[var(--text-dim)]">{t("bank.edit.subtitle", "Treasury-grade entry. Account number is masked in list views.")}</p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-white/[0.06] hover:text-gray-100">
+          <button onClick={onClose} className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]">
             <RrIcon name="cross" size={12} />
           </button>
         </div>
@@ -168,7 +168,7 @@ export function EditDrawer({
                   onChange={(e) => setLocal({ ...local, opening_balance: Number(e.target.value) || 0 })} />
               </Field>
             </div>
-            <label className="inline-flex items-center gap-2 text-[12px] text-gray-300">
+            <label className="inline-flex items-center gap-2 text-[12px] text-[var(--text-highlight)]">
               <input type="checkbox" checked={!!local.is_primary} onChange={(e) => setLocal({ ...local, is_primary: e.target.checked })} />
               {t("bank.field.makePrimary", "Make primary for this currency")}
             </label>
@@ -182,11 +182,11 @@ export function EditDrawer({
             </Field>
           </div>
         </div>
-        <div className="border-t border-white/[0.06] px-5 py-3">
+        <div className="border-t border-[var(--border-subtle)] px-5 py-3">
           <div className="flex items-center justify-between gap-3">
             <span className="text-[11px] text-rose-300 truncate">{error ?? ""}</span>
             <div className="flex items-center gap-2">
-              <button onClick={onClose} className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-gray-300 hover:border-white/[0.18]">{t("bank.action.cancel", "Cancel")}</button>
+              <button onClick={onClose} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-[var(--text-highlight)] hover:border-[var(--border-strong)]">{t("bank.action.cancel", "Cancel")}</button>
               <button onClick={save} disabled={saving} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-xs font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
                 {saving ? <RrIcon name="loading" size={11} className="animate-spin" /> : <RrIcon name="check" size={11} />}
                 {isEdit ? t("bank.action.saveChanges", "Save changes") : t("bank.action.createAccount", "Create account")}
@@ -288,13 +288,13 @@ export function ManualMovementDrawer({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-md sm:items-center sm:px-4 sm:py-8" onClick={onClose}>
-      <div className="relative flex w-full max-w-lg flex-col rounded-t-2xl border border-white/[0.08] bg-[var(--bg-secondary)] shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-3.5">
+      <div className="relative flex w-full max-w-lg flex-col rounded-t-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-3.5">
           <div>
             <h2 className="text-[14px] font-semibold">{t("movement.title", "Manual cash movement")}</h2>
-            <p className="mt-0.5 text-[11px] text-gray-500">{t("movement.intro", "Used for bank fees, FX, adjustments, and one-off entries. The movement enters the reconciliation queue as unreconciled.")}</p>
+            <p className="mt-0.5 text-[11px] text-[var(--text-dim)]">{t("movement.intro", "Used for bank fees, FX, adjustments, and one-off entries. The movement enters the reconciliation queue as unreconciled.")}</p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-white/[0.06] hover:text-gray-100">
+          <button onClick={onClose} className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]">
             <RrIcon name="cross" size={12} />
           </button>
         </div>
@@ -340,11 +340,11 @@ export function ManualMovementDrawer({
             <textarea rows={2} className={INPUT + " resize-none"} value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
           </Field>
         </div>
-        <div className="border-t border-white/[0.06] px-5 py-3">
+        <div className="border-t border-[var(--border-subtle)] px-5 py-3">
           <div className="flex items-center justify-between gap-3">
             <span className="text-[11px] text-rose-300 truncate">{error ?? ""}</span>
             <div className="flex items-center gap-2">
-              <button onClick={onClose} className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-gray-300 hover:border-white/[0.18]">{t("bank.action.cancel", "Cancel")}</button>
+              <button onClick={onClose} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-[var(--text-highlight)] hover:border-[var(--border-strong)]">{t("bank.action.cancel", "Cancel")}</button>
               <button onClick={save} disabled={saving} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-xs font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
                 {saving ? <RrIcon name="loading" size={11} className="animate-spin" /> : <RrIcon name="check" size={11} />}
                 {t("movement.action.record", "Record movement")}

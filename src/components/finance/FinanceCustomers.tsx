@@ -80,17 +80,17 @@ export default function FinanceCustomers() {
 
         <div className="mt-6">
           {loading ? (
-            <div className="py-8 text-center text-sm text-gray-500">{t("customers.loading", "Loading customers…")}</div>
+            <div className="py-8 text-center text-sm text-[var(--text-dim)]">{t("customers.loading", "Loading customers…")}</div>
           ) : rows.length === 0 ? (
             <EmptyState title={t("customers.emptyTitle", "No customers yet")} hint={t("customers.emptyHint", "Customers appear here as soon as you create an order for them on the Orders page.")} />
           ) : (
             <div className="grid gap-3 md:grid-cols-2">
               {rows.map((r) => (
-                <div key={r.customer_id} className="rounded-2xl border border-white/[0.06] bg-[var(--bg-secondary)] p-5 transition hover:border-white/[0.10]">
+                <div key={r.customer_id} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 transition hover:border-[var(--border-color)]">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="text-base font-semibold">{r.customer_name || "—"}</div>
-                      <div className="mt-1 text-[11px] text-gray-500">
+                      <div className="mt-1 text-[11px] text-[var(--text-dim)]">
                         {r.payment_terms ?? t("customers.noTerms", "No payment terms set")}
                       </div>
                     </div>
@@ -102,7 +102,7 @@ export default function FinanceCustomers() {
                     <Mini label={t("customers.mini.outstanding", "Outstanding")} value={fmtMoney(r.outstanding_balance ?? 0, r.default_currency, { compact: true })} accent="amber" />
                   </div>
                   <div className="mt-3">
-                    <div className="flex items-center justify-between text-[10px] text-gray-500">
+                    <div className="flex items-center justify-between text-[10px] text-[var(--text-dim)]">
                       <span>{t("customers.collectionProgress", "Collection progress")}</span>
                       <span>{r.total_revenue ? (((r.paid_amount ?? 0) / r.total_revenue) * 100).toFixed(0) : 0}%</span>
                     </div>
@@ -120,7 +120,7 @@ export default function FinanceCustomers() {
                       type="button"
                       onClick={() => void generateStatement(r.customer_id)}
                       disabled={generating === r.customer_id}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-white/[0.10] bg-[var(--bg-primary)] px-3 py-1.5 text-[11px] font-semibold transition hover:border-white/[0.20] disabled:opacity-50"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-1.5 text-[11px] font-semibold transition hover:border-[var(--border-strong)] disabled:opacity-50"
                     >
                       <RrIcon name="file-invoice" size={12} />
                       {generating === r.customer_id ? t("customers.preparing", "Preparing…") : t("customers.generate", "Generate Account Statement")}
@@ -139,8 +139,8 @@ export default function FinanceCustomers() {
 function Mini({ label, value, accent }: { label: string; value: string; accent: "emerald" | "rose" | "amber" }) {
   const color = accent === "emerald" ? "text-emerald-400" : accent === "rose" ? "text-rose-400" : "text-amber-400";
   return (
-    <div className="rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] p-2">
-      <div className="text-[9px] uppercase tracking-wider text-gray-500">{label}</div>
+    <div className="rounded-lg border border-[var(--border-faint)] bg-[var(--bg-primary)] p-2">
+      <div className="text-[9px] uppercase tracking-wider text-[var(--text-dim)]">{label}</div>
       <div className={`mt-1 text-sm font-semibold tabular-nums ${color}`}>{value}</div>
     </div>
   );

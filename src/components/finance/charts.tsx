@@ -187,8 +187,8 @@ export function AreaChart({
   const hasAnyValue = allValues.some((v) => v !== 0);
   if (!series.length || !labels.length || !hasAnyValue) {
     return (
-      <div className="flex h-64 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-white/[0.06] bg-white/[0.01] text-sm text-gray-500">
-        <span className="text-[11px] uppercase tracking-[0.18em] text-gray-600">No activity</span>
+      <div className="flex h-64 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-sm text-[var(--text-dim)]">
+        <span className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-ghost)]">No activity</span>
         <span>Once orders and expenses flow in, the trend chart appears here.</span>
       </div>
     );
@@ -328,7 +328,7 @@ export function AreaChart({
         )}
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-4 text-[11px] text-gray-400">
+      <div className="mt-3 flex flex-wrap items-center gap-4 text-[11px] text-[var(--text-secondary)]">
         {series.map((s, i) => {
           const stroke = toneToStroke(s.tone);
           return (
@@ -338,7 +338,7 @@ export function AreaChart({
             </span>
           );
         })}
-        <span className="ml-auto text-gray-600">{currency}</span>
+        <span className="ml-auto text-[var(--text-ghost)]">{currency}</span>
       </div>
     </div>
   );
@@ -366,10 +366,10 @@ export function DonutChart({
   if (total <= 0) {
     return (
       <div
-        className="flex flex-col items-center justify-center rounded-xl border border-dashed border-white/[0.06] bg-white/[0.01] text-sm text-gray-500"
+        className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-sm text-[var(--text-dim)]"
         style={{ width: size, height: size }}
       >
-        <span className="text-[10px] uppercase tracking-[0.18em] text-gray-600">No spend</span>
+        <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-ghost)]">No spend</span>
       </div>
     );
   }
@@ -456,7 +456,7 @@ export function BarChart({
 }) {
   if (data.length === 0) {
     return (
-      <div className="flex h-32 items-center justify-center rounded-xl border border-dashed border-white/[0.06] bg-white/[0.01] text-sm text-gray-500">
+      <div className="flex h-32 items-center justify-center rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-sm text-[var(--text-dim)]">
         No data yet.
       </div>
     );
@@ -469,7 +469,7 @@ export function BarChart({
           const pct = (Math.abs(d.value) / max) * 100;
           const isMax = max > 0 && Math.abs(d.value) === max;
           const isLast = i === data.length - 1;
-          const tone = isMax ? "bg-white/[0.45]" : "bg-white/[0.10]";
+          const tone = isMax ? "bg-white/[0.45]" : "bg-[var(--bg-surface-hover)]";
           const ring =
             highlightLast && isLast
               ? "ring-1 ring-white/[0.08]"
@@ -477,7 +477,7 @@ export function BarChart({
           return (
             <div
               key={i}
-              className={`group flex-1 cursor-default rounded-sm transition-colors duration-200 hover:bg-white/[0.20] ${tone} ${ring}`}
+              className={`group flex-1 cursor-default rounded-sm transition-colors duration-200 hover:bg-[var(--bg-surface-bright)] ${tone} ${ring}`}
               style={{ height: `${Math.max(3, pct)}%`, minHeight: 3 }}
               title={`${d.label} · ${formatCompact(d.value)}`}
             />
@@ -486,7 +486,7 @@ export function BarChart({
       </div>
       <div className="mt-1.5 flex gap-1.5">
         {data.map((d, i) => (
-          <div key={i} className="flex-1 text-center text-[9px] tracking-wide text-gray-500">{d.label}</div>
+          <div key={i} className="flex-1 text-center text-[9px] tracking-wide text-[var(--text-dim)]">{d.label}</div>
         ))}
       </div>
     </div>

@@ -410,7 +410,7 @@ export function accentBgClass(accent: CategoryAccent): string {
     case "yellow":  return "bg-yellow-500/12 border-yellow-500/30 text-yellow-200";
     case "red":     return "bg-red-500/12 border-red-500/25 text-red-300";
     case "pink":    return "bg-pink-500/12 border-pink-500/25 text-pink-300";
-    default:        return "bg-gray-500/12 border-gray-500/25 text-gray-300";
+    default:        return "bg-gray-500/12 border-gray-500/25 text-[var(--text-highlight)]";
   }
 }
 
@@ -453,6 +453,6 @@ export function accentActiveClass(accent: CategoryAccent): string {
     case "yellow":  return "border-yellow-500/60 bg-yellow-500/20 text-yellow-100";
     case "red":     return "border-red-500/60 bg-red-500/20 text-red-200";
     case "pink":    return "border-pink-500/60 bg-pink-500/20 text-pink-200";
-    default:        return "border-white/[0.22] bg-white/[0.10] text-gray-100";
+    default:        return "border-[var(--border-strong)] bg-[var(--bg-surface-hover)] text-[var(--text-primary)]";
   }
 }

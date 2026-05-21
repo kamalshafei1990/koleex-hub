@@ -63,13 +63,13 @@ export default function FinanceCashFlow() {
           subtitle={t("accounting.cf.subtitle.long", "Direct-method statement built from posted journal lines that touch cash accounts.")}
         />
 
-        <div className="rounded-xl border border-white/[0.05] bg-white/[0.012] p-4">
+        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
           <div className="flex flex-wrap items-end gap-3">
-            <label className="block"><div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">From</div>
-              <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" /></label>
-            <label className="block"><div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">To</div>
-              <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" /></label>
-            <div className="ml-auto text-[10px] uppercase tracking-[0.18em] text-gray-500">
+            <label className="block"><div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">From</div>
+              <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" /></label>
+            <label className="block"><div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">To</div>
+              <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" /></label>
+            <div className="ml-auto text-[10px] uppercase tracking-[0.18em] text-[var(--text-dim)]">
               {loading ? "Loading…" : data ? `${data.currency} · ${data.period.from} → ${data.period.to}` : ""}
             </div>
           </div>
@@ -78,18 +78,18 @@ export default function FinanceCashFlow() {
         {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">{error}</div>}
 
         {data && (
-          <div className="rounded-xl border border-white/[0.05] bg-white/[0.012]">
+          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
             <table className="min-w-full text-[12.5px]">
               <tbody>
-                <tr className="border-b border-white/[0.08]">
-                  <td className="px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-400">Opening cash</td>
+                <tr className="border-b border-[var(--border-subtle)]">
+                  <td className="px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-secondary)]">Opening cash</td>
                   <td className="px-4 py-2 text-right tabular-nums font-mono font-medium">{fmt(data.opening_cash)}</td>
                 </tr>
                 {[data.operating, data.investing, data.financing].map((sec) => (
                   <Section key={sec.label} section={sec} />
                 ))}
-                <tr className="border-t border-white/[0.10]">
-                  <td className="px-4 py-2 text-[11px] uppercase tracking-[0.08em] text-gray-400">Net change in cash</td>
+                <tr className="border-t border-[var(--border-color)]">
+                  <td className="px-4 py-2 text-[11px] uppercase tracking-[0.08em] text-[var(--text-secondary)]">Net change in cash</td>
                   <td className="px-4 py-2 text-right tabular-nums font-mono">{fmt(data.net_change)}</td>
                 </tr>
                 <tr className="border-t-2 border-white/20">
@@ -109,7 +109,7 @@ export default function FinanceCashFlow() {
         <Hairline />
         <div>
           <Eyebrow>Method</Eyebrow>
-          <p className="mt-2 max-w-prose text-[11.5px] leading-relaxed text-gray-500">
+          <p className="mt-2 max-w-prose text-[11.5px] leading-relaxed text-[var(--text-dim)]">
             Each posted journal line that touches account 1000 or 1010 is classified by source type: payments and expenses are operating; opening-balance entries and lines whose contra side is equity or loans payable are financing; everything else flows to operating. Investing activity stays at zero until fixed-asset accounts are added in a later phase.{" "}
             {/* deliberately ascii apostrophes elsewhere; this single em-clarification kept short */}
           </p>
@@ -122,19 +122,19 @@ export default function FinanceCashFlow() {
 function Section({ section }: { section: CashFlowSection }) {
   return (
     <>
-      <tr className="bg-white/[0.02]">
-        <td className="px-4 py-1.5 text-[10px] uppercase tracking-[0.12em] text-gray-400">{section.label}</td>
-        <td className="px-4 py-1.5 text-right tabular-nums font-mono font-medium text-gray-300">{fmt(section.amount)}</td>
+      <tr className="bg-[var(--bg-secondary)]">
+        <td className="px-4 py-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--text-secondary)]">{section.label}</td>
+        <td className="px-4 py-1.5 text-right tabular-nums font-mono font-medium text-[var(--text-highlight)]">{fmt(section.amount)}</td>
       </tr>
       {section.lines.map((line) => (
-        <tr key={line.label} className="border-b border-white/[0.03]">
-          <td className="px-4 py-1.5 pl-6 text-gray-300">{line.label}</td>
-          <td className="px-4 py-1.5 text-right tabular-nums font-mono text-gray-400">{fmt(line.amount)}</td>
+        <tr key={line.label} className="border-b border-[var(--border-faint)]">
+          <td className="px-4 py-1.5 pl-6 text-[var(--text-highlight)]">{line.label}</td>
+          <td className="px-4 py-1.5 text-right tabular-nums font-mono text-[var(--text-secondary)]">{fmt(line.amount)}</td>
         </tr>
       ))}
       {section.lines.length === 0 && (
-        <tr className="border-b border-white/[0.03]">
-          <td className="px-4 py-1.5 pl-6 text-[11px] text-gray-600" colSpan={2}>No activity in this section.</td>
+        <tr className="border-b border-[var(--border-faint)]">
+          <td className="px-4 py-1.5 pl-6 text-[11px] text-[var(--text-ghost)]" colSpan={2}>No activity in this section.</td>
         </tr>
       )}
     </>

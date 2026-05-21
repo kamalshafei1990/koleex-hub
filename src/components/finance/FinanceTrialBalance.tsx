@@ -33,13 +33,13 @@ function fmt(n: number): string {
 }
 
 function Card({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-2xl border border-white/[0.06] bg-[var(--bg-secondary)] p-5">{children}</div>;
+  return <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">{children}</div>;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">{label}</div>
+      <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{label}</div>
       {children}
     </label>
   );
@@ -93,7 +93,7 @@ export default function FinanceTrialBalance() {
           action={
             <Link
               href="/finance/accounting/general-ledger"
-              className="inline-flex items-center gap-2 rounded-lg border border-white/[0.10] bg-[var(--bg-primary)] px-3 py-1.5 text-[12px] font-semibold transition hover:border-white/[0.20]"
+              className="inline-flex items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-1.5 text-[12px] font-semibold transition hover:border-[var(--border-strong)]"
             >
               <RrIcon name="file-invoice" size={12} />
               Open General Ledger
@@ -105,23 +105,23 @@ export default function FinanceTrialBalance() {
           <div className="flex flex-wrap items-end gap-3">
             <Field label="From">
               <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
-                className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
+                className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
             </Field>
             <Field label="To">
               <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
-                className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
+                className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
             </Field>
             <button
               type="button"
               onClick={() => { setFrom(""); setTo(today); }}
-              className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-[11px] hover:border-white/[0.20]"
+              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-1.5 text-[11px] hover:border-[var(--border-strong)]"
             >Reset to all-time</button>
             <button
               type="button"
               onClick={() => setFrom(ninetyAgo)}
-              className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-[11px] hover:border-white/[0.20]"
+              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-1.5 text-[11px] hover:border-[var(--border-strong)]"
             >Last 365 days</button>
-            <div className="ml-auto text-[10px] uppercase tracking-[0.18em] text-gray-500">
+            <div className="ml-auto text-[10px] uppercase tracking-[0.18em] text-[var(--text-dim)]">
               {loading ? "Loading…" : data ? `As of ${data.as_of}` : ""}
             </div>
           </div>
@@ -145,14 +145,14 @@ export default function FinanceTrialBalance() {
         {data && grouped.map((g) => (
           g.rows.length > 0 && (
             <Card key={g.label}>
-              <div className="mb-2 flex items-center justify-between border-b border-white/[0.04] pb-2">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-400">{g.label}</div>
-                <div className="text-[10px] text-gray-500">{g.rows.length} accounts</div>
+              <div className="mb-2 flex items-center justify-between border-b border-[var(--border-faint)] pb-2">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">{g.label}</div>
+                <div className="text-[10px] text-[var(--text-dim)]">{g.rows.length} accounts</div>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full text-[12px]">
                   <thead>
-                    <tr className="border-b border-white/[0.06] text-[9px] uppercase tracking-[0.10em] text-gray-500">
+                    <tr className="border-b border-[var(--border-subtle)] text-[9px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
                       <th className="px-2 py-1.5 text-left">Code</th>
                       <th className="px-2 py-1.5 text-left">Account</th>
                       <th className="px-2 py-1.5 text-right">Debit</th>
@@ -162,8 +162,8 @@ export default function FinanceTrialBalance() {
                   </thead>
                   <tbody>
                     {g.rows.map((r) => (
-                      <tr key={r.account_id} className="border-b border-white/[0.04]">
-                        <td className="px-2 py-1.5 font-mono text-gray-300">{r.code}</td>
+                      <tr key={r.account_id} className="border-b border-[var(--border-faint)]">
+                        <td className="px-2 py-1.5 font-mono text-[var(--text-highlight)]">{r.code}</td>
                         <td className="px-2 py-1.5">
                           <Link
                             href={`/finance/accounting/general-ledger?account_id=${encodeURIComponent(r.account_id)}`}
@@ -186,13 +186,13 @@ export default function FinanceTrialBalance() {
         {data && (
           <Card>
             <div className="flex flex-wrap items-baseline justify-between gap-4 border-t-2 border-white/20 pt-3">
-              <div className="text-[10px] uppercase tracking-[0.16em] text-gray-400">Totals</div>
+              <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-secondary)]">Totals</div>
               <div className="flex flex-wrap items-baseline gap-6 tabular-nums">
-                <span className="text-[10px] text-gray-500">Debit</span>
+                <span className="text-[10px] text-[var(--text-dim)]">Debit</span>
                 <span className="font-mono text-[14px] font-bold">{fmt(data.totals.debit)}</span>
-                <span className="text-[10px] text-gray-500">Credit</span>
+                <span className="text-[10px] text-[var(--text-dim)]">Credit</span>
                 <span className="font-mono text-[14px] font-bold">{fmt(data.totals.credit)}</span>
-                <span className="text-[10px] text-gray-500">Difference</span>
+                <span className="text-[10px] text-[var(--text-dim)]">Difference</span>
                 <span className={`font-mono text-[14px] font-bold ${balanced ? "text-emerald-300" : "text-rose-300"}`}>{fmt(data.totals.difference)}</span>
               </div>
             </div>

@@ -68,10 +68,10 @@ export function ErpPage({
 /* ─── Typographic primitives ───────────────────────────────── */
 
 export function ErpEyebrow({ children }: { children: ReactNode }) {
-  return <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">{children}</div>;
+  return <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-dim)]">{children}</div>;
 }
 export function ErpHairline({ className = "" }: { className?: string }) {
-  return <div aria-hidden className={`h-px w-full bg-white/[0.05] ${className}`} />;
+  return <div aria-hidden className={`h-px w-full bg-[var(--border-subtle)] ${className}`} />;
 }
 
 /* ─── KPI tile ─────────────────────────────────────────────── */
@@ -90,11 +90,11 @@ export function ErpKpi({
     tone === "info"     ? "bg-blue-300/55"    :
                           "bg-white/30";
   return (
-    <div className="relative rounded-xl border border-white/[0.05] bg-white/[0.012] px-4 py-3.5">
+    <div className="relative rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] px-4 py-3.5">
       <div aria-hidden className={`absolute left-4 top-0 h-px w-8 ${accent}`} />
       <ErpEyebrow>{label}</ErpEyebrow>
       <div className="mt-2 font-mono text-[22px] leading-none tabular-nums tracking-[-0.01em]">{value}</div>
-      {hint && <div className="mt-1.5 text-[10.5px] text-gray-600">{hint}</div>}
+      {hint && <div className="mt-1.5 text-[10.5px] text-[var(--text-ghost)]">{hint}</div>}
     </div>
   );
 }
@@ -103,7 +103,7 @@ export function ErpKpi({
 
 export function ErpPanel({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`overflow-hidden rounded-xl border border-white/[0.05] bg-white/[0.012] ${className}`}>
+    <div className={`overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] ${className}`}>
       {children}
     </div>
   );
@@ -133,7 +133,7 @@ export function ErpTable<T>({
       <div className="overflow-x-auto">
         <table className="min-w-full text-[12.5px]">
           <thead className="sticky top-0 z-[1] bg-[var(--bg-primary)]">
-            <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.10em] text-gray-500">
+            <tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
               {columns.map((c) => (
                 <th
                   key={c.key}
@@ -147,12 +147,12 @@ export function ErpTable<T>({
           </thead>
           <tbody>
             {rows.length === 0 ? (
-              <tr><td colSpan={columns.length} className="px-4 py-6 text-center text-[11px] text-gray-600">{empty}</td></tr>
+              <tr><td colSpan={columns.length} className="px-4 py-6 text-center text-[11px] text-[var(--text-ghost)]">{empty}</td></tr>
             ) : rows.map((row, i) => (
               <tr
                 key={rowKey(row, i)}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
-                className={`border-b border-white/[0.03] last:border-b-0 hover:bg-white/[0.02] ${onRowClick ? "cursor-pointer" : ""}`}
+                className={`border-b border-[var(--border-faint)] last:border-b-0 hover:bg-[var(--bg-secondary)] ${onRowClick ? "cursor-pointer" : ""}`}
               >
                 {columns.map((c) => (
                   <td key={c.key} className={`px-3 py-1.5 text-${c.align ?? "left"} ${c.align === "right" ? "tabular-nums font-mono" : ""}`}>
@@ -174,7 +174,7 @@ export type ErpStatus = "complete" | "started" | "empty" | "blocked";
 const STATUS_CLS: Record<ErpStatus, string> = {
   complete: "bg-emerald-400/80",
   started:  "bg-amber-300/80",
-  empty:    "bg-white/[0.10]",
+  empty:    "bg-[var(--bg-surface-hover)]",
   blocked:  "bg-rose-400/70",
 };
 export function ErpStatusDot({ status }: { status: ErpStatus }) {
@@ -202,20 +202,20 @@ export function ErpStageTimeline({ stages, current }: { stages: WorkflowStage[];
           s.status === "complete" ? "border-emerald-400/30 bg-emerald-500/[0.06]" :
           s.status === "started"  ? "border-amber-400/30 bg-amber-500/[0.06]"   :
           s.status === "blocked"  ? "border-rose-400/30 bg-rose-500/[0.06]"     :
-                                    "border-white/[0.06] bg-white/[0.012]";
+                                    "border-[var(--border-subtle)] bg-[var(--bg-secondary)]";
         const ring = isCurrent ? "ring-1 ring-white/[0.18]" : "";
         const inner = (
           <div className={`flex h-full items-center gap-2 rounded-xl border px-3 py-2 ${tone} ${ring}`}>
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.02] text-gray-300">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-highlight)]">
               <RrIcon name={s.icon} size={12} />
             </span>
             <div>
               <div className="flex items-center gap-1.5">
                 <ErpStatusDot status={s.status} />
-                <span className="text-[10px] uppercase tracking-[0.10em] text-gray-500">{`Step ${i + 1}`}</span>
+                <span className="text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">{`Step ${i + 1}`}</span>
               </div>
               <div className="text-[12.5px] font-medium text-[var(--text-primary)]">{s.label}</div>
-              {s.hint && <div className="text-[10.5px] text-gray-500">{s.hint}</div>}
+              {s.hint && <div className="text-[10.5px] text-[var(--text-dim)]">{s.hint}</div>}
             </div>
           </div>
         );
@@ -225,7 +225,7 @@ export function ErpStageTimeline({ stages, current }: { stages: WorkflowStage[];
               <Link href={s.href} className="block transition-colors hover:opacity-95">{inner}</Link>
             ) : inner}
             {i < stages.length - 1 && (
-              <span aria-hidden className="mx-1 hidden self-center text-gray-600 sm:inline">›</span>
+              <span aria-hidden className="mx-1 hidden self-center text-[var(--text-ghost)] sm:inline">›</span>
             )}
           </li>
         );
@@ -240,17 +240,17 @@ export function ErpQuickAction({
   href, icon, label, hint, onClick,
 }: { href?: string; icon: RrIconName; label: string; hint?: string; onClick?: () => void }) {
   const cls =
-    "flex items-center gap-3 rounded-xl border border-white/[0.05] bg-white/[0.012] px-3 py-2.5 text-left hover:bg-white/[0.025] transition-colors";
+    "flex items-center gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2.5 text-left hover:bg-[var(--bg-surface-subtle)] transition-colors";
   const inner = (
     <>
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.02] text-gray-300">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-highlight)]">
         <RrIcon name={icon} size={14} />
       </span>
       <div className="min-w-0">
         <div className="text-[12.5px] font-medium">{label}</div>
-        {hint && <div className="text-[10.5px] text-gray-500">{hint}</div>}
+        {hint && <div className="text-[10.5px] text-[var(--text-dim)]">{hint}</div>}
       </div>
-      <span className="ml-auto text-gray-500">
+      <span className="ml-auto text-[var(--text-dim)]">
         <RrIcon name="arrow-up-right" size={11} />
       </span>
     </>

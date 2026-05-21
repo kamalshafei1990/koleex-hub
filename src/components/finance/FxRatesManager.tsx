@@ -160,7 +160,7 @@ export default function FxRatesManager() {
       backHref="/finance/workspace"
       action={
         <Link href="/finance/setup?card=fx-rates"
-              className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] hover:bg-white/[0.06]">
+              className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface-hover)]">
           <RrIcon name="info" size={12} /> {t("fx.aboutFx", "About FX")}
         </Link>
       }
@@ -187,7 +187,7 @@ export default function FxRatesManager() {
                     return (
                       <div key={p.pair} className="flex items-baseline justify-between text-[11.5px]">
                         <span className="font-mono">{p.from_currency} → {p.to_currency}</span>
-                        <span className="text-[10.5px] text-gray-400">{usageText}</span>
+                        <span className="text-[10.5px] text-[var(--text-secondary)]">{usageText}</span>
                       </div>
                     );
                   })}
@@ -201,7 +201,7 @@ export default function FxRatesManager() {
                 <div className="flex items-center gap-2 text-[11.5px] text-emerald-200">
                   <RrIcon name="check" size={12} /> {t("fx.allConfigured", "All exposed pairs configured")}
                 </div>
-                <div className="mt-2 text-[10.5px] text-gray-500">
+                <div className="mt-2 text-[10.5px] text-[var(--text-dim)]">
                   {t("fx.allConfiguredHint", "Every non-base currency in use has a rate row.")}
                 </div>
               </ErpPanel>
@@ -216,7 +216,7 @@ export default function FxRatesManager() {
                   {status.stale_pairs.map((p) => (
                     <div key={p.pair} className="flex items-baseline justify-between text-[11.5px]">
                       <span className="font-mono">{p.from_currency} → {p.to_currency}</span>
-                      <span className="text-[10.5px] text-gray-400">{t("fx.daysAgo", "{n}d ago").replace("{n}", String(p.stale_days))}</span>
+                      <span className="text-[10.5px] text-[var(--text-secondary)]">{t("fx.daysAgo", "{n}d ago").replace("{n}", String(p.stale_days))}</span>
                     </div>
                   ))}
                 </div>
@@ -229,23 +229,23 @@ export default function FxRatesManager() {
                 <div className="flex items-center gap-2 text-[11.5px] text-emerald-200">
                   <RrIcon name="check" size={12} /> {t("fx.ratesFresh", "Rates fresh")}
                 </div>
-                <div className="mt-2 text-[10.5px] text-gray-500">
+                <div className="mt-2 text-[10.5px] text-[var(--text-dim)]">
                   {t("fx.ratesFreshHint", "Every configured rate is within 14 days.")}
                 </div>
               </ErpPanel>
             )}
             {/* Used by open documents */}
             <ErpPanel className="px-4 py-3">
-              <div className="flex items-center gap-2 text-[11.5px] text-gray-300">
+              <div className="flex items-center gap-2 text-[11.5px] text-[var(--text-highlight)]">
                 <RrIcon name="signal-stream" size={12} /> {t("fx.openExposure", "Open exposure")}
               </div>
               <div className="mt-2 space-y-1.5">
                 {status.pairs.length === 0 ? (
-                  <div className="text-[10.5px] text-gray-500">{t("fx.noOpenDocs", "No non-base currency open documents.")}</div>
+                  <div className="text-[10.5px] text-[var(--text-dim)]">{t("fx.noOpenDocs", "No non-base currency open documents.")}</div>
                 ) : status.pairs.slice(0, 5).map((p) => (
                   <div key={p.pair} className="flex items-baseline justify-between text-[11.5px]">
                     <span className="font-mono">{p.from_currency}</span>
-                    <span className="text-[10.5px] text-gray-400">
+                    <span className="text-[10.5px] text-[var(--text-secondary)]">
                       {t("fx.invBill", "{inv} inv · {bill} bill")
                         .replace("{inv}", String(p.open_invoice_count))
                         .replace("{bill}", String(p.open_bill_count))}
@@ -262,16 +262,16 @@ export default function FxRatesManager() {
       <section>
         <ErpEyebrow>{t("fx.latestPerPair", "Latest rate per pair")}</ErpEyebrow>
         {latestByPair.length === 0 ? (
-          <ErpPanel className="mt-2 px-4 py-6 text-center text-[12px] text-gray-500">
+          <ErpPanel className="mt-2 px-4 py-6 text-center text-[12px] text-[var(--text-dim)]">
             {t("fx.noneYet", "No rates configured yet. Add one below.")}
           </ErpPanel>
         ) : (
           <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
             {latestByPair.map((r) => (
               <ErpPanel key={r.id} className="px-3 py-3">
-                <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">{r.from_currency} → {r.to_currency}</div>
+                <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-dim)]">{r.from_currency} → {r.to_currency}</div>
                 <div className="mt-1 font-mono text-[20px] leading-none tabular-nums">{fmtRate(r.rate)}</div>
-                <div className="mt-1 text-[10px] text-gray-500">{t("fx.eff", "eff {date}").replace("{date}", fmtDay(r.effective_date))}</div>
+                <div className="mt-1 text-[10px] text-[var(--text-dim)]">{t("fx.eff", "eff {date}").replace("{date}", fmtDay(r.effective_date))}</div>
               </ErpPanel>
             ))}
           </div>
@@ -311,7 +311,7 @@ export default function FxRatesManager() {
               {busy ? t("fx.saving", "Saving…") : t("fx.saveRate", "Save rate")}
             </button>
           </div>
-          <div className="mt-2 text-[10.5px] text-gray-500">
+          <div className="mt-2 text-[10.5px] text-[var(--text-dim)]">
             {t("fx.tipCny", "Tip: as a Chinese tenant your base is CNY. Add USD → CNY so customer payments in USD convert correctly when posted.")}
           </div>
         </ErpPanel>
@@ -321,7 +321,7 @@ export default function FxRatesManager() {
       <section>
         <ErpEyebrow>{t("fx.allRates", "All rates")}</ErpEyebrow>
         {loading ? (
-          <div className="px-1 py-3 text-[12px] text-gray-500">{t("common.loading", "Loading…")}</div>
+          <div className="px-1 py-3 text-[12px] text-[var(--text-dim)]">{t("common.loading", "Loading…")}</div>
         ) : (
           <ErpTable<RateRow>
             rows={rates}

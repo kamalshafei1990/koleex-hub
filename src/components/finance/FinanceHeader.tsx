@@ -127,7 +127,7 @@ export function HealthPill({ status }: { status: HealthStatus }) {
   return (
     <span
       title={t(s.hintKey, s.hintFallback)}
-      className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.06] bg-white/[0.03] px-2 py-0.5 text-[11px] font-medium text-gray-300"
+      className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-highlight)]"
     >
       <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
       {t(s.labelKey, s.labelFallback)}

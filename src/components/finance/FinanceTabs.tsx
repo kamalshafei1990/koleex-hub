@@ -103,7 +103,7 @@ export default function FinanceTabs() {
               key={tab.key}
               href={tab.key}
               className={`relative inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] transition-colors duration-150 ${
-                isActive ? "font-medium text-[var(--text-primary)]" : "text-gray-500 hover:text-gray-300"
+                isActive ? "font-medium text-[var(--text-primary)]" : "text-[var(--text-dim)] hover:text-[var(--text-highlight)]"
               }`}
             >
               {isActive && (
@@ -116,7 +116,7 @@ export default function FinanceTabs() {
         <Link
           href="/finance/accounting/queue"
           className={`relative inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] transition-colors duration-150 ${
-            isAccounting ? "font-medium text-[var(--text-primary)]" : "text-gray-500 hover:text-gray-300"
+            isAccounting ? "font-medium text-[var(--text-primary)]" : "text-[var(--text-dim)] hover:text-[var(--text-highlight)]"
           }`}
         >
           {isAccounting && (
@@ -138,8 +138,8 @@ export default function FinanceTabs() {
                 href={it.key}
                 className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11.5px] transition-colors duration-150 ${
                   isActive
-                    ? "border-white/[0.10] bg-white/[0.04] text-[var(--text-primary)]"
-                    : "border-transparent text-gray-500 hover:border-white/[0.06] hover:text-gray-300"
+                    ? "border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-primary)]"
+                    : "border-transparent text-[var(--text-dim)] hover:border-[var(--border-subtle)] hover:text-[var(--text-highlight)]"
                 }`}
               >
                 <SubIcon name={it.icon} active={isActive} />
@@ -155,7 +155,7 @@ export default function FinanceTabs() {
 
 function SubIcon({ name, active }: { name: RrIconName; active: boolean }): ReactNode {
   return (
-    <span aria-hidden className={active ? "text-gray-300" : "text-gray-600"}>
+    <span aria-hidden className={active ? "text-[var(--text-highlight)]" : "text-[var(--text-ghost)]"}>
       <RrIcon name={name} size={11} />
     </span>
   );

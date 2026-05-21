@@ -26,13 +26,13 @@ function fmt(n: number): string {
 }
 
 function Card({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-2xl border border-white/[0.06] bg-[var(--bg-secondary)] p-5">{children}</div>;
+  return <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">{children}</div>;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">{label}</div>
+      <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{label}</div>
       {children}
     </label>
   );
@@ -102,7 +102,7 @@ export default function FinanceGeneralLedger() {
           action={
             <Link
               href="/finance/accounting/trial-balance"
-              className="inline-flex items-center gap-2 rounded-lg border border-white/[0.10] bg-[var(--bg-primary)] px-3 py-1.5 text-[12px] font-semibold transition hover:border-white/[0.20]"
+              className="inline-flex items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-1.5 text-[12px] font-semibold transition hover:border-[var(--border-strong)]"
             >
               <RrIcon name="file-invoice" size={12} />
               Trial Balance
@@ -116,7 +116,7 @@ export default function FinanceGeneralLedger() {
               <select
                 value={accountId ?? ""}
                 onChange={(e) => setAccountId(e.target.value || null)}
-                className="min-w-[280px] rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                className="min-w-[280px] rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
               >
                 {accounts.map((a) => (
                   <option key={a.id} value={a.id}>
@@ -127,18 +127,18 @@ export default function FinanceGeneralLedger() {
             </Field>
             <Field label="From">
               <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
-                className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
+                className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
             </Field>
             <Field label="To">
               <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
-                className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
+                className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
             </Field>
             <button
               type="button"
               onClick={() => setFrom("")}
-              className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-[11px] hover:border-white/[0.20]"
+              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-1.5 text-[11px] hover:border-[var(--border-strong)]"
             >All-time</button>
-            <div className="ml-auto text-[10px] uppercase tracking-[0.18em] text-gray-500">
+            <div className="ml-auto text-[10px] uppercase tracking-[0.18em] text-[var(--text-dim)]">
               {loading ? "Loading…" : ledger ? `${ledger.rows.length} entries` : ""}
             </div>
           </div>
@@ -152,17 +152,17 @@ export default function FinanceGeneralLedger() {
 
         {ledger && (
           <Card>
-            <div className="mb-2 flex items-baseline justify-between border-b border-white/[0.06] pb-2">
+            <div className="mb-2 flex items-baseline justify-between border-b border-[var(--border-subtle)] pb-2">
               <div>
-                <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500">
+                <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-dim)]">
                   {ledger.account.code} · {ledger.account.type} ({ledger.account.normal_balance}-normal)
                 </div>
                 <div className="text-[14px] font-semibold">{ledger.account.name}</div>
               </div>
               <div className="flex items-baseline gap-6 text-[12px] tabular-nums">
-                <span className="text-[10px] text-gray-500">Opening</span>
+                <span className="text-[10px] text-[var(--text-dim)]">Opening</span>
                 <span className="font-mono">{fmt(ledger.opening_balance)}</span>
-                <span className="text-[10px] text-gray-500">Closing</span>
+                <span className="text-[10px] text-[var(--text-dim)]">Closing</span>
                 <span className="font-mono font-bold">{fmt(ledger.closing_balance)}</span>
               </div>
             </div>
@@ -173,7 +173,7 @@ export default function FinanceGeneralLedger() {
               <div className="overflow-x-auto">
                 <table className="min-w-full text-[12px]">
                   <thead>
-                    <tr className="border-b border-white/[0.06] text-[9px] uppercase tracking-[0.10em] text-gray-500">
+                    <tr className="border-b border-[var(--border-subtle)] text-[9px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
                       <th className="px-2 py-1.5 text-left">Date</th>
                       <th className="px-2 py-1.5 text-left">Journal</th>
                       <th className="px-2 py-1.5 text-left">Description</th>
@@ -185,11 +185,11 @@ export default function FinanceGeneralLedger() {
                   </thead>
                   <tbody>
                     {ledger.rows.map((r, i) => (
-                      <tr key={`${r.entry_id}-${i}`} className="border-b border-white/[0.04]">
-                        <td className="px-2 py-1.5 font-mono text-gray-300">{r.entry_date}</td>
-                        <td className="px-2 py-1.5 font-mono text-gray-400">{r.journal_no}</td>
+                      <tr key={`${r.entry_id}-${i}`} className="border-b border-[var(--border-faint)]">
+                        <td className="px-2 py-1.5 font-mono text-[var(--text-highlight)]">{r.entry_date}</td>
+                        <td className="px-2 py-1.5 font-mono text-[var(--text-secondary)]">{r.journal_no}</td>
                         <td className="px-2 py-1.5">{r.description ?? "—"}</td>
-                        <td className="px-2 py-1.5 text-[10px] text-gray-500">{r.source_type}</td>
+                        <td className="px-2 py-1.5 text-[10px] text-[var(--text-dim)]">{r.source_type}</td>
                         <td className="px-2 py-1.5 text-right tabular-nums font-mono">{r.debit > 0 ? fmt(r.debit) : "—"}</td>
                         <td className="px-2 py-1.5 text-right tabular-nums font-mono">{r.credit > 0 ? fmt(r.credit) : "—"}</td>
                         <td className="px-2 py-1.5 text-right tabular-nums font-mono font-semibold">{fmt(r.running_balance)}</td>

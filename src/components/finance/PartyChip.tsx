@@ -14,7 +14,7 @@ import { useTranslation } from "@/lib/i18n";
 import { financeT } from "@/lib/translations/finance";
 
 const TIER_COLORS: Record<NonNullable<FinancePartyRow["customer_tier"]>, string> = {
-  end_user: "bg-gray-500/15 text-gray-300",
+  end_user: "bg-gray-500/15 text-[var(--text-highlight)]",
   silver:   "bg-zinc-400/15 text-zinc-200",
   gold:     "bg-amber-500/15 text-amber-300",
   platinum: "bg-sky-500/15 text-sky-300",
@@ -58,10 +58,10 @@ export default function PartyChip({
       <button
         type="button"
         onClick={onChange}
-        className="flex w-full items-center justify-between rounded-lg border border-dashed border-white/10 bg-[var(--bg-primary)] px-3 py-2 text-left text-sm text-gray-500 transition hover:border-emerald-500/40 hover:text-gray-300"
+        className="flex w-full items-center justify-between rounded-lg border border-dashed border-white/10 bg-[var(--bg-primary)] px-3 py-2 text-left text-sm text-[var(--text-dim)] transition hover:border-emerald-500/40 hover:text-[var(--text-highlight)]"
       >
         <span>{placeholder}</span>
-        <span className="rounded border border-white/[0.06] bg-white/5 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+        <span className="rounded border border-[var(--border-subtle)] bg-white/5 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
           Pick
         </span>
       </button>
@@ -69,9 +69,9 @@ export default function PartyChip({
   }
   const flag = flagFor(party.country_code);
   return (
-    <div className="group flex items-center gap-2 rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5">
+    <div className="group flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5">
       {/* Avatar */}
-      <div className={`flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/[0.06] bg-[var(--bg-secondary)] ${compact ? "h-6 w-6 text-[10px]" : "h-7 w-7 text-[11px]"} font-semibold text-gray-300`}>
+      <div className={`flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] ${compact ? "h-6 w-6 text-[10px]" : "h-7 w-7 text-[11px]"} font-semibold text-[var(--text-highlight)]`}>
         {party.photo_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={party.photo_url} alt="" className="h-full w-full object-cover" />
@@ -91,7 +91,7 @@ export default function PartyChip({
           )}
         </div>
         {!compact && (party.company || party.payment_terms) && (
-          <div className="mt-0.5 truncate text-[10px] text-gray-500">
+          <div className="mt-0.5 truncate text-[10px] text-[var(--text-dim)]">
             {[party.company, party.payment_terms].filter(Boolean).join(" · ")}
           </div>
         )}
@@ -101,7 +101,7 @@ export default function PartyChip({
         <button
           type="button"
           onClick={onChange}
-          className="rounded-md px-2 py-0.5 text-[10px] font-medium text-gray-300 hover:bg-white/5"
+          className="rounded-md px-2 py-0.5 text-[10px] font-medium text-[var(--text-highlight)] hover:bg-white/5"
           title={t("party.change", "Change")}
         >
           {t("party.change", "Change")}

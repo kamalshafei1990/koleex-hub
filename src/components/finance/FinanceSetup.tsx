@@ -57,7 +57,7 @@ function StatusDot({ status }: { status: CardStatus }) {
   const cls =
     status === "complete" ? "bg-emerald-400/80" :
     status === "started"  ? "bg-amber-300/80"   :
-                            "bg-white/[0.10]";
+                            "bg-[var(--bg-surface-hover)]";
   return <span aria-hidden className={`inline-block h-1.5 w-1.5 rounded-full ${cls}`} />;
 }
 
@@ -123,12 +123,12 @@ export default function FinanceSetup() {
         )}
 
         {/* Progress strip */}
-        <div className="rounded-xl border border-white/[0.05] bg-white/[0.012] px-4 py-3.5">
+        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3.5">
           <div className="flex items-baseline justify-between gap-3">
             <div>
               <Eyebrow>{t("setup.progress.label", "Setup progress")}</Eyebrow>
-              <div className="mt-1 text-[15px] text-gray-200">{t("setup.progress.startedOf", "{n} of {total} sections started").replace("{n}", String(startedCount)).replace("{total}", String(snapshot?.cards.length ?? 10))}</div>
-              <div className="mt-1 text-[11px] text-gray-500">
+              <div className="mt-1 text-[15px] text-[var(--text-highlight)]">{t("setup.progress.startedOf", "{n} of {total} sections started").replace("{n}", String(startedCount)).replace("{total}", String(snapshot?.cards.length ?? 10))}</div>
+              <div className="mt-1 text-[11px] text-[var(--text-dim)]">
                 {snapshot?.ready
                   ? t("setup.progress.ready", "Looks ready — you can start using the Finance app while the rest fills in.")
                   : t("setup.progress.halfHint", "Once half the cards are started, the Finance app is workable.")}
@@ -136,10 +136,10 @@ export default function FinanceSetup() {
             </div>
             <div className="text-right">
               <div className="font-mono text-[22px] tabular-nums tracking-tight">{pct}%</div>
-              <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">{snapshot?.base_currency ?? "CNY"}</div>
+              <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-dim)]">{snapshot?.base_currency ?? "CNY"}</div>
             </div>
           </div>
-          <div aria-hidden className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.05]">
+          <div aria-hidden className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
             <div className="h-full bg-emerald-400/60 transition-all duration-300" style={{ width: `${pct}%` }} />
           </div>
         </div>
@@ -160,24 +160,24 @@ export default function FinanceSetup() {
               type="button"
               onClick={() => setActiveCard(c.key)}
               disabled={loading}
-              className="group text-left rounded-xl border border-white/[0.05] bg-white/[0.012] px-4 py-3.5 transition-colors hover:bg-white/[0.025] focus:outline-none focus:ring-1 focus:ring-white/[0.10]"
+              className="group text-left rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3.5 transition-colors hover:bg-[var(--bg-surface-subtle)] focus:outline-none focus:ring-1 focus:ring-white/[0.10]"
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.14em] text-gray-500">
+                <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.14em] text-[var(--text-dim)]">
                   <StatusDot status={c.status} />
                   {c.status === "complete" ? t("setup.statusComplete", "Complete") : c.status === "started" ? t("setup.statusStarted", "Started") : t("setup.statusEmpty", "Empty")}
                 </div>
                 <RrIcon name="arrow-up-right" size={11} />
               </div>
               <div className="mt-2 text-[14px] font-medium text-[var(--text-primary)]">{c.title}</div>
-              <div className="mt-1 text-[11px] text-gray-500">{c.hint}</div>
+              <div className="mt-1 text-[11px] text-[var(--text-dim)]">{c.hint}</div>
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.12em] text-gray-500">{t("setup.card.count", "Count")}</div>
+                  <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("setup.card.count", "Count")}</div>
                   <div className="mt-0.5 font-mono text-[15px] tabular-nums">{c.count}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.12em] text-gray-500">{t("setup.card.total", "Total")}</div>
+                  <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("setup.card.total", "Total")}</div>
                   <div className="mt-0.5 font-mono text-[15px] tabular-nums">{c.key === "fx_rates" || c.key === "base_currency" ? "—" : fmtMoney(c.total, c.currency)}</div>
                 </div>
               </div>
@@ -206,16 +206,16 @@ function DrawerShell({
   const { t } = useTranslation(financeT);
   return (
     <div className="fixed inset-0 z-[120] flex justify-end bg-black/60" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="flex w-full max-w-lg flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-l border-white/[0.08]">
-        <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
+      <div onClick={(e) => e.stopPropagation()} className="flex w-full max-w-lg flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-l border-[var(--border-subtle)]">
+        <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
           <div>
             <h2 className="text-[14px] font-semibold">{title}</h2>
-            {subtitle && <p className="text-[11px] text-gray-500">{subtitle}</p>}
+            {subtitle && <p className="text-[11px] text-[var(--text-dim)]">{subtitle}</p>}
           </div>
-          <button onClick={onClose} aria-label={t("setup.drawer.close", "Close")} className="text-gray-500 hover:text-gray-300 text-[20px] leading-none">×</button>
+          <button onClick={onClose} aria-label={t("setup.drawer.close", "Close")} className="text-[var(--text-dim)] hover:text-[var(--text-highlight)] text-[20px] leading-none">×</button>
         </div>
         <div className="flex-1 overflow-y-auto p-4">{children}</div>
-        {footer && <div className="border-t border-white/[0.06] px-4 py-3">{footer}</div>}
+        {footer && <div className="border-t border-[var(--border-subtle)] px-4 py-3">{footer}</div>}
       </div>
     </div>
   );
@@ -223,8 +223,8 @@ function DrawerShell({
 
 /* ─── Reusable inputs ────────────────────────────────────────── */
 
-const inputCls = "w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]";
-const labelCls = "mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500";
+const inputCls = "w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]";
+const labelCls = "mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]";
 
 /* ─── Drawer router ──────────────────────────────────────────── */
 
@@ -287,8 +287,8 @@ function BaseCurrencyDrawer({ onClose, onChange }: { onClose: () => void; onChan
       onClose={onClose}
       footer={
         <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-md border border-white/[0.08] px-3 py-1.5 text-[12px] text-gray-400 hover:text-gray-200">{t("setup.drawer.cancel", "Cancel")}</button>
-          <button onClick={save} disabled={submitting || !code} className="rounded-md border border-white/[0.12] bg-white/[0.06] px-3 py-1.5 text-[12px] hover:bg-white/[0.10] disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.drawer.save", "Save")}</button>
+          <button onClick={onClose} className="rounded-md border border-[var(--border-subtle)] px-3 py-1.5 text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-highlight)]">{t("setup.drawer.cancel", "Cancel")}</button>
+          <button onClick={save} disabled={submitting || !code} className="rounded-md border border-[var(--border-color)] bg-[var(--bg-surface-hover)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface-hover)] disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.drawer.save", "Save")}</button>
         </div>
       }
     >
@@ -302,7 +302,7 @@ function BaseCurrencyDrawer({ onClose, onChange }: { onClose: () => void; onChan
             maxLength={3}
             className={`${inputCls} font-mono uppercase`}
           />
-          <div className="mt-1 text-[10.5px] text-gray-500">{t("setup.baseCcy.hint", "Three-letter ISO 4217 code. This value sits on the tenant record and is used everywhere a default is needed.")}</div>
+          <div className="mt-1 text-[10.5px] text-[var(--text-dim)]">{t("setup.baseCcy.hint", "Three-letter ISO 4217 code. This value sits on the tenant record and is used everywhere a default is needed.")}</div>
         </label>
         {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-300">{error}</div>}
       </div>
@@ -372,7 +372,7 @@ function BankAccountsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency:
   return (
     <DrawerShell title={t("setup.banks.title", "Bank Accounts")} subtitle={t("setup.banks.subtitle", "Operating accounts, FX sub-accounts, savings — every bank you transact through.")} onClose={onClose}>
       <div className="space-y-4">
-        <div className="rounded-md border border-white/[0.06] p-3 space-y-2">
+        <div className="rounded-md border border-[var(--border-subtle)] p-3 space-y-2">
           <div className={labelCls}>{t("setup.banks.new", "New bank account")}</div>
           <input placeholder={t("setup.banks.acctNamePlaceholder", "Account name (e.g. Main USD)")}  value={name}          onChange={(e) => setName(e.target.value)}          className={inputCls} />
           <input placeholder={t("setup.banks.bankNamePlaceholder", "Bank name (e.g. HSBC)")}          value={bank}          onChange={(e) => setBank(e.target.value)}          className={inputCls} />
@@ -384,20 +384,20 @@ function BankAccountsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency:
           </div>
           <input type="number" min="0" step="0.01" placeholder={t("setup.banks.openingPlaceholder", "Opening balance")} value={opening} onChange={(e) => setOpening(e.target.value)} className={`${inputCls} tabular-nums`} />
           {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-300">{error}</div>}
-          <button onClick={save} disabled={submitting} className="w-full rounded-md border border-white/[0.12] bg-white/[0.06] px-3 py-1.5 text-[12px] hover:bg-white/[0.10] disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.banks.add", "Add bank account")}</button>
+          <button onClick={save} disabled={submitting} className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-surface-hover)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface-hover)] disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.banks.add", "Add bank account")}</button>
         </div>
 
         <div>
           <div className={labelCls}>{t("setup.banks.existing", "Existing accounts ({n})").replace("{n}", String(rows.length))}</div>
-          {loading ? <div className="text-[11px] text-gray-500">{t("setup.drawer.loading", "Loading…")}</div> : rows.length === 0 ? (
-            <div className="rounded-md border border-white/[0.04] px-3 py-3 text-[11px] text-gray-600">{t("setup.banks.empty", "No bank accounts yet.")}</div>
+          {loading ? <div className="text-[11px] text-[var(--text-dim)]">{t("setup.drawer.loading", "Loading…")}</div> : rows.length === 0 ? (
+            <div className="rounded-md border border-[var(--border-faint)] px-3 py-3 text-[11px] text-[var(--text-ghost)]">{t("setup.banks.empty", "No bank accounts yet.")}</div>
           ) : (
             <ul className="space-y-1">
               {rows.map((b) => (
-                <li key={b.id} className="flex items-center justify-between rounded-md border border-white/[0.04] px-2 py-1.5 text-[11.5px]">
+                <li key={b.id} className="flex items-center justify-between rounded-md border border-[var(--border-faint)] px-2 py-1.5 text-[11.5px]">
                   <div>
-                    <div className="text-gray-200">{b.account_name ?? b.bank_name ?? "—"} <span className="text-gray-500">· {b.currency}</span></div>
-                    <div className="text-[10.5px] text-gray-500 font-mono">{b.account_number ?? "—"}{b.swift_code ? ` · ${b.swift_code}` : ""}</div>
+                    <div className="text-[var(--text-highlight)]">{b.account_name ?? b.bank_name ?? "—"} <span className="text-[var(--text-dim)]">· {b.currency}</span></div>
+                    <div className="text-[10.5px] text-[var(--text-dim)] font-mono">{b.account_number ?? "—"}{b.swift_code ? ` · ${b.swift_code}` : ""}</div>
                   </div>
                   <span className="font-mono tabular-nums">{Number(b.opening_balance || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </li>
@@ -466,7 +466,7 @@ function FxRatesDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: stri
   return (
     <DrawerShell title={t("setup.fx.title", "FX Rates")} subtitle={t("setup.fx.subtitle", "Manual rates for foreign-currency transactions. Used when a movement needs converting back to the base currency.")} onClose={onClose}>
       <div className="space-y-4">
-        <div className="rounded-md border border-white/[0.06] p-3 space-y-2">
+        <div className="rounded-md border border-[var(--border-subtle)] p-3 space-y-2">
           <div className={labelCls}>{t("setup.fx.new", "New rate")}</div>
           <div className="grid grid-cols-3 gap-2">
             <input placeholder={t("setup.fx.fromPlaceholder", "From")} value={from} onChange={(e) => setFrom(e.target.value.toUpperCase().slice(0, 3))} maxLength={3} className={`${inputCls} font-mono uppercase`} />
@@ -476,20 +476,20 @@ function FxRatesDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: stri
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
           <input placeholder={t("setup.fx.notesPlaceholder", "Notes (optional)")} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} />
           {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-300">{error}</div>}
-          <button onClick={save} disabled={submitting || !from || !to || !rate} className="w-full rounded-md border border-white/[0.12] bg-white/[0.06] px-3 py-1.5 text-[12px] hover:bg-white/[0.10] disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.fx.add", "Add rate")}</button>
+          <button onClick={save} disabled={submitting || !from || !to || !rate} className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-surface-hover)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface-hover)] disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.fx.add", "Add rate")}</button>
         </div>
 
         <div>
           <div className={labelCls}>{t("setup.fx.existing", "Existing rates ({n})").replace("{n}", String(rows.length))}</div>
-          {loading ? <div className="text-[11px] text-gray-500">{t("setup.drawer.loading", "Loading…")}</div> : rows.length === 0 ? (
-            <div className="rounded-md border border-white/[0.04] px-3 py-3 text-[11px] text-gray-600">{t("setup.fx.empty", "No rates configured. Anything in the base currency will be passed through unchanged.")}</div>
+          {loading ? <div className="text-[11px] text-[var(--text-dim)]">{t("setup.drawer.loading", "Loading…")}</div> : rows.length === 0 ? (
+            <div className="rounded-md border border-[var(--border-faint)] px-3 py-3 text-[11px] text-[var(--text-ghost)]">{t("setup.fx.empty", "No rates configured. Anything in the base currency will be passed through unchanged.")}</div>
           ) : (
             <ul className="space-y-1">
               {rows.map((r) => (
-                <li key={r.id} className="flex items-center justify-between rounded-md border border-white/[0.04] px-2 py-1.5 text-[11.5px]">
+                <li key={r.id} className="flex items-center justify-between rounded-md border border-[var(--border-faint)] px-2 py-1.5 text-[11.5px]">
                   <div>
-                    <div className="text-gray-200"><span className="font-mono">{r.from_currency} → {r.to_currency}</span> · <span className="tabular-nums">{Number(r.rate).toLocaleString("en-US", { maximumFractionDigits: 8 })}</span></div>
-                    <div className="text-[10.5px] text-gray-500">{r.effective_date}{r.notes ? ` · ${r.notes}` : ""}</div>
+                    <div className="text-[var(--text-highlight)]"><span className="font-mono">{r.from_currency} → {r.to_currency}</span> · <span className="tabular-nums">{Number(r.rate).toLocaleString("en-US", { maximumFractionDigits: 8 })}</span></div>
+                    <div className="text-[10.5px] text-[var(--text-dim)]">{r.effective_date}{r.notes ? ` · ${r.notes}` : ""}</div>
                   </div>
                   <button onClick={() => remove(r.id)} className="text-[11px] text-rose-300 hover:text-rose-200">{t("setup.fx.remove", "Remove")}</button>
                 </li>
@@ -573,7 +573,7 @@ function AssetsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: strin
   return (
     <DrawerShell title={t("setup.assets.title", "Assets")} subtitle={t("setup.assets.subtitle", "Buildings, vehicles, machinery, IT — anything depreciable.")} onClose={onClose}>
       <div className="space-y-4">
-        <div className="rounded-md border border-white/[0.06] p-3 space-y-2">
+        <div className="rounded-md border border-[var(--border-subtle)] p-3 space-y-2">
           <div className={labelCls}>{t("setup.assets.new", "New asset")}</div>
           <input placeholder={t("setup.assets.namePlaceholder", "Asset name (e.g. Forklift FL-2026)")} value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
           <div className="grid grid-cols-2 gap-2">
@@ -588,20 +588,20 @@ function AssetsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: strin
           </div>
           <textarea rows={2} placeholder={t("setup.assets.notesPlaceholder", "Notes")} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} />
           {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-300">{error}</div>}
-          <button onClick={save} disabled={submitting} className="w-full rounded-md border border-white/[0.12] bg-white/[0.06] px-3 py-1.5 text-[12px] hover:bg-white/[0.10] disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.assets.add", "Add asset")}</button>
+          <button onClick={save} disabled={submitting} className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-surface-hover)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface-hover)] disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.assets.add", "Add asset")}</button>
         </div>
 
         <div>
           <div className={labelCls}>{t("setup.assets.existing", "Existing assets ({n})").replace("{n}", String(rows.length))}</div>
-          {loading ? <div className="text-[11px] text-gray-500">{t("setup.drawer.loading", "Loading…")}</div> : rows.length === 0 ? (
-            <div className="rounded-md border border-white/[0.04] px-3 py-3 text-[11px] text-gray-600">{t("setup.assets.empty", "No assets registered yet.")}</div>
+          {loading ? <div className="text-[11px] text-[var(--text-dim)]">{t("setup.drawer.loading", "Loading…")}</div> : rows.length === 0 ? (
+            <div className="rounded-md border border-[var(--border-faint)] px-3 py-3 text-[11px] text-[var(--text-ghost)]">{t("setup.assets.empty", "No assets registered yet.")}</div>
           ) : (
             <ul className="space-y-1">
               {rows.map((a) => (
-                <li key={a.id} className="flex items-center justify-between rounded-md border border-white/[0.04] px-2 py-1.5 text-[11.5px]">
+                <li key={a.id} className="flex items-center justify-between rounded-md border border-[var(--border-faint)] px-2 py-1.5 text-[11.5px]">
                   <div>
-                    <div className="text-gray-200">{a.name} {a.category && <span className="text-gray-500">· {a.category}</span>}</div>
-                    <div className="text-[10.5px] text-gray-500">{a.purchase_date ?? "—"} · {a.depreciation_method}{a.useful_life_years ? ` · ${a.useful_life_years}y` : ""}</div>
+                    <div className="text-[var(--text-highlight)]">{a.name} {a.category && <span className="text-[var(--text-dim)]">· {a.category}</span>}</div>
+                    <div className="text-[10.5px] text-[var(--text-dim)]">{a.purchase_date ?? "—"} · {a.depreciation_method}{a.useful_life_years ? ` · ${a.useful_life_years}y` : ""}</div>
                   </div>
                   <div className="text-right">
                     <div className="font-mono tabular-nums">{Number(a.purchase_value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {a.currency}</div>
@@ -694,7 +694,7 @@ function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { 
   return (
     <DrawerShell title={meta.title} subtitle={meta.hint} onClose={onClose}>
       <div className="space-y-4">
-        <div className="rounded-md border border-white/[0.06] p-3 space-y-2">
+        <div className="rounded-md border border-[var(--border-subtle)] p-3 space-y-2">
           <div className={labelCls}>{t("setup.ob.entry.new", "New entry")}</div>
           <input placeholder={meta.placeholder} value={label} onChange={(e) => setLabel(e.target.value)} className={inputCls} />
           <div className="grid grid-cols-2 gap-2">
@@ -703,20 +703,20 @@ function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { 
           </div>
           <textarea rows={2} placeholder={t("setup.ob.entry.notes", "Notes")} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} />
           {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-300">{error}</div>}
-          <button onClick={save} disabled={submitting} className="w-full rounded-md border border-white/[0.12] bg-white/[0.06] px-3 py-1.5 text-[12px] hover:bg-white/[0.10] disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.ob.entry.add", "Add entry")}</button>
+          <button onClick={save} disabled={submitting} className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-surface-hover)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface-hover)] disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.ob.entry.add", "Add entry")}</button>
         </div>
 
         <div>
           <div className={labelCls}>{t("setup.ob.entries", "Entries ({n})").replace("{n}", String(rows.length))}</div>
-          {loading ? <div className="text-[11px] text-gray-500">{t("setup.drawer.loading", "Loading…")}</div> : rows.length === 0 ? (
-            <div className="rounded-md border border-white/[0.04] px-3 py-3 text-[11px] text-gray-600">{t("setup.ob.empty", "No entries yet. Each entry is a single opening figure for this category.")}</div>
+          {loading ? <div className="text-[11px] text-[var(--text-dim)]">{t("setup.drawer.loading", "Loading…")}</div> : rows.length === 0 ? (
+            <div className="rounded-md border border-[var(--border-faint)] px-3 py-3 text-[11px] text-[var(--text-ghost)]">{t("setup.ob.empty", "No entries yet. Each entry is a single opening figure for this category.")}</div>
           ) : (
             <ul className="space-y-1">
               {rows.map((r) => (
-                <li key={r.id} className="flex items-center justify-between rounded-md border border-white/[0.04] px-2 py-1.5 text-[11.5px]">
+                <li key={r.id} className="flex items-center justify-between rounded-md border border-[var(--border-faint)] px-2 py-1.5 text-[11.5px]">
                   <div>
-                    <div className="text-gray-200">{r.label}</div>
-                    <div className="text-[10.5px] text-gray-500">{r.created_at.slice(0, 10)}{r.notes ? ` · ${r.notes}` : ""}</div>
+                    <div className="text-[var(--text-highlight)]">{r.label}</div>
+                    <div className="text-[10.5px] text-[var(--text-dim)]">{r.created_at.slice(0, 10)}{r.notes ? ` · ${r.notes}` : ""}</div>
                   </div>
                   <div className="text-right">
                     <div className="font-mono tabular-nums">{Number(r.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {r.currency}</div>
@@ -727,10 +727,10 @@ function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { 
             </ul>
           )}
           {totalsByCurrency.length > 0 && (
-            <div className="mt-3 border-t border-white/[0.05] pt-2 text-right text-[11px] tabular-nums">
+            <div className="mt-3 border-t border-[var(--border-subtle)] pt-2 text-right text-[11px] tabular-nums">
               {totalsByCurrency.map(([cur, tot]) => (
                 <div key={cur}>
-                  <span className="text-gray-500">{t("setup.ob.total", "Total {ccy}").replace("{ccy}", cur)}</span>{" "}
+                  <span className="text-[var(--text-dim)]">{t("setup.ob.total", "Total {ccy}").replace("{ccy}", cur)}</span>{" "}
                   <span className="font-mono">{tot.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
               ))}
@@ -797,9 +797,9 @@ function SetupGuidance({ snapshot }: { snapshot: SetupSnapshot }) {
       )}
 
       {/* Recommended order — a clean checklist, not a wizard. */}
-      <div className="rounded-xl border border-white/[0.05] bg-white/[0.012] px-4 py-3">
+      <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3">
         <div className="flex items-baseline justify-between">
-          <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">{t("setup.guidance.recommended", "Recommended order")}</div>
+          <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-dim)]">{t("setup.guidance.recommended", "Recommended order")}</div>
           {firstEmpty && (
             <button
               type="button"
@@ -819,26 +819,26 @@ function SetupGuidance({ snapshot }: { snapshot: SetupSnapshot }) {
             const tone =
               status === "complete" ? "border-emerald-400/30 bg-emerald-500/[0.06]" :
               status === "started"  ? "border-amber-400/30 bg-amber-500/[0.06]"   :
-                                      "border-white/[0.05] bg-white/[0.012]";
+                                      "border-[var(--border-subtle)] bg-[var(--bg-secondary)]";
             const dot =
               status === "complete" ? "bg-emerald-400/80" :
               status === "started"  ? "bg-amber-300/80"   :
-                                      "bg-white/[0.10]";
+                                      "bg-[var(--bg-surface-hover)]";
             return (
               <li key={step.key} className={`flex gap-2 rounded-md border px-3 py-2 ${tone}`}>
                 <span className="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full" aria-hidden style={{ background: undefined }}>
                   <span className={`block h-full w-full rounded-full ${dot}`} />
                 </span>
                 <div className="min-w-0">
-                  <div className="text-[10px] uppercase tracking-[0.10em] text-gray-500">{t("setup.guidance.stepN", "Step {n}").replace("{n}", String(i + 1))}</div>
+                  <div className="text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">{t("setup.guidance.stepN", "Step {n}").replace("{n}", String(i + 1))}</div>
                   <div className="text-[12px] font-medium">{step.label}</div>
-                  <div className="text-[10px] text-gray-500">{step.why}</div>
+                  <div className="text-[10px] text-[var(--text-dim)]">{step.why}</div>
                 </div>
               </li>
             );
           })}
         </ol>
-        <div className="mt-3 text-[10.5px] text-gray-500">
+        <div className="mt-3 text-[10.5px] text-[var(--text-dim)]">
           {t("setup.guidance.flex", "You can fill these in any order — the system uses what's there. The Finance app becomes fully usable once at least half the cards are started.")}
         </div>
       </div>

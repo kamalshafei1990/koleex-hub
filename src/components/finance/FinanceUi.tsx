@@ -112,12 +112,12 @@ export function KpiCard({
   const goodDirection = invertDelta ? deltaSign < 0 : deltaSign > 0;
   const neutralDelta = deltaSign === 0;
   return (
-    <div className="group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-[var(--bg-secondary)] p-5 transition hover:border-white/[0.12] hover:bg-[var(--bg-secondary)]/90">
+    <div className="group relative overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 transition hover:border-[var(--border-color)] hover:bg-[var(--bg-secondary)]/90">
       {/* Left accent bar — subtle visual cue for the metric family */}
       <div className={`absolute left-0 top-4 bottom-4 w-[3px] rounded-r ${ACCENT_BAR[accent]}`} />
       <div className="ml-1.5">
         <div className="flex items-start justify-between gap-3">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">{label}</div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-dim)]">{label}</div>
           {sparkline && sparkline.length > 1 && (
             <Sparkline data={sparkline} accent={accent} />
           )}
@@ -132,7 +132,7 @@ export function KpiCard({
                 className={
                   "inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold " +
                   (neutralDelta
-                    ? "bg-white/5 text-gray-400"
+                    ? "bg-white/5 text-[var(--text-secondary)]"
                     : goodDirection
                       ? "bg-emerald-500/15 text-emerald-400"
                       : "bg-rose-500/15 text-rose-400")
@@ -146,7 +146,7 @@ export function KpiCard({
                 {neutralDelta ? "—" : deltaSign > 0 ? "▲" : "▼"} {fmtPct(delta)}
               </span>
             )}
-            {hint && <span className="text-gray-500">{hint}</span>}
+            {hint && <span className="text-[var(--text-dim)]">{hint}</span>}
           </div>
         )}
       </div>
@@ -201,13 +201,13 @@ function Sparkline({ data, accent }: { data: number[]; accent: KpiAccent }) {
 const STATUS_PALETTE: Record<string, { bg: string; text: string; label?: string }> = {
   paid:           { bg: "bg-emerald-500/15", text: "text-emerald-400" },
   partial:        { bg: "bg-amber-500/15",   text: "text-amber-400" },
-  unpaid:         { bg: "bg-gray-500/15",    text: "text-gray-400" },
+  unpaid:         { bg: "bg-gray-500/15",    text: "text-[var(--text-secondary)]" },
   overdue:        { bg: "bg-rose-500/15",    text: "text-rose-400" },
   open:           { bg: "bg-sky-500/15",     text: "text-sky-400" },
   in_production:  { bg: "bg-violet-500/15",  text: "text-violet-400", label: "In production" },
   shipped:        { bg: "bg-blue-500/15",    text: "text-blue-400" },
   delivered:      { bg: "bg-emerald-500/15", text: "text-emerald-400" },
-  closed:         { bg: "bg-gray-500/15",    text: "text-gray-400" },
+  closed:         { bg: "bg-gray-500/15",    text: "text-[var(--text-secondary)]" },
   cancelled:      { bg: "bg-rose-500/15",    text: "text-rose-400" },
   good:           { bg: "bg-emerald-500/15", text: "text-emerald-400" },
   watch:          { bg: "bg-amber-500/15",   text: "text-amber-400" },
@@ -225,7 +225,7 @@ const STATUS_PALETTE: Record<string, { bg: string; text: string; label?: string 
 };
 
 export function StatusBadge({ status }: { status: string }) {
-  const p = STATUS_PALETTE[status] ?? { bg: "bg-white/5", text: "text-gray-400" };
+  const p = STATUS_PALETTE[status] ?? { bg: "bg-white/5", text: "text-[var(--text-secondary)]" };
   const label = p.label ?? status.replace(/_/g, " ");
   return (
     <span
@@ -252,7 +252,7 @@ export function EmptyState({
     <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-[var(--bg-secondary)] py-16 text-center">
       <div className="mb-4 opacity-50">{icon}</div>
       <p className="text-base font-medium text-[var(--text-primary)]">{title}</p>
-      {hint && <p className="mt-1 text-sm text-gray-500">{hint}</p>}
+      {hint && <p className="mt-1 text-sm text-[var(--text-dim)]">{hint}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
   );
@@ -273,7 +273,7 @@ export function SectionCard({
   helpId?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-[var(--bg-secondary)] p-5">
+    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">
       {(title || action) && (
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
@@ -283,7 +283,7 @@ export function SectionCard({
                 {helpId && <GuidanceTip guidanceId={helpId} />}
               </h2>
             )}
-            {subtitle && <p className="mt-0.5 text-[11px] text-gray-500">{subtitle}</p>}
+            {subtitle && <p className="mt-0.5 text-[11px] text-[var(--text-dim)]">{subtitle}</p>}
           </div>
           {action}
         </div>
@@ -307,7 +307,7 @@ export function PageHeader({
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-gray-500">{subtitle}</p>}
+        {subtitle && <p className="mt-1 text-sm text-[var(--text-dim)]">{subtitle}</p>}
       </div>
       {action && <div className="flex items-center gap-2">{action}</div>}
     </div>
@@ -325,7 +325,7 @@ export function PeriodTabs<T extends string>({
   options: { value: T; label: string }[];
 }) {
   return (
-    <div className="inline-flex rounded-lg border border-white/[0.06] bg-[var(--bg-secondary)] p-1">
+    <div className="inline-flex rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-1">
       {options.map((o) => (
         <button
           key={o.value}
@@ -335,7 +335,7 @@ export function PeriodTabs<T extends string>({
             "rounded-md px-3 py-1.5 text-xs font-medium transition " +
             (o.value === value
               ? "bg-white/10 text-[var(--text-primary)]"
-              : "text-gray-400 hover:text-gray-200")
+              : "text-[var(--text-secondary)] hover:text-[var(--text-highlight)]")
           }
         >
           {o.label}
@@ -390,10 +390,10 @@ export function TrendChart({
       </div>
       <div className="mt-2 flex gap-2 px-0.5">
         {data.map((d, i) => (
-          <div key={i} className="flex-1 text-center text-[10px] text-gray-500">{d.label}</div>
+          <div key={i} className="flex-1 text-center text-[10px] text-[var(--text-dim)]">{d.label}</div>
         ))}
       </div>
-      <div className="mt-3 flex items-center justify-center gap-4 text-[10px] text-gray-400">
+      <div className="mt-3 flex items-center justify-center gap-4 text-[10px] text-[var(--text-secondary)]">
         <span className="inline-flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full" style={{ background: CHART_GAIN_INLINE }} /> Revenue
         </span>

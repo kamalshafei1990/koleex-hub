@@ -36,7 +36,7 @@ function severityOf(due: string): Severity {
 }
 
 const SEVERITY_STYLE: Record<Severity, { ring: string; chip: string; label: string }> = {
-  normal:   { ring: "border-white/[0.06]",       chip: "bg-gray-500/15 text-gray-300",   label: "Normal" },
+  normal:   { ring: "border-[var(--border-subtle)]",       chip: "bg-gray-500/15 text-[var(--text-highlight)]",   label: "Normal" },
   warning:  { ring: "border-amber-500/30",       chip: "bg-amber-500/20 text-amber-300", label: "Warning" },
   urgent:   { ring: "border-rose-500/40",        chip: "bg-rose-500/20 text-rose-300",   label: "Urgent" },
   critical: { ring: "border-rose-500/60 ring-1 ring-rose-500/30", chip: "bg-rose-500/30 text-rose-200", label: "Critical" },
@@ -126,10 +126,10 @@ export default function FinanceNotifications() {
               <div key={sev} className={`rounded-2xl border bg-[var(--bg-secondary)] p-4 ${style.ring}`}>
                 <div className="flex items-center justify-between">
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${style.chip}`}>{style.label}</span>
-                  <span className="text-xs text-gray-500">{items.length}</span>
+                  <span className="text-xs text-[var(--text-dim)]">{items.length}</span>
                 </div>
                 <div className="mt-3 text-lg font-semibold tabular-nums">{fmtMoney(total, baseCurrency, { compact: true })}</div>
-                <div className="mt-1 text-[10px] text-gray-500">
+                <div className="mt-1 text-[10px] text-[var(--text-dim)]">
                   {sev === "critical" ? "Overdue > 7 days"
                   : sev === "urgent"   ? "Overdue 1–7 days"
                   : sev === "warning"  ? "Due in ≤ 3 days"
@@ -143,7 +143,7 @@ export default function FinanceNotifications() {
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
           <SectionCard title="Upcoming Reminders" subtitle="Critical first — colour-coded by severity.">
             {loading ? (
-              <div className="py-6 text-center text-sm text-gray-500">Loading…</div>
+              <div className="py-6 text-center text-sm text-[var(--text-dim)]">Loading…</div>
             ) : sortedUpcoming.length === 0 ? (
               <EmptyState title="Nothing upcoming" hint="Reminders are auto-created when you set a due date on an order or expense." />
             ) : (
@@ -157,14 +157,14 @@ export default function FinanceNotifications() {
 
           <SectionCard title="Recently Done" subtitle="Reminders you've marked complete.">
             {done.length === 0 ? (
-              <div className="py-6 text-center text-sm text-gray-500">No completed reminders yet.</div>
+              <div className="py-6 text-center text-sm text-[var(--text-dim)]">No completed reminders yet.</div>
             ) : (
               <div className="space-y-3">
                 {done.slice(0, 10).map((n) => (
-                  <div key={n.id} className="flex items-center justify-between rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] px-3 py-2 text-sm">
+                  <div key={n.id} className="flex items-center justify-between rounded-lg border border-[var(--border-faint)] bg-[var(--bg-primary)] px-3 py-2 text-sm">
                     <div className="min-w-0">
                       <div className="truncate font-medium">{n.party_name || "—"}</div>
-                      <div className="text-[10px] text-gray-500">{n.due_date} · {n.type === "collect" ? "Collected" : "Paid"}</div>
+                      <div className="text-[10px] text-[var(--text-dim)]">{n.due_date} · {n.type === "collect" ? "Collected" : "Paid"}</div>
                     </div>
                     <span className={`tabular-nums font-semibold ${n.type === "collect" ? "text-emerald-400" : "text-rose-400"}`}>
                       {fmtMoney(Number(n.amount), n.currency, { compact: true })}
@@ -181,23 +181,23 @@ export default function FinanceNotifications() {
             title="How reminders work"
             subtitle="Phase 1 keeps the foundation simple — Phase 2 will deliver Slack + email pushes."
           >
-            <div className="grid gap-3 sm:grid-cols-3 text-sm text-gray-300">
-              <div className="rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] p-3">
+            <div className="grid gap-3 sm:grid-cols-3 text-sm text-[var(--text-highlight)]">
+              <div className="rounded-lg border border-[var(--border-faint)] bg-[var(--bg-primary)] p-3">
                 <div className="font-semibold text-emerald-400">1. Set a due date</div>
-                <p className="mt-1 text-xs text-gray-400">On any order or expense, set the payment due date.</p>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">On any order or expense, set the payment due date.</p>
               </div>
-              <div className="rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] p-3">
+              <div className="rounded-lg border border-[var(--border-faint)] bg-[var(--bg-primary)] p-3">
                 <div className="font-semibold text-amber-400">2. Pick lead time</div>
-                <p className="mt-1 text-xs text-gray-400">Same day, 1 / 3 / 7 / 14 days before — or a custom number.</p>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">Same day, 1 / 3 / 7 / 14 days before — or a custom number.</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {OFFSET_OPTIONS.map((o) => (
-                    <span key={o.value} className="rounded-full border border-white/[0.06] bg-white/[0.02] px-2 py-0.5 text-[10px] text-gray-300">{o.label}</span>
+                    <span key={o.value} className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-0.5 text-[10px] text-[var(--text-highlight)]">{o.label}</span>
                   ))}
                 </div>
               </div>
-              <div className="rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] p-3">
+              <div className="rounded-lg border border-[var(--border-faint)] bg-[var(--bg-primary)] p-3">
                 <div className="font-semibold text-sky-400">3. Act when prompted</div>
-                <p className="mt-1 text-xs text-gray-400">Reminders appear here. Mark Done, Snooze, or Cancel.</p>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">Reminders appear here. Mark Done, Snooze, or Cancel.</p>
               </div>
             </div>
           </SectionCard>
@@ -236,7 +236,7 @@ function ReminderRow({ n, onAction }: { n: FinanceNotification; onAction: (id: s
             )}
           </div>
           <div className="mt-1.5 truncate text-sm font-medium">{n.party_name || "—"}</div>
-          <div className="mt-0.5 text-[11px] text-gray-500">
+          <div className="mt-0.5 text-[11px] text-[var(--text-dim)]">
             {dueLabel} · Due {n.due_date}
             {n.reference_type && <span> · {n.reference_type.replace(/_/g, " ")}</span>}
           </div>
@@ -249,20 +249,20 @@ function ReminderRow({ n, onAction }: { n: FinanceNotification; onAction: (id: s
         <button onClick={() => onAction(n.id, "done")} className="rounded-md border border-emerald-500/20 bg-emerald-500/[0.04] px-2 py-1 text-[11px] font-medium text-emerald-400 hover:bg-emerald-500/15">
           {n.type === "collect" ? "Mark Collected" : "Mark Paid"}
         </button>
-        <button onClick={() => onAction(n.id, "snooze", 1)} className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-amber-400 hover:bg-amber-500/10">Snooze 1d</button>
-        <button onClick={() => onAction(n.id, "snooze", 3)} className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-amber-400 hover:bg-amber-500/10">3d</button>
-        <button onClick={() => onAction(n.id, "snooze", 7)} className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-amber-400 hover:bg-amber-500/10">7d</button>
+        <button onClick={() => onAction(n.id, "snooze", 1)} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-amber-400 hover:bg-amber-500/10">Snooze 1d</button>
+        <button onClick={() => onAction(n.id, "snooze", 3)} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-amber-400 hover:bg-amber-500/10">3d</button>
+        <button onClick={() => onAction(n.id, "snooze", 7)} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-amber-400 hover:bg-amber-500/10">7d</button>
         <button
           onClick={() => {
             const v = prompt("Snooze how many days?");
             const n_days = v ? parseInt(v, 10) : NaN;
             if (Number.isFinite(n_days) && n_days > 0) onAction(n.id, "snooze", n_days);
           }}
-          className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-amber-400 hover:bg-amber-500/10"
+          className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-amber-400 hover:bg-amber-500/10"
         >
           Custom…
         </button>
-        <button onClick={() => onAction(n.id, "cancel")} className="ml-auto rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-gray-400 hover:bg-white/10">Cancel</button>
+        <button onClick={() => onAction(n.id, "cancel")} className="ml-auto rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-[var(--text-secondary)] hover:bg-white/10">Cancel</button>
       </div>
     </div>
   );

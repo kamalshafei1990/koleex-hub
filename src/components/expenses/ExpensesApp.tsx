@@ -220,7 +220,7 @@ export default function ExpensesApp() {
 
         {/* ── Phase 2.2 — Approval filter strip ─────────────────── */}
         <div className="mt-4 flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.18em] text-gray-500">
+          <span className="mr-1 inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.18em] text-[var(--text-dim)]">
             <span>{t("approval.label", "Approval")}</span>
             <GuidanceTip guidanceId="approval.status" />
           </span>
@@ -236,15 +236,15 @@ export default function ExpensesApp() {
                 className={
                   "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors " +
                   (active
-                    ? "border-white/[0.14] bg-white/[0.08] text-[var(--text-primary)]"
-                    : "border-white/[0.05] bg-white/[0.02] text-gray-400 hover:bg-white/[0.05] hover:text-gray-200")
+                    ? "border-[var(--border-color)] bg-[var(--bg-surface-hover)] text-[var(--text-primary)]"
+                    : "border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-highlight)]")
                 }
               >
                 <span>{t(lbl.key, lbl.en)}</span>
                 {count > 0 && key !== "all" && (
                   <span className={
                     "rounded-full px-1 text-[9px] tabular-nums " +
-                    (active ? "bg-white/[0.12] text-gray-200" : "bg-white/[0.04] text-gray-500")
+                    (active ? "bg-[var(--bg-surface-active)] text-[var(--text-highlight)]" : "bg-[var(--bg-surface)] text-[var(--text-dim)]")
                   }>
                     {count}
                   </span>
@@ -268,13 +268,13 @@ export default function ExpensesApp() {
                       key={c.name}
                       type="button"
                       onClick={() => setCategoryFilter(active ? "" : (cat?.id ?? ""))}
-                      className={`rounded-2xl border bg-[var(--bg-secondary)] p-4 text-left transition-colors duration-200 hover:border-white/[0.15] ${active ? "border-white/[0.18] bg-white/[0.04] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]" : accentBgClass(style.accent)}`}
+                      className={`rounded-2xl border bg-[var(--bg-secondary)] p-4 text-left transition-colors duration-200 hover:border-[var(--border-color)] ${active ? "border-[var(--border-strong)] bg-[var(--bg-surface)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]" : accentBgClass(style.accent)}`}
                     >
                       <div className="flex items-center gap-3">
                         <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/5"><RrIcon name={style.icon} size={18} /></span>
                         <div className="min-w-0 flex-1">
-                          <div className="truncate text-[12px] font-semibold uppercase tracking-wider text-gray-300">{c.name}</div>
-                          <div className="text-[10px] text-gray-500">{c.count} {c.count === 1 ? t("categories.expenseOne", "expense") : t("categories.expenseMany", "expenses")}</div>
+                          <div className="truncate text-[12px] font-semibold uppercase tracking-wider text-[var(--text-highlight)]">{c.name}</div>
+                          <div className="text-[10px] text-[var(--text-dim)]">{c.count} {c.count === 1 ? t("categories.expenseOne", "expense") : t("categories.expenseMany", "expenses")}</div>
                         </div>
                       </div>
                       <div className="mt-3 text-base font-semibold tabular-nums">{fmtMoney(c.total, baseCurrency, { compact: true })}</div>
@@ -295,13 +295,13 @@ export default function ExpensesApp() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t("search.placeholder", "Search expenses…")}
-            className="w-full rounded-lg border border-white/[0.06] bg-[var(--bg-secondary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-white/[0.22] focus:outline-none sm:max-w-[280px]"
+            className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2 text-sm placeholder-[var(--text-ghost)] focus:border-[var(--border-strong)] focus:outline-none sm:max-w-[280px]"
           />
           {categoryFilter && (
             <button
               type="button"
               onClick={() => setCategoryFilter("")}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-[var(--bg-secondary)] px-3 py-2 text-xs text-rose-400 hover:border-rose-500/40"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2 text-xs text-rose-400 hover:border-rose-500/40"
               title={t("filter.clearTitle", "Clear category filter")}
             >
               {t("filter.clear", "Clear filter")}
@@ -313,7 +313,7 @@ export default function ExpensesApp() {
         {/* ── EXPENSE LIST ───────────────────────────────────────── */}
         <div className="mt-4">
           {loading ? (
-            <SectionCard><div className="py-8 text-center text-sm text-gray-500">{t("list.loading", "Loading expenses…")}</div></SectionCard>
+            <SectionCard><div className="py-8 text-center text-sm text-[var(--text-dim)]">{t("list.loading", "Loading expenses…")}</div></SectionCard>
           ) : filtered.length === 0 ? (
             <EmptyState
               title={search || categoryFilter
@@ -461,7 +461,7 @@ function ExpenseRow({
   })();
   return (
     <li className="group">
-      <div className={`flex items-center gap-3 rounded-2xl border bg-[var(--bg-secondary)] p-4 transition hover:border-white/[0.12] ${isOverdue ? "border-rose-500/30" : "border-white/[0.06]"}`}>
+      <div className={`flex items-center gap-3 rounded-2xl border bg-[var(--bg-secondary)] p-4 transition hover:border-[var(--border-color)] ${isOverdue ? "border-rose-500/30" : "border-[var(--border-subtle)]"}`}>
         <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${accentBgClass(style.accent)}`}>
           <RrIcon name={style.icon} size={18} />
         </div>
@@ -487,14 +487,14 @@ function ExpenseRow({
               <ApprovalBadge status={approvalStatus} ageDays={ageDays} compact />
             </button>
           </div>
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-gray-500">
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-[var(--text-dim)]">
             <span>{e.expense_date}</span>
             {e.category_name && (<><span>·</span><span>{e.category_name}</span></>)}
             {e.due_date && (<><span>·</span><span>{t("list.dueLabel", "Due")} {e.due_date}</span></>)}
             {e.linked_order_id && (<><span>·</span><span>{t("list.linkedOrder", "Linked to order")}</span></>)}
           </div>
           {e.notes && (
-            <div className="mt-1 truncate text-[11px] text-gray-400">{e.notes}</div>
+            <div className="mt-1 truncate text-[11px] text-[var(--text-secondary)]">{e.notes}</div>
           )}
         </div>
         <div className="flex items-center gap-3">
@@ -509,7 +509,7 @@ function ExpenseRow({
           <div className="flex items-center gap-1">
             <button
               onClick={onEdit}
-              className="rounded-md border border-white/[0.05] bg-white/[0.02] px-2 py-1 text-[11px] text-gray-300 transition-colors hover:border-white/[0.12] hover:bg-white/[0.05]"
+              className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-[var(--text-highlight)] transition-colors hover:border-[var(--border-color)] hover:bg-[var(--bg-surface)]"
               title={t("row.editTitle", "Edit expense")}
             >
               {t("common.edit", "Edit")}
@@ -547,18 +547,18 @@ function RowKebab({
         type="button"
         aria-label={t("row.moreActions", "More actions")}
         onClick={(ev) => { ev.stopPropagation(); setOpen((v) => !v); }}
-        className="flex h-7 w-7 items-center justify-center rounded-md border border-white/[0.05] bg-white/[0.02] text-gray-400 transition-colors hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-gray-100"
+        className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] transition-colors hover:border-[var(--border-color)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
       >
         <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>
       </button>
       {open && (
         <div
           onClick={(ev) => ev.stopPropagation()}
-          className="absolute right-0 top-9 z-30 w-44 overflow-hidden rounded-lg border border-white/[0.08] bg-[var(--bg-secondary)] shadow-[0_12px_32px_-12px_rgba(0,0,0,0.7)]"
+          className="absolute right-0 top-9 z-30 w-44 overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-[0_12px_32px_-12px_rgba(0,0,0,0.7)]"
         >
-          <button onClick={() => { setOpen(false); onReview(); }} className="block w-full px-3 py-2 text-left text-[12px] text-gray-200 hover:bg-white/[0.04]">{t("row.openReview", "Open review")}</button>
-          <button onClick={() => { setOpen(false); onEvidence(); }} className="block w-full px-3 py-2 text-left text-[12px] text-gray-200 hover:bg-white/[0.04]">{t("row.openEvidence", "Open evidence")}</button>
-          <button onClick={() => { setOpen(false); onDelete(); }} className="block w-full border-t border-white/[0.05] px-3 py-2 text-left text-[12px] text-rose-300 hover:bg-rose-500/[0.06]">{t("row.deleteExpense", "Delete expense")}</button>
+          <button onClick={() => { setOpen(false); onReview(); }} className="block w-full px-3 py-2 text-left text-[12px] text-[var(--text-highlight)] hover:bg-[var(--bg-surface)]">{t("row.openReview", "Open review")}</button>
+          <button onClick={() => { setOpen(false); onEvidence(); }} className="block w-full px-3 py-2 text-left text-[12px] text-[var(--text-highlight)] hover:bg-[var(--bg-surface)]">{t("row.openEvidence", "Open evidence")}</button>
+          <button onClick={() => { setOpen(false); onDelete(); }} className="block w-full border-t border-[var(--border-subtle)] px-3 py-2 text-left text-[12px] text-rose-300 hover:bg-rose-500/[0.06]">{t("row.deleteExpense", "Delete expense")}</button>
         </div>
       )}
     </div>
@@ -632,13 +632,13 @@ function ExpenseEditor({
       onClick={onClose}
     >
       <div
-        className="relative flex w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-white/[0.08] bg-[var(--bg-secondary)] shadow-[0_24px_72px_rgba(0,0,0,0.6)] sm:rounded-2xl"
+        className="relative flex w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-[0_24px_72px_rgba(0,0,0,0.6)] sm:rounded-2xl"
         style={{ maxHeight: "min(92vh, 880px)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* ─── Sticky header ─── */}
         <div
-          className="relative shrink-0 border-b border-white/[0.06]"
+          className="relative shrink-0 border-b border-[var(--border-subtle)]"
           style={{
             background: `linear-gradient(180deg, ${selectedStyle ? "rgba(255,255,255,0.02)" : "transparent"} 0%, transparent 100%)`,
           }}
@@ -654,7 +654,7 @@ function ExpenseEditor({
                 <h2 className="truncate text-[15px] font-semibold text-[var(--text-primary)]">
                   {local.id ? t("editor.titleEdit", "Edit expense") : t("editor.titleAdd", "Add expense")}
                 </h2>
-                <p className="mt-0.5 text-[11px] text-gray-500">
+                <p className="mt-0.5 text-[11px] text-[var(--text-dim)]">
                   {t("editor.subtitle", "Title, amount, and a category — done in 20 seconds. The rest is optional.")}
                 </p>
               </div>
@@ -662,7 +662,7 @@ function ExpenseEditor({
             <button
               onClick={onClose}
               aria-label={t("editor.close", "Close")}
-              className="rounded-lg p-1.5 text-gray-400 transition hover:bg-white/[0.06] hover:text-gray-100"
+              className="rounded-lg p-1.5 text-[var(--text-secondary)] transition hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
             >
               <RrIcon name="cross" size={14} />
             </button>
@@ -730,7 +730,7 @@ function ExpenseEditor({
                     )}
                   </span>
                 ) : (
-                  <span className="rounded-full border border-dashed border-white/[0.12] px-2 py-0.5 text-[11px] text-gray-500">
+                  <span className="rounded-full border border-dashed border-[var(--border-color)] px-2 py-0.5 text-[11px] text-[var(--text-dim)]">
                     {t("editor.noCategory", "No category selected")}
                   </span>
                 )
@@ -789,22 +789,22 @@ function ExpenseEditor({
             </Section>
 
             {/* ── Section 5: Advanced (collapsed by default) ────── */}
-            <div className="rounded-xl border border-white/[0.05] bg-[var(--bg-primary)]/40">
+            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)]/40">
               <button
                 type="button"
                 onClick={() => setAdvancedOpen((v) => !v)}
-                className="flex w-full items-center justify-between px-4 py-3 text-left text-[12px] font-medium text-gray-300 transition hover:text-gray-100"
+                className="flex w-full items-center justify-between px-4 py-3 text-left text-[12px] font-medium text-[var(--text-highlight)] transition hover:text-[var(--text-primary)]"
               >
                 <span className="inline-flex items-center gap-2">
                   <RrIcon name={advancedOpen ? "cross" : "plus"} size={11} className="opacity-70" />
                   {t("editor.advanced.title", "Advanced options")}
                 </span>
-                <span className="text-[10px] uppercase tracking-wider text-gray-500">
+                <span className="text-[10px] uppercase tracking-wider text-[var(--text-dim)]">
                   {t("editor.advanced.hint", "link to order / supplier / receipt URL")}
                 </span>
               </button>
               {advancedOpen && (
-                <div className="grid grid-cols-1 gap-3 border-t border-white/[0.05] px-4 py-3 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 border-t border-[var(--border-subtle)] px-4 py-3 sm:grid-cols-2">
                   <div className="sm:col-span-2">
                     <FieldLabel label={t("editor.advanced.receiptUrl", "Legacy receipt URL")}>
                       <input
@@ -838,7 +838,7 @@ function ExpenseEditor({
         </div>
 
         {/* ─── Sticky footer ─── */}
-        <div className="shrink-0 border-t border-white/[0.06] bg-[var(--bg-secondary)] px-5 py-3 sm:px-6">
+        <div className="shrink-0 border-t border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-5 py-3 sm:px-6">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
               {error ? (
@@ -847,7 +847,7 @@ function ExpenseEditor({
                   {error}
                 </span>
               ) : (
-                <span className="text-[11px] text-gray-500">
+                <span className="text-[11px] text-[var(--text-dim)]">
                   {selectedCat ? `${t("editor.footer.category", "Category")} · ${selectedCat.name}` : t("editor.footer.pickPrompt", "Pick a category to make reporting cleaner.")}
                 </span>
               )}
@@ -855,7 +855,7 @@ function ExpenseEditor({
             <div className="flex shrink-0 items-center gap-2">
               <button
                 onClick={onClose}
-                className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-gray-300 transition hover:border-white/[0.18] hover:text-gray-100"
+                className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-[var(--text-highlight)] transition hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
               >
                 {t("common.cancel", "Cancel")}
               </button>
@@ -887,10 +887,10 @@ function ExpenseEditor({
 /* ── Tiny presentational helpers for the editor ─────────────────── */
 
 const INPUT =
-  "w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-gray-600 transition focus:border-white/[0.22] focus:outline-none focus:ring-1 focus:ring-white/[0.08]";
+  "w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-[var(--text-ghost)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-1 focus:ring-[var(--border-subtle)]";
 
 const INPUT_LG =
-  "w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2.5 text-base placeholder-gray-600 transition focus:border-white/[0.22] focus:outline-none focus:ring-1 focus:ring-white/[0.08]";
+  "w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2.5 text-base placeholder-[var(--text-ghost)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-1 focus:ring-[var(--border-subtle)]";
 
 function Section({
   title,
@@ -908,7 +908,7 @@ function Section({
       <div className="mb-2 flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-muted)]">{title}</h3>
-          {hint && <p className="mt-0.5 text-[11px] text-gray-500">{hint}</p>}
+          {hint && <p className="mt-0.5 text-[11px] text-[var(--text-dim)]">{hint}</p>}
         </div>
         {right}
       </div>
@@ -930,7 +930,7 @@ function FieldLabel({
 }) {
   return (
     <label className="block">
-      <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-dim)]">
         <span>{label}</span>
         {required && <span className="text-rose-400">*</span>}
         {helpId && <GuidanceTip guidanceId={helpId} />}
@@ -1025,7 +1025,7 @@ function CategoryPicker({
               className={`group relative flex flex-col items-start gap-2 overflow-hidden rounded-xl border p-3 text-left transition-all duration-200 ${
                 isActive
                   ? `${accentActiveClass(style.accent)} shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]`
-                  : `${accentBgClass(style.accent)} hover:border-white/[0.22] hover:brightness-110`
+                  : `${accentBgClass(style.accent)} hover:border-[var(--border-strong)] hover:brightness-110`
               }`}
               title={p.name}
               aria-pressed={isActive}
@@ -1047,7 +1047,7 @@ function CategoryPicker({
               </div>
               <div className="min-w-0">
                 <div className="truncate text-[12px] font-semibold leading-tight">{p.name}</div>
-                <div className="mt-0.5 text-[10px] uppercase tracking-wider text-gray-500">
+                <div className="mt-0.5 text-[10px] uppercase tracking-wider text-[var(--text-dim)]">
                   {subCount} {subCount === 1 ? t("picker.optionOne", "option") : t("picker.optionMany", "options")}
                 </div>
               </div>
@@ -1058,25 +1058,25 @@ function CategoryPicker({
 
       {/* ── Expanded sub-category panel for the active parent ── */}
       {activeParentObj && (
-        <div className="overflow-hidden rounded-xl border border-white/[0.06] bg-[var(--bg-primary)]">
+        <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)]">
           {/* Panel header — shows which group is open + a tiny search */}
-          <div className="flex items-center justify-between gap-3 border-b border-white/[0.05] bg-[var(--bg-secondary)] px-3 py-2.5">
+          <div className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2.5">
             <div className="inline-flex min-w-0 items-center gap-2">
               <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${accentBgClass(activeParentStyle.accent)}`}>
                 <RrIcon name={activeParentStyle.icon} size={11} />
               </span>
               <span className="truncate text-[12px] font-semibold text-[var(--text-primary)]">{activeParentObj.name}</span>
-              <span className="hidden text-[10px] text-gray-500 sm:inline">{t("picker.chooseSub", "· choose a sub-category")}</span>
+              <span className="hidden text-[10px] text-[var(--text-dim)] sm:inline">{t("picker.chooseSub", "· choose a sub-category")}</span>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               {activeChildren.length > 5 && (
-                <div className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1">
-                  <RrIcon name="search" size={10} className="text-gray-500" />
+                <div className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1">
+                  <RrIcon name="search" size={10} className="text-[var(--text-dim)]" />
                   <input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder={t("picker.filterPlaceholder", "Filter…")}
-                    className="w-24 bg-transparent text-[11px] placeholder-gray-600 focus:outline-none sm:w-32"
+                    className="w-24 bg-transparent text-[11px] placeholder-[var(--text-ghost)] focus:outline-none sm:w-32"
                   />
                 </div>
               )}
@@ -1084,7 +1084,7 @@ function CategoryPicker({
                 <button
                   type="button"
                   onClick={() => onChange("")}
-                  className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1 text-[10px] font-medium text-gray-400 transition hover:border-rose-500/30 hover:text-rose-300"
+                  className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1 text-[10px] font-medium text-[var(--text-secondary)] transition hover:border-rose-500/30 hover:text-rose-300"
                 >
                   <RrIcon name="cross" size={9} />
                   {t("picker.clear", "Clear")}
@@ -1102,11 +1102,11 @@ function CategoryPicker({
               className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-[12px] font-medium transition-all duration-200 ${
                 value === activeParent
                   ? accentActiveClass(activeParentStyle.accent)
-                  : "border-dashed border-white/[0.10] bg-[var(--bg-secondary)] text-gray-300 hover:border-white/[0.22] hover:bg-white/[0.04]"
+                  : "border-dashed border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-highlight)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-surface)]"
               }`}
               title={`${t("picker.general", "General")} · ${activeParentObj.name}`}
             >
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white/[0.06]">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--bg-surface-hover)]">
                 <RrIcon name="info" size={11} className="opacity-70" />
               </span>
               <span className="min-w-0 flex-1 truncate">{t("picker.general", "General")} · {activeParentObj.name}</span>
@@ -1124,7 +1124,7 @@ function CategoryPicker({
                   className={`group flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-[12px] font-medium transition-all duration-200 ${
                     active
                       ? `${accentActiveClass(style.accent)} shadow-[inset_0_0_0_1px_rgba(255,255,255,0.10)]`
-                      : `${accentBgClass(style.accent)} hover:border-white/[0.22] hover:brightness-110`
+                      : `${accentBgClass(style.accent)} hover:border-[var(--border-strong)] hover:brightness-110`
                   }`}
                   title={c.name}
                   aria-pressed={active}
@@ -1139,7 +1139,7 @@ function CategoryPicker({
             })}
 
             {filteredChildren.length === 0 && query && (
-              <div className="col-span-full rounded-lg border border-dashed border-white/[0.08] px-3 py-4 text-center text-[11px] text-gray-500">
+              <div className="col-span-full rounded-lg border border-dashed border-[var(--border-subtle)] px-3 py-4 text-center text-[11px] text-[var(--text-dim)]">
                 {t("picker.noMatch", "No sub-categories match “{q}”.").replace("{q}", query)}
               </div>
             )}

@@ -33,7 +33,7 @@ export default function ExpensesTabs({
         key: tab.key,
         label: t(tab.labelKey, tab.fallback),
         count: counts[tab.key],
-        icon: <span className="text-gray-500" aria-hidden>{tab.icon}</span>,
+        icon: <span className="text-[var(--text-dim)]" aria-hidden>{tab.icon}</span>,
       }))}
     />
   );

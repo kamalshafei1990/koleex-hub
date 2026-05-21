@@ -237,8 +237,8 @@ export default function FinanceExpenseAnalytics() {
                           style={{ background: `rgba(255,255,255,${opacity.toFixed(2)})` }}
                         />
                         <RrIcon name={style.icon} size={14} />
-                        <span className="flex-1 truncate text-gray-300">{c.name}</span>
-                        <span className="tabular-nums text-gray-500">{c.share.toFixed(0)}%</span>
+                        <span className="flex-1 truncate text-[var(--text-highlight)]">{c.name}</span>
+                        <span className="tabular-nums text-[var(--text-dim)]">{c.share.toFixed(0)}%</span>
                         <span className="w-16 text-right font-medium tabular-nums">{formatCompact(c.total)}</span>
                       </li>
                     );
@@ -250,7 +250,7 @@ export default function FinanceExpenseAnalytics() {
             {/* Monthly bar trend */}
             <SectionCard title="Monthly spend" subtitle="Last 6 months. Latest highlighted.">
               <BarChart data={monthlyTrend} highlightLast />
-              <div className="mt-3 flex items-baseline justify-between text-[11px] text-gray-500">
+              <div className="mt-3 flex items-baseline justify-between text-[11px] text-[var(--text-dim)]">
                 <span>This month</span>
                 <span className="text-base font-medium tabular-nums text-[var(--text-primary)]">
                   {formatCompact(monthlyTrend[monthlyTrend.length - 1]?.value ?? 0)}
@@ -261,18 +261,18 @@ export default function FinanceExpenseAnalytics() {
             {/* Top vendors */}
             <SectionCard title="Top vendors" subtitle="Ranked by total spend.">
               {topVendors.length === 0 ? (
-                <div className="py-6 text-center text-[12px] text-gray-500">No supplier-linked expenses yet.</div>
+                <div className="py-6 text-center text-[12px] text-[var(--text-dim)]">No supplier-linked expenses yet.</div>
               ) : (
                 <ol className="space-y-1.5">
                   {topVendors.map((v, idx) => (
-                    <li key={v.key} className="flex items-center justify-between gap-3 rounded-lg border border-white/[0.04] bg-white/[0.018] px-3 py-2 text-[12px]">
+                    <li key={v.key} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border-faint)] bg-[var(--bg-secondary)] px-3 py-2 text-[12px]">
                       <div className="flex min-w-0 items-center gap-2.5">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/[0.06] text-[10px] font-medium text-gray-300">{idx + 1}</span>
-                        <span className="truncate text-gray-200">{v.name}</span>
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--bg-surface-hover)] text-[10px] font-medium text-[var(--text-highlight)]">{idx + 1}</span>
+                        <span className="truncate text-[var(--text-highlight)]">{v.name}</span>
                       </div>
                       <div className="text-right">
                         <div className="font-medium tabular-nums">{formatCompact(v.total)}</div>
-                        <div className="text-[10px] text-gray-500">{v.count} {v.count === 1 ? "expense" : "expenses"}</div>
+                        <div className="text-[10px] text-[var(--text-dim)]">{v.count} {v.count === 1 ? "expense" : "expenses"}</div>
                       </div>
                     </li>
                   ))}
@@ -296,18 +296,18 @@ export default function FinanceExpenseAnalytics() {
                   return (
                     <div
                       key={c.name}
-                      className={`rounded-2xl border ${accentBgClass(style.accent)} bg-[var(--bg-secondary)] p-4 transition hover:border-white/[0.15]`}
+                      className={`rounded-2xl border ${accentBgClass(style.accent)} bg-[var(--bg-secondary)] p-4 transition hover:border-[var(--border-color)]`}
                     >
                       <div className="flex items-center gap-2">
                         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5"><RrIcon name={style.icon} size={16} /></div>
                         <div className="min-w-0 flex-1">
-                          <div className="truncate text-[11px] font-semibold uppercase tracking-wider text-gray-300">{c.name}</div>
-                          <div className="text-[10px] text-gray-500">{c.count} {c.count === 1 ? "expense" : "expenses"}</div>
+                          <div className="truncate text-[11px] font-semibold uppercase tracking-wider text-[var(--text-highlight)]">{c.name}</div>
+                          <div className="text-[10px] text-[var(--text-dim)]">{c.count} {c.count === 1 ? "expense" : "expenses"}</div>
                         </div>
                       </div>
                       <div className="mt-3 text-lg font-semibold tabular-nums">{fmtMoney(c.total, baseCurrency, { compact: true })}</div>
                       <div className="mt-2 flex items-center justify-between text-[10px]">
-                        <span className="text-gray-500">{c.share.toFixed(0)}% of total</span>
+                        <span className="text-[var(--text-dim)]">{c.share.toFixed(0)}% of total</span>
                         {c.delta_pct != null && (
                           <span className={`rounded-full px-1.5 py-0.5 font-semibold ${c.delta_pct >= 0 ? "bg-rose-500/20 text-rose-300" : "bg-emerald-500/20 text-emerald-300"}`}>
                             {c.delta_pct >= 0 ? "▲" : "▼"} {fmtPct(c.delta_pct)}
@@ -334,12 +334,12 @@ export default function FinanceExpenseAnalytics() {
                   {insights.recent.map((c) => {
                     const style = styleForCategory(c.name);
                     return (
-                      <li key={c.name} className="flex items-center justify-between rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] px-3 py-2">
+                      <li key={c.name} className="flex items-center justify-between rounded-lg border border-[var(--border-faint)] bg-[var(--bg-primary)] px-3 py-2">
                         <div className="flex items-center gap-3">
                           <RrIcon name={style.icon} size={16} />
                           <div>
                             <div className="text-sm font-medium">{c.name}</div>
-                            <div className="text-[10px] text-gray-500">This month {fmtMoney(c.thisMonth, baseCurrency, { compact: true })} · last month {fmtMoney(c.lastMonth, baseCurrency, { compact: true })}</div>
+                            <div className="text-[10px] text-[var(--text-dim)]">This month {fmtMoney(c.thisMonth, baseCurrency, { compact: true })} · last month {fmtMoney(c.lastMonth, baseCurrency, { compact: true })}</div>
                           </div>
                         </div>
                         <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-300">▲ {fmtPct(c.delta_pct ?? 0)}</span>
@@ -356,7 +356,7 @@ export default function FinanceExpenseAnalytics() {
                     <li key={e.id} className="flex items-center justify-between rounded-lg border border-amber-500/20 bg-amber-500/[0.04] px-3 py-2">
                       <div className="min-w-0">
                         <div className="truncate text-sm font-medium">{e.title}</div>
-                        <div className="text-[10px] text-gray-500">{e.expense_date} · {e.category_name ?? "Other"}</div>
+                        <div className="text-[10px] text-[var(--text-dim)]">{e.expense_date} · {e.category_name ?? "Other"}</div>
                       </div>
                       <span className="font-semibold tabular-nums text-amber-300">{fmtMoney(Number(e.amount) || 0, e.currency, { compact: true })}</span>
                     </li>
@@ -368,12 +368,12 @@ export default function FinanceExpenseAnalytics() {
               <SectionCard title="Order-Linked Impact" subtitle="Orders absorbing the most expense spend.">
                 <ul className="space-y-2">
                   {orderImpact.map((o, idx) => (
-                    <li key={o.order_id} className="flex items-center justify-between rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] px-3 py-2">
+                    <li key={o.order_id} className="flex items-center justify-between rounded-lg border border-[var(--border-faint)] bg-[var(--bg-primary)] px-3 py-2">
                       <div className="flex items-center gap-3">
                         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-500/15 text-[11px] font-semibold text-violet-300">{idx + 1}</span>
                         <div className="min-w-0">
                           <div className="font-mono text-[11px] font-medium">{o.order_id.slice(0, 8)}…</div>
-                          <div className="text-[10px] text-gray-500">{o.count} {o.count === 1 ? "expense" : "expenses"} linked</div>
+                          <div className="text-[10px] text-[var(--text-dim)]">{o.count} {o.count === 1 ? "expense" : "expenses"} linked</div>
                         </div>
                       </div>
                       <span className="font-semibold tabular-nums text-rose-300">−{fmtMoney(o.total, baseCurrency, { compact: true })}</span>

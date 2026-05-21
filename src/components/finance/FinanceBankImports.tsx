@@ -235,7 +235,7 @@ export default function FinanceBankImports() {
             step !== "pick" ? (
               <button
                 onClick={cancelImport}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-white/[0.06] bg-[var(--bg-surface)] px-3 py-2 text-sm font-medium text-gray-300 transition hover:border-rose-500/30 hover:text-rose-300"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-sm font-medium text-[var(--text-highlight)] transition hover:border-rose-500/30 hover:text-rose-300"
               >
                 <RrIcon name="cross" size={11} />
                 {t("bankImports.cancel", "Cancel")}
@@ -285,16 +285,16 @@ export default function FinanceBankImports() {
                         onClick={() => setAccountId(a.id)}
                         className={`rounded-xl border p-3 text-left transition ${
                           active
-                            ? "border-white/[0.18] bg-white/[0.04]"
-                            : "border-white/[0.06] bg-[var(--bg-primary)] hover:border-white/[0.18]"
+                            ? "border-[var(--border-strong)] bg-[var(--bg-surface)]"
+                            : "border-[var(--border-subtle)] bg-[var(--bg-primary)] hover:border-[var(--border-strong)]"
                         }`}
                       >
                         <div className="flex items-center justify-between">
                           <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--text-primary)]">{a.bank_name}</span>
                           {a.is_primary && <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-emerald-300">{t("bankImports.primary", "Primary")}</span>}
                         </div>
-                        <div className="mt-1 truncate text-[12px] text-gray-400">{a.account_name}</div>
-                        <div className="mt-1 text-[11px] text-gray-500">{a.currency} · {fmtMoney(a.available_balance, a.currency, { compact: true })}</div>
+                        <div className="mt-1 truncate text-[12px] text-[var(--text-secondary)]">{a.account_name}</div>
+                        <div className="mt-1 text-[11px] text-[var(--text-dim)]">{a.currency} · {fmtMoney(a.available_balance, a.currency, { compact: true })}</div>
                       </button>
                     );
                   })}
@@ -390,7 +390,7 @@ export default function FinanceBankImports() {
                 </Link>
                 <button
                   onClick={() => { setStep("pick"); setImportRow(null); setRows([]); setPostSummary(null); }}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-gray-300 hover:border-white/[0.18] hover:text-gray-100"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-[var(--text-highlight)] hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
                 >
                   <RrIcon name="plus" size={11} />
                   {t("bankImports.done.another", "Import another file")}
@@ -418,19 +418,19 @@ function Stepper({ step }: { step: StepKey }) {
   ];
   const idx = steps.findIndex((s) => s.key === step);
   return (
-    <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-white/[0.05] bg-[var(--bg-surface)]/40 px-3 py-2 text-[11px]">
+    <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]/40 px-3 py-2 text-[11px]">
       {steps.map((s, i) => {
         const active = i === idx;
         const past = i < idx;
         return (
           <span key={s.key} className="inline-flex items-center gap-2">
             <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
-              active ? "bg-emerald-500/30 text-emerald-200" : past ? "bg-emerald-500/15 text-emerald-300" : "bg-white/[0.06] text-gray-500"
+              active ? "bg-emerald-500/30 text-emerald-200" : past ? "bg-emerald-500/15 text-emerald-300" : "bg-[var(--bg-surface-hover)] text-[var(--text-dim)]"
             }`}>
               {past ? <RrIcon name="check" size={9} /> : i + 1}
             </span>
-            <span className={active ? "text-[var(--text-primary)] font-semibold" : past ? "text-gray-300" : "text-gray-500"}>{s.label}</span>
-            {i < steps.length - 1 && <span aria-hidden className="text-gray-700">→</span>}
+            <span className={active ? "text-[var(--text-primary)] font-semibold" : past ? "text-[var(--text-highlight)]" : "text-[var(--text-dim)]"}>{s.label}</span>
+            {i < steps.length - 1 && <span aria-hidden className="text-[var(--text-whisper)]">→</span>}
           </span>
         );
       })}
@@ -457,7 +457,7 @@ const RowCard = memo(function RowCard({
   const ccy = row.currency ?? accountCurrency;
   const amount = row.amount != null ? fmtMoney(row.amount, ccy, { compact: true }) : "—";
   const directionLabel = row.direction === "inflow" ? t("bankImports.row.moneyIn", "Money in") : row.direction === "outflow" ? t("bankImports.row.moneyOut", "Money out") : "—";
-  const directionTone = row.direction === "inflow" ? "text-emerald-300" : row.direction === "outflow" ? "text-rose-300" : "text-gray-400";
+  const directionTone = row.direction === "inflow" ? "text-emerald-300" : row.direction === "outflow" ? "text-rose-300" : "text-[var(--text-secondary)]";
 
   const DUP_CHIP_LOCAL: Record<BankStatementRowDuplicateStatus, { label: string; cls: string }> = {
     new:                { label: t("bankImports.dup.new", "New"),       cls: "bg-emerald-500/15 text-emerald-300" },
@@ -466,7 +466,7 @@ const RowCard = memo(function RowCard({
   };
   const ROW_STATUS_CHIP_LOCAL: Record<BankStatementRowImportStatus, { label: string; cls: string }> = {
     ready:    { label: t("bankImports.status.ready", "Ready"),    cls: "bg-emerald-500/15 text-emerald-300" },
-    skipped:  { label: t("bankImports.status.skipped", "Skipped"),  cls: "bg-gray-500/15 text-gray-300" },
+    skipped:  { label: t("bankImports.status.skipped", "Skipped"),  cls: "bg-gray-500/15 text-[var(--text-highlight)]" },
     imported: { label: t("bankImports.status.imported", "Imported"), cls: "bg-sky-500/15 text-sky-300" },
     error:    { label: t("bankImports.status.error", "Error"),    cls: "bg-rose-500/15 text-rose-300" },
   };
@@ -478,14 +478,14 @@ const RowCard = memo(function RowCard({
     <div className={`rounded-xl border bg-[var(--bg-primary)]/60 p-3 transition ${
       row.import_status === "error"   ? "border-rose-500/30"
       : row.duplicate_status === "duplicate" ? "border-amber-500/25 opacity-90"
-      : row.import_status === "skipped" ? "border-white/[0.04] opacity-70"
-      : "border-white/[0.05]"
+      : row.import_status === "skipped" ? "border-[var(--border-faint)] opacity-70"
+      : "border-[var(--border-subtle)]"
     }`}>
       <div className="flex flex-wrap items-center gap-2">
         <span className={`text-[12px] font-semibold tabular-nums ${directionTone}`}>{directionLabel}</span>
         <span className="text-[12px] font-bold tabular-nums">{amount}</span>
-        <span className="text-[11px] text-gray-500 tabular-nums">{row.movement_date ?? "—"}</span>
-        {row.reference && <span className="rounded bg-white/[0.04] px-1.5 py-0.5 text-[10px] text-gray-300">{row.reference}</span>}
+        <span className="text-[11px] text-[var(--text-dim)] tabular-nums">{row.movement_date ?? "—"}</span>
+        {row.reference && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] text-[var(--text-highlight)]">{row.reference}</span>}
         <span className="ml-auto inline-flex items-center gap-1.5">
           <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${dupChip.cls}`}>{dupChip.label}</span>
           <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusChip.cls}`}>{statusChip.label}</span>
@@ -493,10 +493,10 @@ const RowCard = memo(function RowCard({
       </div>
 
       {row.description && (
-        <div className="mt-1 truncate text-[11px] text-gray-400">{row.description}</div>
+        <div className="mt-1 truncate text-[11px] text-[var(--text-secondary)]">{row.description}</div>
       )}
       {row.counterparty_name && (
-        <div className="mt-0.5 truncate text-[11px] text-gray-500">↳ {row.counterparty_name}</div>
+        <div className="mt-0.5 truncate text-[11px] text-[var(--text-dim)]">↳ {row.counterparty_name}</div>
       )}
       {row.error_message && (
         <div className="mt-1 text-[11px] text-rose-300">{t("bankImports.row.parseError", "Parse error: {msg}").replace("{msg}", row.error_message)}</div>
@@ -509,7 +509,7 @@ const RowCard = memo(function RowCard({
             <button
               type="button"
               onClick={() => onToggle(row.id, "skipped")}
-              className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-[var(--bg-secondary)] px-2 py-1 text-[10px] font-medium text-gray-300 hover:border-rose-500/30 hover:text-rose-300"
+              className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-1 text-[10px] font-medium text-[var(--text-highlight)] hover:border-rose-500/30 hover:text-rose-300"
             >
               <RrIcon name="cross" size={9} />
               {t("bankImports.row.skip", "Skip")}
@@ -518,7 +518,7 @@ const RowCard = memo(function RowCard({
             <button
               type="button"
               onClick={() => onToggle(row.id, "ready")}
-              className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-[var(--bg-secondary)] px-2 py-1 text-[10px] font-medium text-gray-300 hover:border-emerald-500/30 hover:text-emerald-300"
+              className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-1 text-[10px] font-medium text-[var(--text-highlight)] hover:border-emerald-500/30 hover:text-emerald-300"
             >
               <RrIcon name="check" size={9} />
               {t("bankImports.row.include", "Include")}
@@ -545,11 +545,11 @@ function RecentImports({
   if (imports.length === 0) return null;
   const byId = new Map(accounts.map((a) => [a.id, a]));
   const IMPORT_STATUS_LOCAL: Record<string, { label: string; cls: string }> = {
-    uploaded:  { label: t("bankImports.impStatus.uploaded", "Uploaded"),  cls: "bg-gray-500/15 text-gray-300" },
+    uploaded:  { label: t("bankImports.impStatus.uploaded", "Uploaded"),  cls: "bg-gray-500/15 text-[var(--text-highlight)]" },
     parsed:    { label: t("bankImports.impStatus.parsed", "Parsed"),    cls: "bg-amber-500/15 text-amber-300" },
     confirmed: { label: t("bankImports.impStatus.confirmed", "Confirmed"), cls: "bg-emerald-500/15 text-emerald-300" },
     failed:    { label: t("bankImports.impStatus.failed", "Failed"),    cls: "bg-rose-500/15 text-rose-300" },
-    cancelled: { label: t("bankImports.impStatus.cancelled", "Cancelled"), cls: "bg-gray-500/15 text-gray-300" },
+    cancelled: { label: t("bankImports.impStatus.cancelled", "Cancelled"), cls: "bg-gray-500/15 text-[var(--text-highlight)]" },
   };
   return (
     <SectionCard title={t("bankImports.recent.title", "Recent imports")} subtitle={t("bankImports.recent.subtitle", "Last 10 imports for this tenant. Confirmed imports are kept for audit.")}>
@@ -561,14 +561,14 @@ function RecentImports({
             <div key={i.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
               <div className="min-w-0">
                 <div className="truncate text-[12px] font-semibold text-[var(--text-primary)]">{i.file_name}</div>
-                <div className="mt-0.5 text-[10px] text-gray-500">
+                <div className="mt-0.5 text-[10px] text-[var(--text-dim)]">
                   {a?.bank_name ?? "—"} · {i.file_type.toUpperCase()} · {new Date(i.uploaded_at).toLocaleString()}
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${statusChip.cls}`}>{statusChip.label}</span>
                 {i.status === "confirmed" && (
-                  <span className="text-[10px] text-gray-500">{t("bankImports.recent.movements", "{n} movements").replace("{n}", String(i.imported_count))}</span>
+                  <span className="text-[10px] text-[var(--text-dim)]">{t("bankImports.recent.movements", "{n} movements").replace("{n}", String(i.imported_count))}</span>
                 )}
               </div>
             </div>
@@ -591,15 +591,15 @@ const DUP_CHIP: Record<BankStatementRowDuplicateStatus, { label: string; cls: st
 
 const ROW_STATUS_CHIP: Record<BankStatementRowImportStatus, { label: string; cls: string }> = {
   ready:    { label: "Ready",    cls: "bg-emerald-500/15 text-emerald-300" },
-  skipped:  { label: "Skipped",  cls: "bg-gray-500/15 text-gray-300" },
+  skipped:  { label: "Skipped",  cls: "bg-gray-500/15 text-[var(--text-highlight)]" },
   imported: { label: "Imported", cls: "bg-sky-500/15 text-sky-300" },
   error:    { label: "Error",    cls: "bg-rose-500/15 text-rose-300" },
 };
 
 const IMPORT_STATUS_CHIP: Record<string, { label: string; cls: string }> = {
-  uploaded:  { label: "Uploaded",  cls: "bg-gray-500/15 text-gray-300" },
+  uploaded:  { label: "Uploaded",  cls: "bg-gray-500/15 text-[var(--text-highlight)]" },
   parsed:    { label: "Parsed",    cls: "bg-amber-500/15 text-amber-300" },
   confirmed: { label: "Confirmed", cls: "bg-emerald-500/15 text-emerald-300" },
   failed:    { label: "Failed",    cls: "bg-rose-500/15 text-rose-300" },
-  cancelled: { label: "Cancelled", cls: "bg-gray-500/15 text-gray-300" },
+  cancelled: { label: "Cancelled", cls: "bg-gray-500/15 text-[var(--text-highlight)]" },
 };

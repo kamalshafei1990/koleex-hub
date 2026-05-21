@@ -18,7 +18,7 @@ export const TONE_TEXT: Record<Tone, string> = {
 };
 
 export const TONE_CHIP_BG: Record<Tone, string> = {
-  neutral:  "bg-white/[0.06] text-gray-300",
+  neutral:  "bg-[var(--bg-surface-hover)] text-[var(--text-highlight)]",
   positive: "bg-emerald-500/15 text-emerald-300",
   negative: "bg-rose-500/15 text-rose-300",
   warning:  "bg-amber-500/15 text-amber-300",
