@@ -500,38 +500,93 @@ function TotalCells({ label, prior, cur, showPrior, tone }: { label: string; pri
 
 /* Headline — Net Income / Closing cash.
 
-   Classic accountant double-rule treatment instead of the previous
-   tinted bar: two parallel lines above the row (the international
-   convention for a final / bottom-line figure in a published
-   statement) plus one strong rule below, no background tint. Bigger
-   value typography (20 px) so the eye lands here last. Tonal colour
-   is reserved for the VALUE itself — positive numbers stay in
-   emerald-200, negatives switch to rose-200. */
+   Standalone summary card treatment so the bottom line reads as a
+   genuinely distinct element rather than just another row with a
+   different border weight. Three adjacent grid cells share an
+   elevated bg (darker than the surrounding panel — panel-in-panel
+   effect, the same depth pattern used by Hub stat cards in Sales /
+   Inventory), a tonal hairline ring all the way around, and rounded
+   corners on the leading and trailing cells.
+
+   Value typography is 24 px font-mono tabular-nums — the largest
+   number on the page so the eye naturally lands here. Label is
+   compact uppercase 13 px so it doesn't compete with the figure.
+
+   A small delta line (▲ +CNY 437,467  +1.2%) renders underneath the
+   value when a prior figure exists, giving the operator the change
+   reading without needing to compute it from two columns. */
 function HeadlineCells({ label, prior, cur, showPrior, tone }: { label: string; prior?: number; cur: number; showPrior: boolean; tone: StatementTone }) {
+  /* Tonal palette — the value carries the signal; the chrome stays
+     calm so the card doesn't look like a status banner. */
   const valueTone =
     tone === "positive" ? "text-emerald-200" :
     tone === "warning"  ? "text-rose-200"    :
                           "text-[var(--text-primary)]";
+  const ringTone =
+    tone === "positive" ? "ring-emerald-300/25" :
+    tone === "warning"  ? "ring-rose-300/25"    :
+                          "ring-[var(--border-color)]";
+  const accentBar =
+    tone === "positive" ? "bg-emerald-300/80" :
+    tone === "warning"  ? "bg-rose-300/80"    :
+                          "bg-[var(--text-highlight)]";
 
-  /* Label cell — bigger uppercase, slightly relaxed tracking */
-  const labelCls = "pt-4 pb-4 text-[15px] font-bold uppercase tracking-[0.12em] text-[var(--text-primary)]";
-  /* Value cell — biggest, mono, tabular-nums */
-  const valueCls = `pt-4 pb-4 text-[20px] font-bold font-mono tabular-nums ${valueTone} text-right pe-4`;
-  const priorCls = "pt-4 pb-4 text-[20px] font-bold font-mono tabular-nums text-[var(--text-secondary)] text-right pe-4";
+  /* Each cell carries the same bg + ring so they read as one card.
+     Rounded corners go on the leading + trailing cells only. */
+  const cellShell =
+    "bg-[var(--bg-primary)] ring-1 " + ringTone + " py-5 sm:py-6";
+
+  /* Delta line — only when comparing periods AND there's a meaningful
+     change to show. */
+  const deltaValue = showPrior && prior !== undefined ? cur - (prior ?? 0) : null;
+  const deltaPct   = showPrior && prior !== undefined && Math.abs(prior) > 0.5
+    ? ((cur - prior) / Math.abs(prior)) * 100
+    : null;
+  const deltaUp    = (deltaValue ?? 0) >= 0;
+  const deltaTone  = deltaValue == null
+    ? "text-[var(--text-dim)]"
+    : deltaUp ? "text-emerald-300/80" : "text-rose-300/80";
 
   return (
     <>
-      {/* Top double-rule: two parallel lines spaced ~2 px apart. */}
-      <Divider showPrior={showPrior} weight="strong" className="mt-5" />
-      <Divider showPrior={showPrior} weight="color" className="mt-[2px]" />
+      {/* Breathing space above the card */}
+      <div aria-hidden className={`${showPrior ? "col-span-3" : "col-span-2"} mt-5`} />
 
-      {/* Row content */}
-      <div className={labelCls}>{label}</div>
-      {showPrior && <div className={priorCls}>{fmtSigned(prior ?? 0)}</div>}
-      <div className={valueCls}>{fmtSigned(cur)}</div>
+      {/* Leading cell — label + accent stripe at the leading edge */}
+      <div className={`${cellShell} relative ps-6 pe-3 rounded-s-xl flex flex-col justify-center`}>
+        <span aria-hidden className={`absolute start-0 top-5 bottom-5 w-[3px] rounded-full ${accentBar}`} />
+        <div className="text-[10.5px] font-semibold uppercase tracking-[0.20em] text-[var(--text-dim)]">
+          {label}
+        </div>
+        {deltaValue !== null && (
+          <div className={`mt-2 text-[12px] font-medium tabular-nums ${deltaTone}`}>
+            {deltaUp ? "▲" : "▼"} {fmtSigned(Math.abs(deltaValue))}
+            {deltaPct !== null && ` · ${deltaPct >= 0 ? "+" : ""}${deltaPct.toFixed(1)}%`}
+          </div>
+        )}
+      </div>
 
-      {/* Bottom single rule, slightly stronger, closes the headline. */}
-      <Divider showPrior={showPrior} weight="color" />
+      {showPrior && (
+        <div className={`${cellShell} px-3 text-right flex flex-col justify-center`}>
+          <div className="text-[9.5px] uppercase tracking-[0.18em] text-[var(--text-dim)] mb-1">
+            Prior
+          </div>
+          <div className="text-[18px] font-bold font-mono tabular-nums text-[var(--text-secondary)]">
+            {fmtSigned(prior ?? 0)}
+          </div>
+        </div>
+      )}
+
+      <div className={`${cellShell} ps-3 pe-6 rounded-e-xl text-right flex flex-col justify-center`}>
+        {showPrior && (
+          <div className="text-[9.5px] uppercase tracking-[0.18em] text-[var(--text-dim)] mb-1">
+            Current
+          </div>
+        )}
+        <div className={`text-[24px] font-bold font-mono tabular-nums leading-none tracking-[-0.01em] ${valueTone}`}>
+          {fmtSigned(cur)}
+        </div>
+      </div>
     </>
   );
 }
