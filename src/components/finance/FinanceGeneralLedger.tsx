@@ -14,7 +14,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { financeT, translateAccountName } from "@/lib/translations/finance";
 import { EmptyState } from "@/components/finance/FinanceUi";
 import RrIcon from "@/components/ui/RrIcon";
 import type { AccountingAccount, GeneralLedger } from "@/lib/accounting/types";
@@ -39,7 +39,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export default function FinanceGeneralLedger() {
-  const { t } = useTranslation(financeT);
+  const { t, lang } = useTranslation(financeT);
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -105,14 +105,14 @@ export default function FinanceGeneralLedger() {
               className="inline-flex items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-1.5 text-[12px] font-semibold transition hover:border-[var(--border-strong)]"
             >
               <RrIcon name="file-invoice" size={12} />
-              Trial Balance
+              {t("gl.openTB", "Trial Balance")}
             </Link>
           }
         />
 
         <Card>
           <div className="flex flex-wrap items-end gap-3">
-            <Field label="Account">
+            <Field label={t("gl.account", "Account")}>
               <select
                 value={accountId ?? ""}
                 onChange={(e) => setAccountId(e.target.value || null)}
@@ -120,16 +120,16 @@ export default function FinanceGeneralLedger() {
               >
                 {accounts.map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.code} — {a.name}
+                    {a.code} — {translateAccountName(a.code, a.name, lang)}
                   </option>
                 ))}
               </select>
             </Field>
-            <Field label="From">
+            <Field label={t("gl.from", "From")}>
               <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
                 className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
             </Field>
-            <Field label="To">
+            <Field label={t("gl.to", "To")}>
               <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
                 className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
             </Field>
@@ -137,9 +137,9 @@ export default function FinanceGeneralLedger() {
               type="button"
               onClick={() => setFrom("")}
               className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-1.5 text-[11px] hover:border-[var(--border-strong)]"
-            >All-time</button>
+            >{t("gl.allTime", "All-time")}</button>
             <div className="ml-auto text-[10px] uppercase tracking-[0.18em] text-[var(--text-dim)]">
-              {loading ? "Loading…" : ledger ? `${ledger.rows.length} entries` : ""}
+              {loading ? t("common.loading", "Loading…") : ledger ? t("gl.entriesCount", "{n} entries").replace("{n}", String(ledger.rows.length)) : ""}
             </div>
           </div>
         </Card>
@@ -155,32 +155,32 @@ export default function FinanceGeneralLedger() {
             <div className="mb-2 flex items-baseline justify-between border-b border-[var(--border-subtle)] pb-2">
               <div>
                 <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-dim)]">
-                  {ledger.account.code} · {ledger.account.type} ({ledger.account.normal_balance}-normal)
+                  {ledger.account.code} · {t(`gl.type.${ledger.account.type}`, `${ledger.account.type} (${ledger.account.normal_balance}-normal)`)}
                 </div>
-                <div className="text-[14px] font-semibold">{ledger.account.name}</div>
+                <div className="text-[14px] font-semibold">{translateAccountName(ledger.account.code, ledger.account.name, lang)}</div>
               </div>
               <div className="flex items-baseline gap-6 text-[12px] tabular-nums">
-                <span className="text-[10px] text-[var(--text-dim)]">Opening</span>
+                <span className="text-[10px] text-[var(--text-dim)]">{t("gl.opening", "Opening")}</span>
                 <span className="font-mono">{fmt(ledger.opening_balance)}</span>
-                <span className="text-[10px] text-[var(--text-dim)]">Closing</span>
+                <span className="text-[10px] text-[var(--text-dim)]">{t("gl.closing", "Closing")}</span>
                 <span className="font-mono font-bold">{fmt(ledger.closing_balance)}</span>
               </div>
             </div>
 
             {ledger.rows.length === 0 ? (
-              <EmptyState title="No activity" hint="No posted journal lines hit this account in the selected window." />
+              <EmptyState title={t("gl.empty.title", "No activity")} hint={t("gl.empty.hint", "No posted journal lines hit this account in the selected window.")} />
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full text-[12px]">
                   <thead>
                     <tr className="border-b border-[var(--border-subtle)] text-[9px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
-                      <th className="px-2 py-1.5 text-left">Date</th>
-                      <th className="px-2 py-1.5 text-left">Journal</th>
-                      <th className="px-2 py-1.5 text-left">Description</th>
-                      <th className="px-2 py-1.5 text-left">Source</th>
-                      <th className="px-2 py-1.5 text-right">Debit</th>
-                      <th className="px-2 py-1.5 text-right">Credit</th>
-                      <th className="px-2 py-1.5 text-right">Balance</th>
+                      <th className="px-2 py-1.5 text-left">{t("gl.col.date", "Date")}</th>
+                      <th className="px-2 py-1.5 text-left">{t("gl.col.journal", "Journal")}</th>
+                      <th className="px-2 py-1.5 text-left">{t("gl.col.description", "Description")}</th>
+                      <th className="px-2 py-1.5 text-left">{t("gl.col.source", "Source")}</th>
+                      <th className="px-2 py-1.5 text-right">{t("gl.col.debit", "Debit")}</th>
+                      <th className="px-2 py-1.5 text-right">{t("gl.col.credit", "Credit")}</th>
+                      <th className="px-2 py-1.5 text-right">{t("gl.col.balance", "Balance")}</th>
                     </tr>
                   </thead>
                   <tbody>

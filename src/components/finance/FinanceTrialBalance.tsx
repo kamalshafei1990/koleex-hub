@@ -13,17 +13,17 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { financeT, translateAccountName } from "@/lib/translations/finance";
 import { EmptyState } from "@/components/finance/FinanceUi";
 import RrIcon from "@/components/ui/RrIcon";
 import type { TrialBalance } from "@/lib/accounting/types";
 
-const TYPE_GROUPS: Array<{ label: string; types: string[] }> = [
-  { label: "Assets",      types: ["asset", "contra_asset"] },
-  { label: "Liabilities", types: ["liability", "contra_liability"] },
-  { label: "Equity",      types: ["equity", "contra_equity"] },
-  { label: "Revenue",     types: ["revenue", "contra_revenue"] },
-  { label: "Expenses",    types: ["expense", "contra_expense"] },
+const TYPE_GROUPS: Array<{ key: string; label: string; types: string[] }> = [
+  { key: "tb.group.assets",      label: "Assets",      types: ["asset", "contra_asset"] },
+  { key: "tb.group.liabilities", label: "Liabilities", types: ["liability", "contra_liability"] },
+  { key: "tb.group.equity",      label: "Equity",      types: ["equity", "contra_equity"] },
+  { key: "tb.group.revenue",     label: "Revenue",     types: ["revenue", "contra_revenue"] },
+  { key: "tb.group.expenses",    label: "Expenses",    types: ["expense", "contra_expense"] },
 ];
 
 function fmt(n: number): string {
@@ -46,7 +46,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export default function FinanceTrialBalance() {
-  const { t } = useTranslation(financeT);
+  const { t, lang } = useTranslation(financeT);
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const ninetyAgo = useMemo(() => { const d = new Date(); d.setDate(d.getDate() - 365); return d.toISOString().slice(0, 10); }, []);
   const [from, setFrom] = useState<string>("");          // empty = all-time
@@ -77,6 +77,7 @@ export default function FinanceTrialBalance() {
   const grouped = useMemo(() => {
     if (!data) return [];
     return TYPE_GROUPS.map((g) => ({
+      key: g.key,
       label: g.label,
       rows: data.rows.filter((r) => g.types.includes(r.type)),
     }));
@@ -96,18 +97,18 @@ export default function FinanceTrialBalance() {
               className="inline-flex items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-1.5 text-[12px] font-semibold transition hover:border-[var(--border-strong)]"
             >
               <RrIcon name="file-invoice" size={12} />
-              Open General Ledger
+              {t("tb.openGL", "Open General Ledger")}
             </Link>
           }
         />
 
         <Card>
           <div className="flex flex-wrap items-end gap-3">
-            <Field label="From">
+            <Field label={t("tb.from", "From")}>
               <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
                 className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
             </Field>
-            <Field label="To">
+            <Field label={t("tb.to", "To")}>
               <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
                 className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
             </Field>
@@ -115,14 +116,14 @@ export default function FinanceTrialBalance() {
               type="button"
               onClick={() => { setFrom(""); setTo(today); }}
               className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-1.5 text-[11px] hover:border-[var(--border-strong)]"
-            >Reset to all-time</button>
+            >{t("tb.resetAllTime", "Reset to all-time")}</button>
             <button
               type="button"
               onClick={() => setFrom(ninetyAgo)}
               className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-1.5 text-[11px] hover:border-[var(--border-strong)]"
-            >Last 365 days</button>
+            >{t("tb.last365", "Last 365 days")}</button>
             <div className="ml-auto text-[10px] uppercase tracking-[0.18em] text-[var(--text-dim)]">
-              {loading ? "Loading…" : data ? `As of ${data.as_of}` : ""}
+              {loading ? t("common.loading", "Loading…") : data ? t("tb.asOf", "As of {date}").replace("{date}", data.as_of) : ""}
             </div>
           </div>
         </Card>
@@ -136,8 +137,8 @@ export default function FinanceTrialBalance() {
         {data && data.rows.length === 0 && (
           <Card>
             <EmptyState
-              title="No accounts yet"
-              hint="The chart of accounts seeds on first read. If you're seeing this, the tenant has accounts but no posted activity — start by posting a payment or an opening balance."
+              title={t("tb.empty.title", "No accounts yet")}
+              hint={t("tb.empty.hint", "The chart of accounts seeds on first read. If you're seeing this, the tenant has accounts but no posted activity — start by posting a payment or an opening balance.")}
             />
           </Card>
         )}
@@ -146,18 +147,18 @@ export default function FinanceTrialBalance() {
           g.rows.length > 0 && (
             <Card key={g.label}>
               <div className="mb-2 flex items-center justify-between border-b border-[var(--border-faint)] pb-2">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">{g.label}</div>
-                <div className="text-[10px] text-[var(--text-dim)]">{g.rows.length} accounts</div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">{t(g.key, g.label)}</div>
+                <div className="text-[10px] text-[var(--text-dim)]">{t("tb.accountsCount", "{n} accounts").replace("{n}", String(g.rows.length))}</div>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full text-[12px]">
                   <thead>
                     <tr className="border-b border-[var(--border-subtle)] text-[9px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
-                      <th className="px-2 py-1.5 text-left">Code</th>
-                      <th className="px-2 py-1.5 text-left">Account</th>
-                      <th className="px-2 py-1.5 text-right">Debit</th>
-                      <th className="px-2 py-1.5 text-right">Credit</th>
-                      <th className="px-2 py-1.5 text-right">Balance</th>
+                      <th className="px-2 py-1.5 text-left">{t("tb.col.code", "Code")}</th>
+                      <th className="px-2 py-1.5 text-left">{t("tb.col.account", "Account")}</th>
+                      <th className="px-2 py-1.5 text-right">{t("tb.col.debit", "Debit")}</th>
+                      <th className="px-2 py-1.5 text-right">{t("tb.col.credit", "Credit")}</th>
+                      <th className="px-2 py-1.5 text-right">{t("tb.col.balance", "Balance")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -168,7 +169,7 @@ export default function FinanceTrialBalance() {
                           <Link
                             href={`/finance/accounting/general-ledger?account_id=${encodeURIComponent(r.account_id)}`}
                             className="text-[var(--text-primary)] hover:underline"
-                          >{r.name}</Link>
+                          >{translateAccountName(r.code, r.name, lang)}</Link>
                         </td>
                         <td className="px-2 py-1.5 text-right tabular-nums font-mono">{fmt(r.debit_total)}</td>
                         <td className="px-2 py-1.5 text-right tabular-nums font-mono">{fmt(r.credit_total)}</td>
@@ -186,19 +187,19 @@ export default function FinanceTrialBalance() {
         {data && (
           <Card>
             <div className="flex flex-wrap items-baseline justify-between gap-4 border-t-2 border-white/20 pt-3">
-              <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-secondary)]">Totals</div>
+              <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-secondary)]">{t("tb.totals", "Totals")}</div>
               <div className="flex flex-wrap items-baseline gap-6 tabular-nums">
-                <span className="text-[10px] text-[var(--text-dim)]">Debit</span>
+                <span className="text-[10px] text-[var(--text-dim)]">{t("tb.col.debit", "Debit")}</span>
                 <span className="font-mono text-[14px] font-bold">{fmt(data.totals.debit)}</span>
-                <span className="text-[10px] text-[var(--text-dim)]">Credit</span>
+                <span className="text-[10px] text-[var(--text-dim)]">{t("tb.col.credit", "Credit")}</span>
                 <span className="font-mono text-[14px] font-bold">{fmt(data.totals.credit)}</span>
-                <span className="text-[10px] text-[var(--text-dim)]">Difference</span>
+                <span className="text-[10px] text-[var(--text-dim)]">{t("tb.diff", "Difference")}</span>
                 <span className={`font-mono text-[14px] font-bold ${balanced ? "text-emerald-300" : "text-rose-300"}`}>{fmt(data.totals.difference)}</span>
               </div>
             </div>
             {!balanced && (
               <div className="mt-2 rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">
-                Ledger is out of balance — investigate before relying on this trial balance.
+                {t("tb.outOfBalance", "Ledger is out of balance — investigate before relying on this trial balance.")}
               </div>
             )}
           </Card>

@@ -32,7 +32,7 @@ import type { ExpenseCategory, FinanceExpense } from "@/lib/finance/types";
 import RrIcon from "@/components/ui/RrIcon";
 
 export default function FinanceExpenseAnalytics() {
-  const { t } = useTranslation(financeT);
+  const { t, lang } = useTranslation(financeT);
   const [expenses, setExpenses] = useState<FinanceExpense[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,8 +72,9 @@ export default function FinanceExpenseAnalytics() {
     const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
     const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
     const map = new Map<string, { name: string; total: number; thisMonth: number; lastMonth: number; count: number }>();
+    const otherLabel = t("expAnalytics.other", "Other");
     for (const e of expenses) {
-      const name = e.category_name || "Other";
+      const name = e.category_name || otherLabel;
       const row = map.get(name) ?? { name, total: 0, thisMonth: 0, lastMonth: 0, count: 0 };
       row.total += Number(e.amount) || 0;
       row.count += 1;
@@ -91,9 +92,10 @@ export default function FinanceExpenseAnalytics() {
       share: (r.total / grandTotal) * 100,
       delta_pct: r.lastMonth > 0 ? ((r.thisMonth - r.lastMonth) / r.lastMonth) * 100 : null,
     }));
-  }, [expenses]);
+  }, [expenses, t]);
 
   const insights = useMemo(() => {
+    const otherLabel = t("expAnalytics.other", "Other");
     const recent = categoryBreakdown.filter((c) => c.delta_pct != null && c.delta_pct > 25);
     const median = (xs: number[]) => {
       if (xs.length === 0) return 0;
@@ -103,30 +105,31 @@ export default function FinanceExpenseAnalytics() {
     };
     const byCat = new Map<string, number[]>();
     for (const e of expenses) {
-      const k = e.category_name || "Other";
+      const k = e.category_name || otherLabel;
       const arr = byCat.get(k) ?? [];
       arr.push(Number(e.amount) || 0);
       byCat.set(k, arr);
     }
     const unusual = expenses.filter((e) => {
-      const arr = byCat.get(e.category_name || "Other") ?? [];
+      const arr = byCat.get(e.category_name || otherLabel) ?? [];
       if (arr.length < 3) return false;
       const m = median(arr);
       return m > 0 && (Number(e.amount) || 0) > m * 3;
     });
     return { recent, unusual };
-  }, [categoryBreakdown, expenses]);
+  }, [categoryBreakdown, expenses, t]);
 
   /* Monthly spend trend — last 6 months. Bar-chart friendly. */
   const monthlyTrend = useMemo(() => {
     const now = new Date();
+    const dateLocale = lang === "zh" ? "zh-CN" : lang === "ar" ? "ar" : "en-US";
     const buckets: { key: string; label: string; from: Date; to: Date }[] = [];
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const next = new Date(d.getFullYear(), d.getMonth() + 1, 1);
       buckets.push({
         key: `${d.getFullYear()}-${d.getMonth()}`,
-        label: d.toLocaleDateString("en-US", { month: "short" }),
+        label: d.toLocaleDateString(dateLocale, { month: "short" }),
         from: d, to: next,
       });
     }
@@ -138,7 +141,7 @@ export default function FinanceExpenseAnalytics() {
       if (i >= 0) totals[i] += Number(e.amount) || 0;
     }
     return buckets.map((b, i) => ({ label: b.label, value: totals[i] }));
-  }, [expenses]);
+  }, [expenses, lang]);
 
   /* Top vendors / suppliers — by total spend. Keyed off
      linked_supplier_id with a fallback to "Unlinked" so the bucket
@@ -187,7 +190,7 @@ export default function FinanceExpenseAnalytics() {
               href="/expenses"
               className="rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-sm font-medium text-[var(--text-inverted)] transition hover:opacity-90 active:scale-95"
             >
-              <span className="inline-flex items-center gap-1.5">Open Expenses App <RrIcon name="arrow-up-right-from-square" size={12} /></span>
+              <span className="inline-flex items-center gap-1.5">{t("expAnalytics.openApp", "Open Expenses App")} <RrIcon name="arrow-up-right-from-square" size={12} /></span>
             </Link>
           }
         />
@@ -196,19 +199,19 @@ export default function FinanceExpenseAnalytics() {
             filtered list so the operator never lands on a dead-end
             number. Wrapped in Link so the visual styling stays intact. */}
         <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <Link href="/finance/expenses" className="block hover:opacity-95" aria-label="See every expense">
-            <HeroKpiCard label="Total Expenses" value={kpi.total} unit={baseCurrency} tone="neutral" hint="All time, this view" loading={loading} />
+          <Link href="/finance/expenses" className="block hover:opacity-95" aria-label={t("expAnalytics.aria.seeAll", "See every expense")}>
+            <HeroKpiCard label={t("expAnalytics.kpi.total.label", "Total Expenses")} value={kpi.total} unit={baseCurrency} tone="neutral" hint={t("expAnalytics.kpi.total.hint", "All time, this view")} loading={loading} />
           </Link>
-          <Link href="/finance/expenses?status=unpaid" className="block hover:opacity-95" aria-label="Review unpaid expenses">
-            <HeroKpiCard label="Unpaid (Money to Pay)" value={kpi.unpaid} unit={baseCurrency} tone="warning" hint="Awaiting payment" loading={loading} />
+          <Link href="/finance/expenses?status=unpaid" className="block hover:opacity-95" aria-label={t("expAnalytics.aria.reviewUnpaid", "Review unpaid expenses")}>
+            <HeroKpiCard label={t("expAnalytics.kpi.unpaid.label", "Unpaid (Money to Pay)")} value={kpi.unpaid} unit={baseCurrency} tone="warning" hint={t("expAnalytics.kpi.unpaid.hint", "Awaiting payment")} loading={loading} />
           </Link>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-2">
-          <Link href="/finance/expenses?status=paid" className="block hover:opacity-95" aria-label="See settled expenses">
-            <MetricCard label="Paid" value={kpi.paid} unit={baseCurrency} hint="Already settled" loading={loading} />
+          <Link href="/finance/expenses?status=paid" className="block hover:opacity-95" aria-label={t("expAnalytics.aria.seeSettled", "See settled expenses")}>
+            <MetricCard label={t("expAnalytics.kpi.paid.label", "Paid")} value={kpi.paid} unit={baseCurrency} hint={t("expAnalytics.kpi.paid.hint", "Already settled")} loading={loading} />
           </Link>
-          <Link href="/finance/expenses?status=overdue" className="block hover:opacity-95" aria-label="Resolve overdue expenses">
-            <MetricCard label="Overdue" value={kpi.overdue} unit={baseCurrency} tone="negative" hint="Past due date — needs action" loading={loading} />
+          <Link href="/finance/expenses?status=overdue" className="block hover:opacity-95" aria-label={t("expAnalytics.aria.resolveOverdue", "Resolve overdue expenses")}>
+            <MetricCard label={t("expAnalytics.kpi.overdue.label", "Overdue")} value={kpi.overdue} unit={baseCurrency} tone="negative" hint={t("expAnalytics.kpi.overdue.hint", "Past due date — needs action")} loading={loading} />
           </Link>
         </div>
 
@@ -216,12 +219,12 @@ export default function FinanceExpenseAnalytics() {
         {categoryBreakdown.length > 0 && (
           <div className="mt-6 grid gap-3 lg:grid-cols-3">
             {/* Donut — category distribution */}
-            <SectionCard title="Category distribution" subtitle="Share of total spend, monochrome by intensity.">
+            <SectionCard title={t("expAnalytics.donut.title", "Category distribution")} subtitle={t("expAnalytics.donut.subtitle", "Share of total spend, monochrome by intensity.")}>
               <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
                 <div className="shrink-0">
                   <DonutChart
                     segments={categoryBreakdown.map((c) => ({ name: c.name, value: c.total }))}
-                    centerLabel="Total"
+                    centerLabel={t("expAnalytics.donut.center", "Total")}
                     centerValue={formatCompact(categoryBreakdown.reduce((s, c) => s + c.total, 0))}
                   />
                 </div>
@@ -248,10 +251,10 @@ export default function FinanceExpenseAnalytics() {
             </SectionCard>
 
             {/* Monthly bar trend */}
-            <SectionCard title="Monthly spend" subtitle="Last 6 months. Latest highlighted.">
+            <SectionCard title={t("expAnalytics.monthly.title", "Monthly spend")} subtitle={t("expAnalytics.monthly.subtitle", "Last 6 months. Latest highlighted.")}>
               <BarChart data={monthlyTrend} highlightLast />
               <div className="mt-3 flex items-baseline justify-between text-[11px] text-[var(--text-dim)]">
-                <span>This month</span>
+                <span>{t("expAnalytics.monthly.thisMonth", "This month")}</span>
                 <span className="text-base font-medium tabular-nums text-[var(--text-primary)]">
                   {formatCompact(monthlyTrend[monthlyTrend.length - 1]?.value ?? 0)}
                 </span>
@@ -259,20 +262,20 @@ export default function FinanceExpenseAnalytics() {
             </SectionCard>
 
             {/* Top vendors */}
-            <SectionCard title="Top vendors" subtitle="Ranked by total spend.">
+            <SectionCard title={t("expAnalytics.vendors.title", "Top vendors")} subtitle={t("expAnalytics.vendors.subtitle", "Ranked by total spend.")}>
               {topVendors.length === 0 ? (
-                <div className="py-6 text-center text-[12px] text-[var(--text-dim)]">No supplier-linked expenses yet.</div>
+                <div className="py-6 text-center text-[12px] text-[var(--text-dim)]">{t("expAnalytics.vendors.empty", "No supplier-linked expenses yet.")}</div>
               ) : (
                 <ol className="space-y-1.5">
                   {topVendors.map((v, idx) => (
                     <li key={v.key} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border-faint)] bg-[var(--bg-secondary)] px-3 py-2 text-[12px]">
                       <div className="flex min-w-0 items-center gap-2.5">
                         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--bg-surface-hover)] text-[10px] font-medium text-[var(--text-highlight)]">{idx + 1}</span>
-                        <span className="truncate text-[var(--text-highlight)]">{v.name}</span>
+                        <span className="truncate text-[var(--text-highlight)]">{v.name === "Unlinked" ? t("expAnalytics.vendors.unlinked", "Unlinked") : v.name}</span>
                       </div>
                       <div className="text-right">
                         <div className="font-medium tabular-nums">{formatCompact(v.total)}</div>
-                        <div className="text-[10px] text-[var(--text-dim)]">{v.count} {v.count === 1 ? "expense" : "expenses"}</div>
+                        <div className="text-[10px] text-[var(--text-dim)]">{v.count} {v.count === 1 ? t("expAnalytics.vendors.expense", "expense") : t("expAnalytics.vendors.expenses", "expenses")}</div>
                       </div>
                     </li>
                   ))}
@@ -287,8 +290,8 @@ export default function FinanceExpenseAnalytics() {
         {categoryBreakdown.length > 0 && (
           <div className="mt-6">
             <SectionCard
-              title="By Category"
-              subtitle="Each tile shows total spend, share of all expenses, and month-over-month change."
+              title={t("expAnalytics.byCategory.title", "By Category")}
+              subtitle={t("expAnalytics.byCategory.subtitle", "Each tile shows total spend, share of all expenses, and month-over-month change.")}
             >
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                 {categoryBreakdown.slice(0, 10).map((c) => {
@@ -302,12 +305,12 @@ export default function FinanceExpenseAnalytics() {
                         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5"><RrIcon name={style.icon} size={16} /></div>
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-[11px] font-semibold uppercase tracking-wider text-[var(--text-highlight)]">{c.name}</div>
-                          <div className="text-[10px] text-[var(--text-dim)]">{c.count} {c.count === 1 ? "expense" : "expenses"}</div>
+                          <div className="text-[10px] text-[var(--text-dim)]">{c.count} {c.count === 1 ? t("expAnalytics.vendors.expense", "expense") : t("expAnalytics.vendors.expenses", "expenses")}</div>
                         </div>
                       </div>
                       <div className="mt-3 text-lg font-semibold tabular-nums">{fmtMoney(c.total, baseCurrency, { compact: true })}</div>
                       <div className="mt-2 flex items-center justify-between text-[10px]">
-                        <span className="text-[var(--text-dim)]">{c.share.toFixed(0)}% of total</span>
+                        <span className="text-[var(--text-dim)]">{t("expAnalytics.byCategory.ofTotal", "{n}% of total").replace("{n}", c.share.toFixed(0))}</span>
                         {c.delta_pct != null && (
                           <span className={`rounded-full px-1.5 py-0.5 font-semibold ${c.delta_pct >= 0 ? "bg-rose-500/20 text-rose-300" : "bg-emerald-500/20 text-emerald-300"}`}>
                             {c.delta_pct >= 0 ? "▲" : "▼"} {fmtPct(c.delta_pct)}
@@ -329,7 +332,7 @@ export default function FinanceExpenseAnalytics() {
         {(insights.recent.length > 0 || insights.unusual.length > 0 || orderImpact.length > 0) && (
           <div className="mt-4 grid gap-4 lg:grid-cols-3">
             {insights.recent.length > 0 && (
-              <SectionCard title="Recent Increases" subtitle="Categories whose spend grew >25 % this month.">
+              <SectionCard title={t("expAnalytics.recent.title", "Recent Increases")} subtitle={t("expAnalytics.recent.subtitle", "Categories whose spend grew >25 % this month.")}>
                 <ul className="space-y-2">
                   {insights.recent.map((c) => {
                     const style = styleForCategory(c.name);
@@ -339,7 +342,7 @@ export default function FinanceExpenseAnalytics() {
                           <RrIcon name={style.icon} size={16} />
                           <div>
                             <div className="text-sm font-medium">{c.name}</div>
-                            <div className="text-[10px] text-[var(--text-dim)]">This month {fmtMoney(c.thisMonth, baseCurrency, { compact: true })} · last month {fmtMoney(c.lastMonth, baseCurrency, { compact: true })}</div>
+                            <div className="text-[10px] text-[var(--text-dim)]">{t("expAnalytics.recent.thisLast", "This month {tm} · last month {lm}").replace("{tm}", fmtMoney(c.thisMonth, baseCurrency, { compact: true })).replace("{lm}", fmtMoney(c.lastMonth, baseCurrency, { compact: true }))}</div>
                           </div>
                         </div>
                         <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-300">▲ {fmtPct(c.delta_pct ?? 0)}</span>
@@ -350,13 +353,13 @@ export default function FinanceExpenseAnalytics() {
               </SectionCard>
             )}
             {insights.unusual.length > 0 && (
-              <SectionCard title="Unusual Expenses" subtitle="Items 3× larger than the median of their category.">
+              <SectionCard title={t("expAnalytics.unusual.title", "Unusual Expenses")} subtitle={t("expAnalytics.unusual.subtitle", "Items 3× larger than the median of their category.")}>
                 <ul className="space-y-2">
                   {insights.unusual.slice(0, 6).map((e) => (
                     <li key={e.id} className="flex items-center justify-between rounded-lg border border-amber-500/20 bg-amber-500/[0.04] px-3 py-2">
                       <div className="min-w-0">
                         <div className="truncate text-sm font-medium">{e.title}</div>
-                        <div className="text-[10px] text-[var(--text-dim)]">{e.expense_date} · {e.category_name ?? "Other"}</div>
+                        <div className="text-[10px] text-[var(--text-dim)]">{e.expense_date} · {e.category_name ?? t("expAnalytics.other", "Other")}</div>
                       </div>
                       <span className="font-semibold tabular-nums text-amber-300">{fmtMoney(Number(e.amount) || 0, e.currency, { compact: true })}</span>
                     </li>
@@ -365,7 +368,7 @@ export default function FinanceExpenseAnalytics() {
               </SectionCard>
             )}
             {orderImpact.length > 0 && (
-              <SectionCard title="Order-Linked Impact" subtitle="Orders absorbing the most expense spend.">
+              <SectionCard title={t("expAnalytics.orderImpact.title", "Order-Linked Impact")} subtitle={t("expAnalytics.orderImpact.subtitle", "Orders absorbing the most expense spend.")}>
                 <ul className="space-y-2">
                   {orderImpact.map((o, idx) => (
                     <li key={o.order_id} className="flex items-center justify-between rounded-lg border border-[var(--border-faint)] bg-[var(--bg-primary)] px-3 py-2">
@@ -373,7 +376,7 @@ export default function FinanceExpenseAnalytics() {
                         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-500/15 text-[11px] font-semibold text-violet-300">{idx + 1}</span>
                         <div className="min-w-0">
                           <div className="font-mono text-[11px] font-medium">{o.order_id.slice(0, 8)}…</div>
-                          <div className="text-[10px] text-[var(--text-dim)]">{o.count} {o.count === 1 ? "expense" : "expenses"} linked</div>
+                          <div className="text-[10px] text-[var(--text-dim)]">{t("expAnalytics.orderImpact.linked", "{n} {label} linked").replace("{n}", String(o.count)).replace("{label}", o.count === 1 ? t("expAnalytics.vendors.expense", "expense") : t("expAnalytics.vendors.expenses", "expenses"))}</div>
                         </div>
                       </div>
                       <span className="font-semibold tabular-nums text-rose-300">−{fmtMoney(o.total, baseCurrency, { compact: true })}</span>
@@ -389,11 +392,11 @@ export default function FinanceExpenseAnalytics() {
         {!loading && expenses.length === 0 && (
           <div className="mt-6">
             <EmptyState
-              title="No expenses recorded yet"
-              hint="Daily expense entry happens in the Expenses app — open it from the sidebar or the button above."
+              title={t("expAnalytics.empty.title", "No expenses recorded yet")}
+              hint={t("expAnalytics.empty.hint", "Daily expense entry happens in the Expenses app — open it from the sidebar or the button above.")}
               action={
                 <Link href="/expenses" className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-400 hover:bg-emerald-500/30">
-                  <span className="inline-flex items-center gap-1.5">Open Expenses App <RrIcon name="arrow-up-right-from-square" size={12} /></span>
+                  <span className="inline-flex items-center gap-1.5">{t("expAnalytics.openApp", "Open Expenses App")} <RrIcon name="arrow-up-right-from-square" size={12} /></span>
                 </Link>
               }
             />

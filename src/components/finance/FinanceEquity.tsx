@@ -61,12 +61,12 @@ export default function FinanceEquity() {
 
         <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
           <div className="flex flex-wrap items-end gap-3">
-            <label className="block"><div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">From</div>
+            <label className="block"><div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("equity.from", "From")}</div>
               <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" /></label>
-            <label className="block"><div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">To</div>
+            <label className="block"><div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("equity.to", "To")}</div>
               <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" /></label>
             <div className="ml-auto text-[10px] uppercase tracking-[0.18em] text-[var(--text-dim)]">
-              {loading ? "Loading…" : data ? `${data.currency} · ${data.period.from} → ${data.period.to}` : ""}
+              {loading ? t("common.loading", "Loading…") : data ? `${data.currency} · ${data.period.from} → ${data.period.to}` : ""}
             </div>
           </div>
         </div>
@@ -78,11 +78,11 @@ export default function FinanceEquity() {
             <table className="min-w-full text-[12.5px]">
               <tbody>
                 <tr className="border-b border-[var(--border-subtle)]">
-                  <td className="px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-secondary)]">Opening equity</td>
+                  <td className="px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-secondary)]">{t("equity.opening", "Opening equity")}</td>
                   <td className="px-4 py-2 text-right tabular-nums font-mono font-medium">{fmt(data.opening_equity)}</td>
                 </tr>
                 {data.movements.length === 0 ? (
-                  <tr><td className="px-4 py-2 pl-6 text-[11px] text-[var(--text-ghost)]" colSpan={2}>No equity movements in this period.</td></tr>
+                  <tr><td className="px-4 py-2 pl-6 text-[11px] text-[var(--text-ghost)]" colSpan={2}>{t("equity.empty", "No equity movements in this period.")}</td></tr>
                 ) : (
                   data.movements.map((m) => (
                     <tr key={m.label} className="border-b border-[var(--border-faint)]">
@@ -92,15 +92,15 @@ export default function FinanceEquity() {
                   ))
                 )}
                 <tr className="border-t border-[var(--border-color)]">
-                  <td className="px-4 py-2 text-[11px] uppercase tracking-[0.08em] text-[var(--text-secondary)]">Net equity movement</td>
+                  <td className="px-4 py-2 text-[11px] uppercase tracking-[0.08em] text-[var(--text-secondary)]">{t("equity.netMovement", "Net equity movement")}</td>
                   <td className="px-4 py-2 text-right tabular-nums font-mono">{fmt(data.closing_equity - data.opening_equity)}</td>
                 </tr>
                 <tr className="border-t-2 border-white/20">
-                  <td className="px-4 py-2 text-[14px] font-bold">Closing equity</td>
+                  <td className="px-4 py-2 text-[14px] font-bold">{t("equity.closing", "Closing equity")}</td>
                   <td className="px-4 py-2 text-right tabular-nums font-mono text-[14px] font-bold">{fmt(data.closing_equity)}</td>
                 </tr>
                 <tr className="border-t border-[var(--border-subtle)]">
-                  <td className="px-4 py-2 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Retained earnings (3100, period-end balance)</td>
+                  <td className="px-4 py-2 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("equity.retained", "Retained earnings (3100, period-end balance)")}</td>
                   <td className="px-4 py-2 text-right tabular-nums font-mono text-[var(--text-secondary)]">{fmt(data.retained_earnings)}</td>
                 </tr>
               </tbody>
@@ -110,9 +110,9 @@ export default function FinanceEquity() {
 
         <Hairline />
         <div>
-          <Eyebrow>Method</Eyebrow>
+          <Eyebrow>{t("equity.method", "Method")}</Eyebrow>
           <p className="mt-2 max-w-prose text-[11.5px] leading-relaxed text-[var(--text-dim)]">
-            Opening equity = balance of 3xxx accounts at period start. Owner contributions = net change on Owner Capital (3000). Current-year earnings = net profit from the P&L for the same period. Closing equity = opening + contributions + earnings.
+            {t("equity.method.body", "Opening equity = balance of 3xxx accounts at period start. Owner contributions = net change on Owner Capital (3000). Current-year earnings = net profit from the P&L for the same period. Closing equity = opening + contributions + earnings.")}
           </p>
         </div>
       </div>
