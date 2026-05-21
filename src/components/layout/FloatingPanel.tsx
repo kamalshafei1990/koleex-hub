@@ -106,6 +106,20 @@ export default function FloatingPanel() {
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
   const [tab, setTab] = useState<"ai" | "discuss">("ai");
+  /* Minimised mode — collapses the FAB to a tiny handle in the corner
+     so it stops covering report tables (operator complaint: the AI +
+     Discuss pill was sitting on top of the Finance Overview's NET
+     INCOME row). Persisted to localStorage so the choice survives
+     navigation + reloads. */
+  const [minimized, setMinimized] = useState<boolean>(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setMinimized(window.localStorage.getItem("koleex-fab-minimized") === "1");
+  }, []);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try { window.localStorage.setItem("koleex-fab-minimized", minimized ? "1" : "0"); } catch { /* private mode */ }
+  }, [minimized]);
 
   /* ── Auto-switch tab when the current one becomes hidden.
      Keeps the sliding highlight behind whatever side is visible. */
@@ -466,6 +480,38 @@ export default function FloatingPanel() {
   const fabBottomClass = isAiApp
     ? "bottom-40 md:bottom-28"
     : "bottom-6";
+
+  /* ── Minimised handle ──
+     When the operator collapses the FAB, render only a small chevron
+     tab in the corner. Single click re-expands the full pill. We keep
+     the same end-6 offset so the visual anchor doesn't jump when the
+     state changes — only the size shrinks. */
+  if (minimized) {
+    return (
+      <button
+        type="button"
+        onClick={() => setMinimized(false)}
+        aria-label="Show AI / Discuss"
+        title="Show AI / Discuss"
+        className={`fixed ${fabBottomClass} end-6 z-[90] flex h-7 w-7 items-center justify-center rounded-full border ${border} ${bg} shadow-lg transition-colors ${hoverBg}`}
+        style={{
+          boxShadow: dk
+            ? "0 4px 14px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.04)"
+            : "0 4px 14px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04)",
+        }}
+      >
+        {totalUnread > 0 && (
+          <span
+            className="fab-badge absolute -top-1 -right-1 min-w-[14px] h-[14px] px-0.5 rounded-full bg-red-500 text-white text-[8px] font-bold flex items-center justify-center"
+            style={{ boxShadow: "0 0 6px rgba(239,68,68,0.45)" }}
+          >
+            {totalUnread > 9 ? "9+" : totalUnread}
+          </span>
+        )}
+        <AngleLeftIcon size={11} className={dk ? "text-white/55" : "text-black/55"} />
+      </button>
+    );
+  }
 
   return (
     <div ref={panelRef} className={`fixed ${fabBottomClass} end-6 z-[90]`}>
@@ -837,8 +883,50 @@ export default function FloatingPanel() {
           border: 1px solid ${dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"};
           background: ${dk ? "#111" : "#fff"};
         }
+        /* Minimise handle — small chevron tab that appears above the
+           pill on hover. Lets the operator collapse the FAB so it
+           stops covering content (Finance Overview last-row issue). */
+        .fab-minimize {
+          position: absolute;
+          top: -10px;
+          inset-inline-end: -4px;
+          width: 18px;
+          height: 18px;
+          border-radius: 999px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: ${dk ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)"};
+          color: ${dk ? "rgba(255,255,255,0.75)" : "rgba(0,0,0,0.65)"};
+          border: 1px solid ${dk ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)"};
+          opacity: 0;
+          transform: translateY(2px) scale(0.85);
+          transition: opacity 0.18s ease, transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+          pointer-events: none;
+          z-index: 5;
+          cursor: pointer;
+        }
+        .fab-wrap:hover .fab-minimize,
+        .fab-minimize:focus-visible {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+          pointer-events: auto;
+        }
       `}</style>
-      <div className="relative">
+      <div className="fab-wrap relative">
+        {/* Minimise button — top-right corner of the FAB cluster.
+            Hidden by default, fades in on hover. */}
+        {!open && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setMinimized(true); }}
+            className="fab-minimize"
+            aria-label="Hide AI / Discuss"
+            title="Hide AI / Discuss"
+          >
+            <CrossIcon size={9} />
+          </button>
+        )}
         {/* Notification badge — positioned outside overflow container */}
         {!open && totalUnread > 0 && (
           <span className="fab-badge absolute -top-1.5 z-10 min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center"
