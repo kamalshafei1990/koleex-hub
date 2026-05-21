@@ -380,9 +380,30 @@ type StatementTone = "neutral" | "positive" | "warning";
                                 stripe (Net Income / Closing Cash).
    ────────────────────────────────────────────────────────────── */
 
+/* Single-element divider that spans all the grid columns. Replaces
+   per-cell border-t / border-b — when each row's three cells each
+   carried their own border, sub-pixel baseline differences between
+   the label and number cells made the line look broken at the cell
+   boundaries. A col-span div is ONE element → guaranteed continuous. */
+function Divider({
+  showPrior, weight = "subtle", className = "",
+}: {
+  showPrior: boolean;
+  weight?: "faint" | "subtle" | "color" | "strong";
+  className?: string;
+}) {
+  const span = showPrior ? "col-span-3" : "col-span-2";
+  const tone =
+    weight === "strong" ? "bg-[var(--border-strong)] h-[1.5px]" :
+    weight === "color"  ? "bg-[var(--border-color)] h-px"       :
+    weight === "subtle" ? "bg-[var(--border-subtle)] h-px"      :
+                          "bg-[var(--border-faint)] h-px";
+  return <div aria-hidden className={`${span} ${tone} ${className}`} />;
+}
+
 function HeaderCells({ priorLabel, curLabel, showPrior }: { priorLabel?: string; curLabel: string; showPrior: boolean }) {
   const { t } = useTranslation(financeT);
-  const baseCls = "pb-3 text-[10.5px] font-semibold uppercase tracking-[0.18em] border-b border-[var(--border-color)]";
+  const baseCls = "pb-3 text-[10.5px] font-semibold uppercase tracking-[0.18em]";
   return (
     <>
       <div className={`${baseCls} text-[var(--text-dim)]`} />
@@ -394,19 +415,23 @@ function HeaderCells({ priorLabel, curLabel, showPrior }: { priorLabel?: string;
       <div className={`${baseCls} text-right text-[var(--text-primary)] pe-4`}>
         {curLabel || t("visual.current", "Current")}
       </div>
+      <Divider showPrior={showPrior} weight="color" />
     </>
   );
 }
 
 function SectionTitleRow({ label, cols }: { label: string; cols: 2 | 3 }) {
-  /* 13 px bold, hairline directly underneath. Sits ABOVE the data
-     rows visually because the data rows have smaller indented labels. */
-  const span = cols === 3 ? "col-span-3" : "col-span-2";
+  /* Label and hairline are SEPARATE col-span items (not nested) so the
+     hairline is guaranteed to be one full-width element. */
+  const showPrior = cols === 3;
+  const span = showPrior ? "col-span-3" : "col-span-2";
   return (
-    <div className={`${span} mt-7 mb-1 first:mt-5`}>
-      <div className="text-[13px] font-bold uppercase tracking-[0.10em] text-[var(--text-primary)]">{label}</div>
-      <div aria-hidden className="mt-1 h-px w-full bg-[var(--border-subtle)]" />
-    </div>
+    <>
+      <div className={`${span} mt-6 first:mt-4 text-[13px] font-bold uppercase tracking-[0.10em] text-[var(--text-primary)]`}>
+        {label}
+      </div>
+      <Divider showPrior={showPrior} weight="subtle" className="mt-1.5 mb-1" />
+    </>
   );
 }
 
@@ -432,12 +457,14 @@ function DataCells({ label, prior, cur, showPrior }: { label: string; prior?: nu
   );
 }
 
-/* Subtotal — semibold, hairline above, label NOT indented so it sits
-   at the section's left edge (one notch outside the data rows). */
+/* Subtotal — semibold, hairline above (rendered as a separate
+   col-span divider, NOT per-cell borders, so the line is guaranteed
+   to be one continuous element). Label NOT indented. */
 function SubtotalCells({ label, prior, cur, showPrior }: { label: string; prior?: number; cur: number; showPrior: boolean }) {
-  const baseCls = "mt-2 pt-2 pb-1 text-[13px] font-semibold border-t border-[var(--border-subtle)]";
+  const baseCls = "pt-2 pb-1 text-[13px] font-semibold";
   return (
     <>
+      <Divider showPrior={showPrior} weight="subtle" className="mt-2" />
       <div className={`${baseCls} text-[var(--text-primary)]`}>{label}</div>
       {showPrior && (
         <div className={`${baseCls} text-right font-mono tabular-nums text-[var(--text-secondary)] pe-4`}>{fmtSigned(prior ?? 0)}</div>
@@ -447,15 +474,16 @@ function SubtotalCells({ label, prior, cur, showPrior }: { label: string; prior?
   );
 }
 
-/* Total — bold, stronger border, tonal value (Operating Income). */
+/* Total — bold uppercase, stronger top divider, tonal value. */
 function TotalCells({ label, prior, cur, showPrior, tone }: { label: string; prior?: number; cur: number; showPrior: boolean; tone: StatementTone }) {
   const valueTone =
     tone === "positive" ? "text-emerald-200" :
     tone === "warning"  ? "text-rose-200"    :
                           "text-[var(--text-primary)]";
-  const baseCls = "mt-4 pt-3 pb-2 text-[14px] font-bold uppercase tracking-[0.06em] border-t border-[var(--border-color)]";
+  const baseCls = "pt-3 pb-2 text-[14px] font-bold uppercase tracking-[0.06em]";
   return (
     <>
+      <Divider showPrior={showPrior} weight="color" className="mt-4" />
       <div className={`${baseCls} text-[var(--text-primary)]`}>{label}</div>
       {showPrior && (
         <div className={`${baseCls} text-right font-mono tabular-nums text-[var(--text-secondary)] pe-4`}>{fmtSigned(prior ?? 0)}</div>
@@ -465,9 +493,10 @@ function TotalCells({ label, prior, cur, showPrior, tone }: { label: string; pri
   );
 }
 
-/* Headline — Net Income / Closing cash. Three adjacent grid cells
-   share the same tonal background so they read as one continuous bar.
-   3 px accent stripe at the leading edge. Biggest type in the table. */
+/* Headline — Net Income / Closing cash. Tinted bar (3 adjacent cells
+   share the same bg), 3 px accent stripe, biggest type in the table.
+   Strong divider above is a separate col-span element so the line is
+   one continuous shape. */
 function HeadlineCells({ label, prior, cur, showPrior, tone }: { label: string; prior?: number; cur: number; showPrior: boolean; tone: StatementTone }) {
   const bg =
     tone === "positive" ? "bg-emerald-300/[0.06]" :
@@ -482,9 +511,10 @@ function HeadlineCells({ label, prior, cur, showPrior, tone }: { label: string; 
     tone === "warning"  ? "bg-rose-300/80"    :
                           "bg-[var(--text-highlight)]";
 
-  const cellBase = "mt-4 py-3.5 text-[16px] font-bold border-t-2 border-[var(--border-strong)]";
+  const cellBase = "py-3.5 text-[16px] font-bold";
   return (
     <>
+      <Divider showPrior={showPrior} weight="strong" className="mt-4" />
       <div className={`relative ${cellBase} ${bg} ps-5 pe-2 rounded-s-md uppercase tracking-[0.08em] text-[var(--text-primary)]`}>
         <span aria-hidden className={`absolute start-0 top-3.5 bottom-3.5 w-[3px] rounded-full ${accent}`} />
         {label}
