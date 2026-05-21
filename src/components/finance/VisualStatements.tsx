@@ -29,10 +29,11 @@
    --------------------------------------------------------------------------- */
 
 import { humanizeError } from "@/lib/ui/humanize-error";
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ErpPage, ErpPanel } from "@/components/ui/erp/ErpUi";
 import RrIcon from "@/components/ui/RrIcon";
+import { AngleLeftIcon, AngleRightIcon, CrossIcon } from "@/components/icons/ui";
 import { useTranslation, type Lang } from "@/lib/i18n";
 import { financeT } from "@/lib/translations/finance";
 
@@ -70,8 +71,10 @@ interface TrendBucket { label: string; from: string; to: string; revenue: number
 interface Snapshot {
   base_currency: string; granularity: Granularity;
   period: { from: string; to: string };
-  income: ProfitLoss; income_prior: ProfitLoss;
+  income: ProfitLoss; income_compare?: ProfitLoss;
+  compare_period?: { from: string; to: string };
   balance: BalanceSheet; cash_flow: CashFlow;
+  cash_flow_compare?: CashFlow;
   trend: TrendBucket[];
 }
 
@@ -113,12 +116,72 @@ function fmtPeriodLabel(iso: string, lang: Lang, granularity: Granularity = "yea
   } catch { return iso; }
 }
 
+/* ── Client-side period navigation helpers ─────────────────────────────
+   Lightweight twins of the server-side helpers in visual-statements.ts.
+   We only need to compute a NEW anchor date (period_end) to send to the
+   API — the server takes it from there and computes the full window. */
+
+function toIso(d: Date): string {
+  /* UTC slice — matches the server's todayIso() convention. */
+  return d.toISOString().slice(0, 10);
+}
+function todayIso(): string {
+  return toIso(new Date());
+}
+/** Return a sensible "anchor" date for the granularity — the end of
+ *  the current calendar bucket, capped at today. */
+function defaultAnchorForGranularity(g: Granularity): string {
+  const today = new Date(`${todayIso()}T00:00:00Z`);
+  if (g === "year") {
+    /* End of current year, but never beyond today. */
+    const end = new Date(Date.UTC(today.getUTCFullYear(), 11, 31));
+    return end > today ? toIso(today) : toIso(end);
+  }
+  if (g === "quarter") {
+    const q = Math.floor(today.getUTCMonth() / 3);
+    const end = new Date(Date.UTC(today.getUTCFullYear(), q * 3 + 3, 0));
+    return end > today ? toIso(today) : toIso(end);
+  }
+  if (g === "month") {
+    const end = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0));
+    return end > today ? toIso(today) : toIso(end);
+  }
+  /* week — last 7 days ending today */
+  return toIso(today);
+}
+function shiftAnchor(iso: string, g: Granularity, direction: 1 | -1): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  if (g === "week")    d.setUTCDate(d.getUTCDate() + direction * 7);
+  if (g === "month")   d.setUTCMonth(d.getUTCMonth() + direction);
+  if (g === "quarter") d.setUTCMonth(d.getUTCMonth() + direction * 3);
+  if (g === "year")    d.setUTCFullYear(d.getUTCFullYear() + direction);
+  return toIso(d);
+}
+/** Once we navigate, the anchor may sit mid-period. Clamp to today so
+ *  ▶ can't drift the user into the future. Returns null when the next
+ *  step would clearly cross "today" by a full bucket. */
+function isAtOrAfterToday(iso: string, g: Granularity): boolean {
+  const t = todayIso();
+  if (g === "year") return iso.slice(0, 4) >= t.slice(0, 4);
+  if (g === "quarter") {
+    const a = new Date(`${iso}T00:00:00Z`);
+    const b = new Date(`${t}T00:00:00Z`);
+    const aQ = a.getUTCFullYear() * 4 + Math.floor(a.getUTCMonth() / 3);
+    const bQ = b.getUTCFullYear() * 4 + Math.floor(b.getUTCMonth() / 3);
+    return aQ >= bQ;
+  }
+  if (g === "month") return iso.slice(0, 7) >= t.slice(0, 7);
+  return iso >= t;
+}
+
 /* ── Chromeless body — used by FinanceHome (/finance) ────────────────── */
 
 export function StatementsDashboard() {
   const { t, lang } = useTranslation(financeT);
   const [tab, setTab] = useState<Tab>("income");
   const [granularity, setGranularity] = useState<Granularity>("year");
+  const [periodEnd, setPeriodEnd] = useState<string>(() => defaultAnchorForGranularity("year"));
+  const [compareEnd, setCompareEnd] = useState<string | null>(null);
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
@@ -126,29 +189,60 @@ export function StatementsDashboard() {
   const fetchSnap = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const r = await fetch(`/api/finance/visual-statements?granularity=${granularity}`, { cache: "no-store" });
+      const qs = new URLSearchParams({ granularity, period_end: periodEnd });
+      if (compareEnd) qs.set("compare_end", compareEnd);
+      const r = await fetch(`/api/finance/visual-statements?${qs.toString()}`, { cache: "no-store" });
       const j = await r.json();
       if (!r.ok) throw new Error(humanizeError(j.error || `HTTP ${r.status}`));
       setSnap(j.snapshot);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally { setLoading(false); }
-  }, [granularity]);
+  }, [granularity, periodEnd, compareEnd]);
 
   useEffect(() => { fetchSnap(); }, [fetchSnap]);
 
+  /* When granularity changes: snap periodEnd to a sensible boundary
+     and clear the comparison — the operator opts back in if they want
+     to compare in the new granularity. */
+  const handleGranularityChange = useCallback((g: Granularity) => {
+    setGranularity(g);
+    setPeriodEnd(defaultAnchorForGranularity(g));
+    setCompareEnd(null);
+  }, []);
+
+  const handleAddCompare = useCallback(() => {
+    /* Pre-fill with the previous period so the comparison is meaningful
+       out of the box. */
+    setCompareEnd(shiftAnchor(periodEnd, granularity, -1));
+  }, [periodEnd, granularity]);
+
+  const showCompare = !!snap?.income_compare;
   const ccy = snap?.base_currency ?? "";
   const totalRevenue = snap?.income.revenue.amount ?? 0;
   const netIncome    = snap?.income.net_profit ?? 0;
-  const priorRevenue = snap?.income_prior.revenue.amount ?? 0;
-  const priorNet     = snap?.income_prior.net_profit ?? 0;
-  const revDelta = priorRevenue !== 0 ? (totalRevenue - priorRevenue) : null;
-  const revPct   = priorRevenue !== 0 ? ((totalRevenue - priorRevenue) / Math.abs(priorRevenue)) * 100 : null;
-  const niDelta  = priorNet !== 0 ? (netIncome - priorNet) : null;
-  const niPct    = priorNet !== 0 ? ((netIncome - priorNet) / Math.abs(priorNet)) * 100 : null;
+  const cmpRevenue   = snap?.income_compare?.revenue.amount ?? 0;
+  const cmpNet       = snap?.income_compare?.net_profit ?? 0;
+  const revDelta = showCompare && cmpRevenue !== 0 ? (totalRevenue - cmpRevenue) : null;
+  const revPct   = showCompare && cmpRevenue !== 0 ? ((totalRevenue - cmpRevenue) / Math.abs(cmpRevenue)) * 100 : null;
+  const niDelta  = showCompare && cmpNet !== 0 ? (netIncome - cmpNet) : null;
+  const niPct    = showCompare && cmpNet !== 0 ? ((netIncome - cmpNet) / Math.abs(cmpNet)) * 100 : null;
 
-  const curLabel   = snap ? fmtPeriodLabel(snap.income.period.to,       lang, snap.granularity) : "";
-  const priorLabel = snap ? fmtPeriodLabel(snap.income_prior.period.to, lang, snap.granularity) : "";
+  const curLabel   = snap ? fmtPeriodLabel(snap.income.period.to, lang, snap.granularity) : "";
+  const cmpLabel   = snap?.income_compare ? fmtPeriodLabel(snap.income_compare.period.to, lang, snap.granularity) : "";
+
+  /* Period-chip label uses the current period_end, computed live so
+     the chip updates immediately while a fetch is in flight. */
+  const periodChipLabel = useMemo(
+    () => fmtPeriodLabel(periodEnd, lang, granularity),
+    [periodEnd, lang, granularity],
+  );
+  const compareChipLabel = useMemo(
+    () => (compareEnd ? fmtPeriodLabel(compareEnd, lang, granularity) : ""),
+    [compareEnd, lang, granularity],
+  );
+
+  const nextDisabled = isAtOrAfterToday(periodEnd, granularity);
 
   return (
     <div className="space-y-5">
@@ -171,7 +265,7 @@ export function StatementsDashboard() {
         </ErpPanel>
       )}
 
-      {/* ── Toggles ─────────────────────────────────────────────────── */}
+      {/* ── Granularity toggle ─────────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-center gap-3">
         <PillToggle
           options={[
@@ -191,8 +285,53 @@ export function StatementsDashboard() {
             { k: "year",    label: t("visual.gran.year",    "Year") },
           ]}
           value={granularity}
-          onChange={(v) => setGranularity(v as Granularity)}
+          onChange={(v) => handleGranularityChange(v as Granularity)}
         />
+      </div>
+
+      {/* ── Period chip + Compare picker ────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-center gap-2.5">
+        <PeriodChip
+          label={periodChipLabel}
+          onPrev={() => setPeriodEnd(shiftAnchor(periodEnd, granularity, -1))}
+          onNext={() => setPeriodEnd(shiftAnchor(periodEnd, granularity, 1))}
+          nextDisabled={nextDisabled}
+          ariaPrev={t("visual.period.prev", "Previous period")}
+          ariaNext={t("visual.period.next", "Next period")}
+        />
+        {compareEnd ? (
+          <>
+            <span className="text-[11.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
+              {t("visual.compare.vs", "vs")}
+            </span>
+            <PeriodChip
+              label={compareChipLabel}
+              onPrev={() => setCompareEnd(shiftAnchor(compareEnd, granularity, -1))}
+              onNext={() => setCompareEnd(shiftAnchor(compareEnd, granularity, 1))}
+              nextDisabled={false}
+              ariaPrev={t("visual.period.prev", "Previous period")}
+              ariaNext={t("visual.period.next", "Next period")}
+              tone="compare"
+            />
+            <button
+              type="button"
+              onClick={() => setCompareEnd(null)}
+              aria-label={t("visual.compare.remove", "Remove comparison")}
+              title={t("visual.compare.remove", "Remove comparison")}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-highlight)] hover:bg-[var(--bg-surface-hover)] transition-colors"
+            >
+              <CrossIcon size={10} />
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={handleAddCompare}
+            className="inline-flex items-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-1.5 text-[12.5px] text-[var(--text-secondary)] hover:text-[var(--text-highlight)] hover:bg-[var(--bg-surface-hover)] transition-colors"
+          >
+            {t("visual.compare.add", "+ Compare")}
+          </button>
+        )}
       </div>
 
       {loading && (
@@ -202,11 +341,77 @@ export function StatementsDashboard() {
       {/* ── Statement body ──────────────────────────────────────────── */}
       {snap && !loading && (
         <ErpPanel className="px-5 py-6 sm:px-8">
-          {tab === "income"   && <IncomeView pl={snap.income} prior={snap.income_prior} ccy={ccy} curLabel={curLabel} priorLabel={priorLabel} />}
+          {tab === "income"   && (
+            <IncomeView
+              pl={snap.income}
+              compare={snap.income_compare}
+              ccy={ccy}
+              curLabel={curLabel}
+              compareLabel={cmpLabel}
+            />
+          )}
           {tab === "balance"  && <BalanceView bs={snap.balance} ccy={ccy} curLabel={curLabel} />}
-          {tab === "cashflow" && <CashFlowView cf={snap.cash_flow} ccy={ccy} curLabel={curLabel} />}
+          {tab === "cashflow" && (
+            <CashFlowView
+              cf={snap.cash_flow}
+              compare={snap.cash_flow_compare}
+              ccy={ccy}
+              curLabel={curLabel}
+              compareLabel={cmpLabel}
+            />
+          )}
         </ErpPanel>
       )}
+    </div>
+  );
+}
+
+/* ───── Period chip — prev / label / next with chevrons ─────
+   Compact pill matching the granularity PillToggle visual family.
+   The chevron buttons are h-7 w-7 (tap-friendly on mobile per the
+   Hub mobile parity rules). When `nextDisabled` is true the ▶ button
+   stops accepting clicks AND tones down so the operator can see why
+   nothing happened (avoids "broken button" anxiety). */
+function PeriodChip({
+  label, onPrev, onNext, nextDisabled, ariaPrev, ariaNext, tone = "current",
+}: {
+  label: string;
+  onPrev: () => void;
+  onNext: () => void;
+  nextDisabled: boolean;
+  ariaPrev: string;
+  ariaNext: string;
+  tone?: "current" | "compare";
+}) {
+  const labelTone =
+    tone === "compare"
+      ? "text-[var(--text-secondary)]"
+      : "text-[var(--text-primary)] font-medium";
+  return (
+    <div className="inline-flex items-center gap-0.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1 py-0.5">
+      <button
+        type="button"
+        onClick={onPrev}
+        aria-label={ariaPrev}
+        className="inline-flex h-7 w-7 items-center justify-center rounded-full text-[var(--text-secondary)] hover:text-[var(--text-highlight)] hover:bg-[var(--bg-surface-hover)] transition-colors"
+      >
+        <AngleLeftIcon size={11} />
+      </button>
+      <span className={`px-2 text-[12.5px] tabular-nums ${labelTone}`}>{label}</span>
+      <button
+        type="button"
+        onClick={onNext}
+        disabled={nextDisabled}
+        aria-label={ariaNext}
+        aria-disabled={nextDisabled}
+        className={`inline-flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
+          nextDisabled
+            ? "text-[var(--text-dim)] opacity-50 cursor-not-allowed"
+            : "text-[var(--text-secondary)] hover:text-[var(--text-highlight)] hover:bg-[var(--bg-surface-hover)]"
+        }`}
+      >
+        <AngleRightIcon size={11} />
+      </button>
     </div>
   );
 }
@@ -577,42 +782,44 @@ function HeadlineCells({ label, prior, cur, showPrior, tone }: { label: string; 
 
 /* ───── Income view ───── */
 
-function IncomeView({ pl, prior, ccy, curLabel, priorLabel }: { pl: ProfitLoss; prior: ProfitLoss; ccy: string; curLabel: string; priorLabel: string }) {
+function IncomeView({ pl, compare, ccy, curLabel, compareLabel }: { pl: ProfitLoss; compare?: ProfitLoss; ccy: string; curLabel: string; compareLabel: string }) {
   const { t } = useTranslation(financeT);
   void ccy;
+  const showCompare = !!compare;
+  const cols: 2 | 3 = showCompare ? 3 : 2;
   return (
-    <div className={STATEMENT_GRID_2COL}>
-      <HeaderCells priorLabel={priorLabel} curLabel={curLabel} showPrior />
+    <div className={showCompare ? STATEMENT_GRID_2COL : STATEMENT_GRID_1COL}>
+      <HeaderCells priorLabel={compareLabel} curLabel={curLabel} showPrior={showCompare} />
 
-      <SectionTitleRow label={t("visual.section.revenues", "Revenues")} cols={3} />
-      {pl.revenue.accounts.length === 0 && <MutedRowSpan label={t("visual.emptyRev", "No revenue posted yet.")} cols={3} />}
+      <SectionTitleRow label={t("visual.section.revenues", "Revenues")} cols={cols} />
+      {pl.revenue.accounts.length === 0 && <MutedRowSpan label={t("visual.emptyRev", "No revenue posted yet.")} cols={cols} />}
       {pl.revenue.accounts.map((a) => (
-        <DataCells key={a.account_id} label={a.name} prior={priorAccount(prior.revenue, a.code)} cur={a.amount} showPrior />
+        <DataCells key={a.account_id} label={a.name} prior={compare ? priorAccount(compare.revenue, a.code) : undefined} cur={a.amount} showPrior={showCompare} />
       ))}
-      <SubtotalCells label={t("visual.row.totalRev", "Total Revenues")} prior={prior.revenue.amount} cur={pl.revenue.amount} showPrior />
+      <SubtotalCells label={t("visual.row.totalRev", "Total Revenues")} prior={compare?.revenue.amount} cur={pl.revenue.amount} showPrior={showCompare} />
 
-      <SectionTitleRow label={t("visual.section.expenses", "Expenses")} cols={3} />
+      <SectionTitleRow label={t("visual.section.expenses", "Expenses")} cols={cols} />
       {pl.cost_of_sales.accounts.map((a) => (
-        <DataCells key={a.account_id} label={a.name} prior={priorAccount(prior.cost_of_sales, a.code)} cur={a.amount} showPrior />
+        <DataCells key={a.account_id} label={a.name} prior={compare ? priorAccount(compare.cost_of_sales, a.code) : undefined} cur={a.amount} showPrior={showCompare} />
       ))}
       {pl.operating_expenses.accounts.map((a) => (
-        <DataCells key={a.account_id} label={a.name} prior={priorAccount(prior.operating_expenses, a.code)} cur={a.amount} showPrior />
+        <DataCells key={a.account_id} label={a.name} prior={compare ? priorAccount(compare.operating_expenses, a.code) : undefined} cur={a.amount} showPrior={showCompare} />
       ))}
       <SubtotalCells
         label={t("visual.row.totalExp", "Total Expenses")}
-        prior={prior.cost_of_sales.amount + prior.operating_expenses.amount}
+        prior={compare ? compare.cost_of_sales.amount + compare.operating_expenses.amount : undefined}
         cur={pl.cost_of_sales.amount + pl.operating_expenses.amount}
-        showPrior
+        showPrior={showCompare}
       />
 
       <TotalCells label={t("visual.row.opIncome", "Operating Income")}
-                  prior={prior.operating_profit} cur={pl.operating_profit}
-                  showPrior
+                  prior={compare?.operating_profit} cur={pl.operating_profit}
+                  showPrior={showCompare}
                   tone={pl.operating_profit >= 0 ? "positive" : "warning"} />
 
       <HeadlineCells label={t("visual.row.netIncome", "Net Income")}
-                     prior={prior.net_profit} cur={pl.net_profit}
-                     showPrior
+                     prior={compare?.net_profit} cur={pl.net_profit}
+                     showPrior={showCompare}
                      tone={pl.net_profit >= 0 ? "positive" : "warning"} />
     </div>
   );
@@ -662,31 +869,63 @@ function BalanceView({ bs, ccy, curLabel }: { bs: BalanceSheet; ccy: string; cur
 
 /* ───── Cash flow ───── */
 
-function CashFlowView({ cf, ccy, curLabel }: { cf: CashFlow; ccy: string; curLabel: string }) {
+function CashFlowView({ cf, compare, ccy, curLabel, compareLabel }: { cf: CashFlow; compare?: CashFlow; ccy: string; curLabel: string; compareLabel: string }) {
   const { t } = useTranslation(financeT);
   void ccy;
+  const showCompare = !!compare;
+  const cols: 2 | 3 = showCompare ? 3 : 2;
+
+  /* Build paired sections from cur + compare, keyed by section label.
+     We look up compare lines by label (the server-side cash-flow
+     builder uses stable labels per section). Missing lines collapse
+     to 0 on the missing side. */
+  const sections = [
+    { cur: cf.operating, cmp: compare?.operating },
+    { cur: cf.investing, cmp: compare?.investing },
+    { cur: cf.financing, cmp: compare?.financing },
+  ];
+  function compareLineAmount(cmpSection: CashFlowSection | undefined, label: string): number | undefined {
+    if (!cmpSection) return undefined;
+    return cmpSection.lines.find((l) => l.label === label)?.amount ?? 0;
+  }
+
   return (
-    <div className={STATEMENT_GRID_1COL}>
-      <HeaderCells curLabel={curLabel} showPrior={false} />
+    <div className={showCompare ? STATEMENT_GRID_2COL : STATEMENT_GRID_1COL}>
+      <HeaderCells priorLabel={compareLabel} curLabel={curLabel} showPrior={showCompare} />
 
-      <DataCells label={t("visual.row.openingCash", "Opening cash")} cur={cf.opening_cash} showPrior={false} />
+      <DataCells label={t("visual.row.openingCash", "Opening cash")} prior={compare?.opening_cash} cur={cf.opening_cash} showPrior={showCompare} />
 
-      {[cf.operating, cf.investing, cf.financing].map((s) => (
-        <Fragment key={s.label}>
-          <SectionTitleRow label={s.label} cols={2} />
-          {s.lines.length === 0 && <MutedRowSpan label="—" cols={2} />}
-          {s.lines.map((l, i) => (
-            <DataCells key={`${s.label}-${i}`} label={l.label} cur={l.amount} showPrior={false} />
+      {sections.map(({ cur, cmp }) => (
+        <Fragment key={cur.label}>
+          <SectionTitleRow label={cur.label} cols={cols} />
+          {cur.lines.length === 0 && <MutedRowSpan label="—" cols={cols} />}
+          {cur.lines.map((l, i) => (
+            <DataCells
+              key={`${cur.label}-${i}`}
+              label={l.label}
+              prior={compareLineAmount(cmp, l.label)}
+              cur={l.amount}
+              showPrior={showCompare}
+            />
           ))}
-          <SubtotalCells label={t("visual.row.subtotal", "{name} subtotal").replace("{name}", s.label)} cur={s.amount} showPrior={false} />
+          <SubtotalCells
+            label={t("visual.row.subtotal", "{name} subtotal").replace("{name}", cur.label)}
+            prior={cmp?.amount}
+            cur={cur.amount}
+            showPrior={showCompare}
+          />
         </Fragment>
       ))}
 
-      <TotalCells label={t("visual.row.netChange", "Net change in cash")} cur={cf.net_change} showPrior={false} tone="neutral" />
+      <TotalCells label={t("visual.row.netChange", "Net change in cash")}
+                  prior={compare?.net_change} cur={cf.net_change}
+                  showPrior={showCompare}
+                  tone="neutral" />
 
       <HeadlineCells label={t("visual.row.closingCash", "Closing cash")}
+                     prior={compare?.closing_cash}
                      cur={cf.closing_cash}
-                     showPrior={false}
+                     showPrior={showCompare}
                      tone={cf.reconciled ? "positive" : "warning"} />
     </div>
   );

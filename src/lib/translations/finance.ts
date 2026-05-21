@@ -993,6 +993,12 @@ export const financeT: Translations = {
   "visual.bsMismatch":         { en: "⚠ Balance sheet does not reconcile.",
                                   zh: "⚠ 资产负债表不平衡。",
                                   ar: "⚠ الميزانية غير متوازنة." },
+  "visual.period.label":       { en: "Period",                          zh: "周期",                    ar: "الفترة" },
+  "visual.period.prev":        { en: "Previous period",                 zh: "上一周期",                ar: "الفترة السابقة" },
+  "visual.period.next":        { en: "Next period",                     zh: "下一周期",                ar: "الفترة التالية" },
+  "visual.compare.add":        { en: "+ Compare",                       zh: "+ 对比",                  ar: "+ مقارنة" },
+  "visual.compare.vs":         { en: "vs",                              zh: "对比",                    ar: "مقابل" },
+  "visual.compare.remove":     { en: "Remove comparison",               zh: "移除对比",                ar: "إزالة المقارنة" },
 
   /* ── Dashboard (FinanceDashboard) extras ──────────────────────── */
   "dash.backHome":             { en: "Back to Finance Home",            zh: "返回财务首页",             ar: "العودة إلى رئيسية المالية" },

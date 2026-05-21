@@ -40,11 +40,22 @@ export interface VisualSnapshot {
   granularity: Granularity;
   period: Period;
   income: ProfitLoss;
-  /** Prior period of the same granularity for the delta header. */
-  income_prior: ProfitLoss;
+  /** Comparison period of the same granularity (opt-in). When omitted, the
+   *  dashboard renders a single-column view. */
+  income_compare?: ProfitLoss;
+  /** Period the comparison set covers (only present when compare is on). */
+  compare_period?: Period;
   balance: BalanceSheet;
   cash_flow: CashFlowStatement;
-  trend: TrendBucket[];     // last 5 buckets
+  cash_flow_compare?: CashFlowStatement;
+  trend: TrendBucket[];     // last 5 buckets ending at periodEnd
+}
+
+export interface BuildVisualSnapshotOpts {
+  /** ISO yyyy-mm-dd. Defaults to today. Determines the "current" period. */
+  periodEnd?: string;
+  /** When provided, the snapshot includes a comparison set. */
+  compareEnd?: string;
 }
 
 /* ─── Period helpers ──────────────────────────────────────── */
@@ -179,33 +190,63 @@ async function buildBalanceSheet(tenantId: string, asOf: string, currency: strin
 
 /* ─── Snapshot builder ────────────────────────────────────── */
 
-export async function buildVisualSnapshot(tenantId: string, granularity: Granularity): Promise<VisualSnapshot> {
+function emptyCashFlow(from: string, to: string, currency: string): CashFlowStatement {
+  return {
+    period: { from, to }, currency,
+    opening_cash: 0,
+    operating: { label: "Operating", amount: 0, lines: [] },
+    investing: { label: "Investing", amount: 0, lines: [] },
+    financing: { label: "Financing", amount: 0, lines: [] },
+    net_change: 0, closing_cash: 0, reconciled: true,
+  } as CashFlowStatement;
+}
+
+export async function buildVisualSnapshot(
+  tenantId: string,
+  granularity: Granularity,
+  opts: BuildVisualSnapshotOpts = {},
+): Promise<VisualSnapshot> {
   const baseCurrency = await resolveBaseCurrency(tenantId);
-  const today = new Date(`${todayIso()}T00:00:00Z`);
-  const cur = periodFor(granularity, today);
-  const prior = periodFor(granularity, priorBase(granularity, today));
 
-  const [income, income_prior, balance, cash_flow] = await Promise.all([
+  /* Anchor date for the "current" view. Defaults to today, but can be
+     any historical date so operators can navigate. */
+  const anchorIso = opts.periodEnd ?? todayIso();
+  const anchor = new Date(`${anchorIso}T00:00:00Z`);
+  const cur = periodFor(granularity, anchor);
+
+  /* Optional comparison anchor. When present we compute a second P&L
+     and Cash Flow against the same granularity window. */
+  const compareIso = opts.compareEnd;
+  const compareAnchor = compareIso ? new Date(`${compareIso}T00:00:00Z`) : null;
+  const comparePeriod = compareAnchor ? periodFor(granularity, compareAnchor) : null;
+
+  const tasks: Promise<unknown>[] = [
     buildProfitLoss(tenantId, { from: cur.from, to: cur.to }, { currency: baseCurrency }),
-    buildProfitLoss(tenantId, { from: prior.from, to: prior.to }, { currency: baseCurrency }),
     buildBalanceSheet(tenantId, cur.to, baseCurrency),
-    buildCashFlow(tenantId, { from: cur.from, to: cur.to }).catch(() => ({
-      period: { from: cur.from, to: cur.to }, currency: baseCurrency,
-      opening_cash: 0,
-      operating: { label: "Operating", amount: 0, lines: [] },
-      investing: { label: "Investing", amount: 0, lines: [] },
-      financing: { label: "Financing", amount: 0, lines: [] },
-      net_change: 0, closing_cash: 0, reconciled: true,
-    } as CashFlowStatement)),
-  ]);
+    buildCashFlow(tenantId, { from: cur.from, to: cur.to }).catch(
+      () => emptyCashFlow(cur.from, cur.to, baseCurrency),
+    ),
+  ];
+  if (comparePeriod) {
+    tasks.push(
+      buildProfitLoss(tenantId, { from: comparePeriod.from, to: comparePeriod.to }, { currency: baseCurrency }),
+      buildCashFlow(tenantId, { from: comparePeriod.from, to: comparePeriod.to }).catch(
+        () => emptyCashFlow(comparePeriod.from, comparePeriod.to, baseCurrency),
+      ),
+    );
+  }
+  const results = await Promise.all(tasks);
+  const income = results[0] as ProfitLoss;
+  const balance = results[1] as BalanceSheet;
+  const cash_flow = results[2] as CashFlowStatement;
+  const income_compare = comparePeriod ? (results[3] as ProfitLoss) : undefined;
+  const cash_flow_compare = comparePeriod ? (results[4] as CashFlowStatement) : undefined;
 
-  /* Trend — last 5 buckets of the chosen granularity (oldest first).
-     Previously sequential (5× serial round-trips ≈ 1s+ overhead).
-     Now fully parallel via Promise.all so the slowest single bucket
-     bounds total wait. */
+  /* Trend — last 5 buckets of the chosen granularity (oldest first),
+     ending at the anchor date so the chart shifts with navigation. */
   const trendPeriods = Array.from({ length: 5 }, (_, idx) => {
     const i = 4 - idx;  /* 4..0 → oldest first */
-    const b = new Date(today);
+    const b = new Date(anchor);
     if (granularity === "week")    b.setUTCDate(b.getUTCDate() - i * 7);
     if (granularity === "month")   b.setUTCMonth(b.getUTCMonth() - i);
     if (granularity === "quarter") b.setUTCMonth(b.getUTCMonth() - i * 3);
@@ -223,11 +264,18 @@ export async function buildVisualSnapshot(tenantId: string, granularity: Granula
     net_income: trendPLs[idx].net_profit,
   }));
   void endOfDay;
+  void priorBase;
 
   return {
     base_currency: baseCurrency,
     granularity,
     period: { from: cur.from, to: cur.to },
-    income, income_prior, balance, cash_flow, trend,
+    income,
+    income_compare,
+    compare_period: comparePeriod ? { from: comparePeriod.from, to: comparePeriod.to } : undefined,
+    balance,
+    cash_flow,
+    cash_flow_compare,
+    trend,
   };
 }
