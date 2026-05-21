@@ -1,22 +1,25 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   /finance — clean operator landing.
+   /finance — Operator front door (Coffee Inc 2-inspired rebuild).
 
-   Operator feedback was "the Finance app is too messy — too many
-   shortcuts and hyperlinks". The previous default landing was the
-   dense Financial Intelligence dashboard, which has 8+ panels and
-   30+ links above the fold.
+   The previous Home had 4 abstract paths + a 5-column Finance Map = 25
+   visible links. The operator's feedback was "I can't see what I need."
 
-   This new Home replaces it. The dense dashboard is preserved at
-   /finance/intelligence; every other route is untouched.
+   This rebuild swaps that for a clear, opinionated front door:
 
-   Layout (top to bottom):
-     1. Hero greeting + one-sentence subtitle
-     2. Four "What do you want to do?" tiles
-     3. Four essential KPIs (Money to Collect · Money to Pay · Cash · Net Profit)
-        — each one a clickable drill-down
-     4. A single, calm bottom link to the full Intelligence dashboard
+     1. Setup-health banner (when items missing)
+     2. Hero: Total Revenue + Net Income, with deltas vs prior period
+     3. Mini trend bars (Revenue vs Net Income, 5 buckets)
+     4. 5 BIG operator tiles — the things the operator uses daily:
+          • Overview · Orders · Customers · Suppliers · Expenses
+     5. ONE Accounting & Deep Analytics panel that collects every
+        professional accounting page (Trial Balance, GL, Reconciliation,
+        FX, Treasury, Statements, Reports, Approvals, Intelligence) so
+        nothing is removed — just no longer in the operator's face.
+
+   Nothing professional was deleted. The deep pages still live at their
+   existing URLs and remain reachable from the Accounting top-tab.
    --------------------------------------------------------------------------- */
 
 import { useEffect, useState } from "react";
@@ -29,56 +32,31 @@ import { useTranslation } from "@/lib/i18n";
 import { financeT } from "@/lib/translations/finance";
 import type { DashboardKpi } from "@/lib/finance/types";
 
-interface PathTile {
+interface OperatorTile {
   href: string;
   icon: RrIconName;
-  tone: "emerald" | "blue" | "amber" | "neutral";
-  /* i18n keys + English fallbacks so the dictionary is the source of
-     truth and the tile still renders if a key is ever missing. */
-  kickerKey: string;     kickerFallback: string;
-  titleKey:  string;     titleFallback:  string;
-  bodyKey:   string;     bodyFallback:   string;
+  tone: "emerald" | "blue" | "amber" | "rose" | "neutral";
+  titleKey: string;  titleFallback: string;
+  bodyKey:  string;  bodyFallback:  string;
 }
 
-const PATHS: PathTile[] = [
-  {
-    href: "/finance/data-entry", icon: "pencil",  tone: "emerald",
-    kickerKey: "home.path.enter.kicker", kickerFallback: "Add data",
-    titleKey:  "home.path.enter.title",  titleFallback:  "Enter finance data",
-    bodyKey:   "home.path.enter.body",
-    bodyFallback: "Assets · opening balances · customers · suppliers · FX rates · expenses · invoices.",
-  },
-  {
-    href: "/finance/visual", icon: "balance-scale-left", tone: "blue",
-    kickerKey: "home.path.read.kicker", kickerFallback: "Read data",
-    titleKey:  "home.path.read.title",  titleFallback:  "Read financial statements",
-    bodyKey:   "home.path.read.body",
-    bodyFallback: "Income · balance sheet · cash flow · AR/AP aging · inventory · gross profit.",
-  },
-  {
-    href: "/finance/workspace", icon: "bank", tone: "amber",
-    kickerKey: "home.path.daily.kicker", kickerFallback: "Day-to-day",
-    titleKey:  "home.path.daily.title",  titleFallback:  "Daily operations",
-    bodyKey:   "home.path.daily.body",
-    bodyFallback: "Pending approvals · bank balances · recent activity · quick actions.",
-  },
-  {
-    href: "/finance/accounting/queue", icon: "books", tone: "neutral",
-    kickerKey: "home.path.accounting.kicker", kickerFallback: "Accounting",
-    titleKey:  "home.path.accounting.title",  titleFallback:  "Ledger work",
-    bodyKey:   "home.path.accounting.body",
-    bodyFallback: "Review journal queue · post entries · trial balance · general ledger.",
-  },
+const TILES: OperatorTile[] = [
+  { href: "/finance/overview",  icon: "balance-scale-left", tone: "emerald",
+    titleKey: "home.tile.overview.title",  titleFallback: "Overview",
+    bodyKey:  "home.tile.overview.body",   bodyFallback:  "Income · Balance Sheet · Cash Flow — at a glance." },
+  { href: "/finance/orders",    icon: "file-invoice",       tone: "blue",
+    titleKey: "home.tile.orders.title",    titleFallback: "Orders & Profit",
+    bodyKey:  "home.tile.orders.body",     bodyFallback:  "Per-order revenue, cost, and gross profit." },
+  { href: "/finance/customers", icon: "arrow-down-left",    tone: "amber",
+    titleKey: "home.tile.customers.title", titleFallback: "Customers",
+    bodyKey:  "home.tile.customers.body",  bodyFallback:  "What each customer owes you and their payment history." },
+  { href: "/finance/suppliers", icon: "arrow-up-right",     tone: "rose",
+    titleKey: "home.tile.suppliers.title", titleFallback: "Suppliers",
+    bodyKey:  "home.tile.suppliers.body",  bodyFallback:  "What you owe each supplier and what's already paid." },
+  { href: "/finance/expenses",  icon: "receipt",            tone: "neutral",
+    titleKey: "home.tile.expenses.title",  titleFallback: "Expenses",
+    bodyKey:  "home.tile.expenses.body",   bodyFallback:  "Rent · salaries · marketing · everything else." },
 ];
-
-interface Kpi {
-  label: string;
-  value: number;
-  unit: string;
-  hint: string;
-  href: string;
-  tone: "positive" | "warning" | "info" | "neutral";
-}
 
 interface SetupHealth {
   ready: boolean;
@@ -90,15 +68,8 @@ interface SetupHealth {
 export default function FinanceHome() {
   const { t } = useTranslation(financeT);
   const [kpi, setKpi] = useState<DashboardKpi | null>(null);
-  /* Tenant currency comes from the shared cached hook — see
-     useBaseCurrencyOptional. Returns null until resolved; KPI labels
-     below render "—" until then so a USD/EUR tenant never flashes
-     "CNY" on first paint. */
   const baseCurrency = useBaseCurrencyOptional() ?? "";
   const [loading, setLoading] = useState(true);
-  /* Setup-health banner — surfaces missing onboarding items so a new
-     tenant isn't left staring at empty KPIs without knowing why. The
-     snapshot endpoint already exists for /finance/setup; we reuse it. */
   const [setupHealth, setSetupHealth] = useState<SetupHealth | null>(null);
 
   useEffect(() => {
@@ -124,155 +95,78 @@ export default function FinanceHome() {
     })();
   }, []);
 
-  const cashPosition = (kpi?.cash_in ?? 0) - (kpi?.cash_out ?? 0);
-
-  const grossMarginPct = (kpi?.gross_margin_pct ?? 0).toFixed(1);
-  const kpis: Kpi[] = [
-    {
-      label: t("home.kpi.collect", "Money to Collect"),
-      value: kpi?.accounts_receivable ?? 0,
-      unit: baseCurrency,
-      hint: t("home.kpi.collect.hint", "Outstanding AR · tap for aging"),
-      href: "/reports/statements?tab=ar",
-      tone: "warning",
-    },
-    {
-      label: t("home.kpi.pay", "Money to Pay"),
-      value: kpi?.accounts_payable ?? 0,
-      unit: baseCurrency,
-      hint: t("home.kpi.pay.hint", "Suppliers + bills · tap for aging"),
-      href: "/reports/statements?tab=ap",
-      tone: "warning",
-    },
-    {
-      label: t("home.kpi.cash", "Cash Position"),
-      value: cashPosition,
-      unit: baseCurrency,
-      hint: cashPosition >= 0
-        ? t("home.kpi.cash.in",  "Inflow heavy")
-        : t("home.kpi.cash.out", "Outflow heavy"),
-      href: "/finance/bank-accounts",
-      tone: cashPosition >= 0 ? "positive" : "warning",
-    },
-    {
-      label: t("home.kpi.netProfit", "Net Profit"),
-      value: kpi?.net_profit ?? 0,
-      unit: baseCurrency,
-      hint: t("home.kpi.netProfit.hint", "{pct}% gross margin · tap for P&L").replace("{pct}", grossMarginPct),
-      href: "/finance/visual",
-      tone: (kpi?.net_profit ?? 0) >= 0 ? "positive" : "warning",
-    },
-  ];
-
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6">
         <FinanceHeader
           title={t("app.title", "Finance")}
-          subtitle={t("app.subtitle", "Add data, read data, run the books — every path one click away.")}
+          subtitle={t("app.subtitle", "Your operator front door — see what you earned, who owes you, what you owe, and where money is going.")}
         />
 
-        {/* Setup-health banner. Hidden once every card is at least
-            'started'; renders amber when items remain. */}
         {setupHealth && !setupHealth.ready && setupHealth.missingCount > 0 && (
           <SetupHealthBanner health={setupHealth} />
         )}
 
-        {/* What do you want to do? — the only thing above the fold. */}
+        {/* ── HERO: Total Revenue + Net Income, Coffee Inc 2 style ── */}
         <section className="mt-5">
-          <div className="mb-2 text-[10px] uppercase tracking-[0.16em] text-gray-500">{t("home.eyebrowAction", "What do you want to do?")}</div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {PATHS.map((p) => <PathTileCard key={p.href} tile={p} />)}
+          <div className="mb-2 text-[10px] uppercase tracking-[0.16em] text-gray-500">
+            {t("home.eyebrowKpis", "This period")}
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <BigKpi
+              label={t("home.kpi.revenue", "Total Revenue")}
+              ccy={baseCurrency}
+              value={kpi?.total_revenue ?? 0}
+              delta={kpi?.delta_value?.revenue ?? null}
+              pct={kpi?.delta?.revenue_pct ?? null}
+              tone="info"
+              loading={loading}
+              href="/finance/overview"
+            />
+            <BigKpi
+              label={t("home.kpi.netIncome", "Net Income")}
+              ccy={baseCurrency}
+              value={kpi?.net_profit ?? 0}
+              delta={kpi?.delta_value?.net_profit ?? null}
+              pct={kpi?.delta?.net_profit_pct ?? null}
+              tone={(kpi?.net_profit ?? 0) >= 0 ? "positive" : "warning"}
+              loading={loading}
+              href="/finance/overview"
+            />
+          </div>
+          {kpi?.trend && kpi.trend.length > 0 && (
+            <div className="mt-3 rounded-xl border border-white/[0.06] bg-white/[0.012] px-4 py-3 sm:px-5">
+              <TrendBars trend={kpi.trend} />
+            </div>
+          )}
+        </section>
+
+        {/* ── 5 operator tiles — the daily front door ── */}
+        <section className="mt-7">
+          <div className="mb-2 text-[10px] uppercase tracking-[0.16em] text-gray-500">
+            {t("home.eyebrowOperator", "What do you need?")}
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            {TILES.map((tile) => <BigTile key={tile.href} tile={tile} />)}
           </div>
         </section>
 
-        {/* Four essential KPIs. */}
-        <section className="mt-8">
-          <div className="mb-2 text-[10px] uppercase tracking-[0.16em] text-gray-500">{t("home.eyebrowToday", "Today at a glance")}</div>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {kpis.map((k) => <KpiCard key={k.label} kpi={k} loading={loading} />)}
-          </div>
-        </section>
-
-        {/* "Finance Map" — every Finance page visible in one calm
-            five-column layout so the operator always knows where
-            things live. Mirrors the FinanceTabs structure exactly. */}
-        <section className="mt-10">
-          <div className="mb-2 text-[10px] uppercase tracking-[0.16em] text-gray-500">{t("home.eyebrowMap", "Finance Map · every page, at a glance")}</div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            <MapColumn
-              title={t("home.map.home", "Home")}
-              hint={t("home.map.home.hint", "Start here")}
-              links={[
-                { href: "/finance",              label: t("subtab.home",         "Home") },
-                { href: "/finance/intelligence", label: t("home.map.intelligence","Intelligence (deep view)") },
-                { href: "/finance/workspace",    label: t("subtab.workspace",    "Workspace") },
-                { href: "/finance/setup",        label: t("subtab.setup",        "Setup") },
-              ]}
-            />
-            <MapColumn
-              title={t("home.map.operations", "Operations")}
-              hint={t("home.map.operations.hint", "Daily transactions")}
-              links={[
-                { href: "/finance/orders",    label: t("home.map.orderProfit",       "Order Profitability") },
-                { href: "/finance/customers", label: t("subtab.customers",           "Customers") },
-                { href: "/finance/suppliers", label: t("subtab.suppliers",           "Suppliers") },
-                { href: "/finance/payments",  label: t("subtab.payments",            "Payments") },
-                { href: "/finance/expenses",  label: t("subtab.expenseAnalytics",    "Expense Analytics") },
-              ]}
-            />
-            <MapColumn
-              title={t("home.map.cash", "Cash & Banking")}
-              hint={t("home.map.cash.hint", "Cash management")}
-              links={[
-                { href: "/finance/bank-accounts",     label: t("subtab.bankAccounts",   "Bank Accounts") },
-                { href: "/finance/bank-imports",      label: t("subtab.bankImports",    "Bank Imports") },
-                { href: "/finance/reconciliation",    label: t("subtab.reconciliation", "Reconciliation") },
-                { href: "/finance/treasury-forecast", label: t("subtab.cashForecast",   "Cash Forecast") },
-                { href: "/finance/treasury-plans",    label: t("subtab.treasuryPlans",  "Treasury Plans") },
-                { href: "/finance/fx-rates",          label: t("home.map.exchangeRates","Exchange Rates") },
-              ]}
-            />
-            <MapColumn
-              title={t("home.map.accounting", "Accounting")}
-              hint={t("home.map.accounting.hint", "Ledger work")}
-              links={[
-                { href: "/finance/accounting/queue",          label: t("home.map.queueApprovals", "Queue (approvals)") },
-                { href: "/finance/accounting/trial-balance",  label: t("subtab.trialBalance",     "Trial Balance") },
-                { href: "/finance/accounting/general-ledger", label: t("subtab.generalLedger",    "General Ledger") },
-                { href: "/finance/accounting/profit-loss",    label: t("subtab.profitLoss",       "Profit & Loss") },
-                { href: "/finance/accounting/cash-flow",      label: t("subtab.cashFlow",         "Cash Flow") },
-                { href: "/finance/accounting/equity",         label: t("subtab.equity",           "Equity") },
-              ]}
-            />
-            <MapColumn
-              title={t("home.map.reports", "Reports")}
-              hint={t("home.map.reports.hint", "Read the books")}
-              links={[
-                { href: "/finance/visual",        label: t("subtab.visualStatements",   "Visual Statements") },
-                { href: "/finance/statements",    label: t("subtab.detailedStatements", "Detailed Statements") },
-                { href: "/finance/reports",       label: t("subtab.operationalReports", "Operational Reports") },
-                { href: "/finance/notifications", label: t("subtab.reminders",          "Reminders") },
-              ]}
-            />
-          </div>
-        </section>
-
-        {/* Single, calm link to the dense intelligence dashboard. */}
-        <section className="mt-8">
+        {/* ── ONE accounting panel — all 20 deep pages collected here ── */}
+        <section className="mt-7">
           <Link
-            href="/finance/intelligence"
-            className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.012] px-4 py-3.5 transition-colors hover:bg-white/[0.025]"
+            href="/finance/accounting/queue"
+            className="group flex items-start justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.012] px-4 py-3.5 transition-colors hover:bg-white/[0.04] sm:px-5 sm:py-4"
           >
-            <div>
-              <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500">{t("home.deep.kicker", "Need the deep view?")}</div>
-              <div className="mt-1 text-[13px] font-medium">{t("home.deep.title", "Open the full Financial Intelligence dashboard")}</div>
-              <div className="mt-0.5 text-[11px] text-gray-500">
-                {t("home.deep.body", "System health · liquidity · counterparty risk · period-over-period deviations · cash flow chart · profit waterfall.")}
+            <div className="min-w-0 flex-1">
+              <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500">
+                {t("home.eyebrowAccounting", "Accounting & deep analytics")}
+              </div>
+              <div className="mt-1 text-[13.5px] font-semibold text-[var(--text-primary)]">
+                {t("home.accounting.body", "Trial Balance · General Ledger · Reconciliation · FX · Treasury · Approvals · Intelligence.")}
               </div>
             </div>
-            <span className="shrink-0 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[11.5px] text-gray-200">
-              {t("home.deep.cta", "Open →")}
+            <span className="shrink-0 self-center rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[11.5px] text-gray-200">
+              {t("home.accounting.cta", "Open Accounting →")}
             </span>
           </Link>
         </section>
@@ -281,114 +175,143 @@ export default function FinanceHome() {
   );
 }
 
-/* ─── Finance map column ─── */
+/* ─── Hero KPI card (large) ─── */
 
-function MapColumn({ title, hint, links }: { title: string; hint: string; links: Array<{ href: string; label: string }> }) {
+function BigKpi({
+  label, ccy, value, delta, pct, tone, loading, href,
+}: {
+  label: string; ccy: string; value: number;
+  delta: number | null; pct: number | null;
+  tone: "info" | "positive" | "warning";
+  loading: boolean; href: string;
+}) {
+  const valueText =
+    tone === "positive" ? "text-emerald-100" :
+    tone === "warning"  ? "text-amber-100"   :
+                          "text-[var(--text-primary)]";
+  const accent =
+    tone === "positive" ? "bg-emerald-300/60" :
+    tone === "warning"  ? "bg-amber-300/60"   :
+                          "bg-blue-300/60";
+  const deltaUp = (delta ?? 0) >= 0;
+  const deltaTone = deltaUp ? "text-emerald-300" : "text-rose-300";
+
   return (
-    <div>
-      <div className="text-[12px] font-semibold text-[var(--text-primary)]">{title}</div>
-      <div className="text-[10px] text-gray-500">{hint}</div>
-      <ul className="mt-2 space-y-0.5">
-        {links.map((l) => (
-          <li key={l.href}>
-            <Link
-              href={l.href}
-              className="block rounded-md px-1.5 py-1 text-[11.5px] text-gray-300 hover:bg-white/[0.03] hover:text-gray-100"
-            >
-              {l.label}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <Link
+      href={href}
+      className="group relative block rounded-xl border border-white/[0.06] bg-white/[0.012] px-5 py-4 transition-colors hover:bg-white/[0.025]"
+      aria-label={`Open ${label}`}
+    >
+      <span aria-hidden className={`absolute left-5 top-0 h-px w-10 ${accent}`} />
+      <div className="text-[10px] uppercase tracking-[0.18em] text-gray-500">{label}</div>
+      <div className={`mt-2 font-mono text-[32px] leading-none tabular-nums tracking-[-0.01em] sm:text-[36px] ${valueText}`}>
+        {loading ? (
+          <span className="text-gray-700">—</span>
+        ) : (
+          <>
+            <span className="text-[14px] text-gray-500">{ccy || ""}</span>{" "}
+            {formatCompact(value)}
+          </>
+        )}
+      </div>
+      {!loading && delta !== null && pct !== null && (
+        <div className={`mt-2 text-[11.5px] ${deltaTone}`}>
+          {deltaUp ? "▲" : "▼"} {formatCompact(Math.abs(delta))} ({pct >= 0 ? "+" : ""}{pct.toFixed(1)}%)
+        </div>
+      )}
+    </Link>
   );
 }
 
-/* ─── Path tile ─── */
+/* ─── Trend bar chart (twin bars: revenue vs expenses, 5 buckets) ─── */
 
-function PathTileCard({ tile }: { tile: PathTile }) {
-  const tones: Record<PathTile["tone"], { border: string; bg: string; iconBg: string; iconText: string; kicker: string }> = {
+function TrendBars({ trend }: { trend: Array<{ label: string; revenue: number; expenses: number }> }) {
+  const buckets = trend.slice(-5);
+  const w = 720; const h = 90; const padL = 8; const padR = 8; const padT = 8; const padB = 18;
+  const innerW = w - padL - padR; const innerH = h - padT - padB;
+  const maxY = Math.max(1, ...buckets.flatMap((b) => [Math.abs(b.revenue), Math.abs(b.expenses)]));
+  const slot = innerW / Math.max(1, buckets.length);
+  const gap = 4;
+  const barW = Math.max(3, (slot - gap * 3) / 2);
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full" role="img" aria-label="Revenue vs expenses trend">
+      <line x1={padL} x2={w - padR} y1={padT + innerH} y2={padT + innerH} stroke="rgba(255,255,255,0.08)" />
+      {buckets.map((b, i) => {
+        const xSlot = padL + i * slot;
+        const xRev = xSlot + slot / 2 - barW - 1;
+        const xExp = xSlot + slot / 2 + 1;
+        const hRev = Math.max(2, (Math.abs(b.revenue)  / maxY) * innerH);
+        const hExp = Math.max(2, (Math.abs(b.expenses) / maxY) * innerH);
+        return (
+          <g key={`${b.label}-${i}`}>
+            <rect x={xRev} y={padT + innerH - hRev} width={barW} height={hRev} fill="rgba(255,255,255,0.85)" rx={2} />
+            <rect x={xExp} y={padT + innerH - hExp} width={barW} height={hExp} fill="rgba(180, 92, 60, 0.85)" rx={2} />
+            <text x={xSlot + slot / 2} y={h - 4} fill="rgba(255,255,255,0.45)"
+                  fontSize={9} textAnchor="middle">{b.label}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+/* ─── Big operator tile ─── */
+
+function BigTile({ tile }: { tile: OperatorTile }) {
+  const { t } = useTranslation(financeT);
+  const tones: Record<OperatorTile["tone"], { border: string; bg: string; iconBg: string; iconText: string }> = {
     emerald: {
       border: "border-emerald-300/30",
-      bg: "bg-emerald-300/[0.04] hover:bg-emerald-300/[0.08]",
+      bg: "bg-emerald-300/[0.04] hover:bg-emerald-300/[0.09]",
       iconBg: "border-emerald-300/40 bg-emerald-300/[0.10]",
       iconText: "text-emerald-100",
-      kicker: "text-emerald-300/80",
     },
     blue: {
       border: "border-blue-300/30",
-      bg: "bg-blue-300/[0.04] hover:bg-blue-300/[0.08]",
+      bg: "bg-blue-300/[0.04] hover:bg-blue-300/[0.09]",
       iconBg: "border-blue-300/40 bg-blue-300/[0.10]",
       iconText: "text-blue-100",
-      kicker: "text-blue-300/80",
     },
     amber: {
       border: "border-amber-300/30",
-      bg: "bg-amber-300/[0.04] hover:bg-amber-300/[0.08]",
+      bg: "bg-amber-300/[0.04] hover:bg-amber-300/[0.09]",
       iconBg: "border-amber-300/40 bg-amber-300/[0.10]",
       iconText: "text-amber-100",
-      kicker: "text-amber-300/80",
+    },
+    rose: {
+      border: "border-rose-300/25",
+      bg: "bg-rose-300/[0.04] hover:bg-rose-300/[0.09]",
+      iconBg: "border-rose-300/40 bg-rose-300/[0.10]",
+      iconText: "text-rose-100",
     },
     neutral: {
-      border: "border-white/[0.08]",
-      bg: "bg-white/[0.012] hover:bg-white/[0.04]",
+      border: "border-white/[0.10]",
+      bg: "bg-white/[0.02] hover:bg-white/[0.05]",
       iconBg: "border-white/[0.10] bg-white/[0.04]",
       iconText: "text-gray-200",
-      kicker: "text-gray-500",
     },
   };
   const toneCls = tones[tile.tone];
-  const { t } = useTranslation(financeT);
   return (
     <Link
       href={tile.href}
-      className={`group flex h-full items-start gap-3 rounded-xl border ${toneCls.border} ${toneCls.bg} px-4 py-4 transition-colors`}
+      className={`group flex h-full flex-col gap-3 rounded-xl border ${toneCls.border} ${toneCls.bg} px-4 py-4 transition-colors`}
     >
-      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border ${toneCls.iconBg} ${toneCls.iconText}`}>
-        <RrIcon name={tile.icon} size={16} />
+      <span className={`flex h-11 w-11 items-center justify-center rounded-lg border ${toneCls.iconBg} ${toneCls.iconText}`}>
+        <RrIcon name={tile.icon} size={18} />
       </span>
       <div className="min-w-0 flex-1">
-        <div className={`text-[10px] uppercase tracking-[0.16em] ${toneCls.kicker}`}>{t(tile.kickerKey, tile.kickerFallback)}</div>
-        <div className="mt-0.5 text-[13.5px] font-semibold text-[var(--text-primary)]">{t(tile.titleKey, tile.titleFallback)}</div>
-        <div className="mt-1 text-[11px] text-gray-400">{t(tile.bodyKey, tile.bodyFallback)}</div>
+        <div className="text-[14px] font-semibold text-[var(--text-primary)]">{t(tile.titleKey, tile.titleFallback)}</div>
+        <div className="mt-1 text-[11.5px] leading-snug text-gray-400">{t(tile.bodyKey, tile.bodyFallback)}</div>
       </div>
-      <RrIcon name="arrow-up-right" size={11} className="text-gray-500 transition-colors group-hover:text-gray-200" />
+      <div className="flex items-center justify-end">
+        <RrIcon name="arrow-up-right" size={11} className="text-gray-500 transition-colors group-hover:text-gray-200" />
+      </div>
     </Link>
   );
 }
 
-/* ─── KPI card ─── */
-
-function KpiCard({ kpi, loading }: { kpi: Kpi; loading: boolean }) {
-  const accent =
-    kpi.tone === "positive" ? "bg-emerald-300/55" :
-    kpi.tone === "warning"  ? "bg-amber-300/55"   :
-    kpi.tone === "info"     ? "bg-blue-300/55"    :
-                              "bg-white/30";
-  const valueText =
-    kpi.tone === "positive" ? "text-emerald-100" :
-    kpi.tone === "warning"  ? "text-amber-100"   :
-                              "text-[var(--text-primary)]";
-  return (
-    <Link
-      href={kpi.href}
-      className="group relative block h-full rounded-xl border border-white/[0.05] bg-white/[0.012] px-4 py-3.5 transition-colors hover:bg-white/[0.025]"
-      aria-label={`Open ${kpi.label}`}
-    >
-      <span aria-hidden className={`absolute left-4 top-0 h-px w-8 ${accent}`} />
-      <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500">{kpi.label}</div>
-      <div className={`mt-2 font-mono text-[24px] leading-none tabular-nums tracking-[-0.01em] ${valueText}`}>
-        <span className="text-[12px] text-gray-500">{kpi.unit}</span>{" "}
-        {loading ? <span className="text-gray-700">—</span> : formatCompact(kpi.value)}
-      </div>
-      <div className="mt-1.5 text-[10.5px] text-gray-500">{kpi.hint}</div>
-    </Link>
-  );
-}
-
-/* ─── Setup-health banner ───
-   Shows when the tenant has empty setup cards. Operator-friendly copy:
-   names the top 3 missing items so the next click is obvious. */
+/* ─── Setup-health banner ─── */
 
 function SetupHealthBanner({ health }: { health: SetupHealth }) {
   const { t } = useTranslation(financeT);
