@@ -738,12 +738,46 @@ const TRACKED_EMPLOYEE_FIELDS: readonly (keyof EmployeeWizardData)[] = [
   "education_degree",
 ];
 
-function isFilledValue(v: unknown): boolean {
-  if (v == null) return false;
-  if (typeof v === "string") return v.trim().length > 0;
-  if (typeof v === "number") return !Number.isNaN(v);
-  if (Array.isArray(v)) return v.length > 0;
-  return true;
+/* Count "filled" only when the value DIFFERS from the empty default.
+   `emptyWizardData()` populates four tracked fields with placeholders —
+   hire_date = today, employment_type = "full_time", work_location =
+   "office", salary_currency = "USD" — so a freshly-opened form used to
+   start at 12%. Compare to defaults so the bar starts at 0%. */
+function isUserFilled<K extends keyof EmployeeWizardData>(
+  key: K,
+  value: EmployeeWizardData[K],
+  defaults: EmployeeWizardData,
+): boolean {
+  const def = defaults[key];
+  if (value == null) return false;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) return false;
+    if (typeof def === "string" && trimmed === def.trim()) return false;
+    return true;
+  }
+  if (typeof value === "number") {
+    if (Number.isNaN(value)) return false;
+    if (typeof def === "number" && value === def) return false;
+    return true;
+  }
+  if (Array.isArray(value)) return value.length > 0;
+  return value !== def;
+}
+
+function EmployeeCompletenessBar({ form }: { form: EmployeeWizardData }) {
+  const defaults = useMemo(() => emptyWizardData(), []);
+  const filled = TRACKED_EMPLOYEE_FIELDS.reduce(
+    (n, k) => n + (isUserFilled(k, form[k], defaults) ? 1 : 0),
+    0,
+  );
+  return (
+    <ProfileCompletenessBar
+      filled={filled}
+      total={TRACKED_EMPLOYEE_FIELDS.length}
+      className="mb-5"
+    />
+  );
 }
 
 export default function AddEmployeePage() {
@@ -1079,14 +1113,7 @@ export default function AddEmployeePage() {
         </div>
 
         {/* Profile completeness — counts the trackable fields filled */}
-        <ProfileCompletenessBar
-          filled={TRACKED_EMPLOYEE_FIELDS.reduce(
-            (n, k) => n + (isFilledValue(form[k]) ? 1 : 0),
-            0,
-          )}
-          total={TRACKED_EMPLOYEE_FIELDS.length}
-          className="mb-5"
-        />
+        <EmployeeCompletenessBar form={form} />
 
         {/* Validation summary — lists the exact fields that need
             attention, with click-to-jump chips. Appears only after

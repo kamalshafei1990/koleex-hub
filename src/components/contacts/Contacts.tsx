@@ -4564,18 +4564,47 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     const isPersonCustomer = form.contact_type === "customer" && form.entity_type === "person";
     const isCompanyType = form.contact_type === "company";
 
-    /* ── Profile completeness ── */
-    const completenessIsFilled = (v: unknown): boolean => {
+    /* ── Profile completeness ──
+       Two-track accounting: scalar fields count 1 / 1. Array fields
+       (phones, emails, addresses, websites, contact_persons,
+       brand_names, certifications, tags) count one slot per ENTRY so
+       the total grows as the operator adds more phones / emails /
+       addresses, exactly matching the operator's mental model
+       ("once I add another phone, that's another field to fill"). An
+       array always contributes at least 1 expected slot so an empty
+       phones array still reads as "0 / 1 phone" — the primary slot
+       is always expected. */
+    const completenessIsFilledScalar = (v: unknown): boolean => {
       if (v == null) return false;
       if (typeof v === "string") return v.trim().length > 0;
       if (typeof v === "number") return !Number.isNaN(v) && v > 0;
-      if (Array.isArray(v)) return v.length > 0;
       if (typeof v === "boolean") return v;
       return Boolean(v);
     };
-    /* Pick a field list per contact type so the count is meaningful for
-       both customers and suppliers. The list mirrors the inputs actually
-       rendered in this form for that type. */
+    /* Count meaningful entries inside an array of strings or objects.
+       String entry: non-empty after trim. Object entry: at least one
+       non-empty/non-default value across its own keys. */
+    const countArrayFilled = (arr: unknown[]): number => {
+      let n = 0;
+      for (const item of arr) {
+        if (item == null) continue;
+        if (typeof item === "string") {
+          if (item.trim().length > 0) n += 1;
+        } else if (typeof item === "object") {
+          const vals = Object.values(item as Record<string, unknown>);
+          if (vals.some((v) => completenessIsFilledScalar(v))) n += 1;
+        } else if (completenessIsFilledScalar(item)) {
+          n += 1;
+        }
+      }
+      return n;
+    };
+    /* Field lists per contact type. Array-shaped fields are flagged
+       so we know to size their slot by length. */
+    const ARRAY_FIELDS = new Set<keyof ContactForm>([
+      "phones", "emails", "addresses", "websites",
+      "contact_persons", "brand_names", "certifications", "tags",
+    ]);
     const supplierFields: (keyof ContactForm)[] = [
       "photo_url", "company_name_en", "company_name_cn", "supplier_type",
       "industry", "source", "supplier_tel", "supplier_mobile",
@@ -4603,11 +4632,22 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       : isCustomer
         ? customerFields
         : genericFields;
-    const filledCount = completenessFields.reduce(
-      (n, k) => n + (completenessIsFilled(form[k]) ? 1 : 0),
-      0,
-    );
-    const totalCount = completenessFields.length;
+    let filledCount = 0;
+    let totalCount = 0;
+    for (const key of completenessFields) {
+      const v = form[key];
+      if (ARRAY_FIELDS.has(key) && Array.isArray(v)) {
+        /* Total = at least 1 expected slot, otherwise grows with the
+           number of entries the operator added. Filled = entries with
+           meaningful content. */
+        const len = v.length;
+        totalCount += Math.max(1, len);
+        filledCount += countArrayFilled(v);
+      } else {
+        totalCount += 1;
+        if (completenessIsFilledScalar(v)) filledCount += 1;
+      }
+    }
 
     /* Customer premium tabs — for non-customers, every tab check returns true so existing behaviour is preserved.
        For customers, only sections on the active tab are rendered. */
