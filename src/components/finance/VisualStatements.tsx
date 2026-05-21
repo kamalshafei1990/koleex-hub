@@ -500,91 +500,86 @@ function TotalCells({ label, prior, cur, showPrior, tone }: { label: string; pri
 
 /* Headline — Net Income / Closing cash.
 
-   Standalone summary card treatment so the bottom line reads as a
-   genuinely distinct element rather than just another row with a
-   different border weight. Three adjacent grid cells share an
-   elevated bg (darker than the surrounding panel — panel-in-panel
-   effect, the same depth pattern used by Hub stat cards in Sales /
-   Inventory), a tonal hairline ring all the way around, and rounded
-   corners on the leading and trailing cells.
+   Uses the Hub's canonical "DisplayKpi" pattern from
+   FinanceDashboardUi (the L1 dominant-number treatment used on the
+   Finance Dashboard for Net Profit, Revenue, Cash Position, etc.):
 
-   Value typography is 24 px font-mono tabular-nums — the largest
-   number on the page so the eye naturally lands here. Label is
-   compact uppercase 13 px so it doesn't compete with the figure.
+     · Tonal hairline accent rule at the top-left (h-px w-10, the
+       Hub's "this is a dominant metric" cue).
+     · Eyebrow label below the rule (TYPE.eyebrow tokens).
+     · Display value rendered at 40 px font-medium tabular-nums
+       (TYPE.display) in the tonal text colour (TONE_TEXT.positive /
+       negative). This is the SAME treatment used for the four lead
+       KPIs on /finance/intelligence, so the bottom line of the
+       statement feels native to the rest of the Hub.
+     · Optional prior-vs-current delta line as a caption.
 
-   A small delta line (▲ +CNY 437,467  +1.2%) renders underneath the
-   value when a prior figure exists, giving the operator the change
-   reading without needing to compute it from two columns. */
+   The headline spans the FULL grid width (col-span) instead of
+   sharing three column cells with the rest of the table — at this
+   typographic scale the value doesn't need to align with the
+   smaller numbers above (those are summed into this figure anyway).
+   Visually breaks the bottom line out as the page's primary stat. */
 function HeadlineCells({ label, prior, cur, showPrior, tone }: { label: string; prior?: number; cur: number; showPrior: boolean; tone: StatementTone }) {
-  /* Tonal palette — the value carries the signal; the chrome stays
-     calm so the card doesn't look like a status banner. */
-  const valueTone =
+  /* Hub DisplayKpi tokens — copied verbatim from FinanceDashboardUi
+     so any future refactor of the Hub design language picks this up
+     too. */
+  const TYPE_DISPLAY = "text-[40px] font-medium leading-[1.05] tracking-[-0.02em] tabular-nums font-mono";
+  const TYPE_EYEBROW = "text-[10px] font-semibold leading-none uppercase tracking-[0.18em] text-[var(--text-dim)]";
+
+  const toneText =
     tone === "positive" ? "text-emerald-200" :
     tone === "warning"  ? "text-rose-200"    :
                           "text-[var(--text-primary)]";
-  const ringTone =
-    tone === "positive" ? "ring-emerald-300/25" :
-    tone === "warning"  ? "ring-rose-300/25"    :
-                          "ring-[var(--border-color)]";
-  const accentBar =
-    tone === "positive" ? "bg-emerald-300/80" :
-    tone === "warning"  ? "bg-rose-300/80"    :
-                          "bg-[var(--text-highlight)]";
+  const toneAccent =
+    tone === "positive" ? "bg-emerald-300/55" :
+    tone === "warning"  ? "bg-rose-300/55"    :
+                          "bg-white/30";
 
-  /* Each cell carries the same bg + ring so they read as one card.
-     Rounded corners go on the leading + trailing cells only. */
-  const cellShell =
-    "bg-[var(--bg-primary)] ring-1 " + ringTone + " py-5 sm:py-6";
-
-  /* Delta line — only when comparing periods AND there's a meaningful
-     change to show. */
-  const deltaValue = showPrior && prior !== undefined ? cur - (prior ?? 0) : null;
+  /* Delta — period-over-period change vs prior. Only rendered when
+     comparing periods AND the prior has enough magnitude to make a
+     percentage meaningful. */
+  const deltaValue = showPrior && prior !== undefined ? cur - prior : null;
   const deltaPct   = showPrior && prior !== undefined && Math.abs(prior) > 0.5
     ? ((cur - prior) / Math.abs(prior)) * 100
     : null;
-  const deltaUp    = (deltaValue ?? 0) >= 0;
-  const deltaTone  = deltaValue == null
+  const deltaUp   = (deltaValue ?? 0) >= 0;
+  const deltaCls  = deltaValue == null
     ? "text-[var(--text-dim)]"
-    : deltaUp ? "text-emerald-300/80" : "text-rose-300/80";
+    : deltaUp ? "text-emerald-300/85" : "text-rose-300/85";
+
+  const span = showPrior ? "col-span-3" : "col-span-2";
 
   return (
     <>
-      {/* Breathing space above the card */}
-      <div aria-hidden className={`${showPrior ? "col-span-3" : "col-span-2"} mt-5`} />
+      {/* Strong divider above — gives the headline room to breathe */}
+      <Divider showPrior={showPrior} weight="color" className="mt-6" />
 
-      {/* Leading cell — label + accent stripe at the leading edge */}
-      <div className={`${cellShell} relative ps-6 pe-3 rounded-s-xl flex flex-col justify-center`}>
-        <span aria-hidden className={`absolute start-0 top-5 bottom-5 w-[3px] rounded-full ${accentBar}`} />
-        <div className="text-[10.5px] font-semibold uppercase tracking-[0.20em] text-[var(--text-dim)]">
-          {label}
-        </div>
-        {deltaValue !== null && (
-          <div className={`mt-2 text-[12px] font-medium tabular-nums ${deltaTone}`}>
-            {deltaUp ? "▲" : "▼"} {fmtSigned(Math.abs(deltaValue))}
-            {deltaPct !== null && ` · ${deltaPct >= 0 ? "+" : ""}${deltaPct.toFixed(1)}%`}
-          </div>
-        )}
-      </div>
+      {/* DisplayKpi-style headline block — full grid width */}
+      <div className={`${span} relative pt-4`}>
+        {/* Tonal hairline accent — the Hub L1 KPI signature */}
+        <div aria-hidden className={`absolute left-0 top-0 h-px w-10 ${toneAccent}`} />
 
-      {showPrior && (
-        <div className={`${cellShell} px-3 text-right flex flex-col justify-center`}>
-          <div className="text-[9.5px] uppercase tracking-[0.18em] text-[var(--text-dim)] mb-1">
-            Prior
+        <div className="flex items-end justify-between gap-6 flex-wrap">
+          <div className="min-w-0">
+            <div className={TYPE_EYEBROW}>{label}</div>
+            {deltaValue !== null && (
+              <div className={`mt-2 text-[12px] font-medium tabular-nums ${deltaCls}`}>
+                {deltaUp ? "▲" : "▼"} {fmtSigned(Math.abs(deltaValue))}
+                {deltaPct !== null && ` · ${deltaPct >= 0 ? "+" : ""}${deltaPct.toFixed(1)}%`}
+                <span className="text-[var(--text-dim)]"> vs prior</span>
+              </div>
+            )}
           </div>
-          <div className="text-[18px] font-bold font-mono tabular-nums text-[var(--text-secondary)]">
-            {fmtSigned(prior ?? 0)}
-          </div>
-        </div>
-      )}
 
-      <div className={`${cellShell} ps-3 pe-6 rounded-e-xl text-right flex flex-col justify-center`}>
-        {showPrior && (
-          <div className="text-[9.5px] uppercase tracking-[0.18em] text-[var(--text-dim)] mb-1">
-            Current
+          <div className="text-right">
+            <div className={`${TYPE_DISPLAY} ${toneText}`}>{fmtSigned(cur)}</div>
+            {showPrior && (
+              <div className="mt-1.5 text-[11px] tabular-nums text-[var(--text-dim)]">
+                <span className="font-semibold text-[var(--text-secondary)]">{fmtSigned(prior ?? 0)}</span>
+                <span className="ms-1.5">prior</span>
+              </div>
+            )}
           </div>
-        )}
-        <div className={`text-[24px] font-bold font-mono tabular-nums leading-none tracking-[-0.01em] ${valueTone}`}>
-          {fmtSigned(cur)}
         </div>
       </div>
     </>
