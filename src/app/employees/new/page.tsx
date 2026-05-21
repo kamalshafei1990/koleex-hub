@@ -32,6 +32,7 @@ import CameraIcon from "@/components/icons/ui/CameraIcon";
 import LanguagesIcon from "@/components/icons/ui/LanguagesIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
+import ProfileCompletenessBar from "@/components/ui/ProfileCompletenessBar";
 import {
   emptyWizardData,
   generateEmployeeNumber,
@@ -717,6 +718,34 @@ const panelCls =
    PAGE COMPONENT
    ═══════════════════════════════════════════════════ */
 
+/* Fields counted toward the profile-completeness bar. Picked to mirror
+   what an HR operator would consider "a complete profile" — identity,
+   contact, employment, address, emergency contact, documents, bank,
+   compensation, education. Excludes derived/admin flags (create_*),
+   the auto-generated employee_number, and the optional account block. */
+const TRACKED_EMPLOYEE_FIELDS: readonly (keyof EmployeeWizardData)[] = [
+  "photo_url", "title", "first_name", "last_name",
+  "gender", "birthday", "nationality", "marital_status",
+  "personal_phone", "personal_email",
+  "hire_date", "employment_type", "work_email", "work_phone", "work_location",
+  "department_id", "position_id",
+  "private_address_line1", "private_city", "private_country",
+  "emergency_contact_name", "emergency_contact_phone", "emergency_contact_relationship",
+  "identification_id", "passport_number",
+  "bank_name", "bank_account_number", "bank_iban", "bank_currency",
+  "initial_salary", "salary_currency",
+  "manager_id",
+  "education_degree",
+];
+
+function isFilledValue(v: unknown): boolean {
+  if (v == null) return false;
+  if (typeof v === "string") return v.trim().length > 0;
+  if (typeof v === "number") return !Number.isNaN(v);
+  if (Array.isArray(v)) return v.length > 0;
+  return true;
+}
+
 export default function AddEmployeePage() {
   const { t } = useTranslation(employeesT);
   const router = useRouter();
@@ -1048,6 +1077,16 @@ export default function AddEmployeePage() {
             <span className="hidden xs:inline sm:inline">{saving ? t("saving") : t("save.employee")}</span>
           </button>
         </div>
+
+        {/* Profile completeness — counts the trackable fields filled */}
+        <ProfileCompletenessBar
+          filled={TRACKED_EMPLOYEE_FIELDS.reduce(
+            (n, k) => n + (isFilledValue(form[k]) ? 1 : 0),
+            0,
+          )}
+          total={TRACKED_EMPLOYEE_FIELDS.length}
+          className="mb-5"
+        />
 
         {/* Validation summary — lists the exact fields that need
             attention, with click-to-jump chips. Appears only after
