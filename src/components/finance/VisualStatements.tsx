@@ -403,12 +403,17 @@ function Divider({
 
 function HeaderCells({ priorLabel, curLabel, showPrior }: { priorLabel?: string; curLabel: string; showPrior: boolean }) {
   const { t } = useTranslation(financeT);
-  const baseCls = "pb-3 text-[10.5px] font-semibold uppercase tracking-[0.18em]";
+  /* Bumped from 10.5 px → 14 px so the period tags ("May 14" /
+     "May 21", "2025" / "2026", "Q4 2026") read clearly on first
+     glance — they're the orientation cue for the whole table. Kept
+     uppercase + tracking for typographic continuity with the rest of
+     the eyebrow labels in the Hub. */
+  const baseCls = "pb-3 text-[14px] font-semibold uppercase tracking-[0.10em]";
   return (
     <>
       <div className={`${baseCls} text-[var(--text-dim)]`} />
       {showPrior && (
-        <div className={`${baseCls} text-right text-[var(--text-dim)] pe-4`}>
+        <div className={`${baseCls} text-right text-[var(--text-secondary)] pe-4`}>
           {priorLabel || t("visual.prior", "Prior")}
         </div>
       )}
@@ -493,36 +498,40 @@ function TotalCells({ label, prior, cur, showPrior, tone }: { label: string; pri
   );
 }
 
-/* Headline — Net Income / Closing cash. Tinted bar (3 adjacent cells
-   share the same bg), 3 px accent stripe, biggest type in the table.
-   Strong divider above is a separate col-span element so the line is
-   one continuous shape. */
+/* Headline — Net Income / Closing cash.
+
+   Classic accountant double-rule treatment instead of the previous
+   tinted bar: two parallel lines above the row (the international
+   convention for a final / bottom-line figure in a published
+   statement) plus one strong rule below, no background tint. Bigger
+   value typography (20 px) so the eye lands here last. Tonal colour
+   is reserved for the VALUE itself — positive numbers stay in
+   emerald-200, negatives switch to rose-200. */
 function HeadlineCells({ label, prior, cur, showPrior, tone }: { label: string; prior?: number; cur: number; showPrior: boolean; tone: StatementTone }) {
-  const bg =
-    tone === "positive" ? "bg-emerald-300/[0.06]" :
-    tone === "warning"  ? "bg-rose-300/[0.06]"    :
-                          "bg-[var(--bg-surface-subtle)]";
   const valueTone =
     tone === "positive" ? "text-emerald-200" :
     tone === "warning"  ? "text-rose-200"    :
                           "text-[var(--text-primary)]";
-  const accent =
-    tone === "positive" ? "bg-emerald-300/80" :
-    tone === "warning"  ? "bg-rose-300/80"    :
-                          "bg-[var(--text-highlight)]";
 
-  const cellBase = "py-3.5 text-[16px] font-bold";
+  /* Label cell — bigger uppercase, slightly relaxed tracking */
+  const labelCls = "pt-4 pb-4 text-[15px] font-bold uppercase tracking-[0.12em] text-[var(--text-primary)]";
+  /* Value cell — biggest, mono, tabular-nums */
+  const valueCls = `pt-4 pb-4 text-[20px] font-bold font-mono tabular-nums ${valueTone} text-right pe-4`;
+  const priorCls = "pt-4 pb-4 text-[20px] font-bold font-mono tabular-nums text-[var(--text-secondary)] text-right pe-4";
+
   return (
     <>
-      <Divider showPrior={showPrior} weight="strong" className="mt-4" />
-      <div className={`relative ${cellBase} ${bg} ps-5 pe-2 rounded-s-md uppercase tracking-[0.08em] text-[var(--text-primary)]`}>
-        <span aria-hidden className={`absolute start-0 top-3.5 bottom-3.5 w-[3px] rounded-full ${accent}`} />
-        {label}
-      </div>
-      {showPrior && (
-        <div className={`${cellBase} ${bg} text-right font-mono tabular-nums text-[var(--text-secondary)] pe-4`}>{fmtSigned(prior ?? 0)}</div>
-      )}
-      <div className={`${cellBase} ${bg} text-right font-mono tabular-nums ${valueTone} pe-5 rounded-e-md`}>{fmtSigned(cur)}</div>
+      {/* Top double-rule: two parallel lines spaced ~2 px apart. */}
+      <Divider showPrior={showPrior} weight="strong" className="mt-5" />
+      <Divider showPrior={showPrior} weight="color" className="mt-[2px]" />
+
+      {/* Row content */}
+      <div className={labelCls}>{label}</div>
+      {showPrior && <div className={priorCls}>{fmtSigned(prior ?? 0)}</div>}
+      <div className={valueCls}>{fmtSigned(cur)}</div>
+
+      {/* Bottom single rule, slightly stronger, closes the headline. */}
+      <Divider showPrior={showPrior} weight="color" />
     </>
   );
 }
