@@ -21,7 +21,7 @@ import "server-only";
    top of this file so future COA edits land in a single spot.
    ========================================================================== */
 
-import { supabaseServer } from "@/lib/server/supabase-server";
+import { getSupabaseServer } from "@/lib/server/supabase-server";
 import type { AccountingAccount } from "./types";
 
 /* ─── Account classification ──────────────────────────────────── */
@@ -84,14 +84,14 @@ interface AggRow {
 async function aggregatePostedLines(tenantId: string, period?: Period): Promise<AggRow[]> {
   /* All accounts loaded once so empty-period statements still render
      every section header (even if the amount is zero). */
-  const { data: accountsRaw } = await supabaseServer
+  const { data: accountsRaw } = await getSupabaseServer()
     .from("accounting_accounts")
     .select("id, code, name, type, normal_balance")
     .eq("tenant_id", tenantId);
   const accounts = (accountsRaw ?? []) as Array<Pick<AccountingAccount, "id" | "code" | "name" | "type" | "normal_balance">>;
   const acctById = new Map(accounts.map((a) => [a.id, a]));
 
-  let q = supabaseServer
+  let q = getSupabaseServer()
     .from("accounting_journal_lines")
     .select("account_id, debit, credit, accounting_journal_entries!inner(entry_date, status, tenant_id)")
     .eq("tenant_id", tenantId)
@@ -101,7 +101,21 @@ async function aggregatePostedLines(tenantId: string, period?: Period): Promise<
     q = q.gte("accounting_journal_entries.entry_date", period.from)
          .lte("accounting_journal_entries.entry_date", period.to);
   }
-  const { data } = await q;
+  const { data, error } = await q;
+  if (error) {
+    /* Surface the error so silent zeros never hide a real fault on
+       Vercel. Log + rethrow so the route's catch block returns 500. */
+    console.error("[aggregatePostedLines] supabase error:", {
+      tenantId,
+      period,
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+    });
+    throw new Error(`aggregatePostedLines failed: ${error.message}`);
+  }
+  console.log("[aggregatePostedLines]", { tenantId, period, rowCount: (data ?? []).length });
 
   const aggMap = new Map<string, AggRow>();
   for (const a of accounts) {
@@ -268,7 +282,7 @@ function cashImpactDr(row: { debit: number | string; credit: number | string }):
 
 export async function buildCashFlow(tenantId: string, period: Period): Promise<CashFlowStatement> {
   /* Resolve cash account ids for this tenant. */
-  const { data: cashAccts } = await supabaseServer
+  const { data: cashAccts } = await getSupabaseServer()
     .from("accounting_accounts")
     .select("id, code")
     .eq("tenant_id", tenantId)
@@ -282,7 +296,7 @@ export async function buildCashFlow(tenantId: string, period: Period): Promise<C
   /* Pull every posted line that hits a cash account in the period
      PLUS the contra account info on the same journal so we can
      classify Operating / Investing / Financing. */
-  const { data: cashLines } = await supabaseServer
+  const { data: cashLines } = await getSupabaseServer()
     .from("accounting_journal_lines")
     .select(
       "id, entry_id, account_id, debit, credit, accounting_journal_entries!inner(id, entry_date, status, source_type, tenant_id)",
@@ -307,7 +321,7 @@ export async function buildCashFlow(tenantId: string, period: Period): Promise<C
   const entryIds = Array.from(new Set(lines.map((l) => l.entry_id)));
   let contraMap = new Map<string, Array<{ account_id: string; debit: number; credit: number; account_code: string; account_type: string }>>();
   if (entryIds.length > 0) {
-    const { data: siblings } = await supabaseServer
+    const { data: siblings } = await getSupabaseServer()
       .from("accounting_journal_lines")
       .select("entry_id, account_id, debit, credit, account:account_id(code, type)")
       .eq("tenant_id", tenantId)

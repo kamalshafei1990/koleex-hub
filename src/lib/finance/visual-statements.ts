@@ -10,7 +10,7 @@ import "server-only";
 
 import { buildProfitLoss, buildCashFlow, type Period, type ProfitLoss, type CashFlowStatement } from "@/lib/accounting/statements";
 import { resolveBaseCurrency } from "@/lib/finance/currency";
-import { supabaseServer } from "@/lib/server/supabase-server";
+import { getSupabaseServer } from "@/lib/server/supabase-server";
 
 export type Granularity = "week" | "quarter" | "year";
 
@@ -98,13 +98,13 @@ function priorBase(granularity: Granularity, base: Date): Date {
    range. */
 
 async function buildBalanceSheet(tenantId: string, asOf: string, currency: string): Promise<BalanceSheet> {
-  const { data: acctsRaw } = await supabaseServer
+  const { data: acctsRaw } = await getSupabaseServer()
     .from("accounting_accounts").select("id, code, name, type, normal_balance")
     .eq("tenant_id", tenantId);
   type Acct = { id: string; code: string; name: string; type: string; normal_balance: string };
   const accts = (acctsRaw ?? []) as Acct[];
 
-  const { data: linesRaw } = await supabaseServer
+  const { data: linesRaw } = await getSupabaseServer()
     .from("accounting_journal_lines")
     .select("account_id, debit, credit, accounting_journal_entries!inner(entry_date, status, tenant_id)")
     .eq("tenant_id", tenantId)
