@@ -29,7 +29,7 @@
    --------------------------------------------------------------------------- */
 
 import { humanizeError } from "@/lib/ui/humanize-error";
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ErpPage, ErpPanel } from "@/components/ui/erp/ErpUi";
 import RrIcon from "@/components/ui/RrIcon";
@@ -342,124 +342,139 @@ function PillToggle<T extends string>({
 
 /* ───── Two-period table primitives (with column headers) ───── */
 
-/* Shared column-width grid so every row in a statement aligns
-   pixel-perfect: label column flexes, two number columns each fixed at
-   ~7 ch (max ~999,999,999 with comma separators). gap-x-10 gives a
-   clear visual gutter between prior and current. */
-const TWO_COL_GRID = "grid grid-cols-[1fr_minmax(7rem,max-content)_minmax(7rem,max-content)] items-baseline gap-x-10";
-const ONE_COL_GRID = "grid grid-cols-[1fr_minmax(7rem,max-content)] items-baseline gap-x-10";
+/* ───── Statement table — shared-grid architecture ─────
+   Each statement view (Income / Balance / Cash Flow) wraps its rows in
+   ONE grid container. Row "components" return Fragments of cells that
+   land directly in the parent grid, so every column track is computed
+   once and all rows share identical widths. This is what fixes the
+   "numbers in different rows don't sit in the same column" problem
+   the operator pointed out — the previous design used per-row grids,
+   each computing its own max-content for the value columns. */
 
-function PeriodHeaders({ curLabel, priorLabel }: { curLabel: string; priorLabel: string }) {
+/* Fixed 8 rem value columns hold up to ~11-digit numbers with thousand
+   separators ("999,999,999") at the current font, with breathing room.
+   Label column flexes; the gap is part of the grid template so we don't
+   need separate gap utilities (which would land on every grid item). */
+const STATEMENT_GRID_2COL = "grid grid-cols-[1fr_8rem_8rem] items-baseline";
+const STATEMENT_GRID_1COL = "grid grid-cols-[1fr_8rem] items-baseline";
+
+type StatementTone = "neutral" | "positive" | "warning";
+
+function HeaderCells({ priorLabel, curLabel, showPrior }: { priorLabel?: string; curLabel: string; showPrior: boolean }) {
   const { t } = useTranslation(financeT);
+  const baseCls = "pb-2 text-[10px] uppercase tracking-[0.18em] border-b border-[var(--border-subtle)]";
   return (
-    <div className={`${TWO_COL_GRID} pb-2 text-[10.5px] uppercase tracking-[0.18em] text-[var(--text-dim)]`}>
-      <span />
-      <span className="text-right">{priorLabel || t("visual.prior", "Prior")}</span>
-      <span className="text-right font-semibold text-[var(--text-secondary)]">{curLabel || t("visual.current", "Current")}</span>
-    </div>
+    <>
+      <div className={`${baseCls} text-[var(--text-dim)]`} />
+      {showPrior && (
+        <div className={`${baseCls} text-right text-[var(--text-dim)] pe-3`}>
+          {priorLabel || t("visual.prior", "Prior")}
+        </div>
+      )}
+      <div className={`${baseCls} text-right font-semibold text-[var(--text-secondary)] pe-3`}>
+        {curLabel || t("visual.current", "Current")}
+      </div>
+    </>
   );
 }
 
-function SingleColHeader({ curLabel }: { curLabel: string }) {
-  const { t } = useTranslation(financeT);
+function SectionTitleRow({ label, cols }: { label: string; cols: 2 | 3 }) {
+  const span = cols === 3 ? "col-span-3" : "col-span-2";
   return (
-    <div className={`${ONE_COL_GRID} pb-2 text-[10.5px] uppercase tracking-[0.18em] text-[var(--text-dim)]`}>
-      <span />
-      <span className="text-right font-semibold text-[var(--text-secondary)]">{curLabel || t("visual.current", "Current")}</span>
-    </div>
-  );
-}
-
-function SectionTitle({ label }: { label: string }) {
-  return (
-    <div className="mt-7 mb-2 first:mt-4 flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+    <div className={`${span} mt-6 mb-1 first:mt-4 flex items-center gap-3 text-[10.5px] font-bold uppercase tracking-[0.22em] text-[var(--text-secondary)]`}>
       <span>{label}</span>
       <span aria-hidden className="h-px flex-1 bg-[var(--border-subtle)]" />
     </div>
   );
 }
 
-function TwoColRow({ label, prior, cur }: { label: string; prior: number; cur: number }) {
+function MutedRowSpan({ label, cols }: { label: string; cols: 2 | 3 }) {
+  const span = cols === 3 ? "col-span-3" : "col-span-2";
+  return <div className={`${span} py-2 text-[11.5px] text-[var(--text-dim)]`}>{label}</div>;
+}
+
+function VerticalGap({ cols }: { cols: 2 | 3 }) {
+  const span = cols === 3 ? "col-span-3" : "col-span-2";
+  return <div className={`${span} h-3`} aria-hidden />;
+}
+
+/* Data row — quiet typography, faint hairline. */
+function DataCells({ label, prior, cur, showPrior }: { label: string; prior?: number; cur: number; showPrior: boolean }) {
+  const baseCls = "py-2 text-[13px] border-b border-[var(--border-faint)]";
   return (
-    <div className={`${TWO_COL_GRID} py-2 text-[13px] last:border-b-0`}>
-      <span className="text-[var(--text-highlight)]">{label}</span>
-      <span className="font-mono tabular-nums text-[var(--text-secondary)]">{fmtSigned(prior)}</span>
-      <span className="font-mono tabular-nums text-[var(--text-primary)]">{fmtSigned(cur)}</span>
-    </div>
+    <>
+      <div className={`${baseCls} text-[var(--text-highlight)]`}>{label}</div>
+      {showPrior && (
+        <div className={`${baseCls} text-right font-mono tabular-nums text-[var(--text-secondary)] pe-3`}>{fmtSigned(prior ?? 0)}</div>
+      )}
+      <div className={`${baseCls} text-right font-mono tabular-nums text-[var(--text-primary)] pe-3`}>{fmtSigned(cur)}</div>
+    </>
   );
 }
 
-function SingleRow({ label, amount }: { label: string; amount: number }) {
+/* Subtotal row — top hairline, slightly heavier label. */
+function SubtotalCells({ label, prior, cur, showPrior }: { label: string; prior?: number; cur: number; showPrior: boolean }) {
+  const baseCls = "mt-1 py-2 text-[13px] font-semibold border-t border-[var(--border-subtle)]";
   return (
-    <div className={`${ONE_COL_GRID} py-2 text-[13px] last:border-b-0`}>
-      <span className="text-[var(--text-highlight)]">{label}</span>
-      <span className="font-mono tabular-nums text-[var(--text-primary)]">{fmtSigned(amount)}</span>
-    </div>
+    <>
+      <div className={`${baseCls} uppercase tracking-[0.04em] text-[var(--text-highlight)]`}>{label}</div>
+      {showPrior && (
+        <div className={`${baseCls} text-right font-mono tabular-nums text-[var(--text-secondary)] pe-3`}>{fmtSigned(prior ?? 0)}</div>
+      )}
+      <div className={`${baseCls} text-right font-mono tabular-nums text-[var(--text-primary)] pe-3`}>{fmtSigned(cur)}</div>
+    </>
   );
 }
 
-type Strength = "subtotal" | "total" | "headline";
-
-function TotalRow({
-  label, prior, cur, strength = "subtotal", tone = "neutral", showPrior = true,
-}: {
-  label: string; prior?: number; cur: number;
-  strength?: Strength;
-  tone?: "neutral" | "positive" | "warning";
-  showPrior?: boolean;
-}) {
-  /* Headline rows (Net Income, Closing Cash) get the strongest visual
-     treatment — bigger type, a tinted accent stripe along the leading
-     edge, and a subtle row background so the eye lands on the bottom
-     line first. Subtotal rows just get a quiet top hairline. */
-  const isHeadline = strength === "headline";
-  const isTotal    = strength === "total";
-
-  const text =
-    isHeadline ? "text-[16px] font-semibold" :
-    isTotal    ? "text-[14px] font-semibold" :
-                 "text-[13px] font-medium";
+/* Total row — stronger border, optional tonal value (Operating Income). */
+function TotalCells({ label, prior, cur, showPrior, tone }: { label: string; prior?: number; cur: number; showPrior: boolean; tone: StatementTone }) {
   const valueTone =
     tone === "positive" ? "text-emerald-200" :
     tone === "warning"  ? "text-rose-200"    :
                           "text-[var(--text-primary)]";
-  const border =
-    isHeadline ? "border-t border-[var(--border-strong)]" :
-    isTotal    ? "border-t border-[var(--border-color)]" :
-                 "border-t border-[var(--border-subtle)]";
-  const bg =
-    isHeadline
-      ? tone === "positive" ? "bg-emerald-300/[0.04]"
-      : tone === "warning"  ? "bg-rose-300/[0.04]"
-      :                       "bg-[var(--bg-surface-subtle)]"
-      : "";
-  const accent =
-    isHeadline
-      ? tone === "positive" ? "before:bg-emerald-300/70"
-      : tone === "warning"  ? "before:bg-rose-300/70"
-      :                       "before:bg-[var(--text-highlight)]"
-      : "";
-
-  const grid = showPrior ? TWO_COL_GRID : ONE_COL_GRID;
-  const wrap = isHeadline
-    ? `relative mt-3 px-3 py-3 rounded-md ${bg} ${accent} before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[3px] before:rounded-full`
-    : `mt-2 py-2`;
-
+  const baseCls = "mt-1 py-2.5 text-[13.5px] font-semibold border-t border-[var(--border-color)]";
   return (
-    <div className={`${grid} items-baseline ${border} ${text} ${wrap}`}>
-      <span className={`uppercase tracking-[0.04em] ${isHeadline ? "text-[var(--text-primary)]" : "text-[var(--text-highlight)]"}`}>{label}</span>
+    <>
+      <div className={`${baseCls} uppercase tracking-[0.04em] text-[var(--text-primary)]`}>{label}</div>
       {showPrior && (
-        <span className={`font-mono tabular-nums ${isHeadline ? "text-[var(--text-secondary)]" : "text-[var(--text-dim)]"}`}>
-          {prior !== undefined ? fmtSigned(prior) : ""}
-        </span>
+        <div className={`${baseCls} text-right font-mono tabular-nums text-[var(--text-secondary)] pe-3`}>{fmtSigned(prior ?? 0)}</div>
       )}
-      <span className={`font-mono tabular-nums ${valueTone}`}>{fmtSigned(cur)}</span>
-    </div>
+      <div className={`${baseCls} text-right font-mono tabular-nums ${valueTone} pe-3`}>{fmtSigned(cur)}</div>
+    </>
   );
 }
 
-function MutedRow({ label }: { label: string }) {
-  return <div className="py-2 text-[11.5px] text-[var(--text-dim)] last:border-b-0">{label}</div>;
+/* Headline row — Net Income / Closing cash. Three adjacent grid cells
+   share the same tonal background so they read as one continuous bar.
+   A 3 px accent stripe sits at the leading edge of the label cell.
+   No nested grid → still aligned with the rest of the statement. */
+function HeadlineCells({ label, prior, cur, showPrior, tone }: { label: string; prior?: number; cur: number; showPrior: boolean; tone: StatementTone }) {
+  const bg =
+    tone === "positive" ? "bg-emerald-300/[0.05]" :
+    tone === "warning"  ? "bg-rose-300/[0.05]"    :
+                          "bg-[var(--bg-surface-subtle)]";
+  const valueTone =
+    tone === "positive" ? "text-emerald-200" :
+    tone === "warning"  ? "text-rose-200"    :
+                          "text-[var(--text-primary)]";
+  const accent =
+    tone === "positive" ? "bg-emerald-300/70" :
+    tone === "warning"  ? "bg-rose-300/70"    :
+                          "bg-[var(--text-highlight)]";
+
+  const cellBase = "mt-3 py-3 text-[15.5px] font-semibold border-t-[1.5px] border-[var(--border-strong)]";
+  return (
+    <>
+      <div className={`relative ${cellBase} ${bg} ps-4 pe-2 rounded-s-md uppercase tracking-[0.05em] text-[var(--text-primary)]`}>
+        <span aria-hidden className={`absolute start-0 top-3 bottom-3 w-[3px] rounded-full ${accent}`} />
+        {label}
+      </div>
+      {showPrior && (
+        <div className={`${cellBase} ${bg} text-right font-mono tabular-nums text-[var(--text-secondary)] pe-3`}>{fmtSigned(prior ?? 0)}</div>
+      )}
+      <div className={`${cellBase} ${bg} text-right font-mono tabular-nums ${valueTone} pe-4 rounded-e-md`}>{fmtSigned(cur)}</div>
+    </>
+  );
 }
 
 /* ───── Income view ───── */
@@ -468,40 +483,39 @@ function IncomeView({ pl, prior, ccy, curLabel, priorLabel }: { pl: ProfitLoss; 
   const { t } = useTranslation(financeT);
   void ccy;
   return (
-    <div>
-      <PeriodHeaders curLabel={curLabel} priorLabel={priorLabel} />
+    <div className={STATEMENT_GRID_2COL}>
+      <HeaderCells priorLabel={priorLabel} curLabel={curLabel} showPrior />
 
-      <SectionTitle label={t("visual.section.revenues", "Revenues")} />
-      {pl.revenue.accounts.length === 0 && <MutedRow label={t("visual.emptyRev", "No revenue posted yet.")} />}
+      <SectionTitleRow label={t("visual.section.revenues", "Revenues")} cols={3} />
+      {pl.revenue.accounts.length === 0 && <MutedRowSpan label={t("visual.emptyRev", "No revenue posted yet.")} cols={3} />}
       {pl.revenue.accounts.map((a) => (
-        <TwoColRow key={a.account_id} label={a.name} prior={priorAccount(prior.revenue, a.code)} cur={a.amount} />
+        <DataCells key={a.account_id} label={a.name} prior={priorAccount(prior.revenue, a.code)} cur={a.amount} showPrior />
       ))}
-      <TotalRow label={t("visual.row.totalRev", "Total Revenues")} prior={prior.revenue.amount} cur={pl.revenue.amount} strength="subtotal" />
+      <SubtotalCells label={t("visual.row.totalRev", "Total Revenues")} prior={prior.revenue.amount} cur={pl.revenue.amount} showPrior />
 
-      <SectionTitle label={t("visual.section.expenses", "Expenses")} />
+      <SectionTitleRow label={t("visual.section.expenses", "Expenses")} cols={3} />
       {pl.cost_of_sales.accounts.map((a) => (
-        <TwoColRow key={a.account_id} label={a.name} prior={priorAccount(prior.cost_of_sales, a.code)} cur={a.amount} />
+        <DataCells key={a.account_id} label={a.name} prior={priorAccount(prior.cost_of_sales, a.code)} cur={a.amount} showPrior />
       ))}
       {pl.operating_expenses.accounts.map((a) => (
-        <TwoColRow key={a.account_id} label={a.name} prior={priorAccount(prior.operating_expenses, a.code)} cur={a.amount} />
+        <DataCells key={a.account_id} label={a.name} prior={priorAccount(prior.operating_expenses, a.code)} cur={a.amount} showPrior />
       ))}
-      <TotalRow
+      <SubtotalCells
         label={t("visual.row.totalExp", "Total Expenses")}
         prior={prior.cost_of_sales.amount + prior.operating_expenses.amount}
         cur={pl.cost_of_sales.amount + pl.operating_expenses.amount}
-        strength="subtotal"
+        showPrior
       />
 
-      <TotalRow label={t("visual.row.opIncome", "Operating Income")}
-                prior={prior.operating_profit} cur={pl.operating_profit}
-                strength="total"
-                tone={pl.operating_profit >= 0 ? "positive" : "warning"} />
+      <TotalCells label={t("visual.row.opIncome", "Operating Income")}
+                  prior={prior.operating_profit} cur={pl.operating_profit}
+                  showPrior
+                  tone={pl.operating_profit >= 0 ? "positive" : "warning"} />
 
-      <div className="mt-4" />
-      <TotalRow label={t("visual.row.netIncome", "Net Income")}
-                prior={prior.net_profit} cur={pl.net_profit}
-                strength="headline"
-                tone={pl.net_profit >= 0 ? "positive" : "warning"} />
+      <HeadlineCells label={t("visual.row.netIncome", "Net Income")}
+                     prior={prior.net_profit} cur={pl.net_profit}
+                     showPrior
+                     tone={pl.net_profit >= 0 ? "positive" : "warning"} />
     </div>
   );
 }
@@ -515,35 +529,34 @@ function BalanceView({ bs, ccy, curLabel }: { bs: BalanceSheet; ccy: string; cur
   const { t } = useTranslation(financeT);
   void ccy;
   return (
-    <div>
-      <SingleColHeader curLabel={curLabel || bs.as_of} />
+    <div className={STATEMENT_GRID_1COL}>
+      <HeaderCells curLabel={curLabel || bs.as_of} showPrior={false} />
 
-      <SectionTitle label={t("visual.section.assets", "Assets")} />
+      <SectionTitleRow label={t("visual.section.assets", "Assets")} cols={2} />
       {bs.assets.accounts.map((a) => (
-        <SingleRow key={a.code} label={a.name} amount={a.amount} />
+        <DataCells key={a.code} label={a.name} cur={a.amount} showPrior={false} />
       ))}
-      <TotalRow label={t("visual.row.totalAssets", "Total Assets")} cur={bs.total_assets} strength="total" showPrior={false} />
+      <TotalCells label={t("visual.row.totalAssets", "Total Assets")} cur={bs.total_assets} showPrior={false} tone="neutral" />
 
-      <SectionTitle label={t("visual.section.liabilities", "Liabilities")} />
-      {bs.liabilities.accounts.length === 0 && <MutedRow label={t("visual.emptyLiab", "No liabilities posted.")} />}
+      <SectionTitleRow label={t("visual.section.liabilities", "Liabilities")} cols={2} />
+      {bs.liabilities.accounts.length === 0 && <MutedRowSpan label={t("visual.emptyLiab", "No liabilities posted.")} cols={2} />}
       {bs.liabilities.accounts.map((a) => (
-        <SingleRow key={a.code} label={a.name} amount={a.amount} />
+        <DataCells key={a.code} label={a.name} cur={a.amount} showPrior={false} />
       ))}
-      <TotalRow label={t("visual.row.totalLiab", "Total Liabilities")} cur={bs.liabilities.amount} strength="subtotal" showPrior={false} />
+      <SubtotalCells label={t("visual.row.totalLiab", "Total Liabilities")} cur={bs.liabilities.amount} showPrior={false} />
 
-      <SectionTitle label={t("visual.section.equity", "Equity")} />
+      <SectionTitleRow label={t("visual.section.equity", "Equity")} cols={2} />
       {bs.equity.accounts.map((a) => (
-        <SingleRow key={a.code} label={a.name} amount={a.amount} />
+        <DataCells key={a.code} label={a.name} cur={a.amount} showPrior={false} />
       ))}
-      <TotalRow label={t("visual.row.totalEquity", "Total Equity")} cur={bs.equity.amount} strength="subtotal" showPrior={false} />
+      <SubtotalCells label={t("visual.row.totalEquity", "Total Equity")} cur={bs.equity.amount} showPrior={false} />
 
-      <div className="mt-4" />
-      <TotalRow label={t("visual.row.totalLiabEq", "Total Liabilities & Equity")} cur={bs.total_liab_eq}
-                strength="headline"
-                tone={bs.reconciled ? "positive" : "warning"}
-                showPrior={false} />
+      <HeadlineCells label={t("visual.row.totalLiabEq", "Total Liabilities & Equity")}
+                     cur={bs.total_liab_eq}
+                     showPrior={false}
+                     tone={bs.reconciled ? "positive" : "warning"} />
       {!bs.reconciled && (
-        <div className="mt-2 text-[11px] text-rose-300">{t("visual.bsMismatch", "⚠ Balance sheet does not reconcile.")}</div>
+        <div className="col-span-2 mt-2 text-[11px] text-rose-300">{t("visual.bsMismatch", "⚠ Balance sheet does not reconcile.")}</div>
       )}
     </div>
   );
@@ -555,29 +568,28 @@ function CashFlowView({ cf, ccy, curLabel }: { cf: CashFlow; ccy: string; curLab
   const { t } = useTranslation(financeT);
   void ccy;
   return (
-    <div>
-      <SingleColHeader curLabel={curLabel} />
+    <div className={STATEMENT_GRID_1COL}>
+      <HeaderCells curLabel={curLabel} showPrior={false} />
 
-      <SingleRow label={t("visual.row.openingCash", "Opening cash")} amount={cf.opening_cash} />
+      <DataCells label={t("visual.row.openingCash", "Opening cash")} cur={cf.opening_cash} showPrior={false} />
 
       {[cf.operating, cf.investing, cf.financing].map((s) => (
-        <div key={s.label}>
-          <SectionTitle label={s.label} />
-          {s.lines.length === 0 && <MutedRow label="—" />}
+        <Fragment key={s.label}>
+          <SectionTitleRow label={s.label} cols={2} />
+          {s.lines.length === 0 && <MutedRowSpan label="—" cols={2} />}
           {s.lines.map((l, i) => (
-            <SingleRow key={`${s.label}-${i}`} label={l.label} amount={l.amount} />
+            <DataCells key={`${s.label}-${i}`} label={l.label} cur={l.amount} showPrior={false} />
           ))}
-          <TotalRow label={t("visual.row.subtotal", "{name} subtotal").replace("{name}", s.label)} cur={s.amount} strength="subtotal" showPrior={false} />
-        </div>
+          <SubtotalCells label={t("visual.row.subtotal", "{name} subtotal").replace("{name}", s.label)} cur={s.amount} showPrior={false} />
+        </Fragment>
       ))}
 
-      <TotalRow label={t("visual.row.netChange", "Net change in cash")} cur={cf.net_change} strength="total" showPrior={false} />
+      <TotalCells label={t("visual.row.netChange", "Net change in cash")} cur={cf.net_change} showPrior={false} tone="neutral" />
 
-      <div className="mt-4" />
-      <TotalRow label={t("visual.row.closingCash", "Closing cash")} cur={cf.closing_cash}
-                strength="headline"
-                tone={cf.reconciled ? "positive" : "warning"}
-                showPrior={false} />
+      <HeadlineCells label={t("visual.row.closingCash", "Closing cash")}
+                     cur={cf.closing_cash}
+                     showPrior={false}
+                     tone={cf.reconciled ? "positive" : "warning"} />
     </div>
   );
 }
