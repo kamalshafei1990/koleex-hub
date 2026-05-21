@@ -24,6 +24,7 @@ import EyeOffIcon from "@/components/icons/ui/EyeOffIcon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import RefreshCcwIcon from "@/components/icons/ui/RefreshCcwIcon";
 import CameraIcon from "@/components/icons/ui/CameraIcon";
+import ProfileCompletenessBar from "@/components/ui/ProfileCompletenessBar";
 import {
   emptyWizardData,
   generateEmployeeNumber,
@@ -142,6 +143,32 @@ export default function EmployeeWizard({ onClose, onCreated }: Props) {
   const set = (key: keyof EmployeeWizardData, value: any) =>
     setForm((f) => ({ ...f, [key]: value }));
 
+  /* ── Profile completeness — fields we encourage users to fill ── */
+  const TRACKED_FIELDS: (keyof EmployeeWizardData)[] = [
+    "photo_url", "title", "first_name", "last_name", "gender", "birthday",
+    "nationality", "marital_status", "personal_phone", "personal_email",
+    "employee_number", "hire_date", "employment_type", "work_email",
+    "work_phone", "work_location", "department_id", "position_id",
+    "private_address_line1", "private_city", "private_country",
+    "emergency_contact_name", "emergency_contact_phone",
+    "identification_id", "passport_number",
+    "bank_name", "bank_iban", "initial_salary", "manager_id",
+    "education_degree", "education_institution", "languages",
+  ];
+  const isFilled = (v: unknown): boolean => {
+    if (v == null) return false;
+    if (typeof v === "string") return v.trim().length > 0;
+    if (typeof v === "number") return !Number.isNaN(v);
+    if (Array.isArray(v)) return v.length > 0;
+    if (typeof v === "boolean") return v;
+    return true;
+  };
+  const filledCount = TRACKED_FIELDS.reduce(
+    (n, k) => n + (isFilled(form[k]) ? 1 : 0),
+    0,
+  );
+  const totalCount = TRACKED_FIELDS.length;
+
   /* ── Validation ── */
   const canProceed = (): boolean => {
     if (step === 0) return !!(form.first_name && form.last_name);
@@ -229,6 +256,13 @@ export default function EmployeeWizard({ onClose, onCreated }: Props) {
               &times;
             </button>
           </div>
+
+          {/* Profile completeness — visible on every step */}
+          <ProfileCompletenessBar
+            filled={filledCount}
+            total={totalCount}
+            className="mb-3"
+          />
 
           {/* Step indicator */}
           <div className="flex gap-2">

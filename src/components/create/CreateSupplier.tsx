@@ -7,6 +7,7 @@ import {
   SmartCreatePage, SmartSection, SmartField, SmartHelpCard,
   SmartInput, SmartSelect, SmartTextarea,
 } from "@/components/ui/create/SmartCreate";
+import ProfileCompletenessBar from "@/components/ui/ProfileCompletenessBar";
 
 const WORKFLOW = [
   { key: "supplier", label: "Supplier",  icon: "id-badge" as const,         state: "current" as const, hint: "You are here" },
@@ -25,6 +26,13 @@ export default function CreateSupplier() {
   const [notes, setNotes]     = useState("");
   const [busy, setBusy]       = useState(false);
   const [error, setError]     = useState<string | null>(null);
+
+  /* ── Profile completeness ── */
+  const isFilled = (v: unknown): boolean =>
+    typeof v === "string" ? v.trim().length > 0 : v != null;
+  const trackedValues: unknown[] = [name, email, phone, country, notes];
+  const filledCount = trackedValues.reduce<number>((n, v) => n + (isFilled(v) ? 1 : 0), 0);
+  const totalCount = trackedValues.length;
 
   async function save() {
     if (!name.trim()) { setError("Company name is required."); return; }
@@ -67,6 +75,8 @@ export default function CreateSupplier() {
         />
       }
     >
+      <ProfileCompletenessBar filled={filledCount} total={totalCount} />
+
       {error && <div className="rounded-md border border-rose-300/40 bg-rose-300/[0.06] px-3 py-2 text-[12px] text-rose-200">{error}</div>}
       <SmartSection title="Identification">
         <SmartField label="Company name" required hint="Used on POs and bills.">

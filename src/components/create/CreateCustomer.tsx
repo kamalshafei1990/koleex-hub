@@ -8,6 +8,7 @@ import {
   SmartInput, SmartSelect, SmartTextarea,
 } from "@/components/ui/create/SmartCreate";
 import { useBaseCurrencyOptional } from "@/lib/hooks/useBaseCurrency";
+import ProfileCompletenessBar from "@/components/ui/ProfileCompletenessBar";
 
 const WORKFLOW = [
   { key: "customer", label: "Customer", icon: "users" as const,                 state: "current" as const, hint: "You are here" },
@@ -39,6 +40,13 @@ export default function CreateCustomer() {
   const [notes, setNotes]       = useState("");
   const [busy, setBusy]         = useState(false);
   const [error, setError]       = useState<string | null>(null);
+
+  /* ── Profile completeness ── */
+  const isFilled = (v: unknown): boolean =>
+    typeof v === "string" ? v.trim().length > 0 : v != null;
+  const trackedValues: unknown[] = [name, company, type, email, phone, country, ccy, terms, notes];
+  const filledCount = trackedValues.reduce<number>((n, v) => n + (isFilled(v) ? 1 : 0), 0);
+  const totalCount = trackedValues.length;
 
   async function save() {
     if (!name.trim()) { setError("Name is required."); return; }
@@ -88,6 +96,8 @@ export default function CreateCustomer() {
         />
       }
     >
+      <ProfileCompletenessBar filled={filledCount} total={totalCount} />
+
       {error && <div className="rounded-md border border-rose-300/40 bg-rose-300/[0.06] px-3 py-2 text-[12px] text-rose-200">{error}</div>}
 
       <SmartSection title="Identification">

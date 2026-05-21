@@ -95,6 +95,7 @@ import { contactsT } from "@/lib/translations/contacts";
 import EntityPlanningStrip from "@/components/planning/EntityPlanningStrip";
 import EntityTasksStrip from "@/components/projects/EntityTasksStrip";
 import EntityInvoicesStrip from "@/components/invoices/EntityInvoicesStrip";
+import ProfileCompletenessBar from "@/components/ui/ProfileCompletenessBar";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TYPES
@@ -4558,9 +4559,55 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
   const renderFormPanel = () => {
     const isCustomer = form.contact_type === "customer";
+    const isSupplier = form.contact_type === "supplier";
     const isCompanyCustomer = form.contact_type === "customer" && form.entity_type === "company";
     const isPersonCustomer = form.contact_type === "customer" && form.entity_type === "person";
     const isCompanyType = form.contact_type === "company";
+
+    /* ── Profile completeness ── */
+    const completenessIsFilled = (v: unknown): boolean => {
+      if (v == null) return false;
+      if (typeof v === "string") return v.trim().length > 0;
+      if (typeof v === "number") return !Number.isNaN(v) && v > 0;
+      if (Array.isArray(v)) return v.length > 0;
+      if (typeof v === "boolean") return v;
+      return Boolean(v);
+    };
+    /* Pick a field list per contact type so the count is meaningful for
+       both customers and suppliers. The list mirrors the inputs actually
+       rendered in this form for that type. */
+    const supplierFields: (keyof ContactForm)[] = [
+      "photo_url", "company_name_en", "company_name_cn", "supplier_type",
+      "industry", "source", "supplier_tel", "supplier_mobile",
+      "supplier_email", "supplier_website", "supplier_address",
+      "country", "province", "city", "division", "category",
+      "brand_names", "payment_terms", "currency", "payment_info",
+      "moq", "lead_time", "certifications", "sample_status", "rating",
+      "contact_persons", "notes",
+    ];
+    const customerFields: (keyof ContactForm)[] = [
+      "photo_url", "first_name", "last_name", "company", "position",
+      "country", "city", "birthday", "phones", "emails", "addresses",
+      "websites", "customer_type", "industry", "source", "tags",
+      "payment_terms", "currency", "credit_limit", "tax_id",
+      "incoterms", "language", "communication_preference",
+      "account_manager", "notes",
+    ];
+    const genericFields: (keyof ContactForm)[] = [
+      "photo_url", "first_name", "last_name", "company", "position",
+      "country", "city", "birthday", "phones", "emails", "addresses",
+      "websites", "notes",
+    ];
+    const completenessFields = isSupplier
+      ? supplierFields
+      : isCustomer
+        ? customerFields
+        : genericFields;
+    const filledCount = completenessFields.reduce(
+      (n, k) => n + (completenessIsFilled(form[k]) ? 1 : 0),
+      0,
+    );
+    const totalCount = completenessFields.length;
 
     /* Customer premium tabs — for non-customers, every tab check returns true so existing behaviour is preserved.
        For customers, only sections on the active tab are rendered. */
@@ -4625,6 +4672,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </div>
           </div>
         )}
+
+        {/* Profile completeness */}
+        <div className="px-4 md:px-6 pt-4">
+          <ProfileCompletenessBar filled={filledCount} total={totalCount} />
+        </div>
 
         {/* Photo / Logo + Type */}
         <div className="px-4 md:px-6 py-5 md:py-6 text-center border-b border-[var(--border-color)]">

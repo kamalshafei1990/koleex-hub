@@ -10,6 +10,7 @@ import PictureIcon from "@/components/icons/ui/PictureIcon";
 import { Country, State, City } from "country-state-city";
 import Modal from "./Modal";
 import { createContact } from "@/lib/contacts-admin";
+import ProfileCompletenessBar from "@/components/ui/ProfileCompletenessBar";
 
 interface Props {
   open: boolean;
@@ -393,6 +394,25 @@ export default function CreateSupplierModal({ open, onClose, onCreated }: Props)
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  /* ── Profile completeness ── */
+  const isFilled = (v: unknown): boolean => {
+    if (v == null) return false;
+    if (typeof v === "string") return v.trim().length > 0;
+    if (typeof v === "number") return !Number.isNaN(v) && v > 0;
+    if (Array.isArray(v)) return v.length > 0;
+    return Boolean(v);
+  };
+  const trackedValues: unknown[] = [
+    logoPreview, companyNameEn, companyNameCn, supplierType, industry, source,
+    tel, mobile, email, website, address,
+    countryName, provinceName, city,
+    contactPersons, division, category, brandNames,
+    paymentTerms, currency, paymentInfo, moq, leadTime,
+    certifications, sampleStatus, rating, notes,
+  ];
+  const filledCount = trackedValues.reduce<number>((n, v) => n + (isFilled(v) ? 1 : 0), 0);
+  const totalCount = trackedValues.length;
+
   const reset = () => {
     setCompanyNameEn(""); setCompanyNameCn(""); setSupplierType(""); setIndustry(""); setSource("");
     setLogoFile(null); setLogoPreview(null);
@@ -525,6 +545,8 @@ export default function CreateSupplierModal({ open, onClose, onCreated }: Props)
         </>
       }
     >
+      <ProfileCompletenessBar filled={filledCount} total={totalCount} className="mb-4" />
+
       {error && (
         <div className="mb-4 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-[12px] text-red-400">
           {error}
