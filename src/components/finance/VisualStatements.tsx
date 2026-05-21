@@ -500,49 +500,58 @@ function TotalCells({ label, prior, cur, showPrior, tone }: { label: string; pri
 
 /* Headline — Net Income / Closing cash.
 
-   Stays inside the parent statement grid so columns line up exactly
-   with the table above. Each of the three cells (label / prior /
-   current) carries its share of a tonal border so together they
-   read as one bordered row — the visual cue that says "this is the
-   bottom line" without breaking the column structure.
+   Spans the full grid width as ONE wrapper element with a single
+   continuous border, so the rounded corners are guaranteed to form
+   a clean closed shape. Inside the wrapper a nested grid uses the
+   same column template as the parent statement, so the value column
+   still lines up with everything above:
 
-       ┌─────────────────────────────────────────────────────┐
-       │  NET INCOME                47,550        (5,850)    │
-       └─────────────────────────────────────────────────────┘
+       ╭───────────────────────────────────────────────────────╮
+       │  NET INCOME                47,550        (5,850)      │
+       ╰───────────────────────────────────────────────────────╯
 
    Border colour follows the value tone (emerald positive / rose
-   negative). Slightly bumped type (15 px label, 18 px value) so the
-   row clearly outranks the regular table rows without overwhelming
-   the page. */
+   negative). Generous rounded-2xl curve so the row feels like a
+   distinct callout, not just a heavier table row. */
 function HeadlineCells({ label, prior, cur, showPrior, tone }: { label: string; prior?: number; cur: number; showPrior: boolean; tone: StatementTone }) {
   const valueTone =
     tone === "positive" ? "text-emerald-200" :
     tone === "warning"  ? "text-rose-200"    :
                           "text-[var(--text-primary)]";
-  /* Border colour — kept calm (around 30% alpha) so it frames the
-     row without competing with the rest of the statement. */
   const borderTone =
-    tone === "positive" ? "border-emerald-300/35" :
-    tone === "warning"  ? "border-rose-300/35"    :
+    tone === "positive" ? "border-emerald-300/40" :
+    tone === "warning"  ? "border-rose-300/40"    :
                           "border-[var(--border-color)]";
 
-  /* Each cell has top + bottom border. Leading cell adds the left
-     border + leading rounded corners; trailing cell adds the right
-     border + trailing rounded corners. Together they look like ONE
-     bordered row surrounding all three columns. */
-  const baseCls = `py-4 text-[15px] font-bold uppercase tracking-[0.05em] border-y ${borderTone}`;
-  const labelCls = `${baseCls} ps-5 border-s rounded-s-md text-[var(--text-primary)]`;
-  const priorCls = `${baseCls} text-right font-mono tabular-nums text-[var(--text-secondary)] pe-4 text-[16px] font-bold`;
-  const curCls   = `${baseCls} pe-5 border-e rounded-e-md text-right font-mono tabular-nums ${valueTone} text-[18px] font-bold`;
+  const span = showPrior ? "col-span-3" : "col-span-2";
+  const innerGrid = showPrior
+    ? "grid grid-cols-[1fr_8rem_8rem] items-baseline"
+    : "grid grid-cols-[1fr_8rem] items-baseline";
 
   return (
     <>
-      {/* Breathing space above the bordered row */}
-      <div aria-hidden className={`${showPrior ? "col-span-3" : "col-span-2"} h-5`} />
+      {/* Breathing space above the framed row */}
+      <div aria-hidden className={`${span} h-5`} />
 
-      <div className={labelCls}>{label}</div>
-      {showPrior && <div className={priorCls}>{fmtSigned(prior ?? 0)}</div>}
-      <div className={curCls}>{fmtSigned(cur)}</div>
+      {/* ONE wrapper carries the border + the curve. Mirrors the
+          outer panel's chrome (border + rounded-xl) so it reads as a
+          contained sub-panel — same visual family as ErpPanel, just
+          one notch smaller. */}
+      <div className={`${span} rounded-2xl border ${borderTone} px-1.5 py-3 sm:px-2.5`}>
+        <div className={innerGrid}>
+          <div className="py-1 text-[15px] font-bold uppercase tracking-[0.06em] text-[var(--text-primary)] ps-3 sm:ps-4">
+            {label}
+          </div>
+          {showPrior && (
+            <div className="py-1 text-[16px] font-bold font-mono tabular-nums text-[var(--text-secondary)] text-right pe-3 sm:pe-4">
+              {fmtSigned(prior ?? 0)}
+            </div>
+          )}
+          <div className={`py-1 text-[18px] font-bold font-mono tabular-nums text-right pe-3 sm:pe-4 ${valueTone}`}>
+            {fmtSigned(cur)}
+          </div>
+        </div>
+      </div>
     </>
   );
 }
