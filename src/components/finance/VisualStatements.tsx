@@ -85,12 +85,31 @@ function fmtSigned(n: number) {
 function localeOf(lang: Lang): string {
   return lang === "zh" ? "zh-CN" : lang === "ar" ? "ar" : "en-US";
 }
-function fmtPeriodLabel(iso: string, lang: Lang): string {
-  /* "2026-08-13" → "Aug 13" (localized). */
+function fmtPeriodLabel(iso: string, lang: Lang, granularity: Granularity = "year"): string {
+  /* Granularity-aware period label so the two comparison columns show
+     a meaningful tag instead of two identical "Dec 31" strings:
+       · year     → "2026"
+       · quarter  → "Q4 2026"
+       · month    → "May 2026"
+       · week     → "May 20"
+     All localized via toLocaleDateString. */
   try {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
-    return d.toLocaleDateString(localeOf(lang), { month: "short", day: "numeric" });
+    const loc = localeOf(lang);
+    if (granularity === "year") {
+      return d.toLocaleDateString(loc, { year: "numeric" });
+    }
+    if (granularity === "quarter") {
+      const q = Math.floor(d.getUTCMonth() / 3) + 1;
+      const year = d.toLocaleDateString(loc, { year: "numeric" });
+      return `Q${q} ${year}`;
+    }
+    if (granularity === "month") {
+      return d.toLocaleDateString(loc, { month: "short", year: "numeric" });
+    }
+    /* week */
+    return d.toLocaleDateString(loc, { month: "short", day: "numeric" });
   } catch { return iso; }
 }
 
@@ -128,8 +147,8 @@ export function StatementsDashboard() {
   const niDelta  = priorNet !== 0 ? (netIncome - priorNet) : null;
   const niPct    = priorNet !== 0 ? ((netIncome - priorNet) / Math.abs(priorNet)) * 100 : null;
 
-  const curLabel   = snap ? fmtPeriodLabel(snap.income.period.to, lang)       : "";
-  const priorLabel = snap ? fmtPeriodLabel(snap.income_prior.period.to, lang) : "";
+  const curLabel   = snap ? fmtPeriodLabel(snap.income.period.to,       lang, snap.granularity) : "";
+  const priorLabel = snap ? fmtPeriodLabel(snap.income_prior.period.to, lang, snap.granularity) : "";
 
   return (
     <div className="space-y-5">
@@ -323,13 +342,20 @@ function PillToggle<T extends string>({
 
 /* ───── Two-period table primitives (with column headers) ───── */
 
+/* Shared column-width grid so every row in a statement aligns
+   pixel-perfect: label column flexes, two number columns each fixed at
+   ~7 ch (max ~999,999,999 with comma separators). gap-x-10 gives a
+   clear visual gutter between prior and current. */
+const TWO_COL_GRID = "grid grid-cols-[1fr_minmax(7rem,max-content)_minmax(7rem,max-content)] items-baseline gap-x-10";
+const ONE_COL_GRID = "grid grid-cols-[1fr_minmax(7rem,max-content)] items-baseline gap-x-10";
+
 function PeriodHeaders({ curLabel, priorLabel }: { curLabel: string; priorLabel: string }) {
   const { t } = useTranslation(financeT);
   return (
-    <div className="grid grid-cols-[1fr_auto_auto] items-baseline gap-x-8 border-b border-[var(--border-subtle)] pb-1.5 text-[10px] uppercase tracking-[0.16em] text-[var(--text-dim)]">
+    <div className={`${TWO_COL_GRID} pb-2 text-[10.5px] uppercase tracking-[0.18em] text-[var(--text-dim)]`}>
       <span />
       <span className="text-right">{priorLabel || t("visual.prior", "Prior")}</span>
-      <span className="text-right">{curLabel || t("visual.current", "Current")}</span>
+      <span className="text-right font-semibold text-[var(--text-secondary)]">{curLabel || t("visual.current", "Current")}</span>
     </div>
   );
 }
@@ -337,22 +363,25 @@ function PeriodHeaders({ curLabel, priorLabel }: { curLabel: string; priorLabel:
 function SingleColHeader({ curLabel }: { curLabel: string }) {
   const { t } = useTranslation(financeT);
   return (
-    <div className="grid grid-cols-[1fr_auto] items-baseline gap-x-8 border-b border-[var(--border-subtle)] pb-1.5 text-[10px] uppercase tracking-[0.16em] text-[var(--text-dim)]">
+    <div className={`${ONE_COL_GRID} pb-2 text-[10.5px] uppercase tracking-[0.18em] text-[var(--text-dim)]`}>
       <span />
-      <span className="text-right">{curLabel || t("visual.current", "Current")}</span>
+      <span className="text-right font-semibold text-[var(--text-secondary)]">{curLabel || t("visual.current", "Current")}</span>
     </div>
   );
 }
 
 function SectionTitle({ label }: { label: string }) {
   return (
-    <div className="mt-6 mb-2 first:mt-0 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">{label}</div>
+    <div className="mt-7 mb-2 first:mt-4 flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+      <span>{label}</span>
+      <span aria-hidden className="h-px flex-1 bg-[var(--border-subtle)]" />
+    </div>
   );
 }
 
 function TwoColRow({ label, prior, cur }: { label: string; prior: number; cur: number }) {
   return (
-    <div className="grid grid-cols-[1fr_auto_auto] items-baseline gap-x-8 border-b border-[var(--border-faint)] py-1.5 text-[12.5px] last:border-b-0">
+    <div className={`${TWO_COL_GRID} py-2 text-[13px] last:border-b-0`}>
       <span className="text-[var(--text-highlight)]">{label}</span>
       <span className="font-mono tabular-nums text-[var(--text-secondary)]">{fmtSigned(prior)}</span>
       <span className="font-mono tabular-nums text-[var(--text-primary)]">{fmtSigned(cur)}</span>
@@ -362,7 +391,7 @@ function TwoColRow({ label, prior, cur }: { label: string; prior: number; cur: n
 
 function SingleRow({ label, amount }: { label: string; amount: number }) {
   return (
-    <div className="grid grid-cols-[1fr_auto] items-baseline gap-x-8 border-b border-[var(--border-faint)] py-1.5 text-[12.5px] last:border-b-0">
+    <div className={`${ONE_COL_GRID} py-2 text-[13px] last:border-b-0`}>
       <span className="text-[var(--text-highlight)]">{label}</span>
       <span className="font-mono tabular-nums text-[var(--text-primary)]">{fmtSigned(amount)}</span>
     </div>
@@ -379,24 +408,50 @@ function TotalRow({
   tone?: "neutral" | "positive" | "warning";
   showPrior?: boolean;
 }) {
+  /* Headline rows (Net Income, Closing Cash) get the strongest visual
+     treatment — bigger type, a tinted accent stripe along the leading
+     edge, and a subtle row background so the eye lands on the bottom
+     line first. Subtotal rows just get a quiet top hairline. */
+  const isHeadline = strength === "headline";
+  const isTotal    = strength === "total";
+
   const text =
-    strength === "headline" ? "text-[15px] font-semibold" :
-    strength === "total"    ? "text-[14px] font-semibold" :
-                              "text-[13px] font-medium";
+    isHeadline ? "text-[16px] font-semibold" :
+    isTotal    ? "text-[14px] font-semibold" :
+                 "text-[13px] font-medium";
   const valueTone =
     tone === "positive" ? "text-emerald-200" :
-    tone === "warning"  ? "text-amber-200"   :
+    tone === "warning"  ? "text-rose-200"    :
                           "text-[var(--text-primary)]";
   const border =
-    strength === "headline" ? "border-t-2 border-[var(--border-strong)]" :
-    strength === "total"    ? "border-t border-[var(--border-color)]" :
-                              "border-t border-[var(--border-subtle)]";
+    isHeadline ? "border-t border-[var(--border-strong)]" :
+    isTotal    ? "border-t border-[var(--border-color)]" :
+                 "border-t border-[var(--border-subtle)]";
+  const bg =
+    isHeadline
+      ? tone === "positive" ? "bg-emerald-300/[0.04]"
+      : tone === "warning"  ? "bg-rose-300/[0.04]"
+      :                       "bg-[var(--bg-surface-subtle)]"
+      : "";
+  const accent =
+    isHeadline
+      ? tone === "positive" ? "before:bg-emerald-300/70"
+      : tone === "warning"  ? "before:bg-rose-300/70"
+      :                       "before:bg-[var(--text-highlight)]"
+      : "";
+
+  const grid = showPrior ? TWO_COL_GRID : ONE_COL_GRID;
+  const wrap = isHeadline
+    ? `relative mt-3 px-3 py-3 rounded-md ${bg} ${accent} before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[3px] before:rounded-full`
+    : `mt-2 py-2`;
 
   return (
-    <div className={`mt-2 grid items-baseline gap-x-8 py-2 ${border} ${text} ${showPrior ? "grid-cols-[1fr_auto_auto]" : "grid-cols-[1fr_auto]"}`}>
-      <span className="uppercase tracking-[0.04em] text-[var(--text-highlight)]">{label}</span>
+    <div className={`${grid} items-baseline ${border} ${text} ${wrap}`}>
+      <span className={`uppercase tracking-[0.04em] ${isHeadline ? "text-[var(--text-primary)]" : "text-[var(--text-highlight)]"}`}>{label}</span>
       {showPrior && (
-        <span className="font-mono tabular-nums text-[var(--text-dim)]">{prior !== undefined ? fmtSigned(prior) : ""}</span>
+        <span className={`font-mono tabular-nums ${isHeadline ? "text-[var(--text-secondary)]" : "text-[var(--text-dim)]"}`}>
+          {prior !== undefined ? fmtSigned(prior) : ""}
+        </span>
       )}
       <span className={`font-mono tabular-nums ${valueTone}`}>{fmtSigned(cur)}</span>
     </div>
@@ -404,7 +459,7 @@ function TotalRow({
 }
 
 function MutedRow({ label }: { label: string }) {
-  return <div className="border-b border-[var(--border-faint)] py-1.5 text-[11px] text-[var(--text-dim)] last:border-b-0">{label}</div>;
+  return <div className="py-2 text-[11.5px] text-[var(--text-dim)] last:border-b-0">{label}</div>;
 }
 
 /* ───── Income view ───── */
