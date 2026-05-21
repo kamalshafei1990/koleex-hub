@@ -104,7 +104,7 @@ export default function FinanceReconciliation() {
   }, [load, filter]);
 
   const reject = useCallback(async (id: string) => {
-    const reason = window.prompt("Why is this match wrong? (optional)") ?? undefined;
+    const reason = window.prompt(t("reconciliation.rejectPrompt", "Why is this match wrong? (optional)")) ?? undefined;
     setActing(id);
     setError(null);
     try {
@@ -150,12 +150,12 @@ export default function FinanceReconciliation() {
               {rescanBusy ? (
                 <>
                   <RrIcon name="loading" size={12} className="animate-spin" />
-                  Scanning…
+                  {t("reconciliation.scanning", "Scanning…")}
                 </>
               ) : (
                 <>
                   <RrIcon name="search" size={12} />
-                  Rescan
+                  {t("reconciliation.rescan", "Rescan")}
                 </>
               )}
             </button>
@@ -163,10 +163,10 @@ export default function FinanceReconciliation() {
         />
 
         <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <MetricCard label="In queue"          value={kpi.total}  unit="cand." hint="Across the current filter" loading={loading} />
-          <MetricCard label="High-confidence"   value={kpi.high}   unit="cand." hint="Same amount + same direction + tight timing" loading={loading} />
-          <MetricCard label="Partial / variance" value={kpi.partial} unit="cand." hint="Partial, over- or under-payments" loading={loading} />
-          <MetricCard label="Duplicate risk"    value={kpi.dups}   unit="cand." hint="Possible duplicate bank movement" loading={loading} />
+          <MetricCard label={t("reconciliation.kpi.queue", "In queue")}          value={kpi.total}  unit={t("reconciliation.kpi.cand", "cand.")} hint={t("reconciliation.kpi.queueHint", "Across the current filter")} loading={loading} />
+          <MetricCard label={t("reconciliation.kpi.high", "High-confidence")}   value={kpi.high}   unit={t("reconciliation.kpi.cand", "cand.")} hint={t("reconciliation.kpi.highHint", "Same amount + same direction + tight timing")} loading={loading} />
+          <MetricCard label={t("reconciliation.kpi.partial", "Partial / variance")} value={kpi.partial} unit={t("reconciliation.kpi.cand", "cand.")} hint={t("reconciliation.kpi.partialHint", "Partial, over- or under-payments")} loading={loading} />
+          <MetricCard label={t("reconciliation.kpi.dup", "Duplicate risk")}    value={kpi.dups}   unit={t("reconciliation.kpi.cand", "cand.")} hint={t("reconciliation.kpi.dupHint", "Possible duplicate bank movement")} loading={loading} />
         </div>
 
         {/* Filter chips */}
@@ -182,11 +182,11 @@ export default function FinanceReconciliation() {
                   : "border-white/[0.06] bg-transparent text-[var(--text-dim)] hover:text-[var(--text-primary)]"
               }`}
             >
-              {k}
+              {t(`reconciliation.filter.${k}`, k)}
             </button>
           ))}
           <span className="ml-auto inline-flex items-center gap-1 text-[11px] text-gray-500">
-            <span>How matching works</span>
+            <span>{t("reconciliation.howWorks", "How matching works")}</span>
             <GuidanceTip guidanceId="treasury.unreconciled" />
           </span>
         </div>
@@ -202,13 +202,13 @@ export default function FinanceReconciliation() {
             <SectionCard>
               <div className="flex items-center justify-center gap-2 py-12 text-sm text-[var(--text-dim)]">
                 <RrIcon name="loading" size={14} className="animate-spin" />
-                Loading queue…
+                {t("reconciliation.loading", "Loading queue…")}
               </div>
             </SectionCard>
           ) : candidates.length === 0 ? (
             <EmptyState
-              title="No reconciliation suggestions yet"
-              hint="The engine compares unreconciled bank movements against open payments. Run a rescan to refresh the queue."
+              title={t("reconciliation.empty.title", "No reconciliation suggestions yet")}
+              hint={t("reconciliation.empty.hint", "The engine compares unreconciled bank movements against open payments. Run a rescan to refresh the queue.")}
               action={
                 <button
                   onClick={rescan}
@@ -216,7 +216,7 @@ export default function FinanceReconciliation() {
                   className="inline-flex items-center gap-2 rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-sm font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-60"
                 >
                   <RrIcon name="search" size={12} />
-                  Rescan now
+                  {t("reconciliation.empty.cta", "Rescan now")}
                 </button>
               }
             />
@@ -260,6 +260,7 @@ const CandidateRow = memo(function CandidateRow({
   onConfirm: (id: string) => void;
   onReject: (id: string) => void;
 }) {
+  const { t } = useTranslation(financeT);
   const p = candidate.payment ?? null;
   const m = candidate.cash_movement ?? null;
   const isActive = candidate.status === "suggested";
@@ -271,7 +272,15 @@ const CandidateRow = memo(function CandidateRow({
   const actual = Number(m?.amount ?? 0);
   const diff = actual - expected;
 
-  const typeLabel = TYPE_LABELS[candidate.candidate_type];
+  const TYPE_LABELS_LOCAL: Record<ReconciliationCandidateType, string> = {
+    exact:          t("reconciliation.typeLabel.exact", "Same amount"),
+    partial:        t("reconciliation.typeLabel.partial", "Partial settlement"),
+    underpayment:   t("reconciliation.typeLabel.under", "Bank short of payment"),
+    overpayment:    t("reconciliation.typeLabel.over", "Bank exceeds payment"),
+    fee_adjusted:   t("reconciliation.typeLabel.fee", "Bank fee deducted"),
+    duplicate_risk: t("reconciliation.typeLabel.dup", "Possible duplicate movement"),
+  };
+  const typeLabel = TYPE_LABELS_LOCAL[candidate.candidate_type];
 
   return (
     <div className={`rounded-2xl border bg-[var(--bg-secondary)] p-4 transition ${
@@ -305,18 +314,18 @@ const CandidateRow = memo(function CandidateRow({
       {/* Two-column comparison */}
       <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
         <SideCard
-          eyebrow="Payment"
+          eyebrow={t("reconciliation.side.payment", "Payment")}
           title={p?.party_name ?? "—"}
-          line1={p ? `${p.direction === "in" ? "Money in" : "Money out"} · ${p.payment_date} · ${p.payment_method ?? "—"}` : "—"}
-          line2={p ? `Expected ${fmtMoney(expected, p.currency, { compact: true })}` : ""}
+          line1={p ? `${p.direction === "in" ? t("reconciliation.side.in", "Money in") : t("reconciliation.side.out", "Money out")} · ${p.payment_date} · ${p.payment_method ?? "—"}` : "—"}
+          line2={p ? t("reconciliation.side.expected", "Expected {value}").replace("{value}", fmtMoney(expected, p.currency, { compact: true })) : ""}
           accentTone={p?.direction === "in" ? "positive" : "negative"}
           href={`/finance/payments`}
         />
         <SideCard
-          eyebrow="Bank movement"
-          title={m?.counterparty_name ?? m?.bank_reference ?? "Bank movement"}
-          line1={m ? `${m.direction === "inflow" ? "Inflow" : "Outflow"} · ${m.movement_date} · ${m.bank_reference ?? "no ref"}` : "—"}
-          line2={m ? `Actual ${fmtMoney(actual, m.currency, { compact: true })}` : ""}
+          eyebrow={t("reconciliation.side.movement", "Bank movement")}
+          title={m?.counterparty_name ?? m?.bank_reference ?? t("reconciliation.side.bankMovement", "Bank movement")}
+          line1={m ? `${m.direction === "inflow" ? t("reconciliation.side.inflow", "Inflow") : t("reconciliation.side.outflow", "Outflow")} · ${m.movement_date} · ${m.bank_reference ?? t("reconciliation.side.noRef", "no ref")}` : "—"}
+          line2={m ? t("reconciliation.side.actual", "Actual {value}").replace("{value}", fmtMoney(actual, m.currency, { compact: true })) : ""}
           accentTone={m?.direction === "inflow" ? "positive" : "negative"}
         />
       </div>
@@ -324,7 +333,7 @@ const CandidateRow = memo(function CandidateRow({
       {/* Difference bar — only when there's a real gap */}
       {Math.abs(diff) > 0.005 && (
         <div className="mt-3 flex items-center justify-between rounded-lg border border-white/[0.04] bg-[var(--bg-primary)]/40 px-3 py-2 text-[11px]">
-          <span className="text-gray-500">Difference</span>
+          <span className="text-gray-500">{t("reconciliation.diff", "Difference")}</span>
           <span className={`tabular-nums font-semibold ${diff > 0 ? "text-amber-300" : "text-rose-300"}`}>
             {diff > 0 ? "+" : "−"}{fmtMoney(Math.abs(diff), m?.currency ?? p?.currency ?? "USD", { compact: true })}
           </span>
@@ -367,7 +376,7 @@ const CandidateRow = memo(function CandidateRow({
             className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/25 px-3 py-1.5 text-[12px] font-semibold text-emerald-200 transition hover:bg-emerald-500/35 disabled:opacity-60"
           >
             {busy ? <RrIcon name="loading" size={11} className="animate-spin" /> : <RrIcon name="check" size={11} />}
-            Confirm match
+            {t("reconciliation.confirm", "Confirm match")}
           </button>
           <button
             type="button"
@@ -376,17 +385,17 @@ const CandidateRow = memo(function CandidateRow({
             className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-[12px] font-medium text-gray-300 transition hover:border-rose-500/30 hover:text-rose-300 disabled:opacity-60"
           >
             <RrIcon name="cross" size={11} />
-            Reject
+            {t("reconciliation.reject", "Reject")}
           </button>
           <span className="ml-auto flex items-center gap-2 text-[11px] text-gray-500">
             <Link href="/finance/payments" className="inline-flex items-center gap-1 hover:text-gray-200">
               <RrIcon name="arrow-up-right-from-square" size={10} />
-              Open payment
+              {t("reconciliation.openPayment", "Open payment")}
             </Link>
             <span className="text-gray-700">·</span>
             <Link href="/finance/payments" className="inline-flex items-center gap-1 hover:text-gray-200">
               <RrIcon name="arrow-up-right-from-square" size={10} />
-              Open movement
+              {t("reconciliation.openMovement", "Open movement")}
             </Link>
           </span>
         </div>
@@ -412,6 +421,7 @@ function ConfidencePill({ level, pct }: { level: ReconciliationConfidenceLevel; 
 }
 
 function TypeChip({ type }: { type: ReconciliationCandidateType }) {
+  const { t } = useTranslation(financeT);
   const cls =
     type === "exact"          ? "bg-emerald-500/15 text-emerald-300" :
     type === "partial"        ? "bg-amber-500/15 text-amber-300"      :
@@ -421,8 +431,8 @@ function TypeChip({ type }: { type: ReconciliationCandidateType }) {
     type === "duplicate_risk" ? "bg-rose-500/15 text-rose-300"        :
                                 "bg-gray-500/15 text-gray-300";
   const label =
-    type === "duplicate_risk" ? "duplicate risk" :
-    type === "fee_adjusted"   ? "fee adjusted"   :
+    type === "duplicate_risk" ? t("reconciliation.typeChip.dup", "duplicate risk") :
+    type === "fee_adjusted"   ? t("reconciliation.typeChip.fee", "fee adjusted")   :
     type;
   return (
     <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${cls}`}>
@@ -441,6 +451,7 @@ function SideCard({
   accentTone: "positive" | "negative";
   href?: string;
 }) {
+  const { t } = useTranslation(financeT);
   const accent = accentTone === "positive" ? "text-emerald-300" : "text-rose-300";
   return (
     <div className="rounded-xl border border-white/[0.05] bg-[var(--bg-primary)]/40 px-3 py-2.5">
@@ -448,7 +459,7 @@ function SideCard({
         <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">{eyebrow}</span>
         {href && (
           <Link href={href} className="text-[10px] text-gray-500 hover:text-gray-200 inline-flex items-center gap-0.5">
-            Open <RrIcon name="arrow-up-right-from-square" size={9} />
+            {t("reconciliation.open", "Open")} <RrIcon name="arrow-up-right-from-square" size={9} />
           </Link>
         )}
       </div>

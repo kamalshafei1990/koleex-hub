@@ -76,19 +76,8 @@ interface ReviewResponse {
   lines: JournalLine[];
 }
 
-const TABS: Array<{ key: QueueStatus; label: string }> = [
-  { key: "pending", label: "Pending" },
-  { key: "drafted", label: "Drafted" },
-  { key: "failed",  label: "Failed" },
-  { key: "posted",  label: "Posted" },
-  { key: "voided",  label: "Voided" },
-];
-
-const KIND_LABEL: Record<Kind, string> = {
-  payment: "Payment",
-  expense: "Expense",
-  cash_movement: "Bank movement",
-};
+/* Tab + kind labels are now created inside components via i18n. */
+const TAB_KEYS: QueueStatus[] = ["pending", "drafted", "failed", "posted", "voided"];
 
 function fmtMoney(n: number, ccy: string): string {
   if (Math.abs(n) < 0.005) return "—";
@@ -96,16 +85,28 @@ function fmtMoney(n: number, ccy: string): string {
   return `${n < 0 ? `(${abs})` : abs} ${ccy}`;
 }
 
-function relativeAge(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  const d = Math.floor(ms / 86_400_000);
-  if (d <= 0) return "today";
-  if (d === 1) return "1d ago";
-  return `${d}d ago`;
-}
-
 export default function FinanceAccountingQueue() {
   const { t } = useTranslation(financeT);
+  const relativeAge = (iso: string): string => {
+    const ms = Date.now() - new Date(iso).getTime();
+    const d = Math.floor(ms / 86_400_000);
+    if (d <= 0) return t("accounting.queue.today", "today");
+    if (d === 1) return t("accounting.queue.dayAgo", "1d ago");
+    return t("accounting.queue.daysAgo", "{n}d ago").replace("{n}", String(d));
+  };
+  const TABS: Array<{ key: QueueStatus; label: string }> = [
+    { key: "pending", label: t("accounting.queue.tab.pending", "Pending") },
+    { key: "drafted", label: t("accounting.queue.tab.drafted", "Drafted") },
+    { key: "failed",  label: t("accounting.queue.tab.failed", "Failed") },
+    { key: "posted",  label: t("accounting.queue.tab.posted", "Posted") },
+    { key: "voided",  label: t("accounting.queue.tab.voided", "Voided") },
+  ];
+  void TAB_KEYS;
+  const KIND_LABEL: Record<Kind, string> = {
+    payment: t("accounting.queue.kind.payment", "Payment"),
+    expense: t("accounting.queue.kind.expense", "Expense"),
+    cash_movement: t("accounting.queue.kind.cash", "Bank movement"),
+  };
   const [active, setActive] = useState<QueueStatus>("pending");
   const [items, setItems] = useState<QueueItem[]>([]);
   const [counts, setCounts] = useState<Record<QueueStatus, number>>({
@@ -174,7 +175,7 @@ export default function FinanceAccountingQueue() {
   }, [callAction, load]);
   const doVoid = useCallback(async (it: QueueItem) => {
     if (!it.accounting_entry_id) return;
-    const reason = window.prompt("Reason for voiding this entry?") ?? "voided via queue";
+    const reason = window.prompt(t("accounting.queue.voidPrompt", "Reason for voiding this entry?")) ?? "voided via queue";
     const res = await fetch(`/api/accounting/journals/${it.accounting_entry_id}/void`, {
       method: "POST",
       credentials: "include",
@@ -182,8 +183,8 @@ export default function FinanceAccountingQueue() {
       body: JSON.stringify({ reason }),
     });
     if (res.ok) await load();
-    else { const j = await res.json().catch(() => ({})); setError(j.error ?? `Void failed (${res.status})`); }
-  }, [load]);
+    else { const j = await res.json().catch(() => ({})); setError(j.error ?? t("accounting.queue.voidFailed", "Void failed ({n})").replace("{n}", String(res.status))); }
+  }, [load, t]);
 
   const visibleItems = useMemo(() => items, [items]);
 
@@ -199,7 +200,7 @@ export default function FinanceAccountingQueue() {
               className="inline-flex items-center gap-2 rounded-md border border-white/[0.10] bg-[var(--bg-primary)] px-3 py-1.5 text-[12px] font-semibold transition hover:border-white/[0.20]"
             >
               <RrIcon name="badge-check" size={12} />
-              Trial Balance
+              {t("accounting.queue.trialBalance", "Trial Balance")}
             </Link>
           }
         />
@@ -236,25 +237,25 @@ export default function FinanceAccountingQueue() {
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="rounded-xl border border-white/[0.05] bg-white/[0.012]">
             {loading ? (
-              <div className="px-4 py-8 text-center text-[11px] text-gray-500">Loading…</div>
+              <div className="px-4 py-8 text-center text-[11px] text-gray-500">{t("accounting.queue.loading", "Loading…")}</div>
             ) : visibleItems.length === 0 ? (
               <div className="px-4 py-12 text-center">
-                <Eyebrow>No {active} items</Eyebrow>
+                <Eyebrow>{t("accounting.queue.emptyTitle", "No {status} items").replace("{status}", active)}</Eyebrow>
                 <p className="mt-2 text-[12px] text-gray-500">
-                  {active === "pending" ? "All operational events have been recognised or drafted." : "Nothing to review in this state."}
+                  {active === "pending" ? t("accounting.queue.empty.pending", "All operational events have been recognised or drafted.") : t("accounting.queue.empty.other", "Nothing to review in this state.")}
                 </p>
               </div>
             ) : (
               <table className="min-w-full text-[12.5px]">
                 <thead>
                   <tr className="border-b border-white/[0.05] text-[9px] uppercase tracking-[0.12em] text-gray-500">
-                    <th className="px-3 py-2 text-left">Kind</th>
-                    <th className="px-3 py-2 text-left">Description</th>
-                    <th className="px-3 py-2 text-left">Party</th>
-                    <th className="px-3 py-2 text-right">Amount</th>
-                    <th className="px-3 py-2 text-left">Date</th>
-                    <th className="px-3 py-2 text-left">Age</th>
-                    <th className="px-3 py-2 text-right">Actions</th>
+                    <th className="px-3 py-2 text-left">{t("accounting.queue.col.kind", "Kind")}</th>
+                    <th className="px-3 py-2 text-left">{t("accounting.queue.col.desc", "Description")}</th>
+                    <th className="px-3 py-2 text-left">{t("accounting.queue.col.party", "Party")}</th>
+                    <th className="px-3 py-2 text-right">{t("accounting.queue.col.amount", "Amount")}</th>
+                    <th className="px-3 py-2 text-left">{t("accounting.queue.col.date", "Date")}</th>
+                    <th className="px-3 py-2 text-left">{t("accounting.queue.col.age", "Age")}</th>
+                    <th className="px-3 py-2 text-right">{t("accounting.queue.col.actions", "Actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -303,29 +304,29 @@ export default function FinanceAccountingQueue() {
             />
           ) : (
             <div className="hidden rounded-xl border border-white/[0.05] bg-white/[0.012] px-4 py-12 text-center lg:block">
-              <Eyebrow>Review panel</Eyebrow>
-              <p className="mt-2 text-[12px] text-gray-500">Select an item to view its operational source and journal draft.</p>
+              <Eyebrow>{t("accounting.queue.review.panel", "Review panel")}</Eyebrow>
+              <p className="mt-2 text-[12px] text-gray-500">{t("accounting.queue.review.empty", "Select an item to view its operational source and journal draft.")}</p>
             </div>
           )}
         </div>
 
         {/* Phase A.4 — Inventory COGS recognition. */}
-        <DashboardSection eyebrow="Inventory COGS" title="Cost of Goods Sold from sales shipments" tight>
+        <DashboardSection eyebrow={t("accounting.cogs.eyebrow", "Inventory COGS")} title={t("accounting.cogs.title", "Cost of Goods Sold from sales shipments")} tight>
           <InventoryCogsSection />
         </DashboardSection>
 
         {/* Phase A.5 — Revenue recognition. Sits beside COGS so the
             accountant sees both sides of every sale in one place. */}
-        <DashboardSection eyebrow="Sales Revenue" title="Revenue + AR recognition from confirmed invoices" tight>
+        <DashboardSection eyebrow={t("accounting.revenue.eyebrow", "Sales Revenue")} title={t("accounting.revenue.title", "Revenue + AR recognition from confirmed invoices")} tight>
           <SalesRevenueSection />
         </DashboardSection>
 
-        <DashboardSection eyebrow="Workflow" title="How recognition works">
+        <DashboardSection eyebrow={t("accounting.workflow.eyebrow", "Workflow")} title={t("accounting.workflow.title", "How recognition works")}>
           <ol className="grid gap-3 text-[12px] text-gray-400 sm:grid-cols-2 lg:grid-cols-4">
-            <li><strong className="text-gray-300">1. Pending</strong> — operational event happened; no journal yet.</li>
-            <li><strong className="text-gray-300">2. Drafted</strong> — entry created in <code>draft</code> status, balanced, awaiting review.</li>
-            <li><strong className="text-gray-300">3. Posted</strong> — entry hit the GL and is now immutable.</li>
-            <li><strong className="text-gray-300">4. Voided</strong> — original posted entry reversed by a new opposite-side entry.</li>
+            <li><strong className="text-gray-300">{t("accounting.workflow.s1", "1. Pending")}</strong> — {t("accounting.workflow.s1Hint", "operational event happened; no journal yet.")}</li>
+            <li><strong className="text-gray-300">{t("accounting.workflow.s2", "2. Drafted")}</strong> — {t("accounting.workflow.s2Hint", "entry created in draft status, balanced, awaiting review.")}</li>
+            <li><strong className="text-gray-300">{t("accounting.workflow.s3", "3. Posted")}</strong> — {t("accounting.workflow.s3Hint", "entry hit the GL and is now immutable.")}</li>
+            <li><strong className="text-gray-300">{t("accounting.workflow.s4", "4. Voided")}</strong> — {t("accounting.workflow.s4Hint", "original posted entry reversed by a new opposite-side entry.")}</li>
           </ol>
         </DashboardSection>
         <Hairline />
@@ -352,6 +353,7 @@ interface CogsRow {
 }
 
 function InventoryCogsSection() {
+  const { t } = useTranslation(financeT);
   const [rows, setRows] = useState<CogsRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -383,7 +385,7 @@ function InventoryCogsSection() {
         body: JSON.stringify({ entry_id: id }),
       });
       const j = await r.json();
-      if (!r.ok || !j.ok) { alert(j.error ?? "Post failed"); return; }
+      if (!r.ok || !j.ok) { alert(j.error ?? t("accounting.cogs.postFailed", "Post failed")); return; }
       await load();
     } finally {
       setBusy(null);
@@ -391,8 +393,8 @@ function InventoryCogsSection() {
   };
 
   const voidEntry = async (id: string) => {
-    if (!confirm("Void this COGS journal? A reversing entry will be posted.")) return;
-    const reason = prompt("Reason (optional):") ?? "voided from queue";
+    if (!confirm(t("accounting.cogs.voidConfirm", "Void this COGS journal? A reversing entry will be posted."))) return;
+    const reason = prompt(t("accounting.cogs.reasonPrompt", "Reason (optional):")) ?? "voided from queue";
     setBusy(id);
     try {
       const r = await fetch(`/api/accounting/journals/${id}/void`, {
@@ -402,7 +404,7 @@ function InventoryCogsSection() {
         body: JSON.stringify({ reason }),
       });
       const j = await r.json();
-      if (!r.ok) { alert(j.error ?? "Void failed"); return; }
+      if (!r.ok) { alert(j.error ?? t("accounting.cogs.voidFailed", "Void failed")); return; }
       await load();
     } finally {
       setBusy(null);
@@ -418,20 +420,20 @@ function InventoryCogsSection() {
         <table className="min-w-full text-[12.5px]">
           <thead>
             <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.10em] text-gray-500">
-              <th className="px-4 py-2 text-left">Journal #</th>
-              <th className="px-4 py-2 text-left">Shipment #</th>
-              <th className="px-4 py-2 text-left">Date</th>
-              <th className="px-4 py-2 text-right">Inventory value</th>
-              <th className="px-4 py-2 text-left">Status</th>
+              <th className="px-4 py-2 text-left">{t("accounting.cogs.col.journal", "Journal #")}</th>
+              <th className="px-4 py-2 text-left">{t("accounting.cogs.col.shipment", "Shipment #")}</th>
+              <th className="px-4 py-2 text-left">{t("accounting.cogs.col.date", "Date")}</th>
+              <th className="px-4 py-2 text-right">{t("accounting.cogs.col.value", "Inventory value")}</th>
+              <th className="px-4 py-2 text-left">{t("accounting.cogs.col.status", "Status")}</th>
               <th className="px-4 py-2 text-right"></th>
             </tr>
           </thead>
           <tbody>
             {loading && rows.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-6 text-center text-[11px] text-gray-600">Loading…</td></tr>
+              <tr><td colSpan={6} className="px-4 py-6 text-center text-[11px] text-gray-600">{t("accounting.queue.loading", "Loading…")}</td></tr>
             ) : rows.length === 0 ? (
               <tr><td colSpan={6} className="px-4 py-6 text-center text-[11px] text-gray-600">
-                No COGS drafts yet. They appear here automatically once a sales shipment is shipped and the operator drafts the entry.
+                {t("accounting.cogs.empty", "No COGS drafts yet. They appear here automatically once a sales shipment is shipped and the operator drafts the entry.")}
               </td></tr>
             ) : (
               rows.map((r) => (
@@ -463,7 +465,7 @@ function InventoryCogsSection() {
                           disabled={busy === r.id}
                           className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-200 hover:bg-emerald-500/15 disabled:opacity-50"
                         >
-                          Post
+                          {t("accounting.queue.btn.post", "Post")}
                         </button>
                       )}
                       {r.status === "posted" && (
@@ -472,7 +474,7 @@ function InventoryCogsSection() {
                           disabled={busy === r.id}
                           className="text-[11px] text-rose-300 hover:text-rose-200 disabled:opacity-50"
                         >
-                          Void
+                          {t("accounting.queue.btn.void", "Void")}
                         </button>
                       )}
                     </div>
@@ -497,6 +499,7 @@ function ActionButtons({
   onRetry: () => void;
   onVoid: () => void;
 }) {
+  const { t } = useTranslation(financeT);
   const isBusy = busy !== null;
   /* Stop the row's onClick from also firing when buttons are tapped. */
   const stop = (e: React.MouseEvent) => e.stopPropagation();
@@ -504,7 +507,7 @@ function ActionButtons({
     return (
       <button type="button" onClick={(e) => { stop(e); onDraft(); }} disabled={isBusy}
         className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-2 py-1 text-[11px] hover:border-white/[0.20] disabled:opacity-50">
-        Create draft
+        {t("accounting.queue.btn.draft", "Create draft")}
       </button>
     );
   }
@@ -512,7 +515,7 @@ function ActionButtons({
     return (
       <button type="button" onClick={(e) => { stop(e); onPost(); }} disabled={isBusy}
         className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-200 hover:bg-emerald-500/15 disabled:opacity-50">
-        Post
+        {t("accounting.queue.btn.post", "Post")}
       </button>
     );
   }
@@ -520,7 +523,7 @@ function ActionButtons({
     return (
       <button type="button" onClick={(e) => { stop(e); onRetry(); }} disabled={isBusy}
         className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-200 hover:bg-amber-500/15 disabled:opacity-50">
-        Retry
+        {t("accounting.queue.btn.retry", "Retry")}
       </button>
     );
   }
@@ -528,7 +531,7 @@ function ActionButtons({
     return (
       <button type="button" onClick={(e) => { stop(e); onVoid(); }} disabled={isBusy}
         className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.02] px-2 py-1 text-[11px] text-gray-400 hover:border-rose-500/30 hover:text-rose-200 disabled:opacity-50">
-        Void
+        {t("accounting.queue.btn.void", "Void")}
       </button>
     );
   }
@@ -544,6 +547,12 @@ function ReviewDrawer({
   busy: string | null;
   callAction: (kind: "draft" | "post-draft" | "retry" | "void", body: Record<string, unknown>) => Promise<boolean>;
 }) {
+  const { t } = useTranslation(financeT);
+  const KIND_LABEL: Record<Kind, string> = {
+    payment: t("accounting.queue.kind.payment", "Payment"),
+    expense: t("accounting.queue.kind.expense", "Expense"),
+    cash_movement: t("accounting.queue.kind.cash", "Bank movement"),
+  };
   const [data, setData] = useState<ReviewResponse | null>(null);
   const [drawerLoading, setDrawerLoading] = useState(false);
 
@@ -569,8 +578,8 @@ function ReviewDrawer({
   return (
     <aside className="rounded-xl border border-white/[0.05] bg-white/[0.012] p-4">
       <div className="flex items-center justify-between">
-        <Eyebrow>Review · {KIND_LABEL[item.kind]}</Eyebrow>
-        <button type="button" onClick={onClose} className="text-[10px] text-gray-500 hover:text-gray-300">Close</button>
+        <Eyebrow>{t("accounting.queue.review.title", "Review · {kind}").replace("{kind}", KIND_LABEL[item.kind])}</Eyebrow>
+        <button type="button" onClick={onClose} className="text-[10px] text-gray-500 hover:text-gray-300">{t("accounting.queue.review.close", "Close")}</button>
       </div>
       <div className="mt-3 text-[13px] font-medium">{item.description}</div>
       <div className="mt-1 text-[11px] text-gray-500">
@@ -589,23 +598,23 @@ function ReviewDrawer({
       )}
 
       <div className="mt-5">
-        <Eyebrow>Journal preview</Eyebrow>
+        <Eyebrow>{t("accounting.queue.review.journalPreview", "Journal preview")}</Eyebrow>
         {drawerLoading ? (
-          <div className="mt-2 text-[11px] text-gray-500">Loading journal…</div>
+          <div className="mt-2 text-[11px] text-gray-500">{t("accounting.queue.review.loadingJournal", "Loading journal…")}</div>
         ) : !data?.entry ? (
-          <div className="mt-2 text-[11px] text-gray-500">No draft yet. Create one from the row above.</div>
+          <div className="mt-2 text-[11px] text-gray-500">{t("accounting.queue.review.noDraft", "No draft yet. Create one from the row above.")}</div>
         ) : (
           <div className="mt-2 space-y-1.5">
             <div className="text-[10px] text-gray-500">
               {data.entry.journal_no} · {data.entry.status}
-              {data.entry.posted_at && ` · posted ${data.entry.posted_at.slice(0, 10)}`}
+              {data.entry.posted_at && ` · ${t("accounting.queue.review.postedOn", "posted {date}").replace("{date}", data.entry.posted_at.slice(0, 10))}`}
             </div>
             <table className="w-full text-[11.5px]">
               <thead>
                 <tr className="border-b border-white/[0.05] text-[9px] uppercase tracking-[0.10em] text-gray-500">
-                  <th className="py-1 text-left">Account</th>
-                  <th className="py-1 text-right">Debit</th>
-                  <th className="py-1 text-right">Credit</th>
+                  <th className="py-1 text-left">{t("accounting.queue.review.col.account", "Account")}</th>
+                  <th className="py-1 text-right">{t("accounting.queue.review.col.debit", "Debit")}</th>
+                  <th className="py-1 text-right">{t("accounting.queue.review.col.credit", "Credit")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -622,14 +631,14 @@ function ReviewDrawer({
               </tbody>
               <tfoot>
                 <tr className="border-t border-white/[0.10]">
-                  <td className="pt-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Totals</td>
+                  <td className="pt-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">{t("accounting.queue.review.totals", "Totals")}</td>
                   <td className="pt-1 text-right tabular-nums font-mono">{totalDr.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   <td className="pt-1 text-right tabular-nums font-mono">{totalCr.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 </tr>
               </tfoot>
             </table>
             <div className={`text-[10px] ${balanced ? "text-emerald-300" : "text-rose-300"}`}>
-              {balanced ? "Balanced" : `Out of balance by ${(totalDr - totalCr).toFixed(2)}`}
+              {balanced ? t("accounting.queue.review.balanced", "Balanced") : t("accounting.queue.review.imbalance", "Out of balance by {value}").replace("{value}", (totalDr - totalCr).toFixed(2))}
             </div>
           </div>
         )}
@@ -642,21 +651,21 @@ function ReviewDrawer({
           <button type="button" disabled={busy !== null}
             onClick={async () => { if (await callAction("draft", { kind: item.kind, source_id: item.source_id })) await onAction(); }}
             className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[11px] hover:border-white/[0.20] disabled:opacity-50">
-            Create draft
+            {t("accounting.queue.btn.draft", "Create draft")}
           </button>
         )}
         {item.accounting_status === "drafted" && item.accounting_entry_id && (
           <button type="button" disabled={busy !== null}
             onClick={async () => { if (await callAction("post-draft", { entry_id: item.accounting_entry_id })) await onAction(); }}
             className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-[11px] text-emerald-200 hover:bg-emerald-500/15 disabled:opacity-50">
-            Post entry
+            {t("accounting.queue.review.postEntry", "Post entry")}
           </button>
         )}
         {item.accounting_status === "failed" && (
           <button type="button" disabled={busy !== null}
             onClick={async () => { if (await callAction("retry", { kind: item.kind, source_id: item.source_id })) await onAction(); }}
             className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[11px] text-amber-200 hover:bg-amber-500/15 disabled:opacity-50">
-            Retry recognition
+            {t("accounting.queue.review.retryRec", "Retry recognition")}
           </button>
         )}
         {data?.entry && (
@@ -664,7 +673,7 @@ function ReviewDrawer({
             href={`/finance/accounting/general-ledger?account_id=${data.lines[0]?.account?.code ?? ""}`}
             className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.06] px-3 py-1.5 text-[11px] text-gray-400 hover:border-white/[0.15] hover:text-gray-200"
           >
-            Open in GL →
+            {t("accounting.queue.review.openGL", "Open in GL →")}
           </Link>
         )}
       </div>
@@ -690,6 +699,7 @@ interface RevenueQueueRow {
 }
 
 function SalesRevenueSection() {
+  const { t } = useTranslation(financeT);
   const [rows, setRows] = useState<RevenueQueueRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -721,7 +731,7 @@ function SalesRevenueSection() {
         body: JSON.stringify({ entry_id: id }),
       });
       const j = await r.json();
-      if (!r.ok || !j.ok) { alert(j.error ?? "Post failed"); return; }
+      if (!r.ok || !j.ok) { alert(j.error ?? t("accounting.cogs.postFailed", "Post failed")); return; }
       await load();
     } finally {
       setBusy(null);
@@ -729,8 +739,8 @@ function SalesRevenueSection() {
   };
 
   const voidEntry = async (id: string) => {
-    if (!confirm("Void this revenue journal? A reversing entry will be posted.")) return;
-    const reason = prompt("Reason (optional):") ?? "voided from queue";
+    if (!confirm(t("accounting.revenue.voidConfirm", "Void this revenue journal? A reversing entry will be posted."))) return;
+    const reason = prompt(t("accounting.cogs.reasonPrompt", "Reason (optional):")) ?? "voided from queue";
     setBusy(id);
     try {
       const r = await fetch(`/api/accounting/journals/${id}/void`, {
@@ -740,7 +750,7 @@ function SalesRevenueSection() {
         body: JSON.stringify({ reason }),
       });
       const j = await r.json();
-      if (!r.ok) { alert(j.error ?? "Void failed"); return; }
+      if (!r.ok) { alert(j.error ?? t("accounting.cogs.voidFailed", "Void failed")); return; }
       await load();
     } finally {
       setBusy(null);
@@ -756,21 +766,21 @@ function SalesRevenueSection() {
         <table className="min-w-full text-[12.5px]">
           <thead>
             <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.10em] text-gray-500">
-              <th className="px-4 py-2 text-left">Journal #</th>
-              <th className="px-4 py-2 text-left">Invoice #</th>
-              <th className="px-4 py-2 text-left">Customer</th>
-              <th className="px-4 py-2 text-left">Date</th>
-              <th className="px-4 py-2 text-right">Total</th>
-              <th className="px-4 py-2 text-left">Status</th>
+              <th className="px-4 py-2 text-left">{t("accounting.cogs.col.journal", "Journal #")}</th>
+              <th className="px-4 py-2 text-left">{t("accounting.revenue.col.invoice", "Invoice #")}</th>
+              <th className="px-4 py-2 text-left">{t("accounting.revenue.col.customer", "Customer")}</th>
+              <th className="px-4 py-2 text-left">{t("accounting.cogs.col.date", "Date")}</th>
+              <th className="px-4 py-2 text-right">{t("accounting.revenue.col.total", "Total")}</th>
+              <th className="px-4 py-2 text-left">{t("accounting.cogs.col.status", "Status")}</th>
               <th className="px-4 py-2 text-right"></th>
             </tr>
           </thead>
           <tbody>
             {loading && rows.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-6 text-center text-[11px] text-gray-600">Loading…</td></tr>
+              <tr><td colSpan={7} className="px-4 py-6 text-center text-[11px] text-gray-600">{t("accounting.queue.loading", "Loading…")}</td></tr>
             ) : rows.length === 0 ? (
               <tr><td colSpan={7} className="px-4 py-6 text-center text-[11px] text-gray-600">
-                No revenue drafts yet. They appear here once a confirmed invoice is drafted via the API.
+                {t("accounting.revenue.empty", "No revenue drafts yet. They appear here once a confirmed invoice is drafted via the API.")}
               </td></tr>
             ) : (
               rows.map((r) => (
@@ -794,13 +804,13 @@ function SalesRevenueSection() {
                       {r.status === "draft" && (
                         <button onClick={() => post(r.id)} disabled={busy === r.id}
                           className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-200 hover:bg-emerald-500/15 disabled:opacity-50">
-                          Post
+                          {t("accounting.queue.btn.post", "Post")}
                         </button>
                       )}
                       {r.status === "posted" && (
                         <button onClick={() => voidEntry(r.id)} disabled={busy === r.id}
                           className="text-[11px] text-rose-300 hover:text-rose-200 disabled:opacity-50">
-                          Void
+                          {t("accounting.queue.btn.void", "Void")}
                         </button>
                       )}
                     </div>

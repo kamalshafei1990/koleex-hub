@@ -50,12 +50,8 @@ function daysAgo(iso: string | null): number | null {
   return Math.max(0, Math.floor((Date.now() - t) / 86_400_000));
 }
 
-const STATUS_BUCKETS: { key: TreasuryPlanStatus; label: string }[] = [
-  { key: "draft",        label: "Drafts" },
-  { key: "under_review", label: "Under review" },
-  { key: "approved",     label: "Approved" },
-  { key: "archived",     label: "Archived" },
-];
+/* Status buckets resolved inside the component so labels go through i18n. */
+const STATUS_BUCKET_KEYS: TreasuryPlanStatus[] = ["draft", "under_review", "approved", "archived"];
 
 interface DetailResponse {
   plan: TreasuryPlan;
@@ -79,6 +75,13 @@ interface CompareResponse {
 
 export default function FinanceTreasuryPlans() {
   const { t } = useTranslation(financeT);
+  const STATUS_BUCKETS: { key: TreasuryPlanStatus; label: string }[] = [
+    { key: "draft",        label: t("treasuryPlans.bucket.draft", "Drafts") },
+    { key: "under_review", label: t("treasuryPlans.bucket.under_review", "Under review") },
+    { key: "approved",     label: t("treasuryPlans.bucket.approved", "Approved") },
+    { key: "archived",     label: t("treasuryPlans.bucket.archived", "Archived") },
+  ];
+  void STATUS_BUCKET_KEYS;
   const [plans, setPlans] = useState<TreasuryPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -165,7 +168,7 @@ export default function FinanceTreasuryPlans() {
 
   const archive = useCallback(async () => {
     if (!openId) return;
-    if (!window.confirm("Archive this plan? It will remain visible in the archive list.")) return;
+    if (!window.confirm(t("treasuryPlans.archiveConfirm", "Archive this plan? It will remain visible in the archive list."))) return;
     setActionBusy(true);
     try {
       const r = await fetch(`/api/finance/treasury-plans/${openId}/archive`, { method: "POST" });
@@ -205,7 +208,7 @@ export default function FinanceTreasuryPlans() {
               className="inline-flex items-center gap-2 rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-sm font-semibold text-[var(--text-inverted)] hover:opacity-90"
             >
               <RrIcon name="plus" size={12} />
-              New plan from forecast
+              {t("treasuryPlans.new", "New plan from forecast")}
             </Link>
           }
         />
@@ -218,21 +221,21 @@ export default function FinanceTreasuryPlans() {
           <SectionCard>
             <div className="flex items-center justify-center gap-2 py-12 text-sm text-[var(--text-dim)]">
               <RrIcon name="loading" size={14} className="animate-spin" />
-              Loading treasury plans…
+              {t("treasuryPlans.loading", "Loading treasury plans…")}
             </div>
           </SectionCard>
         ) : plans.length === 0 ? (
           <div className="mt-4">
             <EmptyState
-              title="No treasury plans yet"
-              hint="Open the Treasury Forecast page, configure a scenario, and click ‘Save as plan’ to capture an executive review snapshot."
+              title={t("treasuryPlans.empty", "No treasury plans yet")}
+              hint={t("treasuryPlans.emptyHint", "Open the Treasury Forecast page, configure a scenario, and click ‘Save as plan’ to capture an executive review snapshot.")}
               action={
                 <Link
                   href="/finance/treasury-forecast"
                   className="inline-flex items-center gap-2 rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-sm font-semibold text-[var(--text-inverted)] hover:opacity-90"
                 >
                   <RrIcon name="arrow-up-right-from-square" size={12} />
-                  Open Treasury Forecast
+                  {t("treasuryPlans.openForecast", "Open Treasury Forecast")}
                 </Link>
               }
             />
@@ -273,7 +276,7 @@ export default function FinanceTreasuryPlans() {
               onCompareCurrent={compareAgainstCurrent}
               onApprove={() => review("approve")}
               onRequestChanges={() => {
-                const notes = window.prompt("Notes for the operator?", "") ?? undefined;
+                const notes = window.prompt(t("treasuryPlans.review.notesPrompt", "Notes for the operator?"), "") ?? undefined;
                 void review("request_changes", notes);
               }}
               onArchive={archive}
@@ -293,13 +296,15 @@ export default function FinanceTreasuryPlans() {
 /* Phase S.4 — memoized; parent's `openId` toggle no longer rerenders
    every card in the list. */
 const PlanCard = memo(function PlanCard({ plan, active, onOpen }: { plan: TreasuryPlan; active: boolean; onOpen: (id: string) => void }) {
+  const { t } = useTranslation(financeT);
   const m = plan.projected_metrics;
   const ds = daysAgo(plan.approved_at ?? plan.updated_at);
+  const agoStr = ds === 0 ? t("treasuryPlans.card.today", "today") : t("treasuryPlans.card.daysAgo", "{n}d ago").replace("{n}", String(ds));
   const reviewLabel = plan.approved_at
-    ? `Approved ${ds === 0 ? "today" : `${ds}d ago`}`
+    ? t("treasuryPlans.card.approved", "Approved {ago}").replace("{ago}", agoStr)
     : plan.status === "under_review"
-      ? `Awaiting review · ${ds === 0 ? "today" : `${ds}d`}`
-      : `Updated ${ds === 0 ? "today" : `${ds}d ago`}`;
+      ? t("treasuryPlans.card.awaiting", "Awaiting review · {ago}").replace("{ago}", agoStr)
+      : t("treasuryPlans.card.updated", "Updated {ago}").replace("{ago}", agoStr);
 
   return (
     <button
@@ -323,20 +328,20 @@ const PlanCard = memo(function PlanCard({ plan, active, onOpen }: { plan: Treasu
       </div>
 
       <div className="grid grid-cols-3 gap-2 rounded-lg border border-white/[0.04] bg-[var(--bg-primary)]/40 px-3 py-2.5">
-        <Stat label="Start" value={fmtCompactUsd(m.startingCash)} />
+        <Stat label={t("treasuryPlans.card.stat.start", "Start")} value={fmtCompactUsd(m.startingCash)} />
         <Stat label="90d"   value={fmtCompactUsd(m.d90)}            tone={m.d90 < 0 ? "rose" : "neutral"} />
-        <Stat label="Runway" value={m.runwayDays != null ? `${m.runwayDays}d` : "—"} tone={m.runwayDays != null && m.runwayDays <= 14 ? "rose" : m.runwayDays != null && m.runwayDays <= 30 ? "amber" : "neutral"} />
+        <Stat label={t("treasuryPlans.card.stat.runway", "Runway")} value={m.runwayDays != null ? `${m.runwayDays}d` : "—"} tone={m.runwayDays != null && m.runwayDays <= 14 ? "rose" : m.runwayDays != null && m.runwayDays <= 30 ? "amber" : "neutral"} />
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-gray-500">
         {m.firstNegativeDate && (
           <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 font-semibold text-rose-300">
             <RrIcon name="info" size={9} />
-            Negative {m.firstNegativeDate}
+            {t("treasuryPlans.card.negative", "Negative {date}").replace("{date}", m.firstNegativeDate)}
           </span>
         )}
         {plan.confidence != null && (
-          <span className="rounded-full bg-white/[0.04] px-1.5 py-0.5 font-medium text-gray-400">{Math.round(plan.confidence * 100)}% confidence</span>
+          <span className="rounded-full bg-white/[0.04] px-1.5 py-0.5 font-medium text-gray-400">{t("treasuryPlans.card.confidence", "{pct}% confidence").replace("{pct}", String(Math.round(plan.confidence * 100)))}</span>
         )}
         <span className="ml-auto">{reviewLabel}</span>
       </div>
@@ -380,6 +385,7 @@ function PlanDetail({
   onArchive: () => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation(financeT);
   const baseCurrency = useBaseCurrency();
   const p = detail.plan;
   const m = p.projected_metrics;
@@ -394,14 +400,17 @@ function PlanDetail({
     <div className="rounded-2xl border border-white/[0.06] bg-[var(--bg-secondary)] p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Plan detail</div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">{t("treasuryPlans.detail.title", "Plan detail")}</div>
           <h2 className="mt-1 text-[18px] font-bold tracking-tight">{p.name}</h2>
           {p.description && <div className="mt-1 max-w-prose text-[12px] text-gray-300">{p.description}</div>}
           <div className="mt-1 text-[10px] text-gray-500">
             {p.status === "approved" && p.approved_at
-              ? <>Approved {new Date(p.approved_at).toLocaleDateString()} · </>
+              ? <>{t("treasuryPlans.detail.approvedOn", "Approved {date}").replace("{date}", new Date(p.approved_at).toLocaleDateString())} · </>
               : null}
-            Created {new Date(p.created_at).toLocaleDateString()} · Window {p.forecast_window_days}d · Confidence {p.confidence != null ? `${Math.round(p.confidence * 100)}%` : "—"}
+            {t("treasuryPlans.detail.created", "Created {date} · Window {n}d · Confidence {pct}")
+              .replace("{date}", new Date(p.created_at).toLocaleDateString())
+              .replace("{n}", String(p.forecast_window_days))
+              .replace("{pct}", p.confidence != null ? `${Math.round(p.confidence * 100)}%` : "—")}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -412,7 +421,7 @@ function PlanDetail({
               className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/25 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-500/35 disabled:opacity-50"
             >
               {actionBusy ? <RrIcon name="loading" size={11} className="animate-spin" /> : <RrIcon name="check" size={11} />}
-              Approve
+              {t("treasuryPlans.detail.approve", "Approve")}
             </button>
           )}
           {canApprove && (
@@ -422,7 +431,7 @@ function PlanDetail({
               className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-gray-300 hover:border-amber-500/30 hover:text-amber-300 disabled:opacity-50"
             >
               <RrIcon name="pencil" size={11} />
-              Request changes
+              {t("treasuryPlans.detail.requestChanges", "Request changes")}
             </button>
           )}
           {canArchive && (
@@ -432,7 +441,7 @@ function PlanDetail({
               className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-gray-300 hover:border-rose-500/30 hover:text-rose-300 disabled:opacity-50"
             >
               <RrIcon name="trash" size={11} />
-              Archive
+              {t("treasuryPlans.detail.archive", "Archive")}
             </button>
           )}
           <button
@@ -446,17 +455,17 @@ function PlanDetail({
 
       {/* Executive summary KPIs */}
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <MetricCard label="Start"  value={m.startingCash} unit={baseCurrency} hint="At save" loading={false} />
-        <MetricCard label="7d"  value={m.d7}  unit={baseCurrency} tone={m.d7  < 0 ? "negative" : "neutral"} hint="Locked" loading={false} />
-        <MetricCard label="30d" value={m.d30} unit={baseCurrency} tone={m.d30 < 0 ? "negative" : "neutral"} hint="Locked" loading={false} />
-        <MetricCard label="60d" value={m.d60} unit={baseCurrency} tone={m.d60 < 0 ? "negative" : "neutral"} hint="Locked" loading={false} />
-        <MetricCard label="90d" value={m.d90} unit={baseCurrency} tone={m.d90 < 0 ? "negative" : "neutral"} hint="Locked" loading={false} />
+        <MetricCard label={t("treasuryPlans.detail.start", "Start")}  value={m.startingCash} unit={baseCurrency} hint={t("treasuryPlans.detail.atSave", "At save")} loading={false} />
+        <MetricCard label="7d"  value={m.d7}  unit={baseCurrency} tone={m.d7  < 0 ? "negative" : "neutral"} hint={t("treasuryPlans.detail.locked", "Locked")} loading={false} />
+        <MetricCard label="30d" value={m.d30} unit={baseCurrency} tone={m.d30 < 0 ? "negative" : "neutral"} hint={t("treasuryPlans.detail.locked", "Locked")} loading={false} />
+        <MetricCard label="60d" value={m.d60} unit={baseCurrency} tone={m.d60 < 0 ? "negative" : "neutral"} hint={t("treasuryPlans.detail.locked", "Locked")} loading={false} />
+        <MetricCard label="90d" value={m.d90} unit={baseCurrency} tone={m.d90 < 0 ? "negative" : "neutral"} hint={t("treasuryPlans.detail.locked", "Locked")} loading={false} />
         <MetricCard
-          label="Runway"
+          label={t("forecast.kpi.runway", "Runway")}
           value={m.runwayDays != null ? `${m.runwayDays}` : "—"}
-          unit={m.runwayDays != null ? "days" : ""}
+          unit={m.runwayDays != null ? t("forecast.kpi.days", "days") : ""}
           tone={m.runwayDays == null ? "positive" : m.runwayDays <= 14 ? "negative" : m.runwayDays <= 30 ? "warning" : "neutral"}
-          hint={m.firstNegativeDate ?? "Beyond horizon"}
+          hint={m.firstNegativeDate ?? t("forecast.kpi.beyondHorizon", "Beyond horizon")}
           loading={false}
         />
       </div>
@@ -464,10 +473,10 @@ function PlanDetail({
       {/* Comparison strip */}
       <div className="mt-4">
         <SectionCard
-          title="Plan vs current treasury state"
+          title={t("treasuryPlans.compare.title", "Plan vs current treasury state")}
           subtitle={comparison
-            ? `Direction: ${comparison.diff.direction}. The plan was locked when the forecast looked like the numbers above; the current state may have drifted.`
-            : "Click to compare this plan's locked snapshot against the current 90-day forecast."}
+            ? t("treasuryPlans.compare.subtitle.with", "Direction: {dir}. The plan was locked when the forecast looked like the numbers above; the current state may have drifted.").replace("{dir}", comparison.diff.direction)
+            : t("treasuryPlans.compare.subtitle.empty", "Click to compare this plan's locked snapshot against the current 90-day forecast.")}
           action={
             <button
               onClick={onCompareCurrent}
@@ -475,29 +484,31 @@ function PlanDetail({
               className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-gray-300 hover:border-white/[0.18] disabled:opacity-50"
             >
               {compareBusy ? <RrIcon name="loading" size={11} className="animate-spin" /> : <RrIcon name="recycle" size={11} />}
-              Re-compare
+              {t("treasuryPlans.compare.recompare", "Re-compare")}
             </button>
           }
         >
           {!comparison ? (
-            <div className="py-2 text-[11px] text-gray-500">Comparison not run yet. Click &ldquo;Re-compare&rdquo; to evaluate this plan against today&apos;s treasury state.</div>
+            <div className="py-2 text-[11px] text-gray-500">{t("treasuryPlans.compare.notRun", "Comparison not run yet. Click \"Re-compare\" to evaluate this plan against today's treasury state.")}</div>
           ) : (
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-5 text-[11px]">
               <Diff label="d7"  value={comparison.diff.d7Delta}  />
               <Diff label="d30" value={comparison.diff.d30Delta} />
               <Diff label="d60" value={comparison.diff.d60Delta} />
               <Diff label="d90" value={comparison.diff.d90Delta} />
-              <Diff label="Lowest projected" value={comparison.diff.lowestDelta} />
+              <Diff label={t("treasuryPlans.diff.lowest", "Lowest projected")} value={comparison.diff.lowestDelta} />
               {comparison.diff.firstNegativeDateChange && (
                 <div className="col-span-full rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-200">
-                  Negative-cash date moved:
-                  {" "}
-                  {comparison.diff.firstNegativeDateChange.from ?? "never"} → {comparison.diff.firstNegativeDateChange.to ?? "never"}
+                  {t("treasuryPlans.compare.negativeMoved", "Negative-cash date moved: {from} → {to}")
+                    .replace("{from}", comparison.diff.firstNegativeDateChange.from ?? t("treasuryPlans.compare.never", "never"))
+                    .replace("{to}", comparison.diff.firstNegativeDateChange.to ?? t("treasuryPlans.compare.never", "never"))}
                 </div>
               )}
               {comparison.diff.runwayDelta != null && (
                 <div className="col-span-full text-[11px] text-gray-400">
-                  Runway: {comparison.diff.runwayDelta > 0 ? "+" : ""}{comparison.diff.runwayDelta} days vs the plan.
+                  {t("treasuryPlans.compare.runwayDelta", "Runway: {sign}{n} days vs the plan.")
+                    .replace("{sign}", comparison.diff.runwayDelta > 0 ? "+" : "")
+                    .replace("{n}", String(comparison.diff.runwayDelta))}
                 </div>
               )}
             </div>
@@ -507,16 +518,16 @@ function PlanDetail({
 
       {/* Body grid: assumptions + drivers / timeline */}
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <SectionCard title="Applied assumptions" subtitle="What was locked into this plan.">
+        <SectionCard title={t("treasuryPlans.assumptions.title", "Applied assumptions")} subtitle={t("treasuryPlans.assumptions.subtitle", "What was locked into this plan.")}>
           {assumptions.length === 0 ? (
-            <div className="py-2 text-[11px] text-gray-500">Base case — no scenario assumptions applied.</div>
+            <div className="py-2 text-[11px] text-gray-500">{t("treasuryPlans.assumptions.empty", "Base case — no scenario assumptions applied.")}</div>
           ) : (
             <ul className="space-y-1.5">
               {assumptions.map((a) => (
                 <li key={a.key} className="flex items-center justify-between gap-2 rounded-lg border border-white/[0.05] bg-[var(--bg-primary)]/40 px-3 py-2 text-[11px]">
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[12px] font-semibold text-[var(--text-primary)]">{a.label}</span>
-                    <span className="block text-[10px] text-gray-500">Affected events: {a.affectedEventCount}</span>
+                    <span className="block text-[10px] text-gray-500">{t("forecast.assumptions.affected", "Affected events: {n}").replace("{n}", String(a.affectedEventCount))}</span>
                   </span>
                   <span className="shrink-0 text-[11px] font-semibold tabular-nums text-gray-300">{fmtCompactUsd(a.cashImpact)}</span>
                 </li>
@@ -525,15 +536,15 @@ function PlanDetail({
           )}
         </SectionCard>
 
-        <SectionCard title="Top liquidity drivers" subtitle="Largest outflows + inflows locked at save time.">
+        <SectionCard title={t("treasuryPlans.drivers.title", "Top liquidity drivers")} subtitle={t("treasuryPlans.drivers.subtitle", "Largest outflows + inflows locked at save time.")}>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <DriverList
-              title="Top outflows"
+              title={t("forecast.drivers.outflows", "Top outflows")}
               items={Array.isArray(drivers?.topOutflows) ? drivers.topOutflows.slice(0, 5) as Array<{ key?: string; party?: string; amountReporting?: number; daysFromNow?: number }> : []}
               tone="negative"
             />
             <DriverList
-              title="Top inflows"
+              title={t("forecast.drivers.inflows", "Top inflows")}
               items={Array.isArray(drivers?.topInflows) ? drivers.topInflows.slice(0, 5) as Array<{ key?: string; party?: string; amountReporting?: number; daysFromNow?: number }> : []}
               tone="positive"
             />
@@ -543,9 +554,9 @@ function PlanDetail({
 
       {/* Review history + version timeline */}
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <SectionCard title="Review history" subtitle="Every approve / request-changes / archive decision.">
+        <SectionCard title={t("treasuryPlans.reviews.title", "Review history")} subtitle={t("treasuryPlans.reviews.subtitle", "Every approve / request-changes / archive decision.")}>
           {detail.reviews.length === 0 ? (
-            <div className="py-2 text-[11px] text-gray-500">No reviews yet.</div>
+            <div className="py-2 text-[11px] text-gray-500">{t("treasuryPlans.reviews.empty", "No reviews yet.")}</div>
           ) : (
             <ul className="divide-y divide-white/[0.04]">
               {detail.reviews.map((rev) => (
@@ -567,9 +578,9 @@ function PlanDetail({
           )}
         </SectionCard>
 
-        <SectionCard title="Version history" subtitle="Assumption + metric changes captured automatically.">
+        <SectionCard title={t("treasuryPlans.versions.title", "Version history")} subtitle={t("treasuryPlans.versions.subtitle", "Assumption + metric changes captured automatically.")}>
           {detail.versions.length === 0 ? (
-            <div className="py-2 text-[11px] text-gray-500">No edits since the plan was first saved.</div>
+            <div className="py-2 text-[11px] text-gray-500">{t("treasuryPlans.versions.empty", "No edits since the plan was first saved.")}</div>
           ) : (
             <ul className="divide-y divide-white/[0.04]">
               {detail.versions.map((v) => {
@@ -580,7 +591,9 @@ function PlanDetail({
                       <span className="text-gray-500">{new Date(v.changed_at).toLocaleString()}</span>
                     </div>
                     {d.d90Delta != null && (
-                      <div className="mt-1 text-gray-400">d90 Δ {fmtCompactUsd(d.d90Delta as number)} USD · Runway Δ {String(d.runwayDelta ?? "—")}d</div>
+                      <div className="mt-1 text-gray-400">{t("treasuryPlans.versions.deltaLine", "d90 Δ {value} USD · Runway Δ {runway}d")
+                        .replace("{value}", fmtCompactUsd(d.d90Delta as number))
+                        .replace("{runway}", String(d.runwayDelta ?? "—"))}</div>
                     )}
                   </li>
                 );
@@ -611,12 +624,13 @@ function DriverList({
   items: Array<{ key?: string; party?: string; amountReporting?: number; daysFromNow?: number }>;
   tone: "positive" | "negative";
 }) {
+  const { t } = useTranslation(financeT);
   const accent = tone === "positive" ? "text-emerald-300" : "text-rose-300";
   return (
     <div>
       <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-500">{title}</div>
       {items.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-white/[0.05] px-3 py-3 text-[11px] text-gray-500">No material items.</div>
+        <div className="rounded-lg border border-dashed border-white/[0.05] px-3 py-3 text-[11px] text-gray-500">{t("forecast.drivers.noItems", "No material items.")}</div>
       ) : (
         <ul className="space-y-1">
           {items.map((it, i) => (

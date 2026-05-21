@@ -162,16 +162,16 @@ export default function FinanceBankAccounts() {
               className="inline-flex items-center gap-2 rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-sm font-semibold text-[var(--text-inverted)] hover:opacity-90"
             >
               <RrIcon name="plus" size={12} />
-              New account
+              {t("bankAccounts.btnNew", "New account")}
             </button>
           }
         />
 
         <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <MetricCard label="Available" value={tenantKpi.avail} unit={baseCurrency} hint="Across active accounts" loading={loading} />
-          <MetricCard label="Pending" value={tenantKpi.pending} unit={baseCurrency} hint="Not yet cleared" loading={loading} />
-          <MetricCard label="Restricted" value={tenantKpi.restricted} unit={baseCurrency} hint="Holds + reserves" loading={loading} />
-          <MetricCard label="Unreconciled movements" value={tenantKpi.unrec} unit="cm." hint="Across all accounts" loading={loading} />
+          <MetricCard label={t("bankAccounts.kpi.available", "Available")} value={tenantKpi.avail} unit={baseCurrency} hint={t("bankAccounts.kpi.availableHint", "Across active accounts")} loading={loading} />
+          <MetricCard label={t("bankAccounts.kpi.pending", "Pending")} value={tenantKpi.pending} unit={baseCurrency} hint={t("bankAccounts.kpi.pendingHint", "Not yet cleared")} loading={loading} />
+          <MetricCard label={t("bankAccounts.kpi.restricted", "Restricted")} value={tenantKpi.restricted} unit={baseCurrency} hint={t("bankAccounts.kpi.restrictedHint", "Holds + reserves")} loading={loading} />
+          <MetricCard label={t("bankAccounts.kpi.unreconciled", "Unreconciled movements")} value={tenantKpi.unrec} unit={t("bankAccounts.cm", "cm.")} hint={t("bankAccounts.kpi.unreconciledHint", "Across all accounts")} loading={loading} />
         </div>
 
         {error && (
@@ -184,21 +184,21 @@ export default function FinanceBankAccounts() {
           <SectionCard>
             <div className="flex items-center justify-center gap-2 py-12 text-sm text-[var(--text-dim)]">
               <RrIcon name="loading" size={14} className="animate-spin" />
-              Loading bank accounts…
+              {t("bankAccounts.loading", "Loading bank accounts…")}
             </div>
           </SectionCard>
         ) : accounts.length === 0 ? (
           <div className="mt-4">
             <EmptyState
-              title="No bank accounts yet"
-              hint="Add your first account to start tracking treasury and importing statements."
+              title={t("bankAccounts.empty.title", "No bank accounts yet")}
+              hint={t("bankAccounts.empty.hint", "Add your first account to start tracking treasury and importing statements.")}
               action={
                 <button
                   onClick={startNew}
                   className="inline-flex items-center gap-2 rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-sm font-semibold text-[var(--text-inverted)] hover:opacity-90"
                 >
                   <RrIcon name="plus" size={12} />
-                  Add first account
+                  {t("bankAccounts.empty.cta", "Add first account")}
                 </button>
               }
             />
@@ -210,7 +210,7 @@ export default function FinanceBankAccounts() {
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <span className="inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">
                     <RrIcon name="bank" size={11} />
-                    {ccy} accounts
+                    {t("bankAccounts.group.accounts", "{ccy} accounts").replace("{ccy}", ccy)}
                     <span className="rounded-full bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-medium text-gray-400">{list.length}</span>
                   </span>
                 </div>
@@ -224,7 +224,7 @@ export default function FinanceBankAccounts() {
                       onEdit={() => setEditing(a)}
                       onAddMovement={() => setMovementDrawer({ accountId: a.id })}
                       onArchive={async () => {
-                        if (!window.confirm(`Archive ${a.bank_name} · ${a.account_name}?`)) return;
+                        if (!window.confirm(t("bankAccounts.archiveConfirm", "Archive {bank} · {account}?").replace("{bank}", a.bank_name).replace("{account}", a.account_name))) return;
                         const r = await fetch(`/api/finance/bank-accounts/${a.id}/archive`, {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
@@ -251,7 +251,7 @@ export default function FinanceBankAccounts() {
               <SectionCard>
                 <div className="flex items-center justify-center gap-2 py-10 text-sm text-[var(--text-dim)]">
                   <RrIcon name="loading" size={14} className="animate-spin" />
-                  Loading account…
+                  {t("bankAccounts.loadingAccount", "Loading account…")}
                 </div>
               </SectionCard>
             ) : detail ? (
@@ -298,6 +298,7 @@ function AccountCard({
   onArchive: () => void;
   onSetPrimary: () => void;
 }) {
+  const { t } = useTranslation(financeT);
   const status = account.status;
   const inactive = status !== "active";
   const dsReconciled = daysSince(account.last_reconciled_at);
@@ -316,10 +317,10 @@ function AccountCard({
           <div className="flex items-center gap-2">
             <span className="text-[12px] font-bold uppercase tracking-wider text-[var(--text-primary)]">{account.bank_name}</span>
             {account.is_primary && (
-              <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-300">Primary</span>
+              <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-300">{t("bankAccounts.badge.primary", "Primary")}</span>
             )}
             {status === "frozen" && (
-              <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-300">Frozen</span>
+              <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-300">{t("bankAccounts.badge.frozen", "Frozen")}</span>
             )}
             {(status === "archived" || status === "closed") && (
               <span className="rounded-full bg-gray-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-gray-300">{status}</span>
@@ -335,16 +336,16 @@ function AccountCard({
           onClick={onOpen}
           className="inline-flex shrink-0 items-center gap-1 rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1 text-[10px] font-medium text-gray-300 hover:border-white/[0.18]"
         >
-          {active ? "Close" : "Open"}
+          {active ? t("bankAccounts.action.close", "Close") : t("bankAccounts.action.open", "Open")}
           <RrIcon name={active ? "cross" : "arrow-up-right"} size={9} />
         </button>
       </div>
 
       {/* Balance grid */}
       <div className="grid grid-cols-3 gap-2 rounded-lg border border-white/[0.04] bg-[var(--bg-primary)]/40 px-3 py-2.5">
-        <BalanceCell label="Available" value={account.available_balance} ccy={account.currency} tone={lowCash ? "warning" : "neutral"} />
-        <BalanceCell label="Pending"   value={account.pending_balance}   ccy={account.currency} tone="neutral" />
-        <BalanceCell label="Restricted" value={account.restricted_balance} ccy={account.currency} tone="neutral" />
+        <BalanceCell label={t("bankAccounts.balance.available", "Available")} value={account.available_balance} ccy={account.currency} tone={lowCash ? "warning" : "neutral"} />
+        <BalanceCell label={t("bankAccounts.balance.pending", "Pending")}   value={account.pending_balance}   ccy={account.currency} tone="neutral" />
+        <BalanceCell label={t("bankAccounts.balance.restricted", "Restricted")} value={account.restricted_balance} ccy={account.currency} tone="neutral" />
       </div>
 
       {/* Operational counters */}
@@ -352,27 +353,27 @@ function AccountCard({
         {account.unreconciled_count > 0 && (
           <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-amber-300">
             <RrIcon name="info" size={9} />
-            {account.unreconciled_count} unreconciled
+            {t("bankAccounts.unrec.n", "{n} unreconciled").replace("{n}", String(account.unreconciled_count))}
           </span>
         )}
         {lowCash && (
           <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-rose-300">
             <RrIcon name="info" size={9} />
-            Low cash
+            {t("bankAccounts.lowCash", "Low cash")}
           </span>
         )}
         {dsReconciled != null && (
           <span className="text-gray-500">
-            Reconciled {dsReconciled === 0 ? "today" : `${dsReconciled}d ago`}
+            {t("bankAccounts.reconciledAgo", "Reconciled {ago}").replace("{ago}", dsReconciled === 0 ? t("bankAccounts.today", "today") : t("bankAccounts.daysAgo", "{n}d ago").replace("{n}", String(dsReconciled)))}
           </span>
         )}
         {dsImport != null && (
           <span className="text-gray-500">
-            · Imported {dsImport === 0 ? "today" : `${dsImport}d ago`}
+            · {t("bankAccounts.importedAgo", "Imported {ago}").replace("{ago}", dsImport === 0 ? t("bankAccounts.today", "today") : t("bankAccounts.daysAgo", "{n}d ago").replace("{n}", String(dsImport)))}
           </span>
         )}
         {dsImport == null && (
-          <span className="text-gray-500">· No import yet</span>
+          <span className="text-gray-500">· {t("bankAccounts.noImport", "No import yet")}</span>
         )}
       </div>
 
@@ -383,21 +384,21 @@ function AccountCard({
           className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1 font-medium text-gray-300 hover:border-white/[0.18]"
         >
           <RrIcon name="upload" size={9} />
-          Import statement
+          {t("bankAccounts.action.import", "Import statement")}
         </Link>
         <button
           onClick={onAddMovement}
           className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1 font-medium text-gray-300 hover:border-white/[0.18]"
         >
           <RrIcon name="plus" size={9} />
-          Manual movement
+          {t("bankAccounts.action.manual", "Manual movement")}
         </button>
         <button
           onClick={onEdit}
           className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1 font-medium text-gray-300 hover:border-white/[0.18]"
         >
           <RrIcon name="pencil" size={9} />
-          Edit
+          {t("bankAccounts.action.edit", "Edit")}
         </button>
         {!account.is_primary && status === "active" && (
           <button
@@ -405,7 +406,7 @@ function AccountCard({
             className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1 font-medium text-gray-300 hover:border-emerald-500/30 hover:text-emerald-300"
           >
             <RrIcon name="check" size={9} />
-            Make primary
+            {t("bankAccounts.action.makePrimary", "Make primary")}
           </button>
         )}
         {status === "active" && (
@@ -414,7 +415,7 @@ function AccountCard({
             className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1 font-medium text-gray-300 hover:border-rose-500/30 hover:text-rose-300"
           >
             <RrIcon name="trash" size={9} />
-            Archive
+            {t("bankAccounts.action.archive", "Archive")}
           </button>
         )}
       </div>
@@ -444,6 +445,7 @@ function AccountDetail({
   onEdit: () => void;
   onAddMovement: () => void;
 }) {
+  const { t } = useTranslation(financeT);
   const a = detail.account;
   const { movements, imports, reconciliation, counters } = detail;
   const lowCash = a.available_balance < 25_000;
@@ -453,7 +455,7 @@ function AccountDetail({
     <div className="rounded-2xl border border-white/[0.06] bg-[var(--bg-secondary)] p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Account detail</div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">{t("bankAccounts.detail.eyebrow", "Account detail")}</div>
           <h2 className="mt-1 text-[18px] font-bold tracking-tight">{a.bank_name} · <span className="font-medium text-gray-300">{a.account_name}</span></h2>
           <div className="mt-1 text-[11px] text-gray-500">
             <span className="font-mono">{maskAccountNumber(a.account_number)}</span>
@@ -469,26 +471,26 @@ function AccountDetail({
             className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3 py-2 text-xs font-semibold text-[var(--text-inverted)] hover:opacity-90"
           >
             <RrIcon name="upload" size={11} />
-            Import statement
+            {t("bankAccounts.action.import", "Import statement")}
           </Link>
           <button
             onClick={onAddMovement}
             className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-gray-300 hover:border-white/[0.18]"
           >
             <RrIcon name="plus" size={11} />
-            Manual movement
+            {t("bankAccounts.action.manual", "Manual movement")}
           </button>
           <button
             onClick={onEdit}
             className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-gray-300 hover:border-white/[0.18]"
           >
             <RrIcon name="pencil" size={11} />
-            Edit
+            {t("bankAccounts.action.edit", "Edit")}
           </button>
           <button
             onClick={onClose}
             className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-2.5 py-2 text-xs text-gray-300 hover:border-rose-500/30 hover:text-rose-300"
-            aria-label="Close detail"
+            aria-label={t("bankAccounts.detail.closeAria", "Close detail")}
           >
             <RrIcon name="cross" size={11} />
           </button>
@@ -497,52 +499,52 @@ function AccountDetail({
 
       {/* Overview */}
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <MetricCard label="Available" value={a.available_balance} unit={a.currency} tone={lowCash ? "warning" : "neutral"} hint="Spendable today" loading={false} />
-        <MetricCard label="Pending"   value={a.pending_balance}   unit={a.currency} hint="Awaiting clearance" loading={false} />
-        <MetricCard label="Restricted" value={a.restricted_balance} unit={a.currency} hint="Holds + reserves" loading={false} />
-        <MetricCard label="Current"   value={a.current_balance}   unit={a.currency} hint="Sum of all positions" loading={false} />
+        <MetricCard label={t("bankAccounts.balance.available", "Available")} value={a.available_balance} unit={a.currency} tone={lowCash ? "warning" : "neutral"} hint={t("bankAccounts.balance.spendable", "Spendable today")} loading={false} />
+        <MetricCard label={t("bankAccounts.balance.pending", "Pending")}   value={a.pending_balance}   unit={a.currency} hint={t("bankAccounts.balance.awaiting", "Awaiting clearance")} loading={false} />
+        <MetricCard label={t("bankAccounts.balance.restricted", "Restricted")} value={a.restricted_balance} unit={a.currency} hint={t("bankAccounts.balance.holds", "Holds + reserves")} loading={false} />
+        <MetricCard label={t("bankAccounts.balance.current", "Current")}   value={a.current_balance}   unit={a.currency} hint={t("bankAccounts.balance.sum", "Sum of all positions")} loading={false} />
       </div>
 
       {/* Risk + activity strip */}
       <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-white/[0.05] bg-[var(--bg-primary)]/40 px-3 py-2 text-[11px]">
         {lowCash && (
           <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-rose-300">
-            <RrIcon name="info" size={9} /> Low available cash
+            <RrIcon name="info" size={9} /> {t("bankAccounts.risk.lowCash", "Low available cash")}
           </span>
         )}
         {idleCash && (
           <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/15 px-2 py-0.5 text-sky-300">
-            <RrIcon name="info" size={9} /> Idle cash
+            <RrIcon name="info" size={9} /> {t("bankAccounts.risk.idle", "Idle cash")}
           </span>
         )}
         {reconciliation.unreconciled >= 3 && (
           <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-amber-300">
-            <RrIcon name="info" size={9} /> {reconciliation.unreconciled} unreconciled movements
+            <RrIcon name="info" size={9} /> {t("bankAccounts.risk.unrecN", "{n} unreconciled movements").replace("{n}", String(reconciliation.unreconciled))}
           </span>
         )}
         {a.currency !== "USD" && (
           <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/15 px-2 py-0.5 text-violet-300">
-            <RrIcon name="coins" size={9} /> FX exposure ({a.currency})
+            <RrIcon name="coins" size={9} /> {t("bankAccounts.risk.fx", "FX exposure ({ccy})").replace("{ccy}", a.currency)}
           </span>
         )}
         <span className="ml-auto text-gray-500">
           {a.last_reconciled_at
-            ? <>Last reconciled {new Date(a.last_reconciled_at).toLocaleDateString()} · </>
-            : <>Never reconciled · </>}
+            ? <>{t("bankAccounts.activity.lastReconciled", "Last reconciled {date}").replace("{date}", new Date(a.last_reconciled_at).toLocaleDateString())} · </>
+            : <>{t("bankAccounts.activity.neverReconciled", "Never reconciled")} · </>}
           {counters.last_import_at
-            ? <>Last import {new Date(counters.last_import_at).toLocaleDateString()}</>
-            : <>No import yet</>}
+            ? <>{t("bankAccounts.activity.lastImport", "Last import {date}").replace("{date}", new Date(counters.last_import_at).toLocaleDateString())}</>
+            : <>{t("bankAccounts.noImport", "No import yet")}</>}
         </span>
       </div>
 
       {/* Two-column body: cash movements + side stack (imports, reconciliation) */}
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]">
         <SectionCard
-          title="Cash movement timeline"
-          subtitle="Most-recent 100 movements on this account."
+          title={t("bankAccounts.movements.title", "Cash movement timeline")}
+          subtitle={t("bankAccounts.movements.subtitle", "Most-recent 100 movements on this account.")}
         >
           {movements.length === 0 ? (
-            <EmptyState title="No movements yet" hint="Import a statement or record a manual movement to seed activity." />
+            <EmptyState title={t("bankAccounts.movements.empty.title", "No movements yet")} hint={t("bankAccounts.movements.empty.hint", "Import a statement or record a manual movement to seed activity.")} />
           ) : (
             <ul className="divide-y divide-white/[0.04]">
               {movements.map((m) => (
@@ -553,31 +555,31 @@ function AccountDetail({
         </SectionCard>
 
         <div className="space-y-4">
-          <SectionCard title="Reconciliation summary" subtitle="Counts derive from movement statuses on this account.">
+          <SectionCard title={t("bankAccounts.recon.title", "Reconciliation summary")} subtitle={t("bankAccounts.recon.subtitle", "Counts derive from movement statuses on this account.")}>
             <div className="grid grid-cols-2 gap-2 text-[11px]">
-              <ReconStat label="Matched"        value={reconciliation.matched}        tone="emerald" />
-              <ReconStat label="Partial"        value={reconciliation.partially_matched} tone="amber" />
-              <ReconStat label="Unreconciled"   value={reconciliation.unreconciled}   tone="amber" />
-              <ReconStat label="Mismatch"       value={reconciliation.mismatch}       tone="rose" />
-              <ReconStat label="Verified"       value={reconciliation.verified}       tone="emerald" />
-              <ReconStat label="Disputed"       value={reconciliation.disputed}       tone="rose" />
+              <ReconStat label={t("bankAccounts.recon.matched", "Matched")}        value={reconciliation.matched}        tone="emerald" />
+              <ReconStat label={t("bankAccounts.recon.partial", "Partial")}        value={reconciliation.partially_matched} tone="amber" />
+              <ReconStat label={t("bankAccounts.recon.unrec", "Unreconciled")}   value={reconciliation.unreconciled}   tone="amber" />
+              <ReconStat label={t("bankAccounts.recon.mismatch", "Mismatch")}       value={reconciliation.mismatch}       tone="rose" />
+              <ReconStat label={t("bankAccounts.recon.verified", "Verified")}       value={reconciliation.verified}       tone="emerald" />
+              <ReconStat label={t("bankAccounts.recon.disputed", "Disputed")}       value={reconciliation.disputed}       tone="rose" />
             </div>
             <div className="mt-3 flex items-center justify-between rounded-lg border border-white/[0.05] bg-[var(--bg-primary)]/40 px-3 py-2 text-[11px]">
-              <span className="text-gray-400">Pending candidates</span>
+              <span className="text-gray-400">{t("bankAccounts.recon.pending", "Pending candidates")}</span>
               <span className="font-semibold tabular-nums text-[var(--text-primary)]">{reconciliation.pending_candidates}</span>
             </div>
             <Link
               href="/finance/reconciliation"
               className="mt-2 inline-flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-200"
             >
-              Open reconciliation queue
+              {t("bankAccounts.recon.openQueue", "Open reconciliation queue")}
               <RrIcon name="arrow-up-right-from-square" size={9} />
             </Link>
           </SectionCard>
 
-          <SectionCard title="Statement imports" subtitle={`Last ${imports.length} for this account.`}>
+          <SectionCard title={t("bankAccounts.imports.title", "Statement imports")} subtitle={t("bankAccounts.imports.subtitle", "Last {n} for this account.").replace("{n}", String(imports.length))}>
             {imports.length === 0 ? (
-              <EmptyState title="No imports yet" hint="Import a CSV or XLSX statement to populate movements." />
+              <EmptyState title={t("bankAccounts.imports.empty.title", "No imports yet")} hint={t("bankAccounts.imports.empty.hint", "Import a CSV or XLSX statement to populate movements.")} />
             ) : (
               <ul className="divide-y divide-white/[0.04]">
                 {imports.map((i) => (
@@ -603,8 +605,9 @@ function ReconStat({ label, value, tone }: { label: string; value: number; tone:
 }
 
 function MovementRow({ movement, accountCurrency }: { movement: CashMovement; accountCurrency: string }) {
+  const { t } = useTranslation(financeT);
   const ccy = movement.currency ?? accountCurrency;
-  const dirLabel = movement.direction === "inflow" ? "Money in" : "Money out";
+  const dirLabel = movement.direction === "inflow" ? t("bankAccounts.row.moneyIn", "Money in") : t("bankAccounts.row.moneyOut", "Money out");
   const dirTone = movement.direction === "inflow" ? "text-emerald-300" : "text-rose-300";
   const sign = movement.direction === "inflow" ? "+" : "−";
   return (
@@ -632,6 +635,7 @@ function MovementRow({ movement, accountCurrency }: { movement: CashMovement; ac
 }
 
 function ImportRow({ imp }: { imp: BankStatementImport }) {
+  const { t } = useTranslation(financeT);
   return (
     <li className="flex items-start gap-2 py-2">
       <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-white/[0.04]">
@@ -643,10 +647,10 @@ function ImportRow({ imp }: { imp: BankStatementImport }) {
           <ImportStatusChip status={imp.status} />
         </div>
         <div className="mt-0.5 text-[10px] text-gray-500">
-          {new Date(imp.uploaded_at).toLocaleDateString()} · {imp.row_count} rows
-          {imp.duplicate_count > 0 && <> · {imp.duplicate_count} duplicates</>}
-          {imp.error_count > 0 && <> · {imp.error_count} errors</>}
-          {imp.imported_count > 0 && <> · {imp.imported_count} movements</>}
+          {new Date(imp.uploaded_at).toLocaleDateString()} · {t("bankAccounts.imports.rows", "{n} rows").replace("{n}", String(imp.row_count))}
+          {imp.duplicate_count > 0 && <> · {t("bankAccounts.imports.dups", "{n} duplicates").replace("{n}", String(imp.duplicate_count))}</>}
+          {imp.error_count > 0 && <> · {t("bankAccounts.imports.errors", "{n} errors").replace("{n}", String(imp.error_count))}</>}
+          {imp.imported_count > 0 && <> · {t("bankAccounts.imports.movements", "{n} movements").replace("{n}", String(imp.imported_count))}</>}
         </div>
       </div>
     </li>
@@ -654,15 +658,22 @@ function ImportRow({ imp }: { imp: BankStatementImport }) {
 }
 
 function ImportStatusChip({ status }: { status: BankStatementImport["status"] }) {
+  const { t } = useTranslation(financeT);
   const cls =
     status === "confirmed" ? "bg-emerald-500/15 text-emerald-300" :
     status === "parsed"    ? "bg-amber-500/15 text-amber-300" :
     status === "failed"    ? "bg-rose-500/15 text-rose-300" :
     status === "cancelled" ? "bg-gray-500/15 text-gray-300" :
                               "bg-gray-500/15 text-gray-300";
+  const label =
+    status === "confirmed" ? t("bankImports.impStatus.confirmed", "Confirmed") :
+    status === "parsed"    ? t("bankImports.impStatus.parsed", "Parsed") :
+    status === "failed"    ? t("bankImports.impStatus.failed", "Failed") :
+    status === "cancelled" ? t("bankImports.impStatus.cancelled", "Cancelled") :
+                              t("bankImports.impStatus.uploaded", "Uploaded");
   return (
     <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${cls}`}>
-      {status}
+      {label}
     </span>
   );
 }

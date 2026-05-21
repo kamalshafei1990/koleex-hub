@@ -130,7 +130,7 @@ export default function FinanceReports({
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({ error: `PDF failed (${res.status})` }));
-        alert(j.error);
+        alert(j.error ?? `PDF failed (${res.status})`);
         return;
       }
       const blob = await res.blob();
@@ -180,16 +180,16 @@ export default function FinanceReports({
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
-          title="Reporting Centre"
-          subtitle="Generate, print, and export official finance documents. External reports are safe to send; internal ones never leave the company."
+          title={t("reports.centre.title", "Reporting Centre")}
+          subtitle={t("reports.centre.subtitle", "Generate, print, and export official finance documents. External reports are safe to send; internal ones never leave the company.")}
         />
 
         <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[260px_300px_minmax(0,1fr)]">
           {/* ───────── Type picker ───────── */}
           <SectionCard>
             <div className="space-y-4">
-              <PickerSection title="External · safe to send" templates={externalTemplates} active={activeType} onPick={(t) => { setActiveType(t); setPreviewHtml(null); }} accent="emerald" />
-              <PickerSection title="Internal · operators only" templates={internalTemplates} active={activeType} onPick={(t) => { setActiveType(t); setPreviewHtml(null); }} accent="rose" />
+              <PickerSection title={t("reports.section.external", "External · safe to send")} templates={externalTemplates} active={activeType} onPick={(ty) => { setActiveType(ty); setPreviewHtml(null); }} accent="emerald" />
+              <PickerSection title={t("reports.section.internal", "Internal · operators only")} templates={internalTemplates} active={activeType} onPick={(ty) => { setActiveType(ty); setPreviewHtml(null); }} accent="rose" />
             </div>
           </SectionCard>
 
@@ -208,7 +208,7 @@ export default function FinanceReports({
                 busy={busy}
               />
             ) : (
-              <div className="py-12 text-center text-sm text-gray-500">Pick a report type to begin.</div>
+              <div className="py-12 text-center text-sm text-gray-500">{t("reports.pickPrompt", "Pick a report type to begin.")}</div>
             )}
           </SectionCard>
 
@@ -219,15 +219,15 @@ export default function FinanceReports({
                 proportions. */}
           <SectionCard>
             <div className="flex items-center justify-between border-b border-white/[0.06] pb-2 mb-3">
-              <div className="text-xs font-semibold uppercase tracking-wider text-gray-400">Document preview</div>
-              {previewLoading && <span className="text-[10px] text-gray-500">Updating…</span>}
+              <div className="text-xs font-semibold uppercase tracking-wider text-gray-400">{t("reports.preview.title", "Document preview")}</div>
+              {previewLoading && <span className="text-[10px] text-gray-500">{t("reports.preview.updating", "Updating…")}</span>}
             </div>
             {previewError ? (
               <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">{previewError}</div>
             ) : previewHtml ? (
               <div className="overflow-hidden rounded-md border border-white/[0.04] bg-white" style={{ aspectRatio: "210 / 297" }}>
                 <iframe
-                  title="Report preview"
+                  title={t("reports.preview.iframeTitle", "Report preview")}
                   srcDoc={previewHtml}
                   className="block h-full w-full border-0"
                   /* sandbox keeps the iframe inert — same-origin so
@@ -238,7 +238,7 @@ export default function FinanceReports({
                 />
               </div>
             ) : (
-              <EmptyState title="No preview yet" hint="Pick a report and adjust filters to see a live preview." />
+              <EmptyState title={t("reports.preview.empty", "No preview yet")} hint={t("reports.preview.emptyHint", "Pick a report and adjust filters to see a live preview.")} />
             )}
           </SectionCard>
         </div>
@@ -312,41 +312,42 @@ function FiltersPanel({
   onPrint: () => void;
   busy: "pdf" | "print" | null;
 }) {
+  const { t } = useTranslation(financeT);
   const allFilterKeys: Array<keyof ReportFilters> = Array.from(new Set([...descriptor.required_filters, ...descriptor.optional_filters]));
   const set = (k: keyof ReportFilters, v: string | undefined) => onChange({ ...filters, [k]: v || undefined });
 
   return (
     <div>
-      <div className="text-[11px] uppercase tracking-[0.16em] text-gray-500">Filters</div>
+      <div className="text-[11px] uppercase tracking-[0.16em] text-gray-500">{t("reports.filters.title", "Filters")}</div>
       <div className="mt-3 space-y-3">
         {allFilterKeys.includes("customer_id") && (
-          <Field label="Customer" required={descriptor.required_filters.includes("customer_id")}>
-            <Select value={filters.customer_id ?? ""} onChange={(v) => set("customer_id", v)} options={customers} placeholder="— Select customer —" />
+          <Field label={t("reports.filters.customer", "Customer")} required={descriptor.required_filters.includes("customer_id")}>
+            <Select value={filters.customer_id ?? ""} onChange={(v) => set("customer_id", v)} options={customers} placeholder={t("reports.filters.customerPlaceholder", "— Select customer —")} />
           </Field>
         )}
         {allFilterKeys.includes("supplier_id") && (
-          <Field label="Supplier" required={descriptor.required_filters.includes("supplier_id")}>
-            <Select value={filters.supplier_id ?? ""} onChange={(v) => set("supplier_id", v)} options={suppliers} placeholder="— Select supplier —" />
+          <Field label={t("reports.filters.supplier", "Supplier")} required={descriptor.required_filters.includes("supplier_id")}>
+            <Select value={filters.supplier_id ?? ""} onChange={(v) => set("supplier_id", v)} options={suppliers} placeholder={t("reports.filters.supplierPlaceholder", "— Select supplier —")} />
           </Field>
         )}
         {allFilterKeys.includes("bank_account_id") && (
-          <Field label="Bank account" required={descriptor.required_filters.includes("bank_account_id")}>
-            <Select value={filters.bank_account_id ?? ""} onChange={(v) => set("bank_account_id", v)} options={[{ id: "", name: "All accounts" }, ...bankAccounts]} placeholder="" />
+          <Field label={t("reports.filters.bankAccount", "Bank account")} required={descriptor.required_filters.includes("bank_account_id")}>
+            <Select value={filters.bank_account_id ?? ""} onChange={(v) => set("bank_account_id", v)} options={[{ id: "", name: t("reports.filters.allAccounts", "All accounts") }, ...bankAccounts]} placeholder="" />
           </Field>
         )}
         {allFilterKeys.includes("date_from") && (
           <div className="grid grid-cols-2 gap-2">
-            <Field label="From" required={descriptor.required_filters.includes("date_from")}>
+            <Field label={t("reports.filters.from", "From")} required={descriptor.required_filters.includes("date_from")}>
               <Input type="date" value={filters.date_from ?? ""} onChange={(v) => set("date_from", v)} />
             </Field>
-            <Field label="To" required={descriptor.required_filters.includes("date_to")}>
+            <Field label={t("reports.filters.to", "To")} required={descriptor.required_filters.includes("date_to")}>
               <Input type="date" value={filters.date_to ?? ""} onChange={(v) => set("date_to", v)} />
             </Field>
           </div>
         )}
         {allFilterKeys.includes("currency") && (
-          <Field label="Currency (optional)">
-            <Input value={filters.currency ?? ""} onChange={(v) => set("currency", v.toUpperCase())} placeholder="USD / EUR / CNY …" />
+          <Field label={t("reports.filters.currency", "Currency (optional)")}>
+            <Input value={filters.currency ?? ""} onChange={(v) => set("currency", v.toUpperCase())} placeholder={t("reports.filters.currencyPlaceholder", "USD / EUR / CNY …")} />
           </Field>
         )}
       </div>
@@ -358,7 +359,7 @@ function FiltersPanel({
           disabled={busy !== null}
           className="rounded-lg border border-white/[0.10] bg-[var(--bg-primary)] px-3 py-2 text-[12px] font-semibold transition hover:border-white/[0.20] disabled:opacity-50"
         >
-          {busy === "print" ? "Preparing…" : "Print"}
+          {busy === "print" ? t("reports.btn.printing", "Preparing…") : t("reports.btn.print", "Print")}
         </button>
         <button
           type="button"
@@ -366,14 +367,14 @@ function FiltersPanel({
           disabled={busy !== null}
           className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-[12px] font-semibold text-emerald-300 transition hover:bg-emerald-500/20 disabled:opacity-50"
         >
-          {busy === "pdf" ? "Building…" : "Download PDF"}
+          {busy === "pdf" ? t("reports.btn.building", "Building…") : t("reports.btn.download", "Download PDF")}
         </button>
       </div>
 
       <div className="mt-3 rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] px-3 py-2 text-[10px] text-gray-500">
         {descriptor.visibility === "external"
-          ? "Safe to send — this report excludes profit, cost, intelligence, and internal notes."
-          : "Internal only — contains operator data. Never share with customers or suppliers."}
+          ? t("reports.external.note", "Safe to send — this report excludes profit, cost, intelligence, and internal notes.")
+          : t("reports.internal.note", "Internal only — contains operator data. Never share with customers or suppliers.")}
       </div>
     </div>
   );

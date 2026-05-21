@@ -126,12 +126,12 @@ export default function FinanceSetup() {
         <div className="rounded-xl border border-white/[0.05] bg-white/[0.012] px-4 py-3.5">
           <div className="flex items-baseline justify-between gap-3">
             <div>
-              <Eyebrow>Setup progress</Eyebrow>
-              <div className="mt-1 text-[15px] text-gray-200">{startedCount} of {snapshot?.cards.length ?? 10} sections started</div>
+              <Eyebrow>{t("setup.progress.label", "Setup progress")}</Eyebrow>
+              <div className="mt-1 text-[15px] text-gray-200">{t("setup.progress.startedOf", "{n} of {total} sections started").replace("{n}", String(startedCount)).replace("{total}", String(snapshot?.cards.length ?? 10))}</div>
               <div className="mt-1 text-[11px] text-gray-500">
                 {snapshot?.ready
-                  ? "Looks ready — you can start using the Finance app while the rest fills in."
-                  : "Once half the cards are started, the Finance app is workable."}
+                  ? t("setup.progress.ready", "Looks ready — you can start using the Finance app while the rest fills in.")
+                  : t("setup.progress.halfHint", "Once half the cards are started, the Finance app is workable.")}
               </div>
             </div>
             <div className="text-right">
@@ -165,7 +165,7 @@ export default function FinanceSetup() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.14em] text-gray-500">
                   <StatusDot status={c.status} />
-                  {c.status}
+                  {c.status === "complete" ? t("setup.statusComplete", "Complete") : c.status === "started" ? t("setup.statusStarted", "Started") : t("setup.statusEmpty", "Empty")}
                 </div>
                 <RrIcon name="arrow-up-right" size={11} />
               </div>
@@ -173,11 +173,11 @@ export default function FinanceSetup() {
               <div className="mt-1 text-[11px] text-gray-500">{c.hint}</div>
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.12em] text-gray-500">Count</div>
+                  <div className="text-[10px] uppercase tracking-[0.12em] text-gray-500">{t("setup.card.count", "Count")}</div>
                   <div className="mt-0.5 font-mono text-[15px] tabular-nums">{c.count}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.12em] text-gray-500">Total</div>
+                  <div className="text-[10px] uppercase tracking-[0.12em] text-gray-500">{t("setup.card.total", "Total")}</div>
                   <div className="mt-0.5 font-mono text-[15px] tabular-nums">{c.key === "fx_rates" || c.key === "base_currency" ? "—" : fmtMoney(c.total, c.currency)}</div>
                 </div>
               </div>
@@ -203,6 +203,7 @@ export default function FinanceSetup() {
 function DrawerShell({
   title, subtitle, onClose, children, footer,
 }: { title: string; subtitle?: string; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode }) {
+  const { t } = useTranslation(financeT);
   return (
     <div className="fixed inset-0 z-[120] flex justify-end bg-black/60" onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} className="flex w-full max-w-lg flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-l border-white/[0.08]">
@@ -211,7 +212,7 @@ function DrawerShell({
             <h2 className="text-[14px] font-semibold">{title}</h2>
             {subtitle && <p className="text-[11px] text-gray-500">{subtitle}</p>}
           </div>
-          <button onClick={onClose} aria-label="Close" className="text-gray-500 hover:text-gray-300 text-[20px] leading-none">×</button>
+          <button onClick={onClose} aria-label={t("setup.drawer.close", "Close")} className="text-gray-500 hover:text-gray-300 text-[20px] leading-none">×</button>
         </div>
         <div className="flex-1 overflow-y-auto p-4">{children}</div>
         {footer && <div className="border-t border-white/[0.06] px-4 py-3">{footer}</div>}
@@ -249,6 +250,7 @@ function SetupDrawer({
 /* ─── Base currency ──────────────────────────────────────────── */
 
 function BaseCurrencyDrawer({ onClose, onChange }: { onClose: () => void; onChange: () => void }) {
+  const { t } = useTranslation(financeT);
   const [code, setCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -280,27 +282,27 @@ function BaseCurrencyDrawer({ onClose, onChange }: { onClose: () => void; onChan
 
   return (
     <DrawerShell
-      title="Company Base Currency"
-      subtitle="The currency every other number defaults to."
+      title={t("setup.baseCcy.title", "Company Base Currency")}
+      subtitle={t("setup.baseCcy.subtitle", "The currency every other number defaults to.")}
       onClose={onClose}
       footer={
         <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-md border border-white/[0.08] px-3 py-1.5 text-[12px] text-gray-400 hover:text-gray-200">Cancel</button>
-          <button onClick={save} disabled={submitting || !code} className="rounded-md border border-white/[0.12] bg-white/[0.06] px-3 py-1.5 text-[12px] hover:bg-white/[0.10] disabled:opacity-50">{submitting ? "Saving…" : "Save"}</button>
+          <button onClick={onClose} className="rounded-md border border-white/[0.08] px-3 py-1.5 text-[12px] text-gray-400 hover:text-gray-200">{t("setup.drawer.cancel", "Cancel")}</button>
+          <button onClick={save} disabled={submitting || !code} className="rounded-md border border-white/[0.12] bg-white/[0.06] px-3 py-1.5 text-[12px] hover:bg-white/[0.10] disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.drawer.save", "Save")}</button>
         </div>
       }
     >
       <div className="space-y-3">
         <label className="block">
-          <div className={labelCls}>ISO currency code</div>
+          <div className={labelCls}>{t("setup.baseCcy.field", "ISO currency code")}</div>
           <input
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase().slice(0, 3))}
-            placeholder="USD, EUR, AED, EGP, CNY…"
+            placeholder={t("setup.baseCcy.placeholder", "USD, EUR, AED, EGP, CNY…")}
             maxLength={3}
             className={`${inputCls} font-mono uppercase`}
           />
-          <div className="mt-1 text-[10.5px] text-gray-500">Three-letter ISO 4217 code. This value sits on the tenant record and is used everywhere a default is needed.</div>
+          <div className="mt-1 text-[10.5px] text-gray-500">{t("setup.baseCcy.hint", "Three-letter ISO 4217 code. This value sits on the tenant record and is used everywhere a default is needed.")}</div>
         </label>
         {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-300">{error}</div>}
       </div>
@@ -313,6 +315,7 @@ function BaseCurrencyDrawer({ onClose, onChange }: { onClose: () => void; onChan
 interface BankRow { id: string; bank_name: string | null; account_name: string | null; account_number: string | null; iban: string | null; swift_code: string | null; currency: string; opening_balance: number; is_primary: boolean; status: string }
 
 function BankAccountsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: string; onClose: () => void; onChange: () => void }) {
+  const { t } = useTranslation(financeT);
   const [rows, setRows] = useState<BankRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -338,7 +341,7 @@ function BankAccountsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency:
   useEffect(() => { void load(); }, [load]);
 
   const save = async () => {
-    if (!name.trim() && !bank.trim()) { setError("Provide bank or account name"); return; }
+    if (!name.trim() && !bank.trim()) { setError(t("setup.banks.err.nameRequired", "Provide bank or account name")); return; }
     setSubmitting(true); setError(null);
     try {
       const r = await fetch("/api/finance/bank-accounts", {
@@ -367,27 +370,27 @@ function BankAccountsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency:
   };
 
   return (
-    <DrawerShell title="Bank Accounts" subtitle="Operating accounts, FX sub-accounts, savings — every bank you transact through." onClose={onClose}>
+    <DrawerShell title={t("setup.banks.title", "Bank Accounts")} subtitle={t("setup.banks.subtitle", "Operating accounts, FX sub-accounts, savings — every bank you transact through.")} onClose={onClose}>
       <div className="space-y-4">
         <div className="rounded-md border border-white/[0.06] p-3 space-y-2">
-          <div className={labelCls}>New bank account</div>
-          <input placeholder="Account name (e.g. Main USD)"  value={name}          onChange={(e) => setName(e.target.value)}          className={inputCls} />
-          <input placeholder="Bank name (e.g. HSBC)"          value={bank}          onChange={(e) => setBank(e.target.value)}          className={inputCls} />
+          <div className={labelCls}>{t("setup.banks.new", "New bank account")}</div>
+          <input placeholder={t("setup.banks.acctNamePlaceholder", "Account name (e.g. Main USD)")}  value={name}          onChange={(e) => setName(e.target.value)}          className={inputCls} />
+          <input placeholder={t("setup.banks.bankNamePlaceholder", "Bank name (e.g. HSBC)")}          value={bank}          onChange={(e) => setBank(e.target.value)}          className={inputCls} />
           <div className="grid grid-cols-2 gap-2">
-            <input placeholder="Account number" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} className={inputCls} />
-            <input placeholder="SWIFT / BIC"     value={swift}         onChange={(e) => setSwift(e.target.value.toUpperCase())} className={`${inputCls} font-mono uppercase`} />
-            <input placeholder="IBAN"            value={iban}          onChange={(e) => setIban(e.target.value.toUpperCase())}  className={`${inputCls} font-mono uppercase`} />
-            <input placeholder="Currency (USD)"  value={currency}      onChange={(e) => setCurrency(e.target.value.toUpperCase().slice(0, 3))} maxLength={3} className={`${inputCls} font-mono uppercase`} />
+            <input placeholder={t("setup.banks.acctNoPlaceholder", "Account number")} value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} className={inputCls} />
+            <input placeholder={t("setup.banks.swiftPlaceholder", "SWIFT / BIC")}     value={swift}         onChange={(e) => setSwift(e.target.value.toUpperCase())} className={`${inputCls} font-mono uppercase`} />
+            <input placeholder={t("setup.banks.ibanPlaceholder", "IBAN")}            value={iban}          onChange={(e) => setIban(e.target.value.toUpperCase())}  className={`${inputCls} font-mono uppercase`} />
+            <input placeholder={t("setup.banks.ccyPlaceholder", "Currency (USD)")}  value={currency}      onChange={(e) => setCurrency(e.target.value.toUpperCase().slice(0, 3))} maxLength={3} className={`${inputCls} font-mono uppercase`} />
           </div>
-          <input type="number" min="0" step="0.01" placeholder="Opening balance" value={opening} onChange={(e) => setOpening(e.target.value)} className={`${inputCls} tabular-nums`} />
+          <input type="number" min="0" step="0.01" placeholder={t("setup.banks.openingPlaceholder", "Opening balance")} value={opening} onChange={(e) => setOpening(e.target.value)} className={`${inputCls} tabular-nums`} />
           {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-300">{error}</div>}
-          <button onClick={save} disabled={submitting} className="w-full rounded-md border border-white/[0.12] bg-white/[0.06] px-3 py-1.5 text-[12px] hover:bg-white/[0.10] disabled:opacity-50">{submitting ? "Saving…" : "Add bank account"}</button>
+          <button onClick={save} disabled={submitting} className="w-full rounded-md border border-white/[0.12] bg-white/[0.06] px-3 py-1.5 text-[12px] hover:bg-white/[0.10] disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.banks.add", "Add bank account")}</button>
         </div>
 
         <div>
-          <div className={labelCls}>Existing accounts ({rows.length})</div>
-          {loading ? <div className="text-[11px] text-gray-500">Loading…</div> : rows.length === 0 ? (
-            <div className="rounded-md border border-white/[0.04] px-3 py-3 text-[11px] text-gray-600">No bank accounts yet.</div>
+          <div className={labelCls}>{t("setup.banks.existing", "Existing accounts ({n})").replace("{n}", String(rows.length))}</div>
+          {loading ? <div className="text-[11px] text-gray-500">{t("setup.drawer.loading", "Loading…")}</div> : rows.length === 0 ? (
+            <div className="rounded-md border border-white/[0.04] px-3 py-3 text-[11px] text-gray-600">{t("setup.banks.empty", "No bank accounts yet.")}</div>
           ) : (
             <ul className="space-y-1">
               {rows.map((b) => (
@@ -412,6 +415,7 @@ function BankAccountsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency:
 interface FxRow { id: string; from_currency: string; to_currency: string; rate: number; effective_date: string; notes: string | null }
 
 function FxRatesDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: string; onClose: () => void; onChange: () => void }) {
+  const { t } = useTranslation(financeT);
   const [rows, setRows] = useState<FxRow[]>([]);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState(baseCurrency);
@@ -454,31 +458,31 @@ function FxRatesDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: stri
   };
 
   const remove = async (id: string) => {
-    if (!confirm("Remove this rate?")) return;
+    if (!confirm(t("setup.fx.removeConfirm", "Remove this rate?"))) return;
     await fetch(`/api/finance/setup/fx-rates/${id}`, { method: "DELETE", credentials: "include" });
     await load(); onChange();
   };
 
   return (
-    <DrawerShell title="FX Rates" subtitle="Manual rates for foreign-currency transactions. Used when a movement needs converting back to the base currency." onClose={onClose}>
+    <DrawerShell title={t("setup.fx.title", "FX Rates")} subtitle={t("setup.fx.subtitle", "Manual rates for foreign-currency transactions. Used when a movement needs converting back to the base currency.")} onClose={onClose}>
       <div className="space-y-4">
         <div className="rounded-md border border-white/[0.06] p-3 space-y-2">
-          <div className={labelCls}>New rate</div>
+          <div className={labelCls}>{t("setup.fx.new", "New rate")}</div>
           <div className="grid grid-cols-3 gap-2">
-            <input placeholder="From" value={from} onChange={(e) => setFrom(e.target.value.toUpperCase().slice(0, 3))} maxLength={3} className={`${inputCls} font-mono uppercase`} />
-            <input placeholder="To"   value={to}   onChange={(e) => setTo(e.target.value.toUpperCase().slice(0, 3))}   maxLength={3} className={`${inputCls} font-mono uppercase`} />
-            <input type="number" min="0" step="0.00000001" placeholder="Rate" value={rate} onChange={(e) => setRate(e.target.value)} className={`${inputCls} tabular-nums`} />
+            <input placeholder={t("setup.fx.fromPlaceholder", "From")} value={from} onChange={(e) => setFrom(e.target.value.toUpperCase().slice(0, 3))} maxLength={3} className={`${inputCls} font-mono uppercase`} />
+            <input placeholder={t("setup.fx.toPlaceholder", "To")}   value={to}   onChange={(e) => setTo(e.target.value.toUpperCase().slice(0, 3))}   maxLength={3} className={`${inputCls} font-mono uppercase`} />
+            <input type="number" min="0" step="0.00000001" placeholder={t("setup.fx.ratePlaceholder", "Rate")} value={rate} onChange={(e) => setRate(e.target.value)} className={`${inputCls} tabular-nums`} />
           </div>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
-          <input placeholder="Notes (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} />
+          <input placeholder={t("setup.fx.notesPlaceholder", "Notes (optional)")} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} />
           {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-300">{error}</div>}
-          <button onClick={save} disabled={submitting || !from || !to || !rate} className="w-full rounded-md border border-white/[0.12] bg-white/[0.06] px-3 py-1.5 text-[12px] hover:bg-white/[0.10] disabled:opacity-50">{submitting ? "Saving…" : "Add rate"}</button>
+          <button onClick={save} disabled={submitting || !from || !to || !rate} className="w-full rounded-md border border-white/[0.12] bg-white/[0.06] px-3 py-1.5 text-[12px] hover:bg-white/[0.10] disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.fx.add", "Add rate")}</button>
         </div>
 
         <div>
-          <div className={labelCls}>Existing rates ({rows.length})</div>
-          {loading ? <div className="text-[11px] text-gray-500">Loading…</div> : rows.length === 0 ? (
-            <div className="rounded-md border border-white/[0.04] px-3 py-3 text-[11px] text-gray-600">No rates configured. Anything in the base currency will be passed through unchanged.</div>
+          <div className={labelCls}>{t("setup.fx.existing", "Existing rates ({n})").replace("{n}", String(rows.length))}</div>
+          {loading ? <div className="text-[11px] text-gray-500">{t("setup.drawer.loading", "Loading…")}</div> : rows.length === 0 ? (
+            <div className="rounded-md border border-white/[0.04] px-3 py-3 text-[11px] text-gray-600">{t("setup.fx.empty", "No rates configured. Anything in the base currency will be passed through unchanged.")}</div>
           ) : (
             <ul className="space-y-1">
               {rows.map((r) => (
@@ -487,7 +491,7 @@ function FxRatesDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: stri
                     <div className="text-gray-200"><span className="font-mono">{r.from_currency} → {r.to_currency}</span> · <span className="tabular-nums">{Number(r.rate).toLocaleString("en-US", { maximumFractionDigits: 8 })}</span></div>
                     <div className="text-[10.5px] text-gray-500">{r.effective_date}{r.notes ? ` · ${r.notes}` : ""}</div>
                   </div>
-                  <button onClick={() => remove(r.id)} className="text-[11px] text-rose-300 hover:text-rose-200">Remove</button>
+                  <button onClick={() => remove(r.id)} className="text-[11px] text-rose-300 hover:text-rose-200">{t("setup.fx.remove", "Remove")}</button>
                 </li>
               ))}
             </ul>
@@ -502,13 +506,13 @@ function FxRatesDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: stri
 
 interface AssetRow { id: string; name: string; category: string | null; purchase_value: number; purchase_date: string | null; depreciation_method: string; useful_life_years: number | null; currency: string; notes: string | null; status: string }
 
-const DEPRECIATION_METHODS: Array<{ value: string; label: string }> = [
-  { value: "straight_line",      label: "Straight line" },
-  { value: "declining_balance",  label: "Declining balance" },
-  { value: "none",               label: "None" },
-];
-
 function AssetsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: string; onClose: () => void; onChange: () => void }) {
+  const { t } = useTranslation(financeT);
+  const DEPRECIATION_METHODS: Array<{ value: string; label: string }> = [
+    { value: "straight_line",      label: t("setup.assets.method.sl", "Straight line") },
+    { value: "declining_balance",  label: t("setup.assets.method.db", "Declining balance") },
+    { value: "none",               label: t("setup.assets.method.none", "None") },
+  ];
   const [rows, setRows] = useState<AssetRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -533,9 +537,9 @@ function AssetsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: strin
   useEffect(() => { void load(); }, [load]);
 
   const save = async () => {
-    if (!name.trim()) { setError("name required"); return; }
+    if (!name.trim()) { setError(t("setup.assets.err.nameRequired", "name required")); return; }
     const v = Number(value);
-    if (!Number.isFinite(v) || v < 0) { setError("purchase value required"); return; }
+    if (!Number.isFinite(v) || v < 0) { setError(t("setup.assets.err.valueRequired", "purchase value required")); return; }
     setSubmitting(true); setError(null);
     try {
       const r = await fetch("/api/finance/setup/assets", {
@@ -561,36 +565,36 @@ function AssetsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: strin
   };
 
   const remove = async (id: string) => {
-    if (!confirm("Archive this asset?")) return;
+    if (!confirm(t("setup.assets.archiveConfirm", "Archive this asset?"))) return;
     await fetch(`/api/finance/setup/assets/${id}`, { method: "DELETE", credentials: "include" });
     await load(); onChange();
   };
 
   return (
-    <DrawerShell title="Assets" subtitle="Buildings, vehicles, machinery, IT — anything depreciable." onClose={onClose}>
+    <DrawerShell title={t("setup.assets.title", "Assets")} subtitle={t("setup.assets.subtitle", "Buildings, vehicles, machinery, IT — anything depreciable.")} onClose={onClose}>
       <div className="space-y-4">
         <div className="rounded-md border border-white/[0.06] p-3 space-y-2">
-          <div className={labelCls}>New asset</div>
-          <input placeholder="Asset name (e.g. Forklift FL-2026)" value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
+          <div className={labelCls}>{t("setup.assets.new", "New asset")}</div>
+          <input placeholder={t("setup.assets.namePlaceholder", "Asset name (e.g. Forklift FL-2026)")} value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
           <div className="grid grid-cols-2 gap-2">
-            <input placeholder="Category (e.g. Machinery)" value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls} />
-            <input type="number" min="0" step="0.01" placeholder="Purchase value" value={value} onChange={(e) => setValue(e.target.value)} className={`${inputCls} tabular-nums`} />
+            <input placeholder={t("setup.assets.categoryPlaceholder", "Category (e.g. Machinery)")} value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls} />
+            <input type="number" min="0" step="0.01" placeholder={t("setup.assets.valuePlaceholder", "Purchase value")} value={value} onChange={(e) => setValue(e.target.value)} className={`${inputCls} tabular-nums`} />
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
-            <input type="number" min="0" step="0.1" placeholder="Useful life (years)" value={life} onChange={(e) => setLife(e.target.value)} className={`${inputCls} tabular-nums`} />
+            <input type="number" min="0" step="0.1" placeholder={t("setup.assets.lifePlaceholder", "Useful life (years)")} value={life} onChange={(e) => setLife(e.target.value)} className={`${inputCls} tabular-nums`} />
             <select value={method} onChange={(e) => setMethod(e.target.value)} className={inputCls}>
               {DEPRECIATION_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
             </select>
-            <input placeholder="Currency" value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase().slice(0, 3))} maxLength={3} className={`${inputCls} font-mono uppercase`} />
+            <input placeholder={t("setup.assets.currencyPlaceholder", "Currency")} value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase().slice(0, 3))} maxLength={3} className={`${inputCls} font-mono uppercase`} />
           </div>
-          <textarea rows={2} placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} />
+          <textarea rows={2} placeholder={t("setup.assets.notesPlaceholder", "Notes")} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} />
           {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-300">{error}</div>}
-          <button onClick={save} disabled={submitting} className="w-full rounded-md border border-white/[0.12] bg-white/[0.06] px-3 py-1.5 text-[12px] hover:bg-white/[0.10] disabled:opacity-50">{submitting ? "Saving…" : "Add asset"}</button>
+          <button onClick={save} disabled={submitting} className="w-full rounded-md border border-white/[0.12] bg-white/[0.06] px-3 py-1.5 text-[12px] hover:bg-white/[0.10] disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.assets.add", "Add asset")}</button>
         </div>
 
         <div>
-          <div className={labelCls}>Existing assets ({rows.length})</div>
-          {loading ? <div className="text-[11px] text-gray-500">Loading…</div> : rows.length === 0 ? (
-            <div className="rounded-md border border-white/[0.04] px-3 py-3 text-[11px] text-gray-600">No assets registered yet.</div>
+          <div className={labelCls}>{t("setup.assets.existing", "Existing assets ({n})").replace("{n}", String(rows.length))}</div>
+          {loading ? <div className="text-[11px] text-gray-500">{t("setup.drawer.loading", "Loading…")}</div> : rows.length === 0 ? (
+            <div className="rounded-md border border-white/[0.04] px-3 py-3 text-[11px] text-gray-600">{t("setup.assets.empty", "No assets registered yet.")}</div>
           ) : (
             <ul className="space-y-1">
               {rows.map((a) => (
@@ -601,7 +605,7 @@ function AssetsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: strin
                   </div>
                   <div className="text-right">
                     <div className="font-mono tabular-nums">{Number(a.purchase_value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {a.currency}</div>
-                    <button onClick={() => remove(a.id)} className="text-[11px] text-rose-300 hover:text-rose-200">Archive</button>
+                    <button onClick={() => remove(a.id)} className="text-[11px] text-rose-300 hover:text-rose-200">{t("setup.assets.archive", "Archive")}</button>
                   </div>
                 </li>
               ))}
@@ -617,20 +621,20 @@ function AssetsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: strin
 
 type OBCategory = "cash" | "owner_capital" | "loan" | "customer_receivable" | "supplier_payable" | "fixed_asset" | "inventory" | "other";
 
-const CATEGORY_META: Record<OBCategory, { title: string; hint: string; placeholder: string }> = {
-  cash:                { title: "Cash Accounts",         hint: "Physical cash on hand and petty-cash floats.",                placeholder: "Main petty cash" },
-  owner_capital:       { title: "Equity / Capital",      hint: "Owner-injected capital at company formation.",                placeholder: "Founder contribution" },
-  loan:                { title: "Loans & Liabilities",   hint: "Bank loans, long-term debt, shareholder loans.",              placeholder: "HSBC term loan" },
-  customer_receivable: { title: "Customers Receivable",  hint: "Outstanding balances customers owe at go-live.",              placeholder: "Customer XYZ — invoice INV-2025-01" },
-  supplier_payable:    { title: "Suppliers Payable",     hint: "Outstanding balances owed to suppliers at go-live.",          placeholder: "Supplier ABC — invoice 5512" },
-  fixed_asset:         { title: "Fixed Asset Opening",   hint: "Opening book value of an asset (independent from the Asset register).", placeholder: "Office equipment opening" },
-  inventory:           { title: "Inventory Opening",     hint: "Opening inventory value snapshot.",                           placeholder: "Warehouse opening value" },
-  other:               { title: "Other Opening Balances", hint: "Anything that doesn't fit the categories above.",            placeholder: "Misc opening" },
-};
-
 interface OBRow { id: string; category: OBCategory; label: string; amount: number; currency: string; notes: string | null; created_at: string }
 
 function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { category: OBCategory; baseCurrency: string; onClose: () => void; onChange: () => void }) {
+  const { t } = useTranslation(financeT);
+  const CATEGORY_META: Record<OBCategory, { title: string; hint: string; placeholder: string }> = {
+    cash:                { title: t("setup.ob.cat.cash.title", "Cash Accounts"),         hint: t("setup.ob.cat.cash.hint", "Physical cash on hand and petty-cash floats."),                placeholder: t("setup.ob.cat.cash.placeholder", "Main petty cash") },
+    owner_capital:       { title: t("setup.ob.cat.owner.title", "Equity / Capital"),      hint: t("setup.ob.cat.owner.hint", "Owner-injected capital at company formation."),                placeholder: t("setup.ob.cat.owner.placeholder", "Founder contribution") },
+    loan:                { title: t("setup.ob.cat.loan.title", "Loans & Liabilities"),   hint: t("setup.ob.cat.loan.hint", "Bank loans, long-term debt, shareholder loans."),              placeholder: t("setup.ob.cat.loan.placeholder", "HSBC term loan") },
+    customer_receivable: { title: t("setup.ob.cat.ar.title", "Customers Receivable"),  hint: t("setup.ob.cat.ar.hint", "Outstanding balances customers owe at go-live."),              placeholder: t("setup.ob.cat.ar.placeholder", "Customer XYZ — invoice INV-2025-01") },
+    supplier_payable:    { title: t("setup.ob.cat.ap.title", "Suppliers Payable"),     hint: t("setup.ob.cat.ap.hint", "Outstanding balances owed to suppliers at go-live."),          placeholder: t("setup.ob.cat.ap.placeholder", "Supplier ABC — invoice 5512") },
+    fixed_asset:         { title: t("setup.ob.cat.fa.title", "Fixed Asset Opening"),   hint: t("setup.ob.cat.fa.hint", "Opening book value of an asset (independent from the Asset register)."), placeholder: t("setup.ob.cat.fa.placeholder", "Office equipment opening") },
+    inventory:           { title: t("setup.ob.cat.inv.title", "Inventory Opening"),     hint: t("setup.ob.cat.inv.hint", "Opening inventory value snapshot."),                           placeholder: t("setup.ob.cat.inv.placeholder", "Warehouse opening value") },
+    other:               { title: t("setup.ob.cat.other.title", "Other Opening Balances"), hint: t("setup.ob.cat.other.hint", "Anything that doesn't fit the categories above."),            placeholder: t("setup.ob.cat.other.placeholder", "Misc opening") },
+  };
   const meta = CATEGORY_META[category];
   const [rows, setRows] = useState<OBRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -651,9 +655,9 @@ function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { 
   useEffect(() => { void load(); }, [load]);
 
   const save = async () => {
-    if (!label.trim()) { setError("Label required"); return; }
+    if (!label.trim()) { setError(t("setup.ob.err.labelRequired", "Label required")); return; }
     const amt = Number(amount);
-    if (!Number.isFinite(amt) || amt < 0) { setError("Amount must be ≥ 0"); return; }
+    if (!Number.isFinite(amt) || amt < 0) { setError(t("setup.ob.err.amountInvalid", "Amount must be ≥ 0")); return; }
     setSubmitting(true); setError(null);
     try {
       const r = await fetch("/api/finance/setup/opening-balances", {
@@ -676,7 +680,7 @@ function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { 
   };
 
   const remove = async (id: string) => {
-    if (!confirm("Remove this entry?")) return;
+    if (!confirm(t("setup.ob.removeConfirm", "Remove this entry?"))) return;
     await fetch(`/api/finance/setup/opening-balances/${id}`, { method: "DELETE", credentials: "include" });
     await load(); onChange();
   };
@@ -691,21 +695,21 @@ function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { 
     <DrawerShell title={meta.title} subtitle={meta.hint} onClose={onClose}>
       <div className="space-y-4">
         <div className="rounded-md border border-white/[0.06] p-3 space-y-2">
-          <div className={labelCls}>New entry</div>
+          <div className={labelCls}>{t("setup.ob.entry.new", "New entry")}</div>
           <input placeholder={meta.placeholder} value={label} onChange={(e) => setLabel(e.target.value)} className={inputCls} />
           <div className="grid grid-cols-2 gap-2">
-            <input type="number" min="0" step="0.01" placeholder="Amount" value={amount} onChange={(e) => setAmount(e.target.value)} className={`${inputCls} tabular-nums`} />
-            <input placeholder="Currency" value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase().slice(0, 3))} maxLength={3} className={`${inputCls} font-mono uppercase`} />
+            <input type="number" min="0" step="0.01" placeholder={t("setup.ob.entry.amount", "Amount")} value={amount} onChange={(e) => setAmount(e.target.value)} className={`${inputCls} tabular-nums`} />
+            <input placeholder={t("setup.ob.entry.currency", "Currency")} value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase().slice(0, 3))} maxLength={3} className={`${inputCls} font-mono uppercase`} />
           </div>
-          <textarea rows={2} placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} />
+          <textarea rows={2} placeholder={t("setup.ob.entry.notes", "Notes")} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} />
           {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-300">{error}</div>}
-          <button onClick={save} disabled={submitting} className="w-full rounded-md border border-white/[0.12] bg-white/[0.06] px-3 py-1.5 text-[12px] hover:bg-white/[0.10] disabled:opacity-50">{submitting ? "Saving…" : "Add entry"}</button>
+          <button onClick={save} disabled={submitting} className="w-full rounded-md border border-white/[0.12] bg-white/[0.06] px-3 py-1.5 text-[12px] hover:bg-white/[0.10] disabled:opacity-50">{submitting ? t("setup.drawer.saving", "Saving…") : t("setup.ob.entry.add", "Add entry")}</button>
         </div>
 
         <div>
-          <div className={labelCls}>Entries ({rows.length})</div>
-          {loading ? <div className="text-[11px] text-gray-500">Loading…</div> : rows.length === 0 ? (
-            <div className="rounded-md border border-white/[0.04] px-3 py-3 text-[11px] text-gray-600">No entries yet. Each entry is a single opening figure for this category.</div>
+          <div className={labelCls}>{t("setup.ob.entries", "Entries ({n})").replace("{n}", String(rows.length))}</div>
+          {loading ? <div className="text-[11px] text-gray-500">{t("setup.drawer.loading", "Loading…")}</div> : rows.length === 0 ? (
+            <div className="rounded-md border border-white/[0.04] px-3 py-3 text-[11px] text-gray-600">{t("setup.ob.empty", "No entries yet. Each entry is a single opening figure for this category.")}</div>
           ) : (
             <ul className="space-y-1">
               {rows.map((r) => (
@@ -716,7 +720,7 @@ function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { 
                   </div>
                   <div className="text-right">
                     <div className="font-mono tabular-nums">{Number(r.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {r.currency}</div>
-                    <button onClick={() => remove(r.id)} className="text-[11px] text-rose-300 hover:text-rose-200">Remove</button>
+                    <button onClick={() => remove(r.id)} className="text-[11px] text-rose-300 hover:text-rose-200">{t("setup.ob.remove", "Remove")}</button>
                   </div>
                 </li>
               ))}
@@ -724,10 +728,10 @@ function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { 
           )}
           {totalsByCurrency.length > 0 && (
             <div className="mt-3 border-t border-white/[0.05] pt-2 text-right text-[11px] tabular-nums">
-              {totalsByCurrency.map(([cur, t]) => (
+              {totalsByCurrency.map(([cur, tot]) => (
                 <div key={cur}>
-                  <span className="text-gray-500">Total {cur}</span>{" "}
-                  <span className="font-mono">{t.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span className="text-gray-500">{t("setup.ob.total", "Total {ccy}").replace("{ccy}", cur)}</span>{" "}
+                  <span className="font-mono">{tot.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
               ))}
             </div>
@@ -741,18 +745,19 @@ function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { 
 /* ─── Setup guidance — operator-friendly checklist + warnings ─── */
 
 function SetupGuidance({ snapshot }: { snapshot: SetupSnapshot }) {
+  const { t } = useTranslation(financeT);
   /* Recommended setup order — operators repeatedly asked "where do I
      start?" The checklist below is the answer: do these in this
      order and the rest unlocks. */
   const order: Array<{ key: CardKey; label: string; why: string }> = [
-    { key: "base_currency",   label: "Main Operating Currency",     why: "Locks the books in your reporting currency." },
-    { key: "bank_accounts",   label: "Bank Accounts",                why: "Tells the system where cash is held." },
-    { key: "fx_rates",        label: "Exchange Rates",               why: "Required if you sell in USD and operate in CNY." },
-    { key: "opening_balances", label: "Starting Company Position",   why: "Day-zero snapshot — assets, liabilities, balances." },
-    { key: "customers_ar",    label: "Money Customers Owe Us",       why: "Outstanding AR at go-live." },
-    { key: "suppliers_ap",    label: "Money We Owe Suppliers",       why: "Outstanding AP at go-live." },
-    { key: "assets",          label: "Assets",                       why: "Fixed assets + equipment register." },
-    { key: "equity",          label: "Owner Capital",                why: "Founder + investor contributions." },
+    { key: "base_currency",   label: t("setup.guidance.steps.baseCcy", "Main Operating Currency"),     why: t("setup.guidance.steps.baseCcyWhy", "Locks the books in your reporting currency.") },
+    { key: "bank_accounts",   label: t("setup.guidance.steps.banks", "Bank Accounts"),                  why: t("setup.guidance.steps.banksWhy", "Tells the system where cash is held.") },
+    { key: "fx_rates",        label: t("setup.guidance.steps.fx", "Exchange Rates"),                    why: t("setup.guidance.steps.fxWhy", "Required if you sell in USD and operate in CNY.") },
+    { key: "opening_balances", label: t("setup.guidance.steps.ob", "Starting Company Position"),        why: t("setup.guidance.steps.obWhy", "Day-zero snapshot — assets, liabilities, balances.") },
+    { key: "customers_ar",    label: t("setup.guidance.steps.ar", "Money Customers Owe Us"),            why: t("setup.guidance.steps.arWhy", "Outstanding AR at go-live.") },
+    { key: "suppliers_ap",    label: t("setup.guidance.steps.ap", "Money We Owe Suppliers"),            why: t("setup.guidance.steps.apWhy", "Outstanding AP at go-live.") },
+    { key: "assets",          label: t("setup.guidance.steps.assets", "Assets"),                        why: t("setup.guidance.steps.assetsWhy", "Fixed assets + equipment register.") },
+    { key: "equity",          label: t("setup.guidance.steps.equity", "Owner Capital"),                 why: t("setup.guidance.steps.equityWhy", "Founder + investor contributions.") },
   ];
 
   const cardByKey = new Map(snapshot.cards.map((c) => [c.key, c]));
@@ -770,9 +775,9 @@ function SetupGuidance({ snapshot }: { snapshot: SetupSnapshot }) {
             <div className="flex items-start gap-2 rounded-md border border-amber-300/40 bg-amber-300/[0.06] px-3 py-2 text-[11.5px] text-amber-100">
               <RrIcon name="info" size={12} className="mt-0.5" />
               <div>
-                <div className="font-medium">Main operating currency is {snapshot.base_currency}, not CNY.</div>
+                <div className="font-medium">{t("setup.guidance.warn.notCN", "Main operating currency is {ccy}, not CNY.").replace("{ccy}", snapshot.base_currency)}</div>
                 <div className="text-[10.5px] text-amber-200/80">
-                  KOLEEX tenants normally use CNY. Change it in the "Main Operating Currency" card if this isn't a foreign subsidiary.
+                  {t("setup.guidance.warn.notCNHint", "KOLEEX tenants normally use CNY. Change it in the “Main Operating Currency” card if this isn't a foreign subsidiary.")}
                 </div>
               </div>
             </div>
@@ -781,9 +786,9 @@ function SetupGuidance({ snapshot }: { snapshot: SetupSnapshot }) {
             <div className="flex items-start gap-2 rounded-md border border-amber-300/40 bg-amber-300/[0.06] px-3 py-2 text-[11.5px] text-amber-100">
               <RrIcon name="balance-scale-left" size={12} className="mt-0.5" />
               <div>
-                <div className="font-medium">USD → CNY exchange rate is missing.</div>
+                <div className="font-medium">{t("setup.guidance.warn.fxMissing", "USD → CNY exchange rate is missing.")}</div>
                 <div className="text-[10.5px] text-amber-200/80">
-                  You sell in USD and operate in CNY — add a USD → CNY rate so customer payments convert correctly.
+                  {t("setup.guidance.warn.fxMissingHint", "You sell in USD and operate in CNY — add a USD → CNY rate so customer payments convert correctly.")}
                 </div>
               </div>
             </div>
@@ -794,7 +799,7 @@ function SetupGuidance({ snapshot }: { snapshot: SetupSnapshot }) {
       {/* Recommended order — a clean checklist, not a wizard. */}
       <div className="rounded-xl border border-white/[0.05] bg-white/[0.012] px-4 py-3">
         <div className="flex items-baseline justify-between">
-          <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Recommended order</div>
+          <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">{t("setup.guidance.recommended", "Recommended order")}</div>
           {firstEmpty && (
             <button
               type="button"
@@ -803,7 +808,7 @@ function SetupGuidance({ snapshot }: { snapshot: SetupSnapshot }) {
               }}
               className="text-[10.5px] text-emerald-200 hover:text-emerald-100"
             >
-              Start here: {firstEmpty.label} →
+              {t("setup.guidance.startHere", "Start here: {label} →").replace("{label}", firstEmpty.label)}
             </button>
           )}
         </div>
@@ -825,7 +830,7 @@ function SetupGuidance({ snapshot }: { snapshot: SetupSnapshot }) {
                   <span className={`block h-full w-full rounded-full ${dot}`} />
                 </span>
                 <div className="min-w-0">
-                  <div className="text-[10px] uppercase tracking-[0.10em] text-gray-500">Step {i + 1}</div>
+                  <div className="text-[10px] uppercase tracking-[0.10em] text-gray-500">{t("setup.guidance.stepN", "Step {n}").replace("{n}", String(i + 1))}</div>
                   <div className="text-[12px] font-medium">{step.label}</div>
                   <div className="text-[10px] text-gray-500">{step.why}</div>
                 </div>
@@ -834,7 +839,7 @@ function SetupGuidance({ snapshot }: { snapshot: SetupSnapshot }) {
           })}
         </ol>
         <div className="mt-3 text-[10.5px] text-gray-500">
-          You can fill these in any order — the system uses what's there. The Finance app becomes fully usable once at least half the cards are started.
+          {t("setup.guidance.flex", "You can fill these in any order — the system uses what's there. The Finance app becomes fully usable once at least half the cards are started.")}
         </div>
       </div>
     </section>

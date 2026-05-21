@@ -238,7 +238,7 @@ export default function FinanceBankImports() {
                 className="inline-flex items-center gap-1.5 rounded-xl border border-white/[0.06] bg-[var(--bg-surface)] px-3 py-2 text-sm font-medium text-gray-300 transition hover:border-rose-500/30 hover:text-rose-300"
               >
                 <RrIcon name="cross" size={11} />
-                Cancel
+                {t("bankImports.cancel", "Cancel")}
               </button>
             ) : null
           }
@@ -268,11 +268,11 @@ export default function FinanceBankImports() {
         {/* STEP 1 — pick account */}
         {step === "pick" && (
           <div className="mt-5 space-y-4">
-            <SectionCard title="Choose a bank account" subtitle="The cash movements will be booked against this account.">
+            <SectionCard title={t("bankImports.section.choose", "Choose a bank account")} subtitle={t("bankImports.section.chooseHint", "The cash movements will be booked against this account.")}>
               {accountOptions.length === 0 ? (
                 <EmptyState
-                  title="No bank accounts yet"
-                  hint="Add a bank account from Treasury before importing a statement."
+                  title={t("bankImports.empty.title", "No bank accounts yet")}
+                  hint={t("bankImports.empty.hint", "Add a bank account from Treasury before importing a statement.")}
                 />
               ) : (
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -291,7 +291,7 @@ export default function FinanceBankImports() {
                       >
                         <div className="flex items-center justify-between">
                           <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--text-primary)]">{a.bank_name}</span>
-                          {a.is_primary && <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-emerald-300">Primary</span>}
+                          {a.is_primary && <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-emerald-300">{t("bankImports.primary", "Primary")}</span>}
                         </div>
                         <div className="mt-1 truncate text-[12px] text-gray-400">{a.account_name}</div>
                         <div className="mt-1 text-[11px] text-gray-500">{a.currency} · {fmtMoney(a.available_balance, a.currency, { compact: true })}</div>
@@ -309,7 +309,7 @@ export default function FinanceBankImports() {
                 className="inline-flex items-center gap-2 rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-sm font-semibold text-[var(--text-inverted)] transition hover:opacity-90 disabled:opacity-50"
               >
                 {busy ? <RrIcon name="loading" size={12} className="animate-spin" /> : <RrIcon name="upload" size={12} />}
-                Choose statement file
+                {t("bankImports.choose", "Choose statement file")}
               </button>
             </div>
 
@@ -320,10 +320,10 @@ export default function FinanceBankImports() {
         {/* STEP 2 — upload in progress */}
         {step === "upload" && (
           <div className="mt-5">
-            <SectionCard title="Uploading and parsing" subtitle="The parser detects columns automatically. You'll review every row before anything lands in the cash book.">
+            <SectionCard title={t("bankImports.uploading", "Uploading and parsing")} subtitle={t("bankImports.uploadingHint", "The parser detects columns automatically. You'll review every row before anything lands in the cash book.")}>
               <div className="flex items-center justify-center gap-2 py-12 text-sm text-[var(--text-dim)]">
                 <RrIcon name="loading" size={14} className="animate-spin" />
-                {busy ? "Uploading + parsing…" : "Pick a file"}
+                {busy ? t("bankImports.uploadingMsg", "Uploading + parsing…") : t("bankImports.pickFile", "Pick a file")}
               </div>
             </SectionCard>
           </div>
@@ -333,16 +333,19 @@ export default function FinanceBankImports() {
         {step === "preview" && importRow && (
           <div className="mt-5 space-y-4">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-              <MetricCard label="Parsed" value={kpis.total} unit="rows" hint="Total rows in file" loading={false} />
-              <MetricCard label="Ready" value={kpis.ready} unit="rows" hint="Will become cash movements" loading={false} />
-              <MetricCard label="Duplicates" value={kpis.duplicates} unit="rows" hint="Possible or hard duplicates" loading={false} />
-              <MetricCard label="Skipped" value={kpis.skipped} unit="rows" hint="Excluded from import" loading={false} />
-              <MetricCard label="Errors" value={kpis.errors} unit="rows" hint="Parse failures" loading={false} />
+              <MetricCard label={t("bankImports.kpi.parsed", "Parsed")} value={kpis.total} unit={t("bankImports.kpi.rows", "rows")} hint={t("bankImports.kpi.parsedHint", "Total rows in file")} loading={false} />
+              <MetricCard label={t("bankImports.kpi.ready", "Ready")} value={kpis.ready} unit={t("bankImports.kpi.rows", "rows")} hint={t("bankImports.kpi.readyHint", "Will become cash movements")} loading={false} />
+              <MetricCard label={t("bankImports.kpi.dups", "Duplicates")} value={kpis.duplicates} unit={t("bankImports.kpi.rows", "rows")} hint={t("bankImports.kpi.dupsHint", "Possible or hard duplicates")} loading={false} />
+              <MetricCard label={t("bankImports.kpi.skipped", "Skipped")} value={kpis.skipped} unit={t("bankImports.kpi.rows", "rows")} hint={t("bankImports.kpi.skippedHint", "Excluded from import")} loading={false} />
+              <MetricCard label={t("bankImports.kpi.errors", "Errors")} value={kpis.errors} unit={t("bankImports.kpi.rows", "rows")} hint={t("bankImports.kpi.errorsHint", "Parse failures")} loading={false} />
             </div>
 
             <SectionCard
-              title={`Statement preview · ${selectedAccount?.bank_name ?? ""}`}
-              subtitle={`File ${importRow.file_name} · ${importRow.file_type.toUpperCase()} · ${(importRow.file_size / 1024).toFixed(0)} KB`}
+              title={t("bankImports.preview.title", "Statement preview · {bank}").replace("{bank}", selectedAccount?.bank_name ?? "")}
+              subtitle={t("bankImports.preview.fileInfo", "File {name} · {type} · {size} KB")
+                .replace("{name}", importRow.file_name)
+                .replace("{type}", importRow.file_type.toUpperCase())
+                .replace("{size}", (importRow.file_size / 1024).toFixed(0))}
               action={
                 <button
                   onClick={confirmImport}
@@ -350,12 +353,12 @@ export default function FinanceBankImports() {
                   className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/20 px-3 py-1.5 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-500/30 disabled:opacity-50"
                 >
                   {busy ? <RrIcon name="loading" size={11} className="animate-spin" /> : <RrIcon name="check" size={11} />}
-                  Confirm import ({kpis.ready})
+                  {t("bankImports.confirm", "Confirm import ({n})").replace("{n}", String(kpis.ready))}
                 </button>
               }
             >
               {rows.length === 0 ? (
-                <EmptyState title="No rows parsed" hint="The file is empty, has no recognised header row, or every row was dropped as an error." />
+                <EmptyState title={t("bankImports.noParsed", "No rows parsed")} hint={t("bankImports.noParsedHint", "The file is empty, has no recognised header row, or every row was dropped as an error.")} />
               ) : (
                 <div className="space-y-2">
                   {rows.map((r) => (
@@ -370,12 +373,12 @@ export default function FinanceBankImports() {
         {/* STEP 4 — done */}
         {step === "done" && postSummary && (
           <div className="mt-5">
-            <SectionCard title="Import complete" subtitle="The new cash movements are in the ledger. The reconciliation engine has already scanned for matches.">
+            <SectionCard title={t("bankImports.done.title", "Import complete")} subtitle={t("bankImports.done.subtitle", "The new cash movements are in the ledger. The reconciliation engine has already scanned for matches.")}>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <MetricCard label="Movements created" value={postSummary.imported} unit="rows" hint="" loading={false} />
-                <MetricCard label="New match candidates" value={postSummary.candidates} unit="cand." hint="In the reconciliation queue" loading={false} />
-                <MetricCard label="Duplicates skipped" value={postSummary.duplicates} unit="rows" hint="Not booked" loading={false} />
-                <MetricCard label="Errors" value={postSummary.errors} unit="rows" hint="" loading={false} />
+                <MetricCard label={t("bankImports.done.created", "Movements created")} value={postSummary.imported} unit={t("bankImports.kpi.rows", "rows")} hint="" loading={false} />
+                <MetricCard label={t("bankImports.done.candidates", "New match candidates")} value={postSummary.candidates} unit={t("reconciliation.kpi.cand", "cand.")} hint={t("bankImports.done.candidatesHint", "In the reconciliation queue")} loading={false} />
+                <MetricCard label={t("bankImports.done.dupsSkipped", "Duplicates skipped")} value={postSummary.duplicates} unit={t("bankImports.kpi.rows", "rows")} hint={t("bankImports.done.notBooked", "Not booked")} loading={false} />
+                <MetricCard label={t("bankImports.done.errorsLabel", "Errors")} value={postSummary.errors} unit={t("bankImports.kpi.rows", "rows")} hint="" loading={false} />
               </div>
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 <Link
@@ -383,14 +386,14 @@ export default function FinanceBankImports() {
                   className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-sm font-semibold text-[var(--text-inverted)] hover:opacity-90"
                 >
                   <RrIcon name="arrow-up-right-from-square" size={12} />
-                  Open reconciliation queue
+                  {t("bankImports.done.openQueue", "Open reconciliation queue")}
                 </Link>
                 <button
                   onClick={() => { setStep("pick"); setImportRow(null); setRows([]); setPostSummary(null); }}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-gray-300 hover:border-white/[0.18] hover:text-gray-100"
                 >
                   <RrIcon name="plus" size={11} />
-                  Import another file
+                  {t("bankImports.done.another", "Import another file")}
                 </button>
               </div>
             </SectionCard>
@@ -406,11 +409,12 @@ export default function FinanceBankImports() {
    ──────────────────────────────────────────────────────────────────────── */
 
 function Stepper({ step }: { step: StepKey }) {
+  const { t } = useTranslation(financeT);
   const steps: { key: StepKey; label: string }[] = [
-    { key: "pick",    label: "Pick account" },
-    { key: "upload",  label: "Upload file" },
-    { key: "preview", label: "Preview rows" },
-    { key: "done",    label: "Hand off" },
+    { key: "pick",    label: t("bankImports.step.pick", "Pick account") },
+    { key: "upload",  label: t("bankImports.step.upload", "Upload file") },
+    { key: "preview", label: t("bankImports.step.preview", "Preview rows") },
+    { key: "done",    label: t("bankImports.step.done", "Hand off") },
   ];
   const idx = steps.findIndex((s) => s.key === step);
   return (
@@ -449,13 +453,26 @@ const RowCard = memo(function RowCard({
   accountCurrency: string;
   onToggle: (id: string, next: BankStatementRowImportStatus) => void;
 }) {
+  const { t } = useTranslation(financeT);
   const ccy = row.currency ?? accountCurrency;
   const amount = row.amount != null ? fmtMoney(row.amount, ccy, { compact: true }) : "—";
-  const directionLabel = row.direction === "inflow" ? "Money in" : row.direction === "outflow" ? "Money out" : "—";
+  const directionLabel = row.direction === "inflow" ? t("bankImports.row.moneyIn", "Money in") : row.direction === "outflow" ? t("bankImports.row.moneyOut", "Money out") : "—";
   const directionTone = row.direction === "inflow" ? "text-emerald-300" : row.direction === "outflow" ? "text-rose-300" : "text-gray-400";
 
-  const dupChip = DUP_CHIP[row.duplicate_status];
-  const statusChip = ROW_STATUS_CHIP[row.import_status];
+  const DUP_CHIP_LOCAL: Record<BankStatementRowDuplicateStatus, { label: string; cls: string }> = {
+    new:                { label: t("bankImports.dup.new", "New"),       cls: "bg-emerald-500/15 text-emerald-300" },
+    possible_duplicate: { label: t("bankImports.dup.possible", "Possible dup"), cls: "bg-amber-500/15 text-amber-300" },
+    duplicate:          { label: t("bankImports.dup.dup", "Duplicate"), cls: "bg-rose-500/15 text-rose-300" },
+  };
+  const ROW_STATUS_CHIP_LOCAL: Record<BankStatementRowImportStatus, { label: string; cls: string }> = {
+    ready:    { label: t("bankImports.status.ready", "Ready"),    cls: "bg-emerald-500/15 text-emerald-300" },
+    skipped:  { label: t("bankImports.status.skipped", "Skipped"),  cls: "bg-gray-500/15 text-gray-300" },
+    imported: { label: t("bankImports.status.imported", "Imported"), cls: "bg-sky-500/15 text-sky-300" },
+    error:    { label: t("bankImports.status.error", "Error"),    cls: "bg-rose-500/15 text-rose-300" },
+  };
+
+  const dupChip = DUP_CHIP_LOCAL[row.duplicate_status];
+  const statusChip = ROW_STATUS_CHIP_LOCAL[row.import_status];
 
   return (
     <div className={`rounded-xl border bg-[var(--bg-primary)]/60 p-3 transition ${
@@ -482,7 +499,7 @@ const RowCard = memo(function RowCard({
         <div className="mt-0.5 truncate text-[11px] text-gray-500">↳ {row.counterparty_name}</div>
       )}
       {row.error_message && (
-        <div className="mt-1 text-[11px] text-rose-300">Parse error: {row.error_message}</div>
+        <div className="mt-1 text-[11px] text-rose-300">{t("bankImports.row.parseError", "Parse error: {msg}").replace("{msg}", row.error_message)}</div>
       )}
 
       {/* Toggle row — only if not in error */}
@@ -495,7 +512,7 @@ const RowCard = memo(function RowCard({
               className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-[var(--bg-secondary)] px-2 py-1 text-[10px] font-medium text-gray-300 hover:border-rose-500/30 hover:text-rose-300"
             >
               <RrIcon name="cross" size={9} />
-              Skip
+              {t("bankImports.row.skip", "Skip")}
             </button>
           ) : row.import_status === "skipped" ? (
             <button
@@ -504,7 +521,7 @@ const RowCard = memo(function RowCard({
               className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-[var(--bg-secondary)] px-2 py-1 text-[10px] font-medium text-gray-300 hover:border-emerald-500/30 hover:text-emerald-300"
             >
               <RrIcon name="check" size={9} />
-              Include
+              {t("bankImports.row.include", "Include")}
             </button>
           ) : null}
         </div>
@@ -524,14 +541,22 @@ function RecentImports({
   accounts: BankAccount[];
   onOpen: (imp: BankStatementImport) => void;
 }) {
+  const { t } = useTranslation(financeT);
   if (imports.length === 0) return null;
   const byId = new Map(accounts.map((a) => [a.id, a]));
+  const IMPORT_STATUS_LOCAL: Record<string, { label: string; cls: string }> = {
+    uploaded:  { label: t("bankImports.impStatus.uploaded", "Uploaded"),  cls: "bg-gray-500/15 text-gray-300" },
+    parsed:    { label: t("bankImports.impStatus.parsed", "Parsed"),    cls: "bg-amber-500/15 text-amber-300" },
+    confirmed: { label: t("bankImports.impStatus.confirmed", "Confirmed"), cls: "bg-emerald-500/15 text-emerald-300" },
+    failed:    { label: t("bankImports.impStatus.failed", "Failed"),    cls: "bg-rose-500/15 text-rose-300" },
+    cancelled: { label: t("bankImports.impStatus.cancelled", "Cancelled"), cls: "bg-gray-500/15 text-gray-300" },
+  };
   return (
-    <SectionCard title="Recent imports" subtitle="Last 10 imports for this tenant. Confirmed imports are kept for audit.">
+    <SectionCard title={t("bankImports.recent.title", "Recent imports")} subtitle={t("bankImports.recent.subtitle", "Last 10 imports for this tenant. Confirmed imports are kept for audit.")}>
       <div className="divide-y divide-white/[0.04]">
         {imports.slice(0, 10).map((i) => {
           const a = byId.get(i.bank_account_id);
-          const statusChip = IMPORT_STATUS_CHIP[i.status] ?? IMPORT_STATUS_CHIP.uploaded;
+          const statusChip = IMPORT_STATUS_LOCAL[i.status] ?? IMPORT_STATUS_LOCAL.uploaded;
           return (
             <div key={i.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
               <div className="min-w-0">
@@ -543,7 +568,7 @@ function RecentImports({
               <div className="flex items-center gap-2">
                 <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${statusChip.cls}`}>{statusChip.label}</span>
                 {i.status === "confirmed" && (
-                  <span className="text-[10px] text-gray-500">{i.imported_count} movements</span>
+                  <span className="text-[10px] text-gray-500">{t("bankImports.recent.movements", "{n} movements").replace("{n}", String(i.imported_count))}</span>
                 )}
               </div>
             </div>

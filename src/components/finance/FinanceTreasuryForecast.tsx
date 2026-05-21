@@ -194,43 +194,43 @@ export default function FinanceTreasuryForecast() {
   }, [base, stress]);
 
   const presetOptions: Array<{ key: ScenarioPreset; label: string; group: string }> = [
-    { key: "base",     label: "Base case",         group: "Baseline" },
-    { key: "delay7",   label: "Customer delay 7d",   group: "Customer delay" },
-    { key: "delay15",  label: "Customer delay 15d",  group: "Customer delay" },
-    { key: "delay30",  label: "Customer delay 30d",  group: "Customer delay" },
-    { key: "accel7",   label: "Supplier accel 7d",   group: "Supplier acceleration" },
-    { key: "accel15",  label: "Supplier accel 15d",  group: "Supplier acceleration" },
-    { key: "fx5",      label: "FX shock −5%",        group: "FX shock" },
-    { key: "fx10",     label: "FX shock −10%",       group: "FX shock" },
-    { key: "cost10",   label: "Cost shock +10%",     group: "Cost shock" },
-    { key: "combined", label: "Combined stress",     group: "Combined" },
+    { key: "base",     label: t("forecast.preset.base", "Base case"),         group: "Baseline" },
+    { key: "delay7",   label: t("forecast.preset.delay7", "Customer delay 7d"),   group: "Customer delay" },
+    { key: "delay15",  label: t("forecast.preset.delay15", "Customer delay 15d"),  group: "Customer delay" },
+    { key: "delay30",  label: t("forecast.preset.delay30", "Customer delay 30d"),  group: "Customer delay" },
+    { key: "accel7",   label: t("forecast.preset.accel7", "Supplier accel 7d"),   group: "Supplier acceleration" },
+    { key: "accel15",  label: t("forecast.preset.accel15", "Supplier accel 15d"),  group: "Supplier acceleration" },
+    { key: "fx5",      label: t("forecast.preset.fx5", "FX shock −5%"),        group: "FX shock" },
+    { key: "fx10",     label: t("forecast.preset.fx10", "FX shock −10%"),       group: "FX shock" },
+    { key: "cost10",   label: t("forecast.preset.cost10", "Cost shock +10%"),     group: "Cost shock" },
+    { key: "combined", label: t("forecast.preset.combined", "Combined stress"),     group: "Combined" },
   ];
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
-          title="Treasury Forecast"
-          subtitle="Deterministic 90-day cash projection. Apply scenarios to stress-test customer delays, FX shocks, supplier acceleration, and cost shocks."
+          title={t("forecast.title", "Treasury Forecast")}
+          subtitle={t("forecast.subtitle", "Deterministic 90-day cash projection. Apply scenarios to stress-test customer delays, FX shocks, supplier acceleration, and cost shocks.")}
           action={
             <div className="flex items-center gap-2">
               <button
                 onClick={() => {
-                  const def = stress?.assumptions?.[0]?.label ?? "Base case";
+                  const def = stress?.assumptions?.[0]?.label ?? t("forecast.save.baseCase", "Base case");
                   setSaveDraft({ name: `${def} · ${new Date().toLocaleDateString()}`, description: "" });
                 }}
                 disabled={!base || loading}
                 className="inline-flex items-center gap-2 rounded-xl bg-[var(--bg-inverted)] px-3 py-2 text-sm font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50"
               >
                 <RrIcon name="check" size={12} />
-                Save as plan
+                {t("forecast.saveAsPlan", "Save as plan")}
               </button>
               <Link
                 href="/finance/treasury-plans"
                 className="inline-flex items-center gap-2 rounded-xl border border-white/[0.06] bg-[var(--bg-surface)] px-3 py-2 text-sm font-medium text-gray-300 hover:border-white/[0.18]"
               >
                 <RrIcon name="file-invoice" size={12} />
-                Plans
+                {t("forecast.plans", "Plans")}
               </Link>
               <button
                 onClick={() => onPreset("base")}
@@ -238,7 +238,7 @@ export default function FinanceTreasuryForecast() {
                 className="inline-flex items-center gap-2 rounded-xl border border-white/[0.06] bg-[var(--bg-surface)] px-3 py-2 text-sm font-medium text-[var(--text-primary)] hover:border-white/[0.18] disabled:opacity-60"
               >
                 {loading ? <RrIcon name="loading" size={12} className="animate-spin" /> : <RrIcon name="recycle" size={12} />}
-                Reset to base
+                {t("forecast.resetToBase", "Reset to base")}
               </button>
             </div>
           }
@@ -250,8 +250,8 @@ export default function FinanceTreasuryForecast() {
             <div className="relative w-full max-w-md rounded-t-2xl border border-white/[0.08] bg-[var(--bg-secondary)] shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-3.5">
                 <div>
-                  <h2 className="text-[14px] font-semibold">Save scenario as plan</h2>
-                  <p className="mt-0.5 text-[11px] text-gray-500">Locks the current assumptions + forecast snapshot for executive review.</p>
+                  <h2 className="text-[14px] font-semibold">{t("forecast.save.title", "Save scenario as plan")}</h2>
+                  <p className="mt-0.5 text-[11px] text-gray-500">{t("forecast.save.subtitle", "Locks the current assumptions + forecast snapshot for executive review.")}</p>
                 </div>
                 <button onClick={() => setSaveDraft(null)} className="rounded-lg p-1.5 text-gray-400 hover:bg-white/[0.06] hover:text-gray-100">
                   <RrIcon name="cross" size={12} />
@@ -259,7 +259,7 @@ export default function FinanceTreasuryForecast() {
               </div>
               <div className="space-y-3 px-5 py-4">
                 <label className="block">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">Plan name</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">{t("forecast.save.planName", "Plan name")}</span>
                   <input
                     className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-white/[0.22] focus:outline-none"
                     value={saveDraft.name}
@@ -267,24 +267,27 @@ export default function FinanceTreasuryForecast() {
                   />
                 </label>
                 <label className="block">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">Description</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">{t("forecast.save.description", "Description")}</span>
                   <textarea
                     rows={3}
                     className="mt-1 w-full resize-none rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-white/[0.22] focus:outline-none"
                     value={saveDraft.description}
-                    placeholder="Why are we saving this scenario? Operator can revisit this later."
+                    placeholder={t("forecast.save.descPlaceholder", "Why are we saving this scenario? Operator can revisit this later.")}
                     onChange={(e) => setSaveDraft({ ...saveDraft, description: e.target.value })}
                   />
                 </label>
                 <div className="rounded-lg border border-white/[0.05] bg-[var(--bg-primary)]/40 px-3 py-2 text-[11px] text-gray-400">
-                  <div className="font-semibold text-[var(--text-primary)]">Snapshot captured</div>
-                  <div className="mt-1">Starting cash · {(stress ?? base).startingCash.toFixed(0)} USD · d90 {(stress ?? base).d90.toFixed(0)} USD · Runway {(stress ?? base).runwayDays ?? "—"}d</div>
-                  <div className="mt-1">Assumptions: {(stress ?? base).assumptions.length === 0 ? "Base case" : (stress ?? base).assumptions.map((a) => a.label).join("; ")}</div>
+                  <div className="font-semibold text-[var(--text-primary)]">{t("forecast.save.snapshot", "Snapshot captured")}</div>
+                  <div className="mt-1">{t("forecast.save.snapshotLine", "Starting cash · {start} USD · d90 {d90} USD · Runway {runway}d")
+                    .replace("{start}", (stress ?? base).startingCash.toFixed(0))
+                    .replace("{d90}", (stress ?? base).d90.toFixed(0))
+                    .replace("{runway}", String((stress ?? base).runwayDays ?? "—"))}</div>
+                  <div className="mt-1">{t("forecast.save.assumptions", "Assumptions: {value}").replace("{value}", (stress ?? base).assumptions.length === 0 ? t("forecast.save.baseCase", "Base case") : (stress ?? base).assumptions.map((a) => a.label).join("; "))}</div>
                 </div>
               </div>
               <div className="border-t border-white/[0.06] px-5 py-3">
                 <div className="flex items-center justify-end gap-2">
-                  <button onClick={() => setSaveDraft(null)} className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-gray-300 hover:border-white/[0.18]">Cancel</button>
+                  <button onClick={() => setSaveDraft(null)} className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-gray-300 hover:border-white/[0.18]">{t("forecast.save.cancel", "Cancel")}</button>
                   <button
                     disabled={saveBusy || !saveDraft.name.trim()}
                     onClick={async () => {
@@ -316,7 +319,7 @@ export default function FinanceTreasuryForecast() {
                     className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-xs font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50"
                   >
                     {saveBusy ? <RrIcon name="loading" size={11} className="animate-spin" /> : <RrIcon name="check" size={11} />}
-                    Save plan
+                    {t("forecast.save.confirm", "Save plan")}
                   </button>
                 </div>
               </div>
@@ -331,37 +334,37 @@ export default function FinanceTreasuryForecast() {
         {/* Safety disclaimer */}
         <div className="mt-4 flex items-center gap-2 rounded-lg border border-white/[0.05] bg-white/[0.018] px-3 py-2 text-[11px] text-gray-400">
           <RrIcon name="info" size={11} />
-          <span>This is a deterministic forecast based on current records and selected assumptions. It is not a guarantee.</span>
+          <span>{t("forecast.disclaimer", "This is a deterministic forecast based on current records and selected assumptions. It is not a guarantee.")}</span>
         </div>
 
         {!base && loading ? (
           <SectionCard>
             <div className="flex items-center justify-center gap-2 py-12 text-sm text-[var(--text-dim)]">
               <RrIcon name="loading" size={14} className="animate-spin" />
-              Building forecast…
+              {t("forecast.building", "Building forecast…")}
             </div>
           </SectionCard>
         ) : !base ? (
-          <EmptyState title="Forecast unavailable" hint="Connect a bank account and add some orders or payments to seed the forecast engine." />
+          <EmptyState title={t("forecast.unavailable", "Forecast unavailable")} hint={t("forecast.unavailable.hint", "Connect a bank account and add some orders or payments to seed the forecast engine.")} />
         ) : (
           <>
             {/* KPI strip */}
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-              <MetricCard label="Cash today"  value={base.startingCash} unit={baseCurrency} hint="Available across active accounts" loading={false} />
-              <MetricCard label="7d"  value={(stress ?? base).d7}  unit={baseCurrency} tone={(stress ?? base).d7  < 0 ? "negative" : "neutral"} hint="Projected" loading={false} />
-              <MetricCard label="30d" value={(stress ?? base).d30} unit={baseCurrency} tone={(stress ?? base).d30 < 0 ? "negative" : "neutral"} hint="Projected" loading={false} />
-              <MetricCard label="60d" value={(stress ?? base).d60} unit={baseCurrency} tone={(stress ?? base).d60 < 0 ? "negative" : "neutral"} hint="Projected" loading={false} />
-              <MetricCard label="90d" value={(stress ?? base).d90} unit={baseCurrency} tone={(stress ?? base).d90 < 0 ? "negative" : "neutral"} hint="Projected" loading={false} />
+              <MetricCard label={t("forecast.kpi.today", "Cash today")}  value={base.startingCash} unit={baseCurrency} hint={t("forecast.kpi.todayHint", "Available across active accounts")} loading={false} />
+              <MetricCard label="7d"  value={(stress ?? base).d7}  unit={baseCurrency} tone={(stress ?? base).d7  < 0 ? "negative" : "neutral"} hint={t("forecast.kpi.projected", "Projected")} loading={false} />
+              <MetricCard label="30d" value={(stress ?? base).d30} unit={baseCurrency} tone={(stress ?? base).d30 < 0 ? "negative" : "neutral"} hint={t("forecast.kpi.projected", "Projected")} loading={false} />
+              <MetricCard label="60d" value={(stress ?? base).d60} unit={baseCurrency} tone={(stress ?? base).d60 < 0 ? "negative" : "neutral"} hint={t("forecast.kpi.projected", "Projected")} loading={false} />
+              <MetricCard label="90d" value={(stress ?? base).d90} unit={baseCurrency} tone={(stress ?? base).d90 < 0 ? "negative" : "neutral"} hint={t("forecast.kpi.projected", "Projected")} loading={false} />
               <MetricCard
-                label="Runway"
+                label={t("forecast.kpi.runway", "Runway")}
                 value={(stress ?? base).runwayDays != null ? `${(stress ?? base).runwayDays}` : "—"}
-                unit={(stress ?? base).runwayDays != null ? "days" : ""}
+                unit={(stress ?? base).runwayDays != null ? t("forecast.kpi.days", "days") : ""}
                 tone={
                   (stress ?? base).runwayDays == null ? "positive" :
                   (stress ?? base).runwayDays! <= 14 ? "negative" :
                   (stress ?? base).runwayDays! <= 30 ? "warning" : "neutral"
                 }
-                hint={(stress ?? base).firstNegativeDate ?? "Beyond horizon"}
+                hint={(stress ?? base).firstNegativeDate ?? t("forecast.kpi.beyondHorizon", "Beyond horizon")}
                 loading={false}
               />
             </div>
@@ -369,8 +372,8 @@ export default function FinanceTreasuryForecast() {
             {/* Comparison chart */}
             <div className="mt-5">
               <SectionCard
-                title="90-day cash trajectory"
-                subtitle="Base case (white) vs scenario (amber). Zero line marked."
+                title={t("forecast.chart.title", "90-day cash trajectory")}
+                subtitle={t("forecast.chart.subtitle", "Base case (white) vs scenario (amber). Zero line marked.")}
                 action={
                   diff ? (
                     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
@@ -378,7 +381,7 @@ export default function FinanceTreasuryForecast() {
                       diff.direction === "improves"     ? "bg-emerald-500/15 text-emerald-300" :
                       "bg-gray-500/15 text-gray-300"
                     }`}>
-                      Impact at 90d: {fmtCompactUsd(diff.d90Delta)} USD
+                      {t("forecast.chart.impact", "Impact at 90d: {value} USD").replace("{value}", fmtCompactUsd(diff.d90Delta))}
                     </span>
                   ) : null
                 }
@@ -418,7 +421,7 @@ export default function FinanceTreasuryForecast() {
                       if (active.firstNegativeDate) {
                         const idx = active.trajectory.findIndex((p) => p.date === active.firstNegativeDate);
                         const p = active.trajectory[idx];
-                        if (p) items.push({ label: "Cash negative", date: p.date, daysFromNow: p.daysFromNow, value: p.cumulative, tone: "rose" });
+                        if (p) items.push({ label: t("forecast.chart.cashNegative", "Cash negative"), date: p.date, daysFromNow: p.daysFromNow, value: p.cumulative, tone: "rose" });
                       }
                       return items.map((it) => {
                         const xPct = (it.daysFromNow / Math.max(1, active.horizonDays)) * 100;
@@ -442,8 +445,8 @@ export default function FinanceTreasuryForecast() {
             {/* Scenario controls */}
             <div className="mt-4">
               <SectionCard
-                title="Scenario controls"
-                subtitle="Pick a preset to stress-test the forecast. The base trajectory stays visible underneath."
+                title={t("forecast.controls.title", "Scenario controls")}
+                subtitle={t("forecast.controls.subtitle", "Pick a preset to stress-test the forecast. The base trajectory stays visible underneath.")}
               >
                 <div className="flex flex-wrap gap-1.5">
                   {presetOptions.map((opt) => {
@@ -470,11 +473,11 @@ export default function FinanceTreasuryForecast() {
             {/* Risk ranking + Drivers + Assumptions */}
             <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
               <SectionCard
-                title="Liquidity risk ranking"
-                subtitle={stress ? "Stress scenario." : "Base case."}
+                title={t("forecast.risks.title", "Liquidity risk ranking")}
+                subtitle={stress ? t("forecast.risks.stress", "Stress scenario.") : t("forecast.risks.base", "Base case.")}
               >
                 {risks.length === 0 ? (
-                  <EmptyState title="No material risks" hint="Forecast looks resilient under the selected scenario." />
+                  <EmptyState title={t("forecast.risks.empty", "No material risks")} hint={t("forecast.risks.emptyHint", "Forecast looks resilient under the selected scenario.")} />
                 ) : (
                   <ul className="space-y-1.5">
                     {risks.slice(0, 6).map((r) => (
@@ -494,28 +497,28 @@ export default function FinanceTreasuryForecast() {
               </SectionCard>
 
               <SectionCard
-                title="Top forecast drivers"
-                subtitle="Largest contribution to cash position in the 90-day window."
+                title={t("forecast.drivers.title", "Top forecast drivers")}
+                subtitle={t("forecast.drivers.subtitle", "Largest contribution to cash position in the 90-day window.")}
               >
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <DriverList title="Top outflows" items={(stress ?? base).drivers.topOutflows} tone="negative" />
-                  <DriverList title="Top inflows"  items={(stress ?? base).drivers.topInflows}  tone="positive" />
+                  <DriverList title={t("forecast.drivers.outflows", "Top outflows")} items={(stress ?? base).drivers.topOutflows} tone="negative" />
+                  <DriverList title={t("forecast.drivers.inflows", "Top inflows")}  items={(stress ?? base).drivers.topInflows}  tone="positive" />
                 </div>
               </SectionCard>
             </div>
 
             {/* Assumptions + limitations */}
             <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <SectionCard title="Applied assumptions" subtitle="Knobs the scenario adjusted; cash impact in USD.">
+              <SectionCard title={t("forecast.assumptions.title", "Applied assumptions")} subtitle={t("forecast.assumptions.subtitle", "Knobs the scenario adjusted; cash impact in USD.")}>
                 {(stress ?? base).assumptions.length === 0 ? (
-                  <div className="py-2 text-[11px] text-gray-500">No assumptions applied. Showing base case as it stands.</div>
+                  <div className="py-2 text-[11px] text-gray-500">{t("forecast.assumptions.empty", "No assumptions applied. Showing base case as it stands.")}</div>
                 ) : (
                   <ul className="space-y-1.5">
                     {(stress ?? base).assumptions.map((a) => (
                       <li key={a.key} className="flex items-center justify-between gap-2 rounded-lg border border-white/[0.05] bg-[var(--bg-primary)]/40 px-3 py-2 text-[11px]">
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[12px] font-semibold text-[var(--text-primary)]">{a.label}</span>
-                          <span className="block text-[10px] text-gray-500">Affected events: {a.affectedEventCount}</span>
+                          <span className="block text-[10px] text-gray-500">{t("forecast.assumptions.affected", "Affected events: {n}").replace("{n}", String(a.affectedEventCount))}</span>
                         </span>
                         <span className="shrink-0 text-[11px] font-semibold tabular-nums text-gray-300">{fmtCompactUsd(a.cashImpact)}</span>
                       </li>
@@ -524,7 +527,7 @@ export default function FinanceTreasuryForecast() {
                 )}
               </SectionCard>
 
-              <SectionCard title="Forecast limitations" subtitle="What this engine can and cannot tell you.">
+              <SectionCard title={t("forecast.limitations.title", "Forecast limitations")} subtitle={t("forecast.limitations.subtitle", "What this engine can and cannot tell you.")}>
                 <ul className="space-y-1.5 text-[11px] text-gray-400">
                   {(stress ?? base).limitations.map((l, i) => (
                     <li key={i} className="flex items-start gap-2">
@@ -534,7 +537,7 @@ export default function FinanceTreasuryForecast() {
                   ))}
                   <li className="flex items-start gap-2">
                     <RrIcon name="info" size={9} className="mt-0.5 shrink-0 opacity-70" />
-                    <span>Composite confidence: {((stress ?? base).confidence * 100).toFixed(0)}%</span>
+                    <span>{t("forecast.limitations.confidence", "Composite confidence: {pct}%").replace("{pct}", ((stress ?? base).confidence * 100).toFixed(0))}</span>
                   </li>
                 </ul>
               </SectionCard>
@@ -542,9 +545,9 @@ export default function FinanceTreasuryForecast() {
 
             {/* Event timeline */}
             <div className="mt-4">
-              <SectionCard title="Cash event timeline" subtitle="Forecast inflows and outflows in the next 90 days.">
+              <SectionCard title={t("forecast.events.title", "Cash event timeline")} subtitle={t("forecast.events.subtitle", "Forecast inflows and outflows in the next 90 days.")}>
                 {((stress ?? base).events.length === 0) ? (
-                  <EmptyState title="No events" hint="No expected cash events in the forecast window." />
+                  <EmptyState title={t("forecast.events.empty", "No events")} hint={t("forecast.events.emptyHint", "No expected cash events in the forecast window.")} />
                 ) : (
                   <ul className="divide-y divide-white/[0.04]">
                     {(stress ?? base).events.slice(0, 30).map((e) => (
@@ -552,7 +555,7 @@ export default function FinanceTreasuryForecast() {
                         <span className="text-gray-500 tabular-nums w-14">d+{e.daysFromNow}</span>
                         <span className="text-gray-500 tabular-nums">{e.date}</span>
                         <span className={`rounded px-1.5 py-0.5 font-semibold uppercase tracking-wider ${e.direction === "inflow" ? "bg-emerald-500/15 text-emerald-300" : "bg-rose-500/15 text-rose-300"}`}>
-                          {e.direction === "inflow" ? "In" : "Out"}
+                          {e.direction === "inflow" ? t("forecast.events.in", "In") : t("forecast.events.out", "Out")}
                         </span>
                         <span className="text-gray-400">{e.source.replace(/_/g, " ")}</span>
                         <span className="min-w-0 flex-1 truncate text-gray-300">{e.party}</span>
@@ -570,12 +573,12 @@ export default function FinanceTreasuryForecast() {
             <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-gray-400">
               <Link href="/finance/reconciliation" className="inline-flex items-center gap-1 hover:text-gray-200">
                 <RrIcon name="arrow-up-right-from-square" size={9} />
-                Reconciliation queue
+                {t("forecast.links.reconciliation", "Reconciliation queue")}
               </Link>
               <span className="text-gray-700">·</span>
               <Link href="/finance/bank-accounts" className="inline-flex items-center gap-1 hover:text-gray-200">
                 <RrIcon name="arrow-up-right-from-square" size={9} />
-                Bank accounts
+                {t("forecast.links.bankAccounts", "Bank accounts")}
               </Link>
             </div>
           </>
@@ -592,12 +595,13 @@ function DriverList({
   items: Array<{ key: string; party: string; amountReporting: number; daysFromNow: number; source: string }>;
   tone: "positive" | "negative";
 }) {
+  const { t } = useTranslation(financeT);
   const accent = tone === "positive" ? "text-emerald-300" : "text-rose-300";
   return (
     <div>
       <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-500">{title}</div>
       {items.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-white/[0.05] px-3 py-3 text-[11px] text-gray-500">No material items.</div>
+        <div className="rounded-lg border border-dashed border-white/[0.05] px-3 py-3 text-[11px] text-gray-500">{t("forecast.drivers.noItems", "No material items.")}</div>
       ) : (
         <ul className="space-y-1">
           {items.map((it) => (

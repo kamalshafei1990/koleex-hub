@@ -146,17 +146,18 @@ export default function ExpensesApp() {
   });
 
   /* Top categories for the visual tile grid (compute, not analytic) */
+  const otherLabel = t("categories.other", "Other");
   const topCategories = useMemo(() => {
     const map = new Map<string, { name: string; total: number; count: number }>();
     for (const e of expenses) {
-      const k = e.category_name || "Other";
+      const k = e.category_name || otherLabel;
       const cur = map.get(k) ?? { name: k, total: 0, count: 0 };
       cur.total += Number(e.amount) || 0;
       cur.count += 1;
       map.set(k, cur);
     }
     return Array.from(map.values()).sort((a, b) => b.total - a.total).slice(0, 8);
-  }, [expenses]);
+  }, [expenses, otherLabel]);
 
   const startNew = () => setEditing({
     title: "",
@@ -178,7 +179,7 @@ export default function ExpensesApp() {
   const startDeferredDelete = () => {
     if (!confirmDelete) return;
     setPendingDeleteId(confirmDelete.id);
-    setPendingDeleteTitle(confirmDelete.title || "Expense");
+    setPendingDeleteTitle(confirmDelete.title || t("evidence.title", "Expense"));
     setConfirmDelete(null);
   };
   const undoDeferredDelete = () => {

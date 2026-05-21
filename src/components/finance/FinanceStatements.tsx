@@ -31,15 +31,7 @@ import { Eyebrow, Hairline } from "@/components/finance/FinanceDashboardUi";
 
 type Tab = "pl" | "bs" | "cf" | "ar" | "ap" | "inv" | "gp";
 
-const TABS: Array<{ key: Tab; label: string }> = [
-  { key: "pl",  label: "Profit & Loss" },
-  { key: "bs",  label: "Balance Sheet" },
-  { key: "cf",  label: "Cash Flow" },
-  { key: "ar",  label: "AR Aging" },
-  { key: "ap",  label: "AP Aging" },
-  { key: "inv", label: "Inventory Value" },
-  { key: "gp",  label: "Gross Profit" },
-];
+const TAB_KEYS: Tab[] = ["pl", "bs", "cf", "ar", "ap", "inv", "gp"];
 
 function fmtMoney(n: number) {
   if (!Number.isFinite(n)) return "—";
@@ -54,6 +46,16 @@ function fmtQty(n: number) {
 
 export default function FinanceStatements() {
   const { t } = useTranslation(financeT);
+  const TABS: Array<{ key: Tab; label: string }> = [
+    { key: "pl",  label: t("statements.tab.pl", "Profit & Loss") },
+    { key: "bs",  label: t("statements.tab.bs", "Balance Sheet") },
+    { key: "cf",  label: t("statements.tab.cf", "Cash Flow") },
+    { key: "ar",  label: t("statements.tab.ar", "AR Aging") },
+    { key: "ap",  label: t("statements.tab.ap", "AP Aging") },
+    { key: "inv", label: t("statements.tab.inv", "Inventory Value") },
+    { key: "gp",  label: t("statements.tab.gp", "Gross Profit") },
+  ];
+  void TAB_KEYS;
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const yearStart = useMemo(() => `${new Date().getUTCFullYear()}-01-01`, []);
 
@@ -72,7 +74,7 @@ export default function FinanceStatements() {
               onClick={() => window.print()}
               className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] hover:bg-white/[0.06] print:hidden"
             >
-              Print / PDF
+              {t("statements.printPdf", "Print / PDF")}
             </button>
           }
         />
@@ -81,11 +83,11 @@ export default function FinanceStatements() {
         <div className="rounded-xl border border-white/[0.05] bg-white/[0.012] p-3 print:hidden">
           <div className="flex flex-wrap items-end gap-3">
             <label className="block">
-              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">From</div>
+              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">{t("statements.from", "From")}</div>
               <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
             </label>
             <label className="block">
-              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">To</div>
+              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">{t("statements.to", "To")}</div>
               <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
             </label>
             <div className="ml-auto text-[10px] uppercase tracking-[0.18em] text-gray-500">{from} → {to}</div>
@@ -177,23 +179,24 @@ interface PLStatement {
 }
 
 function ProfitLossPanel({ from, to }: { from: string; to: string }) {
+  const { t } = useTranslation(financeT);
   const { data, loading, error } = useJson<{ statement: PLStatement }>(
     `/api/accounting/profit-loss?from=${from}&to=${to}`,
   );
   const s = data?.statement;
-  if (loading && !s) return <Panel title="Profit & Loss"><div className="px-4 py-6 text-[12px] text-gray-500">Loading…</div></Panel>;
-  if (error) return <Panel title="Profit & Loss"><div className="px-4 py-6 text-[11px] text-rose-300">{error}</div></Panel>;
+  if (loading && !s) return <Panel title={t("statements.pl.title", "Profit & Loss")}><div className="px-4 py-6 text-[12px] text-gray-500">{t("statements.loading", "Loading…")}</div></Panel>;
+  if (error) return <Panel title={t("statements.pl.title", "Profit & Loss")}><div className="px-4 py-6 text-[11px] text-rose-300">{error}</div></Panel>;
   if (!s) return null;
   return (
-    <Panel title="Profit & Loss">
+    <Panel title={t("statements.pl.title", "Profit & Loss")}>
       <table className="min-w-full text-[12.5px]">
         <tbody>
-          <SectionRow label="Revenue" s={s.revenue} accent="text-emerald-200" />
-          <SectionRow label="Cost of Sales" s={s.cost_of_sales} accent="text-rose-200" />
-          <SubtotalRow label="Gross Profit" value={s.gross_profit} />
-          <SectionRow label="Operating Expenses" s={s.operating_expenses} accent="text-rose-200" />
+          <SectionRow label={t("statements.pl.revenue", "Revenue")} s={s.revenue} accent="text-emerald-200" />
+          <SectionRow label={t("statements.pl.cos", "Cost of Sales")} s={s.cost_of_sales} accent="text-rose-200" />
+          <SubtotalRow label={t("statements.pl.gp", "Gross Profit")} value={s.gross_profit} />
+          <SectionRow label={t("statements.pl.opex", "Operating Expenses")} s={s.operating_expenses} accent="text-rose-200" />
           <tr className="border-t-2 border-white/20">
-            <td className="px-4 py-2.5 text-[14px] font-bold">Net Profit</td>
+            <td className="px-4 py-2.5 text-[14px] font-bold">{t("statements.pl.np", "Net Profit")}</td>
             <td className="px-4 py-2.5 text-right tabular-nums font-mono text-[14px] font-bold">{fmtMoney(s.net_profit)}</td>
           </tr>
         </tbody>
@@ -202,6 +205,7 @@ function ProfitLossPanel({ from, to }: { from: string; to: string }) {
   );
 }
 function SectionRow({ label, s, accent }: { label: string; s: PLSection; accent: string }) {
+  const { t } = useTranslation(financeT);
   const lines = s.lines ?? [];
   return (
     <>
@@ -219,7 +223,7 @@ function SectionRow({ label, s, accent }: { label: string; s: PLSection; accent:
         );
       })}
       {lines.length === 0 && (
-        <tr><td colSpan={2} className="px-4 py-1.5 pl-6 text-[11px] text-gray-600">No activity in this section.</td></tr>
+        <tr><td colSpan={2} className="px-4 py-1.5 pl-6 text-[11px] text-gray-600">{t("statements.pl.noActivity", "No activity in this section.")}</td></tr>
       )}
     </>
   );
@@ -245,48 +249,49 @@ interface BSSummary {
 }
 
 function BalanceSheetPanel({ asOf }: { asOf: string }) {
+  const { t } = useTranslation(financeT);
   const { data, loading, error } = useJson<{ summary: BSSummary }>(
     `/api/accounting/balance-sheet?as_of=${asOf}`,
   );
   const s = data?.summary;
-  if (loading && !s) return <Panel title="Balance Sheet"><div className="px-4 py-6 text-[12px] text-gray-500">Loading…</div></Panel>;
-  if (error) return <Panel title="Balance Sheet"><div className="px-4 py-6 text-[11px] text-rose-300">{error}</div></Panel>;
+  if (loading && !s) return <Panel title={t("statements.tab.bs", "Balance Sheet")}><div className="px-4 py-6 text-[12px] text-gray-500">{t("statements.loading", "Loading…")}</div></Panel>;
+  if (error) return <Panel title={t("statements.tab.bs", "Balance Sheet")}><div className="px-4 py-6 text-[11px] text-rose-300">{error}</div></Panel>;
   if (!s) return null;
   const lAndE = s.total_liabilities + s.total_equity + s.current_year_earnings;
   const reconciled = Math.abs(s.balanced_difference) < 0.05;
   return (
-    <Panel title={`Balance Sheet · as of ${s.as_of}`}>
+    <Panel title={t("statements.bs.title", "Balance Sheet · as of {date}").replace("{date}", s.as_of)}>
       <table className="min-w-full text-[12.5px]">
         <tbody>
           <tr className="bg-white/[0.02]">
-            <td className="px-4 py-2 text-[10px] uppercase tracking-[0.12em] text-gray-400">Assets</td>
+            <td className="px-4 py-2 text-[10px] uppercase tracking-[0.12em] text-gray-400">{t("statements.bs.assets", "Assets")}</td>
             <td className="px-4 py-2 text-right tabular-nums font-mono font-medium">{fmtMoney(s.total_assets)}</td>
           </tr>
           <tr className="bg-white/[0.02]">
-            <td className="px-4 py-2 text-[10px] uppercase tracking-[0.12em] text-gray-400">Liabilities</td>
+            <td className="px-4 py-2 text-[10px] uppercase tracking-[0.12em] text-gray-400">{t("statements.bs.liab", "Liabilities")}</td>
             <td className="px-4 py-2 text-right tabular-nums font-mono font-medium">{fmtMoney(s.total_liabilities)}</td>
           </tr>
           <tr className="bg-white/[0.02]">
-            <td className="px-4 py-2 text-[10px] uppercase tracking-[0.12em] text-gray-400">Equity</td>
+            <td className="px-4 py-2 text-[10px] uppercase tracking-[0.12em] text-gray-400">{t("statements.bs.equity", "Equity")}</td>
             <td className="px-4 py-2 text-right tabular-nums font-mono font-medium">{fmtMoney(s.total_equity)}</td>
           </tr>
           <tr className="border-b border-white/[0.03]">
-            <td className="px-4 py-1.5 pl-6 text-gray-300">Current year earnings</td>
+            <td className="px-4 py-1.5 pl-6 text-gray-300">{t("statements.bs.cye", "Current year earnings")}</td>
             <td className="px-4 py-1.5 text-right tabular-nums font-mono text-gray-400">{fmtMoney(s.current_year_earnings)}</td>
           </tr>
           <tr className="border-t-2 border-white/20">
-            <td className="px-4 py-2 text-[13px] font-bold">Liabilities + Equity + CYE</td>
+            <td className="px-4 py-2 text-[13px] font-bold">{t("statements.bs.lec", "Liabilities + Equity + CYE")}</td>
             <td className="px-4 py-2 text-right tabular-nums font-mono text-[13px] font-bold">{fmtMoney(lAndE)}</td>
           </tr>
           {!reconciled && (
             <tr><td colSpan={2} className="px-4 py-2 text-[11px] text-rose-300 bg-rose-500/[0.06]">
-              Assets do not reconcile (Δ {fmtMoney(s.balanced_difference)}). Run a trial balance check.
+              {t("statements.bs.notReconciled", "Assets do not reconcile (Δ {value}). Run a trial balance check.").replace("{value}", fmtMoney(s.balanced_difference))}
             </td></tr>
           )}
         </tbody>
       </table>
       <div className="border-t border-white/[0.05] px-4 py-2 text-[10.5px] text-gray-500">
-        For a full account-by-account view (Cash, AR, Inventory Asset, AP, Owner Capital, Retained Earnings, …) open the Trial Balance or General Ledger pages.
+        {t("statements.bs.fullView", "For a full account-by-account view (Cash, AR, Inventory Asset, AP, Owner Capital, Retained Earnings, …) open the Trial Balance or General Ledger pages.")}
       </div>
     </Panel>
   );
@@ -296,20 +301,21 @@ function BalanceSheetPanel({ asOf }: { asOf: string }) {
 
 interface CFSummary { from: string; to: string; cash_in: number; cash_out: number; net_change: number; counts: { in: number; out: number } }
 function CashFlowPanel({ from, to }: { from: string; to: string }) {
+  const { t } = useTranslation(financeT);
   const { data, loading, error } = useJson<{ report: CFSummary }>(
     `/api/accounting/statements/cash-flow-summary?from=${from}&to=${to}`,
   );
   const r = data?.report;
-  if (loading && !r) return <Panel title="Cash Flow Summary"><div className="px-4 py-6 text-[12px] text-gray-500">Loading…</div></Panel>;
-  if (error) return <Panel title="Cash Flow Summary"><div className="px-4 py-6 text-[11px] text-rose-300">{error}</div></Panel>;
+  if (loading && !r) return <Panel title={t("statements.cf.title", "Cash Flow Summary")}><div className="px-4 py-6 text-[12px] text-gray-500">{t("statements.loading", "Loading…")}</div></Panel>;
+  if (error) return <Panel title={t("statements.cf.title", "Cash Flow Summary")}><div className="px-4 py-6 text-[11px] text-rose-300">{error}</div></Panel>;
   if (!r) return null;
   return (
-    <Panel title="Cash Flow Summary">
+    <Panel title={t("statements.cf.title", "Cash Flow Summary")}>
       <table className="min-w-full text-[12.5px]">
         <tbody>
-          <tr className="border-b border-white/[0.06]"><td className="px-4 py-2 text-gray-300">Cash in <span className="text-gray-500">({r.counts.in} payments)</span></td><td className="px-4 py-2 text-right tabular-nums font-mono text-emerald-200">{fmtMoney(r.cash_in)}</td></tr>
-          <tr className="border-b border-white/[0.06]"><td className="px-4 py-2 text-gray-300">Cash out <span className="text-gray-500">({r.counts.out} payments)</span></td><td className="px-4 py-2 text-right tabular-nums font-mono text-rose-200">{fmtMoney(r.cash_out)}</td></tr>
-          <tr className="border-t-2 border-white/20"><td className="px-4 py-2.5 text-[14px] font-bold">Net cash change</td><td className="px-4 py-2.5 text-right tabular-nums font-mono text-[14px] font-bold">{fmtMoney(r.net_change)}</td></tr>
+          <tr className="border-b border-white/[0.06]"><td className="px-4 py-2 text-gray-300">{t("statements.cf.in", "Cash in")} <span className="text-gray-500">{t("statements.cf.payments", "({n} payments)").replace("{n}", String(r.counts.in))}</span></td><td className="px-4 py-2 text-right tabular-nums font-mono text-emerald-200">{fmtMoney(r.cash_in)}</td></tr>
+          <tr className="border-b border-white/[0.06]"><td className="px-4 py-2 text-gray-300">{t("statements.cf.out", "Cash out")} <span className="text-gray-500">{t("statements.cf.payments", "({n} payments)").replace("{n}", String(r.counts.out))}</span></td><td className="px-4 py-2 text-right tabular-nums font-mono text-rose-200">{fmtMoney(r.cash_out)}</td></tr>
+          <tr className="border-t-2 border-white/20"><td className="px-4 py-2.5 text-[14px] font-bold">{t("statements.cf.net", "Net cash change")}</td><td className="px-4 py-2.5 text-right tabular-nums font-mono text-[14px] font-bold">{fmtMoney(r.net_change)}</td></tr>
         </tbody>
       </table>
     </Panel>
@@ -322,27 +328,28 @@ interface AgingPartyRow { party_id: string | null; party_name: string | null; to
 interface AgingReport { as_of: string; buckets: string[]; parties: AgingPartyRow[]; totals: { by_bucket: Record<string, number>; total_open: number; total_overdue: number } }
 
 function AgingPanel({ title, url }: { title: string; url: string }) {
+  const { t } = useTranslation(financeT);
   const { data, loading, error } = useJson<{ report: AgingReport }>(url);
   const r = data?.report;
-  if (loading && !r) return <Panel title={title}><div className="px-4 py-6 text-[12px] text-gray-500">Loading…</div></Panel>;
+  if (loading && !r) return <Panel title={title}><div className="px-4 py-6 text-[12px] text-gray-500">{t("statements.loading", "Loading…")}</div></Panel>;
   if (error) return <Panel title={title}><div className="px-4 py-6 text-[11px] text-rose-300">{error}</div></Panel>;
   if (!r) return null;
   return (
-    <Panel title={`${title} · as of ${r.as_of}`}>
+    <Panel title={t("statements.aging.title", "{title} · as of {date}").replace("{title}", title).replace("{date}", r.as_of)}>
       <table className="min-w-full text-[12.5px]">
         <thead>
           <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.10em] text-gray-500">
-            <th className="px-4 py-2 text-left">Party</th>
+            <th className="px-4 py-2 text-left">{t("statements.aging.party", "Party")}</th>
             {r.buckets.map((b) => (
               <th key={b} className="px-4 py-2 text-right">{b}</th>
             ))}
-            <th className="px-4 py-2 text-right">Open</th>
-            <th className="px-4 py-2 text-right">Overdue</th>
+            <th className="px-4 py-2 text-right">{t("statements.aging.open", "Open")}</th>
+            <th className="px-4 py-2 text-right">{t("statements.aging.overdue", "Overdue")}</th>
           </tr>
         </thead>
         <tbody>
           {r.parties.length === 0 ? (
-            <tr><td colSpan={r.buckets.length + 3} className="px-4 py-6 text-center text-[11px] text-gray-600">No open balances.</td></tr>
+            <tr><td colSpan={r.buckets.length + 3} className="px-4 py-6 text-center text-[11px] text-gray-600">{t("statements.aging.empty", "No open balances.")}</td></tr>
           ) : r.parties.map((p) => (
             <tr key={p.party_id ?? p.party_name ?? ""} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
               <td className="px-4 py-1.5 text-gray-200">{p.party_name ?? "—"}</td>
@@ -357,7 +364,7 @@ function AgingPanel({ title, url }: { title: string; url: string }) {
         {r.parties.length > 0 && (
           <tfoot>
             <tr className="border-t-2 border-white/20">
-              <td className="px-4 py-2 text-[13px] font-bold">Totals</td>
+              <td className="px-4 py-2 text-[13px] font-bold">{t("statements.aging.totals", "Totals")}</td>
               {r.buckets.map((b) => (
                 <td key={b} className="px-4 py-2 text-right tabular-nums font-mono text-[13px] font-bold">{fmtMoney(r.totals.by_bucket[b] ?? 0)}</td>
               ))}
@@ -370,8 +377,14 @@ function AgingPanel({ title, url }: { title: string; url: string }) {
     </Panel>
   );
 }
-function ArAgingPanel({ asOf }: { asOf: string }) { return <AgingPanel title="AR Aging" url={`/api/accounting/statements/ar-aging?as_of=${asOf}`} />; }
-function ApAgingPanel({ asOf }: { asOf: string }) { return <AgingPanel title="AP Aging" url={`/api/accounting/statements/ap-aging?as_of=${asOf}`} />; }
+function ArAgingPanel({ asOf }: { asOf: string }) {
+  const { t } = useTranslation(financeT);
+  return <AgingPanel title={t("statements.tab.ar", "AR Aging")} url={`/api/accounting/statements/ar-aging?as_of=${asOf}`} />;
+}
+function ApAgingPanel({ asOf }: { asOf: string }) {
+  const { t } = useTranslation(financeT);
+  return <AgingPanel title={t("statements.tab.ap", "AP Aging")} url={`/api/accounting/statements/ap-aging?as_of=${asOf}`} />;
+}
 
 /* ─── Inventory Value ────────────────────────────────────────── */
 
@@ -379,27 +392,28 @@ interface InvRow { inventory_item_id: string; item_code: string; item_name: stri
 interface InvReport { as_of: string; rows: InvRow[]; totals: { total_qty: number; total_value: number; by_currency: Record<string, number> } }
 
 function InventoryValuePanel() {
+  const { t } = useTranslation(financeT);
   const { data, loading, error } = useJson<{ report: InvReport }>("/api/accounting/statements/inventory-valuation");
   const r = data?.report;
-  if (loading && !r) return <Panel title="Inventory Valuation"><div className="px-4 py-6 text-[12px] text-gray-500">Loading…</div></Panel>;
-  if (error) return <Panel title="Inventory Valuation"><div className="px-4 py-6 text-[11px] text-rose-300">{error}</div></Panel>;
+  if (loading && !r) return <Panel title={t("statements.tab.inv", "Inventory Value")}><div className="px-4 py-6 text-[12px] text-gray-500">{t("statements.loading", "Loading…")}</div></Panel>;
+  if (error) return <Panel title={t("statements.tab.inv", "Inventory Value")}><div className="px-4 py-6 text-[11px] text-rose-300">{error}</div></Panel>;
   if (!r) return null;
   return (
-    <Panel title={`Inventory Valuation · as of ${r.as_of}`}>
+    <Panel title={t("statements.inv.title", "Inventory Valuation · as of {date}").replace("{date}", r.as_of)}>
       <table className="min-w-full text-[12.5px]">
         <thead>
           <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.10em] text-gray-500">
-            <th className="px-4 py-2 text-left">Code</th>
-            <th className="px-4 py-2 text-left">Item</th>
-            <th className="px-4 py-2 text-left">Location</th>
-            <th className="px-4 py-2 text-right">Qty</th>
-            <th className="px-4 py-2 text-right">Avg cost</th>
-            <th className="px-4 py-2 text-right">Value</th>
+            <th className="px-4 py-2 text-left">{t("statements.inv.code", "Code")}</th>
+            <th className="px-4 py-2 text-left">{t("statements.inv.item", "Item")}</th>
+            <th className="px-4 py-2 text-left">{t("statements.inv.location", "Location")}</th>
+            <th className="px-4 py-2 text-right">{t("statements.inv.qty", "Qty")}</th>
+            <th className="px-4 py-2 text-right">{t("statements.inv.avgCost", "Avg cost")}</th>
+            <th className="px-4 py-2 text-right">{t("statements.inv.value", "Value")}</th>
           </tr>
         </thead>
         <tbody>
           {r.rows.length === 0 ? (
-            <tr><td colSpan={6} className="px-4 py-6 text-center text-[11px] text-gray-600">No valued stock.</td></tr>
+            <tr><td colSpan={6} className="px-4 py-6 text-center text-[11px] text-gray-600">{t("statements.inv.empty", "No valued stock.")}</td></tr>
           ) : r.rows.map((row) => (
             <tr key={`${row.inventory_item_id}-${row.warehouse_id}`} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
               <td className="px-4 py-1.5 font-mono text-[11.5px] text-gray-300">{row.item_code}</td>
@@ -414,7 +428,7 @@ function InventoryValuePanel() {
         {r.rows.length > 0 && (
           <tfoot>
             <tr className="border-t-2 border-white/20">
-              <td colSpan={3} className="px-4 py-2 text-[13px] font-bold text-right uppercase tracking-[0.08em]">Totals</td>
+              <td colSpan={3} className="px-4 py-2 text-[13px] font-bold text-right uppercase tracking-[0.08em]">{t("statements.aging.totals", "Totals")}</td>
               <td className="px-4 py-2 text-right tabular-nums font-mono text-[13px] font-bold">{fmtQty(r.totals.total_qty)}</td>
               <td className="px-4 py-2"></td>
               <td className="px-4 py-2 text-right tabular-nums font-mono text-[13px] font-bold text-emerald-200">{fmtMoney(r.totals.total_value)}</td>
@@ -432,30 +446,31 @@ interface GPRow { invoice_id: string; invoice_no: string | null; customer_name: 
 interface GPReport { as_of: string; from: string | null; to: string | null; rows: GPRow[]; totals: { revenue: number; cogs: number; gross_profit: number; margin_pct: number } }
 
 function GrossProfitPanel({ from, to }: { from: string; to: string }) {
+  const { t } = useTranslation(financeT);
   const { data, loading, error } = useJson<{ report: GPReport }>(
     `/api/accounting/statements/gross-profit?from=${from}&to=${to}`,
   );
   const r = data?.report;
-  if (loading && !r) return <Panel title="Gross Profit"><div className="px-4 py-6 text-[12px] text-gray-500">Loading…</div></Panel>;
-  if (error) return <Panel title="Gross Profit"><div className="px-4 py-6 text-[11px] text-rose-300">{error}</div></Panel>;
+  if (loading && !r) return <Panel title={t("statements.tab.gp", "Gross Profit")}><div className="px-4 py-6 text-[12px] text-gray-500">{t("statements.loading", "Loading…")}</div></Panel>;
+  if (error) return <Panel title={t("statements.tab.gp", "Gross Profit")}><div className="px-4 py-6 text-[11px] text-rose-300">{error}</div></Panel>;
   if (!r) return null;
   return (
-    <Panel title="Gross Profit per Invoice">
+    <Panel title={t("statements.gp.title", "Gross Profit per Invoice")}>
       <table className="min-w-full text-[12.5px]">
         <thead>
           <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.10em] text-gray-500">
-            <th className="px-4 py-2 text-left">Invoice</th>
-            <th className="px-4 py-2 text-left">Customer</th>
-            <th className="px-4 py-2 text-right">Revenue</th>
-            <th className="px-4 py-2 text-right">COGS</th>
-            <th className="px-4 py-2 text-right">Gross profit</th>
-            <th className="px-4 py-2 text-right">Margin %</th>
-            <th className="px-4 py-2 text-left">Status</th>
+            <th className="px-4 py-2 text-left">{t("statements.gp.invoice", "Invoice")}</th>
+            <th className="px-4 py-2 text-left">{t("statements.gp.customer", "Customer")}</th>
+            <th className="px-4 py-2 text-right">{t("statements.gp.revenue", "Revenue")}</th>
+            <th className="px-4 py-2 text-right">{t("statements.gp.cogs", "COGS")}</th>
+            <th className="px-4 py-2 text-right">{t("statements.gp.gp", "Gross profit")}</th>
+            <th className="px-4 py-2 text-right">{t("statements.gp.margin", "Margin %")}</th>
+            <th className="px-4 py-2 text-left">{t("statements.gp.status", "Status")}</th>
           </tr>
         </thead>
         <tbody>
           {r.rows.length === 0 ? (
-            <tr><td colSpan={7} className="px-4 py-6 text-center text-[11px] text-gray-600">No invoices in the window.</td></tr>
+            <tr><td colSpan={7} className="px-4 py-6 text-center text-[11px] text-gray-600">{t("statements.gp.empty", "No invoices in the window.")}</td></tr>
           ) : r.rows.map((row) => (
             <tr key={row.invoice_id} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
               <td className="px-4 py-1.5 font-mono text-[11.5px] text-gray-300">{row.invoice_no ?? "—"}</td>
@@ -464,14 +479,14 @@ function GrossProfitPanel({ from, to }: { from: string; to: string }) {
               <td className="px-4 py-1.5 text-right tabular-nums font-mono text-rose-200">{fmtMoney(row.cogs)}</td>
               <td className="px-4 py-1.5 text-right tabular-nums font-mono">{fmtMoney(row.gross_profit)}</td>
               <td className="px-4 py-1.5 text-right tabular-nums font-mono text-gray-400">{row.revenue > 0 ? `${row.margin_pct.toFixed(1)}%` : "—"}</td>
-              <td className="px-4 py-1.5 text-[10.5px] text-gray-500">rev · {row.revenue_status} / cogs · {row.cogs_status}</td>
+              <td className="px-4 py-1.5 text-[10.5px] text-gray-500">{t("statements.gp.statusLine", "rev · {rev} / cogs · {cogs}").replace("{rev}", row.revenue_status).replace("{cogs}", row.cogs_status)}</td>
             </tr>
           ))}
         </tbody>
         {r.rows.length > 0 && (
           <tfoot>
             <tr className="border-t-2 border-white/20">
-              <td colSpan={2} className="px-4 py-2 text-[13px] font-bold text-right uppercase tracking-[0.08em]">Totals</td>
+              <td colSpan={2} className="px-4 py-2 text-[13px] font-bold text-right uppercase tracking-[0.08em]">{t("statements.aging.totals", "Totals")}</td>
               <td className="px-4 py-2 text-right tabular-nums font-mono text-[13px] font-bold text-emerald-200">{fmtMoney(r.totals.revenue)}</td>
               <td className="px-4 py-2 text-right tabular-nums font-mono text-[13px] font-bold text-rose-200">{fmtMoney(r.totals.cogs)}</td>
               <td className="px-4 py-2 text-right tabular-nums font-mono text-[13px] font-bold">{fmtMoney(r.totals.gross_profit)}</td>

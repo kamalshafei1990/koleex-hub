@@ -192,35 +192,36 @@ export default function FinanceOrders() {
             to payments + AR aging so the operator can act on a
             number, not just admire it. */}
         <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <Link href="/finance/visual" className="block hover:opacity-95" aria-label="Open Income Statement">
+          <Link href="/finance/visual" className="block hover:opacity-95" aria-label={t("orders.openIncome.aria", "Open Income Statement")}>
             <HeroKpiCard
               label={t("orders.kpi.revenue", "Total Revenue")}
               helpId="finance.revenue"
               value={kpi.totalSelling}
               unit={baseCurrency}
               tone="positive"
-              hint={`${orders.length} order${orders.length === 1 ? "" : "s"} this view · tap for Income Statement`}
+              hint={t(orders.length === 1 ? "orders.kpi.revenueHint" : "orders.kpi.revenueHintMany",
+                     orders.length === 1 ? "{n} order · tap for Income Statement" : "{n} orders · tap for Income Statement").replace("{n}", String(orders.length))}
               loading={loading}
             />
           </Link>
-          <Link href="/finance/visual" className="block hover:opacity-95" aria-label="Open Income Statement">
+          <Link href="/finance/visual" className="block hover:opacity-95" aria-label={t("orders.openIncome.aria", "Open Income Statement")}>
             <HeroKpiCard
               label={t("orders.kpi.netProfit", "Net Profit")}
               helpId="finance.netProfit"
               value={kpi.totalNet}
               unit={baseCurrency}
               tone={kpi.totalNet >= 0 ? "info" : "negative"}
-              hint={`Average margin ${fmtPct(kpi.avgMargin)} · tap for Income Statement`}
+              hint={t("orders.kpi.netProfitHint", "Average margin {pct} · tap for Income Statement").replace("{pct}", fmtPct(kpi.avgMargin))}
               loading={loading}
             />
           </Link>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3">
-          <Link href="/finance/payments" className="block hover:opacity-95" aria-label="Open payments received">
-            <MetricCard label="Collected (Money in)" helpId="order.collected" value={kpi.totalCollected} unit={baseCurrency} hint="Cash banked · tap for payments" loading={loading} />
+          <Link href="/finance/payments" className="block hover:opacity-95" aria-label={t("orders.openPayments.aria", "Open payments received")}>
+            <MetricCard label={t("orders.col.collected", "Collected")} helpId="order.collected" value={kpi.totalCollected} unit={baseCurrency} hint={t("orders.col.collectedHint", "Cash banked · tap for payments")} loading={loading} />
           </Link>
-          <Link href="/reports/statements?tab=ar" className="block hover:opacity-95" aria-label="Open AR aging report">
-            <MetricCard label="Outstanding (Money to Collect)" helpId="order.outstandingReceivable" value={kpi.totalOutstanding} unit={baseCurrency} tone="warning" hint="Still to collect · tap for AR aging" loading={loading} />
+          <Link href="/reports/statements?tab=ar" className="block hover:opacity-95" aria-label={t("orders.openAR.aria", "Open AR aging report")}>
+            <MetricCard label={t("orders.col.outstanding", "Outstanding (Money to Collect)")} helpId="order.outstandingReceivable" value={kpi.totalOutstanding} unit={baseCurrency} tone="warning" hint={t("orders.col.outstandingHint", "Still to collect · tap for AR aging")} loading={loading} />
           </Link>
           <MetricCard label={t("orders.kpi.orders", "Orders")} value={String(orders.length)} hint={t("orders.kpi.ordersHint", "In current view")} loading={loading} />
         </div>
@@ -252,10 +253,10 @@ export default function FinanceOrders() {
 
       <ConfirmDialog
         open={!!confirmDeleteOrder}
-        title={confirmDeleteOrder ? `Delete order ${confirmDeleteOrder.order_no}?` : ""}
-        description="This removes the order, its supplier lines, and any linked profit calculations. This cannot be undone."
-        confirmLabel="Delete order"
-        cancelLabel="Keep"
+        title={confirmDeleteOrder ? t("orders.delete.title", "Delete order {no}?").replace("{no}", confirmDeleteOrder.order_no) : ""}
+        description={t("orders.delete.desc", "This removes the order, its supplier lines, and any linked profit calculations. This cannot be undone.")}
+        confirmLabel={t("orders.delete.confirm", "Delete order")}
+        cancelLabel={t("orders.delete.keep", "Keep")}
         destructive
         busy={deletingOrder}
         onCancel={() => setConfirmDeleteOrder(null)}
@@ -272,6 +273,7 @@ export default function FinanceOrders() {
    read at a glance.
    ──────────────────────────────────────────────────────────────── */
 function OrderRowCard({ order, onEdit, onDelete }: { order: FinanceOrder; onEdit: () => void; onDelete: () => void }) {
+  const { t } = useTranslation(financeT);
   const ccy = order.currency || "USD";
   const sellingPrice = order.selling_price ?? 0;
   const supplierCost = order.total_supplier_cost ?? 0;
@@ -304,9 +306,9 @@ function OrderRowCard({ order, onEdit, onDelete }: { order: FinanceOrder; onEdit
     : risk === "watch" ? "border-amber-500/30 bg-amber-500/[0.06] text-amber-300"
     : "border-emerald-500/25 bg-emerald-500/[0.06] text-emerald-300";
   const riskLabel =
-    risk === "alert" ? (overdue ? "Overdue" : "Negative margin")
-    : risk === "watch" ? (lowMargin ? "Low margin" : "Heavy AP")
-    : "On track";
+    risk === "alert" ? (overdue ? t("orders.risk.overdue", "Overdue") : t("orders.risk.negative", "Negative margin"))
+    : risk === "watch" ? (lowMargin ? t("orders.risk.low", "Low margin") : t("orders.risk.heavyAp", "Heavy AP"))
+    : t("orders.risk.ok", "On track");
 
   /* Collection percentage for the progress ring */
   const collectionPct = sellingPrice > 0 ? Math.min(100, (collected / sellingPrice) * 100) : 0;
@@ -327,24 +329,24 @@ function OrderRowCard({ order, onEdit, onDelete }: { order: FinanceOrder; onEdit
           <div className="mt-2 truncate text-[15px] font-medium">{order.customer_name || "—"}</div>
           <p className="mt-1 text-[11px] text-gray-500">
             {order.order_date}
-            {order.payment_due_date && <span>{`  ·  Due ${order.payment_due_date}`}</span>}
+            {order.payment_due_date && <span>{`  ·  ${t("orders.due.prefix", "Due")} ${order.payment_due_date}`}</span>}
           </p>
         </div>
         {/* Headline net profit + progress ring + actions */}
         <div className="flex items-center gap-4">
           <div className="text-right">
-            <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500">Net profit</div>
+            <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500">{t("orders.netProfit.label", "Net profit")}</div>
             <div className={`text-[22px] font-medium leading-none tabular-nums ${netProfit >= 0 ? "text-[var(--text-primary)]" : "text-rose-300"}`}>
               {fmtMoney(netProfit, ccy, { compact: true })}
             </div>
             <div className={`mt-1 text-[11px] ${netPct >= 15 ? "text-emerald-300" : netPct >= 0 ? "text-amber-300" : "text-rose-300"}`}>
-              {fmtPct(netPct)} margin
+              {fmtPct(netPct)} {t("orders.margin.suffix", "margin")}
             </div>
           </div>
-          <ProgressRing pct={collectionPct} label={`${collectionPct.toFixed(0)}%`} sub="collected" />
+          <ProgressRing pct={collectionPct} label={`${collectionPct.toFixed(0)}%`} sub={t("orders.collected.label", "collected")} />
           <div className="flex items-center gap-2">
-            <button type="button" onClick={onEdit} className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-gray-300 transition hover:border-white/[0.12]">Edit</button>
-            <button type="button" onClick={onDelete} className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-rose-400 transition hover:border-rose-500/40">Delete</button>
+            <button type="button" onClick={onEdit} className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-gray-300 transition hover:border-white/[0.12]">{t("common.edit", "Edit")}</button>
+            <button type="button" onClick={onDelete} className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-rose-400 transition hover:border-rose-500/40">{t("common.delete", "Delete")}</button>
           </div>
         </div>
       </div>
@@ -354,32 +356,32 @@ function OrderRowCard({ order, onEdit, onDelete }: { order: FinanceOrder; onEdit
             (accounting)    (actual money)      (still open) */}
       <div className="grid grid-cols-1 gap-3 px-5 py-4 lg:grid-cols-3">
         {/* A · BOOKED */}
-        <Zone label="A · Booked" subtitle="Accounting picture">
-          <ZoneRow k="Revenue"        v={sellingPrice}                         ccy={ccy} />
-          <ZoneRow k="− Supplier cost" v={-supplierCost}                       ccy={ccy} negative />
-          <ZoneRow k="− Expenses"     v={-expenses}                             ccy={ccy} negative />
-          <ZoneRow k="+ Tax refund"   v={taxRefund}                             ccy={ccy} positive />
-          <ZoneTotal label="Gross profit" v={grossProfit} ccy={ccy} tone={grossProfit >= 0 ? "info" : "negative"} />
+        <Zone label={t("orders.zone.booked", "A · Booked")} subtitle={t("orders.zone.bookedHint", "Accounting picture")}>
+          <ZoneRow k={t("orders.zone.revenue", "Revenue")}                v={sellingPrice}                         ccy={ccy} />
+          <ZoneRow k={t("orders.preview.supplierCost", "− Supplier cost")} v={-supplierCost}                       ccy={ccy} negative />
+          <ZoneRow k={t("orders.zone.expenses", "− Expenses")}            v={-expenses}                             ccy={ccy} negative />
+          <ZoneRow k={t("orders.zone.taxRefund", "+ Tax refund")}          v={taxRefund}                             ccy={ccy} positive />
+          <ZoneTotal label={t("orders.zone.grossProfit", "Gross profit")} v={grossProfit} ccy={ccy} tone={grossProfit >= 0 ? "info" : "negative"} />
         </Zone>
 
         {/* B · REALIZED CASH */}
-        <Zone label="B · Realized cash" subtitle="Money that has actually moved">
-          <ZoneRow k="Collected"      v={collected}      ccy={ccy} positive />
-          <ZoneRow k="− Paid supplier" v={-paidSupplier} ccy={ccy} negative />
-          <ZoneRow k="− Paid expenses" v={-paidExpenses} ccy={ccy} negative />
-          <ZoneTotal label="Net cash position" v={realizedCash} ccy={ccy} tone={realizedCash >= 0 ? "info" : "negative"} />
+        <Zone label={t("orders.zone.cash", "B · Realized cash")} subtitle={t("orders.zone.cashHint", "Money that has actually moved")}>
+          <ZoneRow k={t("orders.zone.collected", "Collected")}             v={collected}      ccy={ccy} positive />
+          <ZoneRow k={t("orders.zone.paidSupplier", "− Paid supplier")}     v={-paidSupplier} ccy={ccy} negative />
+          <ZoneRow k={t("orders.zone.paidExpenses", "− Paid expenses")}     v={-paidExpenses} ccy={ccy} negative />
+          <ZoneTotal label={t("orders.zone.netCash", "Net cash position")} v={realizedCash} ccy={ccy} tone={realizedCash >= 0 ? "info" : "negative"} />
         </Zone>
 
         {/* C · EXPOSURE */}
-        <Zone label="C · Exposure" subtitle="Still open · risk surface">
-          <ZoneRow k="AR · to collect" v={outstandingAR} ccy={ccy} warning />
-          <ZoneRow k="AP · to pay"     v={outstandingAP} ccy={ccy} warning />
-          <ZoneRow k="Collection"      v={null} ccy={ccy} display={`${collectionPct.toFixed(0)}%`} />
+        <Zone label={t("orders.zone.exposure", "C · Exposure")} subtitle={t("orders.zone.exposureHint", "Still open · risk surface")}>
+          <ZoneRow k={t("orders.zone.arToCollect", "AR · to collect")} v={outstandingAR} ccy={ccy} warning />
+          <ZoneRow k={t("orders.zone.apToPay", "AP · to pay")}         v={outstandingAP} ccy={ccy} warning />
+          <ZoneRow k={t("orders.zone.collection", "Collection")}       v={null} ccy={ccy} display={`${collectionPct.toFixed(0)}%`} />
           <div className="mt-1.5">
             <ProgressBar value={collected} max={sellingPrice} color={collected >= sellingPrice ? "emerald" : "amber"} />
           </div>
           <div className="mt-3 flex items-center justify-between rounded-lg border border-white/[0.04] bg-white/[0.015] px-3 py-2">
-            <span className="text-[11px] text-gray-400">Risk level</span>
+            <span className="text-[11px] text-gray-400">{t("orders.risk.level", "Risk level")}</span>
             <span className={`text-[11px] font-medium uppercase tracking-wide ${
               risk === "alert" ? "text-rose-300"
               : risk === "watch" ? "text-amber-300"
@@ -392,7 +394,7 @@ function OrderRowCard({ order, onEdit, onDelete }: { order: FinanceOrder; onEdit
       {/* ── SUPPLIERS STRIP ──────────────────────────────────────── */}
       {order.suppliers && order.suppliers.length > 0 && (
         <div className="border-t border-white/[0.04] bg-[var(--bg-primary)]/40 px-5 py-3">
-          <div className="mb-2 text-[10px] font-medium uppercase tracking-[0.16em] text-gray-500">Suppliers · {order.suppliers.length}</div>
+          <div className="mb-2 text-[10px] font-medium uppercase tracking-[0.16em] text-gray-500">{t("orders.suppliers.count", "Suppliers · {n}").replace("{n}", String(order.suppliers.length))}</div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {order.suppliers.map((s) => {
               const supplierPct = s.supplier_cost > 0 ? Math.min(100, (s.paid_amount / s.supplier_cost) * 100) : 0;
@@ -400,8 +402,8 @@ function OrderRowCard({ order, onEdit, onDelete }: { order: FinanceOrder; onEdit
                 <div key={s.id} className="rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] px-3 py-2">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="truncate text-xs font-medium text-gray-200">{s.supplier_name || "Unnamed supplier"}</div>
-                      <div className="text-[10px] text-gray-500">{fmtMoney(s.paid_amount, s.currency, { compact: true })} of {fmtMoney(s.supplier_cost, s.currency, { compact: true })}</div>
+                      <div className="truncate text-xs font-medium text-gray-200">{s.supplier_name || t("orders.supplier.unnamed", "Unnamed supplier")}</div>
+                      <div className="text-[10px] text-gray-500">{fmtMoney(s.paid_amount, s.currency, { compact: true })} {t("orders.suppliers.of", "of")} {fmtMoney(s.supplier_cost, s.currency, { compact: true })}</div>
                     </div>
                     <StatusBadge status={s.payment_status} />
                   </div>
@@ -560,6 +562,7 @@ function OrderEditor({
   onCancel: () => void;
   onSave: () => void;
 }) {
+  const { t } = useTranslation(financeT);
   const sellingPrice = Number(draft.order.selling_price) || 0;
   const taxValue = deriveTaxRefundValue(
     sellingPrice,
@@ -672,12 +675,12 @@ function OrderEditor({
 
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
-          title={draft.order.id ? `Edit Order ${draft.order.order_no}` : "New Order"}
-          subtitle="Capture the selling price, every supplier cost, and let Koleex compute the profit automatically."
+          title={draft.order.id ? t("orders.editOrder", "Edit Order {no}").replace("{no}", draft.order.order_no) : t("orders.newOrder", "New Order")}
+          subtitle={t("orders.editor.subtitle", "Capture the selling price, every supplier cost, and let Koleex compute the profit automatically.")}
           action={
             <div className="flex gap-2">
-              <button type="button" onClick={onCancel} className="rounded-xl border border-white/[0.06] bg-[var(--bg-secondary)] px-4 py-2 text-sm font-medium text-gray-300 hover:border-white/[0.12]">Cancel</button>
-              <button type="button" onClick={onSave} className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-400 hover:bg-emerald-500/30">Save Order</button>
+              <button type="button" onClick={onCancel} className="rounded-xl border border-white/[0.06] bg-[var(--bg-secondary)] px-4 py-2 text-sm font-medium text-gray-300 hover:border-white/[0.12]">{t("orders.editor.cancel", "Cancel")}</button>
+              <button type="button" onClick={onSave} className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-400 hover:bg-emerald-500/30">{t("orders.editor.save", "Save Order")}</button>
             </div>
           }
         />
@@ -685,44 +688,44 @@ function OrderEditor({
         {/* Step indicator */}
         <div className="mt-6 flex items-center gap-2 overflow-x-auto pb-1">
           {[
-            { n: 1, label: "Customer & Selling", done: !!draft.order.customer_id || !!draft.order.customer_name?.trim(), active: !draft.order.customer_id && !draft.order.customer_name?.trim() },
-            { n: 2, label: "Suppliers & Costs",  done: draft.suppliers.some((s) => s.supplier_cost > 0),                                          active: false },
-            { n: 3, label: "Tax & Charges",      done: !!draft.order.tax_refund_pct || !!draft.order.tax_refund_value,                            active: false },
-            { n: 4, label: "Save & Track",       done: !!draft.order.id,                                                                          active: false },
+            { n: 1, label: t("orders.step.customer", "Customer & Selling"), done: !!draft.order.customer_id || !!draft.order.customer_name?.trim(), active: !draft.order.customer_id && !draft.order.customer_name?.trim() },
+            { n: 2, label: t("orders.step.suppliers", "Suppliers & Costs"),  done: draft.suppliers.some((s) => s.supplier_cost > 0),                                          active: false },
+            { n: 3, label: t("orders.step.tax", "Tax & Charges"),       done: !!draft.order.tax_refund_pct || !!draft.order.tax_refund_value,                            active: false },
+            { n: 4, label: t("orders.step.save", "Save & Track"),       done: !!draft.order.id,                                                                          active: false },
           ].map((s) => (
             <div key={s.n} className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-medium ${s.done ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : s.active ? "border-sky-500/40 bg-sky-500/10 text-sky-300" : "border-white/[0.06] bg-[var(--bg-secondary)] text-gray-400"}`}>
               <span className={`flex h-5 w-5 items-center justify-center rounded-full ${s.done ? "bg-emerald-500/30" : "bg-white/5"}`}>
                 {s.done ? <RrIcon name="check" size={10} /> : s.n}
               </span>
-              <span className="whitespace-nowrap">Step {s.n} · {s.label}</span>
+              <span className="whitespace-nowrap">{t("orders.editor.stepLabel", "Step {n} · {label}").replace("{n}", String(s.n)).replace("{label}", s.label)}</span>
             </div>
           ))}
         </div>
 
         {/* Order header */}
         <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-3">
-          <SectionCard title="Step 1 · Customer & Selling" subtitle="Pick a customer from Contacts — currency and terms auto-fill.">
+          <SectionCard title={t("orders.step1.title", "Step 1 · Customer & Selling")} subtitle={t("orders.step1.subtitle", "Pick a customer from Contacts — currency and terms auto-fill.")}>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Customer" wide>
+              <Field label={t("orders.field.customer", "Customer")} wide>
                 <PartyChip
                   party={customerChipData}
                   onChange={() => setCustomerPickerOpen(true)}
                   onClear={() => updateOrder("customer_id", null)}
-                  placeholder="Pick a customer from Contacts…"
+                  placeholder={t("orders.step1.pickCustomer", "Pick a customer from Contacts…")}
                 />
               </Field>
-              <Field label="Order No.">
-                <input value={draft.order.order_no} onChange={(e) => updateOrder("order_no", e.target.value)} placeholder="Auto on save" className={INPUT} />
+              <Field label={t("orders.field.orderNo", "Order No.")}>
+                <input value={draft.order.order_no} onChange={(e) => updateOrder("order_no", e.target.value)} placeholder={t("orders.field.orderNoPlaceholder", "Auto on save")} className={INPUT} />
               </Field>
-              <Field label="Order date">
+              <Field label={t("orders.field.orderDate", "Order date")}>
                 <input type="date" value={draft.order.order_date} onChange={(e) => updateOrder("order_date", e.target.value)} className={INPUT} />
               </Field>
-              <Field label="Currency">
+              <Field label={t("orders.field.currency", "Currency")}>
                 <select value={draft.order.currency} onChange={(e) => updateOrder("currency", e.target.value)} className={INPUT}>
                   {["USD", "EUR", "CNY", "EGP", "GBP"].map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
               </Field>
-              <Field label="Status">
+              <Field label={t("orders.field.status", "Status")}>
                 <select value={draft.order.status} onChange={(e) => updateOrder("status", e.target.value as DraftOrder["order"]["status"])} className={INPUT}>
                   {(["open","in_production","shipped","delivered","closed","cancelled"] as const).map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
                 </select>
@@ -730,50 +733,48 @@ function OrderEditor({
             </div>
           </SectionCard>
 
-          <SectionCard title="Step 3 · Money in & Tax" subtitle="Selling price, tax refund, bank charges, due date.">
+          <SectionCard title={t("orders.step3.title", "Step 3 · Money in & Tax")} subtitle={t("orders.step3.subtitle", "Selling price, tax refund, bank charges, due date.")}>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Selling price" wide>
+              <Field label={t("orders.field.sellingPrice", "Selling price")} wide>
                 <input type="number" inputMode="decimal" value={draft.order.selling_price} onChange={(e) => updateOrder("selling_price", Number(e.target.value) || 0)} className={INPUT} />
               </Field>
-              <Field label="Tax refund %">
+              <Field label={t("orders.field.taxPct", "Tax refund %")}>
                 <input type="number" inputMode="decimal" value={draft.order.tax_refund_pct} onChange={(e) => updateOrder("tax_refund_pct", Number(e.target.value) || 0)} className={INPUT} />
               </Field>
-              <Field label="Tax refund value">
-                <input type="number" inputMode="decimal" value={draft.order.tax_refund_value} onChange={(e) => updateOrder("tax_refund_value", Number(e.target.value) || 0)} placeholder={`${taxValue.toFixed(2)} (derived)`} className={INPUT} />
+              <Field label={t("orders.field.taxValue", "Tax refund value")}>
+                <input type="number" inputMode="decimal" value={draft.order.tax_refund_value} onChange={(e) => updateOrder("tax_refund_value", Number(e.target.value) || 0)} placeholder={t("orders.field.taxValueDerived", "{val} (derived)").replace("{val}", taxValue.toFixed(2))} className={INPUT} />
               </Field>
-              <Field label="Bank / L-C / FX charges">
-                <input type="number" inputMode="decimal" value={draft.order.financial_charges} onChange={(e) => updateOrder("financial_charges", Number(e.target.value) || 0)} placeholder="0.00" className={INPUT} />
+              <Field label={t("orders.field.bankCharges", "Bank / L-C / FX charges")}>
+                <input type="number" inputMode="decimal" value={draft.order.financial_charges} onChange={(e) => updateOrder("financial_charges", Number(e.target.value) || 0)} placeholder={t("orders.field.charges.placeholder", "0.00")} className={INPUT} />
               </Field>
-              <Field label="Payment status">
+              <Field label={t("orders.field.payStatus", "Payment status")}>
                 <select value={draft.order.payment_status} onChange={(e) => updateOrder("payment_status", e.target.value as DraftOrder["order"]["payment_status"])} className={INPUT}>
                   {(["unpaid","partial","paid","overdue"] as const).map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </Field>
-              <Field label="Payment due">
+              <Field label={t("orders.field.payDue", "Payment due")}>
                 <input type="date" value={draft.order.payment_due_date} onChange={(e) => updateOrder("payment_due_date", e.target.value)} className={INPUT} />
               </Field>
             </div>
             <p className="mt-3 rounded-lg border border-sky-500/20 bg-sky-500/[0.04] px-3 py-2 text-[11px] text-sky-200">
-              Gross profit excludes tax refund. Tax refund is calculated separately and added back before net profit.
+              {t("orders.editor.taxNote", "Gross profit excludes tax refund. Tax refund is calculated separately and added back before net profit.")}
             </p>
           </SectionCard>
 
-          <SectionCard title="Profit preview" subtitle="Updates live as you type.">
-            <PreviewRow label="Revenue"            value={sellingPrice} currency={draft.order.currency} accent="emerald" />
-            <PreviewRow label="− Supplier cost"    value={profit.total_supplier_cost} currency={draft.order.currency} accent="rose" negative />
+          <SectionCard title={t("orders.preview.title", "Profit preview")} subtitle={t("orders.editor.live", "Updates live as you type.")}>
+            <PreviewRow label={t("orders.preview.revenue", "Revenue")}            value={sellingPrice} currency={draft.order.currency} accent="emerald" />
+            <PreviewRow label={t("orders.preview.supplierCost", "− Supplier cost")}    value={profit.total_supplier_cost} currency={draft.order.currency} accent="rose" negative />
             <div className="my-1.5 border-t border-white/5" />
-            <PreviewRow label="= Gross profit"     value={profit.gross_profit} currency={draft.order.currency} accent={profit.gross_profit >= 0 ? "sky" : "rose"} />
+            <PreviewRow label={t("orders.preview.gross", "= Gross profit")}     value={profit.gross_profit} currency={draft.order.currency} accent={profit.gross_profit >= 0 ? "sky" : "rose"} />
             <div className="my-1.5 border-t border-white/5" />
-            <PreviewRow label="− Order expenses (linked)" value={profit.total_order_expenses} currency={draft.order.currency} accent="rose" negative />
-            <PreviewRow label="+ Tax refund"       value={taxValue} currency={draft.order.currency} accent="emerald" />
-            <PreviewRow label="− Bank / L-C charges" value={profit.financial_charges} currency={draft.order.currency} accent="rose" negative />
+            <PreviewRow label={t("orders.preview.expenses", "− Order expenses (linked)")} value={profit.total_order_expenses} currency={draft.order.currency} accent="rose" negative />
+            <PreviewRow label={t("orders.preview.tax", "+ Tax refund")}       value={taxValue} currency={draft.order.currency} accent="emerald" />
+            <PreviewRow label={t("orders.preview.fin", "− Bank / L-C charges")} value={profit.financial_charges} currency={draft.order.currency} accent="rose" negative />
             <div className="my-1.5 border-t border-white/5" />
-            <PreviewRow label="= Net profit"       value={profit.net_profit} currency={draft.order.currency} accent="violet" />
-            <PreviewRow label="Margin"             value={profit.net_profit_pct} currency="%" accent={profit.net_profit_pct >= 15 ? "emerald" : profit.net_profit_pct >= 0 ? "amber" : "rose"} percent />
+            <PreviewRow label={t("orders.preview.net", "= Net profit")}       value={profit.net_profit} currency={draft.order.currency} accent="violet" />
+            <PreviewRow label={t("orders.preview.margin", "Margin")}             value={profit.net_profit_pct} currency="%" accent={profit.net_profit_pct >= 15 ? "emerald" : profit.net_profit_pct >= 0 ? "amber" : "rose"} percent />
             <p className="mt-3 rounded-md bg-white/5 px-2 py-1.5 text-[10px] leading-relaxed text-gray-400">
-              This is the <strong>expected</strong> profit (booked).
-              The <strong>realized cash result</strong> is tracked on the order card after save —
-              it uses actual collected payments and paid costs, not a ratio.
+              {t("orders.editor.previewNote", "This is the expected profit (booked). The realized cash result is tracked on the order card after save — it uses actual collected payments and paid costs, not a ratio.")}
             </p>
           </SectionCard>
         </div>
@@ -781,14 +782,14 @@ function OrderEditor({
         {/* Suppliers */}
         <div className="mt-4">
           <SectionCard
-            title="Step 2 · Suppliers & Costs"
-            subtitle="Pick each supplier from Contacts. The total supplier cost is the sum of these lines — gross profit updates live."
+            title={t("orders.step2.title", "Step 2 · Suppliers & Costs")}
+            subtitle={t("orders.editor.step2.subtitle", "Pick each supplier from Contacts. The total supplier cost is the sum of these lines — gross profit updates live.")}
             action={
-              <button type="button" onClick={addSupplier} className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-gray-200 hover:border-white/[0.12]">+ Add Supplier</button>
+              <button type="button" onClick={addSupplier} className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-gray-200 hover:border-white/[0.12]">{t("orders.editor.addSupplier", "+ Add Supplier")}</button>
             }
           >
             {draft.suppliers.length === 0 ? (
-              <div className="py-6 text-center text-sm text-gray-500">No suppliers yet. Click + Add Supplier to record a cost.</div>
+              <div className="py-6 text-center text-sm text-gray-500">{t("orders.editor.noSuppliers", "No suppliers yet. Click + Add Supplier to record a cost.")}</div>
             ) : (
               <div className="space-y-3">
                 {draft.suppliers.map((s, i) => {
@@ -802,34 +803,34 @@ function OrderEditor({
                     <div key={i} className="rounded-xl border border-white/[0.04] bg-[var(--bg-primary)] p-3">
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-6">
                         <div className="sm:col-span-2">
-                          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">Supplier</div>
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">{t("orders.editor.supplier", "Supplier")}</div>
                           <div className="mt-1">
                             <PartyChip
                               party={sChip}
                               onChange={() => setSupplierPickerIndex(i)}
                               onClear={() => updateSupplier(i, { supplier_id: null, supplier_name: "" })}
-                              placeholder="Pick a supplier from Contacts…"
+                              placeholder={t("orders.step2.pickSupplier", "Pick a supplier from Contacts…")}
                               compact
                             />
                           </div>
                         </div>
-                        <Field label="Cost">
+                        <Field label={t("orders.field.cost", "Cost")}>
                           <input type="number" inputMode="decimal" value={s.supplier_cost} onChange={(e) => updateSupplier(i, { supplier_cost: Number(e.target.value) || 0 })} className={INPUT} />
                         </Field>
-                        <Field label="Paid">
+                        <Field label={t("orders.editor.paid", "Paid")}>
                           <input type="number" inputMode="decimal" value={s.paid_amount} onChange={(e) => updateSupplier(i, { paid_amount: Number(e.target.value) || 0 })} className={INPUT} />
                         </Field>
-                        <Field label="Status">
+                        <Field label={t("orders.field.status", "Status")}>
                           <select value={s.payment_status} onChange={(e) => updateSupplier(i, { payment_status: e.target.value as FinanceOrderSupplier["payment_status"] })} className={INPUT}>
                             {(["unpaid","partial","paid","overdue"] as const).map((st) => <option key={st} value={st}>{st}</option>)}
                           </select>
                         </Field>
-                        <Field label="Due">
+                        <Field label={t("orders.editor.due", "Due")}>
                           <input type="date" value={s.due_date ?? ""} onChange={(e) => updateSupplier(i, { due_date: e.target.value || null })} className={INPUT} />
                         </Field>
                       </div>
                       <div className="mt-2 flex justify-end">
-                        <button type="button" onClick={() => removeSupplier(i)} className="text-[11px] text-rose-400 hover:text-rose-300">Remove supplier</button>
+                        <button type="button" onClick={() => removeSupplier(i)} className="text-[11px] text-rose-400 hover:text-rose-300">{t("orders.editor.removeSupplier", "Remove supplier")}</button>
                       </div>
                     </div>
                   );
@@ -840,12 +841,12 @@ function OrderEditor({
         </div>
 
         <div className="mt-4">
-          <SectionCard title="Step 4 · Notes & Save" subtitle="Anything operations or finance should remember about this order. Hit Save when ready.">
+          <SectionCard title={t("orders.editor.step4.title", "Step 4 · Notes & Save")} subtitle={t("orders.editor.step4.subtitle", "Anything operations or finance should remember about this order. Hit Save when ready.")}>
             <textarea
               value={draft.order.notes}
               onChange={(e) => updateOrder("notes", e.target.value)}
               rows={3}
-              placeholder="Internal notes — only visible to your team."
+              placeholder={t("orders.editor.notesPlaceholder", "Internal notes — only visible to your team.")}
               className="w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-emerald-500/50 focus:outline-none"
             />
           </SectionCard>
