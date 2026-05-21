@@ -265,82 +265,106 @@ export function StatementsDashboard() {
         </ErpPanel>
       )}
 
-      {/* ── Granularity toggle ─────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center justify-center gap-3">
-        <PillToggle
-          options={[
-            { k: "income"  , label: t("visual.tab.income", "Income") },
-            { k: "balance" , label: t("visual.tab.balance", "Balance Sheet") },
-            { k: "cashflow", label: t("visual.tab.cashflow", "Cash Flow") },
-          ]}
-          value={tab}
-          onChange={(v) => setTab(v as Tab)}
-        />
-        <PillToggle
-          size="sm"
-          options={[
-            { k: "week",    label: t("visual.gran.week",    "Week") },
-            { k: "month",   label: t("visual.gran.month",   "Month") },
-            { k: "quarter", label: t("visual.gran.quarter", "Quarter") },
-            { k: "year",    label: t("visual.gran.year",    "Year") },
-          ]}
-          value={granularity}
-          onChange={(v) => handleGranularityChange(v as Granularity)}
-        />
-      </div>
+      {/* ── Control bar — all toggles + period nav in ONE panel ─────
+           Two visually-grouped rows inside a single ErpPanel-style
+           container so the operator sees "Statement view" and
+           "Period selection" as related controls instead of three
+           floating centered groups. */}
+      <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3 sm:px-5 sm:py-4">
+        {/* Row 1 — Statement view (left) + Granularity (right) */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <PillToggle
+            options={[
+              { k: "income"  , label: t("visual.tab.income", "Income") },
+              { k: "balance" , label: t("visual.tab.balance", "Balance Sheet") },
+              { k: "cashflow", label: t("visual.tab.cashflow", "Cash Flow") },
+            ]}
+            value={tab}
+            onChange={(v) => setTab(v as Tab)}
+          />
+          <PillToggle
+            size="sm"
+            options={[
+              { k: "week",    label: t("visual.gran.week",    "Week") },
+              { k: "month",   label: t("visual.gran.month",   "Month") },
+              { k: "quarter", label: t("visual.gran.quarter", "Quarter") },
+              { k: "year",    label: t("visual.gran.year",    "Year") },
+            ]}
+            value={granularity}
+            onChange={(v) => handleGranularityChange(v as Granularity)}
+          />
+        </div>
 
-      {/* ── Period chip + Compare picker ────────────────────────────── */}
-      <div className="flex flex-wrap items-center justify-center gap-2.5">
-        <PeriodChip
-          label={periodChipLabel}
-          onPrev={() => setPeriodEnd(shiftAnchor(periodEnd, granularity, -1))}
-          onNext={() => setPeriodEnd(shiftAnchor(periodEnd, granularity, 1))}
-          nextDisabled={nextDisabled}
-          ariaPrev={t("visual.period.prev", "Previous period")}
-          ariaNext={t("visual.period.next", "Next period")}
-        />
-        {compareEnd ? (
-          <>
-            <span className="text-[11.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
-              {t("visual.compare.vs", "vs")}
-            </span>
+        {/* Thin hairline between the two control rows */}
+        <div aria-hidden className="my-3 h-px w-full bg-[var(--border-subtle)]" />
+
+        {/* Row 2 — Period chip + Compare */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-[var(--text-dim)]">
+            {t("visual.period.label", "Period")}
+          </div>
+          <div className="flex flex-wrap items-center gap-2.5">
             <PeriodChip
-              label={compareChipLabel}
-              onPrev={() => setCompareEnd(shiftAnchor(compareEnd, granularity, -1))}
-              onNext={() => setCompareEnd(shiftAnchor(compareEnd, granularity, 1))}
-              nextDisabled={false}
+              label={periodChipLabel}
+              onPrev={() => setPeriodEnd(shiftAnchor(periodEnd, granularity, -1))}
+              onNext={() => setPeriodEnd(shiftAnchor(periodEnd, granularity, 1))}
+              nextDisabled={nextDisabled}
               ariaPrev={t("visual.period.prev", "Previous period")}
               ariaNext={t("visual.period.next", "Next period")}
-              tone="compare"
             />
-            <button
-              type="button"
-              onClick={() => setCompareEnd(null)}
-              aria-label={t("visual.compare.remove", "Remove comparison")}
-              title={t("visual.compare.remove", "Remove comparison")}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-highlight)] hover:bg-[var(--bg-surface-hover)] transition-colors"
-            >
-              <CrossIcon size={10} />
-            </button>
-          </>
-        ) : (
-          <button
-            type="button"
-            onClick={handleAddCompare}
-            className="inline-flex items-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-1.5 text-[12.5px] text-[var(--text-secondary)] hover:text-[var(--text-highlight)] hover:bg-[var(--bg-surface-hover)] transition-colors"
-          >
-            {t("visual.compare.add", "+ Compare")}
-          </button>
-        )}
+            {compareEnd ? (
+              <>
+                <span className="text-[11px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
+                  {t("visual.compare.vs", "vs")}
+                </span>
+                <PeriodChip
+                  label={compareChipLabel}
+                  onPrev={() => setCompareEnd(shiftAnchor(compareEnd, granularity, -1))}
+                  onNext={() => setCompareEnd(shiftAnchor(compareEnd, granularity, 1))}
+                  nextDisabled={false}
+                  ariaPrev={t("visual.period.prev", "Previous period")}
+                  ariaNext={t("visual.period.next", "Next period")}
+                  tone="compare"
+                />
+                <button
+                  type="button"
+                  onClick={() => setCompareEnd(null)}
+                  aria-label={t("visual.compare.remove", "Remove comparison")}
+                  title={t("visual.compare.remove", "Remove comparison")}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-highlight)] hover:bg-[var(--bg-surface-hover)] transition-colors"
+                >
+                  <CrossIcon size={10} />
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={handleAddCompare}
+                className="inline-flex items-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-4 py-1.5 text-[12.5px] text-[var(--text-secondary)] hover:text-[var(--text-highlight)] hover:bg-[var(--bg-surface-hover)] transition-colors"
+              >
+                {t("visual.compare.add", "+ Compare")}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
-      {loading && (
-        <div className="text-center text-[12px] text-[var(--text-dim)]">{t("visual.loading", "Loading statements…")}</div>
-      )}
-
-      {/* ── Statement body ──────────────────────────────────────────── */}
-      {snap && !loading && (
-        <ErpPanel className="px-5 py-6 sm:px-8">
+      {/* ── Statement body ──────────────────────────────────────────────
+          We DON'T unmount during loading — that caused the page height
+          to collapse and the browser to scroll to the top when the new
+          snapshot arrived. Instead we keep the previous snap visible,
+          fade it slightly, and overlay a subtle loading badge in the
+          corner. The min-height also reserves space on the first ever
+          load so the page chrome doesn't bounce. */}
+      <div className="relative min-h-[300px]">
+        {loading && (
+          <div className="pointer-events-none absolute right-4 top-4 z-10 inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-1 text-[11px] text-[var(--text-dim)] shadow-sm">
+            <span aria-hidden className="inline-block h-3 w-3 animate-spin rounded-full border border-[var(--border-color)] border-t-[var(--text-primary)]" />
+            {t("visual.loading", "Loading statements…")}
+          </div>
+        )}
+        {snap && (
+        <ErpPanel className={`px-5 py-6 sm:px-8 transition-opacity duration-200 ${loading ? "opacity-60" : "opacity-100"}`}>
           {tab === "income"   && (
             <IncomeView
               pl={snap.income}
@@ -362,6 +386,7 @@ export function StatementsDashboard() {
           )}
         </ErpPanel>
       )}
+      </div>
     </div>
   );
 }
