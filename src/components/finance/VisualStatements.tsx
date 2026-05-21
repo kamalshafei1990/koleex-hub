@@ -360,18 +360,38 @@ const STATEMENT_GRID_1COL = "grid grid-cols-[1fr_8rem] items-baseline";
 
 type StatementTone = "neutral" | "positive" | "warning";
 
+/* ───── Hierarchy ──────────────────────────────────────────────
+   Five distinct row treatments so the operator can tell at a glance
+   what they're looking at:
+
+     1. Period column header  — tiny uppercase eyebrow + hairline.
+     2. Section title         — 13 px BOLD, full-width hairline below.
+                                LARGER than data rows so it actually
+                                reads as a header.
+     3. Data row              — 13 px regular, label INDENTED 24 px so
+                                you can see it belongs to the section.
+     4. Subtotal              — 13.5 px semibold, hairline above, label
+                                NOT indented so it visually sits at the
+                                section level (Total Revenues / Total
+                                Expenses).
+     5. Total                 — 14.5 px bold, stronger border, tonal
+                                value (Operating Income).
+     6. Headline              — 16 px bold, tinted bar with accent
+                                stripe (Net Income / Closing Cash).
+   ────────────────────────────────────────────────────────────── */
+
 function HeaderCells({ priorLabel, curLabel, showPrior }: { priorLabel?: string; curLabel: string; showPrior: boolean }) {
   const { t } = useTranslation(financeT);
-  const baseCls = "pb-2 text-[10px] uppercase tracking-[0.18em] border-b border-[var(--border-subtle)]";
+  const baseCls = "pb-3 text-[10.5px] font-semibold uppercase tracking-[0.18em] border-b border-[var(--border-color)]";
   return (
     <>
       <div className={`${baseCls} text-[var(--text-dim)]`} />
       {showPrior && (
-        <div className={`${baseCls} text-right text-[var(--text-dim)] pe-3`}>
+        <div className={`${baseCls} text-right text-[var(--text-dim)] pe-4`}>
           {priorLabel || t("visual.prior", "Prior")}
         </div>
       )}
-      <div className={`${baseCls} text-right font-semibold text-[var(--text-secondary)] pe-3`}>
+      <div className={`${baseCls} text-right text-[var(--text-primary)] pe-4`}>
         {curLabel || t("visual.current", "Current")}
       </div>
     </>
@@ -379,100 +399,100 @@ function HeaderCells({ priorLabel, curLabel, showPrior }: { priorLabel?: string;
 }
 
 function SectionTitleRow({ label, cols }: { label: string; cols: 2 | 3 }) {
+  /* 13 px bold, hairline directly underneath. Sits ABOVE the data
+     rows visually because the data rows have smaller indented labels. */
   const span = cols === 3 ? "col-span-3" : "col-span-2";
   return (
-    <div className={`${span} mt-6 mb-1 first:mt-4 flex items-center gap-3 text-[10.5px] font-bold uppercase tracking-[0.22em] text-[var(--text-secondary)]`}>
-      <span>{label}</span>
-      <span aria-hidden className="h-px flex-1 bg-[var(--border-subtle)]" />
+    <div className={`${span} mt-7 mb-1 first:mt-5`}>
+      <div className="text-[13px] font-bold uppercase tracking-[0.10em] text-[var(--text-primary)]">{label}</div>
+      <div aria-hidden className="mt-1 h-px w-full bg-[var(--border-subtle)]" />
     </div>
   );
 }
 
 function MutedRowSpan({ label, cols }: { label: string; cols: 2 | 3 }) {
   const span = cols === 3 ? "col-span-3" : "col-span-2";
-  return <div className={`${span} py-2 text-[11.5px] text-[var(--text-dim)]`}>{label}</div>;
+  return <div className={`${span} ps-6 py-2 text-[11.5px] text-[var(--text-dim)] italic`}>{label}</div>;
 }
 
-function VerticalGap({ cols }: { cols: 2 | 3 }) {
-  const span = cols === 3 ? "col-span-3" : "col-span-2";
-  return <div className={`${span} h-3`} aria-hidden />;
-}
-
-/* Data row — quiet typography, faint hairline. */
+/* Data row — labels indented 24px (ps-6) so they read as children of
+   the section header. No border between rows — the indent + section
+   hairline are enough separation; horizontal hairlines made the table
+   feel like a grid of cells instead of a section of related rows. */
 function DataCells({ label, prior, cur, showPrior }: { label: string; prior?: number; cur: number; showPrior: boolean }) {
-  const baseCls = "py-2 text-[13px] border-b border-[var(--border-faint)]";
+  const baseCls = "py-1.5 text-[12.5px]";
   return (
     <>
-      <div className={`${baseCls} text-[var(--text-highlight)]`}>{label}</div>
+      <div className={`${baseCls} ps-6 text-[var(--text-secondary)]`}>{label}</div>
       {showPrior && (
-        <div className={`${baseCls} text-right font-mono tabular-nums text-[var(--text-secondary)] pe-3`}>{fmtSigned(prior ?? 0)}</div>
+        <div className={`${baseCls} text-right font-mono tabular-nums text-[var(--text-dim)] pe-4`}>{fmtSigned(prior ?? 0)}</div>
       )}
-      <div className={`${baseCls} text-right font-mono tabular-nums text-[var(--text-primary)] pe-3`}>{fmtSigned(cur)}</div>
+      <div className={`${baseCls} text-right font-mono tabular-nums text-[var(--text-primary)] pe-4`}>{fmtSigned(cur)}</div>
     </>
   );
 }
 
-/* Subtotal row — top hairline, slightly heavier label. */
+/* Subtotal — semibold, hairline above, label NOT indented so it sits
+   at the section's left edge (one notch outside the data rows). */
 function SubtotalCells({ label, prior, cur, showPrior }: { label: string; prior?: number; cur: number; showPrior: boolean }) {
-  const baseCls = "mt-1 py-2 text-[13px] font-semibold border-t border-[var(--border-subtle)]";
+  const baseCls = "mt-2 pt-2 pb-1 text-[13px] font-semibold border-t border-[var(--border-subtle)]";
   return (
     <>
-      <div className={`${baseCls} uppercase tracking-[0.04em] text-[var(--text-highlight)]`}>{label}</div>
+      <div className={`${baseCls} text-[var(--text-primary)]`}>{label}</div>
       {showPrior && (
-        <div className={`${baseCls} text-right font-mono tabular-nums text-[var(--text-secondary)] pe-3`}>{fmtSigned(prior ?? 0)}</div>
+        <div className={`${baseCls} text-right font-mono tabular-nums text-[var(--text-secondary)] pe-4`}>{fmtSigned(prior ?? 0)}</div>
       )}
-      <div className={`${baseCls} text-right font-mono tabular-nums text-[var(--text-primary)] pe-3`}>{fmtSigned(cur)}</div>
+      <div className={`${baseCls} text-right font-mono tabular-nums text-[var(--text-primary)] pe-4`}>{fmtSigned(cur)}</div>
     </>
   );
 }
 
-/* Total row — stronger border, optional tonal value (Operating Income). */
+/* Total — bold, stronger border, tonal value (Operating Income). */
 function TotalCells({ label, prior, cur, showPrior, tone }: { label: string; prior?: number; cur: number; showPrior: boolean; tone: StatementTone }) {
   const valueTone =
     tone === "positive" ? "text-emerald-200" :
     tone === "warning"  ? "text-rose-200"    :
                           "text-[var(--text-primary)]";
-  const baseCls = "mt-1 py-2.5 text-[13.5px] font-semibold border-t border-[var(--border-color)]";
+  const baseCls = "mt-4 pt-3 pb-2 text-[14px] font-bold uppercase tracking-[0.06em] border-t border-[var(--border-color)]";
   return (
     <>
-      <div className={`${baseCls} uppercase tracking-[0.04em] text-[var(--text-primary)]`}>{label}</div>
+      <div className={`${baseCls} text-[var(--text-primary)]`}>{label}</div>
       {showPrior && (
-        <div className={`${baseCls} text-right font-mono tabular-nums text-[var(--text-secondary)] pe-3`}>{fmtSigned(prior ?? 0)}</div>
+        <div className={`${baseCls} text-right font-mono tabular-nums text-[var(--text-secondary)] pe-4`}>{fmtSigned(prior ?? 0)}</div>
       )}
-      <div className={`${baseCls} text-right font-mono tabular-nums ${valueTone} pe-3`}>{fmtSigned(cur)}</div>
+      <div className={`${baseCls} text-right font-mono tabular-nums ${valueTone} pe-4`}>{fmtSigned(cur)}</div>
     </>
   );
 }
 
-/* Headline row — Net Income / Closing cash. Three adjacent grid cells
+/* Headline — Net Income / Closing cash. Three adjacent grid cells
    share the same tonal background so they read as one continuous bar.
-   A 3 px accent stripe sits at the leading edge of the label cell.
-   No nested grid → still aligned with the rest of the statement. */
+   3 px accent stripe at the leading edge. Biggest type in the table. */
 function HeadlineCells({ label, prior, cur, showPrior, tone }: { label: string; prior?: number; cur: number; showPrior: boolean; tone: StatementTone }) {
   const bg =
-    tone === "positive" ? "bg-emerald-300/[0.05]" :
-    tone === "warning"  ? "bg-rose-300/[0.05]"    :
+    tone === "positive" ? "bg-emerald-300/[0.06]" :
+    tone === "warning"  ? "bg-rose-300/[0.06]"    :
                           "bg-[var(--bg-surface-subtle)]";
   const valueTone =
     tone === "positive" ? "text-emerald-200" :
     tone === "warning"  ? "text-rose-200"    :
                           "text-[var(--text-primary)]";
   const accent =
-    tone === "positive" ? "bg-emerald-300/70" :
-    tone === "warning"  ? "bg-rose-300/70"    :
+    tone === "positive" ? "bg-emerald-300/80" :
+    tone === "warning"  ? "bg-rose-300/80"    :
                           "bg-[var(--text-highlight)]";
 
-  const cellBase = "mt-3 py-3 text-[15.5px] font-semibold border-t-[1.5px] border-[var(--border-strong)]";
+  const cellBase = "mt-4 py-3.5 text-[16px] font-bold border-t-2 border-[var(--border-strong)]";
   return (
     <>
-      <div className={`relative ${cellBase} ${bg} ps-4 pe-2 rounded-s-md uppercase tracking-[0.05em] text-[var(--text-primary)]`}>
-        <span aria-hidden className={`absolute start-0 top-3 bottom-3 w-[3px] rounded-full ${accent}`} />
+      <div className={`relative ${cellBase} ${bg} ps-5 pe-2 rounded-s-md uppercase tracking-[0.08em] text-[var(--text-primary)]`}>
+        <span aria-hidden className={`absolute start-0 top-3.5 bottom-3.5 w-[3px] rounded-full ${accent}`} />
         {label}
       </div>
       {showPrior && (
-        <div className={`${cellBase} ${bg} text-right font-mono tabular-nums text-[var(--text-secondary)] pe-3`}>{fmtSigned(prior ?? 0)}</div>
+        <div className={`${cellBase} ${bg} text-right font-mono tabular-nums text-[var(--text-secondary)] pe-4`}>{fmtSigned(prior ?? 0)}</div>
       )}
-      <div className={`${cellBase} ${bg} text-right font-mono tabular-nums ${valueTone} pe-4 rounded-e-md`}>{fmtSigned(cur)}</div>
+      <div className={`${cellBase} ${bg} text-right font-mono tabular-nums ${valueTone} pe-5 rounded-e-md`}>{fmtSigned(cur)}</div>
     </>
   );
 }
