@@ -1,19 +1,37 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   /finance/visual — Income / Balance / Cash Flow tabs, big KPI strip,
-   bar-chart trend, clean tables. Inspired by simple operator-friendly
-   financial views: minimal chrome, calm colours, one screen.
+   VisualStatements — Coffee-Inc-2-style financial statements dashboard.
 
-   Currency labels respect the tenant base currency (no hard-coded USD).
+   Operator feedback was the FInance app should match the simple, dense
+   dashboard layout the founder is used to from Coffee Inc 2:
+
+     • Two centered hero KPIs (Total Revenue · Net Income) with deltas
+     • A wide twin-bar trend chart with period labels (5 buckets)
+     • Income · Balance Sheet · Cash Flow toggle (pill)
+     • Week · Quarter · Year toggle (pill)
+     • Two-period side-by-side tables with PERIOD COLUMN HEADERS, a
+       calm row stack, and a clear hierarchy of totals:
+         Total Revenues / Total Expenses  (medium)
+         Operating Income / Income Before Taxes  (stronger)
+         Net Income  (strongest, accent colour)
+
+   The component now exports two flavours:
+     · default export  VisualStatements           — full page with chrome
+                                                    (kept for /finance/visual)
+     · named export    StatementsDashboard        — chromeless body suitable
+                                                    for embedding inside
+                                                    FinanceHome (/finance).
+
+   Both flavours render exactly the same dashboard body.  All colours come
+   from the Hub design-system tokens (var(--bg-primary), var(--text-primary),
+   ErpPanel hairlines) so the page sits visually inside the rest of the Hub.
    --------------------------------------------------------------------------- */
 
 import { humanizeError } from "@/lib/ui/humanize-error";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  ErpEyebrow, ErpHairline, ErpPage, ErpPanel,
-} from "@/components/ui/erp/ErpUi";
+import { ErpPage, ErpPanel } from "@/components/ui/erp/ErpUi";
 import RrIcon from "@/components/ui/RrIcon";
 
 type Tab = "income" | "balance" | "cashflow";
@@ -62,8 +80,18 @@ function fmtSigned(n: number) {
   const abs = Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
   return n < 0 ? `(${abs})` : abs;
 }
+function fmtPeriodLabel(iso: string): string {
+  /* "2026-08-13" → "Aug 13" */
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  } catch { return iso; }
+}
 
-export default function VisualStatements() {
+/* ── Chromeless body — used by FinanceHome (/finance) ────────────────── */
+
+export function StatementsDashboard() {
   const [tab, setTab] = useState<Tab>("income");
   const [granularity, setGranularity] = useState<Granularity>("year");
   const [snap, setSnap] = useState<Snapshot | null>(null);
@@ -84,7 +112,7 @@ export default function VisualStatements() {
 
   useEffect(() => { fetchSnap(); }, [fetchSnap]);
 
-  const ccy = snap?.base_currency ?? "CNY";
+  const ccy = snap?.base_currency ?? "";
   const totalRevenue = snap?.income.revenue.amount ?? 0;
   const netIncome    = snap?.income.net_profit ?? 0;
   const priorRevenue = snap?.income_prior.revenue.amount ?? 0;
@@ -94,148 +122,148 @@ export default function VisualStatements() {
   const niDelta  = priorNet !== 0 ? (netIncome - priorNet) : null;
   const niPct    = priorNet !== 0 ? ((netIncome - priorNet) / Math.abs(priorNet)) * 100 : null;
 
+  const curLabel   = snap ? fmtPeriodLabel(snap.income.period.to)       : "";
+  const priorLabel = snap ? fmtPeriodLabel(snap.income_prior.period.to) : "";
+
+  return (
+    <div className="space-y-5">
+      {error && (
+        <ErpPanel className="px-5 py-3">
+          <div className="text-[13px] text-rose-300">{error}</div>
+        </ErpPanel>
+      )}
+
+      {/* ── Hero KPIs + trend bars ───────────────────────────────────── */}
+      {snap && (
+        <ErpPanel className="px-5 py-6 sm:px-8 sm:py-8">
+          <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
+            <KpiHero label="TOTAL REVENUE" ccy={ccy} value={totalRevenue}
+                     delta={revDelta} pct={revPct} tone="neutral" />
+            <KpiHero label="NET INCOME"    ccy={ccy} value={netIncome}
+                     delta={niDelta}  pct={niPct}  tone={netIncome >= 0 ? "positive" : "warning"} />
+          </div>
+          <TrendChart trend={snap.trend} />
+        </ErpPanel>
+      )}
+
+      {/* ── Toggles ─────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <PillToggle
+          options={[
+            { k: "income"  , label: "Income" },
+            { k: "balance" , label: "Balance Sheet" },
+            { k: "cashflow", label: "Cash Flow" },
+          ]}
+          value={tab}
+          onChange={(v) => setTab(v as Tab)}
+        />
+        <PillToggle
+          size="sm"
+          options={[
+            { k: "week",    label: "Week" },
+            { k: "quarter", label: "Quarter" },
+            { k: "year",    label: "Year" },
+          ]}
+          value={granularity}
+          onChange={(v) => setGranularity(v as Granularity)}
+        />
+      </div>
+
+      {loading && (
+        <div className="text-center text-[12px] text-gray-500">Loading statements…</div>
+      )}
+
+      {/* ── Statement body ──────────────────────────────────────────── */}
+      {snap && !loading && (
+        <ErpPanel className="px-5 py-6 sm:px-8">
+          {tab === "income"   && <IncomeView pl={snap.income} prior={snap.income_prior} ccy={ccy} curLabel={curLabel} priorLabel={priorLabel} />}
+          {tab === "balance"  && <BalanceView bs={snap.balance} ccy={ccy} curLabel={curLabel} />}
+          {tab === "cashflow" && <CashFlowView cf={snap.cash_flow} ccy={ccy} curLabel={curLabel} />}
+        </ErpPanel>
+      )}
+    </div>
+  );
+}
+
+/* ── Full page wrapper — used by /finance/visual + /finance/overview ── */
+
+export default function VisualStatements() {
   return (
     <ErpPage
-      title="Statements"
+      title="Overview"
       subtitle="Income · Balance Sheet · Cash Flow"
       icon="balance-scale-left"
-      backHref="/finance/workspace"
+      backHref="/finance"
       action={
         <Link href="/reports/statements" className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] hover:bg-white/[0.06]">
           <RrIcon name="newspaper" size={12} /> Print version
         </Link>
       }
     >
-      {error && <div className="text-sm text-rose-300">{error}</div>}
-
-      {/* Hero KPI strip + trend bars */}
-      {snap && (
-        <ErpPanel className="px-5 py-5">
-          {/* Both hero KPIs drill into the Income tab so the operator
-              can inspect the underlying account lines. */}
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <Link href="/reports/statements" onClick={() => setTab("income")} className="block hover:opacity-95" aria-label="Open Income Statement detail">
-              <KpiHeader
-                label="Total Revenue"
-                ccy={ccy} value={totalRevenue}
-                delta={revDelta} pct={revPct}
-              />
-            </Link>
-            <Link href="/reports/statements" onClick={() => setTab("income")} className="block hover:opacity-95" aria-label="Open Income Statement detail">
-              <KpiHeader
-                label="Net Income"
-                ccy={ccy} value={netIncome}
-                delta={niDelta} pct={niPct}
-                tone={netIncome >= 0 ? "positive" : "warning"}
-              />
-            </Link>
-          </div>
-          {/* Trend bar chart — 5 buckets, twin bars (revenue + net income) */}
-          <TrendChart trend={snap.trend} />
-        </ErpPanel>
-      )}
-
-      {/* Tab + period controls */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex gap-1 rounded-full border border-white/[0.08] bg-white/[0.02] p-1">
-          {[
-            { k: "income"   as Tab, label: "Income" },
-            { k: "balance"  as Tab, label: "Balance Sheet" },
-            { k: "cashflow" as Tab, label: "Cash Flow" },
-          ].map((t) => (
-            <button key={t.k} type="button" onClick={() => setTab(t.k)}
-                    className={`rounded-full px-3.5 py-1.5 text-[12px] transition-colors ${
-                      t.k === tab ? "bg-white/[0.10] text-white" : "text-gray-400 hover:text-gray-200"
-                    }`}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex gap-1 rounded-full border border-white/[0.08] bg-white/[0.02] p-1">
-          {[
-            { k: "week"    as Granularity, label: "Week" },
-            { k: "quarter" as Granularity, label: "Quarter" },
-            { k: "year"    as Granularity, label: "Year" },
-          ].map((g) => (
-            <button key={g.k} type="button" onClick={() => setGranularity(g.k)}
-                    className={`rounded-full px-3 py-1 text-[11.5px] transition-colors ${
-                      g.k === granularity ? "bg-white/[0.10] text-white" : "text-gray-400 hover:text-gray-200"
-                    }`}>
-              {g.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {loading && <div className="text-[12px] text-gray-500">Loading statements…</div>}
-
-      {/* Body */}
-      {snap && !loading && (
-        <ErpPanel className="px-5 py-5">
-          {tab === "income"   && <IncomeView pl={snap.income} priorLabel={snap.granularity === "year" ? "Prior year" : snap.granularity === "quarter" ? "Prior quarter" : "Prior week"} prior={snap.income_prior} ccy={ccy} />}
-          {tab === "balance"  && <BalanceView bs={snap.balance} ccy={ccy} />}
-          {tab === "cashflow" && <CashFlowView cf={snap.cash_flow} ccy={ccy} />}
-        </ErpPanel>
-      )}
+      <StatementsDashboard />
     </ErpPage>
   );
 }
 
-/* ─── Hero KPI header ─── */
+/* ───── KPI Hero (centered, large, Coffee-Inc-2 style) ───── */
 
-function KpiHeader({
-  label, ccy, value, delta, pct, tone = "neutral",
+function KpiHero({
+  label, ccy, value, delta, pct, tone,
 }: {
   label: string; ccy: string; value: number;
   delta: number | null; pct: number | null;
-  tone?: "neutral" | "positive" | "warning";
+  tone: "neutral" | "positive" | "warning";
 }) {
   const main =
     tone === "positive" ? "text-emerald-200" :
     tone === "warning"  ? "text-amber-200"   :
-                          "text-white";
-  const deltaTone = (delta ?? 0) >= 0 ? "text-emerald-300" : "text-rose-300";
+                          "text-[var(--text-primary)]";
+  const deltaUp = (delta ?? 0) >= 0;
+  const deltaTone = deltaUp ? "text-emerald-300" : "text-rose-300";
+
   return (
-    <div>
-      <div className="text-[10px] uppercase tracking-[0.18em] text-gray-500">{label}</div>
-      <div className={`mt-1 font-mono text-[34px] leading-none tabular-nums tracking-[-0.01em] ${main}`}>
-        {ccy} {fmtFull(value)}
+    <div className="text-center">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gray-500">{label}</div>
+      <div className={`mt-3 font-mono text-[34px] leading-none tabular-nums tracking-[-0.01em] sm:text-[42px] ${main}`}>
+        {ccy && <span className="mr-1 text-[16px] text-gray-500">{ccy}</span>}
+        {fmtFull(value)}
       </div>
       {delta !== null && pct !== null && (
-        <div className={`mt-1.5 text-[11px] ${deltaTone}`}>
-          {delta >= 0 ? "▲" : "▼"} {ccy} {fmtFull(Math.abs(delta))} ({pct >= 0 ? "+" : ""}{pct.toFixed(1)}%)
+        <div className={`mt-2 text-[12px] ${deltaTone}`}>
+          {deltaUp ? "▲" : "▼"} {ccy ? ccy + " " : ""}{fmtFull(Math.abs(delta))} ({pct >= 0 ? "+" : ""}{pct.toFixed(1)}%)
         </div>
       )}
     </div>
   );
 }
 
-/* ─── Trend chart ─── */
+/* ───── Trend chart (twin bars) ───── */
 
 function TrendChart({ trend }: { trend: TrendBucket[] }) {
-  const w = 720; const h = 130; const padL = 14; const padR = 14; const padT = 12; const padB = 22;
+  const buckets = trend.slice(-5);
+  const w = 920; const h = 170; const padL = 16; const padR = 16; const padT = 8; const padB = 26;
   const innerW = w - padL - padR; const innerH = h - padT - padB;
-  const maxY = Math.max(1, ...trend.flatMap((t) => [Math.abs(t.revenue), Math.abs(t.net_income)]));
-  const gap = 10;
-  const slot = innerW / trend.length;
-  const barW = (slot - gap) / 2;
+  const maxY = Math.max(1, ...buckets.flatMap((t) => [Math.abs(t.revenue), Math.abs(t.net_income)]));
+  const gap = 14;
+  const slot = innerW / Math.max(1, buckets.length);
+  const barW = Math.max(8, (slot - gap) / 2);
 
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="mt-4 w-full" role="img" aria-label="Revenue and net income trend">
+    <svg viewBox={`0 0 ${w} ${h}`} className="mt-6 w-full" role="img" aria-label="Revenue and net income trend">
       <line x1={padL} x2={w - padR} y1={padT + innerH} y2={padT + innerH} stroke="rgba(255,255,255,0.08)" />
-      {trend.map((t, i) => {
+      {buckets.map((t, i) => {
         const xSlot = padL + i * slot;
-        const xRev = xSlot + slot / 2 - barW - 1;
-        const xNi  = xSlot + slot / 2 + 1;
+        const xRev = xSlot + slot / 2 - barW - 2;
+        const xNi  = xSlot + slot / 2 + 2;
         const hRev = Math.max(2, (Math.abs(t.revenue)    / maxY) * innerH);
         const hNi  = Math.max(2, (Math.abs(t.net_income) / maxY) * innerH);
-        const niColor = t.net_income >= 0 ? "rgba(180, 92, 60, 0.85)" : "rgba(229, 115, 115, 0.7)";
+        const niColor = t.net_income >= 0 ? "rgba(180, 92, 60, 0.9)" : "rgba(229, 115, 115, 0.7)";
         return (
-          <g key={t.label}>
-            <rect x={xRev} y={padT + innerH - hRev} width={barW} height={hRev} fill="rgba(255,255,255,0.85)" rx={2} />
+          <g key={`${t.label}-${i}`}>
+            <rect x={xRev} y={padT + innerH - hRev} width={barW} height={hRev} fill="rgba(255,255,255,0.88)" rx={2} />
             <rect x={xNi}  y={padT + innerH - hNi}  width={barW} height={hNi}  fill={niColor} rx={2} />
-            <text x={xSlot + slot / 2} y={h - 4} fill="rgba(255,255,255,0.5)"
-                  fontSize={10} textAnchor="middle">{t.label}</text>
+            <text x={xSlot + slot / 2} y={h - 6} fill="rgba(255,255,255,0.55)"
+                  fontSize={11} textAnchor="middle">{t.label}</text>
           </g>
         );
       })}
@@ -243,39 +271,160 @@ function TrendChart({ trend }: { trend: TrendBucket[] }) {
   );
 }
 
-/* ─── Income view ─── */
+/* ───── Pill toggle ───── */
 
-function IncomeView({ pl, prior, priorLabel, ccy }: { pl: ProfitLoss; prior: ProfitLoss; priorLabel: string; ccy: string }) {
-  const cur = pl;
+function PillToggle<T extends string>({
+  options, value, onChange, size = "md",
+}: {
+  options: Array<{ k: T; label: string }>;
+  value: T;
+  onChange: (v: T) => void;
+  size?: "sm" | "md";
+}) {
+  const pad = size === "sm" ? "px-3 py-1 text-[11.5px]" : "px-4 py-1.5 text-[12.5px]";
+  return (
+    <div className="flex gap-1 rounded-full border border-white/[0.08] bg-white/[0.02] p-1">
+      {options.map((o) => (
+        <button
+          key={o.k}
+          type="button"
+          onClick={() => onChange(o.k)}
+          className={`rounded-full transition-colors ${pad} ${
+            o.k === value
+              ? "bg-white/[0.12] text-white"
+              : "text-gray-400 hover:text-gray-200"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ───── Two-period table primitives (with column headers) ───── */
+
+function PeriodHeaders({ curLabel, priorLabel }: { curLabel: string; priorLabel: string }) {
+  return (
+    <div className="grid grid-cols-[1fr_auto_auto] items-baseline gap-x-8 border-b border-white/[0.08] pb-1.5 text-[10px] uppercase tracking-[0.16em] text-gray-500">
+      <span />
+      <span className="text-right">{priorLabel || "Prior"}</span>
+      <span className="text-right">{curLabel || "Current"}</span>
+    </div>
+  );
+}
+
+function SingleColHeader({ curLabel }: { curLabel: string }) {
+  return (
+    <div className="grid grid-cols-[1fr_auto] items-baseline gap-x-8 border-b border-white/[0.08] pb-1.5 text-[10px] uppercase tracking-[0.16em] text-gray-500">
+      <span />
+      <span className="text-right">{curLabel || "Current"}</span>
+    </div>
+  );
+}
+
+function SectionTitle({ label }: { label: string }) {
+  return (
+    <div className="mt-6 mb-2 first:mt-0 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">{label}</div>
+  );
+}
+
+function TwoColRow({ label, prior, cur }: { label: string; prior: number; cur: number }) {
+  return (
+    <div className="grid grid-cols-[1fr_auto_auto] items-baseline gap-x-8 border-b border-white/[0.04] py-1.5 text-[12.5px] last:border-b-0">
+      <span className="text-gray-200">{label}</span>
+      <span className="font-mono tabular-nums text-gray-400">{fmtSigned(prior)}</span>
+      <span className="font-mono tabular-nums text-[var(--text-primary)]">{fmtSigned(cur)}</span>
+    </div>
+  );
+}
+
+function SingleRow({ label, amount }: { label: string; amount: number }) {
+  return (
+    <div className="grid grid-cols-[1fr_auto] items-baseline gap-x-8 border-b border-white/[0.04] py-1.5 text-[12.5px] last:border-b-0">
+      <span className="text-gray-200">{label}</span>
+      <span className="font-mono tabular-nums text-[var(--text-primary)]">{fmtSigned(amount)}</span>
+    </div>
+  );
+}
+
+type Strength = "subtotal" | "total" | "headline";
+
+function TotalRow({
+  label, prior, cur, strength = "subtotal", tone = "neutral", showPrior = true,
+}: {
+  label: string; prior?: number; cur: number;
+  strength?: Strength;
+  tone?: "neutral" | "positive" | "warning";
+  showPrior?: boolean;
+}) {
+  const text =
+    strength === "headline" ? "text-[15px] font-semibold" :
+    strength === "total"    ? "text-[14px] font-semibold" :
+                              "text-[13px] font-medium";
+  const valueTone =
+    tone === "positive" ? "text-emerald-200" :
+    tone === "warning"  ? "text-amber-200"   :
+                          "text-[var(--text-primary)]";
+  const border =
+    strength === "headline" ? "border-t-2 border-white/[0.20]" :
+    strength === "total"    ? "border-t border-white/[0.14]" :
+                              "border-t border-white/[0.08]";
+
+  return (
+    <div className={`mt-2 grid items-baseline gap-x-8 py-2 ${border} ${text} ${showPrior ? "grid-cols-[1fr_auto_auto]" : "grid-cols-[1fr_auto]"}`}>
+      <span className="uppercase tracking-[0.04em] text-gray-300">{label}</span>
+      {showPrior && (
+        <span className="font-mono tabular-nums text-gray-500">{prior !== undefined ? fmtSigned(prior) : ""}</span>
+      )}
+      <span className={`font-mono tabular-nums ${valueTone}`}>{fmtSigned(cur)}</span>
+    </div>
+  );
+}
+
+function MutedRow({ label }: { label: string }) {
+  return <div className="border-b border-white/[0.04] py-1.5 text-[11px] text-gray-500 last:border-b-0">{label}</div>;
+}
+
+/* ───── Income view ───── */
+
+function IncomeView({ pl, prior, ccy, curLabel, priorLabel }: { pl: ProfitLoss; prior: ProfitLoss; ccy: string; curLabel: string; priorLabel: string }) {
+  void ccy;
   return (
     <div>
+      <PeriodHeaders curLabel={curLabel} priorLabel={priorLabel} />
+
       <SectionTitle label="Revenues" />
-      {cur.revenue.accounts.length === 0 && <MutedRow label="No revenue posted yet." />}
-      {cur.revenue.accounts.map((a) => (
-        <TwoColRow key={a.account_id} label={a.name} a={a.amount} b={priorAccount(prior.revenue, a.code)} ccy={ccy} />
+      {pl.revenue.accounts.length === 0 && <MutedRow label="No revenue posted yet." />}
+      {pl.revenue.accounts.map((a) => (
+        <TwoColRow key={a.account_id} label={a.name} prior={priorAccount(prior.revenue, a.code)} cur={a.amount} />
       ))}
-      <TotalRow label="Total Revenues" a={cur.revenue.amount} b={prior.revenue.amount} ccy={ccy} />
+      <TotalRow label="Total Revenues" prior={prior.revenue.amount} cur={pl.revenue.amount} strength="subtotal" />
 
       <SectionTitle label="Expenses" />
-      {cur.cost_of_sales.accounts.map((a) => (
-        <TwoColRow key={a.account_id} label={a.name} a={a.amount} b={priorAccount(prior.cost_of_sales, a.code)} ccy={ccy} />
+      {pl.cost_of_sales.accounts.map((a) => (
+        <TwoColRow key={a.account_id} label={a.name} prior={priorAccount(prior.cost_of_sales, a.code)} cur={a.amount} />
       ))}
-      {cur.operating_expenses.accounts.map((a) => (
-        <TwoColRow key={a.account_id} label={a.name} a={a.amount} b={priorAccount(prior.operating_expenses, a.code)} ccy={ccy} />
+      {pl.operating_expenses.accounts.map((a) => (
+        <TwoColRow key={a.account_id} label={a.name} prior={priorAccount(prior.operating_expenses, a.code)} cur={a.amount} />
       ))}
       <TotalRow
         label="Total Expenses"
-        a={cur.cost_of_sales.amount + cur.operating_expenses.amount}
-        b={prior.cost_of_sales.amount + prior.operating_expenses.amount}
-        ccy={ccy}
+        prior={prior.cost_of_sales.amount + prior.operating_expenses.amount}
+        cur={pl.cost_of_sales.amount + pl.operating_expenses.amount}
+        strength="subtotal"
       />
 
       <TotalRow label="Operating Income"
-                a={cur.operating_profit} b={prior.operating_profit} ccy={ccy} bold />
-      <TotalRow label="Net Income"
-                a={cur.net_profit} b={prior.net_profit} ccy={ccy} bold tone={cur.net_profit >= 0 ? "positive" : "warning"} />
+                prior={prior.operating_profit} cur={pl.operating_profit}
+                strength="total"
+                tone={pl.operating_profit >= 0 ? "positive" : "warning"} />
 
-      <div className="mt-3 text-right text-[10px] text-gray-500">vs. {priorLabel}</div>
+      <div className="mt-4" />
+      <TotalRow label="Net Income"
+                prior={prior.net_profit} cur={pl.net_profit}
+                strength="headline"
+                tone={pl.net_profit >= 0 ? "positive" : "warning"} />
     </div>
   );
 }
@@ -283,107 +432,73 @@ function priorAccount(section: PLSection, code: string) {
   return section.accounts.find((a) => a.code === code)?.amount ?? 0;
 }
 
-/* ─── Balance sheet view ─── */
+/* ───── Balance sheet ───── */
 
-function BalanceView({ bs, ccy }: { bs: BalanceSheet; ccy: string }) {
+function BalanceView({ bs, ccy, curLabel }: { bs: BalanceSheet; ccy: string; curLabel: string }) {
+  void ccy;
   return (
     <div>
+      <SingleColHeader curLabel={curLabel || bs.as_of} />
+
       <SectionTitle label="Assets" />
       {bs.assets.accounts.map((a) => (
-        <SingleRow key={a.code} label={a.name} amount={a.amount} ccy={ccy} />
+        <SingleRow key={a.code} label={a.name} amount={a.amount} />
       ))}
-      <TotalRow label="Total Assets" a={bs.total_assets} ccy={ccy} bold />
+      <TotalRow label="Total Assets" cur={bs.total_assets} strength="total" showPrior={false} />
 
       <SectionTitle label="Liabilities" />
       {bs.liabilities.accounts.length === 0 && <MutedRow label="No liabilities posted." />}
       {bs.liabilities.accounts.map((a) => (
-        <SingleRow key={a.code} label={a.name} amount={a.amount} ccy={ccy} />
+        <SingleRow key={a.code} label={a.name} amount={a.amount} />
       ))}
-      <TotalRow label="Total Liabilities" a={bs.liabilities.amount} ccy={ccy} />
+      <TotalRow label="Total Liabilities" cur={bs.liabilities.amount} strength="subtotal" showPrior={false} />
 
       <SectionTitle label="Equity" />
       {bs.equity.accounts.map((a) => (
-        <SingleRow key={a.code} label={a.name} amount={a.amount} ccy={ccy} />
+        <SingleRow key={a.code} label={a.name} amount={a.amount} />
       ))}
-      <TotalRow label="Total Equity" a={bs.equity.amount} ccy={ccy} />
+      <TotalRow label="Total Equity" cur={bs.equity.amount} strength="subtotal" showPrior={false} />
 
-      <TotalRow label="Total Liabilities + Equity" a={bs.total_liab_eq} ccy={ccy} bold
-                tone={bs.reconciled ? "positive" : "warning"} />
+      <div className="mt-4" />
+      <TotalRow label="Total Liabilities & Equity" cur={bs.total_liab_eq}
+                strength="headline"
+                tone={bs.reconciled ? "positive" : "warning"}
+                showPrior={false} />
       {!bs.reconciled && (
         <div className="mt-2 text-[11px] text-rose-300">⚠ Balance sheet does not reconcile.</div>
       )}
-      <div className="mt-3 text-right text-[10px] text-gray-500">As of {bs.as_of}</div>
     </div>
   );
 }
 
-/* ─── Cash flow view ─── */
+/* ───── Cash flow ───── */
 
-function CashFlowView({ cf, ccy }: { cf: CashFlow; ccy: string }) {
+function CashFlowView({ cf, ccy, curLabel }: { cf: CashFlow; ccy: string; curLabel: string }) {
+  void ccy;
   return (
     <div>
-      <SingleRow label="Opening cash" amount={cf.opening_cash} ccy={ccy} muted />
+      <SingleColHeader curLabel={curLabel} />
+
+      <SingleRow label="Opening cash" amount={cf.opening_cash} />
+
       {[cf.operating, cf.investing, cf.financing].map((s) => (
         <div key={s.label}>
           <SectionTitle label={s.label} />
           {s.lines.length === 0 && <MutedRow label="—" />}
           {s.lines.map((l, i) => (
-            <SingleRow key={`${s.label}-${i}`} label={l.label} amount={l.amount} ccy={ccy} />
+            <SingleRow key={`${s.label}-${i}`} label={l.label} amount={l.amount} />
           ))}
-          <TotalRow label={`${s.label} subtotal`} a={s.amount} ccy={ccy} />
+          <TotalRow label={`${s.label} subtotal`} cur={s.amount} strength="subtotal" showPrior={false} />
         </div>
       ))}
-      <TotalRow label="Net change in cash" a={cf.net_change} ccy={ccy} />
-      <TotalRow label="Closing cash" a={cf.closing_cash} ccy={ccy} bold
-                tone={cf.reconciled ? "positive" : "warning"} />
-    </div>
-  );
-}
 
-/* ─── Row primitives ─── */
+      <TotalRow label="Net change in cash" cur={cf.net_change} strength="total" showPrior={false} />
 
-function SectionTitle({ label }: { label: string }) {
-  return (
-    <div className="mb-1 mt-5 first:mt-0 text-[10px] uppercase tracking-[0.16em] text-gray-500">{label}</div>
-  );
-}
-function SingleRow({ label, amount, ccy, muted = false }: { label: string; amount: number; ccy: string; muted?: boolean }) {
-  return (
-    <div className={`flex items-baseline justify-between border-b border-white/[0.04] py-1.5 text-[12.5px] last:border-b-0 ${muted ? "text-gray-500" : ""}`}>
-      <span>{label}</span>
-      <span className="font-mono tabular-nums">{ccy} {fmtSigned(amount)}</span>
+      <div className="mt-4" />
+      <TotalRow label="Closing cash" cur={cf.closing_cash}
+                strength="headline"
+                tone={cf.reconciled ? "positive" : "warning"}
+                showPrior={false} />
     </div>
   );
-}
-function TwoColRow({ label, a, b, ccy }: { label: string; a: number; b: number; ccy: string }) {
-  return (
-    <div className="grid grid-cols-[1fr_auto_auto] items-baseline gap-6 border-b border-white/[0.04] py-1.5 text-[12.5px] last:border-b-0">
-      <span>{label}</span>
-      <span className="font-mono tabular-nums">{fmtSigned(a)}</span>
-      <span className="font-mono tabular-nums text-gray-500">{fmtSigned(b)}</span>
-      <span className="hidden">{ccy}</span>
-    </div>
-  );
-}
-function TotalRow({
-  label, a, b, ccy, bold = false, tone = "neutral",
-}: {
-  label: string; a: number; b?: number; ccy: string;
-  bold?: boolean; tone?: "neutral" | "positive" | "warning";
-}) {
-  const cls =
-    tone === "positive" ? "border-emerald-300/40 bg-emerald-300/[0.04] text-emerald-100" :
-    tone === "warning"  ? "border-amber-300/40 bg-amber-300/[0.04] text-amber-100" :
-                          "border-white/[0.08] bg-white/[0.02]";
-  const inner = (
-    <div className={`mt-2 grid grid-cols-[1fr_auto${b !== undefined ? "_auto" : ""}] items-baseline gap-6 rounded-md border ${cls} px-3 py-2 text-[13px] ${bold ? "font-semibold" : "font-medium"}`}>
-      <span>{label}</span>
-      <span className="font-mono tabular-nums">{ccy} {fmtSigned(a)}</span>
-      {b !== undefined && <span className="font-mono tabular-nums text-gray-500">{fmtSigned(b)}</span>}
-    </div>
-  );
-  return inner;
-}
-function MutedRow({ label }: { label: string }) {
-  return <div className="border-b border-white/[0.04] py-1.5 text-[11px] text-gray-500 last:border-b-0">{label}</div>;
 }

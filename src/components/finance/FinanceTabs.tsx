@@ -35,10 +35,10 @@ interface TabEntry {
   icon: RrIconName;
 }
 
-/* The 6 operator tabs that always sit on row 1 (Home is index 0). */
+/* The 5 operator tabs that always sit on row 1.
+   /finance IS the Overview dashboard now — no separate Home tab. */
 const PRIMARY: TabEntry[] = [
-  { key: "/finance",           labelKey: "subtab.home",      fallback: "Home",      icon: "coins" },
-  { key: "/finance/overview",  labelKey: "tabs.overview",    fallback: "Overview",  icon: "balance-scale-left" },
+  { key: "/finance",           labelKey: "tabs.overview",    fallback: "Overview",  icon: "balance-scale-left" },
   { key: "/finance/orders",    labelKey: "subtab.orders",    fallback: "Orders",    icon: "file-invoice" },
   { key: "/finance/customers", labelKey: "subtab.customers", fallback: "Customers", icon: "arrow-down-left" },
   { key: "/finance/suppliers", labelKey: "subtab.suppliers", fallback: "Suppliers", icon: "arrow-up-right" },
