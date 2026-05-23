@@ -264,9 +264,17 @@ export async function receivePurchaseOrder(opts: {
      inventory. For every other destination mode we post movements
      into the resolved location (warehouse, port, forwarder, etc.). */
   const movementIds: string[] = [];
+  /* INV-H4B — map serial inputs back to inserted lines by po_item_id. */
+  const serialIdsByPoItem = new Map<string, string[]>();
+  const serialNosByPoItem = new Map<string, string[]>();
+  for (const l of request.lines ?? []) {
+    if (l.serial_ids && l.serial_ids.length > 0) serialIdsByPoItem.set(l.po_item_id, l.serial_ids);
+    if (l.serial_nos && l.serial_nos.length > 0) serialNosByPoItem.set(l.po_item_id, l.serial_nos);
+  }
   if (affectsInventory) {
     for (const line of insertedLines as Array<{
       id: string;
+      po_item_id: string;
       product_id: string | null;
       inventory_item_id: string | null;
       qty_accepted: number;
@@ -289,6 +297,31 @@ export async function receivePurchaseOrder(opts: {
       const qty = Number(line.qty_accepted) || 0;
       if (qty <= 0) continue;
 
+      /* INV-H4B — auto-create new serials when serial_nos provided. */
+      let serialIdsForMovement = serialIdsByPoItem.get(line.po_item_id) ?? null;
+      const newSerialNos = serialNosByPoItem.get(line.po_item_id);
+      if (newSerialNos && newSerialNos.length > 0) {
+        const { createSerial } = await import("@/lib/inventory/serials");
+        const createdIds: string[] = [];
+        for (const sn of newSerialNos) {
+          const cs = await createSerial({
+            tenant_id: tenantId,
+            inventory_item_id: inventoryItemId,
+            serial_no: sn,
+            warehouse_id: line.warehouse_id ?? warehouseId,
+            status: "in_stock",
+            condition_status: "new",
+            supplier_id: po.supplier_id,
+            purchase_date: new Date().toISOString(),
+          });
+          if (!cs.ok || !cs.serial) {
+            return { ok: false, error: `Serial create failed: ${cs.error}`, code: 422 };
+          }
+          createdIds.push(cs.serial.id);
+        }
+        serialIdsForMovement = [...(serialIdsForMovement ?? []), ...createdIds];
+      }
+
       const created = await createInventoryMovement({
         tenant_id: tenantId,
         inventory_item_id: inventoryItemId,
@@ -303,7 +336,8 @@ export async function receivePurchaseOrder(opts: {
         reference: receiptNo,
         created_by: receivedBy,
         from_workflow: true,                   // INV-H2 — workflow caller
-        metadata: { destination_mode: destinationMode },
+        metadata: { destination_mode: destinationMode, supplier_id: po.supplier_id },
+        serial_ids: serialIdsForMovement,
       });
       if (!created.ok || !created.movement) {
         return { ok: false, error: `Inventory create failed: ${created.error}`, code: 500 };

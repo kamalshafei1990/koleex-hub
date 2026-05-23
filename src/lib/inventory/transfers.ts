@@ -454,6 +454,8 @@ export async function shipTransfer(
   tenantId: string,
   transferId: string,
   actorId: string | null,
+  /** INV-H4B — per-line serial selection. Map of transfer_item_id → serial_ids[]. */
+  serialsByLine?: Record<string, string[]>,
 ): Promise<{ ok: boolean; error?: string; offending_item_id?: string }> {
   const detail = await getTransferDetail(tenantId, transferId);
   if (!detail) return { ok: false, error: "Transfer not found." };
@@ -501,6 +503,7 @@ export async function shipTransfer(
       notes: line.notes ?? null,
       created_by: actorId,
       metadata: { transfer_id: transfer.id },
+      serial_ids: serialsByLine?.[line.id] ?? null,
     });
     if (!created.ok || !created.movement) {
       await unwindShip(createdMovementIds, upsertedBridgeIds, tenantId, actorId);
@@ -604,6 +607,10 @@ export async function receiveTransfer(
   tenantId: string,
   transferId: string,
   actorId: string | null,
+  /** INV-H4B — for serial-tracked transfers, pass the same per-line map. The
+   *  receive-side serial state change sets warehouse=destination and
+   *  status=in_stock. */
+  serialsByLine?: Record<string, string[]>,
 ): Promise<{ ok: boolean; error?: string }> {
   const detail = await getTransferDetail(tenantId, transferId);
   if (!detail) return { ok: false, error: "Transfer not found." };
@@ -622,11 +629,11 @@ export async function receiveTransfer(
   const movementIds = items.map((i) => bridgeByItem.get(i.id)?.transfer_out_movement_id).filter(Boolean) as string[];
   const { data: outMovementsData } = await supabaseServer
     .from("inventory_stock_movements")
-    .select("id, unit_cost, currency, quantity, status, inventory_item_id")
+    .select("id, unit_cost, currency, quantity, status, inventory_item_id, serial_ids")
     .in("id", movementIds.length ? movementIds : ["00000000-0000-0000-0000-000000000000"]);
   const outMovements = (outMovementsData ?? []) as Array<{
     id: string; unit_cost: number | null; currency: string; quantity: number;
-    status: string; inventory_item_id: string;
+    status: string; inventory_item_id: string; serial_ids: string[] | null;
   }>;
   const outById = new Map(outMovements.map((m) => [m.id, m]));
 
@@ -663,6 +670,10 @@ export async function receiveTransfer(
       notes: line.notes ?? null,
       created_by: actorId,
       metadata: { transfer_id: transfer.id, paired_out_movement_id: outMv.id },
+      /* INV-H4B — reuse the same serials that the ship movement carried.
+         If caller didn't pass an explicit map, fall back to the
+         transfer_out movement's serial_ids. */
+      serial_ids: serialsByLine?.[line.id] ?? (outMv as { serial_ids?: string[] | null }).serial_ids ?? null,
     });
     if (!created.ok || !created.movement) {
       await unwindReceive(createdInMovementIds, tenantId, actorId);

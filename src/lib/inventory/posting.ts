@@ -35,6 +35,7 @@ import {
 } from "./discipline";
 import { logInventoryAudit } from "./audit";
 import { applyBatchMovement } from "./variants";
+import { validateSerialMovement, moveSerials, reverseSerialMovement } from "./serials";
 
 export async function ensureDefaultWarehouse(tenantId: string): Promise<string> {
   const { data, error } = await supabaseServer.rpc("fn_inventory_ensure_default_warehouse", {
@@ -111,6 +112,41 @@ export async function createInventoryMovement(input: CreateMovementInput): Promi
   }
 
   const warehouseId = input.warehouse_id ?? (await ensureDefaultWarehouse(input.tenant_id));
+
+  /* INV-H4B — if item has track_serials=true, enforce serial discipline
+     BEFORE inserting the draft (refuse cleanly with a humanised error).
+     For IN movements where the caller did NOT pass serial_ids but
+     track_serials=true, we still allow the draft — the engine creates
+     serials per serial_no via callers (e.g. purchase receive). The
+     hard quantity-vs-count check only fires when an id list is given. */
+  let trackSerialsItem = false;
+  {
+    const { data: itemRow } = await supabaseServer
+      .from("inventory_items")
+      .select("track_serials")
+      .eq("tenant_id", input.tenant_id)
+      .eq("id", input.inventory_item_id)
+      .maybeSingle();
+    trackSerialsItem = !!(itemRow as { track_serials?: boolean } | null)?.track_serials;
+  }
+  if (trackSerialsItem && input.serial_ids && input.serial_ids.length > 0) {
+    const v = await validateSerialMovement(input.tenant_id, {
+      inventory_item_id: input.inventory_item_id,
+      movement_type: input.movement_type,
+      direction,
+      quantity: input.quantity,
+      warehouse_id: warehouseId,
+      serial_ids: input.serial_ids,
+    });
+    if (!v.ok) return { ok: false, error: v.error, code: "INV_H4B_SERIAL_INVALID" };
+  } else if (trackSerialsItem && direction === "out") {
+    /* OUT movements on serial-tracked items REQUIRE explicit serial ids. */
+    return {
+      ok: false,
+      error: "This item tracks serial numbers. Pick the exact serial(s) being shipped.",
+      code: "INV_H4B_SERIALS_REQUIRED",
+    };
+  }
 
   /* INV-H2 Scope 2 — at most one opening_balance per (item, warehouse). */
   if (input.movement_type === "opening_balance") {
@@ -192,6 +228,8 @@ export async function createInventoryMovement(input: CreateMovementInput): Promi
       /* INV-H4A — optional variant + batch (NULL = item-level back-compat). */
       variant_id: input.variant_id ?? null,
       batch_id: input.batch_id ?? null,
+      /* INV-H4B — optional serial ids (NULL when item does not track). */
+      serial_ids: input.serial_ids && input.serial_ids.length > 0 ? input.serial_ids : null,
     })
     .select("*")
     .single();
@@ -328,6 +366,40 @@ export async function postInventoryMovement(
       const delta = pRow.direction === "in" ? Number(pRow.quantity) : -Number(pRow.quantity);
       await applyBatchMovement(tenantId, pRow.batch_id, delta);
     }
+    /* INV-H4B — apply serial state changes if the movement carries any. */
+    const { data: postedFull } = await supabaseServer
+      .from("inventory_stock_movements")
+      .select("id, movement_type, direction, warehouse_id, serial_ids, posted_at, metadata")
+      .eq("id", movementId)
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
+    const pFull = postedFull as {
+      id: string;
+      movement_type: import("./types").MovementType;
+      direction: import("./types").Direction;
+      warehouse_id: string;
+      serial_ids: string[] | null;
+      posted_at: string | null;
+      metadata: Record<string, unknown> | null;
+    } | null;
+    if (pFull?.serial_ids && pFull.serial_ids.length > 0) {
+      const meta = (pFull.metadata ?? {}) as Record<string, unknown>;
+      await moveSerials(tenantId, pFull.serial_ids, {
+        movementId: pFull.id,
+        ctx: {
+          movement_type: pFull.movement_type,
+          direction: pFull.direction,
+          warehouse_id: pFull.warehouse_id,
+          posted_at: pFull.posted_at,
+          customer_id: (meta.customer_id as string | undefined) ?? null,
+          supplier_id: (meta.supplier_id as string | undefined) ?? null,
+          disposition: (meta.disposition as "restock" | "quarantine" | "scrap" | "vendor_return" | undefined) ?? null,
+          scrap_intent:
+            (meta.adjustment_reason as string | undefined) === "scrap" ||
+            (meta.scrap_intent as boolean | undefined) === true,
+        },
+      });
+    }
     await logInventoryAudit({
       tenant_id: tenantId,
       actor_id: postedBy,
@@ -368,14 +440,20 @@ export async function voidInventoryMovement(
   }
 
   /* INV-H4A — capture batch+direction BEFORE void so we can reverse the
-     batch.quantity_remaining effect. */
+     batch.quantity_remaining effect. INV-H4B — also capture serial_ids. */
   const { data: preVoid } = await supabaseServer
     .from("inventory_stock_movements")
-    .select("batch_id, direction, quantity, status")
+    .select("batch_id, direction, quantity, status, serial_ids")
     .eq("id", movementId)
     .eq("tenant_id", tenantId)
     .maybeSingle();
-  const preRow = preVoid as { batch_id: string | null; direction: "in" | "out"; quantity: number; status: string } | null;
+  const preRow = preVoid as {
+    batch_id: string | null;
+    direction: "in" | "out";
+    quantity: number;
+    status: string;
+    serial_ids: string[] | null;
+  } | null;
 
   const { data, error } = await supabaseServer.rpc("fn_inventory_void_movement", {
     p_movement_id: movementId,
@@ -391,6 +469,10 @@ export async function voidInventoryMovement(
     if (preRow?.batch_id && preRow.status === "posted") {
       const delta = preRow.direction === "in" ? -Number(preRow.quantity) : Number(preRow.quantity);
       await applyBatchMovement(tenantId, preRow.batch_id, delta);
+    }
+    /* INV-H4B — reverse serial state changes if any were applied. */
+    if (preRow?.serial_ids && preRow.serial_ids.length > 0 && preRow.status === "posted") {
+      await reverseSerialMovement(tenantId, preRow.serial_ids);
     }
     await logInventoryAudit({
       tenant_id: tenantId,

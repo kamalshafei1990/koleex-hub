@@ -188,6 +188,7 @@ const PATCHABLE_FIELDS = new Set<keyof InventoryItem>([
   "default_warehouse_id", "preferred_supplier_id", "linked_product_id",
   "sku", "barcode", "qr_code", "cost_price", "currency",
   "min_stock", "reorder_point", "max_stock", "track_stock",
+  "track_serials" as keyof InventoryItem,
   "is_consumable", "is_sellable", "is_purchasable",
   "weight", "dimensions", "image_url", "description", "notes",
   "status",

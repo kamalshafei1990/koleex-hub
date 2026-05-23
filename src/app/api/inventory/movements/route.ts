@@ -205,6 +205,8 @@ export async function POST(req: Request) {
     /* INV-H4A — optional variant + batch (NULL = item-level back-compat). */
     variant_id: body.variant_id ?? null,
     batch_id: body.batch_id ?? null,
+    /* INV-H4B — optional serial ids. */
+    serial_ids: Array.isArray(body.serial_ids) ? body.serial_ids : null,
   };
 
   /* Default behaviour: opening_balance and (legacy non-restricted) types

@@ -80,6 +80,8 @@ export interface SalesShipmentItem {
 export interface ShipLineInput {
   sales_order_item_id: string;
   qty: number;
+  /** INV-H4B — required when the line's inventory item has track_serials=true. */
+  serial_ids?: string[] | null;
 }
 
 export interface ShipRequest {

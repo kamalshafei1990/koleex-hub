@@ -573,6 +573,8 @@ export async function receiveReturn(
   tenantId: string,
   returnId: string,
   actorId: string | null,
+  /** INV-H4B — per-line serial selection. Map of return_item_id → serial_ids[]. */
+  serialsByLine?: Record<string, string[]>,
 ): Promise<{ ok: boolean; error?: string }> {
   const detail = await getReturnDetail(tenantId, returnId);
   if (!detail) return { ok: false, error: "Return not found." };
@@ -607,6 +609,9 @@ export async function receiveReturn(
       return_type: r.return_type,
       disposition: line.disposition,
       condition_status: line.condition_status,
+      /* INV-H4B — customer_id stamped so the serial engine can clear/keep it
+         on return state changes. */
+      customer_id: r.customer_id,
     };
     if (!cost) {
       meta.zero_value_reason = "return_no_cost_basis";
@@ -632,6 +637,7 @@ export async function receiveReturn(
       notes: line.notes ?? null,
       created_by: actorId,
       metadata: meta,
+      serial_ids: serialsByLine?.[line.id] ?? null,
     });
     if (!created.ok || !created.movement) {
       await unwindReceive(createdMovementIds, createdBridgeIds, tenantId, actorId);
@@ -716,6 +722,8 @@ export async function shipReturn(
   tenantId: string,
   returnId: string,
   actorId: string | null,
+  /** INV-H4B — per-line serial selection. Map of return_item_id → serial_ids[]. */
+  serialsByLine?: Record<string, string[]>,
 ): Promise<{ ok: boolean; error?: string; offending_item_id?: string }> {
   const detail = await getReturnDetail(tenantId, returnId);
   if (!detail) return { ok: false, error: "Return not found." };
@@ -765,7 +773,9 @@ export async function shipReturn(
         return_no: r.return_no,
         return_type: r.return_type,
         condition_status: line.condition_status,
+        supplier_id: r.supplier_id,
       },
+      serial_ids: serialsByLine?.[line.id] ?? null,
     });
     if (!created.ok || !created.movement) {
       await unwindShip(createdMovementIds, createdBridgeIds, tenantId, actorId);

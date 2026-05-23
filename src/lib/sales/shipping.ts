@@ -147,8 +147,16 @@ export async function shipSalesOrder(opts: {
      inventory_item_id. SO lines without a tracked item (service/non-
      stock) are still recorded but skip the movement. */
   const movementIds: string[] = [];
+  /* INV-H4B — map serial_ids by sales_order_item_id (from request). */
+  const serialsBySoItem = new Map<string, string[]>();
+  for (const l of lines) {
+    if (l.serial_ids && l.serial_ids.length > 0) {
+      serialsBySoItem.set(l.sales_order_item_id, l.serial_ids);
+    }
+  }
   for (const line of insertedLines as Array<{
     id: string;
+    sales_order_item_id: string;
     inventory_item_id: string | null;
     qty: number;
     unit: string;
@@ -170,6 +178,9 @@ export async function shipSalesOrder(opts: {
       reference: shipmentNoStored,
       created_by: shippedBy,
       from_workflow: true, // INV-H2 — workflow caller
+      /* INV-H4B — serials + customer linkage for sales_shipment. */
+      serial_ids: serialsBySoItem.get(line.sales_order_item_id) ?? null,
+      metadata: { customer_id: so.customer_id },
     });
     if (!created.ok || !created.movement) {
       /* Cleanup partial state: best-effort delete already-created

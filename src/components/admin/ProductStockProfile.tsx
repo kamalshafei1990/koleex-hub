@@ -65,6 +65,7 @@ interface Profile {
   max_stock: number | null;
   status: string;
   track_stock: boolean;
+  track_serials?: boolean;
 }
 interface StockSummary { total_on_hand: number }
 
@@ -80,6 +81,7 @@ export default function ProductStockProfile({ productId }: { productId: string }
   const [loading, setLoading] = useState(true);
 
   const [track, setTrack] = useState(false);
+  const [trackSerials, setTrackSerials] = useState(false);
   const [unit, setUnit] = useState("pcs");
   const [warehouseId, setWarehouseId] = useState<string>("");
   const [cost, setCost] = useState("");
@@ -107,6 +109,7 @@ export default function ProductStockProfile({ productId }: { productId: string }
       setWarehouses((wJ.warehouses ?? []) as Warehouse[]);
       if (p) {
         setTrack(p.track_stock !== false && p.status !== "archived");
+        setTrackSerials(!!p.track_serials);
         setUnit(p.unit_of_measure ?? "pcs");
         setWarehouseId(p.default_warehouse_id ?? "");
         setCost(p.cost_price != null ? String(p.cost_price) : "");
@@ -135,6 +138,7 @@ export default function ProductStockProfile({ productId }: { productId: string }
       const body = track
         ? {
             track_stock: true,
+            track_serials: trackSerials,
             unit_of_measure: unit,
             default_warehouse_id: warehouseId || null,
             cost_price: cost === "" ? null : Number(cost),
@@ -160,7 +164,7 @@ export default function ProductStockProfile({ productId }: { productId: string }
     } finally {
       setSaving(false);
     }
-  }, [track, profile, stock, t, unit, warehouseId, cost, currency, reorder, minStock, maxStock, productId, load]);
+  }, [track, trackSerials, profile, stock, t, unit, warehouseId, cost, currency, reorder, minStock, maxStock, productId, load]);
 
   return (
     <div className="space-y-4">
@@ -252,6 +256,30 @@ export default function ProductStockProfile({ productId }: { productId: string }
               className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1.5 text-[12.5px] text-[var(--text-primary)] tabular-nums"
             />
           </Field>
+          {/* INV-H4B — Track serials toggle. */}
+          <div className="md:col-span-2 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 flex items-start gap-3">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={trackSerials}
+              onClick={() => setTrackSerials((v) => !v)}
+              className={`mt-0.5 relative h-5 w-9 rounded-full transition-colors ${
+                trackSerials ? "bg-[var(--accent-primary,#3b82f6)]" : "bg-[var(--bg-surface-elevated)] border border-[var(--border-subtle)]"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
+                  trackSerials ? "translate-x-4" : "translate-x-0.5"
+                }`}
+              />
+            </button>
+            <div className="min-w-0 flex-1">
+              <div className="text-[12.5px] text-[var(--text-primary)]">Track serial numbers</div>
+              <div className="text-[11px] text-[var(--text-dim)] mt-0.5">
+                Each unit gets a unique serial. Movements require an exact serial match.
+              </div>
+            </div>
+          </div>
         </div>
       ) : (
         <div className="text-[12px] text-[var(--text-dim)] rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-3">

@@ -140,6 +140,12 @@ export interface ReceiveLineInput {
   qty_rejected?: number;        // defaults to 0
   warehouse_id?: string | null; // defaults to receipt-level WH
   condition_notes?: string | null;
+  /** INV-H4B — serial numbers being received. Either explicit `serial_ids`
+   *  (already-registered serials) OR `serial_nos` (new serials to create
+   *  on the fly). When the line's inventory item has track_serials=true the
+   *  engine enforces serial_ids.length === qty_accepted. */
+  serial_ids?: string[] | null;
+  serial_nos?: string[] | null;
 }
 
 export interface ReceiveRequest {

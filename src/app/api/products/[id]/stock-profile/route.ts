@@ -34,6 +34,8 @@ const MODULE = "Inventory";
 
 interface StockProfileBody {
   track_stock?: boolean;
+  /** INV-H4B — toggle per-unit serial tracking. */
+  track_serials?: boolean;
   unit_of_measure?: string;
   default_warehouse_id?: string | null;
   cost_price?: number | null;
@@ -134,6 +136,7 @@ export async function PUT(
   if (body.reorder_point !== undefined) patch.reorder_point = body.reorder_point;
   if (body.min_stock !== undefined) patch.min_stock = body.min_stock;
   if (body.max_stock !== undefined) patch.max_stock = body.max_stock;
+  if (body.track_serials !== undefined) patch.track_serials = body.track_serials;
 
   const r = await updateInventoryItem(auth.tenant_id, itemId, patch);
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: 422 });

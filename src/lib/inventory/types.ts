@@ -213,6 +213,8 @@ export interface StockMovement {
   /* INV-H4A — optional variant + batch (back-compat: NULL on legacy rows). */
   variant_id: string | null;
   batch_id: string | null;
+  /* INV-H4B — serial ids attached to this movement (back-compat: NULL). */
+  serial_ids: string[] | null;
 }
 
 export interface StockBalance {
@@ -298,6 +300,17 @@ export interface CreateMovementInput {
    *  variant is set). When provided, posting maintains
    *  inventory_batches.quantity_remaining. */
   batch_id?: string | null;
+  /** INV-H4B — serial ids attached to this movement. When the item has
+   *  track_serials=true, exact-count match with quantity is enforced. */
+  serial_ids?: string[] | null;
+  /** INV-H4B — context flags passed to the serial engine after posting. */
+  customer_id?: string | null;
+  supplier_id?: string | null;
+  /** INV-H4B — for return_in movements, the disposition routing. */
+  serial_disposition?: "restock" | "quarantine" | "scrap" | "vendor_return" | null;
+  /** INV-H4B — for transfer_in movements, the warehouse the serials land in
+   *  (separate from movement.warehouse_id which is the destination). */
+  serial_destination_warehouse_id?: string | null;
 }
 
 export interface PostMovementResult {
