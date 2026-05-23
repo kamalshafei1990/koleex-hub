@@ -13,6 +13,8 @@ import FolderTreeIcon from "@/components/icons/ui/FolderTreeIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import WrenchIcon from "@/components/icons/ui/WrenchIcon";
 import BoxesIcon from "@/components/icons/ui/BoxesIcon";
+import BoxIcon from "@/components/icons/ui/BoxIcon";
+import ProductStockProfile from "@/components/admin/ProductStockProfile";
 import DollarSignIcon from "@/components/icons/ui/DollarSignIcon";
 import LanguagesIcon from "@/components/icons/ui/LanguagesIcon";
 import Link2Icon from "@/components/icons/ui/Link2Icon";
@@ -1668,6 +1670,13 @@ export default function ProductForm({ productId }: Props) {
                 </div>
               </div>
             </Section>
+
+            {/* INV-H1 — Stock Profile (tenant-scoped inventory_items row). */}
+            {productId && (
+              <Section id="stock-profile" icon={<BoxIcon className="h-4 w-4" />} title="Stock Profile" badge="Inventory" defaultOpen={false}>
+                <ProductStockProfile productId={productId} />
+              </Section>
+            )}
           </div>
         )}
 

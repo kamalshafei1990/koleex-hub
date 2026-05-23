@@ -168,10 +168,12 @@ async function main() {
   const m1 = await createInventoryItem({
     tenant_id: TENANT_A, item_name: "Lockstitch Machine LX-9000",
     type_key: "machine", unit_of_measure: "set",
+    metadata: { admin_repair: true },
   });
   const sp1 = await createInventoryItem({
     tenant_id: TENANT_A, item_name: "Needle Bar Assembly",
     type_key: "spare_part", unit_of_measure: "pcs",
+    metadata: { admin_repair: true },
   });
   ok(
     "08  auto item code: machine → MC-000001, spare part → SP-000001",
@@ -183,11 +185,11 @@ async function main() {
 
   /* 09 — Create items across many types. */
   const created = await Promise.all([
-    createInventoryItem({ tenant_id: TENANT_A, item_name: "Export Carton 60×40×40", type_key: "packaging_material", unit_of_measure: "carton" }),
-    createInventoryItem({ tenant_id: TENANT_A, item_name: "Booth LED Backdrop",     type_key: "exhibition_material", unit_of_measure: "pcs" }),
-    createInventoryItem({ tenant_id: TENANT_A, item_name: "Printer Toner — Black",  type_key: "office_supply",      unit_of_measure: "pcs" }),
-    createInventoryItem({ tenant_id: TENANT_A, item_name: "Damaged Carton Stock",   type_key: "damaged_goods",      unit_of_measure: "pcs" }),
-    createInventoryItem({ tenant_id: TENANT_A, item_name: "Sewing Machine Oil",     type_key: "consumable",         unit_of_measure: "liter", is_consumable: true }),
+    createInventoryItem({ tenant_id: TENANT_A, item_name: "Export Carton 60×40×40", type_key: "packaging_material", unit_of_measure: "carton" , metadata: { admin_repair: true } }),
+    createInventoryItem({ tenant_id: TENANT_A, item_name: "Booth LED Backdrop",     type_key: "exhibition_material", unit_of_measure: "pcs" , metadata: { admin_repair: true } }),
+    createInventoryItem({ tenant_id: TENANT_A, item_name: "Printer Toner — Black",  type_key: "office_supply",      unit_of_measure: "pcs" , metadata: { admin_repair: true } }),
+    createInventoryItem({ tenant_id: TENANT_A, item_name: "Damaged Carton Stock",   type_key: "damaged_goods",      unit_of_measure: "pcs" , metadata: { admin_repair: true } }),
+    createInventoryItem({ tenant_id: TENANT_A, item_name: "Sewing Machine Oil",     type_key: "consumable",         unit_of_measure: "liter", is_consumable: true , metadata: { admin_repair: true } }),
   ]);
   ok(
     "09  create items of types packaging/exhibition/office/damaged/consumable",
@@ -207,6 +209,7 @@ async function main() {
     tenant_id: TENANT_A, item_name: "Office Chair",
     type_key: "office_supply", unit_of_measure: "pcs",
     initial_quantity: 6, initial_warehouse_id: wh1,
+    metadata: { admin_repair: true },
   });
   const seededBal = seeded.item ? await getStockBalance(TENANT_A, seeded.item.id, wh1) : null;
   ok(
@@ -278,6 +281,7 @@ async function main() {
   const itemB = await createInventoryItem({
     tenant_id: TENANT_B, item_name: "B-side item",
     type_key: "machine", unit_of_measure: "pcs",
+    metadata: { admin_repair: true },
   });
   const bMove = await createInventoryMovement({
     tenant_id: TENANT_B, inventory_item_id: itemB.item!.id,

@@ -62,6 +62,10 @@ export default function CreateInventoryItem() {
       const r = await fetch("/api/inventory/items", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          /* INV-H1 — Operational stock comes through Products. This
+             page is kept as an admin/repair path; the API requires
+             admin_repair=true to accept an unlinked item. */
+          admin_repair: true,
           item_name: name.trim(),
           item_code: code.trim() || null,
           brand: brand.trim() || null,

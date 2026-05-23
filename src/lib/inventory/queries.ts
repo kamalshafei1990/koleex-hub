@@ -46,9 +46,10 @@ export async function buildBalancesSnapshot(opts: {
   const warehouseIds = Array.from(new Set(rows.map((r) => r.warehouse_id)));
 
   const [itemsRes, whRes] = await Promise.all([
+    /* INV-H1 — pull linked_product_id so we can overlay product identity. */
     supabaseServer
       .from("inventory_items")
-      .select("id, item_code, item_name, item_type_id")
+      .select("id, item_code, item_name, item_type_id, linked_product_id")
       .in("id", itemIds),
     supabaseServer
       .from("inventory_warehouses")
@@ -56,8 +57,26 @@ export async function buildBalancesSnapshot(opts: {
       .in("id", warehouseIds),
   ]);
   const items = (itemsRes.data ?? []) as Array<{
-    id: string; item_code: string; item_name: string; item_type_id: string;
+    id: string; item_code: string; item_name: string; item_type_id: string; linked_product_id: string | null;
   }>;
+  /* Look up product identity for any item that has a linked product. */
+  const productIds = Array.from(new Set(items.map((i) => i.linked_product_id).filter(Boolean) as string[]));
+  const [productsRes, mediaRes] = await Promise.all([
+    productIds.length
+      ? supabaseServer.from("products").select("id, product_name, slug").in("id", productIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; product_name: string; slug: string }> }),
+    productIds.length
+      ? supabaseServer.from("product_media").select("product_id, url, order").in("product_id", productIds).order("order", { ascending: true })
+      : Promise.resolve({ data: [] as Array<{ product_id: string; url: string | null }> }),
+  ]);
+  const productMap = new Map<string, { product_name: string; slug: string }>();
+  for (const p of (productsRes.data ?? []) as Array<{ id: string; product_name: string; slug: string }>) {
+    productMap.set(p.id, { product_name: p.product_name, slug: p.slug });
+  }
+  const productImageMap = new Map<string, string>();
+  for (const m of (mediaRes.data ?? []) as Array<{ product_id: string; url: string | null }>) {
+    if (!productImageMap.has(m.product_id) && m.url) productImageMap.set(m.product_id, m.url);
+  }
   const typeIds = Array.from(new Set(items.map((i) => i.item_type_id)));
   const typesRes = typeIds.length
     ? await supabaseServer
@@ -70,8 +89,8 @@ export async function buildBalancesSnapshot(opts: {
   for (const t of (typesRes.data ?? []) as Array<{ id: string; type_name: string; icon: IconName; color: ColorToken }>) {
     typeMap.set(t.id, { type_name: t.type_name, icon: t.icon, color: t.color });
   }
-  const itemMap = new Map<string, { item_code: string; item_name: string; item_type_id: string }>();
-  for (const i of items) itemMap.set(i.id, { item_code: i.item_code, item_name: i.item_name, item_type_id: i.item_type_id });
+  const itemMap = new Map<string, { item_code: string; item_name: string; item_type_id: string; linked_product_id: string | null }>();
+  for (const i of items) itemMap.set(i.id, { item_code: i.item_code, item_name: i.item_name, item_type_id: i.item_type_id, linked_product_id: i.linked_product_id });
   const whMap = new Map<string, { code: string; name: string }>();
   for (const w of (whRes.data ?? []) as Array<{ id: string; code: string; name: string }>) {
     whMap.set(w.id, { code: w.code, name: w.name });
@@ -83,18 +102,24 @@ export async function buildBalancesSnapshot(opts: {
     const wh = whMap.get(b.warehouse_id) ?? { code: "?", name: "Unknown" };
     const onHand = Number(b.qty_on_hand) || 0;
     const reserved = Number(b.qty_reserved) || 0;
+    /* INV-H1 — Product identity takes precedence over raw item naming. */
+    const linkedProduct = item?.linked_product_id ? productMap.get(item.linked_product_id) : undefined;
     return {
       ...b,
       qty_on_hand: onHand,
       qty_reserved: reserved,
       item_code: item?.item_code ?? "—",
-      item_name: item?.item_name ?? null,
+      item_name: linkedProduct?.product_name ?? item?.item_name ?? null,
       item_type_name: type?.type_name ?? null,
       item_icon: (type?.icon ?? "box") as IconName,
       item_color: (type?.color ?? "slate") as ColorToken,
       warehouse_code: wh.code,
       warehouse_name: wh.name,
       qty_available: onHand - reserved,
+      product_id: item?.linked_product_id ?? null,
+      product_name: linkedProduct?.product_name ?? null,
+      product_slug: linkedProduct?.slug ?? null,
+      product_image_url: item?.linked_product_id ? productImageMap.get(item.linked_product_id) ?? null : null,
     };
   });
 
@@ -215,7 +240,9 @@ export async function listInventoryItems(opts: {
 
   const typeIds = Array.from(new Set(items.map((i) => i.item_type_id)));
   const catIds = Array.from(new Set(items.map((i) => i.category_id).filter(Boolean) as string[]));
-  const [typesRes, catsRes, balancesRes, valuationRes] = await Promise.all([
+  /* INV-H1 — Pull product identity for linked items. */
+  const productIds = Array.from(new Set(items.map((i) => i.linked_product_id).filter(Boolean) as string[]));
+  const [typesRes, catsRes, balancesRes, valuationRes, productsRes, productMediaRes, productModelsRes] = await Promise.all([
     supabaseServer.from("inventory_item_types").select("id, type_key, type_name, icon, color").in("id", typeIds),
     catIds.length
       ? supabaseServer.from("inventory_item_categories").select("id, name").in("id", catIds)
@@ -233,6 +260,15 @@ export async function listInventoryItems(opts: {
       .select("inventory_item_id, qty_on_hand, inventory_value")
       .eq("tenant_id", opts.tenantId)
       .in("inventory_item_id", items.map((i) => i.id)),
+    productIds.length
+      ? supabaseServer.from("products").select("id, product_name, slug").in("id", productIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; product_name: string; slug: string }> }),
+    productIds.length
+      ? supabaseServer.from("product_media").select("product_id, url, order").in("product_id", productIds).order("order", { ascending: true })
+      : Promise.resolve({ data: [] as Array<{ product_id: string; url: string | null }> }),
+    productIds.length
+      ? supabaseServer.from("product_models").select("product_id, sku, order").in("product_id", productIds).order("order", { ascending: true })
+      : Promise.resolve({ data: [] as Array<{ product_id: string; sku: string | null }> }),
   ]);
   const typeMap = new Map<string, { type_key: string; type_name: string; icon: IconName; color: ColorToken }>();
   for (const t of (typesRes.data ?? []) as Array<{ id: string; type_key: string; type_name: string; icon: IconName; color: ColorToken }>) {
@@ -252,10 +288,25 @@ export async function listInventoryItems(opts: {
     valMap.set(v.inventory_item_id, cur);
   }
 
+  /* Build product-identity overlays once. */
+  const productMap = new Map<string, { product_name: string; slug: string }>();
+  for (const p of (productsRes.data ?? []) as Array<{ id: string; product_name: string; slug: string }>) {
+    productMap.set(p.id, { product_name: p.product_name, slug: p.slug });
+  }
+  const productImageMap = new Map<string, string>();
+  for (const m of (productMediaRes.data ?? []) as Array<{ product_id: string; url: string | null }>) {
+    if (!productImageMap.has(m.product_id) && m.url) productImageMap.set(m.product_id, m.url);
+  }
+  const productSkuMap = new Map<string, string>();
+  for (const m of (productModelsRes.data ?? []) as Array<{ product_id: string; sku: string | null }>) {
+    if (!productSkuMap.has(m.product_id) && m.sku) productSkuMap.set(m.product_id, m.sku);
+  }
+
   return items.map((it) => {
     const t = typeMap.get(it.item_type_id);
     const v = valMap.get(it.id) ?? { qty: 0, value: 0 };
     const avg = v.qty > 0 ? v.value / v.qty : 0;
+    const linkedProduct = it.linked_product_id ? productMap.get(it.linked_product_id) : undefined;
     return {
       ...it,
       type_key: t?.type_key ?? "other",
@@ -266,6 +317,10 @@ export async function listInventoryItems(opts: {
       qty_on_hand: balMap.get(it.id) ?? 0,
       avg_cost: avg,
       inventory_value: v.value,
+      product_name: linkedProduct?.product_name ?? null,
+      product_slug: linkedProduct?.slug ?? null,
+      product_image_url: it.linked_product_id ? productImageMap.get(it.linked_product_id) ?? null : null,
+      product_sku: it.linked_product_id ? productSkuMap.get(it.linked_product_id) ?? null : null,
     };
   });
 }

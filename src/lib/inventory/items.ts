@@ -138,6 +138,7 @@ export async function createInventoryItem(input: CreateItemInput): Promise<{
       linked_product_id: input.linked_product_id ?? null,
       default_warehouse_id: input.default_warehouse_id ?? null,
       created_by: input.created_by ?? null,
+      metadata: input.metadata ?? {},
     })
     .select("*")
     .single();

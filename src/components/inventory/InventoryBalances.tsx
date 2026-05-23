@@ -31,6 +31,11 @@ interface Balance {
   qty_reserved: number;
   qty_available: number;
   last_movement_at: string | null;
+  /* INV-H1 — product identity overlay. */
+  product_id?: string | null;
+  product_name?: string | null;
+  product_slug?: string | null;
+  product_image_url?: string | null;
 }
 interface Warehouse { id: string; code: string; name: string; location_type?: string | null }
 
@@ -187,7 +192,20 @@ export default function InventoryBalances() {
                   return (
                     <tr key={r.id} className="border-b border-white/[0.03] last:border-b-0 hover:bg-white/[0.02]">
                       <td className="px-4 py-2 font-mono text-[11.5px] text-gray-300 whitespace-nowrap">{r.item_code}</td>
-                      <td className="px-4 py-2 text-gray-200">{r.item_name ?? "—"}</td>
+                      <td className="px-4 py-2 text-gray-200">
+                        <span className="inline-flex items-center gap-2">
+                          {r.product_image_url && (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img src={r.product_image_url} alt="" className="h-7 w-7 rounded object-cover bg-[var(--bg-surface)] shrink-0" />
+                          )}
+                          <span className="inline-flex flex-col min-w-0">
+                            <span className="truncate">{r.product_name ?? r.item_name ?? "—"}</span>
+                            {r.product_name && r.item_name && r.product_name !== r.item_name && (
+                              <span className="text-[10.5px] text-gray-500 truncate">{r.item_name}</span>
+                            )}
+                          </span>
+                        </span>
+                      </td>
                       <td className="px-4 py-2 text-[11px] text-gray-500">{r.item_type_name ?? "—"}</td>
                       <td className="px-4 py-2">
                         <div className="inline-flex items-center gap-2">

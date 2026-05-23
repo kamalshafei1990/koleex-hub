@@ -137,6 +137,11 @@ export interface InventoryItemWithRefs extends InventoryItem {
   avg_cost: number;
   /** Sum of inventory_value across every (item, warehouse) bucket. */
   inventory_value: number;
+  /* INV-H1 — product identity overlay. */
+  product_name?: string | null;
+  product_slug?: string | null;
+  product_image_url?: string | null;
+  product_sku?: string | null;
 }
 
 export type LocationType =
@@ -225,6 +230,12 @@ export interface BalanceWithRefs extends StockBalance {
   warehouse_code: string;
   warehouse_name: string;
   qty_available: number;
+  /* INV-H1 — product identity overlay. Populated when the inventory_item
+     is linked to a product in the global catalog. */
+  product_id?: string | null;
+  product_name?: string | null;
+  product_slug?: string | null;
+  product_image_url?: string | null;
 }
 
 export function directionForType(type: MovementType): Direction | null {
@@ -316,4 +327,7 @@ export interface CreateItemInput {
   initial_quantity?: number;
   initial_warehouse_id?: string | null;
   created_by?: string | null;
+  /** INV-H1 — passthrough metadata; the API surface uses this to stamp
+   *  flags like `admin_repair` that the DB guard checks. */
+  metadata?: Record<string, unknown>;
 }

@@ -96,12 +96,27 @@ export async function POST(req: Request) {
 
   if (items.length > 0) {
     const soId = (row as { id: string }).id;
-    const lineRows = items.map((it) => {
+    /* INV-H1 — When a line carries product_id but no inventory_item_id,
+       resolve it via the linked stock profile (don't auto-create — the
+       product needs an explicit stock profile to be shippable). */
+    const lineRows = await Promise.all(items.map(async (it) => {
       const qty = Number(it.qty) || 0;
       const price = Number(it.unit_price) || 0;
+      let resolvedItemId = it.inventory_item_id ?? null;
+      if (!resolvedItemId && it.product_id) {
+        const { data: profile } = await supabaseServer
+          .from("inventory_items")
+          .select("id")
+          .eq("tenant_id", auth.tenant_id)
+          .eq("linked_product_id", it.product_id)
+          .is("deleted_at", null)
+          .neq("status", "archived")
+          .maybeSingle();
+        if (profile) resolvedItemId = (profile as { id: string }).id;
+      }
       return {
         sales_order_id: soId,
-        inventory_item_id: it.inventory_item_id ?? null,
+        inventory_item_id: resolvedItemId,
         product_id: it.product_id ?? null,
         description: it.description ?? null,
         qty,
@@ -109,7 +124,7 @@ export async function POST(req: Request) {
         unit_price: price,
         total: qty * price,
       };
-    });
+    }));
     const { error: itemsErr } = await supabaseServer.from("sales_order_items").insert(lineRows);
     if (itemsErr) {
       await supabaseServer.from("sales_orders").delete().eq("id", soId);

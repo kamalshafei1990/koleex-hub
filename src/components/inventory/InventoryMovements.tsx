@@ -25,6 +25,45 @@ import {
 } from "@/components/inventory/InventoryUi";
 import RrIcon from "@/components/ui/RrIcon";
 import { humanizeError } from "@/lib/ui/humanize-error";
+import { useTranslation, type Translations } from "@/lib/i18n";
+import Link from "next/link";
+
+/* INV-H1 — Movement form selects Products and resolves to inventory_item_id
+   on the server. */
+interface ProductOption {
+  product_id: string;
+  product_name: string;
+  slug: string;
+  brand: string | null;
+  sku: string | null;
+  model_name: string | null;
+  image_url: string | null;
+  stock_profile: {
+    inventory_item_id: string;
+    item_code: string;
+    unit_of_measure: string;
+    default_warehouse_id: string | null;
+  } | null;
+}
+
+const MV_T: Translations = {
+  "mv.title":       { en: "Stock Movements", zh: "库存移动",   ar: "حركات المخزون" },
+  "mv.subtitle":    { en: "Append-only ledger. Posted movements are immutable; void via reversal.", zh: "仅追加分录。已过账的移动不可变；通过反向冲销作废。", ar: "سجل لا يقبل الإلحاق فقط. الحركات المرحلة غير قابلة للتعديل؛ يمكن إلغاؤها بحركة عكسية." },
+  "mv.new":         { en: "New Movement",    zh: "新建移动",   ar: "حركة جديدة" },
+  "mv.product":     { en: "Product",         zh: "产品",       ar: "المنتج" },
+  "mv.product_hint":{ en: "Search by name, SKU or brand", zh: "按名称、SKU 或品牌搜索", ar: "ابحث بالاسم أو SKU أو العلامة التجارية" },
+  "mv.no_profile":  { en: "This product is not tracked in inventory.", zh: "此产品不在库存中跟踪。", ar: "هذا المنتج غير مُتتبَّع في المخزون." },
+  "mv.create_profile_cta": { en: "Open product to create a Stock Profile →", zh: "打开产品以创建库存档案 →", ar: "افتح المنتج لإنشاء ملف مخزون ←" },
+  "mv.location":    { en: "Location",        zh: "位置",       ar: "الموقع" },
+  "mv.type":        { en: "Type",            zh: "类型",       ar: "النوع" },
+  "mv.direction":   { en: "Direction",       zh: "方向",       ar: "الاتجاه" },
+  "mv.qty":         { en: "Quantity",        zh: "数量",       ar: "الكمية" },
+  "mv.unit":        { en: "Unit",            zh: "单位",       ar: "الوحدة" },
+  "mv.reference":   { en: "Reference",       zh: "参考",       ar: "المرجع" },
+  "mv.notes":       { en: "Notes",           zh: "备注",       ar: "ملاحظات" },
+  "mv.post":        { en: "Post Movement",   zh: "过账",       ar: "ترحيل الحركة" },
+  "mv.posting":     { en: "Posting…",        zh: "过账中…",     ar: "جارٍ الترحيل…" },
+};
 
 interface Item { id: string; item_code: string; item_name: string }
 interface Warehouse {
@@ -62,8 +101,11 @@ const MOVEMENT_TYPES: Array<{ value: MovementType; label: string; direction: "in
 ];
 
 export default function InventoryMovements() {
+  const { t } = useTranslation(MV_T);
   const [movements, setMovements] = useState<MovementRow[]>([]);
   const [items, setItems] = useState<Item[]>([]);
+  /* INV-H1 — product picker: list of products + their resolved profile. */
+  const [products, setProducts] = useState<ProductOption[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +115,8 @@ export default function InventoryMovements() {
   const [filterType, setFilterType] = useState<string>("");
 
   /* Form */
+  const [productQuery, setProductQuery] = useState("");
+  const [selectedProduct, setSelectedProduct] = useState<ProductOption | null>(null);
   const [itemQuery, setItemQuery] = useState("");
   const [itemId, setItemId] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
@@ -87,10 +131,22 @@ export default function InventoryMovements() {
   const [flash, setFlash] = useState<string | null>(null);
 
   const itemMap = useMemo(() => {
-    const m = new Map<string, { code: string; name: string }>();
+    const m = new Map<string, { code: string; name: string; product_name?: string; sku?: string | null; image_url?: string | null }>();
     for (const i of items) m.set(i.id, { code: i.item_code, name: i.item_name });
+    /* Overlay product identity for items that have a stock profile. */
+    for (const p of products) {
+      if (p.stock_profile) {
+        m.set(p.stock_profile.inventory_item_id, {
+          code: p.stock_profile.item_code,
+          name: p.product_name,
+          product_name: p.product_name,
+          sku: p.sku,
+          image_url: p.image_url,
+        });
+      }
+    }
     return m;
-  }, [items]);
+  }, [items, products]);
   const warehouseMap = useMemo(() => {
     const m = new Map<string, Warehouse>();
     for (const w of warehouses) m.set(w.id, w);
@@ -103,15 +159,18 @@ export default function InventoryMovements() {
     let cancelled = false;
     void (async () => {
       try {
-        const [itemRes, whRes] = await Promise.all([
+        const [itemRes, whRes, prodRes] = await Promise.all([
           fetch("/api/inventory/items?status=active&limit=500", { cache: "no-store", credentials: "include" }),
           fetch("/api/inventory/warehouses", { cache: "no-store", credentials: "include" }),
+          fetch("/api/products/with-stock-profile?limit=500", { cache: "no-store", credentials: "include" }),
         ]);
         const itemJ = await itemRes.json();
         const whJ = await whRes.json();
+        const prodJ = await prodRes.json();
         if (cancelled) return;
         setItems(((itemJ.items ?? []) as Array<{ id: string; item_code: string; item_name: string }>)
           .map((i) => ({ id: i.id, item_code: i.item_code, item_name: i.item_name })));
+        setProducts((prodJ.products ?? []) as ProductOption[]);
         const whList = ((whJ.warehouses ?? []) as Warehouse[]);
         setWarehouses(whList);
         const def = whList.find((w) => w.is_default) ?? whList.find((w) => (w.location_type ?? "warehouse") === "warehouse") ?? whList[0];
@@ -165,27 +224,38 @@ export default function InventoryMovements() {
     setSubmitError(null);
     setFlash(null);
     const qty = Number(quantity);
-    const resolvedItemId = itemId || resolveItemFromQuery(itemQuery);
-    if (!resolvedItemId) { setSubmitError("Pick an inventory item from the list"); return; }
+    /* INV-H1 — prefer product_id (resolved on server). Fall back to
+       legacy inventory_item_id for legacy / admin paths. */
+    const useProduct = !!selectedProduct?.product_id;
+    const resolvedItemId = useProduct
+      ? selectedProduct?.stock_profile?.inventory_item_id ?? ""
+      : itemId || resolveItemFromQuery(itemQuery);
+    if (useProduct && !selectedProduct?.stock_profile) {
+      setSubmitError(t("mv.no_profile"));
+      return;
+    }
+    if (!useProduct && !resolvedItemId) { setSubmitError("Pick a product or legacy item"); return; }
     if (!warehouseId) { setSubmitError("Pick a warehouse / location"); return; }
     if (!Number.isFinite(qty) || qty <= 0) { setSubmitError("Quantity must be > 0"); return; }
     setSubmitting(true);
     try {
+      const body: Record<string, unknown> = {
+        warehouse_id: warehouseId,
+        movement_type: type,
+        direction,
+        quantity: qty,
+        unit,
+        reference: reference || null,
+        notes: notes || null,
+        post: true,
+      };
+      if (useProduct) body.product_id = selectedProduct!.product_id;
+      else body.inventory_item_id = resolvedItemId;
       const r = await fetch("/api/inventory/movements", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          inventory_item_id: resolvedItemId,
-          warehouse_id: warehouseId,
-          movement_type: type,
-          direction,
-          quantity: qty,
-          unit,
-          reference: reference || null,
-          notes: notes || null,
-          post: true,
-        }),
+        body: JSON.stringify(body),
       });
       const j = await r.json();
       if (!r.ok) { setSubmitError(humanizeError(j.error ?? `HTTP ${r.status}`)); return; }
@@ -215,7 +285,7 @@ export default function InventoryMovements() {
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
-        <InventoryHeader title="Stock Movements" subtitle="Append-only ledger. Posted movements are immutable; void via reversal." />
+        <InventoryHeader title={t("mv.title")} subtitle={t("mv.subtitle")} />
 
         {error && (
           <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">
@@ -289,9 +359,17 @@ export default function InventoryMovements() {
                           <td className="px-3 py-1.5 font-mono text-[11.5px] text-gray-300 whitespace-nowrap">{m.movement_no}</td>
                           <td className="px-3 py-1.5 text-gray-200">
                             {item ? (
-                              <span className="inline-flex flex-col">
-                                <span className="text-[12px]">{item.name}</span>
-                                <span className="font-mono text-[10.5px] text-gray-500">{item.code}</span>
+                              <span className="inline-flex items-center gap-2">
+                                {item.image_url && (
+                                  /* eslint-disable-next-line @next/next/no-img-element */
+                                  <img src={item.image_url} alt="" className="h-7 w-7 rounded object-cover bg-[var(--bg-surface)] shrink-0" />
+                                )}
+                                <span className="inline-flex flex-col min-w-0">
+                                  <span className="text-[12px] truncate">{item.name}</span>
+                                  <span className="font-mono text-[10.5px] text-gray-500">
+                                    {item.sku ? <>{item.sku} · </> : null}{item.code}
+                                  </span>
+                                </span>
                               </span>
                             ) : <span className="text-gray-500">—</span>}
                           </td>
@@ -331,25 +409,62 @@ export default function InventoryMovements() {
               <div className="text-[10px] uppercase tracking-[0.12em] text-gray-500">New Movement</div>
             </div>
 
+            {/* INV-H1 — Operators select a Product. The server resolves
+                product → inventory_item_id; the legacy item picker
+                stays available as a fallback for legacy items only. */}
             <label className="block">
-              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Inventory Item</div>
+              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">{t("mv.product")}</div>
               <input
-                list="inv-item-list"
-                value={itemQuery}
+                list="inv-product-list"
+                value={productQuery}
                 onChange={(e) => {
-                  setItemQuery(e.target.value);
-                  setItemId(resolveItemFromQuery(e.target.value));
+                  const v = e.target.value;
+                  setProductQuery(v);
+                  /* Match the full "Name · Brand · SKU" display value. */
+                  const match = products.find((p) =>
+                    [p.product_name, p.brand, p.sku, p.model_name].filter(Boolean).join(" · ") === v
+                    || p.product_name === v,
+                  );
+                  setSelectedProduct(match ?? null);
+                  if (match) setItemQuery("");
                 }}
-                placeholder="Search by code or name…"
-                className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                placeholder={t("mv.product_hint")}
+                className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] text-[var(--text-primary)]"
               />
-              <datalist id="inv-item-list">
-                {items.slice(0, 500).map((i) => (
-                  <option key={i.id} value={`${i.item_code} · ${i.item_name}`} />
+              <datalist id="inv-product-list">
+                {products.slice(0, 500).map((p) => (
+                  <option
+                    key={p.product_id}
+                    value={[p.product_name, p.brand, p.sku, p.model_name].filter(Boolean).join(" · ")}
+                  />
                 ))}
               </datalist>
-              {itemQuery && !itemId && (
-                <div className="mt-1 text-[10.5px] text-amber-300/80">Pick an item from the suggestions list.</div>
+              {selectedProduct && (
+                <div className="mt-1.5 flex items-center gap-2 text-[11px] text-[var(--text-dim)]">
+                  {selectedProduct.image_url && (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={selectedProduct.image_url} alt="" className="h-6 w-6 rounded object-cover bg-[var(--bg-surface)]" />
+                  )}
+                  <span className="truncate">
+                    <span className="text-[var(--text-secondary)]">{selectedProduct.product_name}</span>
+                    {selectedProduct.sku ? <span className="ml-1 font-mono text-[10px]">{selectedProduct.sku}</span> : null}
+                  </span>
+                  {selectedProduct.stock_profile ? (
+                    <span className="ml-auto font-mono text-[10px] text-[var(--text-ghost)]">
+                      {selectedProduct.stock_profile.item_code}
+                    </span>
+                  ) : (
+                    <span className="ml-auto text-[10.5px] text-amber-300/80">{t("mv.no_profile")}</span>
+                  )}
+                </div>
+              )}
+              {selectedProduct && !selectedProduct.stock_profile && (
+                <Link
+                  href={`/products/${selectedProduct.slug || selectedProduct.product_id}/edit#stock-profile`}
+                  className="mt-1 inline-block text-[10.5px] text-[var(--accent-primary,#3b82f6)] hover:underline"
+                >
+                  {t("mv.create_profile_cta")}
+                </Link>
               )}
             </label>
 

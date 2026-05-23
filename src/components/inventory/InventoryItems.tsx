@@ -26,6 +26,19 @@ import {
 } from "@/components/inventory/InventoryUi";
 import RrIcon from "@/components/ui/RrIcon";
 import { humanizeError } from "@/lib/ui/humanize-error";
+import { useTranslation, type Translations } from "@/lib/i18n";
+import Link from "next/link";
+
+const INV_H1_T: Translations = {
+  "inv.title":             { en: "Stock Profiles",   zh: "库存档案",       ar: "ملفات المخزون" },
+  "inv.subtitle":          { en: "Stock-tracked products. Operational stock is created from Products, not freely.", zh: "按产品跟踪的库存。库存档案从产品创建。", ar: "ملفات المخزون مرتبطة بالمنتجات. يتم إنشاء المخزون من المنتجات." },
+  "inv.add_via_product":   { en: "Create Product with Stock Profile", zh: "创建产品并附库存档案", ar: "إنشاء منتج مع ملف مخزون" },
+  "inv.open_products":     { en: "Open Products",    zh: "打开产品库",     ar: "فتح المنتجات" },
+  "inv.create_for_existing": { en: "Create Stock Profile for Existing Product", zh: "为现有产品创建库存档案", ar: "إنشاء ملف مخزون لمنتج موجود" },
+  "inv.link_existing":     { en: "Link existing item (admin)", zh: "链接现有项目（管理员）", ar: "ربط عنصر موجود (مسؤول)" },
+  "inv.manage_types":      { en: "Manage Types",     zh: "管理类型",       ar: "إدارة الأنواع" },
+  "inv.add":               { en: "Add",              zh: "添加",           ar: "إضافة" },
+};
 
 interface ItemRow {
   id: string;
@@ -43,6 +56,12 @@ interface ItemRow {
   /* Phase O.5 — folded into the items list query. */
   avg_cost: number;
   inventory_value: number;
+  /* INV-H1 — product identity overlay. */
+  linked_product_id?: string | null;
+  product_name?: string | null;
+  product_slug?: string | null;
+  product_image_url?: string | null;
+  product_sku?: string | null;
 }
 
 interface ItemType {
@@ -67,6 +86,8 @@ function fmtMoney(n: number) {
 }
 
 export default function InventoryItems() {
+  const { t } = useTranslation(INV_H1_T);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [rows, setRows] = useState<ItemRow[]>([]);
   const [types, setTypes] = useState<ItemType[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -133,24 +154,67 @@ export default function InventoryItems() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
         <InventoryHeader
-          title="Inventory Items"
-          subtitle="Products, parts, packaging, supplies — anything physically tracked."
+          title={t("inv.title")}
+          subtitle={t("inv.subtitle")}
           action={
-            <div className="flex flex-wrap gap-2">
+            <div className="relative flex flex-wrap gap-2">
               <button
                 onClick={() => setTypesPanelOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] hover:bg-white/[0.06]"
+                className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-strong,var(--bg-surface))]"
               >
                 <RrIcon name="stamp" size={12} />
-                Manage Types
+                {t("inv.manage_types")}
               </button>
               <button
-                onClick={() => setQuickAddOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.06] px-3 py-1.5 text-[12px] hover:bg-white/[0.10]"
+                onClick={() => setAddMenuOpen((v) => !v)}
+                className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-strong,var(--bg-surface))]"
               >
                 <RrIcon name="plus" size={12} />
-                Add Item
+                {t("inv.add")}
               </button>
+              {addMenuOpen && (
+                <>
+                  <button
+                    type="button"
+                    aria-label="Close menu"
+                    onClick={() => setAddMenuOpen(false)}
+                    className="fixed inset-0 z-40 cursor-default"
+                  />
+                  <div className="absolute right-0 top-full z-50 mt-2 w-[300px] rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] p-1.5 shadow-lg">
+                    <Link
+                      href="/products/new"
+                      onClick={() => setAddMenuOpen(false)}
+                      className="flex items-start gap-2 rounded-md px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+                    >
+                      <RrIcon name="plus" size={12} />
+                      <span>{t("inv.add_via_product")}</span>
+                    </Link>
+                    <Link
+                      href="/products"
+                      onClick={() => setAddMenuOpen(false)}
+                      className="flex items-start gap-2 rounded-md px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+                    >
+                      <RrIcon name="box-open" size={12} />
+                      <span>{t("inv.open_products")}</span>
+                    </Link>
+                    <Link
+                      href="/products?stock_profile=open"
+                      onClick={() => setAddMenuOpen(false)}
+                      className="flex items-start gap-2 rounded-md px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+                    >
+                      <RrIcon name="box-circle-check" size={12} />
+                      <span>{t("inv.create_for_existing")}</span>
+                    </Link>
+                    <button
+                      onClick={() => { setAddMenuOpen(false); setQuickAddOpen(true); }}
+                      className="flex w-full items-start gap-2 rounded-md px-3 py-2 text-[12px] text-[var(--text-dim)] hover:bg-[var(--bg-surface)]"
+                    >
+                      <RrIcon name="tools" size={12} />
+                      <span>{t("inv.link_existing")}</span>
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           }
         />
@@ -263,7 +327,22 @@ export default function InventoryItems() {
                   >
                     <td className="px-3 py-2"><TypeIcon icon={r.icon} color={r.color} /></td>
                     <td className="px-3 py-2 font-mono text-[11.5px] text-gray-300">{r.item_code}</td>
-                    <td className="px-3 py-2 text-gray-200">{r.item_name}</td>
+                    <td className="px-3 py-2 text-gray-200">
+                      <span className="inline-flex items-center gap-2">
+                        {r.product_image_url && (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img src={r.product_image_url} alt="" className="h-7 w-7 rounded object-cover bg-[var(--bg-surface)] shrink-0" />
+                        )}
+                        <span className="inline-flex flex-col min-w-0">
+                          <span className="truncate">{r.product_name ?? r.item_name}</span>
+                          {(r.product_sku || (r.product_name && r.product_name !== r.item_name)) && (
+                            <span className="text-[10.5px] text-gray-500 truncate">
+                              {r.product_sku ?? r.item_name}
+                            </span>
+                          )}
+                        </span>
+                      </span>
+                    </td>
                     <td className="px-3 py-2">
                       <TypeChip name={r.type_name} icon={r.icon} color={r.color} />
                     </td>
@@ -401,6 +480,10 @@ function QuickAddDrawer({
         item_name: itemName.trim(),
         item_type_id: typeId,
         unit_of_measure: unit,
+        /* INV-H1 — Quick Add from /inventory/items is the admin repair
+           path. Stamp admin_repair=true so the API guard accepts the
+           insert. Normal stock creation goes through Products. */
+        admin_repair: true,
       };
       if (initialQty) {
         payload.initial_quantity = Number(initialQty) || 0;

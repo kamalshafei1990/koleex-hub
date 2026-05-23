@@ -15,6 +15,7 @@
     "validate:perf": "NODE_OPTIONS=--conditions=react-server tsx scripts/perf.ts",
     "validate:accounting": "NODE_OPTIONS=--conditions=react-server tsx scripts/accounting.ts",
     "validate:inventory": "NODE_OPTIONS=--conditions=react-server tsx scripts/inventory.ts",
+    "validate:inventory-unification": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-inventory-unification.ts",
     "validate:purchases": "NODE_OPTIONS=--conditions=react-server tsx scripts/purchases.ts",
     "validate:sales": "NODE_OPTIONS=--conditions=react-server tsx scripts/sales.ts",
     "validate:valuation": "NODE_OPTIONS=--conditions=react-server tsx scripts/valuation.ts",
