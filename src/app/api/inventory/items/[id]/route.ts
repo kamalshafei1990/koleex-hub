@@ -45,8 +45,16 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const patch = (await req.json().catch(() => null)) as Partial<InventoryItem> | null;
   if (!patch) return NextResponse.json({ error: "JSON body required" }, { status: 400 });
 
-  const r = await updateInventoryItem(auth.tenant_id, id, patch);
-  if (!r.ok) return NextResponse.json({ error: r.error }, { status: 422 });
+  const r = await updateInventoryItem(auth.tenant_id, id, patch, {
+    actor_id: auth.account_id,
+    is_super_admin: auth.is_super_admin,
+  });
+  if (!r.ok) {
+    return NextResponse.json(
+      { error: r.error, code: r.code ?? null },
+      { status: 422 },
+    );
+  }
   return NextResponse.json({ item: r.item });
 }
 
@@ -57,7 +65,12 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
   const deny = await requireModuleAccess(auth, MODULE);
   if (deny) return deny;
 
-  const r = await archiveInventoryItem(auth.tenant_id, id);
-  if (!r.ok) return NextResponse.json({ error: r.error }, { status: 500 });
+  const r = await archiveInventoryItem(auth.tenant_id, id, { actor_id: auth.account_id });
+  if (!r.ok) {
+    return NextResponse.json(
+      { error: r.error, code: r.code ?? null },
+      { status: r.code ? 422 : 500 },
+    );
+  }
   return NextResponse.json({ ok: true });
 }

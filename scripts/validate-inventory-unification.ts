@@ -238,6 +238,8 @@ async function main() {
     warehouse_id: wh,
     movement_type: "opening_balance",
     quantity: 50,
+    unit_cost: 10,
+    from_workflow: true,
   });
   const ok07post = ok07create.ok && ok07create.movement
     ? await postInventoryMovement(ok07create.movement.id, TENANT_A, null)
@@ -290,6 +292,9 @@ async function main() {
     movement_type: "sales_shipment",
     quantity: 5,
     unit_cost: 10,
+    source_type: "sales_shipment",
+    source_id: "00000000-0000-4000-a000-0000000000F5",
+    from_workflow: true,
   });
   const shipPost = ship.ok && ship.movement
     ? await postInventoryMovement(ship.movement.id, TENANT_A, null)

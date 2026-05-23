@@ -31,6 +31,12 @@ import type {
   InventoryItemType,
 } from "./types";
 import { ALLOWED_COLORS, ALLOWED_ICONS, ALLOWED_UNITS } from "./types";
+import {
+  guardProfileArchivable,
+  guardProfileDeletable,
+  guardProfilePatch,
+} from "./discipline";
+import { logInventoryAudit } from "./audit";
 
 /* ─── Resolve type by id or key ──────────────────────────── */
 async function resolveItemTypeId(
@@ -164,6 +170,7 @@ export async function createInventoryItem(input: CreateItemInput): Promise<{
       source_id: item.id,
       reference: code,
       created_by: input.created_by ?? null,
+      from_workflow: true, // INV-H2 — item-create flow is the opening's workflow
     });
     if (created.ok && created.movement) {
       const posted = await postInventoryMovement(created.movement.id, input.tenant_id, input.created_by ?? null);
@@ -190,12 +197,49 @@ export async function updateInventoryItem(
   tenantId: string,
   itemId: string,
   patch: Partial<InventoryItem>,
-): Promise<{ ok: boolean; item?: InventoryItem; error?: string }> {
+  opts: { actor_id?: string | null; is_super_admin?: boolean } = {},
+): Promise<{ ok: boolean; item?: InventoryItem; error?: string; code?: string }> {
   const filtered: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(patch)) {
     if (PATCHABLE_FIELDS.has(k as keyof InventoryItem)) filtered[k] = v;
   }
   if (Object.keys(filtered).length === 0) return { ok: false, error: "No patchable fields supplied" };
+
+  /* INV-H2 Scope 6 — locked fields after movement history. */
+  const guard = await guardProfilePatch({
+    tenant_id: tenantId,
+    inventory_item_id: itemId,
+    patch: filtered,
+    is_super_admin: !!opts.is_super_admin,
+  });
+  if (!guard.ok) {
+    await logInventoryAudit({
+      tenant_id: tenantId,
+      actor_id: opts.actor_id ?? null,
+      action: "restricted_action_blocked",
+      entity_type: "profile",
+      entity_id: itemId,
+      metadata: {
+        reason: guard.code ?? "profile_patch_blocked",
+        fields: Object.keys(filtered),
+      },
+    });
+    return { ok: false, error: guard.error, code: guard.code };
+  }
+
+  /* Archive transition — block when stock exists. */
+  if (filtered.status === "archived") {
+    const archGuard = await guardProfileArchivable({ tenant_id: tenantId, inventory_item_id: itemId });
+    await logInventoryAudit({
+      tenant_id: tenantId,
+      actor_id: opts.actor_id ?? null,
+      action: archGuard.ok ? "profile_archive_attempt" : "profile_archive_blocked",
+      entity_type: "profile",
+      entity_id: itemId,
+      metadata: { result: archGuard.ok ? "allowed" : "blocked", reason: archGuard.code ?? null },
+    });
+    if (!archGuard.ok) return { ok: false, error: archGuard.error, code: archGuard.code };
+  }
 
   const { data, error } = await supabaseServer
     .from("inventory_items")
@@ -208,10 +252,54 @@ export async function updateInventoryItem(
   return { ok: true, item: data as InventoryItem };
 }
 
-export async function archiveInventoryItem(tenantId: string, itemId: string): Promise<{ ok: boolean; error?: string }> {
+export async function archiveInventoryItem(
+  tenantId: string,
+  itemId: string,
+  opts: { actor_id?: string | null } = {},
+): Promise<{ ok: boolean; error?: string; code?: string }> {
+  const guard = await guardProfileArchivable({ tenant_id: tenantId, inventory_item_id: itemId });
+  await logInventoryAudit({
+    tenant_id: tenantId,
+    actor_id: opts.actor_id ?? null,
+    action: guard.ok ? "profile_archive_attempt" : "profile_archive_blocked",
+    entity_type: "profile",
+    entity_id: itemId,
+    metadata: { result: guard.ok ? "allowed" : "blocked", reason: guard.code ?? null },
+  });
+  if (!guard.ok) return { ok: false, error: guard.error, code: guard.code };
+
   const { error } = await supabaseServer
     .from("inventory_items")
     .update({ status: "archived" })
+    .eq("id", itemId)
+    .eq("tenant_id", tenantId);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+/** INV-H2 — Hard-delete (soft-delete via deleted_at) a stock profile.
+ *  Refuses if any posted/voided movement references the profile. */
+export async function deleteInventoryItem(
+  tenantId: string,
+  itemId: string,
+  opts: { actor_id?: string | null } = {},
+): Promise<{ ok: boolean; error?: string; code?: string }> {
+  const guard = await guardProfileDeletable({ tenant_id: tenantId, inventory_item_id: itemId });
+  if (!guard.ok) {
+    await logInventoryAudit({
+      tenant_id: tenantId,
+      actor_id: opts.actor_id ?? null,
+      action: "restricted_action_blocked",
+      entity_type: "profile",
+      entity_id: itemId,
+      metadata: { reason: guard.code ?? "profile_delete_blocked" },
+    });
+    return { ok: false, error: guard.error, code: guard.code };
+  }
+
+  const { error } = await supabaseServer
+    .from("inventory_items")
+    .update({ deleted_at: new Date().toISOString(), status: "archived" })
     .eq("id", itemId)
     .eq("tenant_id", tenantId);
   if (error) return { ok: false, error: error.message };

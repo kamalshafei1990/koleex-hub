@@ -302,6 +302,7 @@ export async function receivePurchaseOrder(opts: {
         source_id: line.id,                    // line-level idempotency
         reference: receiptNo,
         created_by: receivedBy,
+        from_workflow: true,                   // INV-H2 — workflow caller
         metadata: { destination_mode: destinationMode },
       });
       if (!created.ok || !created.movement) {

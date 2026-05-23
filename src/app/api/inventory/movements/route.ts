@@ -27,7 +27,10 @@ import {
   createInventoryMovement,
 } from "@/lib/inventory/posting";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import type { CreateMovementInput } from "@/lib/inventory/types";
+import type { CreateMovementInput, MovementType } from "@/lib/inventory/types";
+import { isDocumentGenerated, requiresApproval } from "@/lib/inventory/discipline";
+import { loadInventoryPermissions } from "@/lib/inventory/permissions";
+import { logInventoryAudit } from "@/lib/inventory/audit";
 
 const MODULE = "Inventory";
 
@@ -62,6 +65,10 @@ interface MovementBody extends Partial<CreateMovementInput> {
    *  product_id → inventory_item_id via the existing linked profile. */
   product_id?: string;
   post?: boolean;
+  /** INV-H2 — when true and the actor holds can_approve_adjustments,
+   *  the adjustment is created with approval_status='approved' so the
+   *  same request can post it. Otherwise the value is ignored. */
+  pre_approved?: boolean;
 }
 
 /** Resolve a product to its tenant-scoped active inventory_item_id.
@@ -123,30 +130,95 @@ export async function POST(req: Request) {
     );
   }
 
+  /* INV-H2 Scope 4 — refuse purchase_receipt / sales_shipment / transfer
+     / return creation from the generic Movements form. These must come
+     from their respective workflow pages. */
+  const movementType = body.movement_type as MovementType;
+  if (isDocumentGenerated(movementType)) {
+    await logInventoryAudit({
+      tenant_id: auth.tenant_id,
+      actor_id: auth.account_id,
+      action: "restricted_action_blocked",
+      entity_type: "movement",
+      entity_id: null,
+      metadata: {
+        reason: "document_generated_blocked_from_generic_route",
+        movement_type: movementType,
+      },
+    });
+    return NextResponse.json(
+      {
+        error: "Receipts and shipments are created from Purchase and Sales workflows.",
+        code: "INV_H2_USE_WORKFLOW",
+      },
+      { status: 422 },
+    );
+  }
+
+  /* INV-H2 Scope 3 — load inventory permissions to decide whether the
+     caller may opt to pre-approve a manual adjustment. */
+  const perms = await loadInventoryPermissions(auth);
+
+  const adjustmentReason =
+    typeof body.adjustment_reason === "string" ? body.adjustment_reason.trim() : "";
+
+  const needsApproval = requiresApproval(movementType);
+  if (needsApproval && !adjustmentReason) {
+    return NextResponse.json(
+      {
+        error: "Manual inventory changes require a reason.",
+        code: "INV_H2_REASON_REQUIRED",
+      },
+      { status: 422 },
+    );
+  }
+
+  /* A caller can ask to pre-approve in the same request only when they
+     hold can_approve_adjustments OR is_super_admin. Otherwise the row
+     is created as approval_status='pending' and the actor must use
+     the /approve endpoint (Scope 3 separation). */
+  const canPreApprove = (auth.is_super_admin || perms.can_approve) && body.pre_approved === true;
+
   const input: CreateMovementInput = {
     tenant_id: auth.tenant_id,
     inventory_item_id: inventoryItemId,
     warehouse_id: body.warehouse_id ?? undefined,
-    movement_type: body.movement_type as CreateMovementInput["movement_type"],
+    movement_type: movementType,
     direction: body.direction,
     quantity: Number(body.quantity ?? 0),
     unit: body.unit,
     unit_cost: body.unit_cost ?? null,
     currency: body.currency,
-    source_type: body.source_type ?? null,
-    source_id: body.source_id ?? null,
+    /* Generic /api/inventory/movements is NEVER a workflow caller. The
+       discipline layer uses this to refuse document-generated types and
+       to skip the source-required check. */
+    from_workflow: false,
+    source_type: null,
+    source_id: null,
     reference: body.reference ?? null,
     notes: body.notes ?? null,
     movement_date: body.movement_date,
     created_by: auth.account_id,
-    metadata: {},
+    adjustment_reason: adjustmentReason || undefined,
+    pre_approved: canPreApprove,
+    metadata: body.metadata ?? {},
   };
 
-  const shouldPost = body.post !== false;
+  /* Default behaviour: opening_balance and (legacy non-restricted) types
+     are still post-on-create. Manual / adjustment_in / adjustment_out
+     are now ALWAYS created as drafts — caller cannot bypass the
+     approval gate by setting post=true. */
+  const callerWantsPost = body.post !== false;
+  const shouldPost = needsApproval ? canPreApprove && callerWantsPost : callerWantsPost;
 
   if (!shouldPost) {
     const r = await createInventoryMovement(input);
-    if (!r.ok) return NextResponse.json({ error: r.error }, { status: 422 });
+    if (!r.ok) {
+      return NextResponse.json(
+        { error: r.error, code: r.code ?? null },
+        { status: 422 },
+      );
+    }
     return NextResponse.json({ movement: r.movement });
   }
 

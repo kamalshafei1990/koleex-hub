@@ -26,6 +26,14 @@ import {
   type VoidMovementResult,
   directionForType,
 } from "./types";
+import {
+  guardStockValue,
+  guardDocumentGenerated,
+  guardOpeningBalanceUnique,
+  guardPostingApproval,
+  requiresApproval,
+} from "./discipline";
+import { logInventoryAudit } from "./audit";
 
 export async function ensureDefaultWarehouse(tenantId: string): Promise<string> {
   const { data, error } = await supabaseServer.rpc("fn_inventory_ensure_default_warehouse", {
@@ -56,6 +64,7 @@ export async function createInventoryMovement(input: CreateMovementInput): Promi
   ok: boolean;
   movement?: StockMovement;
   error?: string;
+  code?: string;
 }> {
   if (!input.tenant_id) return { ok: false, error: "tenant_id required" };
   if (!input.inventory_item_id) return { ok: false, error: "inventory_item_id required" };
@@ -70,7 +79,49 @@ export async function createInventoryMovement(input: CreateMovementInput): Promi
     return { ok: false, error: `direction required for ${input.movement_type}` };
   }
 
+  /* INV-H2 Scope 4 — block document-generated movement types when the
+     call did NOT come from a workflow page (purchase receive, sales
+     ship, etc). The workflow caller passes from_workflow=true and the
+     required source_type/source_id. */
+  const docGuard = guardDocumentGenerated({
+    movement_type: input.movement_type,
+    source_type: input.source_type ?? null,
+    source_id: input.source_id ?? null,
+    from_workflow: !!input.from_workflow,
+  });
+  if (!docGuard.ok) {
+    return { ok: false, error: docGuard.error, code: docGuard.code };
+  }
+
+  const baseCcy = await resolveBaseCurrency(input.tenant_id);
+  const effectiveCcy = input.currency ?? baseCcy;
+
+  /* INV-H2 Scope 1 — mandatory stock value on IN movements. */
+  const valGuard = guardStockValue({
+    movement_type: input.movement_type,
+    direction,
+    quantity: input.quantity,
+    unit_cost: input.unit_cost ?? null,
+    currency: effectiveCcy,
+    metadata: input.metadata,
+  });
+  if (!valGuard.ok) {
+    return { ok: false, error: valGuard.error, code: valGuard.code };
+  }
+
   const warehouseId = input.warehouse_id ?? (await ensureDefaultWarehouse(input.tenant_id));
+
+  /* INV-H2 Scope 2 — at most one opening_balance per (item, warehouse). */
+  if (input.movement_type === "opening_balance") {
+    const obGuard = await guardOpeningBalanceUnique({
+      tenant_id: input.tenant_id,
+      inventory_item_id: input.inventory_item_id,
+      warehouse_id: warehouseId,
+    });
+    if (!obGuard.ok) {
+      return { ok: false, error: obGuard.error, code: obGuard.code };
+    }
+  }
 
   const date = input.movement_date ? new Date(input.movement_date) : new Date();
   const movementDate = date.toISOString().slice(0, 10);
@@ -91,6 +142,20 @@ export async function createInventoryMovement(input: CreateMovementInput): Promi
     }
   }
 
+  /* INV-H2 Scope 3 — approval state for manual / adjustment movements.
+     Caller passes pre_approved=true when the actor has the
+     can_approve_adjustments permission and explicitly opted to approve
+     while drafting. Otherwise the row enters approval_status='pending'
+     and posting is blocked until approved. */
+  const needsApproval = requiresApproval(input.movement_type);
+  const approvalStatus = needsApproval
+    ? (input.pre_approved ? "approved" : "pending")
+    : "not_required";
+
+  /* Merge adjustment_reason / zero_value_reason into metadata for audit. */
+  const mergedMeta: Record<string, unknown> = { ...(input.metadata ?? {}) };
+  if (input.adjustment_reason) mergedMeta.adjustment_reason = input.adjustment_reason;
+
   const { data, error } = await supabaseServer
     .from("inventory_stock_movements")
     .insert({
@@ -104,16 +169,17 @@ export async function createInventoryMovement(input: CreateMovementInput): Promi
       quantity: input.quantity,
       unit: input.unit ?? "pcs",
       unit_cost: input.unit_cost ?? null,
-      /* Currency stabilization — fall back to the tenant base when
-         the caller doesn't pass one. CNY for Chinese tenants. */
-      currency: input.currency ?? (await resolveBaseCurrency(input.tenant_id)),
+      currency: effectiveCcy,
       source_type: input.source_type ?? null,
       source_id: input.source_id ?? null,
       reference: input.reference ?? null,
       notes: input.notes ?? null,
       status: "draft",
+      approval_status: approvalStatus,
+      approved_by: needsApproval && input.pre_approved ? (input.created_by ?? null) : null,
+      approved_at: needsApproval && input.pre_approved ? new Date().toISOString() : null,
       created_by: input.created_by ?? null,
-      metadata: input.metadata ?? {},
+      metadata: mergedMeta,
     })
     .select("*")
     .single();
@@ -123,40 +189,136 @@ export async function createInventoryMovement(input: CreateMovementInput): Promi
     if (error.code === "23505" && /uq_inv_mv_source/.test(msg)) {
       return { ok: false, error: "Movement already exists for this source" };
     }
+    if (error.code === "23505" && /uq_inv_movements_one_opening_balance/.test(msg)) {
+      return {
+        ok: false,
+        error: "Opening balance already exists. Use an adjustment instead.",
+        code: "INV_H2_OPENING_BALANCE_DUPLICATE",
+      };
+    }
     return { ok: false, error: msg };
   }
 
-  return { ok: true, movement: data as StockMovement };
+  const created = data as StockMovement;
+
+  /* Audit — draft created. */
+  await logInventoryAudit({
+    tenant_id: input.tenant_id,
+    actor_id: input.created_by ?? null,
+    action: "movement_draft_created",
+    entity_type: "movement",
+    entity_id: created.id,
+    metadata: {
+      movement_type: input.movement_type,
+      quantity: input.quantity,
+      unit_cost: input.unit_cost ?? null,
+      approval_status: approvalStatus,
+      from_workflow: !!input.from_workflow,
+      adjustment_reason: input.adjustment_reason ?? null,
+      zero_value_override: (mergedMeta.admin_zero_value_override === true) || false,
+    },
+  });
+
+  return { ok: true, movement: created };
 }
 
+/** INV-H2 — Posting gate. Loads the draft first, runs the approval guard,
+ *  then delegates to the RPC. */
 export async function postInventoryMovement(
   movementId: string,
   tenantId: string,
   postedBy: string | null,
 ): Promise<PostMovementResult> {
+  /* Fetch the draft to inspect movement_type + approval_status. */
+  const { data: draft } = await supabaseServer
+    .from("inventory_stock_movements")
+    .select("movement_type, approval_status, status")
+    .eq("id", movementId)
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  const d = draft as {
+    movement_type: import("./types").MovementType;
+    approval_status: string;
+    status: string;
+  } | null;
+  if (d && d.status === "draft") {
+    const approvalGuard = guardPostingApproval({
+      movement_type: d.movement_type,
+      approval_status: d.approval_status ?? "not_required",
+      is_super_admin: false, // SA gate happens in the route handler
+      can_approve: false,
+    });
+    if (!approvalGuard.ok) {
+      return { ok: false, error: approvalGuard.error, code: 409 };
+    }
+  }
+
   const { data, error } = await supabaseServer.rpc("fn_inventory_post_movement", {
     p_movement_id: movementId,
     p_tenant_id: tenantId,
     p_posted_by: postedBy,
   });
   if (error) return { ok: false, error: error.message, code: 500 };
-  return (data ?? { ok: false, error: "No response from posting RPC" }) as PostMovementResult;
+  const result = (data ?? { ok: false, error: "No response from posting RPC" }) as PostMovementResult;
+  if (result.ok && !result.already_posted) {
+    await logInventoryAudit({
+      tenant_id: tenantId,
+      actor_id: postedBy,
+      action: "movement_posted",
+      entity_type: "movement",
+      entity_id: movementId,
+      metadata: { qty_before: result.qty_before, qty_after: result.qty_after },
+    });
+  }
+  return result;
 }
 
+/** INV-H2 — Void with reason + permission gate. The route handler runs
+ *  the permission guard; this function still enforces a non-empty
+ *  reason and logs the action. Idempotent on already-voided. */
 export async function voidInventoryMovement(
   movementId: string,
   tenantId: string,
   voidedBy: string | null,
   reason: string | null,
 ): Promise<VoidMovementResult> {
+  /* Empty-reason guard at the storage layer so any caller — workflow
+     or generic — must supply one. */
+  const trimmedReason = (reason ?? "").trim();
+  if (trimmedReason.length < 3) {
+    /* Allow the RPC to short-circuit on already-voided rows without a
+       reason — peek first. */
+    const { data: row } = await supabaseServer
+      .from("inventory_stock_movements")
+      .select("status")
+      .eq("id", movementId)
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
+    if ((row as { status: string } | null)?.status === "voided") {
+      return { ok: true, already_voided: true, movement_id: movementId };
+    }
+    return { ok: false, error: "A void reason is required (min 3 characters).", code: 422 };
+  }
+
   const { data, error } = await supabaseServer.rpc("fn_inventory_void_movement", {
     p_movement_id: movementId,
     p_tenant_id: tenantId,
     p_voided_by: voidedBy,
-    p_reason: reason,
+    p_reason: trimmedReason,
   });
   if (error) return { ok: false, error: error.message, code: 500 };
-  return (data ?? { ok: false, error: "No response from void RPC" }) as VoidMovementResult;
+  const result = (data ?? { ok: false, error: "No response from void RPC" }) as VoidMovementResult;
+  if (result.ok && !result.already_voided) {
+    await logInventoryAudit({
+      tenant_id: tenantId,
+      actor_id: voidedBy,
+      action: "movement_voided",
+      entity_type: "movement",
+      entity_id: movementId,
+      metadata: { reason: trimmedReason, reverse_movement_id: result.reverse_movement_id ?? null },
+    });
+  }
+  return result;
 }
 
 /* ─── rebuildStockBalance — repair tool ─────────────────────── */

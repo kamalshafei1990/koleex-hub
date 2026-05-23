@@ -169,6 +169,7 @@ export async function shipSalesOrder(opts: {
       source_id: line.id,
       reference: shipmentNoStored,
       created_by: shippedBy,
+      from_workflow: true, // INV-H2 — workflow caller
     });
     if (!created.ok || !created.movement) {
       /* Cleanup partial state: best-effort delete already-created

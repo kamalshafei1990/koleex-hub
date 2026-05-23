@@ -204,11 +204,14 @@ async function main() {
     m1.item?.linked_product_id == null && sp1.item?.linked_product_id == null,
   );
 
-  /* 11 — Quick add with initial_quantity posts opening_balance. */
+  /* 11 — Quick add with initial_quantity posts opening_balance.
+     INV-H2: opening_balance now requires a positive unit_cost, so we
+     supply cost_price (which the item creator threads into unit_cost). */
   const seeded = await createInventoryItem({
     tenant_id: TENANT_A, item_name: "Office Chair",
     type_key: "office_supply", unit_of_measure: "pcs",
     initial_quantity: 6, initial_warehouse_id: wh1,
+    cost_price: 50,
     metadata: { admin_repair: true },
   });
   const seededBal = seeded.item ? await getStockBalance(TENANT_A, seeded.item.id, wh1) : null;
@@ -230,28 +233,32 @@ async function main() {
     !!mv && mv.inventory_item_id === seeded.item!.id && mv.movement_type === "opening_balance" && mv.source_type === "inventory_item_opening_balance",
   );
 
-  /* 13 — Post IN +100 on m1. */
+  /* 13 — Post IN +100 on m1. INV-H2: unit_cost required + workflow flag. */
   const inCreate = await createInventoryMovement({
     tenant_id: TENANT_A, inventory_item_id: m1.item!.id,
     warehouse_id: wh1, movement_type: "opening_balance", quantity: 100,
+    unit_cost: 100, from_workflow: true,
   });
   await postInventoryMovement(inCreate.movement!.id, TENANT_A, null);
   const bal0 = await getStockBalance(TENANT_A, m1.item!.id, wh1);
   ok("13  post IN increases stock to 100", bal0.qty_on_hand === 100, `on_hand=${bal0.qty_on_hand}`);
 
-  /* 14 — Post OUT 40. */
+  /* 14 — Post OUT 40. INV-H2: sales_shipment requires from_workflow=true. */
   const outCreate = await createInventoryMovement({
     tenant_id: TENANT_A, inventory_item_id: m1.item!.id,
     warehouse_id: wh1, movement_type: "sales_shipment", quantity: 40,
+    source_type: "sales_shipment", source_id: "00000000-0000-4000-a000-000000000040",
+    from_workflow: true,
   });
   await postInventoryMovement(outCreate.movement!.id, TENANT_A, null);
   const bal1 = await getStockBalance(TENANT_A, m1.item!.id, wh1);
   ok("14  post OUT decreases stock 100 → 60", bal1.qty_on_hand === 60, `on_hand=${bal1.qty_on_hand}`);
 
-  /* 15 — Negative rejected. */
+  /* 15 — Negative rejected. INV-H2: adjustment_out needs approval to post. */
   const over = await createInventoryMovement({
     tenant_id: TENANT_A, inventory_item_id: m1.item!.id,
     warehouse_id: wh1, movement_type: "adjustment_out", quantity: 500,
+    adjustment_reason: "negative-stock-test", pre_approved: true,
   });
   const overPost = await postInventoryMovement(over.movement!.id, TENANT_A, null);
   ok("15  negative stock rejected (422)", !overPost.ok && overPost.code === 422, overPost.error ?? "");
@@ -286,6 +293,7 @@ async function main() {
   const bMove = await createInventoryMovement({
     tenant_id: TENANT_B, inventory_item_id: itemB.item!.id,
     warehouse_id: whB, movement_type: "opening_balance", quantity: 9,
+    unit_cost: 1, from_workflow: true,
   });
   await postInventoryMovement(bMove.movement!.id, TENANT_B, null);
   const aSees = await buildMovementHistory({ tenantId: TENANT_A });

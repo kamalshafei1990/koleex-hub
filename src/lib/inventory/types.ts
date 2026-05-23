@@ -205,6 +205,11 @@ export interface StockMovement {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  /* INV-H2 — approval workflow for manual / adjustment_* movements. */
+  approval_status: "not_required" | "pending" | "approved" | "rejected";
+  approved_by: string | null;
+  approved_at: string | null;
+  rejection_reason: string | null;
 }
 
 export interface StockBalance {
@@ -273,6 +278,17 @@ export interface CreateMovementInput {
   movement_date?: string;
   created_by?: string | null;
   metadata?: Record<string, unknown>;
+  /** INV-H2 — set to true when this call originates from a workflow page
+   *  (purchase receive, sales ship, transfer, return). Document-generated
+   *  movement types are blocked at the generic /api/inventory/movements
+   *  entry point unless this flag is true. */
+  from_workflow?: boolean;
+  /** INV-H2 — for manual / adjustment movements, the actor's reason. */
+  adjustment_reason?: string;
+  /** INV-H2 — true when caller has been verified as authorised to
+   *  approve adjustments. The posting layer never resolves permissions
+   *  by itself — the route handler does that and passes the verdict. */
+  pre_approved?: boolean;
 }
 
 export interface PostMovementResult {
