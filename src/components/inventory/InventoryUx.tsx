@@ -1,0 +1,580 @@
+"use client";
+
+/* ---------------------------------------------------------------------------
+   InventoryUx — INV-H5A shared operator UX primitives.
+
+   Houses small components that the dashboard, list pages, and detail
+   pages all use:
+     · ActionCard         — large quick-action tile (Receive / Ship / …)
+     · AlertCard          — banner-style operational alert tile
+     · TodayTile          — compact "Today" counter tile
+     · IntelTile          — operator-intelligence one-liner tile
+     · LookupInput        — debounced quick-lookup input
+     · BulkActionBar      — sticky bottom selection bar
+     · MobileFab          — floating create button (inventory routes)
+     · MobileBottomBar    — sticky mobile bottom bar
+     · TraceabilityCard   — cross-link card for detail pages
+     · OperatorMovementMenu — Receive / Ship / Transfer / Adjust / Return menu
+     · useInventoryShortcuts — R/S/T/A/F keyboard shortcuts hook
+     · operatorLabel      — humanize movement_type with i18n awareness
+     · useDebouncedValue  — small debounce helper (perf)
+   --------------------------------------------------------------------------- */
+
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
+import { useTranslation } from "@/lib/i18n";
+import { inventoryT } from "@/lib/translations/inventory";
+
+/* ─── Debounce hook (perf) ─────────────────────────────────── */
+
+export function useDebouncedValue<T>(value: T, delayMs = 300): T {
+  const [debounced, setDebounced] = useState<T>(value);
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebounced(value), delayMs);
+    return () => window.clearTimeout(id);
+  }, [value, delayMs]);
+  return debounced;
+}
+
+/* ─── Operator label mapping ───────────────────────────────── */
+
+/** Hide DB enums from the operator. Used in pickers and movement
+ *  rows. Maps every movement_type to one of five verbs. */
+export function operatorLabel(movementType: string): string {
+  switch (movementType) {
+    case "purchase_receipt":
+    case "opening_balance":
+    case "adjustment_in":
+    case "return_in":
+      return "Receive";
+    case "sales_shipment":
+    case "adjustment_out":
+    case "return_out":
+      return "Ship";
+    case "transfer_in":
+    case "transfer_out":
+      return "Transfer";
+    case "manual":
+      return "Adjustment";
+    default:
+      return movementType;
+  }
+}
+
+/* ─── ActionCard ───────────────────────────────────────────── */
+
+export function ActionCard({
+  icon,
+  label,
+  hint,
+  href,
+  onClick,
+  tone = "neutral",
+  testId,
+}: {
+  icon: RrIconName;
+  label: string;
+  hint?: string;
+  href?: string;
+  onClick?: () => void;
+  tone?: "neutral" | "positive" | "warning" | "info";
+  testId?: string;
+}) {
+  const accent =
+    tone === "positive" ? "bg-emerald-300/60" :
+    tone === "warning"  ? "bg-amber-300/60"   :
+    tone === "info"     ? "bg-blue-300/60"    :
+                          "bg-white/40 dark:bg-white/30";
+  const inner = (
+    <div
+      data-testid={testId}
+      className="group relative flex h-full min-h-[112px] flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3.5 transition-colors hover:bg-[var(--bg-elevated)]"
+    >
+      <div aria-hidden className={`absolute left-4 top-0 h-px w-10 ${accent}`} />
+      <div className="flex items-center gap-2.5">
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)]">
+          <RrIcon name={icon} size={14} />
+        </span>
+        <div className="text-[14px] font-medium tracking-tight text-[var(--text-primary)]">
+          {label}
+        </div>
+      </div>
+      {hint && (
+        <div className="mt-2 text-[11.5px] leading-relaxed text-[var(--text-dim)]">
+          {hint}
+        </div>
+      )}
+      <div className="mt-auto pt-3 text-[11px] text-[var(--text-dim)] opacity-0 transition-opacity group-hover:opacity-100">
+        →
+      </div>
+    </div>
+  );
+  if (href) return <Link href={href} className="block h-full">{inner}</Link>;
+  return (
+    <button type="button" onClick={onClick} className="block h-full w-full text-left">
+      {inner}
+    </button>
+  );
+}
+
+/* ─── AlertCard ────────────────────────────────────────────── */
+
+export function AlertCard({
+  icon,
+  label,
+  count,
+  href,
+  tone = "warning",
+}: {
+  icon: RrIconName;
+  label: string;
+  count: number;
+  href?: string;
+  tone?: "warning" | "rose" | "info";
+}) {
+  const dot =
+    tone === "rose" ? "bg-rose-400 dark:bg-rose-300" :
+    tone === "info" ? "bg-blue-400 dark:bg-blue-300" :
+                      "bg-amber-400 dark:bg-amber-300";
+  const inner = (
+    <div className="flex items-center gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2.5 transition-colors hover:bg-[var(--bg-elevated)]">
+      <span className={`mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-dim)]">
+        <RrIcon name={icon} size={12} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="text-[12px] text-[var(--text-primary)]">{label}</div>
+      </div>
+      <div className="text-[16px] font-medium tabular-nums text-[var(--text-primary)]">
+        {count}
+      </div>
+    </div>
+  );
+  if (href) return <Link href={href} className="block">{inner}</Link>;
+  return inner;
+}
+
+/* ─── TodayTile ────────────────────────────────────────────── */
+
+export function TodayTile({
+  icon,
+  label,
+  value,
+  href,
+}: {
+  icon: RrIconName;
+  label: string;
+  value: number;
+  href?: string;
+}) {
+  const inner = (
+    <div className="flex items-center gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2.5 transition-colors hover:bg-[var(--bg-elevated)]">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-dim)]">
+        <RrIcon name={icon} size={12} />
+      </span>
+      <div className="text-[11.5px] text-[var(--text-dim)]">{label}</div>
+      <div className="ml-auto text-[16px] font-medium tabular-nums text-[var(--text-primary)]">
+        {value}
+      </div>
+    </div>
+  );
+  if (href) return <Link href={href} className="block">{inner}</Link>;
+  return inner;
+}
+
+/* ─── IntelTile ────────────────────────────────────────────── */
+
+export function IntelTile({
+  icon,
+  label,
+  primary,
+  secondary,
+  href,
+}: {
+  icon: RrIconName;
+  label: string;
+  primary: string;
+  secondary?: string;
+  href?: string;
+}) {
+  const inner = (
+    <div className="flex h-full flex-col rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2.5 transition-colors hover:bg-[var(--bg-elevated)]">
+      <div className="flex items-center gap-2">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-dim)]">
+          <RrIcon name={icon} size={11} />
+        </span>
+        <div className="text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
+          {label}
+        </div>
+      </div>
+      <div className="mt-1.5 text-[13.5px] font-medium text-[var(--text-primary)]">{primary}</div>
+      {secondary && <div className="mt-0.5 text-[11px] text-[var(--text-dim)]">{secondary}</div>}
+    </div>
+  );
+  if (href) return <Link href={href} className="block h-full">{inner}</Link>;
+  return inner;
+}
+
+/* ─── LookupInput ──────────────────────────────────────────── */
+
+export function LookupInput({
+  icon,
+  placeholder,
+  type,
+}: {
+  icon: RrIconName;
+  placeholder: string;
+  /** Which entity tab to deep-link into (server search route accepts q). */
+  type: "item" | "serial" | "batch";
+}) {
+  const [q, setQ] = useState("");
+  const router = useRouter();
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const term = q.trim();
+    if (!term) return;
+    /* The global search route filters server-side; route there with q + a
+       focused type hint via fragment so the page can pre-collapse. */
+    router.push(`/inventory/search?q=${encodeURIComponent(term)}#${type}`);
+  };
+  return (
+    <form onSubmit={submit} className="flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2">
+      <span className="text-[var(--text-dim)]"><RrIcon name={icon} size={12} /></span>
+      <input
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder={placeholder}
+        className="min-h-[40px] flex-1 bg-transparent text-[12.5px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-dim)]"
+      />
+      <button
+        type="submit"
+        className="rounded border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"
+      >
+        <RrIcon name="search" size={11} />
+      </button>
+    </form>
+  );
+}
+
+/* ─── BulkActionBar ────────────────────────────────────────── */
+
+/** Sticky bottom selection bar used by every table that supports
+ *  multi-row actions (movements, transfers, returns, batches). */
+export function BulkActionBar({
+  count,
+  actions,
+  onClear,
+}: {
+  count: number;
+  actions: Array<{ label: string; icon?: RrIconName; onClick: () => void; tone?: "primary" | "danger" | "default" }>;
+  onClear: () => void;
+}) {
+  const { t } = useTranslation(inventoryT);
+  if (count <= 0) return null;
+  return (
+    <div
+      data-testid="inv-bulk-action-bar"
+      className="fixed inset-x-2 bottom-2 z-30 mx-auto flex max-w-[920px] flex-wrap items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2.5 shadow-lg sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2"
+    >
+      <div className="text-[12px] text-[var(--text-primary)]">
+        {t("inv.bulk.selected").replace("{n}", String(count))}
+      </div>
+      <div className="ml-auto flex flex-wrap items-center gap-1.5">
+        {actions.map((a) => {
+          const cls =
+            a.tone === "primary"
+              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20"
+              : a.tone === "danger"
+                ? "border-rose-500/30 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20"
+                : "border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]";
+          return (
+            <button
+              key={a.label}
+              type="button"
+              onClick={a.onClick}
+              className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[11.5px] ${cls}`}
+            >
+              {a.icon && <RrIcon name={a.icon} size={11} />}
+              {a.label}
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          onClick={onClear}
+          className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2.5 py-1.5 text-[11.5px] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+        >
+          {t("inv.bulk.clear")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ─── OperatorMovementMenu ─────────────────────────────────── */
+
+/** The 5-verb create menu shown in headers / FABs. Replaces the
+ *  technical "New Movement" button with Receive / Ship / Transfer /
+ *  Adjustment / Return. Each entry routes to the right workflow page. */
+export function OperatorMovementMenu({
+  compact = false,
+  testId,
+}: { compact?: boolean; testId?: string }) {
+  const { t } = useTranslation(inventoryT);
+  const entries: Array<{ key: string; label: string; icon: RrIconName; href: string }> = [
+    { key: "receive",  label: t("inv.action.receive"),  icon: "download",       href: "/inventory/movements?create=receive" },
+    { key: "ship",     label: t("inv.action.ship"),     icon: "truck-side",     href: "/inventory/movements?create=ship" },
+    { key: "transfer", label: t("inv.action.transfer"), icon: "shipping-fast",  href: "/inventory/transfers?create=1" },
+    { key: "adjust",   label: t("inv.action.adjust"),   icon: "pencil",         href: "/inventory/movements?create=adjustment" },
+    { key: "return",   label: t("inv.action.return"),   icon: "recycle",        href: "/inventory/returns?create=1" },
+  ];
+  return (
+    <div data-testid={testId ?? "operator-movement-menu"} className={`flex flex-wrap items-center ${compact ? "gap-1" : "gap-1.5"}`}>
+      {entries.map((e) => (
+        <Link
+          key={e.key}
+          href={e.href}
+          className={`inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] ${compact ? "px-2 py-1 text-[11px]" : "px-2.5 py-1.5 text-[12px]"}`}
+        >
+          <RrIcon name={e.icon} size={compact ? 11 : 12} />
+          {e.label}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+/* ─── Mobile FAB ───────────────────────────────────────────── */
+
+export function MobileFab() {
+  const [open, setOpen] = useState(false);
+  const { t } = useTranslation(inventoryT);
+  return (
+    <div data-testid="inv-mobile-fab" className="fixed bottom-20 right-4 z-30 md:hidden">
+      {open && (
+        <div className="mb-2 flex flex-col items-end gap-1.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-2 shadow-lg">
+          <FabLink href="/inventory/movements?create=receive"   icon="download"         label={t("inv.action.receive")} />
+          <FabLink href="/inventory/movements?create=ship"      icon="truck-side"       label={t("inv.action.ship")} />
+          <FabLink href="/inventory/transfers?create=1"         icon="shipping-fast"    label={t("inv.action.transfer")} />
+          <FabLink href="/inventory/movements?create=adjustment" icon="pencil"          label={t("inv.action.adjust")} />
+          <FabLink href="/inventory/returns?create=1"           icon="recycle"          label={t("inv.action.return")} />
+        </div>
+      )}
+      <button
+        type="button"
+        aria-label={t("inv.mobile.create")}
+        onClick={() => setOpen((v) => !v)}
+        className="flex h-12 w-12 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--accent-primary,#fff)] text-[var(--bg-primary)] shadow-lg"
+      >
+        <RrIcon name={open ? "cross" : "plus"} size={16} />
+      </button>
+    </div>
+  );
+}
+
+function FabLink({ href, icon, label }: { href: string; icon: RrIconName; label: string }) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex min-h-[44px] min-w-[44px] items-center gap-2 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-[12.5px] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"
+    >
+      <RrIcon name={icon} size={13} /> {label}
+    </Link>
+  );
+}
+
+/* ─── Mobile bottom bar ────────────────────────────────────── */
+
+export function MobileBottomBar() {
+  const entries: Array<{ label: string; icon: RrIconName; href: string }> = [
+    { label: "Home",      icon: "coins",        href: "/inventory" },
+    { label: "Items",     icon: "box-open",     href: "/inventory/items" },
+    { label: "Movements", icon: "file-invoice", href: "/inventory/movements" },
+    { label: "Search",    icon: "search",       href: "/inventory/search" },
+  ];
+  return (
+    <nav
+      data-testid="inv-mobile-bottom-bar"
+      aria-label="Inventory mobile nav"
+      className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-4 border-t border-[var(--border-color)] bg-[var(--bg-surface)] md:hidden"
+    >
+      {entries.map((e) => (
+        <Link
+          key={e.href}
+          href={e.href}
+          className="flex min-h-[44px] flex-col items-center justify-center gap-0.5 py-1.5 text-[10.5px] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+        >
+          <RrIcon name={e.icon} size={13} />
+          <span>{e.label}</span>
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+/* ─── TraceabilityCard ─────────────────────────────────────── */
+
+export interface TraceLink {
+  label: string;
+  value: string;
+  href?: string;
+  icon?: RrIconName;
+}
+
+export function TraceabilityCard({
+  links,
+  emptyHint,
+}: {
+  links: TraceLink[];
+  emptyHint?: string;
+}) {
+  const { t } = useTranslation(inventoryT);
+  return (
+    <section
+      data-testid="inv-trace-card"
+      className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4"
+    >
+      <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-dim)]">
+        {t("inv.trace.title")}
+      </div>
+      {links.length === 0 ? (
+        <div className="mt-2 text-[11.5px] text-[var(--text-dim)]">
+          {emptyHint ?? t("inv.trace.empty")}
+        </div>
+      ) : (
+        <ul className="mt-2 space-y-1.5">
+          {links.map((l, i) => (
+            <li key={`${l.label}-${i}`} className="flex items-center gap-2">
+              {l.icon && (
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-dim)]">
+                  <RrIcon name={l.icon} size={11} />
+                </span>
+              )}
+              <span className="text-[11px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
+                {l.label}
+              </span>
+              {l.href ? (
+                <Link
+                  href={l.href}
+                  className="ml-auto truncate text-[12px] text-[var(--text-primary)] hover:underline"
+                >
+                  {l.value}
+                </Link>
+              ) : (
+                <span className="ml-auto truncate text-[12px] text-[var(--text-primary)]">
+                  {l.value}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/* ─── Warning chips ────────────────────────────────────────── */
+
+export function WarningChip({
+  tone = "warning",
+  icon,
+  children,
+}: {
+  tone?: "warning" | "rose" | "info";
+  icon?: RrIconName;
+  children: ReactNode;
+}) {
+  const cls =
+    tone === "rose" ? "border-rose-500/30 bg-rose-500/10 text-rose-200 dark:text-rose-200" :
+    tone === "info" ? "border-blue-500/30 bg-blue-500/10 text-blue-200 dark:text-blue-200" :
+                      "border-amber-500/30 bg-amber-500/10 text-amber-200 dark:text-amber-200";
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.10em] ${cls}`}>
+      {icon && <RrIcon name={icon} size={10} />}
+      {children}
+    </span>
+  );
+}
+
+/* ─── useInventoryShortcuts ────────────────────────────────── */
+
+/** R/S/T/A/F keyboard shortcuts. Only attached when isActive=true
+ *  (i.e. on inventory routes). Never fires while typing in an input,
+ *  textarea, contenteditable, or with a modifier key held down. */
+export function useInventoryShortcuts({ isActive = true }: { isActive?: boolean } = {}) {
+  const router = useRouter();
+  const handlersRef = useRef({
+    r: () => router.push("/inventory/movements?create=receive"),
+    s: () => router.push("/inventory/movements?create=ship"),
+    t: () => router.push("/inventory/transfers?create=1"),
+    a: () => router.push("/inventory/movements?create=adjustment"),
+    f: () => router.push("/inventory/search"),
+  });
+
+  const isTypingTarget = useCallback((el: EventTarget | null): boolean => {
+    if (!(el instanceof HTMLElement)) return false;
+    const tag = el.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+    if (el.isContentEditable) return true;
+    return false;
+  }, []);
+
+  useEffect(() => {
+    if (!isActive) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+      if (isTypingTarget(e.target)) return;
+      const key = e.key.toLowerCase();
+      const h = handlersRef.current as Record<string, () => void>;
+      if (h[key]) {
+        e.preventDefault();
+        h[key]();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isActive, isTypingTarget]);
+}
+
+/* ─── Section eyebrow + hairline (shared) ─────────────────── */
+
+export function SectionEyebrow({ children }: { children: ReactNode }) {
+  return (
+    <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-dim)]">
+      {children}
+    </div>
+  );
+}
+
+/* ─── FEFO helper (re-exported from server-safe lib) ──────── */
+
+export { suggestFefoBatch, type FefoBatchOption as BatchOption } from "@/lib/inventory/fefo";
+
+/* ─── useSelection ─────────────────────────────────────────── */
+
+/** Tiny selection store for tables — used by every bulk-action page. */
+export function useSelection<T extends string>() {
+  const [selected, setSelected] = useState<Set<T>>(new Set());
+  const toggle = useCallback((id: T) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+  const clear = useCallback(() => setSelected(new Set()), []);
+  const set = useCallback((ids: T[]) => setSelected(new Set(ids)), []);
+  const has = useCallback((id: T) => selected.has(id), [selected]);
+  const count = selected.size;
+  const ids = useMemo(() => [...selected], [selected]);
+  return { selected, ids, count, toggle, clear, set, has };
+}

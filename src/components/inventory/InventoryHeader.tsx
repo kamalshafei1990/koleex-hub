@@ -27,6 +27,7 @@ const TABS: TabEntry[] = [
   { key: "/inventory/batches",    label: "Batches",         icon: "clock" },
   { key: "/inventory/serials",    label: "Serials",         icon: "fingerprint" },
   { key: "/inventory/warehouses", label: "Warehouses",      icon: "bank" },
+  { key: "/inventory/search",     label: "Search",          icon: "search" },
 ];
 
 export default function InventoryHeader({

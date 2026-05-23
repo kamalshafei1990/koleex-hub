@@ -420,6 +420,493 @@ export async function buildInventoryDashboardSummary(
   };
 }
 
+/* ─── INV-H5A — Operator dashboard intelligence ──────────── */
+
+export interface InventoryOperatorSummary {
+  /** Counts for the four "Today" tiles. */
+  today: {
+    receipts: number;
+    shipments: number;
+    transfers: number;
+    returns: number;
+  };
+  /** Operational alerts surfaced on the home page. */
+  alerts: {
+    low_stock: number;
+    expired_batches: number;
+    pending_approvals: number;
+    pending_transfers: number;
+    pending_returns: number;
+    stuck_serials: number;
+    stale_drafts: number;
+  };
+  /** Compact intelligence widgets. */
+  intel: {
+    fastest_moving: Array<{ inventory_item_id: string; item_code: string; item_name: string | null; moves: number }>;
+    stagnant: Array<{ inventory_item_id: string; item_code: string; item_name: string | null; days_idle: number }>;
+    busiest_warehouse: { warehouse_id: string; warehouse_code: string; warehouse_name: string; moves: number } | null;
+    most_returned: { inventory_item_id: string; item_code: string; item_name: string | null; returns: number } | null;
+  };
+}
+
+/** Aggregated operator-facing dashboard data. Designed to be cheap —
+ *  every chunk is a small COUNT or LIMIT query, no heavy joins. */
+export async function buildInventoryOperatorSummary(
+  tenantId: string,
+): Promise<InventoryOperatorSummary> {
+  const today = new Date().toISOString().slice(0, 10);
+  const sevenDaysAgo = new Date(Date.now() - 7 * 86400_000).toISOString();
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 86400_000).toISOString();
+  const onehundredEightyDaysAgo = new Date(Date.now() - 180 * 86400_000).toISOString();
+
+  /* Run independent queries in parallel; degrade gracefully if any one
+     fails (operator UX should still show what we did get). */
+  const safe = async <T>(p: PromiseLike<T>, fallback: T): Promise<T> => {
+    try { return await p; } catch { return fallback; }
+  };
+
+  const todayCount = async (movementType: string) => {
+    const { count } = await supabaseServer
+      .from("inventory_stock_movements")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenantId)
+      .eq("status", "posted")
+      .eq("movement_type", movementType)
+      .gte("movement_date", today);
+    return count ?? 0;
+  };
+
+  const [
+    receiptsIn, receiptsOpening, receiptsAdjIn, receiptsRetIn,
+    shipmentsOut, shipmentsAdjOut,
+    transfersToday, returnsToday,
+    lowStockBalances, expiredBatches,
+    pendingApprovals, pendingTransfers, pendingTransfersShipped,
+    pendingReturns,
+    stuckSerials, staleDrafts,
+    recentMovements,
+    returnItems,
+  ] = await Promise.all([
+    safe(todayCount("purchase_receipt"), 0),
+    safe(todayCount("opening_balance"), 0),
+    safe(todayCount("adjustment_in"), 0),
+    safe(todayCount("return_in"), 0),
+    safe(todayCount("sales_shipment"), 0),
+    safe(todayCount("adjustment_out"), 0),
+    safe(
+      supabaseServer
+        .from("inventory_transfers")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .gte("created_at", today)
+        .then((r) => r.count ?? 0),
+      0,
+    ),
+    safe(
+      supabaseServer
+        .from("inventory_returns")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .gte("created_at", today)
+        .then((r) => r.count ?? 0),
+      0,
+    ),
+    /* low stock — count balances where qty_on_hand <= item.reorder_point > 0 */
+    safe(
+      supabaseServer
+        .from("inventory_stock_balances")
+        .select("inventory_item_id, qty_on_hand, inventory_items!inner(reorder_point)")
+        .eq("tenant_id", tenantId)
+        .then((r) => {
+          const rows = (r.data ?? []) as unknown as Array<{
+            inventory_item_id: string;
+            qty_on_hand: number;
+            inventory_items: { reorder_point: number | null } | Array<{ reorder_point: number | null }> | null;
+          }>;
+          const seen = new Set<string>();
+          for (const row of rows) {
+            const linked = Array.isArray(row.inventory_items)
+              ? row.inventory_items[0] ?? null
+              : row.inventory_items;
+            const rp = Number(linked?.reorder_point ?? 0);
+            if (rp > 0 && Number(row.qty_on_hand) <= rp) seen.add(row.inventory_item_id);
+          }
+          return seen.size;
+        }),
+      0,
+    ),
+    /* expired batches with remaining stock */
+    safe(
+      supabaseServer
+        .from("inventory_batches")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .lt("expiry_date", today)
+        .gt("quantity_remaining", 0)
+        .then((r) => r.count ?? 0),
+      0,
+    ),
+    /* pending approvals on movements */
+    safe(
+      supabaseServer
+        .from("inventory_stock_movements")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .eq("approval_status", "pending")
+        .then((r) => r.count ?? 0),
+      0,
+    ),
+    /* pending transfers: approved but not shipped */
+    safe(
+      supabaseServer
+        .from("inventory_transfers")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .eq("status", "approved")
+        .then((r) => r.count ?? 0),
+      0,
+    ),
+    /* pending transfers: shipped but not received */
+    safe(
+      supabaseServer
+        .from("inventory_transfers")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .eq("status", "shipped")
+        .then((r) => r.count ?? 0),
+      0,
+    ),
+    /* pending returns: approved but not received/shipped */
+    safe(
+      supabaseServer
+        .from("inventory_returns")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .eq("status", "approved")
+        .then((r) => r.count ?? 0),
+      0,
+    ),
+    /* serials stuck in transit > 7d */
+    safe(
+      supabaseServer
+        .from("inventory_serials")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .eq("status", "in_transit")
+        .lt("updated_at", sevenDaysAgo)
+        .then((r) => r.count ?? 0),
+      0,
+    ),
+    /* stale drafts: movements stuck in draft > 7d */
+    safe(
+      supabaseServer
+        .from("inventory_stock_movements")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .eq("status", "draft")
+        .lt("created_at", sevenDaysAgo)
+        .then((r) => r.count ?? 0),
+      0,
+    ),
+    /* intel: last 30d movements for fastest + busiest warehouse */
+    safe(
+      supabaseServer
+        .from("inventory_stock_movements")
+        .select("inventory_item_id, warehouse_id, movement_date")
+        .eq("tenant_id", tenantId)
+        .eq("status", "posted")
+        .gte("movement_date", thirtyDaysAgo.slice(0, 10))
+        .limit(2000)
+        .then((r) => r.data ?? []),
+      [] as Array<{ inventory_item_id: string; warehouse_id: string; movement_date: string }>,
+    ),
+    /* intel: returns by item (last 30d) */
+    safe(
+      supabaseServer
+        .from("inventory_return_items")
+        .select("inventory_item_id, inventory_returns!inner(tenant_id, created_at)")
+        .eq("inventory_returns.tenant_id", tenantId)
+        .gte("inventory_returns.created_at", thirtyDaysAgo)
+        .limit(1000)
+        .then((r) => (r.data ?? []) as unknown as Array<{ inventory_item_id: string }>),
+      [] as Array<{ inventory_item_id: string }>,
+    ),
+  ]);
+
+  /* fastest moving */
+  const byItemCount = new Map<string, number>();
+  const byWarehouseCount = new Map<string, number>();
+  for (const m of recentMovements as Array<{ inventory_item_id: string; warehouse_id: string }>) {
+    byItemCount.set(m.inventory_item_id, (byItemCount.get(m.inventory_item_id) ?? 0) + 1);
+    byWarehouseCount.set(m.warehouse_id, (byWarehouseCount.get(m.warehouse_id) ?? 0) + 1);
+  }
+  const topItems = [...byItemCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const topWarehouseId = [...byWarehouseCount.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
+  /* Resolve item names */
+  let fastest: InventoryOperatorSummary["intel"]["fastest_moving"] = [];
+  if (topItems.length) {
+    const ids = topItems.map((t) => t[0]);
+    const { data: items } = await supabaseServer
+      .from("inventory_items")
+      .select("id, item_code, item_name")
+      .in("id", ids);
+    const byId = new Map((items ?? []).map((i) => [i.id as string, i as { item_code: string; item_name: string | null }]));
+    fastest = topItems.map(([id, moves]) => {
+      const it = byId.get(id);
+      return {
+        inventory_item_id: id,
+        item_code: it?.item_code ?? "—",
+        item_name: it?.item_name ?? null,
+        moves,
+      };
+    });
+  }
+
+  /* busiest warehouse */
+  let busiest_warehouse: InventoryOperatorSummary["intel"]["busiest_warehouse"] = null;
+  if (topWarehouseId) {
+    const { data: w } = await supabaseServer
+      .from("inventory_warehouses")
+      .select("id, code, name")
+      .eq("id", topWarehouseId)
+      .single();
+    if (w) {
+      busiest_warehouse = {
+        warehouse_id: w.id as string,
+        warehouse_code: (w as { code: string }).code,
+        warehouse_name: (w as { name: string }).name,
+        moves: byWarehouseCount.get(topWarehouseId) ?? 0,
+      };
+    }
+  }
+
+  /* stagnant — items with stock but no movement in 180d */
+  let stagnant: InventoryOperatorSummary["intel"]["stagnant"] = [];
+  const { data: balanceRows } = await supabaseServer
+    .from("inventory_stock_balances")
+    .select("inventory_item_id, qty_on_hand")
+    .eq("tenant_id", tenantId)
+    .gt("qty_on_hand", 0)
+    .limit(500);
+  const itemsWithStock = [...new Set((balanceRows ?? []).map((b) => b.inventory_item_id as string))];
+  if (itemsWithStock.length) {
+    const { data: recent } = await supabaseServer
+      .from("inventory_stock_movements")
+      .select("inventory_item_id, movement_date")
+      .eq("tenant_id", tenantId)
+      .eq("status", "posted")
+      .gte("movement_date", onehundredEightyDaysAgo.slice(0, 10))
+      .in("inventory_item_id", itemsWithStock);
+    const recentSet = new Set((recent ?? []).map((r) => r.inventory_item_id as string));
+    const stagnantIds = itemsWithStock.filter((id) => !recentSet.has(id)).slice(0, 5);
+    if (stagnantIds.length) {
+      const { data: items } = await supabaseServer
+        .from("inventory_items")
+        .select("id, item_code, item_name")
+        .in("id", stagnantIds);
+      stagnant = (items ?? []).map((i) => ({
+        inventory_item_id: i.id as string,
+        item_code: (i as { item_code: string }).item_code,
+        item_name: (i as { item_name: string | null }).item_name,
+        days_idle: 180,
+      }));
+    }
+  }
+
+  /* most returned */
+  let most_returned: InventoryOperatorSummary["intel"]["most_returned"] = null;
+  if (returnItems.length) {
+    const cnt = new Map<string, number>();
+    for (const r of returnItems as Array<{ inventory_item_id: string }>) {
+      cnt.set(r.inventory_item_id, (cnt.get(r.inventory_item_id) ?? 0) + 1);
+    }
+    const top = [...cnt.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (top) {
+      const { data: i } = await supabaseServer
+        .from("inventory_items")
+        .select("id, item_code, item_name")
+        .eq("id", top[0])
+        .single();
+      if (i) {
+        most_returned = {
+          inventory_item_id: i.id as string,
+          item_code: (i as { item_code: string }).item_code,
+          item_name: (i as { item_name: string | null }).item_name,
+          returns: top[1],
+        };
+      }
+    }
+  }
+
+  return {
+    today: {
+      receipts: receiptsIn + receiptsOpening + receiptsAdjIn + receiptsRetIn,
+      shipments: shipmentsOut + shipmentsAdjOut,
+      transfers: transfersToday,
+      returns: returnsToday,
+    },
+    alerts: {
+      low_stock: lowStockBalances,
+      expired_batches: expiredBatches,
+      pending_approvals: pendingApprovals,
+      pending_transfers: pendingTransfers + pendingTransfersShipped,
+      pending_returns: pendingReturns,
+      stuck_serials: stuckSerials,
+      stale_drafts: staleDrafts,
+    },
+    intel: {
+      fastest_moving: fastest,
+      stagnant,
+      busiest_warehouse,
+      most_returned,
+    },
+  };
+}
+
+/* ─── INV-H5A — Global inventory search ───────────────────── */
+
+export interface InventorySearchResult {
+  type: "item" | "serial" | "batch" | "transfer" | "return" | "movement";
+  id: string;
+  label: string;
+  sublabel?: string | null;
+  href: string;
+}
+
+export interface InventorySearchResults {
+  items: InventorySearchResult[];
+  serials: InventorySearchResult[];
+  batches: InventorySearchResult[];
+  transfers: InventorySearchResult[];
+  returns: InventorySearchResult[];
+  movements: InventorySearchResult[];
+}
+
+export async function inventoryGlobalSearch(
+  tenantId: string,
+  q: string,
+): Promise<InventorySearchResults> {
+  const term = q.trim();
+  if (!term || term.length < 1) {
+    return { items: [], serials: [], batches: [], transfers: [], returns: [], movements: [] };
+  }
+  const like = `%${term}%`;
+  const limit = 8;
+
+  const safe = async <T>(p: PromiseLike<T>, fallback: T): Promise<T> => {
+    try { return await p; } catch { return fallback; }
+  };
+
+  const [itemRows, serialRows, batchRows, transferRows, returnRows, movementRows] = await Promise.all([
+    safe(
+      supabaseServer
+        .from("inventory_items")
+        .select("id, item_code, item_name, sku, barcode")
+        .eq("tenant_id", tenantId)
+        .or(`item_code.ilike.${like},item_name.ilike.${like},sku.ilike.${like},barcode.ilike.${like}`)
+        .limit(limit)
+        .then((r) => r.data ?? []),
+      [] as Array<{ id: string; item_code: string; item_name: string | null; sku: string | null; barcode: string | null }>,
+    ),
+    safe(
+      supabaseServer
+        .from("inventory_serials")
+        .select("id, serial_no, inventory_item_id, status")
+        .eq("tenant_id", tenantId)
+        .ilike("serial_no", like)
+        .limit(limit)
+        .then((r) => r.data ?? []),
+      [] as Array<{ id: string; serial_no: string; inventory_item_id: string; status: string }>,
+    ),
+    safe(
+      supabaseServer
+        .from("inventory_batches")
+        .select("id, batch_no, supplier_batch_no, inventory_item_id, expiry_date, quantity_remaining")
+        .eq("tenant_id", tenantId)
+        .or(`batch_no.ilike.${like},supplier_batch_no.ilike.${like}`)
+        .limit(limit)
+        .then((r) => r.data ?? []),
+      [] as Array<{ id: string; batch_no: string; supplier_batch_no: string | null; inventory_item_id: string; expiry_date: string | null; quantity_remaining: number }>,
+    ),
+    safe(
+      supabaseServer
+        .from("inventory_transfers")
+        .select("id, transfer_no, status")
+        .eq("tenant_id", tenantId)
+        .ilike("transfer_no", like)
+        .limit(limit)
+        .then((r) => r.data ?? []),
+      [] as Array<{ id: string; transfer_no: string; status: string }>,
+    ),
+    safe(
+      supabaseServer
+        .from("inventory_returns")
+        .select("id, return_no, return_type, status")
+        .eq("tenant_id", tenantId)
+        .ilike("return_no", like)
+        .limit(limit)
+        .then((r) => r.data ?? []),
+      [] as Array<{ id: string; return_no: string; return_type: string; status: string }>,
+    ),
+    safe(
+      supabaseServer
+        .from("inventory_stock_movements")
+        .select("id, movement_no, movement_type, status, direction")
+        .eq("tenant_id", tenantId)
+        .ilike("movement_no", like)
+        .limit(limit)
+        .then((r) => r.data ?? []),
+      [] as Array<{ id: string; movement_no: string; movement_type: string; status: string; direction: string }>,
+    ),
+  ]);
+
+  return {
+    items: itemRows.map((i) => ({
+      type: "item" as const,
+      id: i.id,
+      label: i.item_code,
+      sublabel: i.item_name ?? i.sku ?? null,
+      href: `/inventory/items?q=${encodeURIComponent(i.item_code)}`,
+    })),
+    serials: serialRows.map((s) => ({
+      type: "serial" as const,
+      id: s.id,
+      label: s.serial_no,
+      sublabel: s.status,
+      href: `/inventory/serials?q=${encodeURIComponent(s.serial_no)}`,
+    })),
+    batches: batchRows.map((b) => ({
+      type: "batch" as const,
+      id: b.id,
+      label: b.batch_no,
+      sublabel: b.expiry_date ? `Exp ${b.expiry_date} · qty ${b.quantity_remaining}` : `qty ${b.quantity_remaining}`,
+      href: `/inventory/batches?q=${encodeURIComponent(b.batch_no)}`,
+    })),
+    transfers: transferRows.map((t) => ({
+      type: "transfer" as const,
+      id: t.id,
+      label: t.transfer_no,
+      sublabel: t.status,
+      href: `/inventory/transfers/${t.id}`,
+    })),
+    returns: returnRows.map((r) => ({
+      type: "return" as const,
+      id: r.id,
+      label: r.return_no,
+      sublabel: `${r.return_type} · ${r.status}`,
+      href: `/inventory/returns/${r.id}`,
+    })),
+    movements: movementRows.map((m) => ({
+      type: "movement" as const,
+      id: m.id,
+      label: m.movement_no,
+      sublabel: `${m.movement_type} · ${m.status}`,
+      href: `/inventory/movements?q=${encodeURIComponent(m.movement_no)}`,
+    })),
+  };
+}
+
 /* ─── Per-item stock summary ─────────────────────────────── */
 
 export interface ItemStockSummary {

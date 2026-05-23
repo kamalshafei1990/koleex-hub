@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
 import RrIcon from "@/components/ui/RrIcon";
 import { Panel, StatusBadge, DirectionDelta } from "@/components/inventory/InventoryUi";
+import { TraceabilityCard } from "@/components/inventory/InventoryUx";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
 import { inventoryT } from "@/lib/translations/inventory";
@@ -455,6 +456,28 @@ export default function InventoryTransferDetail({ transferId }: { transferId: st
             </table>
           )}
         </Panel>
+
+        {/* INV-H5A — Traceability card */}
+        <TraceabilityCard
+          links={[
+            { label: t("inv.trace.current_warehouse"), value: warehouseMap.get(transfer.destination_warehouse_id)?.code ?? warehouseMap.get(transfer.source_warehouse_id)?.code ?? "—", icon: "bank" },
+            ...(transfer.source_warehouse_id
+              ? [{ label: "Source", value: warehouseMap.get(transfer.source_warehouse_id)?.name ?? transfer.source_warehouse_id, href: `/inventory/warehouses`, icon: "bank" as const }]
+              : []),
+            ...(transfer.destination_warehouse_id
+              ? [{ label: "Destination", value: warehouseMap.get(transfer.destination_warehouse_id)?.name ?? transfer.destination_warehouse_id, href: `/inventory/warehouses`, icon: "bank" as const }]
+              : []),
+            ...items.slice(0, 1).map((it) => {
+              const product = productByItem.get(it.inventory_item_id);
+              return {
+                label: t("inv.trace.latest"),
+                value: product?.product_name ?? `Item ${it.inventory_item_id.slice(0, 8)}`,
+                href: `/inventory/items?q=${encodeURIComponent(product?.stock_profile?.item_code ?? "")}`,
+                icon: "box-open" as const,
+              };
+            }),
+          ]}
+        />
 
         {showVoid && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

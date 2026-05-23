@@ -19,6 +19,7 @@ import { useRouter } from "next/navigation";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
 import RrIcon from "@/components/ui/RrIcon";
 import { Panel, StatusBadge, DirectionDelta } from "@/components/inventory/InventoryUi";
+import { TraceabilityCard } from "@/components/inventory/InventoryUx";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
 import { inventoryT } from "@/lib/translations/inventory";
@@ -536,6 +537,17 @@ export default function InventoryReturnDetail({ returnId }: { returnId: string }
             </table>
           </div>
         </Panel>
+
+        {/* INV-H5A — Traceability card */}
+        <TraceabilityCard
+          links={[
+            { label: t("inv.trace.current_warehouse"), value: wh?.code ?? "—", href: "/inventory/warehouses", icon: "bank" },
+            { label: "Return type", value: ret.return_type, icon: "recycle" },
+            ...(ret.source_document_type
+              ? [{ label: "Source", value: ret.source_document_type, href: ret.source_document_id ? sourceDocHref(ret.source_document_type, ret.source_document_id) : undefined, icon: "file-invoice" as const }]
+              : []),
+          ]}
+        />
 
         {/* Section 3 — Timeline */}
         <Panel>

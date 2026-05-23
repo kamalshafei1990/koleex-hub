@@ -83,6 +83,13 @@ export default function InventoryReturns() {
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
 
+  /* INV-H5A — ?create=1 deep link */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("create") === "1") setCreateOpen(true);
+  }, []);
+
   const warehouseMap = useMemo(() => {
     const m = new Map<string, Warehouse>();
     for (const w of warehouses) m.set(w.id, w);

@@ -339,4 +339,107 @@ export const inventoryT: Translations = {
   "inv.item.track_serials":          { en: "Track serial numbers", zh: "跟踪序列号",      ar: "تتبع الأرقام التسلسلية" },
   "inv.item.track_serials.hint":     { en: "Each unit gets a unique serial. Movements require an exact serial match.", zh: "每个单元都有唯一序列号。移动需精确匹配。", ar: "كل وحدة لها رقم تسلسلي فريد. تتطلب الحركات مطابقة دقيقة." },
   "inv.loading":                     { en: "Loading…",             zh: "加载中…",         ar: "جارٍ التحميل…" },
+
+  /* ============================================================
+     Phase INV-H5A — UX + operator workflow stabilization.
+     ============================================================ */
+
+  /* ── Operator-friendly movement labels ─────────────────────── */
+  "inv.action.receive":              { en: "Receive Stock",         zh: "入库",            ar: "استلام المخزون" },
+  "inv.action.ship":                 { en: "Ship Stock",            zh: "发货",            ar: "شحن المخزون" },
+  "inv.action.transfer":             { en: "Transfer Stock",        zh: "调拨",            ar: "تحويل المخزون" },
+  "inv.action.adjust":               { en: "Stock Count / Adjust",  zh: "盘点/调整",       ar: "جرد/تعديل" },
+  "inv.action.return":               { en: "Return",                zh: "退货",            ar: "مرتجع" },
+  "inv.action.receive.hint":         { en: "Bring stock in from a supplier or opening balance.", zh: "从供应商或期初余额收货。", ar: "إدخال مخزون من مورد أو رصيد افتتاحي." },
+  "inv.action.ship.hint":            { en: "Send stock out to a customer.", zh: "向客户发货。", ar: "إرسال المخزون إلى عميل." },
+  "inv.action.transfer.hint":        { en: "Move stock between warehouses.", zh: "在仓库之间转移库存。", ar: "نقل المخزون بين المستودعات." },
+  "inv.action.adjust.hint":          { en: "Reconcile a stock count or correct a balance.", zh: "盘点对账或纠正余额。", ar: "تسوية جرد أو تصحيح رصيد." },
+  "inv.action.return.hint":          { en: "Process a customer or supplier return.", zh: "处理客户或供应商退货。", ar: "معالجة مرتجع عميل أو مورد." },
+
+  /* ── Dashboard ─────────────────────────────────────────────── */
+  "inv.home.title":                  { en: "Inventory Operations",  zh: "库存运营",        ar: "عمليات المخزون" },
+  "inv.home.subtitle":               { en: "What needs doing today — receive, ship, transfer, adjust.", zh: "今日需办：入库、发货、调拨、调整。", ar: "ما يلزم اليوم — استلام، شحن، تحويل، تعديل." },
+  "inv.home.quick.title":            { en: "Quick actions",         zh: "快捷操作",        ar: "إجراءات سريعة" },
+  "inv.home.alerts.title":           { en: "Needs attention",       zh: "需关注",          ar: "يستدعي الانتباه" },
+  "inv.home.alerts.empty":           { en: "All clear — nothing waiting.", zh: "一切就绪 — 无待办。", ar: "كل شيء على ما يرام — لا انتظار." },
+  "inv.home.today.title":            { en: "Today",                 zh: "今日",            ar: "اليوم" },
+  "inv.home.lookup.title":           { en: "Quick lookup",          zh: "快速查找",        ar: "بحث سريع" },
+  "inv.home.lookup.item":            { en: "Item code, name, or SKU…", zh: "物料代码、名称或 SKU…", ar: "كود الصنف أو الاسم أو SKU…" },
+  "inv.home.lookup.serial":          { en: "Serial number…",        zh: "序列号…",         ar: "رقم تسلسلي…" },
+  "inv.home.lookup.batch":           { en: "Batch number…",         zh: "批次号…",         ar: "رقم دفعة…" },
+  "inv.home.intel.title":            { en: "Operational intelligence", zh: "运营洞察",     ar: "ذكاء تشغيلي" },
+  "inv.home.intel.fastest":          { en: "Fastest moving (30d)",  zh: "周转最快（30天）", ar: "الأسرع حركة (٣٠ يوم)" },
+  "inv.home.intel.stagnant":         { en: "Stagnant stock (>180d)", zh: "滞销库存（>180天）", ar: "مخزون راكد (+١٨٠ يوم)" },
+  "inv.home.intel.busiest":          { en: "Busiest warehouse (7d)", zh: "最繁忙仓库（7天）", ar: "المستودع الأكثر نشاطًا (٧ أيام)" },
+  "inv.home.intel.returned":         { en: "Most returned (30d)",   zh: "退货最多（30天）", ar: "الأكثر إرجاعًا (٣٠ يوم)" },
+
+  /* ── Alert labels ──────────────────────────────────────────── */
+  "inv.alert.low_stock":             { en: "Low stock items",       zh: "低库存物料",      ar: "أصناف منخفضة المخزون" },
+  "inv.alert.expired_batches":       { en: "Expired batches",       zh: "过期批次",        ar: "دفعات منتهية" },
+  "inv.alert.pending_approvals":     { en: "Pending approvals",     zh: "待审批",          ar: "بانتظار الاعتماد" },
+  "inv.alert.pending_transfers":     { en: "Pending transfers",     zh: "待处理调拨",      ar: "تحويلات قيد التنفيذ" },
+  "inv.alert.pending_returns":       { en: "Pending returns",       zh: "待处理退货",      ar: "مرتجعات قيد التنفيذ" },
+  "inv.alert.stuck_serials":         { en: "Stuck serials (>7d in transit)", zh: "卡住的序列号（在途>7天）", ar: "أرقام تسلسلية معلقة (+٧ أيام نقل)" },
+  "inv.alert.stale_drafts":          { en: "Stale drafts (>7d)",    zh: "陈旧草稿（>7天）", ar: "مسودات قديمة (+٧ أيام)" },
+  "inv.alert.serial_mismatch":       { en: "Serial mismatch",       zh: "序列号不匹配",    ar: "عدم تطابق الرقم التسلسلي" },
+
+  /* ── Today section ─────────────────────────────────────────── */
+  "inv.today.receipts":              { en: "Receipts",              zh: "收货",            ar: "الاستلامات" },
+  "inv.today.shipments":             { en: "Shipments",             zh: "发货",            ar: "الشحنات" },
+  "inv.today.transfers":             { en: "Transfers",             zh: "调拨",            ar: "التحويلات" },
+  "inv.today.returns":               { en: "Returns",               zh: "退货",            ar: "المرتجعات" },
+
+  /* ── Global search ─────────────────────────────────────────── */
+  "inv.search.title":                { en: "Inventory Search",      zh: "库存搜索",        ar: "بحث المخزون" },
+  "inv.search.placeholder":          { en: "SKU · serial · batch · item code · barcode · product name", zh: "SKU·序列·批次·代码·条码·名称", ar: "SKU·تسلسلي·دفعة·كود·باركود·اسم" },
+  "inv.search.empty":                { en: "Type to search across items, serials, batches, transfers, returns, and movements.", zh: "输入以搜索物料、序列号、批次、调拨、退货与库存分录。", ar: "اكتب للبحث في الأصناف والأرقام التسلسلية والدفعات والتحويلات والمرتجعات والحركات." },
+  "inv.search.no_results":           { en: "No results.",           zh: "无结果。",        ar: "لا توجد نتائج." },
+  "inv.search.group.items":          { en: "Items",                 zh: "物料",            ar: "الأصناف" },
+  "inv.search.group.serials":        { en: "Serials",               zh: "序列号",          ar: "أرقام تسلسلية" },
+  "inv.search.group.batches":        { en: "Batches",               zh: "批次",            ar: "دفعات" },
+  "inv.search.group.transfers":      { en: "Transfers",             zh: "调拨",            ar: "تحويلات" },
+  "inv.search.group.returns":        { en: "Returns",               zh: "退货",            ar: "مرتجعات" },
+  "inv.search.group.movements":      { en: "Movements",             zh: "库存分录",        ar: "حركات" },
+
+  /* ── Bulk action bar ───────────────────────────────────────── */
+  "inv.bulk.selected":               { en: "{n} selected",          zh: "已选 {n}",        ar: "{n} محدد" },
+  "inv.bulk.clear":                  { en: "Clear",                 zh: "清除",            ar: "مسح" },
+  "inv.bulk.approve":                { en: "Approve all",           zh: "全部批准",        ar: "اعتماد الكل" },
+  "inv.bulk.void":                   { en: "Void drafts",           zh: "作废草稿",        ar: "إبطال المسودات" },
+  "inv.bulk.archive":                { en: "Archive",               zh: "归档",            ar: "أرشفة" },
+  "inv.bulk.receive":                { en: "Receive items",         zh: "收货",            ar: "استلام البنود" },
+  "inv.bulk.complete":               { en: "Mark received",         zh: "标记已收",        ar: "تأشير الاستلام" },
+
+  /* ── Mobile + FAB ──────────────────────────────────────────── */
+  "inv.mobile.create":               { en: "Create",                zh: "新建",            ar: "إنشاء" },
+
+  /* ── Traceability card ─────────────────────────────────────── */
+  "inv.trace.title":                 { en: "Traceability",          zh: "可追溯",          ar: "تتبع كامل" },
+  "inv.trace.latest":                { en: "Latest movement",       zh: "最近分录",        ar: "آخر حركة" },
+  "inv.trace.current_warehouse":     { en: "Current warehouse",     zh: "当前仓库",        ar: "المستودع الحالي" },
+  "inv.trace.transfers":             { en: "Linked transfers",      zh: "相关调拨",        ar: "التحويلات المرتبطة" },
+  "inv.trace.returns":               { en: "Linked returns",        zh: "相关退货",        ar: "المرتجعات المرتبطة" },
+  "inv.trace.shipment":              { en: "Linked shipment",       zh: "相关发货",        ar: "الشحنة المرتبطة" },
+  "inv.trace.party":                 { en: "Customer / Supplier",   zh: "客户/供应商",     ar: "العميل/المورد" },
+  "inv.trace.journal":               { en: "Accounting entry",      zh: "会计分录",        ar: "القيد المحاسبي" },
+  "inv.trace.empty":                 { en: "No traceability links yet.", zh: "暂无追溯链接。", ar: "لا توجد روابط تتبع بعد." },
+
+  /* ── Warnings ──────────────────────────────────────────────── */
+  "inv.warn.low_stock":              { en: "Below reorder point",   zh: "低于补货点",      ar: "تحت نقطة إعادة الطلب" },
+  "inv.warn.expired":                { en: "Expired",               zh: "已过期",          ar: "منتهي الصلاحية" },
+  "inv.warn.near_expiry":            { en: "Near expiry",           zh: "临期",            ar: "قارب الانتهاء" },
+  "inv.warn.serial_required":        { en: "Serial required",       zh: "需要序列号",      ar: "رقم تسلسلي مطلوب" },
+  "inv.warn.stale_draft":            { en: "Draft >7d old",         zh: "草稿 >7 天",      ar: "مسودة لأكثر من ٧ أيام" },
+
+  /* ── Empty states (operator-friendly) ──────────────────────── */
+  "inv.empty.transfers.pending":     { en: "No stock transfers waiting for approval.", zh: "无待审批调拨。", ar: "لا توجد تحويلات تنتظر الاعتماد." },
+  "inv.empty.returns.pending":       { en: "No returns waiting for processing.", zh: "无待处理退货。", ar: "لا توجد مرتجعات قيد المعالجة." },
+  "inv.empty.movements":             { en: "No movements yet — receive, ship, or adjust stock to get started.", zh: "暂无分录 — 入库、发货或调整以开始。", ar: "لا توجد حركات بعد — استلم أو اشحن أو عدّل للبدء." },
+  "inv.empty.batches":               { en: "No batches yet — create a batch when you receive lot-tracked stock.", zh: "暂无批次 — 收到批次跟踪的库存时创建。", ar: "لا توجد دفعات بعد — أنشئ دفعة عند استلام مخزون متتبع." },
+  "inv.empty.cta.receive":           { en: "Receive stock",         zh: "入库",            ar: "استلام مخزون" },
+  "inv.empty.cta.transfer":          { en: "Create transfer",       zh: "新建调拨",        ar: "إنشاء تحويل" },
+  "inv.empty.cta.adjust":            { en: "Create adjustment",     zh: "新建调整",        ar: "إنشاء تعديل" },
+
+  /* ── Shortcuts hint ────────────────────────────────────────── */
+  "inv.shortcuts.hint":              { en: "Shortcuts: R receive · S ship · T transfer · A adjust · F find", zh: "快捷键：R 入库·S 发货·T 调拨·A 调整·F 搜索", ar: "اختصارات: R استلام · S شحن · T تحويل · A تعديل · F بحث" },
 };

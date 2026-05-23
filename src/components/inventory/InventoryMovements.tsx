@@ -31,6 +31,16 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation, type Translations } from "@/lib/i18n";
 import Link from "next/link";
 import InventoryMovementDetail from "@/components/inventory/InventoryMovementDetail";
+import {
+  BulkActionBar,
+  MobileBottomBar,
+  MobileFab,
+  OperatorMovementMenu,
+  WarningChip,
+  operatorLabel,
+  useInventoryShortcuts,
+  useSelection,
+} from "@/components/inventory/InventoryUx";
 
 const MV_T: Translations = {
   "mv.title":            { en: "Stock Movements", zh: "库存移动", ar: "حركات المخزون" },
@@ -109,6 +119,17 @@ const WORKFLOW_TYPES: MovementType[] = [
 
 export default function InventoryMovements() {
   const { t } = useTranslation(MV_T);
+  useInventoryShortcuts({ isActive: true });
+  const selection = useSelection<string>();
+
+  /* INV-H5A — operator menu deep-links: ?create=receive|ship|adjustment|… */
+  const [pendingCreate, setPendingCreate] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const create = params.get("create");
+    if (create) setPendingCreate(create);
+  }, []);
 
   const [movements, setMovements] = useState<MovementRow[]>([]);
   const [products, setProducts] = useState<ProductOption[]>([]);
@@ -196,6 +217,15 @@ export default function InventoryMovements() {
 
   useEffect(() => { void loadMovements(); }, [loadMovements]);
 
+  /* Apply ?create= deep-link once the form state is wired. */
+  useEffect(() => {
+    if (!pendingCreate) return;
+    setShowForm(true);
+    if (pendingCreate === "ship") setDirection("out");
+    else if (pendingCreate === "receive") setDirection("in");
+    setPendingCreate(null);
+  }, [pendingCreate]);
+
   /* INV-H4A — load variants when item changes; reset variant/batch. */
   useEffect(() => {
     const itemId = selectedProduct?.stock_profile?.inventory_item_id;
@@ -252,6 +282,15 @@ export default function InventoryMovements() {
         setBatchOptions(filtered);
         // Clear batch if it's no longer in options.
         if (batchId && !filtered.find((b) => b.id === batchId)) setBatchId("");
+        /* INV-H5A — FEFO suggestion: when no batch chosen yet, pre-select
+           the earliest-expiry batch as a hint. Operator can override. */
+        if (!batchId && filtered.length > 0) {
+          const withExp = filtered.filter((b) => b.expiry_date);
+          if (withExp.length > 0) {
+            const fefo = withExp.slice().sort((a, b) => (a.expiry_date ?? "") < (b.expiry_date ?? "") ? -1 : 1)[0];
+            if (fefo) setBatchId(fefo.id);
+          }
+        }
       } catch {/* ignore */}
     })();
     return () => { cancelled = true; };
@@ -332,8 +371,44 @@ export default function InventoryMovements() {
     }
   };
 
+  /* INV-H5A bulk operations: approve drafts / void drafts */
+  const bulkApprove = async () => {
+    if (selection.count === 0) return;
+    const ids = [...selection.ids];
+    for (const id of ids) {
+      try {
+        await fetch(`/api/inventory/movements/${id}/approve`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "approve" }),
+        });
+      } catch { /* swallow — re-loaded below */ }
+    }
+    selection.clear();
+    await loadMovements();
+  };
+  const bulkVoid = async () => {
+    if (selection.count === 0) return;
+    const reason = window.prompt("Void reason (min 3 chars)?") ?? "";
+    if (reason.trim().length < 3) return;
+    const ids = [...selection.ids];
+    for (const id of ids) {
+      try {
+        await fetch(`/api/inventory/movements/${id}/void`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ void_reason: reason.trim() }),
+        });
+      } catch { /* */ }
+    }
+    selection.clear();
+    await loadMovements();
+  };
+
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-screen bg-[var(--bg-primary)] pb-16 text-[var(--text-primary)] md:pb-6">
       <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
         <InventoryHeader title={t("mv.title")} subtitle={t("mv.subtitle")} />
 
@@ -342,6 +417,15 @@ export default function InventoryMovements() {
             {error}
           </div>
         )}
+
+        {/* INV-H5A — operator-first create menu */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <OperatorMovementMenu />
+          <div className="text-[10.5px] text-[var(--text-dim)]">
+            {/* helpful hint — desktop only */}
+            <span className="hidden sm:inline">Shortcuts: R · S · T · A · F</span>
+          </div>
+        </div>
 
         {/* Tabs + Create */}
         <div className="flex flex-wrap items-center gap-2">
@@ -600,6 +684,18 @@ export default function InventoryMovements() {
           <table className="min-w-full text-[12.5px]">
             <thead>
               <tr className="border-b border-[var(--border-color)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
+                <th className="px-2 py-2 text-left">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all"
+                    checked={filtered.length > 0 && filtered.every((m) => selection.has(m.id))}
+                    onChange={(e) => {
+                      const visible = filtered.filter((m) => m.status === "draft" || m.approval_status === "pending").map((m) => m.id);
+                      if (e.target.checked) selection.set(visible);
+                      else selection.clear();
+                    }}
+                  />
+                </th>
                 <th className="px-3 py-2 text-left">Date</th>
                 <th className="px-3 py-2 text-left">Movement #</th>
                 <th className="px-3 py-2 text-left">Product</th>
@@ -613,22 +709,50 @@ export default function InventoryMovements() {
             </thead>
             <tbody>
               {loading && filtered.length === 0 ? (
-                <tr><td colSpan={9} className="px-4 py-6 text-center text-[11px] text-[var(--text-dim)]">Loading…</td></tr>
+                <tr><td colSpan={10} className="px-4 py-6 text-center text-[11px] text-[var(--text-dim)]">Loading…</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={9} className="px-0 py-0">
+                <tr><td colSpan={10} className="px-0 py-0">
                   <InventoryEmpty title={`No ${tab} movements`} hint="Try a different tab." />
                 </td></tr>
               ) : (
                 filtered.map((m) => {
                   const wh = warehouseMap.get(m.warehouse_id);
                   const product = productItemMap.get(m.inventory_item_id);
+                  /* INV-H5A — stale draft check. We approximate "created > 7d
+                     ago" using movement_date as a proxy (the row only carries
+                     posted_at / voided_at on the wire — created_at is not in
+                     MovementRow). Operators see this only on actual drafts. */
+                  const isStaleDraft = (() => {
+                    if (m.status !== "draft") return false;
+                    const d = Date.parse(m.movement_date);
+                    if (!Number.isFinite(d)) return false;
+                    return Date.now() - d > 7 * 86400_000;
+                  })();
+                  const canSelect = m.status === "draft" || m.approval_status === "pending";
                   return (
                     <tr
                       key={m.id}
                       className="border-b border-[var(--border-color)]/40 last:border-b-0 hover:bg-[var(--bg-surface)]/60"
                     >
+                      <td className="px-2 py-1.5">
+                        {canSelect ? (
+                          <input
+                            type="checkbox"
+                            checked={selection.has(m.id)}
+                            onChange={() => selection.toggle(m.id)}
+                            aria-label={`Select ${m.movement_no}`}
+                          />
+                        ) : null}
+                      </td>
                       <td className="px-3 py-1.5 whitespace-nowrap text-[var(--text-dim)]">{m.movement_date}</td>
-                      <td className="px-3 py-1.5 font-mono text-[11.5px] text-[var(--text-secondary)] whitespace-nowrap">{m.movement_no}</td>
+                      <td className="px-3 py-1.5 font-mono text-[11.5px] text-[var(--text-secondary)] whitespace-nowrap">
+                        {m.movement_no}
+                        {isStaleDraft && (
+                          <span className="ml-1.5">
+                            <WarningChip tone="warning">Draft &gt;7d</WarningChip>
+                          </span>
+                        )}
+                      </td>
                       <td className="px-3 py-1.5 text-[var(--text-primary)]">
                         {product ? (
                           <span className="inline-flex items-center gap-2">
@@ -654,7 +778,8 @@ export default function InventoryMovements() {
                         ) : <span className="text-[var(--text-dim)]">—</span>}
                       </td>
                       <td className="px-3 py-1.5 text-[11.5px] text-[var(--text-secondary)] whitespace-nowrap">
-                        {movementLabel(m.movement_type)}
+                        <span className="font-medium text-[var(--text-primary)]">{operatorLabel(m.movement_type)}</span>
+                        <span className="ml-1.5 text-[10.5px] text-[var(--text-dim)]">{movementLabel(m.movement_type)}</span>
                         {m.source_type && (
                           <span className="ml-1.5 rounded border border-[var(--border-color)] px-1 py-0.5 text-[9.5px] uppercase tracking-wider text-[var(--text-dim)]">
                             system
@@ -692,6 +817,16 @@ export default function InventoryMovements() {
           />
         )}
       </div>
+      <BulkActionBar
+        count={selection.count}
+        onClear={selection.clear}
+        actions={[
+          { label: "Approve all",  icon: "check",     onClick: bulkApprove, tone: "primary" },
+          { label: "Void drafts",  icon: "cross",     onClick: bulkVoid,    tone: "danger"  },
+        ]}
+      />
+      <MobileFab />
+      <MobileBottomBar />
     </div>
   );
 }

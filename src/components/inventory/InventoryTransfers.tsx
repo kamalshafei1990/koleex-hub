@@ -17,6 +17,14 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
 import { inventoryT } from "@/lib/translations/inventory";
 import InventoryTransferCreateDrawer from "./InventoryTransferCreateDrawer";
+import {
+  BulkActionBar,
+  MobileBottomBar,
+  MobileFab,
+  OperatorMovementMenu,
+  useInventoryShortcuts,
+  useSelection,
+} from "./InventoryUx";
 
 type TransferStatus =
   | "draft" | "pending" | "approved" | "shipped" | "received" | "cancelled" | "voided";
@@ -49,6 +57,8 @@ const TABS: TabKey[] = ["all", "draft", "pending", "approved", "shipped", "recei
 
 export default function InventoryTransfers() {
   const { t } = useTranslation(inventoryT);
+  useInventoryShortcuts({ isActive: true });
+  const selection = useSelection<string>();
 
   const [transfers, setTransfers] = useState<TransferRow[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -57,6 +67,31 @@ export default function InventoryTransfers() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+
+  /* INV-H5A — ?create=1 deep link from operator menu */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("create") === "1") setCreateOpen(true);
+  }, []);
+
+  /* INV-H5A — bulk receive on shipped transfers. */
+  const bulkComplete = async () => {
+    if (selection.count === 0) return;
+    const ids = [...selection.ids];
+    for (const id of ids) {
+      try {
+        await fetch(`/api/inventory/transfers/${id}/receive`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+      } catch { /* re-loaded below */ }
+    }
+    selection.clear();
+    await load();
+  };
 
   const warehouseMap = useMemo(() => {
     const m = new Map<string, Warehouse>();
@@ -117,7 +152,7 @@ export default function InventoryTransfers() {
   }, [transfers, tab]);
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-screen bg-[var(--bg-primary)] pb-16 text-[var(--text-primary)] md:pb-6">
       <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
         <InventoryHeader
           title={t("inv.transfers.title")}
@@ -133,6 +168,7 @@ export default function InventoryTransfers() {
             </button>
           }
         />
+        <OperatorMovementMenu />
 
         {error && (
           <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11.5px] text-rose-300 dark:text-rose-200">
@@ -155,6 +191,18 @@ export default function InventoryTransfers() {
           <table className="min-w-full text-[12.5px]">
             <thead>
               <tr className="border-b border-[var(--border-color)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
+                <th className="px-2 py-2 text-left">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all shipped"
+                    checked={filtered.length > 0 && filtered.filter((tr) => tr.status === "shipped").every((tr) => selection.has(tr.id))}
+                    onChange={(e) => {
+                      const ids = filtered.filter((tr) => tr.status === "shipped").map((tr) => tr.id);
+                      if (e.target.checked) selection.set(ids);
+                      else selection.clear();
+                    }}
+                  />
+                </th>
                 <th className="px-3 py-2 text-left">{t("inv.transfers.col.no")}</th>
                 <th className="px-3 py-2 text-left">{t("inv.transfers.col.source")}</th>
                 <th className="px-3 py-2 text-left">{t("inv.transfers.col.destination")}</th>
@@ -168,13 +216,13 @@ export default function InventoryTransfers() {
             <tbody>
               {loading && filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-6 text-center text-[11px] text-[var(--text-dim)]">
+                  <td colSpan={9} className="px-4 py-6 text-center text-[11px] text-[var(--text-dim)]">
                     {t("inv.transfers.loading")}
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-0 py-0">
+                  <td colSpan={9} className="px-0 py-0">
                     <InventoryEmpty
                       title={t("inv.transfers.empty.title")}
                       hint={t("inv.transfers.empty.hint")}
@@ -191,6 +239,16 @@ export default function InventoryTransfers() {
                       key={tr.id}
                       className="border-b border-[var(--border-color)]/40 last:border-b-0 hover:bg-[var(--bg-surface)]/60"
                     >
+                      <td className="px-2 py-1.5">
+                        {tr.status === "shipped" ? (
+                          <input
+                            type="checkbox"
+                            aria-label={`Select ${tr.transfer_no}`}
+                            checked={selection.has(tr.id)}
+                            onChange={() => selection.toggle(tr.id)}
+                          />
+                        ) : null}
+                      </td>
                       <td className="px-3 py-1.5 font-mono text-[11.5px] text-[var(--text-secondary)]">
                         <Link href={`/inventory/transfers/${tr.id}`} className="hover:underline">
                           {tr.transfer_no}
@@ -242,6 +300,13 @@ export default function InventoryTransfers() {
           />
         )}
       </div>
+      <BulkActionBar
+        count={selection.count}
+        onClear={selection.clear}
+        actions={[{ label: "Mark received", icon: "download", onClick: bulkComplete, tone: "primary" }]}
+      />
+      <MobileFab />
+      <MobileBottomBar />
     </div>
   );
 }

@@ -1,99 +1,78 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   /inventory — Dashboard.
+   /inventory — INV-H5A operator-first dashboard.
 
-   Four KPI tiles (warehouses, items with stock, total on-hand, reserved)
-   followed by two sections:
-     · Top stock holders   — the eight items with the most on-hand
-     · Recent movements    — the last ten posted/draft/voided rows
+   Reorganized around what a warehouse clerk needs to do today:
+     1. Four large action cards (Receive / Ship / Transfer / Adjust)
+     2. Operational alerts (low stock, expired batches, pending …)
+     3. Today's activity counters
+     4. Quick lookup (item / serial / batch)
+     5. Compact operational intelligence widgets
 
-   The page consciously mirrors the visual rhythm of Finance: hairline
-   between sections, eyebrow + heading + "view all" link, no card
-   chrome inside sections except a single rounded panel around the
-   table. Movement type is humanised; direction is colour-coded.
+   The old finance-style "top holders / valuation / KPI strip" was a
+   read-only dashboard. The operator view replaces it with an action
+   surface. Existing endpoints power the data:
+     · /api/inventory/summary           — top-holder + value KPIs
+     · /api/inventory/operator-summary  — INV-H5A alerts/today/intel
    --------------------------------------------------------------------------- */
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
-import { Eyebrow, Hairline } from "@/components/finance/FinanceDashboardUi";
 import {
-  DirectionDelta,
-  InventoryEmpty,
-  InventoryKpi,
-  Panel,
-  StatusBadge,
-  movementLabel,
-} from "@/components/inventory/InventoryUi";
+  ActionCard,
+  AlertCard,
+  IntelTile,
+  LookupInput,
+  MobileBottomBar,
+  MobileFab,
+  SectionEyebrow,
+  TodayTile,
+  useInventoryShortcuts,
+} from "@/components/inventory/InventoryUx";
+import { InventoryKpi } from "@/components/inventory/InventoryUi";
 import RrIcon from "@/components/ui/RrIcon";
+import { useTranslation } from "@/lib/i18n";
+import { inventoryT } from "@/lib/translations/inventory";
 
-interface SummaryMovement {
-  id: string;
-  movement_no: string;
-  movement_date: string;
-  movement_type: string;
-  direction: "in" | "out";
-  quantity: number;
-  unit: string;
-  status: string;
+interface OperatorSummary {
+  today: { receipts: number; shipments: number; transfers: number; returns: number };
+  alerts: {
+    low_stock: number;
+    expired_batches: number;
+    pending_approvals: number;
+    pending_transfers: number;
+    pending_returns: number;
+    stuck_serials: number;
+    stale_drafts: number;
+  };
+  intel: {
+    fastest_moving: Array<{ inventory_item_id: string; item_code: string; item_name: string | null; moves: number }>;
+    stagnant: Array<{ inventory_item_id: string; item_code: string; item_name: string | null; days_idle: number }>;
+    busiest_warehouse: { warehouse_id: string; warehouse_code: string; warehouse_name: string; moves: number } | null;
+    most_returned: { inventory_item_id: string; item_code: string; item_name: string | null; returns: number } | null;
+  };
 }
-interface SummaryBalance {
-  inventory_item_id: string;
-  item_code: string;
-  item_name: string | null;
-  item_type_name: string | null;
-  warehouse_code: string;
-  warehouse_name: string;
-  qty_on_hand: number;
-  qty_available: number;
-}
-interface Summary {
+
+interface BasicSummary {
   warehouse_count: number;
   item_count: number;
   total_on_hand: number;
   total_reserved: number;
-  /* Phase O.5 */
-  total_value: number;
-  value_by_currency: Record<string, number>;
-  recent_movements: SummaryMovement[];
-  top_balances: SummaryBalance[];
-  /* INV-H4A — batch expiry KPIs. */
-  batch_kpis?: { expired: number; near_expiry: number };
-}
-
-interface ValuationRow {
-  inventory_item_id: string;
-  item_code: string;
-  item_name: string | null;
-  warehouse_code: string;
-  warehouse_name: string;
-  qty_on_hand: number;
-  average_cost: number;
-  inventory_value: number;
-  currency: string;
 }
 
 function fmtQty(n: number): string {
   if (!Number.isFinite(n)) return "—";
   return n.toLocaleString("en-US", { maximumFractionDigits: 4 });
 }
-function fmtMoney(n: number): string {
-  if (!Number.isFinite(n)) return "—";
-  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-/* For mixed-currency tenants we still want a single headline KPI; pick
-   the dominant currency and surface a "+ N" note. */
-function pickHeadlineCurrency(byCurrency: Record<string, number> | undefined): { currency: string; value: number; otherCount: number } {
-  if (!byCurrency) return { currency: "USD", value: 0, otherCount: 0 };
-  const entries = Object.entries(byCurrency).sort((a, b) => b[1] - a[1]);
-  if (entries.length === 0) return { currency: "USD", value: 0, otherCount: 0 };
-  return { currency: entries[0][0], value: entries[0][1], otherCount: entries.length - 1 };
-}
 
 export default function InventoryDashboard() {
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [topValue, setTopValue] = useState<ValuationRow[]>([]);
+  const { t } = useTranslation(inventoryT);
+  useInventoryShortcuts({ isActive: true });
+
+  const [op, setOp] = useState<OperatorSummary | null>(null);
+  const [basic, setBasic] = useState<BasicSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -101,18 +80,16 @@ export default function InventoryDashboard() {
     let cancelled = false;
     void (async () => {
       try {
-        const [sRes, vRes] = await Promise.all([
+        const [opRes, basicRes] = await Promise.all([
+          fetch("/api/inventory/operator-summary", { credentials: "include", cache: "no-store" }),
           fetch("/api/inventory/summary", { credentials: "include", cache: "no-store" }),
-          fetch("/api/inventory/valuation?only_positive=1&totals=1", { credentials: "include", cache: "no-store" }),
         ]);
-        const sJ = await sRes.json();
-        const vJ = await vRes.json();
+        const opJ = await opRes.json();
+        const basicJ = await basicRes.json();
         if (cancelled) return;
-        if (!sRes.ok) { setError(sJ.error ?? `Failed (${sRes.status})`); return; }
-        setSummary(sJ.summary as Summary);
-        if (vRes.ok && vJ.totals) {
-          setTopValue((vJ.totals.top_holders ?? []) as ValuationRow[]);
-        }
+        if (opRes.ok) setOp(opJ.summary as OperatorSummary);
+        if (basicRes.ok) setBasic(basicJ.summary as BasicSummary);
+        if (!opRes.ok && !basicRes.ok) setError(opJ.error ?? basicJ.error ?? "Failed to load");
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       } finally {
@@ -122,240 +99,194 @@ export default function InventoryDashboard() {
     return () => { cancelled = true; };
   }, []);
 
-  const totalStock = summary?.total_on_hand ?? 0;
-  const headlineValue = pickHeadlineCurrency(summary?.value_by_currency);
+  const totalAlerts =
+    (op?.alerts.low_stock ?? 0) +
+    (op?.alerts.expired_batches ?? 0) +
+    (op?.alerts.pending_approvals ?? 0) +
+    (op?.alerts.pending_transfers ?? 0) +
+    (op?.alerts.pending_returns ?? 0) +
+    (op?.alerts.stuck_serials ?? 0) +
+    (op?.alerts.stale_drafts ?? 0);
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-screen bg-[var(--bg-primary)] pb-16 text-[var(--text-primary)] md:pb-6">
       <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
         <InventoryHeader
-          title="Inventory"
-          subtitle="Stock movements and balances across every location."
-          action={
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href="/inventory/items"
-                className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] hover:bg-white/[0.06]"
-              >
-                <RrIcon name="box-open" size={12} />
-                Items
-              </Link>
-              <Link
-                href="/inventory/movements"
-                className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.06] px-3 py-1.5 text-[12px] text-[var(--text-primary)] hover:bg-white/[0.10]"
-              >
-                <RrIcon name="plus" size={12} />
-                New Movement
-              </Link>
-            </div>
-          }
+          title={t("inv.home.title")}
+          subtitle={t("inv.home.subtitle")}
         />
 
         {error && (
-          <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">
+          <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300 dark:text-rose-300">
             {error}
           </div>
         )}
 
-        {/* KPI strip — uses InventoryKpi (mirrors Finance KPI rhythm). */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
-          <InventoryKpi
-            label="Locations"
-            value={loading ? "—" : String(summary?.warehouse_count ?? 0)}
-            hint="Warehouses + virtual locations"
-            tone="info"
-          />
-          <InventoryKpi
-            label="Items in stock"
-            value={loading ? "—" : String(summary?.item_count ?? 0)}
-            hint="Distinct inventory items on hand"
-          />
-          <InventoryKpi
-            label="Total on-hand"
-            value={loading ? "—" : fmtQty(totalStock)}
-            hint="Sum across all locations"
-            tone="positive"
-          />
-          <InventoryKpi
-            label="Reserved"
-            value={loading ? "—" : fmtQty(summary?.total_reserved ?? 0)}
-            hint="Committed but not yet shipped"
-            tone="warning"
-          />
-          <InventoryKpi
-            label="Inventory value"
-            value={loading ? "—" : fmtMoney(headlineValue.value)}
-            hint={
-              headlineValue.otherCount > 0
-                ? `${headlineValue.currency} (+ ${headlineValue.otherCount} other currencies)`
-                : headlineValue.currency
-            }
-            tone="positive"
-          />
-          {/* INV-H4A — batch expiry tiles (only render if there's data). */}
-          <InventoryKpi
-            label="Expired batches"
-            value={loading ? "—" : String(summary?.batch_kpis?.expired ?? 0)}
-            hint="Batches past expiry date with stock remaining"
-            tone={(summary?.batch_kpis?.expired ?? 0) > 0 ? "warning" : "info"}
-          />
-          <InventoryKpi
-            label="Near-expiry batches"
-            value={loading ? "—" : String(summary?.batch_kpis?.near_expiry ?? 0)}
-            hint="Batches expiring within next 30 days"
-            tone={(summary?.batch_kpis?.near_expiry ?? 0) > 0 ? "warning" : "info"}
-          />
+        {/* 1. Quick actions ─────────────────────────────────── */}
+        <section data-testid="inv-home-actions">
+          <div className="flex items-baseline justify-between">
+            <SectionEyebrow>{t("inv.home.quick.title")}</SectionEyebrow>
+            <span className="text-[10.5px] text-[var(--text-dim)]">{t("inv.shortcuts.hint")}</span>
+          </div>
+          <div data-testid="inv-home-quick-actions" className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <ActionCard
+              testId="action-receive"
+              icon="download"
+              label={t("inv.action.receive")}
+              hint={t("inv.action.receive.hint")}
+              href="/inventory/movements?create=receive"
+              tone="positive"
+            />
+            <ActionCard
+              testId="action-ship"
+              icon="truck-side"
+              label={t("inv.action.ship")}
+              hint={t("inv.action.ship.hint")}
+              href="/inventory/movements?create=ship"
+              tone="info"
+            />
+            <ActionCard
+              testId="action-transfer"
+              icon="shipping-fast"
+              label={t("inv.action.transfer")}
+              hint={t("inv.action.transfer.hint")}
+              href="/inventory/transfers?create=1"
+              tone="info"
+            />
+            <ActionCard
+              testId="action-adjust"
+              icon="pencil"
+              label={t("inv.action.adjust")}
+              hint={t("inv.action.adjust.hint")}
+              href="/inventory/movements?create=adjustment"
+              tone="warning"
+            />
+          </div>
+        </section>
+
+        {/* 2. Operational alerts ────────────────────────────── */}
+        <section data-testid="inv-home-alerts">
+          <SectionEyebrow>{t("inv.home.alerts.title")}</SectionEyebrow>
+          {loading ? (
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="h-12 animate-pulse rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]/40" />
+              ))}
+            </div>
+          ) : totalAlerts === 0 ? (
+            <div className="mt-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-4 text-[12px] text-[var(--text-dim)]">
+              {t("inv.home.alerts.empty")}
+            </div>
+          ) : (
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {(op?.alerts.low_stock ?? 0) > 0 && (
+                <AlertCard icon="interrogation" label={t("inv.alert.low_stock")} count={op!.alerts.low_stock} href="/inventory/items?filter=low_stock" tone="warning" />
+              )}
+              {(op?.alerts.expired_batches ?? 0) > 0 && (
+                <AlertCard icon="clock" label={t("inv.alert.expired_batches")} count={op!.alerts.expired_batches} href="/inventory/batches?status=expired" tone="rose" />
+              )}
+              {(op?.alerts.pending_approvals ?? 0) > 0 && (
+                <AlertCard icon="shield-check" label={t("inv.alert.pending_approvals")} count={op!.alerts.pending_approvals} href="/inventory/movements?approval=pending" tone="warning" />
+              )}
+              {(op?.alerts.pending_transfers ?? 0) > 0 && (
+                <AlertCard icon="shipping-fast" label={t("inv.alert.pending_transfers")} count={op!.alerts.pending_transfers} href="/inventory/transfers?status=approved" tone="info" />
+              )}
+              {(op?.alerts.pending_returns ?? 0) > 0 && (
+                <AlertCard icon="recycle" label={t("inv.alert.pending_returns")} count={op!.alerts.pending_returns} href="/inventory/returns?status=approved" tone="info" />
+              )}
+              {(op?.alerts.stuck_serials ?? 0) > 0 && (
+                <AlertCard icon="fingerprint" label={t("inv.alert.stuck_serials")} count={op!.alerts.stuck_serials} href="/inventory/serials?status=in_transit" tone="rose" />
+              )}
+              {(op?.alerts.stale_drafts ?? 0) > 0 && (
+                <AlertCard icon="file" label={t("inv.alert.stale_drafts")} count={op!.alerts.stale_drafts} href="/inventory/movements?tab=drafts" tone="warning" />
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* 3. Today ─────────────────────────────────────────── */}
+        <section data-testid="inv-home-today">
+          <SectionEyebrow>{t("inv.home.today.title")}</SectionEyebrow>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <TodayTile icon="download"    label={t("inv.today.receipts")}  value={op?.today.receipts ?? 0} href="/inventory/movements?direction=in" />
+            <TodayTile icon="truck-side"  label={t("inv.today.shipments")} value={op?.today.shipments ?? 0} href="/inventory/movements?direction=out" />
+            <TodayTile icon="shipping-fast" label={t("inv.today.transfers")} value={op?.today.transfers ?? 0} href="/inventory/transfers" />
+            <TodayTile icon="recycle"     label={t("inv.today.returns")}   value={op?.today.returns ?? 0} href="/inventory/returns" />
+          </div>
+        </section>
+
+        {/* 4. Quick lookup ──────────────────────────────────── */}
+        <section data-testid="inv-home-lookup">
+          <SectionEyebrow>{t("inv.home.lookup.title")}</SectionEyebrow>
+          <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
+            <LookupInput icon="box-open"    placeholder={t("inv.home.lookup.item")}   type="item" />
+            <LookupInput icon="fingerprint" placeholder={t("inv.home.lookup.serial")} type="serial" />
+            <LookupInput icon="clock"       placeholder={t("inv.home.lookup.batch")}  type="batch" />
+          </div>
+          <div className="mt-2 text-right text-[11px]">
+            <Link href="/inventory/search" className="text-[var(--text-dim)] hover:text-[var(--text-primary)]">
+              Advanced search →
+            </Link>
+          </div>
+        </section>
+
+        {/* 5. Operational intelligence ───────────────────────── */}
+        <section data-testid="inv-home-intel">
+          <SectionEyebrow>{t("inv.home.intel.title")}</SectionEyebrow>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <IntelTile
+              icon="bullseye-arrow"
+              label={t("inv.home.intel.fastest")}
+              primary={op?.intel.fastest_moving[0]?.item_code ?? "—"}
+              secondary={op?.intel.fastest_moving[0] ? `${op.intel.fastest_moving[0].item_name ?? ""} · ${op.intel.fastest_moving[0].moves} moves` : ""}
+              href={op?.intel.fastest_moving[0] ? `/inventory/items/${op.intel.fastest_moving[0].inventory_item_id}` : undefined}
+            />
+            <IntelTile
+              icon="clock"
+              label={t("inv.home.intel.stagnant")}
+              primary={op?.intel.stagnant[0]?.item_code ?? "—"}
+              secondary={op?.intel.stagnant[0] ? `${op.intel.stagnant[0].item_name ?? ""}` : ""}
+              href={op?.intel.stagnant[0] ? `/inventory/items/${op.intel.stagnant[0].inventory_item_id}` : undefined}
+            />
+            <IntelTile
+              icon="bank"
+              label={t("inv.home.intel.busiest")}
+              primary={op?.intel.busiest_warehouse?.warehouse_code ?? "—"}
+              secondary={op?.intel.busiest_warehouse ? `${op.intel.busiest_warehouse.warehouse_name} · ${op.intel.busiest_warehouse.moves} moves` : ""}
+              href={op?.intel.busiest_warehouse ? `/inventory/warehouses` : undefined}
+            />
+            <IntelTile
+              icon="recycle"
+              label={t("inv.home.intel.returned")}
+              primary={op?.intel.most_returned?.item_code ?? "—"}
+              secondary={op?.intel.most_returned ? `${op.intel.most_returned.item_name ?? ""} · ${op.intel.most_returned.returns} returns` : ""}
+              href={op?.intel.most_returned ? `/inventory/items/${op.intel.most_returned.inventory_item_id}` : undefined}
+            />
+          </div>
+        </section>
+
+        {/* Compact KPI strip — kept from the prior dashboard for context. */}
+        <section>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <InventoryKpi label="Locations"     value={basic ? String(basic.warehouse_count) : "—"} tone="info" />
+            <InventoryKpi label="Items in stock" value={basic ? String(basic.item_count) : "—"} />
+            <InventoryKpi label="Total on-hand"  value={basic ? fmtQty(basic.total_on_hand) : "—"} tone="positive" />
+            <InventoryKpi label="Reserved"       value={basic ? fmtQty(basic.total_reserved) : "—"} tone="warning" />
+          </div>
+        </section>
+
+        <div className="flex flex-wrap items-center gap-2 pt-2">
+          <Link href="/inventory/balances" className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]">
+            <RrIcon name="badge-check" size={11} /> Balances
+          </Link>
+          <Link href="/inventory/movements" className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]">
+            <RrIcon name="file-invoice" size={11} /> Movements ledger
+          </Link>
         </div>
-
-        <Hairline />
-
-        {/* Top stock holders. */}
-        <section>
-          <div className="flex items-baseline justify-between gap-3">
-            <Eyebrow>Top stock holders</Eyebrow>
-            <Link href="/inventory/balances" className="inline-flex items-center gap-1 text-[11px] text-gray-500 hover:text-gray-300">
-              View all balances <span aria-hidden>→</span>
-            </Link>
-          </div>
-          <Panel className="mt-3">
-            <table className="min-w-full text-[12.5px]">
-              <thead>
-                <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.10em] text-gray-500">
-                  <th className="px-4 py-2 text-left">Code</th>
-                  <th className="px-4 py-2 text-left">Item</th>
-                  <th className="px-4 py-2 text-left">Type</th>
-                  <th className="px-4 py-2 text-left">Location</th>
-                  <th className="px-4 py-2 text-right">On hand</th>
-                  <th className="px-4 py-2 text-right">Available</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={6} className="px-4 py-6 text-center text-[11px] text-gray-600">Loading…</td></tr>
-                ) : !summary?.top_balances?.length ? (
-                  <tr><td colSpan={6} className="px-0 py-0">
-                    <InventoryEmpty
-                      title="No stock recorded yet"
-                      hint="Create an inventory item with an initial quantity, or post your first movement."
-                      action={
-                        <Link href="/inventory/items" className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1 text-[11.5px] hover:bg-white/[0.06]">
-                          <RrIcon name="plus" size={11} />
-                          Add an item
-                        </Link>
-                      }
-                    />
-                  </td></tr>
-                ) : (
-                  summary.top_balances.map((b) => (
-                    <tr key={`${b.inventory_item_id}-${b.warehouse_code}`} className="border-b border-white/[0.03] last:border-b-0 hover:bg-white/[0.02]">
-                      <td className="px-4 py-2 font-mono text-[11.5px] text-gray-300">{b.item_code}</td>
-                      <td className="px-4 py-2 text-gray-200">{b.item_name ?? "—"}</td>
-                      <td className="px-4 py-2 text-[11px] text-gray-500">{b.item_type_name ?? "—"}</td>
-                      <td className="px-4 py-2 text-gray-400">{b.warehouse_code}</td>
-                      <td className="px-4 py-2 text-right tabular-nums font-mono">{fmtQty(b.qty_on_hand)}</td>
-                      <td className="px-4 py-2 text-right tabular-nums font-mono text-gray-400">{fmtQty(b.qty_available)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </Panel>
-        </section>
-
-        {/* Phase O.5 — Top value holders. */}
-        <section>
-          <div className="flex items-baseline justify-between gap-3">
-            <Eyebrow>Top value holders</Eyebrow>
-            <Link href="/inventory/items" className="inline-flex items-center gap-1 text-[11px] text-gray-500 hover:text-gray-300">
-              View all items <span aria-hidden>→</span>
-            </Link>
-          </div>
-          <Panel className="mt-3">
-            <table className="min-w-full text-[12.5px]">
-              <thead>
-                <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.10em] text-gray-500">
-                  <th className="px-4 py-2 text-left">Code</th>
-                  <th className="px-4 py-2 text-left">Item</th>
-                  <th className="px-4 py-2 text-left">Location</th>
-                  <th className="px-4 py-2 text-right">Qty</th>
-                  <th className="px-4 py-2 text-right">Avg cost</th>
-                  <th className="px-4 py-2 text-right">Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={6} className="px-4 py-6 text-center text-[11px] text-gray-600">Loading…</td></tr>
-                ) : topValue.length === 0 ? (
-                  <tr><td colSpan={6} className="px-0 py-0">
-                    <InventoryEmpty
-                      title="No valued stock yet"
-                      hint="Receive items with a unit cost (or set one on the item master) and the value shows up here."
-                    />
-                  </td></tr>
-                ) : (
-                  topValue.map((r) => (
-                    <tr key={`${r.inventory_item_id}-${r.warehouse_code}`} className="border-b border-white/[0.03] last:border-b-0 hover:bg-white/[0.02]">
-                      <td className="px-4 py-2 font-mono text-[11.5px] text-gray-300">{r.item_code}</td>
-                      <td className="px-4 py-2 text-gray-200">{r.item_name ?? "—"}</td>
-                      <td className="px-4 py-2 text-gray-400">{r.warehouse_code}</td>
-                      <td className="px-4 py-2 text-right tabular-nums font-mono">{fmtQty(r.qty_on_hand)}</td>
-                      <td className="px-4 py-2 text-right tabular-nums font-mono text-gray-400">{fmtMoney(r.average_cost)}</td>
-                      <td className="px-4 py-2 text-right tabular-nums font-mono text-emerald-200">{fmtMoney(r.inventory_value)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </Panel>
-        </section>
-
-        {/* Recent movements. */}
-        <section>
-          <div className="flex items-baseline justify-between gap-3">
-            <Eyebrow>Recent movements</Eyebrow>
-            <Link href="/inventory/movements" className="inline-flex items-center gap-1 text-[11px] text-gray-500 hover:text-gray-300">
-              View all <span aria-hidden>→</span>
-            </Link>
-          </div>
-          <Panel className="mt-3">
-            <table className="min-w-full text-[12.5px]">
-              <thead>
-                <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.10em] text-gray-500">
-                  <th className="px-4 py-2 text-left">Date</th>
-                  <th className="px-4 py-2 text-left">Movement #</th>
-                  <th className="px-4 py-2 text-left">Type</th>
-                  <th className="px-4 py-2 text-right">Qty</th>
-                  <th className="px-4 py-2 text-left">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={5} className="px-4 py-6 text-center text-[11px] text-gray-600">Loading…</td></tr>
-                ) : !summary?.recent_movements?.length ? (
-                  <tr><td colSpan={5} className="px-0 py-0">
-                    <InventoryEmpty
-                      title="No movements yet"
-                      hint="Stock moves the moment you receive a PO, post an adjustment, or open a balance."
-                    />
-                  </td></tr>
-                ) : (
-                  summary.recent_movements.map((m) => (
-                    <tr key={m.id} className="border-b border-white/[0.03] last:border-b-0 hover:bg-white/[0.02]">
-                      <td className="px-4 py-2 text-gray-400">{m.movement_date}</td>
-                      <td className="px-4 py-2 font-mono text-[11.5px] text-gray-300">{m.movement_no}</td>
-                      <td className="px-4 py-2 text-gray-300">{movementLabel(m.movement_type)}</td>
-                      <td className="px-4 py-2 text-right">
-                        <DirectionDelta direction={m.direction} quantity={m.quantity} unit={m.unit} />
-                      </td>
-                      <td className="px-4 py-2"><StatusBadge status={m.status} /></td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </Panel>
-        </section>
       </div>
+
+      <MobileFab />
+      <MobileBottomBar />
     </div>
   );
 }
