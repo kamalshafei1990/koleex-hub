@@ -63,6 +63,7 @@ export default function InventoryMovementDetail({
 }) {
   const [movement, setMovement] = useState<MovementDetail | null>(null);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
+  const [transferLink, setTransferLink] = useState<{ transfer_id: string; transfer_no: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -77,7 +78,8 @@ export default function InventoryMovementDetail({
         const j = await r.json();
         if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
         if (cancelled) return;
-        setMovement(j.movement as MovementDetail);
+        const mv = j.movement as MovementDetail;
+        setMovement(mv);
 
         const a = await fetch(
           `/api/inventory/audit-log?entity_type=movement&entity_id=${movementId}`,
@@ -85,6 +87,19 @@ export default function InventoryMovementDetail({
         );
         const aj = await a.json();
         if (a.ok && !cancelled) setAudit((aj.entries ?? []) as AuditEntry[]);
+
+        /* INV-H3A traceability: if this movement is tied to a transfer,
+           fetch the transfer header link so we can render "View transfer →". */
+        if (mv.source_type === "inventory_transfer") {
+          const lr = await fetch(`/api/inventory/transfers/by-movement/${movementId}`, {
+            cache: "no-store",
+            credentials: "include",
+          });
+          const lj = await lr.json();
+          if (lr.ok && lj.link && !cancelled) {
+            setTransferLink(lj.link as { transfer_id: string; transfer_no: string });
+          }
+        }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       } finally {
@@ -173,6 +188,14 @@ export default function InventoryMovementDetail({
                   className="text-[11.5px] text-[var(--accent-primary,#3b82f6)] hover:underline"
                 >
                   Open {sourceLink.label} →
+                </a>
+              )}
+              {transferLink && (
+                <a
+                  href={`/inventory/transfers/${transferLink.transfer_id}`}
+                  className="text-[11.5px] text-[var(--accent-primary,#3b82f6)] hover:underline"
+                >
+                  Transfer → {transferLink.transfer_no}
                 </a>
               )}
             </Section>

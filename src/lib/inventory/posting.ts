@@ -127,16 +127,24 @@ export async function createInventoryMovement(input: CreateMovementInput): Promi
   const movementDate = date.toISOString().slice(0, 10);
   const movementNo = generateMovementNo(input.movement_type, date);
 
-  /* Source idempotency probe. */
+  /* Source idempotency probe. For most workflows, (source_type, source_id)
+     is unique per direction (e.g. purchase_receipt_item only ever drives
+     an IN). Transfers are different: the same transfer_item_id drives
+     BOTH a transfer_out (at ship) AND a transfer_in (at receive). Cut the
+     probe by movement_type when the source is a transfer so the receive
+     side doesn't accidentally match the ship side. */
   if (input.source_type && input.source_id) {
-    const { data: existing } = await supabaseServer
+    let probe = supabaseServer
       .from("inventory_stock_movements")
       .select("*")
       .eq("tenant_id", input.tenant_id)
       .eq("source_type", input.source_type)
       .eq("source_id", input.source_id)
-      .neq("status", "voided")
-      .maybeSingle();
+      .neq("status", "voided");
+    if (input.source_type === "inventory_transfer") {
+      probe = probe.eq("movement_type", input.movement_type);
+    }
+    const { data: existing } = await probe.maybeSingle();
     if (existing) {
       return { ok: true, movement: existing as StockMovement };
     }

@@ -17,6 +17,7 @@
     "validate:inventory": "NODE_OPTIONS=--conditions=react-server tsx scripts/inventory.ts",
     "validate:inventory-unification": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-inventory-unification.ts",
     "validate:inventory-discipline": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-inventory-discipline.ts",
+    "validate:inventory-transfers": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-inventory-transfers.ts",
     "validate:purchases": "NODE_OPTIONS=--conditions=react-server tsx scripts/purchases.ts",
     "validate:sales": "NODE_OPTIONS=--conditions=react-server tsx scripts/sales.ts",
     "validate:valuation": "NODE_OPTIONS=--conditions=react-server tsx scripts/valuation.ts",
