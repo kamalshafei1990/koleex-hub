@@ -64,6 +64,7 @@ export default function InventoryMovementDetail({
   const [movement, setMovement] = useState<MovementDetail | null>(null);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [transferLink, setTransferLink] = useState<{ transfer_id: string; transfer_no: string } | null>(null);
+  const [returnLink, setReturnLink] = useState<{ return_id: string; return_no: string; return_type: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -98,6 +99,18 @@ export default function InventoryMovementDetail({
           const lj = await lr.json();
           if (lr.ok && lj.link && !cancelled) {
             setTransferLink(lj.link as { transfer_id: string; transfer_no: string });
+          }
+        }
+        /* INV-H3B traceability: if this movement is tied to a return,
+           fetch the return header link so we can render "Return → <no>". */
+        if (mv.source_type === "inventory_return") {
+          const lr = await fetch(`/api/inventory/returns/by-movement/${movementId}`, {
+            cache: "no-store",
+            credentials: "include",
+          });
+          const lj = await lr.json();
+          if (lr.ok && lj.link && !cancelled) {
+            setReturnLink(lj.link as { return_id: string; return_no: string; return_type: string });
           }
         }
       } catch (e) {
@@ -196,6 +209,14 @@ export default function InventoryMovementDetail({
                   className="text-[11.5px] text-[var(--accent-primary,#3b82f6)] hover:underline"
                 >
                   Transfer → {transferLink.transfer_no}
+                </a>
+              )}
+              {returnLink && (
+                <a
+                  href={`/inventory/returns/${returnLink.return_id}`}
+                  className="text-[11.5px] text-[var(--accent-primary,#3b82f6)] hover:underline"
+                >
+                  Return → {returnLink.return_no}
                 </a>
               )}
             </Section>
