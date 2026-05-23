@@ -133,6 +133,11 @@ export default function InventoryMovements() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  /* INV-H4A — optional variant + batch pickers. */
+  const [variantId, setVariantId] = useState<string>("");
+  const [batchId, setBatchId] = useState<string>("");
+  const [variantOptions, setVariantOptions] = useState<Array<{ id: string; variant_name: string }>>([]);
+  const [batchOptions, setBatchOptions] = useState<Array<{ id: string; batch_no: string; variant_id: string | null; expiry_date: string | null }>>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -191,6 +196,68 @@ export default function InventoryMovements() {
 
   useEffect(() => { void loadMovements(); }, [loadMovements]);
 
+  /* INV-H4A — load variants when item changes; reset variant/batch. */
+  useEffect(() => {
+    const itemId = selectedProduct?.stock_profile?.inventory_item_id;
+    if (!itemId) {
+      setVariantOptions([]);
+      setVariantId("");
+      setBatchOptions([]);
+      setBatchId("");
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const r = await fetch(`/api/inventory/variants?item_id=${itemId}&status=active&limit=200`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+        if (!r.ok) return;
+        const j = await r.json();
+        if (cancelled) return;
+        setVariantOptions(((j.variants ?? []) as Array<{ id: string; variant_name: string }>).map((v) => ({
+          id: v.id,
+          variant_name: v.variant_name,
+        })));
+      } catch {/* ignore */}
+    })();
+    return () => { cancelled = true; };
+  }, [selectedProduct?.stock_profile?.inventory_item_id]);
+
+  /* INV-H4A — load batches for the (item, variant) pair. */
+  useEffect(() => {
+    const itemId = selectedProduct?.stock_profile?.inventory_item_id;
+    if (!itemId) {
+      setBatchOptions([]);
+      setBatchId("");
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const url = new URL("/api/inventory/batches", window.location.origin);
+        url.searchParams.set("item_id", itemId);
+        url.searchParams.set("limit", "200");
+        if (variantId) url.searchParams.set("variant_id", variantId);
+        const r = await fetch(url.toString(), { credentials: "include", cache: "no-store" });
+        if (!r.ok) return;
+        const j = await r.json();
+        if (cancelled) return;
+        const all = (j.batches ?? []) as Array<{ id: string; batch_no: string; variant_id: string | null; expiry_date: string | null }>;
+        // If no variant chosen, only show batches without a variant; else show only those matching.
+        const filtered = variantId
+          ? all.filter((b) => b.variant_id === variantId)
+          : all.filter((b) => b.variant_id == null);
+        setBatchOptions(filtered);
+        // Clear batch if it's no longer in options.
+        if (batchId && !filtered.find((b) => b.id === batchId)) setBatchId("");
+      } catch {/* ignore */}
+    })();
+    return () => { cancelled = true; };
+    // batchId is intentionally NOT a dep (would loop on clear)
+  }, [selectedProduct?.stock_profile?.inventory_item_id, variantId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   /* Tab filtering. */
   const filtered = useMemo(() => {
     switch (tab) {
@@ -246,11 +313,15 @@ export default function InventoryMovements() {
           notes: notes || null,
           adjustment_reason: reason.trim(),
           post: false, // Always draft — Scope 3.
+          /* INV-H4A — optional variant + batch. */
+          variant_id: variantId || null,
+          batch_id: batchId || null,
         }),
       });
       const j = await r.json();
       if (!r.ok) { setSubmitError(humanizeError(j.error ?? `HTTP ${r.status}`)); return; }
       setQuantity(""); setReference(""); setNotes(""); setReason(""); setUnitCost("");
+      setVariantId(""); setBatchId("");
       setFlash("Submitted for approval.");
       window.setTimeout(() => setFlash(null), 2500);
       setShowForm(false);
@@ -366,6 +437,49 @@ export default function InventoryMovements() {
                   <option key={w.id} value={w.id}>{w.code} — {w.name}</option>
                 ))}
               </select>
+            </label>
+
+            {/* INV-H4A — Variant + Batch optional pickers. */}
+            <label className="block">
+              <div className="mb-1 text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
+                Variant (optional)
+              </div>
+              <select
+                value={variantId}
+                onChange={(e) => setVariantId(e.target.value)}
+                disabled={!selectedProduct?.stock_profile}
+                className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] disabled:opacity-50"
+              >
+                <option value="">—</option>
+                {variantOptions.map((v) => (
+                  <option key={v.id} value={v.id}>{v.variant_name}</option>
+                ))}
+              </select>
+              {selectedProduct?.stock_profile && variantOptions.length === 0 && (
+                <div className="mt-0.5 text-[10px] text-[var(--text-dim)]">No variants for this item.</div>
+              )}
+            </label>
+
+            <label className="block">
+              <div className="mb-1 text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
+                Batch (optional)
+              </div>
+              <select
+                value={batchId}
+                onChange={(e) => setBatchId(e.target.value)}
+                disabled={!selectedProduct?.stock_profile}
+                className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] disabled:opacity-50"
+              >
+                <option value="">—</option>
+                {batchOptions.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.batch_no}{b.expiry_date ? ` · exp ${b.expiry_date}` : ""}
+                  </option>
+                ))}
+              </select>
+              {selectedProduct?.stock_profile && batchOptions.length === 0 && (
+                <div className="mt-0.5 text-[10px] text-[var(--text-dim)]">No batches match.</div>
+              )}
             </label>
 
             <label className="block">

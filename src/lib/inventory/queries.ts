@@ -367,6 +367,8 @@ export interface InventoryDashboardSummary {
   value_by_currency: Record<string, number>;
   recent_movements: StockMovement[];
   top_balances: BalanceWithRefs[];
+  /** INV-H4A — batch expiry KPIs (counts only, computed by getBatchKpis). */
+  batch_kpis?: { expired: number; near_expiry: number };
 }
 
 export async function buildInventoryDashboardSummary(

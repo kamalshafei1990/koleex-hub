@@ -9,6 +9,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { buildInventoryDashboardSummary } from "@/lib/inventory/queries";
+import { getBatchKpis } from "@/lib/inventory/variants";
 
 export async function GET() {
   const auth = await requireAuth();
@@ -17,8 +18,11 @@ export async function GET() {
   if (deny) return deny;
 
   try {
-    const summary = await buildInventoryDashboardSummary(auth.tenant_id);
-    return NextResponse.json({ summary });
+    const [summary, batchKpis] = await Promise.all([
+      buildInventoryDashboardSummary(auth.tenant_id),
+      getBatchKpis(auth.tenant_id),
+    ]);
+    return NextResponse.json({ summary: { ...summary, batch_kpis: batchKpis } });
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : String(e) },

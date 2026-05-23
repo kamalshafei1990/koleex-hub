@@ -202,6 +202,9 @@ export async function POST(req: Request) {
     adjustment_reason: adjustmentReason || undefined,
     pre_approved: canPreApprove,
     metadata: body.metadata ?? {},
+    /* INV-H4A — optional variant + batch (NULL = item-level back-compat). */
+    variant_id: body.variant_id ?? null,
+    batch_id: body.batch_id ?? null,
   };
 
   /* Default behaviour: opening_balance and (legacy non-restricted) types

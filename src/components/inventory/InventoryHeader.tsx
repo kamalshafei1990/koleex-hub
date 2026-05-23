@@ -24,6 +24,7 @@ const TABS: TabEntry[] = [
   { key: "/inventory/balances",   label: "Stock Balances",  icon: "badge-check" },
   { key: "/inventory/transfers",  label: "Transfers",       icon: "truck-side" },
   { key: "/inventory/returns",    label: "Returns",         icon: "recycle" },
+  { key: "/inventory/batches",    label: "Batches",         icon: "clock" },
   { key: "/inventory/warehouses", label: "Warehouses",      icon: "bank" },
 ];
 

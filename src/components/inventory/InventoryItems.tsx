@@ -900,6 +900,9 @@ function ItemDetailDrawer({
             </div>
           )}
 
+          {/* INV-H4A — Variants section */}
+          <ItemVariantsSection itemId={itemId} />
+
           {/* Details grid */}
           <div>
             <div className="text-[10px] uppercase tracking-[0.12em] text-gray-500 mb-2">Details</div>
@@ -1045,5 +1048,223 @@ function TypesPanel({
         </div>
       </div>
     </DrawerShell>
+  );
+}
+
+/* ─── INV-H4A — Variants section inside item detail ──────────── */
+
+interface VariantDto {
+  id: string;
+  variant_code: string;
+  variant_name: string;
+  attributes: Record<string, unknown>;
+  cost_price: number | null;
+  status: "active" | "inactive" | "archived";
+}
+
+function ItemVariantsSection({ itemId }: { itemId: string }) {
+  const [variants, setVariants] = useState<VariantDto[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [color, setColorAttr] = useState("");
+  const [voltage, setVoltage] = useState("");
+  const [size, setSize] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const r = await fetch(`/api/inventory/variants?item_id=${itemId}&limit=200`, {
+        credentials: "include",
+        cache: "no-store",
+      });
+      const j = await r.json();
+      if (!r.ok) {
+        setError(humanizeError(j.error ?? r.statusText));
+        return;
+      }
+      setVariants((j.variants ?? []) as VariantDto[]);
+    } catch (e) {
+      setError(humanizeError(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [itemId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function submit() {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const attrs: Record<string, string> = {};
+      if (color) attrs.color = color;
+      if (voltage) attrs.voltage = voltage;
+      if (size) attrs.size = size;
+      const r = await fetch("/api/inventory/variants", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          inventory_item_id: itemId,
+          variant_name: name,
+          attributes: attrs,
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok) {
+        setError(humanizeError(j.error ?? r.statusText));
+        return;
+      }
+      setName("");
+      setColorAttr("");
+      setVoltage("");
+      setSize("");
+      setAddOpen(false);
+      void load();
+    } catch (e) {
+      setError(humanizeError(e));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function archive(id: string) {
+    if (!confirm("Archive this variant?")) return;
+    await fetch(`/api/inventory/variants/${id}`, { method: "DELETE", credentials: "include" });
+    void load();
+  }
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between">
+        <div className="text-[10px] uppercase tracking-[0.12em] text-gray-500">Variants</div>
+        <button
+          type="button"
+          onClick={() => setAddOpen((s) => !s)}
+          className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-0.5 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"
+        >
+          <RrIcon name="plus" size={10} />
+          Add variant
+        </button>
+      </div>
+
+      {error && (
+        <div className="mb-2 rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-700 dark:text-rose-200">
+          {error}
+        </div>
+      )}
+
+      {addOpen && (
+        <div className="mb-3 rounded-md border border-white/[0.05] bg-white/[0.012] p-3 dark:border-white/[0.05]">
+          <div className="grid grid-cols-2 gap-2 text-[11.5px]">
+            <label className="col-span-2 block">
+              <div className="mb-0.5 text-[10px] uppercase tracking-[0.10em] text-gray-500">Name</div>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Black 220V Large"
+                className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1 text-[11.5px] text-[var(--text-primary)]"
+              />
+            </label>
+            <label className="block">
+              <div className="mb-0.5 text-[10px] uppercase tracking-[0.10em] text-gray-500">Color</div>
+              <input
+                value={color}
+                onChange={(e) => setColorAttr(e.target.value)}
+                className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1 text-[11.5px] text-[var(--text-primary)]"
+              />
+            </label>
+            <label className="block">
+              <div className="mb-0.5 text-[10px] uppercase tracking-[0.10em] text-gray-500">Voltage</div>
+              <input
+                value={voltage}
+                onChange={(e) => setVoltage(e.target.value)}
+                className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1 text-[11.5px] text-[var(--text-primary)]"
+              />
+            </label>
+            <label className="col-span-2 block">
+              <div className="mb-0.5 text-[10px] uppercase tracking-[0.10em] text-gray-500">Size</div>
+              <input
+                value={size}
+                onChange={(e) => setSize(e.target.value)}
+                className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1 text-[11.5px] text-[var(--text-primary)]"
+              />
+            </label>
+          </div>
+          <div className="mt-2 flex justify-end">
+            <button
+              type="button"
+              onClick={submit}
+              disabled={submitting || !name.trim()}
+              className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] text-emerald-700 hover:bg-emerald-500/20 disabled:opacity-50 dark:text-emerald-200"
+            >
+              {submitting ? "…" : "Save variant"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="text-[11px] text-gray-500">Loading…</div>
+      ) : variants.length === 0 ? (
+        <div className="rounded-md border border-white/[0.05] bg-white/[0.012] px-3 py-3 text-[11.5px] text-gray-500">
+          No variants yet. Add a variant when this item exists in multiple flavours (color, voltage, size).
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-md border border-white/[0.05]">
+          <table className="min-w-full text-[11.5px]">
+            <thead>
+              <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.10em] text-gray-500">
+                <th className="px-2 py-1.5 text-left">Name</th>
+                <th className="px-2 py-1.5 text-left">Attributes</th>
+                <th className="px-2 py-1.5 text-right">Cost</th>
+                <th className="px-2 py-1.5">Status</th>
+                <th className="px-2 py-1.5"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {variants.map((v) => (
+                <tr key={v.id} className="border-b border-white/[0.03] last:border-b-0">
+                  <td className="px-2 py-1.5 text-gray-300">
+                    <div>{v.variant_name}</div>
+                    <div className="font-mono text-[10px] text-gray-500">{v.variant_code}</div>
+                  </td>
+                  <td className="px-2 py-1.5 text-gray-400">
+                    {Object.entries(v.attributes ?? {})
+                      .map(([k, val]) => `${k}: ${String(val)}`)
+                      .join(", ") || "—"}
+                  </td>
+                  <td className="px-2 py-1.5 text-right tabular-nums font-mono text-gray-400">
+                    {v.cost_price != null
+                      ? Number(v.cost_price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                      : "—"}
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <StatusBadge status={v.status} />
+                  </td>
+                  <td className="px-2 py-1.5 text-right">
+                    {v.status !== "archived" && (
+                      <button
+                        type="button"
+                        onClick={() => archive(v.id)}
+                        className="inline-flex items-center gap-1 rounded-md border border-rose-500/30 bg-rose-500/10 px-1.5 py-0.5 text-[10px] text-rose-700 hover:bg-rose-500/20 dark:text-rose-200"
+                      >
+                        <RrIcon name="trash" size={10} /> Archive
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }

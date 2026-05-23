@@ -58,6 +58,8 @@ interface Summary {
   value_by_currency: Record<string, number>;
   recent_movements: SummaryMovement[];
   top_balances: SummaryBalance[];
+  /* INV-H4A — batch expiry KPIs. */
+  batch_kpis?: { expired: number; near_expiry: number };
 }
 
 interface ValuationRow {
@@ -189,6 +191,19 @@ export default function InventoryDashboard() {
                 : headlineValue.currency
             }
             tone="positive"
+          />
+          {/* INV-H4A — batch expiry tiles (only render if there's data). */}
+          <InventoryKpi
+            label="Expired batches"
+            value={loading ? "—" : String(summary?.batch_kpis?.expired ?? 0)}
+            hint="Batches past expiry date with stock remaining"
+            tone={(summary?.batch_kpis?.expired ?? 0) > 0 ? "warning" : "info"}
+          />
+          <InventoryKpi
+            label="Near-expiry batches"
+            value={loading ? "—" : String(summary?.batch_kpis?.near_expiry ?? 0)}
+            hint="Batches expiring within next 30 days"
+            tone={(summary?.batch_kpis?.near_expiry ?? 0) > 0 ? "warning" : "info"}
           />
         </div>
 

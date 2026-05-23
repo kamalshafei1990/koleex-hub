@@ -34,6 +34,7 @@ import {
   requiresApproval,
 } from "./discipline";
 import { logInventoryAudit } from "./audit";
+import { applyBatchMovement } from "./variants";
 
 export async function ensureDefaultWarehouse(tenantId: string): Promise<string> {
   const { data, error } = await supabaseServer.rpc("fn_inventory_ensure_default_warehouse", {
@@ -188,6 +189,9 @@ export async function createInventoryMovement(input: CreateMovementInput): Promi
       approved_at: needsApproval && input.pre_approved ? new Date().toISOString() : null,
       created_by: input.created_by ?? null,
       metadata: mergedMeta,
+      /* INV-H4A — optional variant + batch (NULL = item-level back-compat). */
+      variant_id: input.variant_id ?? null,
+      batch_id: input.batch_id ?? null,
     })
     .select("*")
     .single();
@@ -203,6 +207,19 @@ export async function createInventoryMovement(input: CreateMovementInput): Promi
         error: "Opening balance already exists. Use an adjustment instead.",
         code: "INV_H2_OPENING_BALANCE_DUPLICATE",
       };
+    }
+    /* INV-H4A — humanize variant/batch integrity errors. */
+    if (/INV_H4A_MOVEMENT_VARIANT_ITEM_MISMATCH/.test(msg)) {
+      return { ok: false, error: "Variant does not belong to this item.", code: "INV_H4A_VARIANT_ITEM_MISMATCH" };
+    }
+    if (/INV_H4A_MOVEMENT_BATCH_ITEM_MISMATCH/.test(msg)) {
+      return { ok: false, error: "Batch does not belong to this item.", code: "INV_H4A_BATCH_ITEM_MISMATCH" };
+    }
+    if (/INV_H4A_MOVEMENT_BATCH_VARIANT_MISMATCH/.test(msg)) {
+      return { ok: false, error: "Batch does not match the chosen variant.", code: "INV_H4A_BATCH_VARIANT_MISMATCH" };
+    }
+    if (/INV_H4A_MOVEMENT_BATCH_MISSING/.test(msg)) {
+      return { ok: false, error: "Batch does not exist.", code: "INV_H4A_BATCH_MISSING" };
     }
     return { ok: false, error: msg };
   }
@@ -261,6 +278,35 @@ export async function postInventoryMovement(
     }
   }
 
+  /* INV-H4A — pre-check batch capacity for OUT-with-batch movements so we
+     can refuse cleanly BEFORE the post RPC mutates balances. */
+  if (d?.status === "draft") {
+    const { data: row } = await supabaseServer
+      .from("inventory_stock_movements")
+      .select("batch_id, direction, quantity")
+      .eq("id", movementId)
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
+    const r = row as { batch_id: string | null; direction: "in" | "out"; quantity: number } | null;
+    if (r?.batch_id && r.direction === "out") {
+      const { data: batchRow } = await supabaseServer
+        .from("inventory_batches")
+        .select("quantity_remaining, batch_no")
+        .eq("tenant_id", tenantId)
+        .eq("id", r.batch_id)
+        .maybeSingle();
+      const remaining = Number((batchRow as { quantity_remaining: number } | null)?.quantity_remaining ?? 0);
+      if (remaining < Number(r.quantity)) {
+        const no = (batchRow as { batch_no: string } | null)?.batch_no ?? r.batch_id;
+        return {
+          ok: false,
+          error: `Batch ${no} only has ${remaining} remaining (cannot ship ${r.quantity}).`,
+          code: 409,
+        };
+      }
+    }
+  }
+
   const { data, error } = await supabaseServer.rpc("fn_inventory_post_movement", {
     p_movement_id: movementId,
     p_tenant_id: tenantId,
@@ -269,6 +315,19 @@ export async function postInventoryMovement(
   if (error) return { ok: false, error: error.message, code: 500 };
   const result = (data ?? { ok: false, error: "No response from posting RPC" }) as PostMovementResult;
   if (result.ok && !result.already_posted) {
+    /* INV-H4A — sync batch.quantity_remaining for posted movements that
+       carry a batch reference. */
+    const { data: posted } = await supabaseServer
+      .from("inventory_stock_movements")
+      .select("batch_id, direction, quantity")
+      .eq("id", movementId)
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
+    const pRow = posted as { batch_id: string | null; direction: "in" | "out"; quantity: number } | null;
+    if (pRow?.batch_id) {
+      const delta = pRow.direction === "in" ? Number(pRow.quantity) : -Number(pRow.quantity);
+      await applyBatchMovement(tenantId, pRow.batch_id, delta);
+    }
     await logInventoryAudit({
       tenant_id: tenantId,
       actor_id: postedBy,
@@ -308,6 +367,16 @@ export async function voidInventoryMovement(
     return { ok: false, error: "A void reason is required (min 3 characters).", code: 422 };
   }
 
+  /* INV-H4A — capture batch+direction BEFORE void so we can reverse the
+     batch.quantity_remaining effect. */
+  const { data: preVoid } = await supabaseServer
+    .from("inventory_stock_movements")
+    .select("batch_id, direction, quantity, status")
+    .eq("id", movementId)
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  const preRow = preVoid as { batch_id: string | null; direction: "in" | "out"; quantity: number; status: string } | null;
+
   const { data, error } = await supabaseServer.rpc("fn_inventory_void_movement", {
     p_movement_id: movementId,
     p_tenant_id: tenantId,
@@ -317,6 +386,12 @@ export async function voidInventoryMovement(
   if (error) return { ok: false, error: error.message, code: 500 };
   const result = (data ?? { ok: false, error: "No response from void RPC" }) as VoidMovementResult;
   if (result.ok && !result.already_voided) {
+    /* Reverse batch.quantity_remaining if the voided movement had a batch
+       AND was previously posted. */
+    if (preRow?.batch_id && preRow.status === "posted") {
+      const delta = preRow.direction === "in" ? -Number(preRow.quantity) : Number(preRow.quantity);
+      await applyBatchMovement(tenantId, preRow.batch_id, delta);
+    }
     await logInventoryAudit({
       tenant_id: tenantId,
       actor_id: voidedBy,

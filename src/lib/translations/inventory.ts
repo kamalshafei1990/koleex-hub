@@ -209,4 +209,99 @@ export const inventoryT: Translations = {
   "inv.returns.timeline.completed": { en: "Completed",         zh: "已完成",          ar: "مكتمل" },
   "inv.returns.timeline.cancelled": { en: "Cancelled",         zh: "已取消",          ar: "تم الإلغاء" },
   "inv.returns.timeline.voided":    { en: "Voided",            zh: "已作废",          ar: "تم الإبطال" },
+
+  /* ============================================================
+     Phase INV-H4A — Product Variants + Batch Foundation.
+     ============================================================ */
+
+  /* ── Header / nav ──────────────────────────────────────────── */
+  "inv.tab.batches":               { en: "Batches",             zh: "批次",            ar: "الدُفعات" },
+
+  /* ── Variants ──────────────────────────────────────────────── */
+  "inv.variants.title":            { en: "Variants",            zh: "变体",            ar: "المتغيرات" },
+  "inv.variants.empty":            { en: "No variants yet.",    zh: "暂无变体。",      ar: "لا توجد متغيرات بعد." },
+  "inv.variants.hint": {
+    en: "Add a variant when this item exists in multiple flavours (color, voltage, size).",
+    zh: "当此物料存在多种规格（颜色、电压、尺寸）时添加变体。",
+    ar: "أضف متغيرًا عندما يكون لهذا الصنف أكثر من شكل (لون، فولتية، حجم).",
+  },
+  "inv.variants.add":              { en: "Add variant",         zh: "添加变体",        ar: "إضافة متغير" },
+  "inv.variants.edit":             { en: "Edit",                zh: "编辑",            ar: "تعديل" },
+  "inv.variants.archive":          { en: "Archive",             zh: "归档",            ar: "أرشفة" },
+  "inv.variants.col.name":         { en: "Name",                zh: "名称",            ar: "الاسم" },
+  "inv.variants.col.code":         { en: "Code",                zh: "代码",            ar: "الرمز" },
+  "inv.variants.col.attributes":   { en: "Attributes",          zh: "属性",            ar: "السمات" },
+  "inv.variants.col.qty":          { en: "On hand",             zh: "在库",            ar: "متوفر" },
+  "inv.variants.col.value":        { en: "Value",               zh: "价值",            ar: "القيمة" },
+  "inv.variants.col.status":       { en: "Status",              zh: "状态",            ar: "الحالة" },
+  "inv.variants.form.name":        { en: "Variant name",        zh: "变体名称",        ar: "اسم المتغير" },
+  "inv.variants.form.code":        { en: "Variant code",        zh: "变体代码",        ar: "رمز المتغير" },
+  "inv.variants.form.attributes":  { en: "Attributes (color, voltage, size …)", zh: "属性（颜色、电压、尺寸…）", ar: "السمات (لون، فولتية، حجم…)" },
+  "inv.variants.form.barcode":     { en: "Barcode",             zh: "条码",            ar: "الباركود" },
+  "inv.variants.form.cost":        { en: "Cost price",          zh: "成本价",          ar: "سعر التكلفة" },
+  "inv.variants.form.save":        { en: "Save variant",        zh: "保存变体",        ar: "حفظ المتغير" },
+  "inv.variants.status.active":    { en: "Active",              zh: "活动",            ar: "نشط" },
+  "inv.variants.status.inactive":  { en: "Inactive",            zh: "停用",            ar: "غير نشط" },
+  "inv.variants.status.archived":  { en: "Archived",            zh: "已归档",          ar: "مؤرشف" },
+
+  /* ── Batches ───────────────────────────────────────────────── */
+  "inv.batches.title":             { en: "Batches & Lots",      zh: "批次与批号",      ar: "الدفعات والأرقام التسلسلية" },
+  "inv.batches.subtitle": {
+    en: "Lot / batch records with expiry dates, manufacture dates, and remaining quantity. Visibility only — expired stock is not auto-blocked.",
+    zh: "带有效期、生产日期与剩余数量的批次记录。仅作可视化，过期不会自动锁定。",
+    ar: "سجلات الدفعات/الأرقام التسلسلية مع تواريخ الإنتاج والانتهاء والكميات المتبقية. للمعاينة فقط — لا يتم الحجب تلقائيًا.",
+  },
+  "inv.batches.new":               { en: "New batch",           zh: "新建批次",        ar: "دفعة جديدة" },
+  "inv.batches.empty.title":       { en: "No batches yet",      zh: "暂无批次",        ar: "لا توجد دفعات بعد" },
+  "inv.batches.empty.hint": {
+    en: "Create a batch when you receive stock that you want to track by lot or expiry.",
+    zh: "当您按批次或有效期追踪入库时，创建批次。",
+    ar: "أنشئ دفعة عند استلام مخزون ترغب في تتبعه برقم تسلسلي أو تاريخ انتهاء.",
+  },
+
+  "inv.batches.col.no":            { en: "Batch #",             zh: "批次号",          ar: "رقم الدفعة" },
+  "inv.batches.col.item":          { en: "Item",                zh: "物料",            ar: "الصنف" },
+  "inv.batches.col.variant":       { en: "Variant",             zh: "变体",            ar: "المتغير" },
+  "inv.batches.col.warehouse":     { en: "Warehouse",           zh: "仓库",            ar: "المستودع" },
+  "inv.batches.col.expiry":        { en: "Expiry",              zh: "有效期",          ar: "تاريخ الانتهاء" },
+  "inv.batches.col.qty":           { en: "Remaining",           zh: "剩余",            ar: "المتبقي" },
+  "inv.batches.col.status":        { en: "Status",              zh: "状态",            ar: "الحالة" },
+
+  "inv.batches.tab.all":           { en: "All",                 zh: "全部",            ar: "الكل" },
+  "inv.batches.tab.normal":        { en: "Normal",              zh: "正常",            ar: "عادي" },
+  "inv.batches.tab.near_expiry":   { en: "Near expiry",         zh: "临期",            ar: "قارب الانتهاء" },
+  "inv.batches.tab.expired":       { en: "Expired",             zh: "已过期",          ar: "منتهي الصلاحية" },
+  "inv.batches.tab.depleted":      { en: "Depleted",            zh: "已耗尽",          ar: "مستنفد" },
+
+  "inv.batches.status.normal":     { en: "Normal",              zh: "正常",            ar: "عادي" },
+  "inv.batches.status.near_expiry":{ en: "Near expiry",         zh: "临期",            ar: "قارب الانتهاء" },
+  "inv.batches.status.expired":    { en: "Expired",             zh: "已过期",          ar: "منتهي الصلاحية" },
+  "inv.batches.status.depleted":   { en: "Depleted",            zh: "已耗尽",          ar: "مستنفد" },
+
+  "inv.batches.form.no":             { en: "Batch number",         zh: "批次号",          ar: "رقم الدفعة" },
+  "inv.batches.form.supplier_no":    { en: "Supplier batch number",zh: "供应商批次号",    ar: "رقم دفعة المورد" },
+  "inv.batches.form.manufacture":    { en: "Manufacture date",     zh: "生产日期",        ar: "تاريخ الإنتاج" },
+  "inv.batches.form.expiry":         { en: "Expiry date",          zh: "有效期至",        ar: "تاريخ الانتهاء" },
+  "inv.batches.form.qty_initial":    { en: "Initial quantity",     zh: "初始数量",        ar: "الكمية الابتدائية" },
+  "inv.batches.form.item":           { en: "Item",                 zh: "物料",            ar: "الصنف" },
+  "inv.batches.form.variant":        { en: "Variant (optional)",   zh: "变体（可选）",    ar: "المتغير (اختياري)" },
+  "inv.batches.form.warehouse":      { en: "Warehouse",            zh: "仓库",            ar: "المستودع" },
+  "inv.batches.form.notes":          { en: "Notes",                zh: "备注",            ar: "ملاحظات" },
+  "inv.batches.form.save":           { en: "Create batch",         zh: "创建批次",        ar: "إنشاء دفعة" },
+
+  /* ── KPI ───────────────────────────────────────────────────── */
+  "inv.dashboard.kpi.expired_batches":    { en: "Expired batches",    zh: "过期批次",        ar: "دفعات منتهية" },
+  "inv.dashboard.kpi.near_expiry_batches":{ en: "Near-expiry batches",zh: "临期批次",        ar: "دفعات قاربت الانتهاء" },
+
+  /* ── Movement form pickers ─────────────────────────────────── */
+  "inv.movements.form.variant":      { en: "Variant (optional)",   zh: "变体（可选）",    ar: "المتغير (اختياري)" },
+  "inv.movements.form.batch":        { en: "Batch (optional)",     zh: "批次（可选）",    ar: "الدفعة (اختياري)" },
+  "inv.movements.form.no_variants":  { en: "No variants for this item.", zh: "此物料无变体。", ar: "لا توجد متغيرات لهذا الصنف." },
+  "inv.movements.form.no_batches":   { en: "No batches match.",    zh: "无匹配批次。",     ar: "لا توجد دفعات مطابقة." },
+
+  /* ── Balances drill-down ───────────────────────────────────── */
+  "inv.balances.group_by":           { en: "Group by",             zh: "分组方式",        ar: "تجميع حسب" },
+  "inv.balances.group_by.item":      { en: "Item",                 zh: "物料",            ar: "الصنف" },
+  "inv.balances.group_by.variant":   { en: "Item + Variant",       zh: "物料 + 变体",     ar: "الصنف + المتغير" },
+  "inv.balances.group_by.batch":     { en: "Item + Variant + Batch", zh: "物料 + 变体 + 批次", ar: "الصنف + المتغير + الدفعة" },
 };

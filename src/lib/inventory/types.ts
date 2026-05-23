@@ -210,6 +210,9 @@ export interface StockMovement {
   approved_by: string | null;
   approved_at: string | null;
   rejection_reason: string | null;
+  /* INV-H4A — optional variant + batch (back-compat: NULL on legacy rows). */
+  variant_id: string | null;
+  batch_id: string | null;
 }
 
 export interface StockBalance {
@@ -289,6 +292,12 @@ export interface CreateMovementInput {
    *  approve adjustments. The posting layer never resolves permissions
    *  by itself — the route handler does that and passes the verdict. */
   pre_approved?: boolean;
+  /** INV-H4A — optional variant. Must belong to inventory_item_id. */
+  variant_id?: string | null;
+  /** INV-H4A — optional batch. Must belong to the same item (and variant if
+   *  variant is set). When provided, posting maintains
+   *  inventory_batches.quantity_remaining. */
+  batch_id?: string | null;
 }
 
 export interface PostMovementResult {
