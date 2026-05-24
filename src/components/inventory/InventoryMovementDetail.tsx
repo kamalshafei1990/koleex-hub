@@ -14,7 +14,8 @@
 
 import { useEffect, useState } from "react";
 import { humanizeError } from "@/lib/ui/humanize-error";
-import { movementLabel, StatusBadge } from "./InventoryUi";
+import { movementLabel } from "./InventoryUi";
+import { DetailsAccordion, HumanStatusPill, humanStatus, operatorLabel } from "./InventoryUx";
 import type { MovementType } from "@/lib/inventory/types";
 
 interface MovementDetail {
@@ -167,101 +168,72 @@ export default function InventoryMovementDetail({
 
         {m && (
           <div className="space-y-4 text-[12px]">
-            <Row label="Type" value={movementLabel(m.movement_type)} />
+            {/* INV-H6 — operator-first default view: action + qty + status. */}
+            <Row label="Action" value={operatorLabel(m.movement_type)} />
             <Row label="Direction" value={m.direction === "in" ? "IN (+)" : "OUT (−)"} />
             <Row label="Quantity" value={`${m.quantity} ${m.unit}`} />
-            <Row
-              label="Unit cost"
-              value={m.unit_cost != null ? `${m.unit_cost} ${m.currency}` : "—"}
-            />
-            <Row label="Reference" value={m.reference || "—"} />
-            <Row
-              label="Status"
-              value={<StatusBadge status={m.status as "draft" | "posted" | "voided"} />}
-            />
-
-            <Section title="Approval">
-              <Row label="Approval status" value={m.approval_status} />
-              {m.approved_at && (
-                <Row
-                  label="Approved at"
-                  value={new Date(m.approved_at).toLocaleString()}
-                />
-              )}
-              {m.rejection_reason && (
-                <Row label="Rejection reason" value={m.rejection_reason} />
-              )}
-            </Section>
-
-            <Section title="Source">
-              <Row label="source_type" value={m.source_type ?? "—"} />
-              {sourceLink && (
-                <a
-                  href={sourceLink.href}
-                  className="text-[11.5px] text-[var(--accent-primary,#3b82f6)] hover:underline"
-                >
-                  Open {sourceLink.label} →
-                </a>
-              )}
-              {transferLink && (
-                <a
-                  href={`/inventory/transfers/${transferLink.transfer_id}`}
-                  className="text-[11.5px] text-[var(--accent-primary,#3b82f6)] hover:underline"
-                >
-                  Transfer → {transferLink.transfer_no}
-                </a>
-              )}
-              {returnLink && (
-                <a
-                  href={`/inventory/returns/${returnLink.return_id}`}
-                  className="text-[11.5px] text-[var(--accent-primary,#3b82f6)] hover:underline"
-                >
-                  Return → {returnLink.return_no}
-                </a>
-              )}
-            </Section>
-
-            <Section title="Lifecycle">
-              {m.posted_at && (
-                <Row label="Posted at" value={new Date(m.posted_at).toLocaleString()} />
-              )}
-              {m.voided_at && (
-                <Row label="Voided at" value={new Date(m.voided_at).toLocaleString()} />
-              )}
-              {m.void_reason && <Row label="Void reason" value={m.void_reason} />}
-            </Section>
-
-            {accountingEntryId && (
-              <Section title="Accounting link">
-                <Row label="Journal entry" value={accountingEntryId} />
-              </Section>
+            <Row label="Status" value={<HumanStatusPill status={m.status} />} />
+            {m.reference && <Row label="Reference" value={m.reference} />}
+            {(sourceLink || transferLink || returnLink) && (
+              <div className="flex flex-col gap-1">
+                {sourceLink && (
+                  <a href={sourceLink.href} className="text-[11.5px] text-[var(--accent-primary,#3b82f6)] hover:underline">
+                    Open {sourceLink.label} →
+                  </a>
+                )}
+                {transferLink && (
+                  <a href={`/inventory/transfers/${transferLink.transfer_id}`} className="text-[11.5px] text-[var(--accent-primary,#3b82f6)] hover:underline">
+                    Transfer → {transferLink.transfer_no}
+                  </a>
+                )}
+                {returnLink && (
+                  <a href={`/inventory/returns/${returnLink.return_id}`} className="text-[11.5px] text-[var(--accent-primary,#3b82f6)] hover:underline">
+                    Return → {returnLink.return_no}
+                  </a>
+                )}
+              </div>
             )}
 
-            <Section title="Audit log">
-              {audit.length === 0 && (
-                <div className="text-[11px] text-[var(--text-dim)]">No audit entries.</div>
-              )}
-              <ul className="space-y-1.5">
-                {audit.map((a) => (
-                  <li
-                    key={a.id}
-                    className="rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-1.5"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11.5px] font-medium">{a.action}</span>
-                      <span className="text-[10.5px] text-[var(--text-dim)]">
-                        {new Date(a.created_at).toLocaleString()}
-                      </span>
-                    </div>
-                    {a.metadata && Object.keys(a.metadata).length > 0 && (
-                      <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words text-[10.5px] text-[var(--text-dim)]">
-                        {JSON.stringify(a.metadata, null, 0)}
-                      </pre>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </Section>
+            {/* INV-H6 — Everything below collapses behind "Details". */}
+            <DetailsAccordion label="Details">
+              <div className="space-y-3 text-[11.5px]">
+                <Row label="Raw type" value={<span className="font-mono">{movementLabel(m.movement_type)}</span>} />
+                <Row
+                  label="Unit cost"
+                  value={m.unit_cost != null ? `${m.unit_cost} ${m.currency}` : "—"}
+                />
+                <Row label="Approval" value={humanStatus(m.approval_status)} />
+                {m.approved_at && (
+                  <Row label="Approved at" value={new Date(m.approved_at).toLocaleString()} />
+                )}
+                {m.rejection_reason && <Row label="Rejection reason" value={m.rejection_reason} />}
+                {m.source_type && <Row label="Source type" value={<span className="font-mono">{m.source_type}</span>} />}
+                {m.posted_at  && <Row label="Posted at" value={new Date(m.posted_at).toLocaleString()} />}
+                {m.voided_at  && <Row label="Voided at" value={new Date(m.voided_at).toLocaleString()} />}
+                {m.void_reason && <Row label="Void reason" value={m.void_reason} />}
+                {accountingEntryId && <Row label="Journal entry" value={<span className="font-mono">{accountingEntryId}</span>} />}
+
+                <div>
+                  <div className="mb-2 text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Audit log</div>
+                  {audit.length === 0 && <div className="text-[11px] text-[var(--text-dim)]">No audit entries.</div>}
+                  <ul className="space-y-1.5">
+                    {audit.map((a) => (
+                      <li key={a.id} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11.5px] font-medium">{a.action}</span>
+                          <span className="text-[10.5px] text-[var(--text-dim)]">{new Date(a.created_at).toLocaleString()}</span>
+                        </div>
+                        {a.metadata && Object.keys(a.metadata).length > 0 && (
+                          <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words text-[10.5px] text-[var(--text-dim)]">
+                            {JSON.stringify(a.metadata, null, 0)}
+                          </pre>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </DetailsAccordion>
           </div>
         )}
       </div>
@@ -276,17 +248,6 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
         {label}
       </div>
       <div className="break-words text-[var(--text-secondary)]">{value}</div>
-    </div>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)]/50 p-3">
-      <div className="mb-2 text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
-        {title}
-      </div>
-      <div className="space-y-1.5">{children}</div>
     </div>
   );
 }

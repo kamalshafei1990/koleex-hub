@@ -18,8 +18,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
 import RrIcon from "@/components/ui/RrIcon";
-import { Panel, StatusBadge, DirectionDelta } from "@/components/inventory/InventoryUi";
-import { TraceabilityCard } from "@/components/inventory/InventoryUx";
+import { Panel, DirectionDelta } from "@/components/inventory/InventoryUi";
+import { DetailsAccordion, HumanStatusPill, TraceabilityCard } from "@/components/inventory/InventoryUx";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
 import { inventoryT } from "@/lib/translations/inventory";
@@ -370,81 +370,31 @@ export default function InventoryReturnDetail({ returnId }: { returnId: string }
           </div>
         )}
 
-        {/* Section 1 — Header */}
+        {/* Section 1 — Calm header: party + warehouse + status + reason.
+              Created / submitted / approved / processed timestamps and
+              source-document refs move into the Details accordion. */}
         <Panel>
-          <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-4">
-            <HeaderCell
-              label={t("inv.returns.form.type")}
-              value={
-                ret.return_type === "customer_return"
-                  ? t("inv.returns.type.customer")
-                  : t("inv.returns.type.supplier")
-              }
-            />
-            <HeaderCell
-              label={
-                ret.return_type === "customer_return"
-                  ? t("inv.returns.form.party_customer")
-                  : t("inv.returns.form.party_supplier")
-              }
-              value={contactLabel(party)}
-            />
-            <HeaderCell
-              label={t("inv.returns.form.warehouse")}
-              value={wh ? `${wh.code} — ${wh.name}` : "—"}
-            />
-            <HeaderCell label={t("inv.returns.col.status")} value={<StatusBadge status={ret.status} />} />
-
-            <HeaderCell
-              label={t("inv.returns.form.reason")}
-              value={t(`inv.returns.reason.${ret.reason_code}`)}
-            />
-            {ret.source_document_type && ret.source_document_id && (
-              <HeaderCell
-                label={t("inv.returns.form.source_doc_type")}
-                value={
-                  <a
-                    href={sourceDocHref(ret.source_document_type, ret.source_document_id)}
-                    className="font-mono text-[11px] text-[var(--accent-primary,#3b82f6)] hover:underline"
-                  >
-                    {ret.source_document_type} · {ret.source_document_id.slice(0, 8)}
-                  </a>
-                }
-              />
-            )}
-            <HeaderCell label={t("inv.returns.col.created")} value={new Date(ret.created_at).toLocaleString()} />
-            <HeaderCell label={t("inv.returns.timeline.submitted")} value={fmt(ret.requested_at)} />
-            <HeaderCell label={t("inv.returns.timeline.approved")} value={fmt(ret.approved_at)} />
-            <HeaderCell
-              label={isCustomer ? t("inv.returns.timeline.received") : t("inv.returns.timeline.shipped")}
-              value={fmt(ret.processed_at)}
-            />
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 p-4">
+            <div className="flex flex-col text-[13px] text-[var(--text-primary)]">
+              <span className="font-medium">{contactLabel(party)}</span>
+              <span className="text-[11px] text-[var(--text-dim)]">
+                {wh ? `${wh.code} — ${wh.name}` : "—"} · {t(`inv.returns.reason.${ret.reason_code}`)}
+              </span>
+            </div>
+            <div className="ml-auto"><HumanStatusPill status={ret.status} /></div>
             {ret.reason_notes && (
-              <div className="sm:col-span-4">
-                <div className="text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
-                  {t("inv.returns.form.reason_notes")}
-                </div>
-                <div className="mt-1 text-[12.5px] text-[var(--text-secondary)] whitespace-pre-wrap">
-                  {ret.reason_notes}
-                </div>
+              <div className="basis-full text-[12px] text-[var(--text-secondary)] whitespace-pre-wrap">
+                {ret.reason_notes}
               </div>
             )}
             {ret.notes && (
-              <div className="sm:col-span-4">
-                <div className="text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
-                  {t("inv.returns.form.notes")}
-                </div>
-                <div className="mt-1 text-[12.5px] text-[var(--text-secondary)] whitespace-pre-wrap">
-                  {ret.notes}
-                </div>
+              <div className="basis-full text-[12px] text-[var(--text-secondary)] whitespace-pre-wrap">
+                {ret.notes}
               </div>
             )}
             {ret.void_reason && (
-              <div className="sm:col-span-4">
-                <div className="text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
-                  Void reason
-                </div>
-                <div className="mt-1 text-[12.5px] text-rose-300 dark:text-rose-200">{ret.void_reason}</div>
+              <div className="basis-full text-[12px] text-rose-300 dark:text-rose-200">
+                Void reason: {ret.void_reason}
               </div>
             )}
           </div>
@@ -538,99 +488,112 @@ export default function InventoryReturnDetail({ returnId }: { returnId: string }
           </div>
         </Panel>
 
-        {/* INV-H5A — Traceability card */}
-        <TraceabilityCard
-          links={[
-            { label: t("inv.trace.current_warehouse"), value: wh?.code ?? "—", href: "/inventory/warehouses", icon: "bank" },
-            { label: "Return type", value: ret.return_type, icon: "recycle" },
-            ...(ret.source_document_type
-              ? [{ label: "Source", value: ret.source_document_type, href: ret.source_document_id ? sourceDocHref(ret.source_document_type, ret.source_document_id) : undefined, icon: "file-invoice" as const }]
-              : []),
-          ]}
-        />
-
-        {/* Section 3 — Timeline */}
-        <Panel>
-          <div className="border-b border-[var(--border-color)] px-4 py-2 text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
-            {t("inv.returns.detail.timeline")}
-          </div>
-          <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-5">
-            <Step label={t("inv.returns.timeline.drafted")}   at={ret.created_at}    done />
-            <Step label={t("inv.returns.timeline.submitted")} at={ret.requested_at}  done={!!ret.requested_at} />
-            <Step label={t("inv.returns.timeline.approved")}  at={ret.approved_at}   done={!!ret.approved_at} />
-            <Step
-              label={isCustomer ? t("inv.returns.timeline.received") : t("inv.returns.timeline.shipped")}
-              at={ret.processed_at}
-              done={!!ret.processed_at}
-            />
-            <Step
-              label={t("inv.returns.timeline.completed")}
-              at={isCompleted ? ret.processed_at : null}
-              done={isCompleted}
-            />
-          </div>
-        </Panel>
-
-        {/* Section 4 — Related movements */}
-        <Panel>
-          <div className="border-b border-[var(--border-color)] px-4 py-2 text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
-            {t("inv.returns.detail.movements")}
-          </div>
-          {bridges.length === 0 ? (
-            <div className="px-4 py-6 text-center text-[11.5px] text-[var(--text-dim)]">
-              {t("inv.returns.detail.no_movements")}
-            </div>
-          ) : (
-            <table className="min-w-full text-[12.5px]">
-              <thead>
-                <tr className="border-b border-[var(--border-color)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
-                  <th className="px-3 py-2 text-left">{t("inv.returns.form.item")}</th>
-                  <th className="px-3 py-2 text-left">Movement</th>
-                  <th className="px-3 py-2 text-left">Warehouse</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((it) => {
-                  const product = productByItem.get(it.inventory_item_id);
-                  const myBridges = bridgeByItem.get(it.id) ?? [];
-                  if (myBridges.length === 0) {
-                    return (
-                      <tr key={it.id} className="border-b border-[var(--border-color)]/40 last:border-b-0">
-                        <td className="px-3 py-2 text-[var(--text-primary)]">
-                          {product?.product_name ?? <span className="font-mono text-[11px] text-[var(--text-dim)]">{it.inventory_item_id.slice(0, 8)}</span>}
-                        </td>
-                        <td colSpan={2} className="px-3 py-2 text-[var(--text-dim)]">—</td>
-                      </tr>
-                    );
+        {/* INV-H6 — Single "Details" accordion: timeline, source doc,
+            related movements, traceability, raw timestamps. */}
+        <DetailsAccordion label={t("inv.returns.detail.timeline") + " · " + t("inv.returns.detail.movements")}>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3 text-[12px] sm:grid-cols-4">
+              <HeaderCell label={t("inv.returns.col.created")} value={new Date(ret.created_at).toLocaleString()} />
+              <HeaderCell label={t("inv.returns.timeline.submitted")} value={fmt(ret.requested_at)} />
+              <HeaderCell label={t("inv.returns.timeline.approved")} value={fmt(ret.approved_at)} />
+              <HeaderCell
+                label={isCustomer ? t("inv.returns.timeline.received") : t("inv.returns.timeline.shipped")}
+                value={fmt(ret.processed_at)}
+              />
+              {ret.source_document_type && ret.source_document_id && (
+                <HeaderCell
+                  label={t("inv.returns.form.source_doc_type")}
+                  value={
+                    <a
+                      href={sourceDocHref(ret.source_document_type, ret.source_document_id)}
+                      className="font-mono text-[11px] text-[var(--accent-primary,#3b82f6)] hover:underline"
+                    >
+                      {ret.source_document_type} · {ret.source_document_id.slice(0, 8)}
+                    </a>
                   }
-                  return myBridges.map((b, ix) => {
-                    const mv = movements[b.movement_id];
-                    const mvWh = mv ? warehouseMap.get(mv.warehouse_id) : null;
-                    return (
-                      <tr key={b.id} className="border-b border-[var(--border-color)]/40 last:border-b-0">
-                        {ix === 0 ? (
-                          <td className="px-3 py-2 text-[var(--text-primary)]" rowSpan={myBridges.length}>
-                            {product?.product_name ?? <span className="font-mono text-[11px] text-[var(--text-dim)]">{it.inventory_item_id.slice(0, 8)}</span>}
-                          </td>
-                        ) : null}
-                        <td className="px-3 py-2">
-                          {mv ? (
-                            <MovementLink mv={mv} onOpen={(id) => router.push(`/inventory/movements?focus=${id}`)} />
-                          ) : (
-                            <span className="text-[var(--text-dim)]">—</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-[var(--text-secondary)]">
-                          {mvWh ? `${mvWh.code} — ${mvWh.name}` : <span className="text-[var(--text-dim)]">—</span>}
-                        </td>
-                      </tr>
-                    );
-                  });
-                })}
-              </tbody>
-            </table>
-          )}
-        </Panel>
+                />
+              )}
+            </div>
+
+            <div>
+              <div className="text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)] mb-2">
+                {t("inv.returns.detail.timeline")}
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
+                <Step label={t("inv.returns.timeline.drafted")}   at={ret.created_at}    done />
+                <Step label={t("inv.returns.timeline.submitted")} at={ret.requested_at}  done={!!ret.requested_at} />
+                <Step label={t("inv.returns.timeline.approved")}  at={ret.approved_at}   done={!!ret.approved_at} />
+                <Step
+                  label={isCustomer ? t("inv.returns.timeline.received") : t("inv.returns.timeline.shipped")}
+                  at={ret.processed_at}
+                  done={!!ret.processed_at}
+                />
+                <Step
+                  label={t("inv.returns.timeline.completed")}
+                  at={isCompleted ? ret.processed_at : null}
+                  done={isCompleted}
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)] mb-2">
+                {t("inv.returns.detail.movements")}
+              </div>
+              {bridges.length === 0 ? (
+                <div className="text-[11.5px] text-[var(--text-dim)]">
+                  {t("inv.returns.detail.no_movements")}
+                </div>
+              ) : (
+                <table className="min-w-full text-[12px]">
+                  <thead>
+                    <tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
+                      <th className="px-2 py-1.5 text-left">{t("inv.returns.form.item")}</th>
+                      <th className="px-2 py-1.5 text-left">Movement</th>
+                      <th className="px-2 py-1.5 text-left">Warehouse</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((it) => {
+                      const product = productByItem.get(it.inventory_item_id);
+                      const myBridges = bridgeByItem.get(it.id) ?? [];
+                      if (myBridges.length === 0) {
+                        return (
+                          <tr key={it.id} className="border-b border-[var(--border-subtle)]/40 last:border-b-0">
+                            <td className="px-2 py-1.5">{product?.product_name ?? <span className="font-mono text-[10.5px] text-[var(--text-dim)]">{it.inventory_item_id.slice(0, 8)}</span>}</td>
+                            <td colSpan={2} className="px-2 py-1.5 text-[var(--text-dim)]">—</td>
+                          </tr>
+                        );
+                      }
+                      return myBridges.map((b, ix) => {
+                        const mv = movements[b.movement_id];
+                        const mvWh = mv ? warehouseMap.get(mv.warehouse_id) : null;
+                        return (
+                          <tr key={b.id} className="border-b border-[var(--border-subtle)]/40 last:border-b-0">
+                            {ix === 0 ? (
+                              <td className="px-2 py-1.5" rowSpan={myBridges.length}>{product?.product_name ?? <span className="font-mono text-[10.5px] text-[var(--text-dim)]">{it.inventory_item_id.slice(0, 8)}</span>}</td>
+                            ) : null}
+                            <td className="px-2 py-1.5">{mv ? <MovementLink mv={mv} onOpen={(id) => router.push(`/inventory/movements?focus=${id}`)} /> : <span className="text-[var(--text-dim)]">—</span>}</td>
+                            <td className="px-2 py-1.5 text-[var(--text-secondary)]">{mvWh ? `${mvWh.code} — ${mvWh.name}` : <span className="text-[var(--text-dim)]">—</span>}</td>
+                          </tr>
+                        );
+                      });
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <TraceabilityCard
+              links={[
+                { label: t("inv.trace.current_warehouse"), value: wh?.code ?? "—", href: "/inventory/warehouses", icon: "bank" },
+                ...(ret.source_document_type
+                  ? [{ label: "Source", value: ret.source_document_type, href: ret.source_document_id ? sourceDocHref(ret.source_document_type, ret.source_document_id) : undefined, icon: "file-invoice" as const }]
+                  : []),
+              ]}
+            />
+          </div>
+        </DetailsAccordion>
 
         {showVoid && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -728,7 +691,7 @@ function MovementLink({ mv, onOpen }: { mv: { id: string; movement_no: string; d
     >
       <span className="font-mono text-[11px] text-[var(--text-secondary)]">{mv.movement_no}</span>
       <DirectionDelta direction={mv.direction} quantity={mv.quantity} unit={mv.unit} />
-      <StatusBadge status={mv.status} />
+      <HumanStatusPill status={mv.status} />
     </button>
   );
 }

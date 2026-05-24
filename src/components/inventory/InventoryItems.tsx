@@ -125,6 +125,9 @@ export default function InventoryItems() {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [typesPanelOpen, setTypesPanelOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  /* INV-H6 — Type + Status filters hide behind a single "Filters" disclosure.
+     Default-collapsed; opens automatically if either filter is non-default. */
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   /* Debounce search. */
   const debounceRef = useRef<number | null>(null);
@@ -252,61 +255,72 @@ export default function InventoryItems() {
           </div>
         )}
 
-        {/* Filters bar — search left, dropdowns center, count right. */}
+        {/* INV-H6 — Calm filter bar: search + "Filters" toggle + count.
+              Type / Status dropdowns hide behind the toggle and only
+              render when open or non-default. */}
         <Panel className="px-3 py-2.5">
-          <div className="flex flex-wrap items-end gap-3">
-            <label className="flex flex-col">
-              <span className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Search</span>
-              <span className="relative">
-                <span aria-hidden className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-gray-500">
-                  <RrIcon name="search" size={12} />
-                </span>
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Name, code, brand, SKU…"
-                  className="w-[260px] rounded-md border border-white/[0.06] bg-[var(--bg-primary)] py-1.5 pl-7 pr-2 text-[12px]"
-                />
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="relative">
+              <span aria-hidden className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-[var(--text-dim)]">
+                <RrIcon name="search" size={12} />
               </span>
-            </label>
-            <label className="flex flex-col">
-              <span className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Type</span>
-              <select
-                value={filterTypeId}
-                onChange={(e) => setFilterTypeId(e.target.value)}
-                className="rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
-              >
-                <option value="">All types</option>
-                {types.map((t) => (
-                  <option key={t.id} value={t.id}>{t.type_name}{t.is_system ? "" : " · custom"}</option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col">
-              <span className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Status</span>
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
-                className="rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="archived">Archived</option>
-                <option value="">All</option>
-              </select>
-            </label>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Name, code, brand, SKU…"
+                className="w-[260px] rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] py-1.5 pl-7 pr-2 text-[12px]"
+              />
+            </span>
+            <button
+              type="button"
+              onClick={() => setFiltersOpen((v) => !v)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2.5 py-1.5 text-[11.5px] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+              aria-expanded={filtersOpen}
+            >
+              Filters {(filterTypeId || filterStatus !== "active") && <span className="rounded-full bg-[var(--bg-elevated)] px-1.5 text-[9.5px]">·</span>}
+            </button>
             {filterTypeId && (
               <button
                 onClick={() => setFilterTypeId("")}
-                className="self-end rounded-md border border-white/[0.06] bg-transparent px-2 py-1.5 text-[11px] text-gray-400 hover:text-gray-200"
+                className="rounded-md border border-[var(--border-subtle)] bg-transparent px-2 py-1.5 text-[11px] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
               >
-                Clear filter
+                Clear
               </button>
             )}
-            <div className="ml-auto self-end text-[11px] text-gray-500 tabular-nums">
+            <div className="ml-auto text-[11px] text-[var(--text-dim)] tabular-nums">
               {loading ? "…" : `${rows.length} item${rows.length === 1 ? "" : "s"}`}
             </div>
           </div>
+          {filtersOpen && (
+            <div className="mt-2.5 flex flex-wrap items-end gap-3 border-t border-[var(--border-subtle)] pt-2.5">
+              <label className="flex flex-col">
+                <span className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Type</span>
+                <select
+                  value={filterTypeId}
+                  onChange={(e) => setFilterTypeId(e.target.value)}
+                  className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                >
+                  <option value="">All types</option>
+                  {types.map((t) => (
+                    <option key={t.id} value={t.id}>{t.type_name}{t.is_system ? "" : " · custom"}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col">
+                <span className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Status</span>
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
+                  className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="archived">Archived</option>
+                  <option value="">All</option>
+                </select>
+              </label>
+            </div>
+          )}
         </Panel>
 
         {/* INV-H5C — Items table polished for operator-first scan:

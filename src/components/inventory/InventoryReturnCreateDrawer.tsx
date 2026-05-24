@@ -360,10 +360,10 @@ export default function InventoryReturnCreateDrawer({
               className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
             >
               <option value="">—</option>
-              <option value="sales_shipment">sales_shipment</option>
-              <option value="invoice">invoice</option>
-              <option value="purchase_receipt">purchase_receipt</option>
-              <option value="vendor_bill">vendor_bill</option>
+              <option value="sales_shipment">Sales shipment</option>
+              <option value="invoice">Invoice</option>
+              <option value="purchase_receipt">Purchase receipt</option>
+              <option value="vendor_bill">Vendor bill</option>
             </select>
           </label>
 

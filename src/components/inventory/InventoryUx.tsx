@@ -34,6 +34,133 @@ import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
 import { useTranslation } from "@/lib/i18n";
 import { inventoryT } from "@/lib/translations/inventory";
 
+/* ─── useInventoryViewMode ─────────────────────────────────────
+   INV-H6 — single-app role-based visibility.
+
+   Returns `'operator' | 'manager'` based on:
+     1. localStorage override at key `inv:viewMode` (lets managers
+        preview the operator view via a small header toggle).
+     2. Falls back to fetching /api/me once per session; managers /
+        super-admins land on `'manager'`, everyone else on `'operator'`.
+
+   No new backend, no new auth model. Pure UI gating — backend / RLS
+   stays the source of truth for what data is actually returned.
+   --------------------------------------------------------------- */
+
+type InventoryViewMode = "operator" | "manager";
+
+const VIEW_MODE_KEY = "inv:viewMode";
+
+function readStoredMode(): InventoryViewMode | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const v = window.localStorage.getItem(VIEW_MODE_KEY);
+    return v === "operator" || v === "manager" ? v : null;
+  } catch { return null; }
+}
+
+export function useInventoryViewMode(): {
+  mode: InventoryViewMode;
+  setMode: (next: InventoryViewMode) => void;
+  isManager: boolean;
+  canSwitch: boolean;
+} {
+  const [serverMode, setServerMode] = useState<InventoryViewMode | null>(null);
+  const [override, setOverride] = useState<InventoryViewMode | null>(() => readStoredMode());
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const r = await fetch("/api/me", { credentials: "include", cache: "no-store" });
+        if (!r.ok) return;
+        const j = await r.json().catch(() => ({}));
+        if (cancelled) return;
+        const isAdmin =
+          j?.is_super_admin === true ||
+          j?.can_view_private === true ||
+          j?.account?.is_super_admin === true;
+        setServerMode(isAdmin ? "manager" : "operator");
+      } catch { /* default to operator */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const mode: InventoryViewMode = override ?? serverMode ?? "operator";
+  const setMode = useCallback((next: InventoryViewMode) => {
+    setOverride(next);
+    try { window.localStorage.setItem(VIEW_MODE_KEY, next); } catch {/* ignore */}
+  }, []);
+  /* Managers can switch back and forth; operators are pinned. */
+  const canSwitch = serverMode === "manager" || override !== null;
+  return { mode, setMode, isManager: mode === "manager", canSwitch };
+}
+
+/* ─── ViewModeToggle ───────────────────────────────────────────
+   Small "Operator / Manager" toggle. Rendered in the page header
+   on inventory routes; only visible for users with manager-level
+   server role (so operators can't escalate themselves via UI). */
+export function ViewModeToggle() {
+  const { mode, setMode, canSwitch } = useInventoryViewMode();
+  if (!canSwitch) return null;
+  const next: InventoryViewMode = mode === "operator" ? "manager" : "operator";
+  return (
+    <button
+      type="button"
+      onClick={() => setMode(next)}
+      data-testid="inv-view-mode-toggle"
+      className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1 text-[10.5px] uppercase tracking-[0.10em] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+      title={`Switch to ${next} view`}
+    >
+      <RrIcon name={mode === "manager" ? "shield-check" : "user-headset"} size={10} />
+      {mode}
+    </button>
+  );
+}
+
+/* ─── DetailsAccordion ─────────────────────────────────────────
+   INV-H6 — single collapsed "Details" disclosure. Used on every
+   detail page to push timeline / audit log / raw IDs / source
+   document references out of the default operator view. */
+export function DetailsAccordion({
+  label = "Details",
+  defaultOpen = false,
+  testId,
+  children,
+}: {
+  label?: string;
+  defaultOpen?: boolean;
+  testId?: string;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section
+      data-testid={testId ?? "inv-details-accordion"}
+      className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]"
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between px-4 py-2.5 text-left"
+      >
+        <span className="text-[10.5px] uppercase tracking-[0.14em] text-[var(--text-dim)]">
+          {label}
+        </span>
+        <span className="text-[var(--text-dim)] text-[12px]">
+          {open ? "▾" : "▸"}
+        </span>
+      </button>
+      {open && (
+        <div className="border-t border-[var(--border-subtle)] px-4 py-3">
+          {children}
+        </div>
+      )}
+    </section>
+  );
+}
+
 /* ─── Debounce hook (perf) ─────────────────────────────────── */
 
 export function useDebouncedValue<T>(value: T, delayMs = 300): T {

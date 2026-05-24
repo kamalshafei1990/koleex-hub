@@ -16,7 +16,7 @@ import { useRouter } from "next/navigation";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
 import RrIcon from "@/components/ui/RrIcon";
 import { Panel, StatusBadge, DirectionDelta } from "@/components/inventory/InventoryUi";
-import { TraceabilityCard } from "@/components/inventory/InventoryUx";
+import { DetailsAccordion, HumanStatusPill, TraceabilityCard } from "@/components/inventory/InventoryUx";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
 import { inventoryT } from "@/lib/translations/inventory";
@@ -308,33 +308,24 @@ export default function InventoryTransferDetail({ transferId }: { transferId: st
           </div>
         )}
 
-        {/* Section 1 — Header */}
+        {/* Section 1 — Header (calm: route + status, notes when present).
+              All timestamps moved into the Details accordion below. */}
         <Panel>
-          <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-4">
-            <HeaderCell label={t("inv.transfers.form.source")} value={src ? `${src.code} — ${src.name}` : "—"} />
-            <HeaderCell label={t("inv.transfers.form.destination")} value={dest ? `${dest.code} — ${dest.name}` : "—"} />
-            <HeaderCell label={t("inv.transfers.col.status")} value={<StatusBadge status={transfer.status} />} />
-            <HeaderCell label={t("inv.transfers.col.created")} value={new Date(transfer.created_at).toLocaleString()} />
-            <HeaderCell label={t("inv.transfers.timeline.submitted")} value={fmt(transfer.requested_at)} />
-            <HeaderCell label={t("inv.transfers.timeline.approved")} value={fmt(transfer.approved_at)} />
-            <HeaderCell label={t("inv.transfers.timeline.shipped")} value={fmt(transfer.shipped_at)} />
-            <HeaderCell label={t("inv.transfers.timeline.received")} value={fmt(transfer.received_at)} />
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 p-4">
+            <div className="flex items-center gap-2 text-[13px] text-[var(--text-primary)]">
+              <span className="font-medium">{src ? `${src.code} — ${src.name}` : "—"}</span>
+              <span className="text-[var(--text-dim)]">→</span>
+              <span className="font-medium">{dest ? `${dest.code} — ${dest.name}` : "—"}</span>
+            </div>
+            <div className="ml-auto"><HumanStatusPill status={transfer.status} /></div>
             {transfer.notes && (
-              <div className="sm:col-span-4">
-                <div className="text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
-                  {t("inv.transfers.form.notes")}
-                </div>
-                <div className="mt-1 text-[12.5px] text-[var(--text-secondary)] whitespace-pre-wrap">
-                  {transfer.notes}
-                </div>
+              <div className="basis-full text-[12px] text-[var(--text-secondary)] whitespace-pre-wrap">
+                {transfer.notes}
               </div>
             )}
             {transfer.void_reason && (
-              <div className="sm:col-span-4">
-                <div className="text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
-                  Void reason
-                </div>
-                <div className="mt-1 text-[12.5px] text-rose-300 dark:text-rose-200">{transfer.void_reason}</div>
+              <div className="basis-full text-[12px] text-rose-300 dark:text-rose-200">
+                Void reason: {transfer.void_reason}
               </div>
             )}
           </div>
@@ -400,84 +391,81 @@ export default function InventoryTransferDetail({ transferId }: { transferId: st
           </table>
         </Panel>
 
-        {/* Section 3 — Timeline */}
-        <Panel>
-          <div className="border-b border-[var(--border-color)] px-4 py-2 text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
-            {t("inv.transfers.detail.timeline")}
-          </div>
-          <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-5">
-            <Step label={t("inv.transfers.timeline.drafted")}   at={transfer.created_at}    done />
-            <Step label={t("inv.transfers.timeline.submitted")} at={transfer.requested_at}  done={!!transfer.requested_at} />
-            <Step label={t("inv.transfers.timeline.approved")}  at={transfer.approved_at}   done={!!transfer.approved_at} />
-            <Step label={t("inv.transfers.timeline.shipped")}   at={transfer.shipped_at}    done={!!transfer.shipped_at} />
-            <Step label={t("inv.transfers.timeline.received")}  at={transfer.received_at}   done={!!transfer.received_at} />
-          </div>
-        </Panel>
-
-        {/* Section 4 — Related movements */}
-        <Panel>
-          <div className="border-b border-[var(--border-color)] px-4 py-2 text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
-            {t("inv.transfers.detail.movements")}
-          </div>
-          {bridges.length === 0 ? (
-            <div className="px-4 py-6 text-center text-[11.5px] text-[var(--text-dim)]">
-              {t("inv.transfers.detail.no_movements")}
+        {/* INV-H6 — Single "Details" accordion folds timeline, related
+            movements, audit metadata, and traceability links out of the
+            default operator view. */}
+        <DetailsAccordion label={t("inv.transfers.detail.timeline") + " · " + t("inv.transfers.detail.movements")}>
+          <div className="space-y-4">
+            {/* Created timestamp lives here now. */}
+            <div className="grid grid-cols-2 gap-3 text-[12px] sm:grid-cols-4">
+              <HeaderCell label={t("inv.transfers.col.created")} value={new Date(transfer.created_at).toLocaleString()} />
+              <HeaderCell label={t("inv.transfers.timeline.submitted")} value={fmt(transfer.requested_at)} />
+              <HeaderCell label={t("inv.transfers.timeline.approved")} value={fmt(transfer.approved_at)} />
+              <HeaderCell label={t("inv.transfers.timeline.shipped")} value={fmt(transfer.shipped_at)} />
+              <HeaderCell label={t("inv.transfers.timeline.received")} value={fmt(transfer.received_at)} />
             </div>
-          ) : (
-            <table className="min-w-full text-[12.5px]">
-              <thead>
-                <tr className="border-b border-[var(--border-color)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
-                  <th className="px-3 py-2 text-left">{t("inv.transfers.form.item")}</th>
-                  <th className="px-3 py-2 text-left">Transfer OUT</th>
-                  <th className="px-3 py-2 text-left">Transfer IN</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((it) => {
-                  const product = productByItem.get(it.inventory_item_id);
-                  const bridge = bridgeByItem.get(it.id);
-                  const outMv = bridge?.transfer_out_movement_id ? movements[bridge.transfer_out_movement_id] : null;
-                  const inMv  = bridge?.transfer_in_movement_id  ? movements[bridge.transfer_in_movement_id]  : null;
-                  return (
-                    <tr key={it.id} className="border-b border-[var(--border-color)]/40 last:border-b-0">
-                      <td className="px-3 py-2 text-[var(--text-primary)]">
-                        {product?.product_name ?? <span className="font-mono text-[11px] text-[var(--text-dim)]">{it.inventory_item_id.slice(0, 8)}</span>}
-                      </td>
-                      <td className="px-3 py-2">
-                        {outMv ? <MovementLink mv={outMv} onOpen={(id) => router.push(`/inventory/movements?focus=${id}`)} /> : <span className="text-[var(--text-dim)]">—</span>}
-                      </td>
-                      <td className="px-3 py-2">
-                        {inMv ? <MovementLink mv={inMv} onOpen={(id) => router.push(`/inventory/movements?focus=${id}`)} /> : <span className="text-[var(--text-dim)]">—</span>}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </Panel>
 
-        {/* INV-H5A — Traceability card */}
-        <TraceabilityCard
-          links={[
-            { label: t("inv.trace.current_warehouse"), value: warehouseMap.get(transfer.destination_warehouse_id)?.code ?? warehouseMap.get(transfer.source_warehouse_id)?.code ?? "—", icon: "bank" },
-            ...(transfer.source_warehouse_id
-              ? [{ label: "Source", value: warehouseMap.get(transfer.source_warehouse_id)?.name ?? transfer.source_warehouse_id, href: `/inventory/warehouses`, icon: "bank" as const }]
-              : []),
-            ...(transfer.destination_warehouse_id
-              ? [{ label: "Destination", value: warehouseMap.get(transfer.destination_warehouse_id)?.name ?? transfer.destination_warehouse_id, href: `/inventory/warehouses`, icon: "bank" as const }]
-              : []),
-            ...items.slice(0, 1).map((it) => {
-              const product = productByItem.get(it.inventory_item_id);
-              return {
-                label: t("inv.trace.latest"),
-                value: product?.product_name ?? `Item ${it.inventory_item_id.slice(0, 8)}`,
-                href: `/inventory/items?q=${encodeURIComponent(product?.stock_profile?.item_code ?? "")}`,
-                icon: "box-open" as const,
-              };
-            }),
-          ]}
-        />
+            <div>
+              <div className="text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)] mb-2">
+                {t("inv.transfers.detail.timeline")}
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
+                <Step label={t("inv.transfers.timeline.drafted")}   at={transfer.created_at}    done />
+                <Step label={t("inv.transfers.timeline.submitted")} at={transfer.requested_at}  done={!!transfer.requested_at} />
+                <Step label={t("inv.transfers.timeline.approved")}  at={transfer.approved_at}   done={!!transfer.approved_at} />
+                <Step label={t("inv.transfers.timeline.shipped")}   at={transfer.shipped_at}    done={!!transfer.shipped_at} />
+                <Step label={t("inv.transfers.timeline.received")}  at={transfer.received_at}   done={!!transfer.received_at} />
+              </div>
+            </div>
+
+            <div>
+              <div className="text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)] mb-2">
+                {t("inv.transfers.detail.movements")}
+              </div>
+              {bridges.length === 0 ? (
+                <div className="text-[11.5px] text-[var(--text-dim)]">
+                  {t("inv.transfers.detail.no_movements")}
+                </div>
+              ) : (
+                <table className="min-w-full text-[12px]">
+                  <thead>
+                    <tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
+                      <th className="px-2 py-1.5 text-left">{t("inv.transfers.form.item")}</th>
+                      <th className="px-2 py-1.5 text-left">Out</th>
+                      <th className="px-2 py-1.5 text-left">In</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((it) => {
+                      const product = productByItem.get(it.inventory_item_id);
+                      const bridge = bridgeByItem.get(it.id);
+                      const outMv = bridge?.transfer_out_movement_id ? movements[bridge.transfer_out_movement_id] : null;
+                      const inMv  = bridge?.transfer_in_movement_id  ? movements[bridge.transfer_in_movement_id]  : null;
+                      return (
+                        <tr key={it.id} className="border-b border-[var(--border-subtle)]/40 last:border-b-0">
+                          <td className="px-2 py-1.5">{product?.product_name ?? <span className="font-mono text-[10.5px] text-[var(--text-dim)]">{it.inventory_item_id.slice(0, 8)}</span>}</td>
+                          <td className="px-2 py-1.5">{outMv ? <MovementLink mv={outMv} onOpen={(id) => router.push(`/inventory/movements?focus=${id}`)} /> : <span className="text-[var(--text-dim)]">—</span>}</td>
+                          <td className="px-2 py-1.5">{inMv  ? <MovementLink mv={inMv}  onOpen={(id) => router.push(`/inventory/movements?focus=${id}`)} /> : <span className="text-[var(--text-dim)]">—</span>}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <TraceabilityCard
+              links={[
+                ...(transfer.source_warehouse_id
+                  ? [{ label: "Source", value: warehouseMap.get(transfer.source_warehouse_id)?.name ?? transfer.source_warehouse_id, href: `/inventory/warehouses`, icon: "bank" as const }]
+                  : []),
+                ...(transfer.destination_warehouse_id
+                  ? [{ label: "Destination", value: warehouseMap.get(transfer.destination_warehouse_id)?.name ?? transfer.destination_warehouse_id, href: `/inventory/warehouses`, icon: "bank" as const }]
+                  : []),
+              ]}
+            />
+          </div>
+        </DetailsAccordion>
 
         {showVoid && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -575,7 +563,7 @@ function MovementLink({ mv, onOpen }: { mv: MovementLite; onOpen: (id: string) =
     >
       <span className="font-mono text-[11px] text-[var(--text-secondary)]">{mv.movement_no}</span>
       <DirectionDelta direction={mv.direction} quantity={mv.quantity} unit={mv.unit} />
-      <StatusBadge status={mv.status} />
+      <HumanStatusPill status={mv.status} />
     </button>
   );
 }

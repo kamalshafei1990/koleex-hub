@@ -1,20 +1,18 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   /inventory — INV-H5A operator-first dashboard.
+   /inventory — INV-H6 operator-first dashboard (radical simplification).
 
-   Reorganized around what a warehouse clerk needs to do today:
-     1. Four large action cards (Receive / Ship / Transfer / Adjust)
-     2. Operational alerts (low stock, expired batches, pending …)
-     3. Today's activity counters
-     4. Quick lookup (item / serial / batch)
-     5. Compact operational intelligence widgets
+   Default view (operator):
+     1. Four BIG action cards (Receive / Ship / Transfer / Adjust)
+     2. Secondary utility tiles (Search · Low Stock · Returns · Serials · Batches)
+     3. Active alerts list (only when there ARE alerts — empty state hidden)
+     4. "Today & intel" accordion (collapsed by default) — Today counters +
+         IntelTiles + quick-lookup all live here.
 
-   The old finance-style "top holders / valuation / KPI strip" was a
-   read-only dashboard. The operator view replaces it with an action
-   surface. Existing endpoints power the data:
-     · /api/inventory/summary           — top-holder + value KPIs
-     · /api/inventory/operator-summary  — INV-H5A alerts/today/intel
+   Manager view (toggle in header): same layout, accordion auto-expanded.
+
+   The H5A finance-style "top holders / valuation / KPI strip" was removed.
    --------------------------------------------------------------------------- */
 
 import { useEffect, useState } from "react";
@@ -23,15 +21,17 @@ import InventoryHeader from "@/components/inventory/InventoryHeader";
 import {
   ActionCard,
   AlertCard,
+  DetailsAccordion,
   IntelTile,
   LookupInput,
   MobileBottomBar,
   MobileFab,
   SectionEyebrow,
   TodayTile,
+  ViewModeToggle,
   useInventoryShortcuts,
+  useInventoryViewMode,
 } from "@/components/inventory/InventoryUx";
-import RrIcon from "@/components/ui/RrIcon";
 import { useTranslation } from "@/lib/i18n";
 import { inventoryT } from "@/lib/translations/inventory";
 
@@ -57,6 +57,7 @@ interface OperatorSummary {
 export default function InventoryDashboard() {
   const { t } = useTranslation(inventoryT);
   useInventoryShortcuts({ isActive: true });
+  const { isManager } = useInventoryViewMode();
 
   const [op, setOp] = useState<OperatorSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -95,6 +96,7 @@ export default function InventoryDashboard() {
         <InventoryHeader
           title={t("inv.home.title")}
           subtitle={t("inv.home.subtitle")}
+          action={<ViewModeToggle />}
         />
 
         {error && (
@@ -103,55 +105,21 @@ export default function InventoryDashboard() {
           </div>
         )}
 
-        {/* 1. Primary actions — INV-H5C: visibly larger / higher contrast
-                so the 4 core verbs dominate the page. ─────────────────── */}
+        {/* 1. Primary actions — dominate the page. */}
         <section data-testid="inv-home-actions">
           <div className="flex items-baseline justify-between">
             <SectionEyebrow>{t("inv.home.quick.title")}</SectionEyebrow>
             <span className="text-[10.5px] text-[var(--text-dim)]">{t("inv.shortcuts.hint")}</span>
           </div>
           <div data-testid="inv-home-quick-actions" className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <ActionCard
-              testId="action-receive"
-              icon="download"
-              label={t("inv.action.receive")}
-              hint={t("inv.action.receive.hint")}
-              href="/inventory/movements?create=receive"
-              tone="positive"
-              size="primary"
-            />
-            <ActionCard
-              testId="action-ship"
-              icon="truck-side"
-              label={t("inv.action.ship")}
-              hint={t("inv.action.ship.hint")}
-              href="/inventory/movements?create=ship"
-              tone="info"
-              size="primary"
-            />
-            <ActionCard
-              testId="action-transfer"
-              icon="shipping-fast"
-              label={t("inv.action.transfer")}
-              hint={t("inv.action.transfer.hint")}
-              href="/inventory/transfers?create=1"
-              tone="info"
-              size="primary"
-            />
-            <ActionCard
-              testId="action-adjust"
-              icon="pencil"
-              label={t("inv.action.adjust")}
-              hint={t("inv.action.adjust.hint")}
-              href="/inventory/movements?create=adjustment"
-              tone="warning"
-              size="primary"
-            />
+            <ActionCard testId="action-receive"  icon="download"       label={t("inv.action.receive")}  hint={t("inv.action.receive.hint")}  href="/inventory/movements?create=receive"    tone="positive" size="primary" />
+            <ActionCard testId="action-ship"     icon="truck-side"     label={t("inv.action.ship")}     hint={t("inv.action.ship.hint")}     href="/inventory/movements?create=ship"       tone="info"     size="primary" />
+            <ActionCard testId="action-transfer" icon="shipping-fast"  label={t("inv.action.transfer")} hint={t("inv.action.transfer.hint")} href="/inventory/transfers?create=1"          tone="info"     size="primary" />
+            <ActionCard testId="action-adjust"   icon="pencil"         label={t("inv.action.adjust")}   hint={t("inv.action.adjust.hint")}   href="/inventory/movements?create=adjustment" tone="warning"  size="primary" />
           </div>
         </section>
 
-        {/* 1b. Secondary utility tiles — visibly smaller than primary
-                actions. Search / Low Stock / Returns / Serials / Batches. */}
+        {/* 1b. Secondary utility tiles. */}
         <section data-testid="inv-home-secondary">
           <div className="mt-1 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
             <ActionCard size="secondary" icon="search"        label="Search"     href="/inventory/search" />
@@ -162,23 +130,13 @@ export default function InventoryDashboard() {
           </div>
         </section>
 
-        {/* 2. Operational alerts — INV-H5C: visually quieter than primary
-                actions (smaller eyebrow, dimmer border). */}
-        <section data-testid="inv-home-alerts" className="opacity-95">
-          <div className="text-[9.5px] uppercase tracking-[0.18em] text-[var(--text-dim)]">
-            {t("inv.home.alerts.title")}
-          </div>
-          {loading ? (
-            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="h-12 animate-pulse rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]/40" />
-              ))}
+        {/* 2. Active alerts — only rendered when there's something to flag.
+              Empty state is hidden entirely so the calm operator view stays calm. */}
+        {!loading && totalAlerts > 0 && (
+          <section data-testid="inv-home-alerts">
+            <div className="text-[9.5px] uppercase tracking-[0.18em] text-[var(--text-dim)]">
+              {t("inv.home.alerts.title")}
             </div>
-          ) : totalAlerts === 0 ? (
-            <div className="mt-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-3 text-[11.5px] text-[var(--text-dim)]">
-              {t("inv.home.alerts.empty")}
-            </div>
-          ) : (
             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {(op?.alerts.low_stock ?? 0) > 0 && (
                 <AlertCard icon="interrogation" label={t("inv.alert.low_stock")} count={op!.alerts.low_stock} href="/inventory/items?filter=low_stock" tone="warning" />
@@ -202,82 +160,85 @@ export default function InventoryDashboard() {
                 <AlertCard icon="file" label={t("inv.alert.stale_drafts")} count={op!.alerts.stale_drafts} href="/inventory/movements?tab=drafts" tone="warning" />
               )}
             </div>
-          )}
-        </section>
+          </section>
+        )}
 
-        {/* 3. Today ─────────────────────────────────────────── */}
-        <section data-testid="inv-home-today">
-          <SectionEyebrow>{t("inv.home.today.title")}</SectionEyebrow>
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <TodayTile icon="download"    label={t("inv.today.receipts")}  value={op?.today.receipts ?? 0} href="/inventory/movements?direction=in" />
-            <TodayTile icon="truck-side"  label={t("inv.today.shipments")} value={op?.today.shipments ?? 0} href="/inventory/movements?direction=out" />
-            <TodayTile icon="shipping-fast" label={t("inv.today.transfers")} value={op?.today.transfers ?? 0} href="/inventory/transfers" />
-            <TodayTile icon="recycle"     label={t("inv.today.returns")}   value={op?.today.returns ?? 0} href="/inventory/returns" />
+        {/* 3. Today + intel + lookup — collapsed by default for operators.
+              Manager view opens the accordion automatically. */}
+        <DetailsAccordion
+          label={t("inv.home.today.title") + " · " + t("inv.home.intel.title")}
+          defaultOpen={isManager}
+          testId="inv-home-extras"
+        >
+          <div className="space-y-4">
+            <div>
+              <SectionEyebrow>{t("inv.home.today.title")}</SectionEyebrow>
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <TodayTile icon="download"      label={t("inv.today.receipts")}  value={op?.today.receipts ?? 0}  href="/inventory/movements?direction=in" />
+                <TodayTile icon="truck-side"    label={t("inv.today.shipments")} value={op?.today.shipments ?? 0} href="/inventory/movements?direction=out" />
+                <TodayTile icon="shipping-fast" label={t("inv.today.transfers")} value={op?.today.transfers ?? 0} href="/inventory/transfers" />
+                <TodayTile icon="recycle"       label={t("inv.today.returns")}   value={op?.today.returns ?? 0}   href="/inventory/returns" />
+              </div>
+            </div>
+            <div>
+              <SectionEyebrow>{t("inv.home.lookup.title")}</SectionEyebrow>
+              <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-3">
+                <LookupInput icon="box-open"    placeholder={t("inv.home.lookup.item")}   type="item" />
+                <LookupInput icon="fingerprint" placeholder={t("inv.home.lookup.serial")} type="serial" />
+                <LookupInput icon="clock"       placeholder={t("inv.home.lookup.batch")}  type="batch" />
+              </div>
+              <div className="mt-2 text-right text-[11px]">
+                <Link href="/inventory/search" className="text-[var(--text-dim)] hover:text-[var(--text-primary)]">
+                  Advanced search →
+                </Link>
+              </div>
+            </div>
+            <div>
+              <SectionEyebrow>{t("inv.home.intel.title")}</SectionEyebrow>
+              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                <IntelTile
+                  icon="bullseye-arrow"
+                  label={t("inv.home.intel.fastest")}
+                  primary={op?.intel.fastest_moving[0]?.item_code ?? "—"}
+                  secondary={op?.intel.fastest_moving[0] ? `${op.intel.fastest_moving[0].item_name ?? ""} · ${op.intel.fastest_moving[0].moves} moves` : ""}
+                  href={op?.intel.fastest_moving[0] ? `/inventory/items/${op.intel.fastest_moving[0].inventory_item_id}` : undefined}
+                />
+                <IntelTile
+                  icon="clock"
+                  label={t("inv.home.intel.stagnant")}
+                  primary={op?.intel.stagnant[0]?.item_code ?? "—"}
+                  secondary={op?.intel.stagnant[0]?.item_name ?? ""}
+                  href={op?.intel.stagnant[0] ? `/inventory/items/${op.intel.stagnant[0].inventory_item_id}` : undefined}
+                />
+                <IntelTile
+                  icon="bank"
+                  label={t("inv.home.intel.busiest")}
+                  primary={op?.intel.busiest_warehouse?.warehouse_code ?? "—"}
+                  secondary={op?.intel.busiest_warehouse ? `${op.intel.busiest_warehouse.warehouse_name} · ${op.intel.busiest_warehouse.moves} moves` : ""}
+                  href={op?.intel.busiest_warehouse ? `/inventory/warehouses` : undefined}
+                />
+                <IntelTile
+                  icon="recycle"
+                  label={t("inv.home.intel.returned")}
+                  primary={op?.intel.most_returned?.item_code ?? "—"}
+                  secondary={op?.intel.most_returned ? `${op.intel.most_returned.item_name ?? ""} · ${op.intel.most_returned.returns} returns` : ""}
+                  href={op?.intel.most_returned ? `/inventory/items/${op.intel.most_returned.inventory_item_id}` : undefined}
+                />
+              </div>
+            </div>
+            {/* Manager-only deep links — Balances + Movements ledger. */}
+            {isManager && (
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <Link href="/inventory/balances" className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[11.5px] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]">
+                  Balances →
+                </Link>
+                <Link href="/inventory/movements" className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[11.5px] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]">
+                  Movements ledger →
+                </Link>
+              </div>
+            )}
           </div>
-        </section>
-
-        {/* 4. Quick lookup ──────────────────────────────────── */}
-        <section data-testid="inv-home-lookup">
-          <SectionEyebrow>{t("inv.home.lookup.title")}</SectionEyebrow>
-          <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
-            <LookupInput icon="box-open"    placeholder={t("inv.home.lookup.item")}   type="item" />
-            <LookupInput icon="fingerprint" placeholder={t("inv.home.lookup.serial")} type="serial" />
-            <LookupInput icon="clock"       placeholder={t("inv.home.lookup.batch")}  type="batch" />
-          </div>
-          <div className="mt-2 text-right text-[11px]">
-            <Link href="/inventory/search" className="text-[var(--text-dim)] hover:text-[var(--text-primary)]">
-              Advanced search →
-            </Link>
-          </div>
-        </section>
-
-        {/* 5. Operational intelligence ───────────────────────── */}
-        <section data-testid="inv-home-intel">
-          <SectionEyebrow>{t("inv.home.intel.title")}</SectionEyebrow>
-          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            <IntelTile
-              icon="bullseye-arrow"
-              label={t("inv.home.intel.fastest")}
-              primary={op?.intel.fastest_moving[0]?.item_code ?? "—"}
-              secondary={op?.intel.fastest_moving[0] ? `${op.intel.fastest_moving[0].item_name ?? ""} · ${op.intel.fastest_moving[0].moves} moves` : ""}
-              href={op?.intel.fastest_moving[0] ? `/inventory/items/${op.intel.fastest_moving[0].inventory_item_id}` : undefined}
-            />
-            <IntelTile
-              icon="clock"
-              label={t("inv.home.intel.stagnant")}
-              primary={op?.intel.stagnant[0]?.item_code ?? "—"}
-              secondary={op?.intel.stagnant[0] ? `${op.intel.stagnant[0].item_name ?? ""}` : ""}
-              href={op?.intel.stagnant[0] ? `/inventory/items/${op.intel.stagnant[0].inventory_item_id}` : undefined}
-            />
-            <IntelTile
-              icon="bank"
-              label={t("inv.home.intel.busiest")}
-              primary={op?.intel.busiest_warehouse?.warehouse_code ?? "—"}
-              secondary={op?.intel.busiest_warehouse ? `${op.intel.busiest_warehouse.warehouse_name} · ${op.intel.busiest_warehouse.moves} moves` : ""}
-              href={op?.intel.busiest_warehouse ? `/inventory/warehouses` : undefined}
-            />
-            <IntelTile
-              icon="recycle"
-              label={t("inv.home.intel.returned")}
-              primary={op?.intel.most_returned?.item_code ?? "—"}
-              secondary={op?.intel.most_returned ? `${op.intel.most_returned.item_name ?? ""} · ${op.intel.most_returned.returns} returns` : ""}
-              href={op?.intel.most_returned ? `/inventory/items/${op.intel.most_returned.inventory_item_id}` : undefined}
-            />
-          </div>
-        </section>
-
-        {/* INV-H5C — removed the small unreadable KPI strip; the actionable
-            "Today's activity" + alerts panels above cover daily flow, and
-            deep KPIs live in /inventory/balances. */}
-
-        <div className="flex flex-wrap items-center gap-2 pt-2">
-          <Link href="/inventory/balances" className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]">
-            <RrIcon name="badge-check" size={11} /> Balances
-          </Link>
-          <Link href="/inventory/movements" className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]">
-            <RrIcon name="file-invoice" size={11} /> Movements ledger
-          </Link>
-        </div>
+        </DetailsAccordion>
       </div>
 
       <MobileFab />
