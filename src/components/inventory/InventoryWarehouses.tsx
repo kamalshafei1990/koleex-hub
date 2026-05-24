@@ -253,11 +253,11 @@ function NewLocationDrawer({
       <form
         onSubmit={submit}
         onClick={(e) => e.stopPropagation()}
-        className="flex w-full max-w-md flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-l border-white/[0.08]"
+        className="flex w-full sm:max-w-md flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-l border-[var(--border-color)]"
       >
-        <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
+        <div className="flex items-center justify-between border-b border-[var(--border-color)] px-4 py-3">
           <h2 className="text-[14px] font-semibold">New Location</h2>
-          <button type="button" onClick={onClose} aria-label="Close" className="text-gray-500 hover:text-gray-300 text-[20px] leading-none">×</button>
+          <button type="button" onClick={onClose} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-dim)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] text-[20px] leading-none">×</button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3">

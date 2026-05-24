@@ -30,6 +30,8 @@ import { useTranslation, type Translations } from "@/lib/i18n";
 import Link from "next/link";
 /* INV-H5C — taxonomy hints for internal-use items. */
 import { suggestSubcategories, INTERNAL_TYPE_KEYS } from "@/lib/inventory/internal-taxonomy";
+/* INV-H9 — card-based internal-item picker (replaces dropdown flow). */
+import InventoryInternalItemDrawer from "@/components/inventory/InventoryInternalItemDrawer";
 
 const INV_H1_T: Translations = {
   "inv.title":             { en: "Stock Profiles",   zh: "库存档案",       ar: "ملفات المخزون" },
@@ -123,6 +125,8 @@ export default function InventoryItems() {
   const [error, setError] = useState<string | null>(null);
 
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  /* INV-H9 — card-based internal-item drawer. */
+  const [internalDrawerOpen, setInternalDrawerOpen] = useState(false);
   const [typesPanelOpen, setTypesPanelOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   /* INV-H6 — Type + Status filters hide behind a single "Filters" disclosure.
@@ -230,7 +234,7 @@ export default function InventoryItems() {
                       <span>{t("inv.create_for_existing")}</span>
                     </Link>
                     <button
-                      onClick={() => { setAddMenuOpen(false); setQuickAddOpen(true); }}
+                      onClick={() => { setAddMenuOpen(false); setInternalDrawerOpen(true); }}
                       className="flex w-full items-start gap-2 rounded-md px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
                     >
                       <RrIcon name="briefcase" size={12} />
@@ -343,7 +347,7 @@ export default function InventoryItems() {
             </thead>
             <tbody>
               {loading && rows.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-6 text-center text-[11px] text-gray-600">Loading…</td></tr>
+                <tr><td colSpan={7} className="px-4 py-6 text-center text-[11px] text-[var(--text-dim)]">Loading…</td></tr>
               ) : rows.length === 0 ? (
                 <tr><td colSpan={7} className="px-0 py-0">
                   <InventoryEmpty
@@ -352,11 +356,11 @@ export default function InventoryItems() {
                     hint={searchKey || filterTypeId ? "Try clearing filters or broadening your search." : "Create your first item — machines, parts, packaging, supplies, anything you track."}
                     action={
                       <button
-                        onClick={() => setQuickAddOpen(true)}
-                        className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.06] px-3 py-1 text-[11.5px] hover:bg-white/[0.10]"
+                        onClick={() => setInternalDrawerOpen(true)}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[11.5px] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"
                       >
-                        <RrIcon name="plus" size={11} />
-                        Add Item
+                        <RrIcon name="briefcase" size={11} />
+                        {t("inv.add_internal_use")}
                       </button>
                     }
                   />
@@ -423,6 +427,13 @@ export default function InventoryItems() {
         />
       )}
 
+      {internalDrawerOpen && (
+        <InventoryInternalItemDrawer
+          onClose={() => setInternalDrawerOpen(false)}
+          onSuccess={() => { setInternalDrawerOpen(false); void load(); }}
+        />
+      )}
+
       {typesPanelOpen && (
         <TypesPanel
           types={types}
@@ -457,7 +468,7 @@ function DrawerShell({
       >
         <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
           <h2 className="text-[14px] font-semibold">{title}</h2>
-          <button onClick={onClose} aria-label="Close" className="text-gray-500 hover:text-gray-300 text-[20px] leading-none">×</button>
+          <button onClick={onClose} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-dim)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] text-[20px] leading-none">×</button>
         </div>
         <div className="flex-1 overflow-y-auto p-4">{children}</div>
         {footer && <div className="border-t border-white/[0.06] px-4 py-3">{footer}</div>}
@@ -933,7 +944,7 @@ function ItemDetailDrawer({
         ) : null
       }
     >
-      {loading && <div className="text-[12px] text-gray-500">Loading…</div>}
+      {loading && <div className="text-[12px] text-[var(--text-dim)]">Loading…</div>}
       {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">{error}</div>}
       {item && (
         <div className="space-y-4">

@@ -18,6 +18,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
+import InventoryInternalItemDrawer from "@/components/inventory/InventoryInternalItemDrawer";
+import RrIcon from "@/components/ui/RrIcon";
 import {
   ActionCard,
   AlertCard,
@@ -62,6 +64,8 @@ export default function InventoryDashboard() {
   const [op, setOp] = useState<OperatorSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /* INV-H9 — Add Internal Item shortcut state. */
+  const [internalDrawerOpen, setInternalDrawerOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,9 +112,22 @@ export default function InventoryDashboard() {
 
         {/* 1. Primary actions — dominate the page. */}
         <section data-testid="inv-home-actions">
-          <div className="flex items-baseline justify-between">
+          <div className="flex flex-wrap items-center gap-2">
             <SectionEyebrow>{t("inv.home.quick.title")}</SectionEyebrow>
-            <span className="text-[10.5px] text-[var(--text-dim)]">{t("inv.shortcuts.hint")}</span>
+            {/* INV-H9 — Add Internal Item shortcut. Sits on the actions header
+                so operators can reach it from /inventory without competing
+                with the 4 big primary actions. */}
+            <button
+              type="button"
+              onClick={() => setInternalDrawerOpen(true)}
+              data-testid="inv-home-add-internal"
+              aria-label={t("inv.home.add_internal", "Add Internal Item")}
+              className="inline-flex min-h-[32px] items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-1 text-[11.5px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"
+            >
+              <RrIcon name="briefcase" size={11} />
+              {t("inv.home.add_internal", "Add Internal Item")}
+            </button>
+            <span className="ml-auto text-[10.5px] text-[var(--text-dim)]">{t("inv.shortcuts.hint")}</span>
           </div>
           <div data-testid="inv-home-quick-actions" className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <ActionCard testId="action-receive"  icon="download"       label={t("inv.action.receive")}  hint={t("inv.action.receive.hint")}  href="/inventory/movements?create=receive"    tone="positive" size="primary" />
@@ -247,6 +264,13 @@ export default function InventoryDashboard() {
 
       <MobileFab />
       <MobileBottomBar />
+
+      {internalDrawerOpen && (
+        <InventoryInternalItemDrawer
+          onClose={() => setInternalDrawerOpen(false)}
+          onSuccess={() => setInternalDrawerOpen(false)}
+        />
+      )}
     </div>
   );
 }

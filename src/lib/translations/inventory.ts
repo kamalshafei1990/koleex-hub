@@ -360,6 +360,7 @@ export const inventoryT: Translations = {
   "inv.home.title":                  { en: "Inventory Operations",  zh: "库存运营",        ar: "عمليات المخزون" },
   "inv.home.subtitle":               { en: "What needs doing today — receive, ship, transfer, adjust.", zh: "今日需办：入库、发货、调拨、调整。", ar: "ما يلزم اليوم — استلام، شحن، تحويل، تعديل." },
   "inv.home.quick.title":            { en: "Quick actions",         zh: "快捷操作",        ar: "إجراءات سريعة" },
+  "inv.home.add_internal":           { en: "Add Internal Item",     zh: "添加内部物品",     ar: "إضافة عنصر داخلي" },
   "inv.home.alerts.title":           { en: "Needs attention",       zh: "需关注",          ar: "يستدعي الانتباه" },
   "inv.home.alerts.empty":           { en: "All clear — nothing waiting.", zh: "一切就绪 — 无待办。", ar: "كل شيء على ما يرام — لا انتظار." },
   "inv.home.today.title":            { en: "Today",                 zh: "今日",            ar: "اليوم" },

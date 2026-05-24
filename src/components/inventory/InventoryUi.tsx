@@ -226,11 +226,11 @@ export function InventoryEmpty({
 }: { title: string; hint?: string; action?: ReactNode; icon?: RrIconName }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
-      <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.02] text-gray-500">
+      <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)]">
         {icon ? <RrIcon name={icon} size={16} /> : <BoxIcon size={16} />}
       </div>
-      <div className="text-[12.5px] text-gray-300">{title}</div>
-      {hint && <div className="max-w-sm text-[11px] text-gray-500">{hint}</div>}
+      <div className="text-[12.5px] text-[var(--text-primary)]">{title}</div>
+      {hint && <div className="max-w-sm text-[11px] text-[var(--text-dim)]">{hint}</div>}
       {action && <div className="mt-1">{action}</div>}
     </div>
   );
