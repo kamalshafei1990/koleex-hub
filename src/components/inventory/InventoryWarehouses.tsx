@@ -141,6 +141,7 @@ export default function InventoryWarehouses() {
               ) : visible.length === 0 ? (
                 <tr><td colSpan={6} className="px-0 py-0">
                   <InventoryEmpty
+                    icon="building"
                     title={filterType ? "No locations of this type" : "No locations yet"}
                     hint={filterType ? "Try clearing the filter." : "Create your first warehouse — every receipt and shipment will need at least one."}
                     action={

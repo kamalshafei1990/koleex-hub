@@ -28,6 +28,12 @@ import ShieldIcon      from "@/components/icons/ui/ShieldIcon";
 import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
 import BoxesIcon       from "@/components/icons/ui/BoxesIcon";
 import InboxRawIcon    from "@/components/icons/ui/InboxRawIcon";
+import CircleDotIcon   from "@/components/icons/ui/CircleDotIcon";
+import ClockIcon       from "@/components/icons/ui/ClockIcon";
+import CheckIcon       from "@/components/icons/ui/CheckIcon";
+import CheckCheckIcon  from "@/components/icons/ui/CheckCheckIcon";
+import BanIcon         from "@/components/icons/ui/BanIcon";
+import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
 
 /* ─── Tone (color token → tailwind classes) ──────────────────── */
 
@@ -104,14 +110,30 @@ export function LocationTypeChip({ type }: { type: string | null | undefined }) 
    Shared by movements (draft/posted/voided) and items
    (active/inactive/archived). */
 
+/* Status → small leading glyph. Maps the most common workflow statuses
+   across items / movements / transfers / returns to a recognisable shape
+   so operators can scan a column without parsing the text. */
+function StatusGlyph({ status, size = 10 }: { status: string; size?: number }) {
+  const s = status.toLowerCase();
+  if (s === "posted" || s === "active" || s === "approved" || s === "completed") return <CheckIcon size={size} />;
+  if (s === "received" || s === "closed") return <CheckCheckIcon size={size} />;
+  if (s === "shipped" || s === "in_transit" || s === "in transit") return <TruckIcon size={size} />;
+  if (s === "voided" || s === "cancelled" || s === "canceled" || s === "archived") return <BanIcon size={size} />;
+  if (s === "pending" || s === "draft" || s === "inactive" || s === "approval_required" || s === "submitted") return <ClockIcon size={size} />;
+  return <CircleDotIcon size={size} />;
+}
+
 export function StatusBadge({ status }: { status: string }) {
+  const s = status.toLowerCase();
   const cls =
-    status === "posted" || status === "active"   ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200" :
-    status === "voided" || status === "archived" ? "border-gray-500/30 bg-gray-500/10 text-gray-400" :
-    status === "draft"  || status === "inactive" ? "border-amber-400/30 bg-amber-500/10 text-amber-200" :
-                                                    "border-white/[0.10] bg-white/[0.04] text-gray-300";
+    s === "posted"   || s === "active"   || s === "approved" || s === "completed" ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200" :
+    s === "received" || s === "closed"   || s === "shipped"  || s === "in_transit" ? "border-sky-400/30 bg-sky-500/10 text-sky-200" :
+    s === "voided"   || s === "archived" || s === "cancelled" || s === "canceled"  ? "border-gray-500/30 bg-gray-500/10 text-gray-400" :
+    s === "draft"    || s === "inactive" || s === "pending"   || s === "approval_required" || s === "submitted" ? "border-amber-400/30 bg-amber-500/10 text-amber-200" :
+                                                                                     "border-white/[0.10] bg-white/[0.04] text-gray-300";
   return (
-    <span className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.10em] ${cls}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.10em] ${cls}`}>
+      <span aria-hidden className="opacity-80"><StatusGlyph status={status} /></span>
       {status}
     </span>
   );
@@ -199,17 +221,31 @@ export function DirectionDelta({ direction, quantity, unit }: { direction: "in" 
    `—`. */
 
 export function InventoryEmpty({
-  title, hint, action,
-}: { title: string; hint?: string; action?: ReactNode }) {
+  title, hint, action, icon,
+}: { title: string; hint?: string; action?: ReactNode; icon?: RrIconName }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
       <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.02] text-gray-500">
-        <BoxIcon size={16} />
+        {icon ? <RrIcon name={icon} size={16} /> : <BoxIcon size={16} />}
       </div>
       <div className="text-[12.5px] text-gray-300">{title}</div>
       {hint && <div className="max-w-sm text-[11px] text-gray-500">{hint}</div>}
       {action && <div className="mt-1">{action}</div>}
     </div>
+  );
+}
+
+/* ─── Page title icon ────────────────────────────────────────────
+   Small icon badge to prefix page titles. Used in section headers /
+   detail-page subsections that don't sit in the InventoryHeader. */
+export function PageTitleIcon({ icon, size = 14 }: { icon: RrIconName; size?: number }) {
+  return (
+    <span
+      aria-hidden
+      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)]"
+    >
+      <RrIcon name={icon} size={size} />
+    </span>
   );
 }
 

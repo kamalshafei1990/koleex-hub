@@ -237,7 +237,7 @@ export default function InventoryBalances() {
                   <tr><td colSpan={groupBy === "batch" ? 7 : 6} className="px-4 py-6 text-center text-[11px] text-gray-600">Loading…</td></tr>
                 ) : drilled.length === 0 ? (
                   <tr><td colSpan={groupBy === "batch" ? 7 : 6} className="px-0 py-0">
-                    <InventoryEmpty title="No balances yet" hint="Drilled balances appear when posted movements carry variants or batches." />
+                    <InventoryEmpty icon="badge-check" title="No balances yet" hint="Drilled balances appear when posted movements carry variants or batches." />
                   </td></tr>
                 ) : (
                   /* When groupBy="variant", collapse rows by (item, variant, warehouse) ignoring batch. */
@@ -314,6 +314,7 @@ export default function InventoryBalances() {
               ) : filteredRows.length === 0 ? (
                 <tr><td colSpan={8} className="px-0 py-0">
                   <InventoryEmpty
+                    icon="badge-check"
                     title={search || filterWh ? "No balances match the filters" : "No balances yet"}
                     hint={search || filterWh ? "Try clearing filters." : "Balances appear automatically as soon as you post stock movements."}
                   />

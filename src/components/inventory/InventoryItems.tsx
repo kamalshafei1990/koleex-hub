@@ -346,6 +346,7 @@ export default function InventoryItems() {
               ) : rows.length === 0 ? (
                 <tr><td colSpan={7} className="px-0 py-0">
                   <InventoryEmpty
+                    icon="box-open"
                     title={searchKey || filterTypeId ? "No items match the current filters" : "No items yet"}
                     hint={searchKey || filterTypeId ? "Try clearing filters or broadening your search." : "Create your first item — machines, parts, packaging, supplies, anything you track."}
                     action={

@@ -235,6 +235,7 @@ export default function InventoryTransfers() {
             </div>
           ) : filtered.length === 0 ? (
             <InventoryEmpty
+              icon="truck-side"
               title={t("inv.transfers.empty.title")}
               hint={t("inv.transfers.empty.hint")}
             />

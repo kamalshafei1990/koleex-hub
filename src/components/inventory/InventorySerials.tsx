@@ -239,6 +239,7 @@ export default function InventorySerials() {
           <div className="px-4 py-8 text-center text-[12px] text-[var(--text-dim)]">{t("inv.loading", "Loading…")}</div>
         ) : serials.length === 0 ? (
           <InventoryEmpty
+            icon="fingerprint"
             title={t("inv.serials.empty.title", "No serials yet")}
             hint={t(
               "inv.serials.empty.description",

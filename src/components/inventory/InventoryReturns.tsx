@@ -241,6 +241,7 @@ export default function InventoryReturns() {
             </div>
           ) : filtered.length === 0 ? (
             <InventoryEmpty
+              icon="recycle"
               title={t("inv.returns.empty.title")}
               hint={t("inv.returns.empty.hint")}
             />
