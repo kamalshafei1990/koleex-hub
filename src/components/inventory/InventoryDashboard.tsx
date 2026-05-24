@@ -31,7 +31,6 @@ import {
   TodayTile,
   useInventoryShortcuts,
 } from "@/components/inventory/InventoryUx";
-import { InventoryKpi } from "@/components/inventory/InventoryUi";
 import RrIcon from "@/components/ui/RrIcon";
 import { useTranslation } from "@/lib/i18n";
 import { inventoryT } from "@/lib/translations/inventory";
@@ -55,24 +54,11 @@ interface OperatorSummary {
   };
 }
 
-interface BasicSummary {
-  warehouse_count: number;
-  item_count: number;
-  total_on_hand: number;
-  total_reserved: number;
-}
-
-function fmtQty(n: number): string {
-  if (!Number.isFinite(n)) return "—";
-  return n.toLocaleString("en-US", { maximumFractionDigits: 4 });
-}
-
 export default function InventoryDashboard() {
   const { t } = useTranslation(inventoryT);
   useInventoryShortcuts({ isActive: true });
 
   const [op, setOp] = useState<OperatorSummary | null>(null);
-  const [basic, setBasic] = useState<BasicSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -80,16 +66,11 @@ export default function InventoryDashboard() {
     let cancelled = false;
     void (async () => {
       try {
-        const [opRes, basicRes] = await Promise.all([
-          fetch("/api/inventory/operator-summary", { credentials: "include", cache: "no-store" }),
-          fetch("/api/inventory/summary", { credentials: "include", cache: "no-store" }),
-        ]);
+        const opRes = await fetch("/api/inventory/operator-summary", { credentials: "include", cache: "no-store" });
         const opJ = await opRes.json();
-        const basicJ = await basicRes.json();
         if (cancelled) return;
         if (opRes.ok) setOp(opJ.summary as OperatorSummary);
-        if (basicRes.ok) setBasic(basicJ.summary as BasicSummary);
-        if (!opRes.ok && !basicRes.ok) setError(opJ.error ?? basicJ.error ?? "Failed to load");
+        else setError(opJ.error ?? "Failed to load");
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       } finally {
@@ -122,13 +103,14 @@ export default function InventoryDashboard() {
           </div>
         )}
 
-        {/* 1. Quick actions ─────────────────────────────────── */}
+        {/* 1. Primary actions — INV-H5C: visibly larger / higher contrast
+                so the 4 core verbs dominate the page. ─────────────────── */}
         <section data-testid="inv-home-actions">
           <div className="flex items-baseline justify-between">
             <SectionEyebrow>{t("inv.home.quick.title")}</SectionEyebrow>
             <span className="text-[10.5px] text-[var(--text-dim)]">{t("inv.shortcuts.hint")}</span>
           </div>
-          <div data-testid="inv-home-quick-actions" className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div data-testid="inv-home-quick-actions" className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <ActionCard
               testId="action-receive"
               icon="download"
@@ -136,6 +118,7 @@ export default function InventoryDashboard() {
               hint={t("inv.action.receive.hint")}
               href="/inventory/movements?create=receive"
               tone="positive"
+              size="primary"
             />
             <ActionCard
               testId="action-ship"
@@ -144,6 +127,7 @@ export default function InventoryDashboard() {
               hint={t("inv.action.ship.hint")}
               href="/inventory/movements?create=ship"
               tone="info"
+              size="primary"
             />
             <ActionCard
               testId="action-transfer"
@@ -152,6 +136,7 @@ export default function InventoryDashboard() {
               hint={t("inv.action.transfer.hint")}
               href="/inventory/transfers?create=1"
               tone="info"
+              size="primary"
             />
             <ActionCard
               testId="action-adjust"
@@ -160,21 +145,37 @@ export default function InventoryDashboard() {
               hint={t("inv.action.adjust.hint")}
               href="/inventory/movements?create=adjustment"
               tone="warning"
+              size="primary"
             />
           </div>
         </section>
 
-        {/* 2. Operational alerts ────────────────────────────── */}
-        <section data-testid="inv-home-alerts">
-          <SectionEyebrow>{t("inv.home.alerts.title")}</SectionEyebrow>
+        {/* 1b. Secondary utility tiles — visibly smaller than primary
+                actions. Search / Low Stock / Returns / Serials / Batches. */}
+        <section data-testid="inv-home-secondary">
+          <div className="mt-1 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+            <ActionCard size="secondary" icon="search"        label="Search"     href="/inventory/search" />
+            <ActionCard size="secondary" icon="interrogation" label="Low Stock"  href="/inventory/items?filter=low_stock" />
+            <ActionCard size="secondary" icon="recycle"       label="Returns"    href="/inventory/returns" />
+            <ActionCard size="secondary" icon="fingerprint"   label="Serials"    href="/inventory/serials" />
+            <ActionCard size="secondary" icon="clock"         label="Batches"    href="/inventory/batches" />
+          </div>
+        </section>
+
+        {/* 2. Operational alerts — INV-H5C: visually quieter than primary
+                actions (smaller eyebrow, dimmer border). */}
+        <section data-testid="inv-home-alerts" className="opacity-95">
+          <div className="text-[9.5px] uppercase tracking-[0.18em] text-[var(--text-dim)]">
+            {t("inv.home.alerts.title")}
+          </div>
           {loading ? (
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {[0, 1, 2, 3].map((i) => (
                 <div key={i} className="h-12 animate-pulse rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]/40" />
               ))}
             </div>
           ) : totalAlerts === 0 ? (
-            <div className="mt-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-4 text-[12px] text-[var(--text-dim)]">
+            <div className="mt-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-3 text-[11.5px] text-[var(--text-dim)]">
               {t("inv.home.alerts.empty")}
             </div>
           ) : (
@@ -265,15 +266,9 @@ export default function InventoryDashboard() {
           </div>
         </section>
 
-        {/* Compact KPI strip — kept from the prior dashboard for context. */}
-        <section>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <InventoryKpi label="Locations"     value={basic ? String(basic.warehouse_count) : "—"} tone="info" />
-            <InventoryKpi label="Items in stock" value={basic ? String(basic.item_count) : "—"} />
-            <InventoryKpi label="Total on-hand"  value={basic ? fmtQty(basic.total_on_hand) : "—"} tone="positive" />
-            <InventoryKpi label="Reserved"       value={basic ? fmtQty(basic.total_reserved) : "—"} tone="warning" />
-          </div>
-        </section>
+        {/* INV-H5C — removed the small unreadable KPI strip; the actionable
+            "Today's activity" + alerts panels above cover daily flow, and
+            deep KPIs live in /inventory/balances. */}
 
         <div className="flex flex-wrap items-center gap-2 pt-2">
           <Link href="/inventory/balances" className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]">

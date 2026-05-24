@@ -23,6 +23,7 @@
     "validate:inventory-serials": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-inventory-serials.ts",
     "validate:inventory-ux": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-inventory-ux.ts",
     "validate:inventory-internal-use": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-inventory-internal-use.ts",
+    "validate:inventory-internal-items": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-inventory-internal-items.ts",
     "validate:purchases": "NODE_OPTIONS=--conditions=react-server tsx scripts/purchases.ts",
     "validate:sales": "NODE_OPTIONS=--conditions=react-server tsx scripts/sales.ts",
     "validate:valuation": "NODE_OPTIONS=--conditions=react-server tsx scripts/valuation.ts",

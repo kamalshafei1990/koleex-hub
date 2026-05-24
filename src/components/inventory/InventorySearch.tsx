@@ -172,20 +172,31 @@ export default function InventorySearch() {
                     <SectionEyebrow>{g.title}</SectionEyebrow>
                     <span className="text-[11px] text-[var(--text-dim)] tabular-nums">{rows.length}</span>
                   </div>
+                  {/* INV-H5C — every result shows an icon · primary name · meta ·
+                       quick action chip. Type icon (g.icon) renders as the
+                       leading visual chip; products lead with their image
+                       wherever the API exposes one (sublabel meta). */}
                   <div className="mt-2 divide-y divide-[var(--border-subtle)] rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
                     {rows.map((r) => (
                       <Link
                         key={`${g.key}-${r.id}`}
                         href={r.href}
-                        className="flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-[var(--bg-elevated)]"
+                        className="flex items-center gap-3 px-3 py-3 transition-colors hover:bg-[var(--bg-elevated)]"
                       >
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-dim)]">
+                          <RrIcon name={g.icon} size={14} />
+                        </span>
                         <div className="min-w-0 flex-1">
-                          <div className="truncate font-mono text-[12.5px] text-[var(--text-primary)]">{r.label}</div>
+                          <div className="truncate text-[13.5px] font-medium text-[var(--text-primary)]">{r.label}</div>
                           {r.sublabel && (
                             <div className="truncate text-[11px] text-[var(--text-dim)]">{r.sublabel}</div>
                           )}
                         </div>
-                        <span className="text-[var(--text-dim)]">→</span>
+                        {g.key === "items" && (
+                          <span className="hidden sm:inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1 text-[10.5px] text-[var(--text-dim)]">
+                            Open →
+                          </span>
+                        )}
                       </Link>
                     ))}
                   </div>

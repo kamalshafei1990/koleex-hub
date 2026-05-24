@@ -80,6 +80,7 @@ export function ActionCard({
   onClick,
   tone = "neutral",
   testId,
+  size = "primary",
 }: {
   icon: RrIconName;
   label: string;
@@ -88,34 +89,56 @@ export function ActionCard({
   onClick?: () => void;
   tone?: "neutral" | "positive" | "warning" | "info";
   testId?: string;
+  /** INV-H5C — `primary` (large + bold) for top 4 actions, `secondary` for
+   *  the smaller utility tiles row. */
+  size?: "primary" | "secondary";
 }) {
   const accent =
     tone === "positive" ? "bg-emerald-300/60" :
     tone === "warning"  ? "bg-amber-300/60"   :
     tone === "info"     ? "bg-blue-300/60"    :
                           "bg-white/40 dark:bg-white/30";
+  const isPrimary = size === "primary";
   const inner = (
     <div
       data-testid={testId}
-      className="group relative flex h-full min-h-[112px] flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3.5 transition-colors hover:bg-[var(--bg-elevated)]"
+      className={`group relative flex h-full flex-col rounded-xl border bg-[var(--bg-surface)] transition-colors hover:bg-[var(--bg-elevated)] ${
+        isPrimary
+          ? "min-h-[140px] border-[var(--border-color)] px-5 py-4 shadow-sm"
+          : "min-h-[80px] border-[var(--border-subtle)] px-3.5 py-3"
+      }`}
     >
-      <div aria-hidden className={`absolute left-4 top-0 h-px w-10 ${accent}`} />
-      <div className="flex items-center gap-2.5">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)]">
-          <RrIcon name={icon} size={14} />
+      <div aria-hidden className={`absolute left-4 top-0 h-px ${isPrimary ? "w-14" : "w-8"} ${accent}`} />
+      <div className={`flex items-center ${isPrimary ? "gap-3" : "gap-2"}`}>
+        <span
+          className={`flex shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)] ${
+            isPrimary ? "h-11 w-11" : "h-7 w-7"
+          }`}
+        >
+          <RrIcon name={icon} size={isPrimary ? 16 : 12} />
         </span>
-        <div className="text-[14px] font-medium tracking-tight text-[var(--text-primary)]">
+        <div
+          className={`font-medium tracking-tight text-[var(--text-primary)] ${
+            isPrimary ? "text-[16px]" : "text-[12.5px]"
+          }`}
+        >
           {label}
         </div>
       </div>
       {hint && (
-        <div className="mt-2 text-[11.5px] leading-relaxed text-[var(--text-dim)]">
+        <div
+          className={`leading-relaxed text-[var(--text-dim)] ${
+            isPrimary ? "mt-2.5 text-[12.5px]" : "mt-1.5 text-[10.5px]"
+          }`}
+        >
           {hint}
         </div>
       )}
-      <div className="mt-auto pt-3 text-[11px] text-[var(--text-dim)] opacity-0 transition-opacity group-hover:opacity-100">
-        →
-      </div>
+      {isPrimary && (
+        <div className="mt-auto pt-3 text-[11px] text-[var(--text-dim)] opacity-0 transition-opacity group-hover:opacity-100">
+          →
+        </div>
+      )}
     </div>
   );
   if (href) return <Link href={href} className="block h-full">{inner}</Link>;

@@ -141,6 +141,7 @@ export async function createInventoryItem(input: CreateItemInput): Promise<{
       item_name: input.item_name.trim(),
       item_type_id: type.id,
       category_id: input.category_id ?? null,
+      subcategory: input.subcategory ?? null,
       brand: input.brand ?? null,
       unit_of_measure: unit,
       sku: input.sku ?? null,

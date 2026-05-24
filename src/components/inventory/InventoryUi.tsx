@@ -51,17 +51,21 @@ export const COLOR_TONE: Record<ColorToken, { chip: string; dot: string; text: s
    label and a tonal hint for the UI. Keeps page components free
    of repeated switch statements.                                       */
 
+/* INV-H5C — operator-first labels. Replaces the raw DB enum names
+   (adjustment_in / transfer_out / sales_shipment / …) with plain English
+   the warehouse clerk actually uses. The enum values themselves don't
+   change — only their on-screen labels. */
 const MOVEMENT_TYPE_META: Record<MovementType, { label: string; tone: "in" | "out" | "neutral" }> = {
-  opening_balance:  { label: "Opening Balance",  tone: "in" },
-  purchase_receipt: { label: "Purchase Receipt", tone: "in" },
-  sales_shipment:   { label: "Sales Shipment",   tone: "out" },
-  adjustment_in:    { label: "Adjustment IN",    tone: "in" },
-  adjustment_out:   { label: "Adjustment OUT",   tone: "out" },
-  transfer_in:      { label: "Transfer IN",      tone: "in" },
-  transfer_out:     { label: "Transfer OUT",     tone: "out" },
-  return_in:        { label: "Return IN",        tone: "in" },
-  return_out:       { label: "Return OUT",       tone: "out" },
-  manual:           { label: "Manual",           tone: "neutral" },
+  opening_balance:  { label: "Opening Stock",      tone: "in" },
+  purchase_receipt: { label: "Goods Received",     tone: "in" },
+  sales_shipment:   { label: "Goods Shipped",      tone: "out" },
+  adjustment_in:    { label: "Stock Added",        tone: "in" },
+  adjustment_out:   { label: "Stock Removed",      tone: "out" },
+  transfer_in:      { label: "Warehouse Transfer", tone: "in" },
+  transfer_out:     { label: "Warehouse Transfer", tone: "out" },
+  return_in:        { label: "Customer Return",    tone: "in" },
+  return_out:       { label: "Supplier Return",    tone: "out" },
+  manual:           { label: "Adjustment",         tone: "neutral" },
 };
 export function movementLabel(type: string | MovementType): string {
   return MOVEMENT_TYPE_META[type as MovementType]?.label ?? type;

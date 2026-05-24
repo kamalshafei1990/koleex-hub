@@ -347,6 +347,8 @@ export interface CreateItemInput {
   item_type_id?: string;        // resolved from type_key if absent
   type_key?: string;
   category_id?: string | null;
+  /** INV-H5C — free-text subcategory used by internal-use items. */
+  subcategory?: string | null;
   unit_of_measure?: UnitOfMeasure;
   brand?: string | null;
   sku?: string | null;

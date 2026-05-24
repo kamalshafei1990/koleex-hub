@@ -28,6 +28,8 @@ import RrIcon from "@/components/ui/RrIcon";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation, type Translations } from "@/lib/i18n";
 import Link from "next/link";
+/* INV-H5C — taxonomy hints for internal-use items. */
+import { suggestSubcategories, INTERNAL_TYPE_KEYS } from "@/lib/inventory/internal-taxonomy";
 
 const INV_H1_T: Translations = {
   "inv.title":             { en: "Stock Profiles",   zh: "库存档案",       ar: "ملفات المخزون" },
@@ -307,28 +309,28 @@ export default function InventoryItems() {
           </div>
         </Panel>
 
-        {/* Items table */}
+        {/* INV-H5C — Items table polished for operator-first scan:
+              image · name (large) · type/subcategory · UoM · on-hand · status.
+            Cost / stock value / avg cost moved into the detail drawer
+            (chevron column → click row). Row height bumped to py-3.5 / py-4. */}
         <Panel>
           <table className="min-w-full text-[12.5px]">
             <thead>
-              <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.10em] text-gray-500">
-                <th className="px-3 py-2 text-left w-[40px]"></th>
-                <th className="px-3 py-2 text-left">Code</th>
-                <th className="px-3 py-2 text-left">Item</th>
-                <th className="px-3 py-2 text-left">Type</th>
-                <th className="px-3 py-2 text-left">Brand</th>
-                <th className="px-3 py-2 text-left">UoM</th>
-                <th className="px-3 py-2 text-right">On hand</th>
-                <th className="px-3 py-2 text-right">Avg cost</th>
-                <th className="px-3 py-2 text-right">Stock value</th>
-                <th className="px-3 py-2 text-left">Status</th>
+              <tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
+                <th className="px-3 py-2.5 text-left w-[48px]"></th>
+                <th className="px-3 py-2.5 text-left">Item</th>
+                <th className="px-3 py-2.5 text-left">Type</th>
+                <th className="px-3 py-2.5 text-left">UoM</th>
+                <th className="px-3 py-2.5 text-right">On hand</th>
+                <th className="px-3 py-2.5 text-left">Status</th>
+                <th className="px-3 py-2.5 text-right w-[32px]"></th>
               </tr>
             </thead>
             <tbody>
               {loading && rows.length === 0 ? (
-                <tr><td colSpan={10} className="px-4 py-6 text-center text-[11px] text-gray-600">Loading…</td></tr>
+                <tr><td colSpan={7} className="px-4 py-6 text-center text-[11px] text-gray-600">Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={10} className="px-0 py-0">
+                <tr><td colSpan={7} className="px-0 py-0">
                   <InventoryEmpty
                     title={searchKey || filterTypeId ? "No items match the current filters" : "No items yet"}
                     hint={searchKey || filterTypeId ? "Try clearing filters or broadening your search." : "Create your first item — machines, parts, packaging, supplies, anything you track."}
@@ -348,71 +350,50 @@ export default function InventoryItems() {
                   <tr
                     key={r.id}
                     onClick={() => setSelectedId(r.id)}
-                    className="cursor-pointer border-b border-white/[0.03] last:border-b-0 hover:bg-white/[0.025]"
+                    className="cursor-pointer border-b border-[var(--border-subtle)] last:border-b-0 hover:bg-[var(--bg-elevated)]"
                   >
-                    <td className="px-3 py-2"><TypeIcon icon={r.icon} color={r.color} /></td>
-                    <td className="px-3 py-2 font-mono text-[11.5px] text-gray-300">{r.item_code}</td>
-                    <td className="px-3 py-2 text-gray-200">
-                      <span className="inline-flex items-center gap-2">
-                        {r.product_image_url && (
-                          /* eslint-disable-next-line @next/next/no-img-element */
-                          <img src={r.product_image_url} alt="" className="h-7 w-7 rounded object-cover bg-[var(--bg-surface)] shrink-0" />
-                        )}
-                        <span className="inline-flex flex-col min-w-0">
-                          <span className="truncate inline-flex items-center gap-1.5">
-                            <span className="truncate">{r.usage_scope === "internal_use" ? r.item_name : (r.product_name ?? r.item_name)}</span>
-                            {r.usage_scope === "internal_use" && (
-                              <span className="shrink-0 rounded-full border border-[var(--border-color)] bg-[var(--bg-surface)] px-1.5 py-0.5 text-[9.5px] font-medium uppercase tracking-[0.06em] text-[var(--text-dim)]">
-                                {t("inv.badge_internal_use")}
-                              </span>
-                            )}
-                          </span>
-                          {r.usage_scope === "internal_use" ? (
-                            r.brand && <span className="text-[10.5px] text-gray-500 truncate">{r.brand}</span>
-                          ) : (
-                            (r.product_sku || (r.product_name && r.product_name !== r.item_name)) && (
-                              <span className="text-[10.5px] text-gray-500 truncate">
-                                {r.product_sku ?? r.item_name}
-                              </span>
-                            )
-                          )}
+                    {/* Image / type icon. Image first when available; type icon chip fallback. */}
+                    <td className="px-3 py-3.5 md:py-4">
+                      {r.product_image_url ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={r.product_image_url} alt="" className="h-9 w-9 rounded-lg object-cover bg-[var(--bg-surface)]" />
+                      ) : (
+                        <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+                          <TypeIcon icon={r.icon} color={r.color} size={14} />
                         </span>
-                      </span>
+                      )}
                     </td>
-                    <td className="px-3 py-2">
+                    {/* Name — larger than meta. */}
+                    <td className="px-3 py-3.5 md:py-4">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[14px] font-medium text-[var(--text-primary)] truncate">
+                          {r.usage_scope === "internal_use" ? r.item_name : (r.product_name ?? r.item_name)}
+                        </span>
+                        {r.usage_scope === "internal_use" && (
+                          <span className="shrink-0 rounded-full border border-[var(--border-color)] bg-[var(--bg-surface)] px-1.5 py-0.5 text-[9.5px] font-medium uppercase tracking-[0.06em] text-[var(--text-dim)]">
+                            {t("inv.badge_internal_use")}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-0.5 text-[11px] text-[var(--text-dim)] truncate">
+                        <span className="font-mono">{r.item_code}</span>
+                        {r.brand && <> · {r.brand}</>}
+                        {r.product_sku && r.product_sku !== r.item_code && <> · {r.product_sku}</>}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3.5 md:py-4">
                       <TypeChip name={r.type_name} icon={r.icon} color={r.color} />
                     </td>
-                    <td className="px-3 py-2 text-gray-400">{r.brand ?? "—"}</td>
-                    <td className="px-3 py-2 text-gray-400">{r.unit_of_measure}</td>
-                    <td className="px-3 py-2 text-right tabular-nums font-mono">{fmtQty(r.qty_on_hand)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums font-mono text-gray-400">
-                      {r.avg_cost > 0 ? fmtMoney(r.avg_cost) : <span className="text-gray-600">—</span>}
+                    <td className="px-3 py-3.5 md:py-4 text-[var(--text-dim)] text-[12px]">{r.unit_of_measure}</td>
+                    <td className="px-3 py-3.5 md:py-4 text-right tabular-nums font-mono text-[13px] text-[var(--text-primary)]">
+                      {fmtQty(r.qty_on_hand)}
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums font-mono">
-                      {r.inventory_value > 0 ? fmtMoney(r.inventory_value) : <span className="text-gray-600">—</span>}
-                    </td>
-                    <td className="px-3 py-2"><StatusBadge status={r.status} /></td>
+                    <td className="px-3 py-3.5 md:py-4"><StatusBadge status={r.status} /></td>
+                    <td className="px-3 py-3.5 md:py-4 text-right text-[12px] text-[var(--text-dim)]">→</td>
                   </tr>
                 ))
               )}
             </tbody>
-            {rows.length > 0 && (
-              <tfoot>
-                <tr className="border-t border-white/[0.08] text-[11px]">
-                  <td colSpan={6} className="px-3 py-2 text-right uppercase tracking-[0.10em] text-gray-500">
-                    Totals
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums font-mono text-gray-400">
-                    {fmtQty(rows.reduce((acc, r) => acc + r.qty_on_hand, 0))}
-                  </td>
-                  <td className="px-3 py-2 text-gray-600 text-right text-[10px]">—</td>
-                  <td className="px-3 py-2 text-right tabular-nums font-mono text-emerald-200">
-                    {fmtMoney(rows.reduce((acc, r) => acc + r.inventory_value, 0))}
-                  </td>
-                  <td className="px-3 py-2"></td>
-                </tr>
-              </tfoot>
-            )}
           </table>
         </Panel>
       </div>
@@ -455,7 +436,8 @@ function DrawerShell({
     <div className="fixed inset-0 z-[120] flex justify-end bg-black/60" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex w-full max-w-md flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-l border-white/[0.08]"
+        /* INV-H5C — full-screen on mobile, side drawer on desktop. */
+        className="flex w-full sm:max-w-md flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-l border-white/[0.08]"
       >
         <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
           <h2 className="text-[14px] font-semibold">{title}</h2>
@@ -500,6 +482,10 @@ function QuickAddDrawer({
   const [minStock, setMinStock] = useState("");
   const [maxStock, setMaxStock] = useState("");
   const [description, setDescription] = useState("");
+  /* INV-H5C — free-text subcategory with taxonomy hints. */
+  const [subcategory, setSubcategory] = useState("");
+  const [notes, setNotes] = useState("");
+  const [notesOpen, setNotesOpen] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -509,7 +495,13 @@ function QuickAddDrawer({
      the API guard skips the product requirement entirely (no admin_repair
      stamp needed). Product-related types still need admin_repair on this
      standalone drawer since the canonical path is via Products. */
-  const isInternalUse = selectedType?.usage_scope === "internal_use" || selectedType?.requires_product === false;
+  const isInternalUse =
+    selectedType?.usage_scope === "internal_use" ||
+    selectedType?.requires_product === false ||
+    (selectedType ? INTERNAL_TYPE_KEYS.has(selectedType.type_key) : false);
+  const subcategorySuggestions = isInternalUse && selectedType
+    ? suggestSubcategories(selectedType.type_key)
+    : [];
 
   const submit = async () => {
     if (!itemName.trim()) { setError("Item name required"); return; }
@@ -535,6 +527,11 @@ function QuickAddDrawer({
         payload.initial_quantity = Number(initialQty) || 0;
         payload.initial_warehouse_id = warehouseId || null;
       }
+      /* INV-H5C — subcategory + notes always flow through, regardless of
+         the Advanced section. Subcategory is the new core "what kind of
+         X is this?" field for internal items. */
+      if (subcategory.trim()) payload.subcategory = subcategory.trim();
+      if (notes.trim()) payload.notes = notes.trim();
       if (advanced) {
         if (brand) payload.brand = brand;
         if (sku) payload.sku = sku;
@@ -641,6 +638,28 @@ function QuickAddDrawer({
             </div>
           )
         )}
+        {/* INV-H5C — Subcategory autocomplete. Only shown for internal-use
+            items where the taxonomy file has hints. Optional, free-text. */}
+        {isInternalUse && subcategorySuggestions.length > 0 && (
+          <label className="block">
+            <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">
+              Subcategory <span className="text-gray-600 normal-case tracking-normal">(optional)</span>
+            </div>
+            <input
+              list={`subcat-${selectedType?.type_key ?? "all"}`}
+              value={subcategory}
+              onChange={(e) => setSubcategory(e.target.value)}
+              placeholder={`e.g. ${subcategorySuggestions[0]}`}
+              className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+            />
+            <datalist id={`subcat-${selectedType?.type_key ?? "all"}`}>
+              {subcategorySuggestions.map((s) => (
+                <option key={s} value={s} />
+              ))}
+            </datalist>
+          </label>
+        )}
+
         <label className="block">
           <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Unit of Measure</div>
           <select
@@ -685,12 +704,35 @@ function QuickAddDrawer({
           </div>
         )}
 
+        {/* INV-H5C — Notes collapse (default closed for internal-use). */}
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => setNotesOpen((s) => !s)}
+            className="inline-flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-200"
+          >
+            <span aria-hidden>{notesOpen ? "−" : "+"}</span>
+            {notesOpen ? "Hide notes" : "Add notes (optional)"}
+          </button>
+          {notesOpen && (
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Anything the next person should know about this item…"
+              rows={2}
+              className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+            />
+          )}
+        </div>
+
         <button
           onClick={() => setAdvanced((s) => !s)}
           className="inline-flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-200"
         >
           <span aria-hidden>{advanced ? "−" : "+"}</span>
-          {advanced ? "Hide advanced details" : "Advanced details (brand, SKU, cost, thresholds)"}
+          {isInternalUse
+            ? (advanced ? "Hide advanced details" : "Advanced (cost, reorder point, supplier)")
+            : (advanced ? "Hide advanced details" : "Advanced details (brand, SKU, cost, thresholds)")}
         </button>
 
         {advanced && (
