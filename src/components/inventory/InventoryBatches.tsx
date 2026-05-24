@@ -109,6 +109,7 @@ export default function InventoryBatches() {
   return (
     <div className="space-y-6">
       <InventoryHeader
+        icon="pallet"
         title={t("inv.batches.title")}
         subtitle={t("inv.batches.subtitle")}
         action={

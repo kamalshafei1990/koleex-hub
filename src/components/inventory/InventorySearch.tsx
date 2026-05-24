@@ -118,7 +118,7 @@ export default function InventorySearch() {
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] pb-16 text-[var(--text-primary)] md:pb-6">
       <div className="mx-auto max-w-[1200px] space-y-5 px-4 py-6 sm:px-6">
-        <InventoryHeader title={t("inv.search.title")} subtitle="" />
+        <InventoryHeader icon="search" title={t("inv.search.title")} subtitle="Find any item, serial, batch, transfer, return or movement across all warehouses." />
 
         <div data-testid="inv-search-input" className="flex items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2">
           <RrIcon name="search" size={14} />

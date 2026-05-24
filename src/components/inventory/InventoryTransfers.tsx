@@ -181,6 +181,7 @@ export default function InventoryTransfers() {
     <div className="min-h-screen bg-[var(--bg-primary)] pb-16 text-[var(--text-primary)] md:pb-6">
       <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
         <InventoryHeader
+          icon="truck-side"
           title={t("inv.transfers.title")}
           subtitle={t("inv.transfers.subtitle")}
           action={

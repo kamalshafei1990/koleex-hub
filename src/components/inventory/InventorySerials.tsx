@@ -149,6 +149,7 @@ export default function InventorySerials() {
   return (
     <div className="mx-auto w-full max-w-[1400px] px-4 py-4 sm:px-6 lg:px-8">
       <InventoryHeader
+        icon="fingerprint"
         title={t("inv.serials.title", "Serials")}
         subtitle={t("inv.serials.subtitle", "Per-unit identity & lifecycle")}
       />

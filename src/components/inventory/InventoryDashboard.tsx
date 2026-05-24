@@ -94,6 +94,7 @@ export default function InventoryDashboard() {
     <div className="min-h-screen bg-[var(--bg-primary)] pb-16 text-[var(--text-primary)] md:pb-6">
       <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
         <InventoryHeader
+          icon="home"
           title={t("inv.home.title")}
           subtitle={t("inv.home.subtitle")}
           action={<ViewModeToggle />}
@@ -119,14 +120,17 @@ export default function InventoryDashboard() {
           </div>
         </section>
 
-        {/* 1b. Secondary utility tiles. */}
+        {/* 1b. Inventory map — secondary destinations, matched to the
+              Finance "map" pattern (calm tile grid under primary actions). */}
         <section data-testid="inv-home-secondary">
-          <div className="mt-1 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          <SectionEyebrow>{t("inv.home.map.title", "Explore inventory")}</SectionEyebrow>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
             <ActionCard size="secondary" icon="search"        label="Search"     href="/inventory/search" />
+            <ActionCard size="secondary" icon="box-open"      label="Items"      href="/inventory/items" />
             <ActionCard size="secondary" icon="interrogation" label="Low Stock"  href="/inventory/items?filter=low_stock" />
             <ActionCard size="secondary" icon="recycle"       label="Returns"    href="/inventory/returns" />
             <ActionCard size="secondary" icon="fingerprint"   label="Serials"    href="/inventory/serials" />
-            <ActionCard size="secondary" icon="clock"         label="Batches"    href="/inventory/batches" />
+            <ActionCard size="secondary" icon="pallet"        label="Batches"    href="/inventory/batches" />
           </div>
         </section>
 

@@ -252,6 +252,7 @@ export default function InventoryTransferDetail({ transferId }: { transferId: st
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
         <InventoryHeader
+          icon="truck-side"
           title={transfer.transfer_no}
           subtitle={t("inv.transfers.title")}
           action={

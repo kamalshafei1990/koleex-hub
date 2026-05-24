@@ -190,6 +190,7 @@ export default function InventoryReturns() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
         <InventoryHeader
+          icon="recycle"
           title={t("inv.returns.title")}
           subtitle={t("inv.returns.subtitle")}
           action={

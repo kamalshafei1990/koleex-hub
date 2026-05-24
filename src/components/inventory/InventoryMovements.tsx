@@ -472,7 +472,7 @@ export default function InventoryMovements() {
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] pb-16 text-[var(--text-primary)] md:pb-6">
       <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
-        <InventoryHeader title={t("mv.title")} subtitle={t("mv.subtitle")} />
+        <InventoryHeader icon="file-invoice" title={t("mv.title")} subtitle={t("mv.subtitle")} />
 
         {error && (
           <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">

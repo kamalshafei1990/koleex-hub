@@ -10,6 +10,7 @@
    --------------------------------------------------------------------------- */
 
 import type { ReactNode } from "react";
+import Link from "next/link";
 import type { ColorToken, IconName, LocationType, MovementType } from "@/lib/inventory/types";
 import BoxIcon         from "@/components/icons/ui/BoxIcon";
 import PackageIcon     from "@/components/icons/ui/PackageIcon";
@@ -284,5 +285,349 @@ export function InventoryKpi({
       <div className="mt-2 text-[24px] font-medium leading-none tabular-nums tracking-[-0.01em]">{value}</div>
       {hint && <div className="mt-1.5 text-[10.5px] text-gray-600">{hint}</div>}
     </div>
+  );
+}
+
+/* ============================================================================
+   INV-H8 — Shared page primitives matched to Hub design system.
+
+   InventoryPageShell  — outer page wrapper (bg, max-width, padding) used by
+                          every inventory page. Wires the InventoryHeader
+                          (back arrow + app icon + global nav) plus optional
+                          mobile FAB / bottom bar.
+   InventoryPageHero   — the "this page" hero block: icon-in-chip + h1 title
+                          + dim subtitle + actions row. Matches the Finance
+                          page-hero pattern (text-2xl heading, soft icon chip).
+   ListSection         — calm wrapper for a list / card body, matches the
+                          rounded-2xl card chrome the rest of the Hub uses.
+   ListRow             — image-first card-style row used by every list page
+                          (image/icon · title · meta · status · action ·
+                          optional expand).
+   EmptyHero           — branded empty state (icon-in-chip + headline +
+                          hint + CTA) used in every list/drawer.
+   FilterChip          — the canonical pill-style filter button.
+   ============================================================================ */
+
+/* ── InventoryPageShell ───────────────────────────────────────
+   The page wrapper. Mobile FAB / bottom bar are injected by the
+   consumer (they live in InventoryUx) so this primitive stays
+   import-cycle free. */
+export function InventoryPageShell({
+  children,
+  width = "wide",
+}: {
+  children: ReactNode;
+  width?: "wide" | "narrow";
+}) {
+  const maxW = width === "narrow" ? "max-w-[1200px]" : "max-w-[1500px]";
+  return (
+    <div className="min-h-screen bg-[var(--bg-primary)] pb-16 text-[var(--text-primary)] md:pb-6">
+      <div className={`mx-auto ${maxW} space-y-6 px-4 py-5 sm:px-6 sm:py-6`}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* ── InventoryPageHero ──────────────────────────────────────────
+   The hero row every inventory page renders directly under the
+   global InventoryHeader. Mirrors the Finance hero structure:
+   large icon in a soft chip · h1 in the canonical title scale ·
+   dim subtitle below · actions on the right (responsive). */
+export function InventoryPageHero({
+  icon,
+  title,
+  subtitle,
+  actions,
+  meta,
+}: {
+  icon: RrIconName;
+  title: string;
+  subtitle?: string;
+  actions?: ReactNode;
+  /** Optional small meta line (e.g. count, status pill row) under the
+   *  subtitle. Keeps the hero visually unified rather than letting each
+   *  page invent its own count display. */
+  meta?: ReactNode;
+}) {
+  return (
+    <section className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex items-start gap-3.5">
+        <span
+          aria-hidden
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-primary)] sm:h-12 sm:w-12"
+        >
+          <RrIcon name={icon} size={18} />
+        </span>
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
+            {title}
+          </h1>
+          {subtitle && (
+            <p className="mt-1 max-w-prose text-sm leading-relaxed text-[var(--text-dim)]">
+              {subtitle}
+            </p>
+          )}
+          {meta && <div className="mt-2">{meta}</div>}
+        </div>
+      </div>
+      {actions && <div className="flex flex-wrap items-center gap-2 sm:justify-end">{actions}</div>}
+    </section>
+  );
+}
+
+/* ── ListSection ─────────────────────────────────────────────────
+   The card chrome list pages live inside. Matches the Hub card —
+   rounded-2xl, secondary background, subtle border — and lays out
+   an optional title / subtitle / action row above the list slot. */
+export function ListSection({
+  title,
+  subtitle,
+  action,
+  children,
+  bare = false,
+}: {
+  title?: string;
+  subtitle?: string;
+  action?: ReactNode;
+  children: ReactNode;
+  /** When `true`, no padding around children — the consumer renders
+   *  edge-to-edge content (e.g. a divided list). Header still padded. */
+  bare?: boolean;
+}) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
+      {(title || action) && (
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-4 py-3 sm:px-5">
+          <div className="min-w-0">
+            {title && (
+              <h2 className="text-[15px] font-medium tracking-tight text-[var(--text-primary)]">
+                {title}
+              </h2>
+            )}
+            {subtitle && <p className="mt-0.5 text-xs text-[var(--text-dim)]">{subtitle}</p>}
+          </div>
+          {action && <div className="flex flex-wrap items-center gap-2">{action}</div>}
+        </header>
+      )}
+      <div className={bare ? "" : "p-4 sm:p-5"}>{children}</div>
+    </section>
+  );
+}
+
+/* ── ListRow ─────────────────────────────────────────────────────
+   Card-first list row used by every inventory list page. Visual
+   anatomy: image/icon chip · primary line · quiet meta line · pill ·
+   primary action right · optional expand strip below.
+
+   The expand strip ("View details ▾") is rendered by the caller as
+   a child element via `expand` — this primitive only supplies the
+   anchor row + a consistent border underneath. */
+export function ListRow({
+  leading,
+  title,
+  meta,
+  status,
+  action,
+  href,
+  onClick,
+  trailingHref,
+  expanded,
+  expand,
+}: {
+  leading: ReactNode;
+  title: ReactNode;
+  meta?: ReactNode;
+  status?: ReactNode;
+  action?: ReactNode;
+  href?: string;
+  onClick?: () => void;
+  /** Render an "Open →" chevron link on the far right (separate from action). */
+  trailingHref?: string;
+  /** When true the expand block underneath the row is visible. */
+  expanded?: boolean;
+  /** Content of the expand block — typically a `<dl>` with extra fields. */
+  expand?: ReactNode;
+}) {
+  const rowInner = (
+    <div className="flex flex-col gap-2 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-3 sm:px-5">
+      <span className="flex shrink-0 items-center">{leading}</span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px] font-medium text-[var(--text-primary)]">
+          {title}
+        </div>
+        {meta && (
+          <div className="mt-0.5 truncate text-xs text-[var(--text-dim)]">{meta}</div>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+        {status}
+        {action}
+        {trailingHref && (
+          <Link
+            href={trailingHref}
+            className="hidden text-[var(--text-dim)] hover:text-[var(--text-primary)] sm:inline-flex"
+            aria-label="Open"
+          >
+            <RrIcon name="arrow-up-right" size={12} />
+          </Link>
+        )}
+      </div>
+    </div>
+  );
+  return (
+    <li className="border-b border-[var(--border-subtle)] last:border-b-0 transition-colors hover:bg-[var(--bg-elevated)]">
+      {href ? (
+        <Link href={href} className="block">{rowInner}</Link>
+      ) : onClick ? (
+        <button type="button" onClick={onClick} className="block w-full text-left">{rowInner}</button>
+      ) : (
+        rowInner
+      )}
+      {expanded && expand && (
+        <div className="border-t border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3 text-xs sm:px-5">
+          {expand}
+        </div>
+      )}
+    </li>
+  );
+}
+
+/* ── EmptyHero ────────────────────────────────────────────────
+   Branded empty state. Larger icon, more whitespace, matches the
+   Finance / Products empty pattern. */
+export function EmptyHero({
+  icon,
+  title,
+  hint,
+  action,
+  compact = false,
+}: {
+  icon: RrIconName;
+  title: string;
+  hint?: string;
+  action?: ReactNode;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      className={`flex flex-col items-center justify-center gap-3 px-6 text-center ${
+        compact ? "py-10" : "py-16"
+      }`}
+    >
+      <span
+        aria-hidden
+        className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)]"
+      >
+        <RrIcon name={icon} size={20} />
+      </span>
+      <div className="text-[15px] font-medium text-[var(--text-primary)]">{title}</div>
+      {hint && <div className="max-w-sm text-sm text-[var(--text-dim)]">{hint}</div>}
+      {action && <div className="mt-2">{action}</div>}
+    </div>
+  );
+}
+
+/* ── FilterChip ─────────────────────────────────────────────────
+   Canonical pill-style filter button used by every list page's
+   filter strip. Active state matches the Hub's tab convention
+   (subtle border + lifted background, no saturated tint). */
+export function FilterChip({
+  active,
+  onClick,
+  children,
+  count,
+  icon,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+  count?: number | null;
+  icon?: RrIconName;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] transition-colors ${
+        active
+          ? "border-[var(--border-color)] bg-[var(--bg-elevated)] text-[var(--text-primary)]"
+          : "border-[var(--border-subtle)] bg-transparent text-[var(--text-dim)] hover:border-[var(--border-color)] hover:text-[var(--text-primary)]"
+      }`}
+    >
+      {icon && <RrIcon name={icon} size={11} />}
+      <span>{children}</span>
+      {count != null && (
+        <span className="rounded-full bg-[var(--bg-surface)] px-1.5 text-[10px] tabular-nums text-[var(--text-dim)]">
+          {count}
+        </span>
+      )}
+    </button>
+  );
+}
+
+/* ── PrimaryButton / SecondaryButton ────────────────────────────
+   The two canonical inventory action buttons. Matches the Hub
+   convention: primary = inverted bg, secondary = soft surface. */
+export function PrimaryButton({
+  icon,
+  children,
+  onClick,
+  href,
+  type = "button",
+  disabled,
+}: {
+  icon?: RrIconName;
+  children: ReactNode;
+  onClick?: () => void;
+  href?: string;
+  type?: "button" | "submit";
+  disabled?: boolean;
+}) {
+  const cls =
+    "inline-flex items-center gap-1.5 rounded-md bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] transition-opacity hover:opacity-90 disabled:opacity-50";
+  const inner = (
+    <>
+      {icon && <RrIcon name={icon} size={12} />}
+      <span>{children}</span>
+    </>
+  );
+  if (href) return <Link href={href} className={cls}>{inner}</Link>;
+  return (
+    <button type={type} onClick={onClick} disabled={disabled} className={cls}>
+      {inner}
+    </button>
+  );
+}
+
+export function SecondaryButton({
+  icon,
+  children,
+  onClick,
+  href,
+  type = "button",
+  disabled,
+}: {
+  icon?: RrIconName;
+  children: ReactNode;
+  onClick?: () => void;
+  href?: string;
+  type?: "button" | "submit";
+  disabled?: boolean;
+}) {
+  const cls =
+    "inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-elevated)] disabled:opacity-50";
+  const inner = (
+    <>
+      {icon && <RrIcon name={icon} size={12} />}
+      <span>{children}</span>
+    </>
+  );
+  if (href) return <Link href={href} className={cls}>{inner}</Link>;
+  return (
+    <button type={type} onClick={onClick} disabled={disabled} className={cls}>
+      {inner}
+    </button>
   );
 }

@@ -305,6 +305,7 @@ export default function InventoryReturnDetail({ returnId }: { returnId: string }
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
         <InventoryHeader
+          icon="recycle"
           title={ret.return_no}
           subtitle={
             ret.return_type === "customer_return"

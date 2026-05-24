@@ -66,14 +66,20 @@ const ALL_TABS: TabEntry[] = NAV_GROUPS.flatMap((g) => g.items);
 export default function InventoryHeader({
   title,
   subtitle,
+  icon,
   action,
   controls,
+  meta,
   showTabs = true,
 }: {
   title: string;
   subtitle?: string;
+  /** Per-page icon for the hero chip. Defaults to box-open. */
+  icon?: RrIconName;
   action?: ReactNode;
   controls?: ReactNode;
+  /** Optional secondary line under the subtitle (e.g. status pills, counts). */
+  meta?: ReactNode;
   showTabs?: boolean;
 }) {
   const pathname = usePathname() ?? "/inventory";
@@ -85,36 +91,61 @@ export default function InventoryHeader({
     ?? "/inventory";
 
   const visibleGroups = NAV_GROUPS.filter((g) => !g.managerOnly || isManager);
+  const heroIcon: RrIconName = icon ?? "box-open";
 
   return (
     <div>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-3">
-          <Link
-            href="/"
-            aria-label="Back to Hub"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] transition-colors hover:text-[var(--text-primary)]"
+      {/* Top chrome strip: back · tiny app badge — kept compact so the
+          hero below is what carries the page identity. INV-H8 */}
+      <div className="flex items-center gap-2 text-[var(--text-dim)]">
+        <Link
+          href="/"
+          aria-label="Back to Hub"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] transition-colors hover:text-[var(--text-primary)]"
+        >
+          <RrIcon name="arrow-left" size={13} />
+        </Link>
+        <Link
+          href="/inventory"
+          className="inline-flex items-center gap-1.5 text-[10.5px] uppercase tracking-[0.16em] transition-colors hover:text-[var(--text-primary)]"
+        >
+          <RrIcon name="box-open" size={10} />
+          <span>Inventory</span>
+        </Link>
+      </div>
+
+      {/* Hero: large icon chip · big title · roomy subtitle · action row.
+          INV-H8 — mirrors Finance/Products hero pattern. */}
+      <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3.5">
+          <span
+            aria-hidden
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-primary)] sm:h-12 sm:w-12"
           >
-            <RrIcon name="arrow-left" size={16} />
-          </Link>
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)]">
-            <RrIcon name="box-open" size={16} />
-          </div>
-          <div className="flex min-w-0 items-center gap-2.5">
-            <h1 className="text-xl font-bold tracking-tight md:text-[22px]">{title}</h1>
+            <RrIcon name={heroIcon} size={18} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-[22px] font-semibold tracking-tight text-[var(--text-primary)] sm:text-2xl">
+              {title}
+            </h1>
             {subtitle && (
-              <p className="hidden text-[12px] text-[var(--text-dim)] sm:block">{subtitle}</p>
+              <p className="mt-1 max-w-prose text-[13px] leading-relaxed text-[var(--text-dim)] sm:text-sm">
+                {subtitle}
+              </p>
             )}
+            {meta && <div className="mt-2">{meta}</div>}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {controls}
-          {action}
-        </div>
+        {(controls || action) && (
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+            {controls}
+            {action}
+          </div>
+        )}
       </div>
 
       {showTabs && (
-        <nav aria-label="Inventory navigation" className="mt-5">
+        <nav aria-label="Inventory navigation" className="mt-6">
           {/* Desktop: grouped clusters with eyebrow labels */}
           <div className="hidden flex-wrap items-start gap-x-5 gap-y-3 sm:flex">
             {visibleGroups.map((group) => (
