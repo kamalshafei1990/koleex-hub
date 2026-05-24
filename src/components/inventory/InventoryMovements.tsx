@@ -23,7 +23,6 @@ import {
   InventoryEmpty,
   LocationTypeChip,
   Panel,
-  StatusBadge,
   movementLabel,
 } from "@/components/inventory/InventoryUi";
 import RrIcon from "@/components/ui/RrIcon";
@@ -33,11 +32,13 @@ import Link from "next/link";
 import InventoryMovementDetail from "@/components/inventory/InventoryMovementDetail";
 import {
   BulkActionBar,
+  HumanStatusPill,
   MobileBottomBar,
   MobileFab,
   OperatorMovementMenu,
   WarningChip,
   operatorLabel,
+  relativeTime,
   useInventoryShortcuts,
   useSelection,
 } from "@/components/inventory/InventoryUx";
@@ -71,6 +72,18 @@ const MV_T: Translations = {
   "mv.submit":           { en: "Submit for Approval", zh: "提交审批", ar: "إرسال للاعتماد" },
   "mv.submitting":       { en: "Submitting…",    zh: "提交中…",  ar: "جارٍ الإرسال…" },
   "mv.value_required":   { en: "Inventory value is required before stock can be added.", zh: "添加库存前必须填写库存价值。", ar: "قيمة المخزون مطلوبة قبل إضافة المخزون." },
+  /* INV-H5D — operator polish strings */
+  "mv.details.show":     { en: "View details",   zh: "查看详情",       ar: "عرض التفاصيل" },
+  "mv.details.hide":     { en: "Hide details",   zh: "隐藏详情",       ar: "إخفاء التفاصيل" },
+  "mv.filters.more":     { en: "More filters",   zh: "更多筛选",       ar: "مزيد من المرشحات" },
+  "mv.filters.fewer":    { en: "Fewer filters",  zh: "收起筛选",       ar: "تقليل المرشحات" },
+  "mv.action.review":    { en: "Review",         zh: "审核",          ar: "مراجعة" },
+  "mv.action.open":      { en: "Open",           zh: "打开",          ar: "فتح" },
+  "mv.raw.movement_type":{ en: "Raw movement type", zh: "原始动作类型", ar: "نوع الحركة الخام" },
+  "mv.raw.audit_id":     { en: "Audit row id",   zh: "审计记录ID",     ar: "معرف السجل" },
+  "mv.raw.source":       { en: "Source document",zh: "来源单据",       ar: "مستند المصدر" },
+  "mv.raw.posted_at":    { en: "Posted at",      zh: "过账时间",       ar: "وقت الترحيل" },
+  "mv.raw.voided_at":    { en: "Voided at",      zh: "作废时间",       ar: "وقت الإبطال" },
 };
 
 interface ProductOption {
@@ -126,6 +139,15 @@ export default function InventoryMovements() {
   const { t } = useTranslation(MV_T);
   useInventoryShortcuts({ isActive: true });
   const selection = useSelection<string>();
+  /* INV-H5D — per-row "View details" disclosure + secondary-filter toggle */
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpand = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
 
   /* INV-H5A — operator menu deep-links: ?create=receive|ship|adjustment|… */
   const [pendingCreate, setPendingCreate] = useState<string | null>(null);
@@ -467,13 +489,27 @@ export default function InventoryMovements() {
           </div>
         </div>
 
-        {/* Tabs + Create */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Tabs + Create.
+            INV-H5D — primary chips (Workflow, Adjustments, Drafts) stay
+            visible; the secondary status filters (Posted / Voided) hide
+            behind "More filters". */}
+        <div className="flex flex-wrap items-center gap-1.5">
           <TabBtn active={tab === "workflow"}     onClick={() => setTab("workflow")}>{t("mv.tab.workflow")}</TabBtn>
           <TabBtn active={tab === "adjustments"}  onClick={() => setTab("adjustments")}>{t("mv.tab.adjustments")}</TabBtn>
           <TabBtn active={tab === "drafts"}       onClick={() => setTab("drafts")}>{t("mv.tab.drafts")}</TabBtn>
-          <TabBtn active={tab === "posted"}       onClick={() => setTab("posted")}>{t("mv.tab.posted")}</TabBtn>
-          <TabBtn active={tab === "voided"}       onClick={() => setTab("voided")}>{t("mv.tab.voided")}</TabBtn>
+          {showMoreFilters && (
+            <>
+              <TabBtn active={tab === "posted"} onClick={() => setTab("posted")}>{t("mv.tab.posted")}</TabBtn>
+              <TabBtn active={tab === "voided"} onClick={() => setTab("voided")}>{t("mv.tab.voided")}</TabBtn>
+            </>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowMoreFilters((v) => !v)}
+            className="rounded-md border border-[var(--border-subtle)] bg-transparent px-2.5 py-1.5 text-[11px] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+          >
+            {showMoreFilters ? t("mv.filters.fewer") : t("mv.filters.more")}
+          </button>
           <div className="ml-auto flex items-center gap-2">
             <div className="text-[11px] text-[var(--text-dim)] tabular-nums">
               {loading ? "…" : `${filtered.length} of ${movements.length}`}
@@ -777,135 +813,201 @@ export default function InventoryMovements() {
           </form>
         )}
 
-        {/* Ledger */}
+        {/* Ledger — INV-H5D operator-first list.
+            Visible row: icon · product/item · operator label · qty ·
+            warehouse · humanized status pill · primary action. Raw enum,
+            audit row id, full timestamps, source document — all collapse
+            behind "View details". */}
         <Panel>
-          <table className="min-w-full text-[12.5px]">
-            <thead>
-              <tr className="border-b border-[var(--border-color)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
-                <th className="px-2 py-2 text-left">
-                  <input
-                    type="checkbox"
-                    aria-label="Select all"
-                    checked={filtered.length > 0 && filtered.every((m) => selection.has(m.id))}
-                    onChange={(e) => {
-                      const visible = filtered.filter((m) => m.status === "draft" || m.approval_status === "pending").map((m) => m.id);
-                      if (e.target.checked) selection.set(visible);
-                      else selection.clear();
-                    }}
-                  />
-                </th>
-                <th className="px-3 py-2 text-left">Date</th>
-                <th className="px-3 py-2 text-left">Movement #</th>
-                <th className="px-3 py-2 text-left">Product</th>
-                <th className="px-3 py-2 text-left">Location</th>
-                <th className="px-3 py-2 text-left">Type</th>
-                <th className="px-3 py-2 text-right">Qty</th>
-                <th className="px-3 py-2 text-left">Status</th>
-                <th className="px-3 py-2 text-left">Approval</th>
-                <th className="px-3 py-2 text-right"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && filtered.length === 0 ? (
-                <tr><td colSpan={10} className="px-4 py-6 text-center text-[11px] text-[var(--text-dim)]">Loading…</td></tr>
-              ) : filtered.length === 0 ? (
-                <tr><td colSpan={10} className="px-0 py-0">
-                  <InventoryEmpty title={`No ${tab} movements`} hint="Try a different tab." />
-                </td></tr>
-              ) : (
-                filtered.map((m) => {
-                  const wh = warehouseMap.get(m.warehouse_id);
-                  const product = productItemMap.get(m.inventory_item_id);
-                  /* INV-H5A — stale draft check. We approximate "created > 7d
-                     ago" using movement_date as a proxy (the row only carries
-                     posted_at / voided_at on the wire — created_at is not in
-                     MovementRow). Operators see this only on actual drafts. */
-                  const isStaleDraft = (() => {
-                    if (m.status !== "draft") return false;
-                    const d = Date.parse(m.movement_date);
-                    if (!Number.isFinite(d)) return false;
-                    return Date.now() - d > 7 * 86400_000;
-                  })();
-                  const canSelect = m.status === "draft" || m.approval_status === "pending";
-                  return (
-                    <tr
-                      key={m.id}
-                      className="border-b border-[var(--border-color)]/40 last:border-b-0 hover:bg-[var(--bg-surface)]/60"
-                    >
-                      <td className="px-2 py-1.5">
-                        {canSelect ? (
-                          <input
-                            type="checkbox"
-                            checked={selection.has(m.id)}
-                            onChange={() => selection.toggle(m.id)}
-                            aria-label={`Select ${m.movement_no}`}
-                          />
-                        ) : null}
-                      </td>
-                      <td className="px-3 py-1.5 whitespace-nowrap text-[var(--text-dim)]">{m.movement_date}</td>
-                      <td className="px-3 py-1.5 font-mono text-[11.5px] text-[var(--text-secondary)] whitespace-nowrap">
-                        {m.movement_no}
-                        {isStaleDraft && (
-                          <span className="ml-1.5">
-                            <WarningChip tone="warning">Draft &gt;7d</WarningChip>
+          {loading && filtered.length === 0 ? (
+            <div className="px-4 py-6 text-center text-[11px] text-[var(--text-dim)]">Loading…</div>
+          ) : filtered.length === 0 ? (
+            <InventoryEmpty title={`No ${tab} movements`} hint="Try a different tab." />
+          ) : (
+            <ul role="list" className="divide-y divide-[var(--border-color)]/40">
+              {filtered.map((m) => {
+                const wh = warehouseMap.get(m.warehouse_id);
+                const product = productItemMap.get(m.inventory_item_id);
+                const isStaleDraft = (() => {
+                  if (m.status !== "draft") return false;
+                  const d = Date.parse(m.movement_date);
+                  if (!Number.isFinite(d)) return false;
+                  return Date.now() - d > 7 * 86400_000;
+                })();
+                const canSelect = m.status === "draft" || m.approval_status === "pending";
+                const isExpanded = expanded.has(m.id);
+                const primaryActionLabel = canSelect ? t("mv.action.review") : t("mv.action.open");
+                const displayName = product?.product_name ?? "—";
+                const subline = (() => {
+                  const parts: string[] = [];
+                  if (wh) parts.push(wh.code);
+                  parts.push(movementLabel(m.movement_type));
+                  parts.push(relativeTime(m.movement_date));
+                  return parts.join(" · ");
+                })();
+                return (
+                  <li
+                    key={m.id}
+                    className="px-3 py-3.5 transition-colors hover:bg-[var(--bg-surface)]/60 sm:px-4"
+                  >
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                      {/* Select checkbox — only meaningful for actionable rows. */}
+                      {canSelect ? (
+                        <input
+                          type="checkbox"
+                          checked={selection.has(m.id)}
+                          onChange={() => selection.toggle(m.id)}
+                          aria-label={`Select ${m.movement_no}`}
+                          className="hidden sm:block"
+                        />
+                      ) : (
+                        <span className="hidden sm:block sm:w-[16px]" aria-hidden />
+                      )}
+
+                      {/* Image or fallback icon */}
+                      {product?.image_url ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={product.image_url}
+                          alt=""
+                          className="h-9 w-9 shrink-0 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] object-cover"
+                        />
+                      ) : (
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-dim)]">
+                          <RrIcon name="box-open" size={14} />
+                        </span>
+                      )}
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="truncate text-base font-medium text-[var(--text-primary)]">
+                            {displayName}
                           </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-1.5 text-[var(--text-primary)]">
-                        {product ? (
-                          <span className="inline-flex items-center gap-2">
-                            {product.image_url && (
-                              /* eslint-disable-next-line @next/next/no-img-element */
-                              <img src={product.image_url} alt="" className="h-7 w-7 rounded object-cover bg-[var(--bg-surface)]" />
-                            )}
-                            <span className="flex flex-col min-w-0">
-                              <span className="truncate text-[12px]">{product.product_name}</span>
-                              <span className="font-mono text-[10.5px] text-[var(--text-dim)]">
-                                {product.sku ? <>{product.sku} · </> : null}{product.stock_profile?.item_code}
-                              </span>
+                          <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-0.5 text-[10.5px] text-[var(--text-secondary)]">
+                            {operatorLabel(m.movement_type)}
+                          </span>
+                          {m.source_type && (
+                            <span className="rounded border border-[var(--border-subtle)] px-1.5 py-0 text-[9.5px] uppercase tracking-wider text-[var(--text-dim)]">
+                              system
                             </span>
-                          </span>
-                        ) : <span className="text-[var(--text-dim)]">—</span>}
-                      </td>
-                      <td className="px-3 py-1.5">
-                        {wh ? (
-                          <span className="inline-flex items-center gap-1.5">
-                            <span className="text-[11.5px] text-[var(--text-secondary)]">{wh.code}</span>
-                            <LocationTypeChip type={wh.location_type} />
-                          </span>
-                        ) : <span className="text-[var(--text-dim)]">—</span>}
-                      </td>
-                      <td className="px-3 py-1.5 text-[11.5px] text-[var(--text-secondary)] whitespace-nowrap">
-                        <span className="font-medium text-[var(--text-primary)]">{operatorLabel(m.movement_type)}</span>
-                        <span className="ml-1.5 text-[10.5px] text-[var(--text-dim)]">{movementLabel(m.movement_type)}</span>
-                        {m.source_type && (
-                          <span className="ml-1.5 rounded border border-[var(--border-color)] px-1 py-0.5 text-[9.5px] uppercase tracking-wider text-[var(--text-dim)]">
-                            system
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-1.5 text-right whitespace-nowrap">
+                          )}
+                          {isStaleDraft && (
+                            <WarningChip tone="warning">Draft &gt;7d</WarningChip>
+                          )}
+                        </div>
+                        <div className="mt-0.5 truncate text-xs text-[var(--text-dim)]">
+                          {subline}
+                        </div>
+                      </div>
+
+                      {/* Qty */}
+                      <div className="text-right tabular-nums">
                         <DirectionDelta direction={m.direction} quantity={m.quantity} unit={m.unit} />
-                      </td>
-                      <td className="px-3 py-1.5"><StatusBadge status={m.status} /></td>
-                      <td className="px-3 py-1.5 text-[11px] text-[var(--text-dim)]">
-                        {m.approval_status && m.approval_status !== "not_required" ? m.approval_status : "—"}
-                      </td>
-                      <td className="px-3 py-1.5 text-right">
+                      </div>
+
+                      {/* Humanized status + primary action */}
+                      <div className="flex items-center gap-2 sm:ml-2">
+                        <HumanStatusPill status={m.status} />
                         <button
                           type="button"
                           onClick={() => setDetailId(m.id)}
-                          className="text-[11px] text-[var(--text-secondary)] hover:underline"
+                          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] sm:min-h-0 sm:py-1.5"
                         >
-                          Details
+                          {primaryActionLabel}
                         </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                      </div>
+                    </div>
+
+                    {/* INV-H5D — collapsed details. Raw movement_type,
+                        audit row id, source-document raw id, raw
+                        timestamps, approval enum live here. */}
+                    <div className="mt-1.5">
+                      <button
+                        type="button"
+                        onClick={() => toggleExpand(m.id)}
+                        className="text-[11px] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:underline"
+                      >
+                        {isExpanded ? t("mv.details.hide") : t("mv.details.show")}
+                      </button>
+                    </div>
+                    {isExpanded && (
+                      <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)]/40 px-3 py-2 text-[11px] sm:grid-cols-2">
+                        <div className="flex justify-between gap-2">
+                          <dt className="text-[var(--text-dim)]">Movement #</dt>
+                          <dd className="font-mono text-[var(--text-secondary)]">{m.movement_no}</dd>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <dt className="text-[var(--text-dim)]">{t("mv.raw.audit_id")}</dt>
+                          <dd className="font-mono text-[var(--text-secondary)] truncate">{m.id}</dd>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <dt className="text-[var(--text-dim)]">{t("mv.raw.movement_type")}</dt>
+                          <dd className="text-[var(--text-secondary)]">{m.movement_type} → {operatorLabel(m.movement_type)}</dd>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <dt className="text-[var(--text-dim)]">Date</dt>
+                          <dd className="text-[var(--text-secondary)]">{m.movement_date}</dd>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <dt className="text-[var(--text-dim)]">Location</dt>
+                          <dd className="text-[var(--text-secondary)]">
+                            {wh ? (
+                              <span className="inline-flex items-center gap-1.5">
+                                {wh.code}
+                                <LocationTypeChip type={wh.location_type} />
+                              </span>
+                            ) : "—"}
+                          </dd>
+                        </div>
+                        {product?.stock_profile?.item_code && (
+                          <div className="flex justify-between gap-2">
+                            <dt className="text-[var(--text-dim)]">Item code</dt>
+                            <dd className="font-mono text-[var(--text-secondary)]">
+                              {product.sku ? `${product.sku} · ` : ""}{product.stock_profile.item_code}
+                            </dd>
+                          </div>
+                        )}
+                        {m.source_type && (
+                          <div className="flex justify-between gap-2">
+                            <dt className="text-[var(--text-dim)]">{t("mv.raw.source")}</dt>
+                            <dd className="text-[var(--text-secondary)]">{m.source_type}</dd>
+                          </div>
+                        )}
+                        {m.reference && (
+                          <div className="flex justify-between gap-2">
+                            <dt className="text-[var(--text-dim)]">Reference</dt>
+                            <dd className="text-[var(--text-secondary)]">{m.reference}</dd>
+                          </div>
+                        )}
+                        {m.approval_status && m.approval_status !== "not_required" && (
+                          <div className="flex justify-between gap-2">
+                            <dt className="text-[var(--text-dim)]">Approval</dt>
+                            <dd className="text-[var(--text-secondary)]">{m.approval_status}</dd>
+                          </div>
+                        )}
+                        {m.posted_at && (
+                          <div className="flex justify-between gap-2">
+                            <dt className="text-[var(--text-dim)]">{t("mv.raw.posted_at")}</dt>
+                            <dd className="text-[var(--text-secondary)]">{new Date(m.posted_at).toLocaleString()}</dd>
+                          </div>
+                        )}
+                        {m.voided_at && (
+                          <div className="flex justify-between gap-2">
+                            <dt className="text-[var(--text-dim)]">{t("mv.raw.voided_at")}</dt>
+                            <dd className="text-[var(--text-secondary)]">{new Date(m.voided_at).toLocaleString()}</dd>
+                          </div>
+                        )}
+                        <div className="flex justify-between gap-2 sm:col-span-2">
+                          <dt className="text-[var(--text-dim)]">Raw status</dt>
+                          <dd className="text-[var(--text-secondary)]">{m.status}</dd>
+                        </div>
+                      </dl>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </Panel>
 
         {detailId && (

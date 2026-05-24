@@ -18,11 +18,22 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
 import RrIcon from "@/components/ui/RrIcon";
-import { InventoryEmpty, Panel, StatusBadge } from "@/components/inventory/InventoryUi";
+import { InventoryEmpty, Panel } from "@/components/inventory/InventoryUi";
 import { humanizeError } from "@/lib/ui/humanize-error";
-import { useTranslation } from "@/lib/i18n";
+import { useTranslation, type Translations } from "@/lib/i18n";
 import { inventoryT } from "@/lib/translations/inventory";
 import InventoryReturnCreateDrawer from "./InventoryReturnCreateDrawer";
+import { HumanStatusPill, humanStatus, relativeTime } from "./InventoryUx";
+
+/* INV-H5D — local i18n extension for the operator polish strings. */
+const RT_T: Translations = {
+  "inv.returns.action.open":      { en: "Open",           zh: "打开",            ar: "فتح" },
+  "inv.returns.details.show":     { en: "View details",   zh: "查看详情",        ar: "عرض التفاصيل" },
+  "inv.returns.details.hide":     { en: "Hide details",   zh: "隐藏详情",        ar: "إخفاء التفاصيل" },
+  "inv.returns.filters.more":     { en: "More filters",   zh: "更多筛选",        ar: "مزيد من المرشحات" },
+  "inv.returns.filters.fewer":    { en: "Fewer filters",  zh: "收起筛选",        ar: "تقليل المرشحات" },
+  "inv.returns.row.items":        { en: "{n} items",      zh: "{n} 条",          ar: "{n} عناصر" },
+};
 
 type ReturnStatus =
   | "draft" | "pending" | "approved" | "received" | "shipped"
@@ -57,7 +68,10 @@ interface ReturnRollup { item_count: number; total_qty: number }
 
 type TabKey = "all" | "draft" | "pending" | "approved" | "processed" | "completed" | "voided";
 
-const TABS: TabKey[] = ["all", "draft", "pending", "approved", "processed", "completed", "voided"];
+/* INV-H5D — primary chips are the three statuses an operator usually
+ * cares about; the rest hide behind "More filters". */
+const PRIMARY_TABS: TabKey[] = ["all", "pending", "processed"];
+const SECONDARY_TABS: TabKey[] = ["draft", "approved", "completed", "voided"];
 
 function contactLabel(c: ContactRow | undefined): string {
   if (!c) return "—";
@@ -71,7 +85,15 @@ function contactLabel(c: ContactRow | undefined): string {
 }
 
 export default function InventoryReturns() {
-  const { t } = useTranslation(inventoryT);
+  const { t } = useTranslation({ ...inventoryT, ...RT_T });
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpand = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
 
   const [returns, setReturns] = useState<ReturnRow[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -188,97 +210,128 @@ export default function InventoryReturns() {
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-2">
-          {TABS.map((k) => (
+        {/* INV-H5D — filter strip: primary chips + "More filters" disclosure */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {PRIMARY_TABS.map((k) => (
             <TabBtn key={k} active={tab === k} onClick={() => setTab(k)}>
               {t(`inv.returns.tab.${k}`)}
             </TabBtn>
           ))}
+          {showMoreFilters && SECONDARY_TABS.map((k) => (
+            <TabBtn key={k} active={tab === k} onClick={() => setTab(k)}>
+              {t(`inv.returns.tab.${k}`)}
+            </TabBtn>
+          ))}
+          <button
+            type="button"
+            onClick={() => setShowMoreFilters((v) => !v)}
+            className="rounded-md border border-[var(--border-subtle)] bg-transparent px-2.5 py-1.5 text-[11px] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+          >
+            {showMoreFilters ? t("inv.returns.filters.fewer") : t("inv.returns.filters.more")}
+          </button>
           <div className="ml-auto text-[11px] text-[var(--text-dim)] tabular-nums">
             {loading ? "…" : `${filtered.length} of ${returns.length}`}
           </div>
         </div>
 
         <Panel>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-[12.5px]">
-              <thead>
-                <tr className="border-b border-[var(--border-color)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
-                  <th className="px-3 py-2 text-left">{t("inv.returns.col.no")}</th>
-                  <th className="px-3 py-2 text-left">{t("inv.returns.col.type")}</th>
-                  <th className="px-3 py-2 text-left">{t("inv.returns.col.party")}</th>
-                  <th className="px-3 py-2 text-left">{t("inv.returns.col.warehouse")}</th>
-                  <th className="px-3 py-2 text-right">{t("inv.returns.col.items")}</th>
-                  <th className="px-3 py-2 text-left">{t("inv.returns.col.status")}</th>
-                  <th className="px-3 py-2 text-left">{t("inv.returns.col.created")}</th>
-                  <th className="px-3 py-2"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading && filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-6 text-center text-[11px] text-[var(--text-dim)]">
-                      {t("inv.returns.loading")}
-                    </td>
-                  </tr>
-                ) : filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="px-0 py-0">
-                      <InventoryEmpty
-                        title={t("inv.returns.empty.title")}
-                        hint={t("inv.returns.empty.hint")}
-                      />
-                    </td>
-                  </tr>
-                ) : (
-                  filtered.map((rr) => {
-                    const wh = warehouseMap.get(rr.warehouse_id);
-                    const partyId = rr.return_type === "customer_return" ? rr.customer_id : rr.supplier_id;
-                    const party = partyId ? contactMap.get(partyId) : undefined;
-                    const roll = rollups[rr.id];
-                    return (
-                      <tr
-                        key={rr.id}
-                        className="border-b border-[var(--border-color)]/40 last:border-b-0 hover:bg-[var(--bg-surface)]/60"
-                      >
-                        <td className="px-3 py-1.5 font-mono text-[11.5px] text-[var(--text-secondary)]">
-                          <Link href={`/inventory/returns/${rr.id}`} className="hover:underline">
-                            {rr.return_no}
-                          </Link>
-                        </td>
-                        <td className="px-3 py-1.5 text-[var(--text-secondary)]">
-                          {rr.return_type === "customer_return"
-                            ? t("inv.returns.type.customer")
-                            : t("inv.returns.type.supplier")}
-                        </td>
-                        <td className="px-3 py-1.5 text-[var(--text-secondary)]">
+          {loading && filtered.length === 0 ? (
+            <div className="px-4 py-6 text-center text-[11px] text-[var(--text-dim)]">
+              {t("inv.returns.loading")}
+            </div>
+          ) : filtered.length === 0 ? (
+            <InventoryEmpty
+              title={t("inv.returns.empty.title")}
+              hint={t("inv.returns.empty.hint")}
+            />
+          ) : (
+            <ul role="list" className="divide-y divide-[var(--border-color)]/40">
+              {filtered.map((rr) => {
+                const wh = warehouseMap.get(rr.warehouse_id);
+                const partyId = rr.return_type === "customer_return" ? rr.customer_id : rr.supplier_id;
+                const party = partyId ? contactMap.get(partyId) : undefined;
+                const roll = rollups[rr.id];
+                const isExpanded = expanded.has(rr.id);
+                const typeLabel =
+                  rr.return_type === "customer_return"
+                    ? t("inv.returns.type.customer")
+                    : t("inv.returns.type.supplier");
+                const icon = rr.return_type === "customer_return" ? "recycle" : "truck-side";
+                return (
+                  <li
+                    key={rr.id}
+                    className="px-3 py-3.5 transition-colors hover:bg-[var(--bg-surface)]/60 sm:px-4"
+                  >
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-dim)]">
+                        <RrIcon name={icon} size={14} />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-base font-medium text-[var(--text-primary)]">
                           {contactLabel(party)}
-                        </td>
-                        <td className="px-3 py-1.5 text-[var(--text-secondary)]">
-                          {wh ? `${wh.code} — ${wh.name}` : "—"}
-                        </td>
-                        <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text-secondary)]">
-                          {roll?.item_count ?? "—"}
-                        </td>
-                        <td className="px-3 py-1.5"><StatusBadge status={rr.status} /></td>
-                        <td className="px-3 py-1.5 whitespace-nowrap text-[var(--text-dim)]">
-                          {new Date(rr.created_at).toLocaleDateString()}
-                        </td>
-                        <td className="px-3 py-1.5 text-right">
-                          <Link
-                            href={`/inventory/returns/${rr.id}`}
-                            className="text-[11px] text-[var(--text-secondary)] hover:underline"
-                          >
-                            Details →
-                          </Link>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                        </div>
+                        <div className="mt-0.5 truncate text-xs text-[var(--text-dim)]">
+                          {typeLabel}
+                          {roll?.item_count != null && (
+                            <> · {t("inv.returns.row.items").replace("{n}", String(roll.item_count))}</>
+                          )}
+                          {" · "}
+                          {relativeTime(rr.created_at)}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 sm:ml-auto">
+                        <HumanStatusPill status={rr.status} />
+                        <Link
+                          href={`/inventory/returns/${rr.id}`}
+                          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] sm:min-h-0 sm:py-1.5"
+                        >
+                          {t("inv.returns.action.open")}
+                        </Link>
+                      </div>
+                    </div>
+
+                    <div className="mt-1.5">
+                      <button
+                        type="button"
+                        onClick={() => toggleExpand(rr.id)}
+                        className="text-[11px] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:underline"
+                      >
+                        {isExpanded ? t("inv.returns.details.hide") : t("inv.returns.details.show")}
+                      </button>
+                    </div>
+                    {isExpanded && (
+                      <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)]/40 px-3 py-2 text-[11px] sm:grid-cols-2">
+                        <div className="flex justify-between gap-2">
+                          <dt className="text-[var(--text-dim)]">{t("inv.returns.col.no")}</dt>
+                          <dd className="font-mono text-[var(--text-secondary)]">{rr.return_no}</dd>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <dt className="text-[var(--text-dim)]">Raw status</dt>
+                          <dd className="text-[var(--text-secondary)]">{rr.status} → {humanStatus(rr.status)}</dd>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <dt className="text-[var(--text-dim)]">Raw type</dt>
+                          <dd className="text-[var(--text-secondary)]">{rr.return_type}</dd>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <dt className="text-[var(--text-dim)]">{t("inv.returns.col.warehouse")}</dt>
+                          <dd className="text-[var(--text-secondary)]">{wh ? `${wh.code} — ${wh.name}` : "—"}</dd>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <dt className="text-[var(--text-dim)]">{t("inv.returns.col.created")}</dt>
+                          <dd className="text-[var(--text-secondary)]">{new Date(rr.created_at).toLocaleString()}</dd>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <dt className="text-[var(--text-dim)]">Reason</dt>
+                          <dd className="text-[var(--text-secondary)]">{rr.reason_code || "—"}</dd>
+                        </div>
+                      </dl>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </Panel>
 
         {createOpen && (

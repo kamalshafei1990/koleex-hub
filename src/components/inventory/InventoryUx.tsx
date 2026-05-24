@@ -70,6 +70,66 @@ export function operatorLabel(movementType: string): string {
   }
 }
 
+/* ─── Humanized status label ───────────────────────────────────
+   INV-H5D — operator-friendly status text. Replaces raw enum
+   ("approved", "received", "voided") with a humanized phrase that
+   reads sensibly inline. Used by Transfers and Returns list rows. */
+export function humanStatus(status: string): string {
+  switch (status) {
+    case "draft":            return "Draft";
+    case "pending":          return "Pending approval";
+    case "approved":         return "Approved";
+    case "shipped":          return "Shipped";
+    case "received":         return "Received";
+    case "completed":        return "Completed";
+    case "cancelled":        return "Cancelled";
+    case "voided":           return "Voided";
+    case "posted":           return "Posted";
+    case "active":           return "Active";
+    case "inactive":         return "Inactive";
+    case "archived":         return "Archived";
+    default:                 return status;
+  }
+}
+
+/* ─── Relative time helper ─────────────────────────────────────
+   INV-H5D — humanize timestamps to "2h ago", "3d ago", "Just now".
+   Keeps the row scannable; absolute timestamps move into expanded
+   details. */
+export function relativeTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return "—";
+  const diff = Date.now() - t;
+  if (diff < 60_000)         return "Just now";
+  if (diff < 3_600_000)      return `${Math.floor(diff / 60_000)}m ago`;
+  if (diff < 86_400_000)     return `${Math.floor(diff / 3_600_000)}h ago`;
+  if (diff < 7 * 86_400_000) return `${Math.floor(diff / 86_400_000)}d ago`;
+  if (diff < 30 * 86_400_000) return `${Math.floor(diff / (7 * 86_400_000))}w ago`;
+  return new Date(t).toLocaleDateString();
+}
+
+/* ─── Humanized status pill ────────────────────────────────────
+   INV-H5D — colored pill, lowercase-friendly. Reads humanStatus()
+   so operators never see a raw enum in the list row. */
+export function HumanStatusPill({ status }: { status: string }) {
+  const cls =
+    status === "posted" || status === "active" || status === "received" || status === "completed"
+      ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
+      : status === "voided" || status === "archived" || status === "cancelled"
+        ? "border-gray-500/30 bg-gray-500/10 text-gray-400"
+        : status === "draft" || status === "inactive" || status === "pending"
+          ? "border-amber-400/30 bg-amber-500/10 text-amber-200"
+          : status === "approved" || status === "shipped"
+            ? "border-blue-400/30 bg-blue-500/10 text-blue-200"
+            : "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)]";
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10.5px] tracking-tight ${cls}`}>
+      {humanStatus(status)}
+    </span>
+  );
+}
+
 /* ─── ActionCard ───────────────────────────────────────────── */
 
 export function ActionCard({
