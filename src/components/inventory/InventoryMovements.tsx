@@ -55,6 +55,11 @@ const MV_T: Translations = {
   "mv.product":          { en: "Product",        zh: "产品",     ar: "المنتج" },
   "mv.product_hint":     { en: "Search by name, SKU or brand", zh: "按名称、SKU 或品牌搜索", ar: "ابحث بالاسم أو SKU أو العلامة التجارية" },
   "mv.no_profile":       { en: "This product is not tracked in inventory.", zh: "此产品不在库存中跟踪。", ar: "هذا المنتج غير مُتتبَّع في المخزون." },
+  /* INV-H5B — picker tabs */
+  "mv.pick_products":    { en: "Products",       zh: "产品",     ar: "المنتجات" },
+  "mv.pick_internal":    { en: "Internal Use",   zh: "内部使用", ar: "استخدام داخلي" },
+  "mv.item":             { en: "Item",           zh: "物品",     ar: "العنصر" },
+  "mv.item_hint":        { en: "Search internal-use stock (catalogs, uniforms, office supplies…)", zh: "搜索内部使用库存（目录、工服、办公用品…）", ar: "ابحث في مخزون الاستخدام الداخلي (الكتالوجات، الزي، اللوازم المكتبية…)" },
   "mv.location":         { en: "Location",       zh: "位置",     ar: "الموقع" },
   "mv.direction":        { en: "Direction",      zh: "方向",     ar: "الاتجاه" },
   "mv.qty":              { en: "Quantity",       zh: "数量",     ar: "الكمية" },
@@ -141,6 +146,14 @@ export default function InventoryMovements() {
   const [detailId, setDetailId] = useState<string | null>(null);
 
   /* Form state — only adjustments. */
+  /* INV-H5B — picker tab toggle between product-linked items and internal-use items. */
+  const [pickerTab, setPickerTab] = useState<"products" | "internal">("products");
+  const [internalItems, setInternalItems] = useState<Array<{
+    id: string; item_code: string; item_name: string; brand: string | null;
+    unit_of_measure: string; type_name: string; usage_scope?: string;
+  }>>([]);
+  const [internalItemId, setInternalItemId] = useState<string>("");
+  const [internalQuery, setInternalQuery] = useState("");
   const [productQuery, setProductQuery] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<ProductOption | null>(null);
   const [warehouseId, setWarehouseId] = useState("");
@@ -164,18 +177,37 @@ export default function InventoryMovements() {
     let cancelled = false;
     void (async () => {
       try {
-        const [whRes, prodRes] = await Promise.all([
+        const [whRes, prodRes, invRes] = await Promise.all([
           fetch("/api/inventory/warehouses", { cache: "no-store", credentials: "include" }),
           fetch("/api/products/with-stock-profile?limit=500", { cache: "no-store", credentials: "include" }),
+          /* INV-H5B — internal-use items live in inventory_items but have no
+             linked product. Pull a generous page and filter client-side. */
+          fetch("/api/inventory/items?status=active&limit=500", { cache: "no-store", credentials: "include" }),
         ]);
         const whJ = await whRes.json();
         const prodJ = await prodRes.json();
+        const invJ = await invRes.json();
         if (cancelled) return;
         setProducts((prodJ.products ?? []) as ProductOption[]);
         const whList = (whJ.warehouses ?? []) as Warehouse[];
         setWarehouses(whList);
         const def = whList.find((w) => w.is_default) ?? whList[0];
         if (def) setWarehouseId(def.id);
+        const allItems = (invJ.items ?? []) as Array<{
+          id: string; item_code: string; item_name: string; brand: string | null;
+          unit_of_measure: string; type_name: string;
+          usage_scope?: string; requires_product?: boolean;
+          linked_product_id?: string | null;
+        }>;
+        setInternalItems(
+          allItems
+            .filter((it) => it.usage_scope === "internal_use" || it.requires_product === false || !it.linked_product_id)
+            .map((it) => ({
+              id: it.id, item_code: it.item_code, item_name: it.item_name,
+              brand: it.brand, unit_of_measure: it.unit_of_measure,
+              type_name: it.type_name, usage_scope: it.usage_scope,
+            })),
+        );
       } catch {
         /* surface via movement load instead */
       }
@@ -321,7 +353,11 @@ export default function InventoryMovements() {
     e.preventDefault();
     setSubmitError(null); setFlash(null);
     const qty = Number(quantity);
-    if (!selectedProduct?.stock_profile) { setSubmitError(t("mv.no_profile")); return; }
+    if (pickerTab === "products") {
+      if (!selectedProduct?.stock_profile) { setSubmitError(t("mv.no_profile")); return; }
+    } else {
+      if (!internalItemId) { setSubmitError("Pick an internal-use item"); return; }
+    }
     if (!warehouseId) { setSubmitError("Pick a location"); return; }
     if (!Number.isFinite(qty) || qty <= 0) { setSubmitError("Quantity must be > 0"); return; }
     if (!reason.trim() || reason.trim().length < 3) {
@@ -336,12 +372,15 @@ export default function InventoryMovements() {
     setSubmitting(true);
     try {
       const movement_type: MovementType = direction === "in" ? "adjustment_in" : "adjustment_out";
+      const pickerPayload: Record<string, unknown> = pickerTab === "products"
+        ? { product_id: selectedProduct!.product_id }
+        : { inventory_item_id: internalItemId };
       const r = await fetch("/api/inventory/movements", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          product_id: selectedProduct.product_id,
+          ...pickerPayload,
           warehouse_id: warehouseId,
           movement_type,
           direction,
@@ -352,15 +391,16 @@ export default function InventoryMovements() {
           notes: notes || null,
           adjustment_reason: reason.trim(),
           post: false, // Always draft — Scope 3.
-          /* INV-H4A — optional variant + batch. */
-          variant_id: variantId || null,
-          batch_id: batchId || null,
+          /* INV-H4A — optional variant + batch (only meaningful for product items). */
+          variant_id: pickerTab === "products" ? (variantId || null) : null,
+          batch_id:   pickerTab === "products" ? (batchId   || null) : null,
         }),
       });
       const j = await r.json();
       if (!r.ok) { setSubmitError(humanizeError(j.error ?? `HTTP ${r.status}`)); return; }
       setQuantity(""); setReference(""); setNotes(""); setReason(""); setUnitCost("");
       setVariantId(""); setBatchId("");
+      setInternalItemId(""); setInternalQuery("");
       setFlash("Submitted for approval.");
       window.setTimeout(() => setFlash(null), 2500);
       setShowForm(false);
@@ -470,43 +510,101 @@ export default function InventoryMovements() {
               {t("mv.new")}
             </div>
 
-            <label className="block md:col-span-2">
-              <div className="mb-1 text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
-                {t("mv.product")}
-              </div>
-              <input
-                list="inv-h2-product-list"
-                value={productQuery}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setProductQuery(v);
-                  const match = products.find(
-                    (p) =>
-                      [p.product_name, p.brand, p.sku, p.model_name].filter(Boolean).join(" · ") === v
-                      || p.product_name === v,
-                  );
-                  setSelectedProduct(match ?? null);
-                }}
-                placeholder={t("mv.product_hint")}
-                className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
-              />
-              <datalist id="inv-h2-product-list">
-                {products.slice(0, 500).map((p) => (
-                  <option
-                    key={p.product_id}
-                    value={[p.product_name, p.brand, p.sku, p.model_name].filter(Boolean).join(" · ")}
-                  />
-                ))}
-              </datalist>
-              {selectedProduct && !selectedProduct.stock_profile && (
-                <Link
-                  href={`/products/${selectedProduct.slug || selectedProduct.product_id}/edit#stock-profile`}
-                  className="mt-1 inline-block text-[10.5px] text-[var(--accent-primary,#3b82f6)] hover:underline"
+            {/* INV-H5B — picker source tabs */}
+            <div className="md:col-span-2">
+              <div className="mb-2 inline-flex rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] p-0.5 text-[11.5px]">
+                <button
+                  type="button"
+                  onClick={() => setPickerTab("products")}
+                  className={`rounded px-2.5 py-1 ${pickerTab === "products" ? "bg-[var(--bg-primary)] text-[var(--text-primary)]" : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"}`}
                 >
-                  {t("mv.no_profile")} →
-                </Link>
+                  {t("mv.pick_products")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPickerTab("internal")}
+                  className={`rounded px-2.5 py-1 ${pickerTab === "internal" ? "bg-[var(--bg-primary)] text-[var(--text-primary)]" : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"}`}
+                >
+                  {t("mv.pick_internal")}
+                </button>
+              </div>
+              {pickerTab === "products" ? (
+                <label className="block">
+                  <div className="mb-1 text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
+                    {t("mv.product")}
+                  </div>
+                  <input
+                    list="inv-h2-product-list"
+                    value={productQuery}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setProductQuery(v);
+                      const match = products.find(
+                        (p) =>
+                          [p.product_name, p.brand, p.sku, p.model_name].filter(Boolean).join(" · ") === v
+                          || p.product_name === v,
+                      );
+                      setSelectedProduct(match ?? null);
+                    }}
+                    placeholder={t("mv.product_hint")}
+                    className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                  />
+                  <datalist id="inv-h2-product-list">
+                    {products.slice(0, 500).map((p) => (
+                      <option
+                        key={p.product_id}
+                        value={[p.product_name, p.brand, p.sku, p.model_name].filter(Boolean).join(" · ")}
+                      />
+                    ))}
+                  </datalist>
+                  {selectedProduct && !selectedProduct.stock_profile && (
+                    <Link
+                      href={`/products/${selectedProduct.slug || selectedProduct.product_id}/edit#stock-profile`}
+                      className="mt-1 inline-block text-[10.5px] text-[var(--accent-primary,#3b82f6)] hover:underline"
+                    >
+                      {t("mv.no_profile")} →
+                    </Link>
+                  )}
+                </label>
+              ) : (
+                <label className="block">
+                  <div className="mb-1 text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
+                    {t("mv.item")}
+                  </div>
+                  <input
+                    list="inv-h5b-internal-list"
+                    value={internalQuery}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setInternalQuery(v);
+                      const match = internalItems.find(
+                        (it) =>
+                          `${it.item_code} · ${it.item_name}${it.brand ? " · " + it.brand : ""}` === v
+                          || it.item_name === v
+                          || it.item_code === v,
+                      );
+                      setInternalItemId(match?.id ?? "");
+                      if (match) setUnit(match.unit_of_measure);
+                    }}
+                    placeholder={t("mv.item_hint")}
+                    className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                  />
+                  <datalist id="inv-h5b-internal-list">
+                    {internalItems.slice(0, 500).map((it) => (
+                      <option
+                        key={it.id}
+                        value={`${it.item_code} · ${it.item_name}${it.brand ? " · " + it.brand : ""}`}
+                      />
+                    ))}
+                  </datalist>
+                  {internalItems.length === 0 && (
+                    <p className="mt-1 text-[10.5px] text-[var(--text-dim)]">
+                      No internal-use items yet. Create one from <Link href="/inventory/items" className="underline">Stock Profiles</Link>.
+                    </p>
+                  )}
+                </label>
               )}
-            </label>
+            </div>
 
             <label className="block">
               <div className="mb-1 text-[10.5px] uppercase tracking-[0.12em] text-[var(--text-dim)]">

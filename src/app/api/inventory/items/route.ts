@@ -15,7 +15,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { listInventoryItems } from "@/lib/inventory/queries";
-import { createInventoryItem } from "@/lib/inventory/items";
+import { createInventoryItem, getItemTypeRequiresProduct } from "@/lib/inventory/items";
 import type { CreateItemInput } from "@/lib/inventory/types";
 import { getUserExperience } from "@/lib/experience";
 
@@ -63,14 +63,31 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as CreateItemBody | null;
   if (!body?.item_name) return NextResponse.json({ error: "item_name required" }, { status: 400 });
 
-  /* INV-H1 guard: the API now refuses to mint a brand-new inventory item
-     without a Product, unless the caller is explicitly running the
-     admin-repair flow. */
+  /* INV-H5B guard: branch on the item type's requires_product flag.
+     - product_related types (machines, parts, finished products...) still
+       need a Product unless the caller opts into admin_repair.
+     - internal_use types (office supplies, catalogs, uniforms...) may be
+       created standalone with no Product link. */
   if (!body.linked_product_id && !body.admin_repair) {
-    return NextResponse.json(
-      { error: "Create or link a Product before tracking stock.", code: "INV_H1_REQUIRE_PRODUCT" },
-      { status: 422 },
-    );
+    if (!body.item_type_id && !body.type_key) {
+      return NextResponse.json(
+        { error: "Select an item type before creating stock.", code: "INV_H5B_REQUIRE_TYPE" },
+        { status: 422 },
+      );
+    }
+    const typeInfo = await getItemTypeRequiresProduct(auth.tenant_id, {
+      item_type_id: body.item_type_id ?? undefined,
+      type_key: body.type_key ?? undefined,
+    });
+    if (!typeInfo.ok) {
+      return NextResponse.json({ error: typeInfo.error ?? "Unknown item type" }, { status: 422 });
+    }
+    if (typeInfo.requires_product === true) {
+      return NextResponse.json(
+        { error: "Create or link a Product before tracking stock.", code: "INV_H1_REQUIRE_PRODUCT" },
+        { status: 422 },
+      );
+    }
   }
 
   const r = await createInventoryItem({

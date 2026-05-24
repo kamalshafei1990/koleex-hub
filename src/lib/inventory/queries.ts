@@ -243,7 +243,7 @@ export async function listInventoryItems(opts: {
   /* INV-H1 — Pull product identity for linked items. */
   const productIds = Array.from(new Set(items.map((i) => i.linked_product_id).filter(Boolean) as string[]));
   const [typesRes, catsRes, balancesRes, valuationRes, productsRes, productMediaRes, productModelsRes] = await Promise.all([
-    supabaseServer.from("inventory_item_types").select("id, type_key, type_name, icon, color").in("id", typeIds),
+    supabaseServer.from("inventory_item_types").select("id, type_key, type_name, icon, color, requires_product, usage_scope").in("id", typeIds),
     catIds.length
       ? supabaseServer.from("inventory_item_categories").select("id, name").in("id", catIds)
       : Promise.resolve({ data: [] as Array<{ id: string; name: string }> }),
@@ -270,9 +270,13 @@ export async function listInventoryItems(opts: {
       ? supabaseServer.from("product_models").select("product_id, sku, order").in("product_id", productIds).order("order", { ascending: true })
       : Promise.resolve({ data: [] as Array<{ product_id: string; sku: string | null }> }),
   ]);
-  const typeMap = new Map<string, { type_key: string; type_name: string; icon: IconName; color: ColorToken }>();
-  for (const t of (typesRes.data ?? []) as Array<{ id: string; type_key: string; type_name: string; icon: IconName; color: ColorToken }>) {
-    typeMap.set(t.id, { type_key: t.type_key, type_name: t.type_name, icon: t.icon, color: t.color });
+  const typeMap = new Map<string, { type_key: string; type_name: string; icon: IconName; color: ColorToken; requires_product: boolean; usage_scope: "product_related" | "internal_use" }>();
+  for (const t of (typesRes.data ?? []) as Array<{ id: string; type_key: string; type_name: string; icon: IconName; color: ColorToken; requires_product: boolean; usage_scope: "product_related" | "internal_use" }>) {
+    typeMap.set(t.id, {
+      type_key: t.type_key, type_name: t.type_name, icon: t.icon, color: t.color,
+      requires_product: t.requires_product ?? true,
+      usage_scope: t.usage_scope ?? "product_related",
+    });
   }
   const catMap = new Map<string, string>();
   for (const c of (catsRes.data ?? []) as Array<{ id: string; name: string }>) catMap.set(c.id, c.name);
@@ -313,6 +317,9 @@ export async function listInventoryItems(opts: {
       type_name: t?.type_name ?? "Other",
       icon: (t?.icon ?? "box") as IconName,
       color: (t?.color ?? "slate") as ColorToken,
+      /* INV-H5B — usage-scope info so the UI can render the "Internal Use" badge */
+      requires_product: t?.requires_product ?? true,
+      usage_scope: t?.usage_scope ?? "product_related",
       category_name: it.category_id ? catMap.get(it.category_id) ?? null : null,
       qty_on_hand: balMap.get(it.id) ?? 0,
       avg_cost: avg,

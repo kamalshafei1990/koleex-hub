@@ -31,13 +31,25 @@ import Link from "next/link";
 
 const INV_H1_T: Translations = {
   "inv.title":             { en: "Stock Profiles",   zh: "库存档案",       ar: "ملفات المخزون" },
-  "inv.subtitle":          { en: "Stock-tracked products. Operational stock is created from Products, not freely.", zh: "按产品跟踪的库存。库存档案从产品创建。", ar: "ملفات المخزون مرتبطة بالمنتجات. يتم إنشاء المخزون من المنتجات." },
+  "inv.subtitle":          { en: "Stock-tracked products + internal-use items (catalogs, uniforms, office supplies).", zh: "按产品跟踪的库存以及内部使用物品（目录、工服、办公用品）。", ar: "المخزون المرتبط بالمنتجات بالإضافة إلى عناصر الاستخدام الداخلي (الكتالوجات، الزي، اللوازم المكتبية)." },
   "inv.add_via_product":   { en: "Create Product with Stock Profile", zh: "创建产品并附库存档案", ar: "إنشاء منتج مع ملف مخزون" },
   "inv.open_products":     { en: "Open Products",    zh: "打开产品库",     ar: "فتح المنتجات" },
   "inv.create_for_existing": { en: "Create Stock Profile for Existing Product", zh: "为现有产品创建库存档案", ar: "إنشاء ملف مخزون لمنتج موجود" },
   "inv.link_existing":     { en: "Link existing item (admin)", zh: "链接现有项目（管理员）", ar: "ربط عنصر موجود (مسؤول)" },
+  "inv.add_internal_use":  { en: "Add Internal-Use Stock", zh: "添加内部用品库存", ar: "إضافة مخزون استخدام داخلي" },
   "inv.manage_types":      { en: "Manage Types",     zh: "管理类型",       ar: "إدارة الأنواع" },
   "inv.add":               { en: "Add",              zh: "添加",           ar: "إضافة" },
+  /* INV-H5B */
+  "inv.badge_internal_use":  { en: "Internal Use",      zh: "内部使用",     ar: "استخدام داخلي" },
+  "inv.badge_product_linked":{ en: "Product-linked",    zh: "关联产品",     ar: "مرتبط بمنتج" },
+  "inv.usage_label":         { en: "Usage",             zh: "用途",         ar: "الاستخدام" },
+  "inv.usage_product":       { en: "Product-related",   zh: "产品相关",     ar: "مرتبط بالمنتجات" },
+  "inv.usage_internal":      { en: "Internal use",      zh: "内部使用",     ar: "استخدام داخلي" },
+  "inv.usage_product_hint":  { en: "Sellable goods, machines, parts, raw materials. Must link to a Product.", zh: "可销售商品、机器、零件、原材料。必须关联到产品。", ar: "البضائع القابلة للبيع، الآلات، القطع، المواد الخام. يجب الربط بمنتج." },
+  "inv.usage_internal_hint": { en: "Catalogs, uniforms, business cards, office supplies, packaging, exhibition materials. No product needed.", zh: "目录、工服、名片、办公用品、包装、展览材料。无需产品。", ar: "الكتالوجات، الزي، بطاقات العمل، اللوازم المكتبية، التغليف، مواد المعارض. لا حاجة لمنتج." },
+  "inv.internal_use_helper": { en: "Use this for catalogs, uniforms, business cards, office supplies, packaging, exhibition materials, and consumables.", zh: "用于目录、工服、名片、办公用品、包装、展览材料和消耗品。", ar: "استخدمه للكتالوجات، الزي، بطاقات العمل، اللوازم المكتبية، التغليف، مواد المعارض، والمستهلكات." },
+  "inv.product_linked_helper": { en: "This stock profile must be linked to a Product.", zh: "此库存档案必须关联到产品。", ar: "يجب ربط ملف المخزون هذا بمنتج." },
+  "inv.examples_label":      { en: "Examples",          zh: "示例",         ar: "أمثلة" },
 };
 
 interface ItemRow {
@@ -62,6 +74,9 @@ interface ItemRow {
   product_slug?: string | null;
   product_image_url?: string | null;
   product_sku?: string | null;
+  /* INV-H5B — usage scope of the type. */
+  requires_product?: boolean;
+  usage_scope?: "product_related" | "internal_use";
 }
 
 interface ItemType {
@@ -74,6 +89,9 @@ interface ItemType {
   is_system: boolean;
   is_active: boolean;
   description: string | null;
+  /** INV-H5B */
+  requires_product?: boolean;
+  usage_scope?: "product_related" | "internal_use";
 }
 
 interface Warehouse { id: string; code: string; name: string; is_default: boolean }
@@ -207,6 +225,13 @@ export default function InventoryItems() {
                     </Link>
                     <button
                       onClick={() => { setAddMenuOpen(false); setQuickAddOpen(true); }}
+                      className="flex w-full items-start gap-2 rounded-md px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+                    >
+                      <RrIcon name="briefcase" size={12} />
+                      <span>{t("inv.add_internal_use")}</span>
+                    </button>
+                    <button
+                      onClick={() => { setAddMenuOpen(false); setQuickAddOpen(true); }}
                       className="flex w-full items-start gap-2 rounded-md px-3 py-2 text-[12px] text-[var(--text-dim)] hover:bg-[var(--bg-surface)]"
                     >
                       <RrIcon name="tools" size={12} />
@@ -334,11 +359,22 @@ export default function InventoryItems() {
                           <img src={r.product_image_url} alt="" className="h-7 w-7 rounded object-cover bg-[var(--bg-surface)] shrink-0" />
                         )}
                         <span className="inline-flex flex-col min-w-0">
-                          <span className="truncate">{r.product_name ?? r.item_name}</span>
-                          {(r.product_sku || (r.product_name && r.product_name !== r.item_name)) && (
-                            <span className="text-[10.5px] text-gray-500 truncate">
-                              {r.product_sku ?? r.item_name}
-                            </span>
+                          <span className="truncate inline-flex items-center gap-1.5">
+                            <span className="truncate">{r.usage_scope === "internal_use" ? r.item_name : (r.product_name ?? r.item_name)}</span>
+                            {r.usage_scope === "internal_use" && (
+                              <span className="shrink-0 rounded-full border border-[var(--border-color)] bg-[var(--bg-surface)] px-1.5 py-0.5 text-[9.5px] font-medium uppercase tracking-[0.06em] text-[var(--text-dim)]">
+                                {t("inv.badge_internal_use")}
+                              </span>
+                            )}
+                          </span>
+                          {r.usage_scope === "internal_use" ? (
+                            r.brand && <span className="text-[10.5px] text-gray-500 truncate">{r.brand}</span>
+                          ) : (
+                            (r.product_sku || (r.product_name && r.product_name !== r.item_name)) && (
+                              <span className="text-[10.5px] text-gray-500 truncate">
+                                {r.product_sku ?? r.item_name}
+                              </span>
+                            )
                           )}
                         </span>
                       </span>
@@ -440,10 +476,14 @@ function QuickAddDrawer({
   onClose: () => void;
   onSuccess: () => void;
 }) {
+  const { t } = useTranslation(INV_H1_T);
   const [itemName, setItemName] = useState("");
+  /* INV-H5B — default to office_supply (internal-use) so the drawer
+     defaults to the "no product needed" flow; operator can switch. */
   const initialTypeId =
-    types.find((t) => t.is_active && t.type_key === "finished_product")?.id ??
-    types.find((t) => t.is_active)?.id ?? "";
+    types.find((tt) => tt.is_active && tt.type_key === "office_supply")?.id ??
+    types.find((tt) => tt.is_active && tt.usage_scope === "internal_use")?.id ??
+    types.find((tt) => tt.is_active)?.id ?? "";
   const [typeId, setTypeId] = useState(initialTypeId);
   const [unit, setUnit] = useState<UnitOfMeasure>("pcs");
   const [initialQty, setInitialQty] = useState("");
@@ -464,7 +504,12 @@ function QuickAddDrawer({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const selectedType = types.find((t) => t.id === typeId);
+  const selectedType = types.find((tt) => tt.id === typeId);
+  /* INV-H5B — when the selected type is internal-use, the new branch in
+     the API guard skips the product requirement entirely (no admin_repair
+     stamp needed). Product-related types still need admin_repair on this
+     standalone drawer since the canonical path is via Products. */
+  const isInternalUse = selectedType?.usage_scope === "internal_use" || selectedType?.requires_product === false;
 
   const submit = async () => {
     if (!itemName.trim()) { setError("Item name required"); return; }
@@ -480,11 +525,12 @@ function QuickAddDrawer({
         item_name: itemName.trim(),
         item_type_id: typeId,
         unit_of_measure: unit,
-        /* INV-H1 — Quick Add from /inventory/items is the admin repair
-           path. Stamp admin_repair=true so the API guard accepts the
-           insert. Normal stock creation goes through Products. */
-        admin_repair: true,
       };
+      if (!isInternalUse) {
+        /* Product-related types still go through the admin_repair path on
+           this drawer; canonical creation is via Products. */
+        payload.admin_repair = true;
+      }
       if (initialQty) {
         payload.initial_quantity = Number(initialQty) || 0;
         payload.initial_warehouse_id = warehouseId || null;
@@ -555,11 +601,46 @@ function QuickAddDrawer({
             onChange={(e) => setTypeId(e.target.value)}
             className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
           >
-            {types.filter((t) => t.is_active).map((t) => (
-              <option key={t.id} value={t.id}>{t.type_name}{t.is_system ? "" : " · custom"}</option>
-            ))}
+            <optgroup label="Internal use (no product needed)">
+              {types.filter((tt) => tt.is_active && (tt.usage_scope === "internal_use" || tt.requires_product === false)).map((tt) => (
+                <option key={tt.id} value={tt.id}>{tt.type_name}{tt.is_system ? "" : " · custom"}</option>
+              ))}
+            </optgroup>
+            <optgroup label="Product-related (requires Product link)">
+              {types.filter((tt) => tt.is_active && tt.usage_scope !== "internal_use" && tt.requires_product !== false).map((tt) => (
+                <option key={tt.id} value={tt.id}>{tt.type_name}{tt.is_system ? "" : " · custom"}</option>
+              ))}
+            </optgroup>
           </select>
         </label>
+
+        {/* INV-H5B — Branch on usage scope. */}
+        {selectedType && (
+          isInternalUse ? (
+            <div className="rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2.5 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="rounded-full border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--text-primary)]">
+                  {t("inv.badge_internal_use")}
+                </span>
+                <span className="text-[10.5px] text-[var(--text-dim)]">— Not linked to Product</span>
+              </div>
+              <p className="text-[11px] leading-relaxed text-[var(--text-dim)]">{t("inv.internal_use_helper")}</p>
+              <div className="text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">{t("inv.examples_label")}</div>
+              <div className="flex flex-wrap gap-1.5">
+                {["Catalogs","Uniforms","Business cards","Office supplies","Packaging boxes","Exhibition banners"].map((ex) => (
+                  <span key={ex} className="rounded-full border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 py-0.5 text-[10.5px] text-[var(--text-dim)]">{ex}</span>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[11px] text-[var(--text-dim)]">
+              <span className="mr-1 inline-block rounded-full border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--text-primary)]">
+                {t("inv.badge_product_linked")}
+              </span>
+              {t("inv.product_linked_helper")}
+            </div>
+          )
+        )}
         <label className="block">
           <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Unit of Measure</div>
           <select
@@ -952,10 +1033,13 @@ function TypesPanel({
   onClose: () => void;
   onChanged: () => void;
 }) {
+  const { t } = useTranslation(INV_H1_T);
   const [name, setName] = useState("");
   const [icon, setIcon] = useState<IconName>("box");
   const [color, setColor] = useState<ColorToken>("slate");
   const [description, setDescription] = useState("");
+  /* INV-H5B — usage scope picker for custom types (default internal_use). */
+  const [usageScope, setUsageScope] = useState<"product_related" | "internal_use">("internal_use");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -971,7 +1055,12 @@ function TypesPanel({
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type_name: name.trim(), icon, color, description: description || null }),
+        body: JSON.stringify({
+          type_name: name.trim(),
+          icon, color,
+          description: description || null,
+          usage_scope: usageScope,
+        }),
       });
       const j = await r.json();
       if (!r.ok) { setError(humanizeError(j.error ?? `HTTP ${r.status}`)); return; }
@@ -1019,6 +1108,38 @@ function TypesPanel({
             </label>
           </div>
           <textarea placeholder="Optional description" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
+
+          {/* INV-H5B — Usage scope */}
+          <div className="space-y-1.5">
+            <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("inv.usage_label")}</div>
+            <div className="grid grid-cols-1 gap-1.5">
+              <label className={`flex cursor-pointer items-start gap-2 rounded-md border px-2 py-1.5 text-[11.5px] ${usageScope === "internal_use" ? "border-[var(--text-primary)] bg-[var(--bg-surface)]" : "border-[var(--border-color)]"}`}>
+                <input
+                  type="radio"
+                  className="mt-0.5"
+                  checked={usageScope === "internal_use"}
+                  onChange={() => setUsageScope("internal_use")}
+                />
+                <span className="flex-1">
+                  <span className="block text-[12px] font-medium text-[var(--text-primary)]">{t("inv.usage_internal")}</span>
+                  <span className="block text-[10.5px] leading-relaxed text-[var(--text-dim)]">{t("inv.usage_internal_hint")}</span>
+                </span>
+              </label>
+              <label className={`flex cursor-pointer items-start gap-2 rounded-md border px-2 py-1.5 text-[11.5px] ${usageScope === "product_related" ? "border-[var(--text-primary)] bg-[var(--bg-surface)]" : "border-[var(--border-color)]"}`}>
+                <input
+                  type="radio"
+                  className="mt-0.5"
+                  checked={usageScope === "product_related"}
+                  onChange={() => setUsageScope("product_related")}
+                />
+                <span className="flex-1">
+                  <span className="block text-[12px] font-medium text-[var(--text-primary)]">{t("inv.usage_product")}</span>
+                  <span className="block text-[10.5px] leading-relaxed text-[var(--text-dim)]">{t("inv.usage_product_hint")}</span>
+                </span>
+              </label>
+            </div>
+          </div>
+
           {error && (
             <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-300">{error}</div>
           )}
@@ -1030,17 +1151,20 @@ function TypesPanel({
         <div>
           <div className="text-[10px] uppercase tracking-[0.12em] text-gray-500 mb-2">All types ({sorted.length})</div>
           <ul className="space-y-1">
-            {sorted.map((t) => (
-              <li key={t.id} className="flex items-center justify-between rounded-md border border-white/[0.04] px-2 py-1.5">
+            {sorted.map((tt) => (
+              <li key={tt.id} className="flex items-center justify-between rounded-md border border-white/[0.04] px-2 py-1.5">
                 <div className="flex items-center gap-2 min-w-0">
-                  <TypeIcon icon={t.icon} color={t.color} />
-                  <span className="text-[12px] text-gray-200 truncate">{t.type_name}</span>
+                  <TypeIcon icon={tt.icon} color={tt.color} />
+                  <span className="text-[12px] text-gray-200 truncate">{tt.type_name}</span>
+                  <span className="shrink-0 rounded-full border border-[var(--border-color)] bg-[var(--bg-surface)] px-1.5 py-0.5 text-[9.5px] uppercase tracking-[0.06em] text-[var(--text-dim)]">
+                    {tt.usage_scope === "internal_use" || tt.requires_product === false ? t("inv.badge_internal_use") : t("inv.badge_product_linked")}
+                  </span>
                   <span className="text-[10px] text-gray-500 shrink-0">
-                    {t.is_system ? "system" : "custom"}{!t.is_active ? " · archived" : ""}
+                    {tt.is_system ? "system" : "custom"}{!tt.is_active ? " · archived" : ""}
                   </span>
                 </div>
-                {!t.is_system && t.is_active && (
-                  <button onClick={() => archive(t.id)} className="shrink-0 text-[11px] text-rose-300 hover:text-rose-200">Archive</button>
+                {!tt.is_system && tt.is_active && (
+                  <button onClick={() => archive(tt.id)} className="shrink-0 text-[11px] text-rose-300 hover:text-rose-200">Archive</button>
                 )}
               </li>
             ))}

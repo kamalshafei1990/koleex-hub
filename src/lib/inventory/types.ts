@@ -57,6 +57,8 @@ export const ALLOWED_COLORS: ColorToken[] = [
   "red","rose","purple","violet","slate",
 ];
 
+export type ItemUsageScope = "product_related" | "internal_use";
+
 export interface InventoryItemType {
   id: string;
   tenant_id: string | null;        // NULL for system rows
@@ -69,6 +71,9 @@ export interface InventoryItemType {
   is_system: boolean;
   is_active: boolean;
   sort_order: number;
+  /** INV-H5B — does an item of this type need to be linked to a Product? */
+  requires_product: boolean;
+  usage_scope: ItemUsageScope;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -142,6 +147,9 @@ export interface InventoryItemWithRefs extends InventoryItem {
   product_slug?: string | null;
   product_image_url?: string | null;
   product_sku?: string | null;
+  /* INV-H5B — usage scope of the item type, propagated for the UI badge. */
+  requires_product?: boolean;
+  usage_scope?: ItemUsageScope;
 }
 
 export type LocationType =

@@ -39,44 +39,64 @@ import {
 import { logInventoryAudit } from "./audit";
 
 /* ─── Resolve type by id or key ──────────────────────────── */
+interface ResolvedItemType {
+  id: string;
+  code_prefix: string;
+  requires_product: boolean;
+  usage_scope: "product_related" | "internal_use";
+}
+
 async function resolveItemTypeId(
   tenantId: string,
   opts: { item_type_id?: string; type_key?: string },
-): Promise<{ id: string; code_prefix: string } | null> {
+): Promise<ResolvedItemType | null> {
   if (opts.item_type_id) {
     /* Allow either a tenant-custom type or a system type. */
     const { data } = await supabaseServer
       .from("inventory_item_types")
-      .select("id, code_prefix, tenant_id, is_system")
+      .select("id, code_prefix, tenant_id, is_system, requires_product, usage_scope")
       .eq("id", opts.item_type_id)
       .is("deleted_at", null)
       .maybeSingle();
     if (!data) return null;
-    const t = data as { id: string; code_prefix: string; tenant_id: string | null; is_system: boolean };
+    const t = data as {
+      id: string; code_prefix: string; tenant_id: string | null; is_system: boolean;
+      requires_product: boolean; usage_scope: "product_related" | "internal_use";
+    };
     if (!t.is_system && t.tenant_id !== tenantId) return null;       // tenant boundary
-    return { id: t.id, code_prefix: t.code_prefix };
+    return { id: t.id, code_prefix: t.code_prefix, requires_product: t.requires_product, usage_scope: t.usage_scope };
   }
   if (opts.type_key) {
     /* Prefer a tenant-custom row with this key; fall back to system. */
     const { data: custom } = await supabaseServer
       .from("inventory_item_types")
-      .select("id, code_prefix")
+      .select("id, code_prefix, requires_product, usage_scope")
       .eq("tenant_id", tenantId)
       .eq("type_key", opts.type_key)
       .is("deleted_at", null)
       .maybeSingle();
-    if (custom) return custom as { id: string; code_prefix: string };
+    if (custom) return custom as ResolvedItemType;
     const { data: sys } = await supabaseServer
       .from("inventory_item_types")
-      .select("id, code_prefix")
+      .select("id, code_prefix, requires_product, usage_scope")
       .is("tenant_id", null)
       .eq("is_system", true)
       .eq("type_key", opts.type_key)
       .is("deleted_at", null)
       .maybeSingle();
-    if (sys) return sys as { id: string; code_prefix: string };
+    if (sys) return sys as ResolvedItemType;
   }
   return null;
+}
+
+/** INV-H5B — external lookup: does the given item type require a Product link? */
+export async function getItemTypeRequiresProduct(
+  tenantId: string,
+  opts: { item_type_id?: string; type_key?: string },
+): Promise<{ ok: boolean; requires_product?: boolean; usage_scope?: "product_related" | "internal_use"; error?: string }> {
+  const t = await resolveItemTypeId(tenantId, opts);
+  if (!t) return { ok: false, error: "Unknown item_type_id / type_key" };
+  return { ok: true, requires_product: t.requires_product, usage_scope: t.usage_scope };
 }
 
 async function nextItemCode(tenantId: string, prefix: string): Promise<string> {
@@ -327,6 +347,10 @@ export interface CreateItemTypeInput {
   color?: ColorToken;
   description?: string | null;
   created_by?: string | null;
+  /** INV-H5B — explicit usage scope. Custom types default to internal_use
+   *  (requires_product=false) so operators can create stock for catalogs,
+   *  uniforms, office supplies etc. without forcing a Product. */
+  usage_scope?: "product_related" | "internal_use";
 }
 
 function slugify(s: string): string {
@@ -348,6 +372,11 @@ export async function createItemType(input: CreateItemTypeInput): Promise<{
   if (!key) return { ok: false, error: "type_name must contain alphanumeric characters" };
   const prefix = (input.code_prefix ?? input.type_name.slice(0, 2).toUpperCase()).replace(/[^A-Z0-9]/g, "").slice(0, 4) || "XX";
 
+  /* INV-H5B — custom types default to internal_use unless caller explicitly
+     opts in to product_related. */
+  const usageScope = input.usage_scope ?? "internal_use";
+  const requiresProduct = usageScope === "product_related";
+
   const { data, error } = await supabaseServer
     .from("inventory_item_types")
     .insert({
@@ -359,6 +388,8 @@ export async function createItemType(input: CreateItemTypeInput): Promise<{
       description: input.description ?? null,
       is_system: false,
       is_active: true,
+      requires_product: requiresProduct,
+      usage_scope: usageScope,
       created_by: input.created_by ?? null,
     })
     .select("*")

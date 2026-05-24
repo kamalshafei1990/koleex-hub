@@ -33,6 +33,9 @@ interface NewTypeBody {
   icon?: IconName;
   color?: ColorToken;
   description?: string | null;
+  /** INV-H5B — caller can opt this custom type into product_related;
+   *  default is internal_use. */
+  usage_scope?: "product_related" | "internal_use";
 }
 
 export async function POST(req: Request) {
@@ -51,6 +54,7 @@ export async function POST(req: Request) {
     icon: body.icon,
     color: body.color,
     description: body.description ?? null,
+    usage_scope: body.usage_scope ?? "internal_use",
     created_by: auth.account_id,
   });
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: 422 });
