@@ -20,7 +20,6 @@
    --------------------------------------------------------------------------- */
 
 import { useMemo, useState, type ComponentType } from "react";
-import Link from "next/link";
 import { useTranslation } from "@/lib/i18n";
 import { purchaseT } from "@/lib/translations/purchase";
 
@@ -33,7 +32,6 @@ import {
   type PurchaseTabId,
 } from "./shared";
 
-import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
 import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
 import LineChartIcon from "@/components/icons/ui/LineChartIcon";
@@ -49,6 +47,7 @@ import FilePlusIcon from "@/components/icons/ui/FilePlusIcon";
 import ClipboardCheckIcon from "@/components/icons/ui/ClipboardCheckIcon";
 import CornerUpLeftIcon from "@/components/icons/ui/CornerUpLeftIcon";
 import PurchaseIcon from "@/components/icons/PurchaseIcon";
+import PageHeader from "@/components/ui/PageHeader";
 
 import DashboardModule    from "./modules/Dashboard";
 import RequisitionsModule from "./modules/Requisitions";
@@ -126,77 +125,67 @@ export default function PurchaseApp() {
       dir={lang === "ar" ? "rtl" : "ltr"}
       className="h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden max-w-[100vw]"
     >
-      {/* ═══════════ TOP BAR ═══════════ */}
-      <div className="shrink-0 border-b border-[var(--border-color)] bg-[var(--bg-secondary)]">
-        {/* Title row */}
-        <div className="flex items-center gap-3 px-5 pt-4 pb-3">
-          <Link
-            href="/"
-            className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
-            aria-label="Back to apps"
-          >
-            <ArrowLeftIcon size={16} className="rtl:rotate-180" />
-          </Link>
-          <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-            <PurchaseIcon size={16} />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-[16px] font-bold text-[var(--text-primary)] leading-tight truncate">{t("purchase.title")}</h1>
-            <p className="text-[11px] text-[var(--text-dim)] hidden md:block truncate">{t("purchase.subtitle")}</p>
-          </div>
-        </div>
-
-        {/* Primary group bar — text-only, mixed case (matches Sales). */}
-        <div className="relative">
-          <div className="flex overflow-x-auto scrollbar-hide px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {PURCHASE_GROUPS.map((g) => {
-              const isActive = activeGroup === g.id;
-              return (
-                <button
-                  key={g.id}
-                  onClick={() => handleGroupClick(g.id)}
-                  className={`relative px-3 py-2.5 whitespace-nowrap text-[13px] transition-colors ${
-                    isActive
-                      ? "text-[var(--text-primary)] font-semibold"
-                      : "text-[var(--text-dim)] hover:text-[var(--text-muted)] font-medium"
-                  }`}
-                >
-                  <span>{t(PURCHASE_GROUP_LABEL_KEYS[g.id])}</span>
-                  {isActive && (
-                    <span className="absolute bottom-0 inset-x-2 h-[2px] rounded-full bg-[var(--text-primary)]" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-[var(--bg-secondary)] to-transparent rtl:left-0 rtl:right-auto rtl:bg-gradient-to-r" />
-        </div>
+      {/* ═══════════ TOP BAR — canonical Hub PageHeader + state tab strips ═══════════ */}
+      <div className="shrink-0 border-b border-[var(--border-color)] px-5 pt-4">
+        <PageHeader
+          title={t("purchase.title")}
+          subtitle={t("purchase.subtitle")}
+          icon={<PurchaseIcon size={16} />}
+          showTabs={false}
+        />
+        {/* Primary group strip — flat border-b like all other Hub apps */}
+        <nav
+          aria-label="Purchase navigation"
+          className="mt-5 flex items-end gap-0.5 overflow-x-auto border-b border-[var(--border-subtle)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {PURCHASE_GROUPS.map((g) => {
+            const isActive = activeGroup === g.id;
+            return (
+              <button
+                key={g.id}
+                type="button"
+                onClick={() => handleGroupClick(g.id)}
+                aria-current={isActive ? "page" : undefined}
+                className={`inline-flex h-10 shrink-0 items-center gap-1.5 px-3 text-[12px] transition-colors duration-150 ${
+                  isActive
+                    ? "border-b-2 border-[var(--text-primary)] pb-0 text-[var(--text-primary)]"
+                    : "border-b-2 border-transparent text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                }`}
+              >
+                {t(PURCHASE_GROUP_LABEL_KEYS[g.id])}
+              </button>
+            );
+          })}
+        </nav>
       </div>
 
       {/* Secondary sub-tab bar */}
       {showSubBar && (
-        <div className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--bg-primary)] relative">
-          <div className="flex overflow-x-auto scrollbar-hide px-3 py-2 gap-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--bg-primary)] px-5">
+          <nav
+            aria-label="Purchase sub-navigation"
+            className="flex items-center gap-1 overflow-x-auto py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
             {activeGroupConfig.tabs.map((tabId) => {
               const Icon = TAB_ICONS[tabId];
               const isActive = activeTab === tabId;
               return (
                 <button
                   key={tabId}
+                  type="button"
                   onClick={() => setActiveTab(tabId)}
-                  className={`flex items-center gap-1.5 px-2.5 h-8 rounded-lg whitespace-nowrap text-[12px] font-medium transition-colors ${
+                  className={`flex items-center gap-1.5 whitespace-nowrap rounded-md border px-2.5 py-1 text-[11.5px] transition-colors ${
                     isActive
-                      ? "bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
-                      : "border border-transparent text-[var(--text-dim)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-surface)]"
+                      ? "border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-primary)]"
+                      : "border-transparent text-[var(--text-dim)] hover:border-[var(--border-subtle)] hover:text-[var(--text-primary)]"
                   }`}
                 >
-                  <Icon size={13} />
-                  <span>{t(PURCHASE_TAB_LABEL_KEYS[tabId])}</span>
+                  <Icon size={11} />
+                  {t(PURCHASE_TAB_LABEL_KEYS[tabId])}
                 </button>
               );
             })}
-          </div>
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-[var(--bg-primary)] to-transparent rtl:left-0 rtl:right-auto rtl:bg-gradient-to-r" />
+          </nav>
         </div>
       )}
 

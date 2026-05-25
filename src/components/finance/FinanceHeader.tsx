@@ -1,24 +1,18 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   FinanceHeader  —  Phase 1.5 alignment with the Koleex Hub native page
-   bar pattern.
+   FinanceHeader — thin wrapper around the shared PageHeader.
 
-   Replaces the previous custom rounded-3xl gradient hero card with the
-   compact layout every other Hub app uses: back arrow → app icon →
-   h1 page title → small subtitle/count → action button on the right.
-   The global MainHeader already renders "KOLEEX Finance" beside the
-   logo so this bar focuses on the section heading.
-
-   Below the title bar, a thin secondary row carries the FinanceTabs
-   sub-nav (and optional period selector / health badge) — both
-   monochrome, sized to match the other Hub app sub-navs.
+   Same chrome as every other Hub app:
+     · 5 primary tabs: Overview · Orders · Customers · Suppliers · Expenses
+     · "Accounting" tab opens the ··· popup with 20+ accounting routes
+       grouped by Accounting · Banking · Treasury · Reports · Setup
    --------------------------------------------------------------------------- */
 
 import type { ReactNode } from "react";
-import Link from "next/link";
+import PageHeader, { type PageTab } from "@/components/ui/PageHeader";
+import type { NavGroup } from "@/components/ui/PageNavPopup";
 import RrIcon from "@/components/ui/RrIcon";
-import FinanceTabs from "@/components/finance/FinanceTabs";
 import { openSmartCreate } from "@/components/ui/create/SmartCreateDrawer";
 import { useTranslation } from "@/lib/i18n";
 import { financeT } from "@/lib/translations/finance";
@@ -50,6 +44,105 @@ const HEALTH_STYLE: Record<HealthStatus, HealthStyle> = {
   },
 };
 
+/* The 5 operator tabs + Accounting entry. */
+const PRIMARY_TABS_RAW: Array<{ key: string; labelKey: string; fallback: string; icon: PageTab["icon"] }> = [
+  { key: "/finance",                    labelKey: "tabs.overview",    fallback: "Overview",   icon: "balance-scale-left" },
+  { key: "/finance/orders",             labelKey: "subtab.orders",    fallback: "Orders",     icon: "file-invoice" },
+  { key: "/finance/customers",          labelKey: "subtab.customers", fallback: "Customers",  icon: "arrow-down-left" },
+  { key: "/finance/suppliers",          labelKey: "subtab.suppliers", fallback: "Suppliers",  icon: "arrow-up-right" },
+  { key: "/finance/expenses",           labelKey: "subtab.expenses",  fallback: "Expenses",   icon: "receipt" },
+  { key: "/finance/accounting/queue",   labelKey: "tabs.accounting",  fallback: "Accounting", icon: "contract" },
+];
+
+/* All accounting routes — grouped for the ··· popup. */
+const OVERFLOW_GROUPS_RAW: Array<{ id: string; labelKey: string; fallback: string; accent: NavGroup["accent"]; items: Array<{ key: string; labelKey: string; fallback: string; icon: PageTab["icon"]; blurb: string }> }> = [
+  {
+    id: "accounting",
+    labelKey: "tabs.accounting",
+    fallback: "Accounting",
+    accent: {
+      border:   "border-l-blue-500/70",
+      chipBg:   "bg-blue-500/10",
+      chipText: "text-blue-400",
+      header:   "text-blue-400",
+    },
+    items: [
+      { key: "/finance/accounting/queue",          labelKey: "subtab.queue",         fallback: "Queue",          icon: "clock",                blurb: "Pending journal entries" },
+      { key: "/finance/accounting/trial-balance",  labelKey: "subtab.trialBalance",  fallback: "Trial Balance",  icon: "badge-check",          blurb: "All accounts at a glance" },
+      { key: "/finance/accounting/general-ledger", labelKey: "subtab.generalLedger", fallback: "General Ledger", icon: "contract",             blurb: "Every transaction posted" },
+      { key: "/finance/accounting/profit-loss",    labelKey: "subtab.profitLoss",    fallback: "Profit & Loss",  icon: "file-invoice-dollar",  blurb: "Income statement view" },
+      { key: "/finance/accounting/cash-flow",      labelKey: "subtab.cashFlow",      fallback: "Cash Flow",      icon: "wallet",               blurb: "Operating · investing · financing" },
+      { key: "/finance/accounting/equity",         labelKey: "subtab.equity",        fallback: "Equity",         icon: "coins",                blurb: "Owners' equity changes" },
+    ],
+  },
+  {
+    id: "banking",
+    labelKey: "tabs.banking",
+    fallback: "Banking",
+    accent: {
+      border:   "border-l-teal-500/70",
+      chipBg:   "bg-teal-500/10",
+      chipText: "text-teal-400",
+      header:   "text-teal-400",
+    },
+    items: [
+      { key: "/finance/bank-accounts",   labelKey: "subtab.bankAccounts",   fallback: "Bank Accounts",   icon: "bank",        blurb: "Active accounts + balances" },
+      { key: "/finance/bank-imports",    labelKey: "subtab.bankImports",    fallback: "Bank Imports",    icon: "upload",      blurb: "CSV / OFX statements" },
+      { key: "/finance/reconciliation",  labelKey: "subtab.reconciliation", fallback: "Reconciliation",  icon: "badge-check", blurb: "Match books to bank" },
+      { key: "/finance/payments",        labelKey: "subtab.payments",       fallback: "Payments",        icon: "wallet",      blurb: "Outgoing + incoming" },
+    ],
+  },
+  {
+    id: "treasury",
+    labelKey: "subtab.treasuryPlans",
+    fallback: "Treasury",
+    accent: {
+      border:   "border-l-amber-500/70",
+      chipBg:   "bg-amber-500/10",
+      chipText: "text-amber-400",
+      header:   "text-amber-400",
+    },
+    items: [
+      { key: "/finance/treasury-forecast", labelKey: "subtab.cashForecast",  fallback: "Cash Forecast",  icon: "arrow-up-right", blurb: "13-week cash projection" },
+      { key: "/finance/treasury-plans",    labelKey: "subtab.treasuryPlans", fallback: "Treasury Plans", icon: "file-invoice",   blurb: "Long-range plans" },
+      { key: "/finance/fx-rates",          labelKey: "home.map.exchangeRates", fallback: "FX Rates",     icon: "coins",          blurb: "Multi-currency rates" },
+    ],
+  },
+  {
+    id: "reports",
+    labelKey: "subtab.reports",
+    fallback: "Reports",
+    accent: {
+      border:   "border-l-violet-500/70",
+      chipBg:   "bg-violet-500/10",
+      chipText: "text-violet-400",
+      header:   "text-violet-400",
+    },
+    items: [
+      { key: "/finance/statements",    labelKey: "subtab.detailedStatements", fallback: "Statements",     icon: "balance-scale-left", blurb: "Detailed financial statements" },
+      { key: "/finance/reports",       labelKey: "subtab.operationalReports", fallback: "Reports",        icon: "file-invoice",       blurb: "Operational reports" },
+      { key: "/finance/intelligence",  labelKey: "subtab.intelligence",       fallback: "Intelligence",   icon: "signal-stream",      blurb: "Insights + alerts" },
+    ],
+  },
+  {
+    id: "setup",
+    labelKey: "subtab.setup",
+    fallback: "Setup",
+    accent: {
+      border:   "border-l-rose-500/70",
+      chipBg:   "bg-rose-500/10",
+      chipText: "text-rose-400",
+      header:   "text-rose-400",
+    },
+    items: [
+      { key: "/finance/approvals",     labelKey: "subtab.approvals",     fallback: "Approvals",     icon: "shield-check", blurb: "Approval workflows" },
+      { key: "/finance/notifications", labelKey: "subtab.reminders",     fallback: "Notifications", icon: "clock",        blurb: "Reminders + alerts" },
+      { key: "/finance/setup",         labelKey: "subtab.setup",         fallback: "Setup",         icon: "shield-check", blurb: "Chart of accounts + rules" },
+      { key: "/finance/workspace",     labelKey: "subtab.workspace",     fallback: "Workspace",     icon: "bank",         blurb: "Pro accounting workspace" },
+    ],
+  },
+];
+
 export default function FinanceHeader({
   title,
   subtitle,
@@ -61,66 +154,77 @@ export default function FinanceHeader({
   title: string;
   subtitle?: string;
   action?: ReactNode;
-  /* Slot for the Week/Quarter/Year selector or any inline filters. */
   controls?: ReactNode;
   health?: HealthStatus;
   showTabs?: boolean;
 }) {
   const { t } = useTranslation(financeT);
-  return (
-    <div>
-      {/* ── Native Hub page bar ─────────────────────────────────── */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-3">
-          <Link
-            href="/"
-            aria-label={t("header.backHub", "Back to Hub")}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] transition-colors hover:text-[var(--text-primary)]"
-          >
-            <RrIcon name="arrow-left" size={16} />
-          </Link>
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)]">
-            <RrIcon name="coins" size={16} />
-          </div>
-          <div className="flex min-w-0 items-center gap-2.5">
-            <h1 className="text-xl font-bold tracking-tight md:text-[22px]">{title}</h1>
-            {subtitle && (
-              <p className="hidden text-[12px] text-[var(--text-dim)] sm:block">{subtitle}</p>
-            )}
-            {health && health !== "unknown" && (
-              <HealthPill status={health} />
-            )}
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {controls}
-          <button
-            type="button"
-            onClick={() => openSmartCreate()}
-            className="inline-flex items-center gap-1.5 rounded-md bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] transition-opacity hover:opacity-90"
-            title={t("header.createTitle", "Create (c)")}
-            aria-label={t("header.createAria", "Open Smart Create drawer (shortcut: c)")}
-          >
-            <RrIcon name="plus" size={12} />
-            {t("header.create", "Create")}
-          </button>
-          {action}
-        </div>
-      </div>
 
-      {/* ── Sub-navigation row ──────────────────────────────────── */}
-      {showTabs && (
-        <div className="mt-5">
-          <FinanceTabs />
-        </div>
+  const tabs: PageTab[] = PRIMARY_TABS_RAW.map((tab) => ({
+    key: tab.key,
+    icon: tab.icon,
+    label: t(tab.labelKey, tab.fallback),
+  }));
+
+  const overflowTabs: NavGroup[] = OVERFLOW_GROUPS_RAW.map((g) => ({
+    id: g.id,
+    label: t(g.labelKey, g.fallback),
+    accent: g.accent,
+    items: g.items.map((it) => ({
+      key: it.key,
+      icon: it.icon,
+      label: t(it.labelKey, it.fallback),
+      blurb: it.blurb,
+    })),
+  }));
+
+  const createBtn = (
+    <button
+      type="button"
+      onClick={() => openSmartCreate()}
+      className="inline-flex items-center gap-1.5 rounded-md bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] transition-opacity hover:opacity-90"
+      title={t("header.createTitle", "Create (c)")}
+      aria-label={t("header.createAria", "Open Smart Create drawer (shortcut: c)")}
+    >
+      <RrIcon name="plus" size={12} />
+      {t("header.create", "Create")}
+    </button>
+  );
+
+  const titleWithHealth = (
+    <>
+      {title}
+      {health && health !== "unknown" && (
+        <span className="ml-2 inline-flex align-middle">
+          <HealthPill status={health} />
+        </span>
       )}
-    </div>
+    </>
+  );
+
+  return (
+    <PageHeader
+      title={typeof titleWithHealth === "string" ? titleWithHealth : title}
+      subtitle={subtitle}
+      icon="coins"
+      action={
+        <>
+          {createBtn}
+          {action}
+        </>
+      }
+      controls={controls}
+      meta={health && health !== "unknown" ? <HealthPill status={health} /> : undefined}
+      tabs={tabs}
+      overflowTabs={overflowTabs}
+      popupTitle={t("app.title", "Finance")}
+      popupSubtitle={t("header.popupSubtitle", "Pick where to go.")}
+      showTabs={showTabs}
+    />
   );
 }
 
-/* Compact health pill used in the title row. The bigger HealthBadge
-   was reserved for the old hero — this lighter version sits inline
-   alongside the title without dominating. */
+/* Compact health pill — re-exported for callers that render it inline. */
 export function HealthPill({ status }: { status: HealthStatus }) {
   const s = HEALTH_STYLE[status];
   const { t } = useTranslation(financeT);
@@ -135,5 +239,5 @@ export function HealthPill({ status }: { status: HealthStatus }) {
   );
 }
 
-/* Re-export legacy badge name in case callers reference it. */
+/* Legacy alias */
 export { HealthPill as HealthBadge };

@@ -6,14 +6,12 @@
    --------------------------------------------------------------------------- */
 
 import { useState, useEffect, useCallback, type ComponentType } from "react";
-import Link from "next/link";
 import { useTranslation } from "@/lib/i18n";
 import { hrT } from "@/lib/translations/hr";
 import { fetchEmployeeList, type EmployeeListItem } from "@/lib/employees-admin";
 import { type TabId, TAB_IDS, TAB_LABEL_KEYS } from "./shared";
 
 /* ── Icons ── */
-import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
 import CalendarPlusIcon from "@/components/icons/ui/CalendarPlusIcon";
 import ClockIcon from "@/components/icons/ui/ClockIcon";
@@ -25,6 +23,7 @@ import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import HrIcon from "@/components/icons/HrIcon";
+import PageHeader from "@/components/ui/PageHeader";
 
 /* ── Module components (lazy‑loaded) ── */
 import DashboardModule from "./modules/Dashboard";
@@ -107,43 +106,40 @@ export default function HRApp() {
   return (
     <div dir={lang === "ar" ? "rtl" : "ltr"} className="h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden max-w-[100vw]">
 
-      {/* ═══════════ TOP BAR ═══════════ */}
-      <div className="shrink-0 border-b border-[var(--border-color)] bg-[var(--bg-secondary)]">
-        {/* Title row */}
-        <div className="flex items-center gap-3 px-5 pt-4 pb-3">
-          <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-            <ArrowLeftIcon size={16} className="rtl:rotate-180" />
-          </Link>
-          <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-            <HrIcon size={16} />
-          </div>
-          <h1 className="text-[16px] font-bold text-[var(--text-primary)] truncate">{t("hr.title")}</h1>
-        </div>
-
-        {/* Horizontal tab bar */}
-        <div className="flex overflow-x-auto scrollbar-hide px-3 gap-0.5">
+      {/* ═══════════ TOP BAR — canonical Hub PageHeader + state tab strip ═══════════ */}
+      <div className="shrink-0 border-b border-[var(--border-color)] px-5 pt-4">
+        <PageHeader
+          title={t("hr.title")}
+          icon={<HrIcon size={16} />}
+          showTabs={false}
+        />
+        <nav
+          aria-label="HR navigation"
+          className="mt-5 flex items-end gap-0.5 overflow-x-auto border-b border-[var(--border-subtle)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
           {TAB_IDS.map((tabId) => {
             const Icon = TAB_ICONS[tabId];
             const isActive = activeTab === tabId;
             return (
               <button
                 key={tabId}
+                type="button"
                 onClick={() => setActiveTab(tabId)}
-                className={`relative flex items-center gap-1.5 px-3.5 py-2.5 whitespace-nowrap text-[12px] font-semibold uppercase tracking-wider transition-colors ${
+                aria-current={isActive ? "page" : undefined}
+                className={`inline-flex h-10 shrink-0 items-center gap-1.5 px-3 text-[12px] transition-colors duration-150 ${
                   isActive
-                    ? "text-[var(--text-primary)]"
-                    : "text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+                    ? "border-b-2 border-[var(--text-primary)] pb-0 text-[var(--text-primary)]"
+                    : "border-b-2 border-transparent text-[var(--text-dim)] hover:text-[var(--text-primary)]"
                 }`}
               >
-                <Icon size={14} />
-                <span>{t(TAB_LABEL_KEYS[tabId])}</span>
-                {isActive && (
-                  <span className="absolute bottom-0 inset-x-2 h-[2px] rounded-full bg-[var(--text-primary)]" />
-                )}
+                <span aria-hidden>
+                  <Icon size={12} />
+                </span>
+                {t(TAB_LABEL_KEYS[tabId])}
               </button>
             );
           })}
-        </div>
+        </nav>
       </div>
 
       {/* ═══════════ CONTENT ═══════════ */}
