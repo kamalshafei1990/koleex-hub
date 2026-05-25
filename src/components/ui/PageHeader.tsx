@@ -99,19 +99,19 @@ export default function PageHeader({
   return (
     <div>
       {/* ── Title row ──────────────────────────────────────────── */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
           {/* Back arrow */}
           <Link
             href={backHref}
             aria-label="Back"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] transition-colors hover:text-[var(--text-primary)]"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] transition-colors hover:border-[var(--border-color)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
           >
             <RrIcon name="arrow-left" size={16} />
           </Link>
 
           {/* App identity icon chip */}
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)]">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)]">
             {typeof icon === "string" ? (
               <RrIcon name={icon as RrIconName} size={16} />
             ) : isValidElement(icon) ? (
@@ -119,11 +119,15 @@ export default function PageHeader({
             ) : null}
           </div>
 
-          {/* Title + inline subtitle */}
-          <div className="flex min-w-0 items-center gap-2.5">
-            <h1 className="text-xl font-bold tracking-tight md:text-[22px]">{title}</h1>
+          {/* Title + stacked subtitle */}
+          <div className="flex min-w-0 flex-col">
+            <h1 className="text-[20px] font-bold tracking-tight leading-tight text-[var(--text-primary)] md:text-[22px]">
+              {title}
+            </h1>
             {subtitle && (
-              <p className="hidden text-[12px] text-[var(--text-dim)] sm:block">{subtitle}</p>
+              <p className="mt-0.5 truncate text-[12px] leading-snug text-[var(--text-dim)]">
+                {subtitle}
+              </p>
             )}
           </div>
         </div>
@@ -138,13 +142,13 @@ export default function PageHeader({
       </div>
 
       {/* Optional meta row */}
-      {meta && <div className="mt-2">{meta}</div>}
+      {meta && <div className="mt-3">{meta}</div>}
 
-      {/* ── Tab strip ──────────────────────────────────────────── */}
+      {/* ── Tab strip — bigger tap targets, calmer hover ──────────── */}
       {hasTabs && (
         <nav
           aria-label={`${title} navigation`}
-          className="mt-5 flex items-end gap-0.5 overflow-x-auto border-b border-[var(--border-subtle)]"
+          className="mt-5 flex items-end gap-0.5 overflow-x-auto border-b border-[var(--border-subtle)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {tabs!.map((tab) => {
             const isActive = tab.key === active;
@@ -154,14 +158,14 @@ export default function PageHeader({
                 href={tab.key}
                 aria-current={isActive ? "page" : undefined}
                 title={tab.label}
-                className={`inline-flex h-10 shrink-0 items-center gap-1.5 px-3 text-[12px] transition-colors duration-150 ${
+                className={`inline-flex h-11 shrink-0 items-center gap-1.5 px-3.5 text-[12.5px] font-medium transition-colors duration-150 ${
                   isActive
                     ? "border-b-2 border-[var(--text-primary)] pb-0 text-[var(--text-primary)]"
                     : "border-b-2 border-transparent text-[var(--text-dim)] hover:text-[var(--text-primary)]"
                 }`}
               >
-                <span aria-hidden>
-                  <RrIcon name={tab.icon} size={12} />
+                <span aria-hidden className={isActive ? "" : "text-[var(--text-ghost)]"}>
+                  <RrIcon name={tab.icon} size={13} />
                 </span>
                 {tab.label}
               </Link>
@@ -174,9 +178,10 @@ export default function PageHeader({
               onClick={() => setMenuOpen(true)}
               data-testid="page-nav-menu-trigger"
               aria-label="More routes"
-              className="ml-1 inline-flex h-10 shrink-0 items-center gap-1 border-b-2 border-transparent px-2.5 text-[12px] text-[var(--text-dim)] transition-colors hover:text-[var(--text-primary)]"
+              title="More"
+              className="ml-1 inline-flex h-11 shrink-0 items-center gap-1 border-b-2 border-transparent px-3 text-[12.5px] text-[var(--text-dim)] transition-colors hover:text-[var(--text-primary)]"
             >
-              <RrIcon name="books" size={12} />
+              <RrIcon name="books" size={13} />
               <span className="tracking-widest">···</span>
             </button>
           )}
