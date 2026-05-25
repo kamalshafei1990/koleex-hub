@@ -20,6 +20,7 @@ import { invoicesT } from "@/lib/translations/invoices";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
 import RrIcon from "@/components/ui/RrIcon";
 import PageHeader from "@/components/ui/PageHeader";
+import AppHomeMenu from "@/components/ui/AppHomeMenu";
 import EntityPicker from "@/components/planning/EntityPicker";
 import {
   createInvoice,
@@ -136,6 +137,22 @@ function InvoiceListView({ onOpen }: { onOpen: (id: string) => void }) {
       {/* Body */}
       <div className="flex-1 overflow-y-auto w-full">
         <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-4 min-w-0 space-y-4">
+          {/* Brand-aligned tile menu + search — same across every Hub app */}
+          <AppHomeMenu
+            navItems={[
+              { key: "all",        onClick: () => setFilter("all"),     icon: "document",            label: "All Invoices" },
+              { key: "open",       onClick: () => setFilter("open"),    icon: "clock",               label: "Open"         },
+              { key: "draft",      onClick: () => setFilter("draft"),   icon: "file",                label: "Drafts"       },
+              { key: "sent",       onClick: () => setFilter("sent"),    icon: "paper-plane",         label: "Sent"         },
+              { key: "paid",       onClick: () => setFilter("paid"),    icon: "check",               label: "Paid"         },
+              { key: "overdue",    onClick: () => setFilter("overdue"), icon: "info",                label: "Overdue"      },
+              { key: "new",        onClick: () => setFormOpen(true),    icon: "plus",                label: "New Invoice"  },
+              { key: "customers",  href: "/customers",                  icon: "users",               label: "Customers"    },
+            ]}
+            searchPlaceholder="Search invoices, customers, amounts…"
+            onSearchSubmit={(term) => setSearch(term)}
+          />
+
           {/* KPI strip */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <KpiCard label={t("kpi.outstanding")} value={formatMoney(kpi.outstanding)} accent="text-amber-400" />

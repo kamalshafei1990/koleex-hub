@@ -11,6 +11,7 @@ import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import NotesIcon from "@/components/icons/NotesIcon";
 import PageHeader from "@/components/ui/PageHeader";
+import AppHomeMenu from "@/components/ui/AppHomeMenu";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
@@ -439,6 +440,21 @@ export default function NotesApp() {
             icon={<NotesIcon size={16} />}
             showTabs={false}
           />
+
+          {/* Brand-aligned tile menu + search — same across every Hub app */}
+          <div className="mt-5 mb-3">
+            <AppHomeMenu
+              navItems={[
+                { key: "all",     onClick: () => setSelection({ kind: "smart", key: "all" }),    icon: "document",   label: "All Notes" },
+                { key: "pinned",  onClick: () => setSelection({ kind: "smart", key: "pinned" }), icon: "star",       label: "Pinned"    },
+                { key: "none",    onClick: () => setSelection({ kind: "smart", key: "none" }),   icon: "file",       label: "Unfiled"   },
+                { key: "trash",   onClick: () => setSelection({ kind: "smart", key: "trash" }),  icon: "recycle",    label: "Trash"     },
+                { key: "new",     onClick: onCreateNote,                                          icon: "plus",       label: "New Note"  },
+              ]}
+              searchPlaceholder="Search notes, folders, tags…"
+              onSearchSubmit={(term) => setSearch(term)}
+            />
+          </div>
 
           {/* Search + quick New Note */}
           <div className="flex items-center gap-2 pb-3 min-w-0">

@@ -33,6 +33,7 @@ import CheckSquareIcon from "@/components/icons/ui/CheckSquareIcon";
 import ListTodoIcon from "@/components/icons/ui/ListTodoIcon";
 import ProjectsIcon from "@/components/icons/ProjectsIcon";
 import PageHeader from "@/components/ui/PageHeader";
+import AppHomeMenu from "@/components/ui/AppHomeMenu";
 import EntityPlanningStrip from "@/components/planning/EntityPlanningStrip";
 import EntityPicker from "@/components/planning/EntityPicker";
 import {
@@ -141,7 +142,19 @@ export default function ProjectsApp() {
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto w-full">
-        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-4 min-w-0">
+        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-4 min-w-0 space-y-4">
+          {/* Brand-aligned tile menu + search — same across every Hub app */}
+          <AppHomeMenu
+            navItems={[
+              { key: "projects",  onClick: () => setTab("projects"),  icon: "layout-grid",   label: "Projects"     },
+              { key: "mine",      onClick: () => setTab("mine"),      icon: "user",          label: "My Tasks"     },
+              { key: "all",       onClick: () => setTab("all"),       icon: "list-todo",     label: "All Tasks"    },
+              { key: "reporting", onClick: () => setTab("reporting"), icon: "chart-pie",     label: "Reporting"    },
+              { key: "config",    onClick: () => setTab("config"),    icon: "cog",           label: "Configuration"},
+            ]}
+            searchPlaceholder="Search projects, tasks, tags…"
+          />
+
           {tab === "projects" && <ProjectsListView onOpenProject={setActiveProjectId} />}
           {tab === "mine" && <TasksListView mine tags={tags} />}
           {tab === "all" && <TasksListView mine={false} tags={tags} />}

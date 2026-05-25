@@ -31,6 +31,7 @@ import PencilIcon from "@/components/icons/ui/PencilIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PlanningIcon from "@/components/icons/PlanningIcon";
 import PageHeader from "@/components/ui/PageHeader";
+import AppHomeMenu from "@/components/ui/AppHomeMenu";
 import EntityPicker from "@/components/planning/EntityPicker";
 import {
   addDays,
@@ -233,7 +234,19 @@ export default function PlanningApp() {
 
       {/* ── Body ── */}
       <div className="flex-1 overflow-y-auto w-full">
-        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-4 min-w-0">
+        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-4 min-w-0 space-y-4">
+          {/* Brand-aligned tile menu + search — same across every Hub app */}
+          <AppHomeMenu
+            navItems={[
+              { key: "schedule",  onClick: () => setTab("schedule"), icon: "calendar",     label: "Schedule"      },
+              { key: "open",      onClick: () => setTab("open"),     icon: "paper-plane",  label: "Open Shifts"   },
+              { key: "mine",      onClick: () => setTab("mine"),     icon: "clock",        label: "My Planning"   },
+              { key: "new",       onClick: () => setModal({ open: true, editing: null }), icon: "plus", label: "New" },
+              { key: "config",    onClick: () => setTab("config"),   icon: "cog",          label: "Configuration" },
+            ]}
+            searchPlaceholder="Search shifts, resources, roles…"
+          />
+
           {loading ? (
             <div className="flex items-center justify-center py-20">
               <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)] animate-spin" />

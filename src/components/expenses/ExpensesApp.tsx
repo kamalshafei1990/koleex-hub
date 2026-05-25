@@ -27,6 +27,7 @@ import { useBaseCurrencyOptional } from "@/lib/hooks/useBaseCurrency";
 import { useTranslation } from "@/lib/i18n";
 import { expensesT } from "@/lib/translations/expenses";
 import ExpensesHeader from "@/components/expenses/ExpensesHeader";
+import AppHomeMenu, { type AppHomeNavItem } from "@/components/ui/AppHomeMenu";
 import type { ExpensesTabKey } from "@/components/expenses/ExpensesTabs";
 import { EmptyState, SectionCard, StatusBadge } from "@/components/finance/FinanceUi";
 import {
@@ -217,6 +218,24 @@ export default function ExpensesApp() {
             </button>
           }
         />
+
+        {/* Brand-aligned tile menu + search — same across every Hub app */}
+        <div className="mt-5">
+          <AppHomeMenu
+            navItems={[
+              { key: "all",       onClick: () => setTab("all"),     icon: "document",       label: "All Expenses" },
+              { key: "unpaid",    onClick: () => setTab("unpaid"),  icon: "clock",          label: "Unpaid"       },
+              { key: "paid",      onClick: () => setTab("paid"),    icon: "check",          label: "Paid"         },
+              { key: "overdue",   onClick: () => setTab("overdue"), icon: "info",           label: "Overdue"      },
+              { key: "new",       onClick: startNew,                 icon: "plus",          label: "New Expense"  },
+              { key: "categories",href: "/categories",               icon: "books",         label: "Categories"   },
+              { key: "approvals", onClick: () => setApprovalFilter("needs_review"), icon: "shield-check", label: "Approvals"  },
+              { key: "analytics", href: "/finance/expenses",         icon: "signal-stream", label: "Analytics"    },
+            ] as AppHomeNavItem[]}
+            searchPlaceholder="Search expenses, categories, payments…"
+            onSearchSubmit={(term) => setSearch(term)}
+          />
+        </div>
 
         {/* ── Phase 2.2 — Approval filter strip ─────────────────── */}
         <div className="mt-4 flex flex-wrap items-center gap-1.5">
