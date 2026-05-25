@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
-import type { PurchaseModuleProps } from "../PurchaseApp";
+import type { PurchaseModuleProps } from "../shared";
 import { cardCls, formatMoney, sectionTitleCls, relativeTime } from "../shared";
 
 import LineChartIcon from "@/components/icons/ui/LineChartIcon";

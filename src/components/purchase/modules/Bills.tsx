@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
-import type { PurchaseModuleProps } from "../PurchaseApp";
+import type { PurchaseModuleProps } from "../shared";
 import { cardCls, formatMoney, formatDate, sectionTitleCls, STATUS_TONE_BILL } from "../shared";
 import { NewBillDialog } from "../dialogs";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";

@@ -6,7 +6,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
-import type { PurchaseModuleProps } from "../PurchaseApp";
+import type { PurchaseModuleProps } from "../shared";
 import { cardCls, formatMoney, sectionTitleCls } from "../shared";
 import LineChartIcon from "@/components/icons/ui/LineChartIcon";
 import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";

@@ -8,7 +8,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
-import type { PurchaseModuleProps } from "../PurchaseApp";
+import type { PurchaseModuleProps } from "../shared";
 import { cardCls, formatMoney, sectionTitleCls, linkBtnCls } from "../shared";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";

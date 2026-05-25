@@ -2,6 +2,17 @@
    pattern so the two procure-to-pay / order-to-cash apps feel like
    siblings. */
 
+/** Props every Purchase module component receives. Lives here (not in
+ *  PurchaseApp.tsx) so route pages can construct them without a
+ *  dependency on the legacy state-based shell. */
+export interface PurchaseModuleProps {
+  t: (key: string) => string;
+  lang: string;
+  /** Optional — legacy hook for state-based navigation. URL-based pages
+   *  can omit this; the few modules that still call it will become noops. */
+  setActiveTab?: (next: string) => void;
+}
+
 export type PurchaseTabId =
   | "dashboard"
   | "requisitions"

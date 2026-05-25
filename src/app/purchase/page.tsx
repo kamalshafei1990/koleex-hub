@@ -1,7 +1,5 @@
-"use client";
+import PurchaseHome from "@/components/purchase/PurchaseHome";
 
-import PurchaseApp from "@/components/purchase/PurchaseApp";
-
-export default function PurchasePage() {
-  return <PurchaseApp />;
+export default function PurchasePageRoute() {
+  return <PurchaseHome />;
 }

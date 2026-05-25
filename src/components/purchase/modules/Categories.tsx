@@ -12,7 +12,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
-import type { PurchaseModuleProps } from "../PurchaseApp";
+import type { PurchaseModuleProps } from "../shared";
 import { cardCls, sectionTitleCls } from "../shared";
 import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";

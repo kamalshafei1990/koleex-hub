@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
-import type { PurchaseModuleProps } from "../PurchaseApp";
+import type { PurchaseModuleProps } from "../shared";
 import { cardCls, formatDate, sectionTitleCls } from "../shared";
 import { NewReceiptDialog } from "../dialogs";
 import ClipboardCheckIcon from "@/components/icons/ui/ClipboardCheckIcon";

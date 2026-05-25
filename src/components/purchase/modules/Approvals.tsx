@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from "react";
 import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
-import type { PurchaseModuleProps } from "../PurchaseApp";
+import type { PurchaseModuleProps } from "../shared";
 import { cardCls, formatMoney, sectionTitleCls } from "../shared";
 import HandCoinsIcon from "@/components/icons/ui/HandCoinsIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
