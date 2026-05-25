@@ -119,30 +119,40 @@ export default function PageHeader({
     (mergedTabs[0]?.key ?? "");
 
   return (
-    <div className="space-y-4 sm:space-y-5">
-      {/* ── Hero row: back + icon + name + subtitle + actions ─── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-5">
-        <div className="flex min-w-0 items-center gap-3 sm:items-start sm:gap-4">
+    <>
+    {/* Hero + search live in their own block. The menu is a SIBLING (not
+        nested) so its sticky positioning has the caller's full-page
+        wrapper as the scroll context, instead of being trapped inside
+        this short space-y wrapper (which would un-stick the moment the
+        hero scrolled past). */}
+    <div className="space-y-3 sm:space-y-5">
+      {/* ── Hero row: back + icon + name + subtitle + actions ───
+          On mobile: tighter gaps (gap-2), smaller back/icon chips (h-8),
+          smaller title (18px). Drops ~40px of vertical space so content
+          starts higher on small viewports — addresses the "not organized"
+          complaint that the header was dominating the screen. */}
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-5">
+        <div className="flex min-w-0 items-center gap-2 sm:items-start sm:gap-4">
           <Link
             href={resolvedBackHref}
             aria-label="Back"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] sm:h-10 sm:w-10"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] transition-all duration-200 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] sm:h-10 sm:w-10 sm:rounded-xl sm:hover:-translate-y-0.5"
           >
-            <RrIcon name="arrow-left" size={16} />
+            <RrIcon name="arrow-left" size={14} />
           </Link>
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)] sm:h-10 sm:w-10">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)] sm:h-10 sm:w-10 sm:rounded-xl">
             {typeof icon === "string" ? (
-              <RrIcon name={icon as RrIconName} size={18} />
+              <RrIcon name={icon as RrIconName} size={16} />
             ) : isValidElement(icon) ? (
               icon
             ) : null}
           </div>
           <div className="flex min-w-0 flex-col">
-            <h1 className="text-[20px] font-bold tracking-tight leading-tight text-[var(--text-primary)] sm:text-[24px] md:text-[26px]">
+            <h1 className="text-[17px] font-bold tracking-tight leading-tight text-[var(--text-primary)] sm:text-[24px] md:text-[26px]">
               {title}
             </h1>
             {subtitle && (
-              <p className="mt-0.5 text-[12.5px] leading-snug text-[var(--text-muted)] sm:mt-1 sm:text-[13px]">
+              <p className="mt-0.5 line-clamp-2 text-[11.5px] leading-snug text-[var(--text-muted)] sm:line-clamp-none sm:mt-1 sm:text-[13px]">
                 {subtitle}
               </p>
             )}
@@ -166,16 +176,28 @@ export default function PageHeader({
           onSearchSubmit={onSearchSubmit}
         />
       )}
+    </div>
 
-      {/* ── Menu row — sliding pill ────────────────────────────── */}
-      {hasTabs && (
+    {/* ── Menu row — sticks at the TOP of the inner scroll container
+          (which itself starts just below MainHeader via pt-14 on the
+          shell) so the user can always navigate without scrolling back
+          up. top-0 here = directly under the fixed MainHeader.
+          Sibling (not nested) of the hero block so the sticky's
+          containing block is the caller's full-page wrapper, not the
+          short hero box (which would un-stick it the moment the hero
+          scrolled past).
+          -mx + px restore the page's horizontal padding so the bar
+          bleeds to the edges and content scrolling under is hidden. */}
+    {hasTabs && (
+      <div className="sticky top-0 z-30 -mx-4 mt-3 bg-[var(--bg-primary)] px-4 py-2 sm:-mx-6 sm:mt-5 sm:px-6">
         <SlidingPillNav
           tabs={mergedTabs}
           activeKey={active}
           ariaLabel={`${title} navigation`}
         />
-      )}
-    </div>
+      </div>
+    )}
+    </>
   );
 }
 
