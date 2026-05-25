@@ -31,6 +31,9 @@ export interface PageHeaderProps {
   subtitle?: string;
   /** App icon — RrIcon name string OR custom ReactNode (e.g. SalesIcon). */
   icon: RrIconName | ReactNode;
+  /** Override back-arrow destination. If omitted, auto-computes the parent
+   *  path from the current URL (e.g. /inventory/items → /inventory,
+   *  /inventory/items/abc → /inventory/items, /inventory → /). */
   backHref?: string;
   action?: ReactNode;
   controls?: ReactNode;
@@ -42,11 +45,24 @@ export interface PageHeaderProps {
   showTabs?: boolean;
 }
 
+/** Strip the last URL segment to get the parent path.
+ *    "/inventory"            → "/"
+ *    "/inventory/items"      → "/inventory"
+ *    "/inventory/items/abc"  → "/inventory/items"
+ *    "/" or ""               → "/" */
+function parentPath(pathname: string): string {
+  if (!pathname || pathname === "/") return "/";
+  const trimmed = pathname.replace(/\/+$/, "");
+  const idx = trimmed.lastIndexOf("/");
+  if (idx <= 0) return "/";
+  return trimmed.slice(0, idx);
+}
+
 export default function PageHeader({
   title,
   subtitle,
   icon,
-  backHref = "/",
+  backHref,
   action,
   controls,
   meta,
@@ -58,6 +74,7 @@ export default function PageHeader({
 }: PageHeaderProps) {
   const pathname = usePathname() ?? "";
   const [menuOpen, setMenuOpen] = useState(false);
+  const resolvedBackHref = backHref ?? parentPath(pathname);
 
   const hasTabs = showTabs && tabs && tabs.length > 0;
   const hasOverflow = overflowTabs && overflowTabs.length > 0;
@@ -71,7 +88,7 @@ export default function PageHeader({
     allKeys
       .slice()
       .sort((a, b) => b.length - a.length)
-      .find((k) => pathname === k || (k !== backHref && pathname.startsWith(k + "/"))) ??
+      .find((k) => pathname === k || (k !== resolvedBackHref && pathname.startsWith(k + "/"))) ??
     (tabs?.[0]?.key ?? "");
 
   return (
@@ -79,9 +96,9 @@ export default function PageHeader({
       {/* ── Hero title row — bold + generous (matches Hub home greeting) ── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-5">
         <div className="flex min-w-0 items-center gap-3 sm:items-start sm:gap-4">
-          {/* Back arrow */}
+          {/* Back arrow — auto-computes parent path unless backHref overrides */}
           <Link
-            href={backHref}
+            href={resolvedBackHref}
             aria-label="Back"
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] sm:h-10 sm:w-10"
           >
