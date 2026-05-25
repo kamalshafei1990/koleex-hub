@@ -140,23 +140,6 @@ export default function DashboardModule({ t, setActiveTab }: PurchaseModuleProps
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      {/* Brand-aligned tile menu + search — same across every Hub app */}
-      <AppHomeMenu
-        navItems={[
-          { key: "dashboard",    onClick: () => setActiveTab?.("dashboard"),    icon: <BarChart3Icon size={22} />,    label: "Dashboard"    },
-          { key: "requisitions", onClick: () => setActiveTab?.("requisitions"), icon: <FilePlusIcon size={22} />,     label: "Requisitions" },
-          { key: "rfqs",         onClick: () => setActiveTab?.("rfqs"),         icon: <FileBadge2Icon size={22} />,   label: "RFQs"         },
-          { key: "orders",       onClick: () => setActiveTab?.("orders"),       icon: <BoxesIcon size={22} />,        label: "Orders"       },
-          { key: "receipts",     onClick: () => setActiveTab?.("receipts"),     icon: <ClipboardCheckIcon size={22} />, label: "Receipts"   },
-          { key: "bills",        onClick: () => setActiveTab?.("bills"),        icon: <DocumentIcon size={22} />,     label: "Bills"        },
-          { key: "payments",     onClick: () => setActiveTab?.("payments"),     icon: <WalletIcon size={22} />,       label: "Payments"     },
-          { key: "suppliers",    onClick: () => setActiveTab?.("suppliers"),    icon: <UsersIcon size={22} />,        label: "Suppliers"    },
-          { key: "categories",   onClick: () => setActiveTab?.("categories"),   icon: <LayoutGridIcon size={22} />,   label: "Categories"   },
-          { key: "reports",      onClick: () => setActiveTab?.("reports"),      icon: <LineChartIcon size={22} />,    label: "Reports"      },
-        ]}
-        searchPlaceholder="Search RFQs, POs, suppliers, bills…"
-      />
-
       {/* KPI grid. KPIs whose `href` points at an external app (e.g.
           /contacts) render as <Link>; the in-app `#tab` ones render
           as plain divs since the parent shell controls tab state. */}

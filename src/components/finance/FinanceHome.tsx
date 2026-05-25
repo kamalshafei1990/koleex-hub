@@ -58,28 +58,7 @@ export default function FinanceHome() {
         <FinanceHeader
           title={t("app.title", "Finance")}
           subtitle={t("app.subtitle", "Income · Balance Sheet · Cash Flow — your full picture at a glance.")}
-          showTabs={false}
         />
-
-        {/* Canonical Hub tile menu + search — same as every other app */}
-        <div className="mt-5">
-          <AppHomeMenu
-            navItems={[
-              { href: "/finance",                  icon: "balance-scale-left", label: "Overview",   chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
-              { href: "/finance/orders",           icon: "file-invoice",       label: "Orders",     chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
-              { href: "/finance/customers",        icon: "arrow-down-left",    label: "Customers",  chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
-              { href: "/finance/suppliers",        icon: "arrow-up-right",     label: "Suppliers",  chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
-              { href: "/finance/expenses",         icon: "receipt",            label: "Expenses",   chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
-              { href: "/finance/accounting/queue", icon: "contract",           label: "Accounting", chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
-              { href: "/finance/bank-accounts",    icon: "bank",               label: "Banking",    chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
-              { href: "/finance/treasury-forecast",icon: "wallet",             label: "Treasury",   chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
-              { href: "/finance/statements",       icon: "balance-scale-left", label: "Statements", chipBg: "bg-amber-500/10", chipText: "text-amber-400" },
-              { href: "/finance/setup",            icon: "shield-check",       label: "Setup",      chipBg: "bg-amber-500/10", chipText: "text-amber-400" },
-            ]}
-            searchPlaceholder="Search customers, suppliers, invoices, payments…"
-            searchHref="/inventory/search"
-          />
-        </div>
 
         {setupHealth && !setupHealth.ready && setupHealth.missingCount > 0 && (
           <SetupHealthBanner health={setupHealth} />

@@ -160,12 +160,11 @@ export default function InventoryDashboard() {
     <div className="min-h-screen bg-[var(--bg-primary)] pb-16 text-[var(--text-primary)] md:pb-6">
       <div className="mx-auto max-w-[1500px] space-y-6 px-4 py-6 sm:px-6">
 
-        {/* ── 1. Header (no tab strip — nav cards replace it) ─────── */}
+        {/* ── 1. Odoo-style compact header (menu inline) ──────────── */}
         <InventoryHeader
           icon="home"
           title={t("inv.home.title")}
           subtitle={t("inv.home.subtitle")}
-          showTabs={false}
           action={
             <div className="flex items-center gap-2">
               {addInternalBtn}
@@ -180,13 +179,6 @@ export default function InventoryDashboard() {
             {error}
           </div>
         )}
-
-        {/* ── 2. Nav cards + Search (shared AppHomeMenu) ──────────── */}
-        <AppHomeMenu
-          navItems={NAV_CARDS}
-          searchPlaceholder="Search items, serials, batches, movements…"
-          searchHref="/inventory/search"
-        />
 
         {/* ── 3. KPI strip ────────────────────────────────────────── */}
         <section data-testid="inv-home-kpis">

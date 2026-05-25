@@ -55,7 +55,7 @@ const PRIMARY_TABS_RAW: Array<{ key: string; labelKey: string; fallback: string;
 ];
 
 /* All accounting routes — grouped for the ··· popup. */
-const OVERFLOW_GROUPS_RAW: Array<{ id: string; labelKey: string; fallback: string; accent: NavGroup["accent"]; items: Array<{ key: string; labelKey: string; fallback: string; icon: PageTab["icon"]; blurb: string }> }> = [
+const OVERFLOW_GROUPS_RAW: Array<{ id: string; labelKey: string; fallback: string; accent: NavGroup["accent"]; items: Array<{ key: string; labelKey: string; fallback: string; icon: NavGroup["items"][number]["icon"]; blurb: string }> }> = [
   {
     id: "accounting",
     labelKey: "tabs.accounting",

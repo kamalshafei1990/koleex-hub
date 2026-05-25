@@ -126,40 +126,19 @@ export default function PurchaseApp() {
       dir={lang === "ar" ? "rtl" : "ltr"}
       className="h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden max-w-[100vw]"
     >
-      {/* ═══════════ TOP BAR — canonical Hub PageHeader + state tab strips ═══════════ */}
-      <div className="shrink-0 border-b border-[var(--border-color)] px-4 pt-4 pb-4 sm:px-5">
+      {/* ═══════════ TOP BAR — Odoo-style compact header with inline menu ═══════════ */}
+      <div className="shrink-0 px-4 sm:px-5">
         <PageHeader
           title={t("purchase.title")}
           subtitle={t("purchase.subtitle")}
           icon={<PurchaseIcon size={16} />}
-          showTabs={false}
+          tabs={PURCHASE_GROUPS.map((g) => ({
+            key: g.id,
+            label: t(PURCHASE_GROUP_LABEL_KEYS[g.id]),
+            onClick: () => handleGroupClick(g.id),
+            active: activeGroup === g.id,
+          }))}
         />
-        {/* Primary group strip — pill chips matching Hub home aesthetic */}
-        {activeTab !== "dashboard" && (
-        <nav
-          aria-label="Purchase navigation"
-          className="mt-6 flex items-center gap-1.5 overflow-x-auto pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-          {PURCHASE_GROUPS.map((g) => {
-            const isActive = activeGroup === g.id;
-            return (
-              <button
-                key={g.id}
-                type="button"
-                onClick={() => handleGroupClick(g.id)}
-                aria-current={isActive ? "page" : undefined}
-                className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-4 text-[12.5px] font-medium transition-all duration-200 ${
-                  isActive
-                    ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] shadow-sm"
-                    : "border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
-                }`}
-              >
-                {t(PURCHASE_GROUP_LABEL_KEYS[g.id])}
-              </button>
-            );
-          })}
-        </nav>
-        )}
       </div>
 
       {/* Secondary sub-tab bar */}

@@ -1,55 +1,67 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   PageHeader — Koleex Hub brand-aligned app header.
+   PageHeader — Odoo-style compact app menu bar (Koleex brand).
 
-   Matches the visual language of the Hub homepage (/):
-     · Large bold title (28–32px) — same scale as "Good evening, Kamal"
-     · Muted subtitle on its own line for proper hierarchy
-     · Generous whitespace and breathing room
-     · Pill-shaped tabs (rounded-full) — same as Hub category chips
-     · Back arrow + identity icon as compact circular controls
-     · Optional ··· overflow popup for secondary routes
+   Single horizontal row with everything inline:
 
-   Each app passes its own tabs config and identity icon; chrome is identical.
+   ┌─────────────────────────────────────────────────────────────────────┐
+   │ [←] [icon] App Name · Page · Sub · Actions ··· ▾    [+ New] [🔍 …]  │
+   └─────────────────────────────────────────────────────────────────────┘
+
+   · Back arrow (auto-computes parent path)
+   · App icon chip + app name (small, top-left)
+   · Inline menu items (text links, hover underline) — primary navigation
+   · "···" overflow → dropdown menu for secondary routes
+   · Right side: action buttons + controls (search, filters, etc.)
+
+   Optional second row only when needed for page-specific subtitle.
    --------------------------------------------------------------------------- */
 
-import { useState, isValidElement, type ReactNode } from "react";
+import { useEffect, useRef, useState, isValidElement, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
-import PageNavPopup, { type NavGroup } from "@/components/ui/PageNavPopup";
+import type { NavGroup } from "@/components/ui/PageNavPopup";
 
 export interface PageTab {
   key: string;
   label: string;
-  icon: RrIconName;
+  /** RrIcon name OR custom ReactNode. Optional. */
+  icon?: RrIconName | ReactNode;
+  /** When provided, tab renders as a state-toggle button. */
+  onClick?: () => void;
+  /** Force-mark this tab as active (useful for state-based apps). */
+  active?: boolean;
 }
 
 export interface PageHeaderProps {
+  /** App / page title (e.g. "Inventory", "Sales", "Finance"). */
   title: string;
+  /** Optional secondary subtitle shown on a second row when present. */
   subtitle?: string;
-  /** App icon — RrIcon name string OR custom ReactNode (e.g. SalesIcon). */
+  /** App icon — RrIcon name or custom ReactNode. */
   icon: RrIconName | ReactNode;
-  /** Override back-arrow destination. If omitted, auto-computes the parent
-   *  path from the current URL (e.g. /inventory/items → /inventory,
-   *  /inventory/items/abc → /inventory/items, /inventory → /). */
+  /** Back-arrow destination. Auto-computes parent path if omitted. */
   backHref?: string;
+  /** Action button slot (right side). */
   action?: ReactNode;
+  /** Controls slot — search, filter, view-mode icons (right side). */
   controls?: ReactNode;
+  /** Optional secondary meta row (status pills, counts). */
   meta?: ReactNode;
+  /** Inline menu items shown after the app name. */
   tabs?: PageTab[];
+  /** Items shown only inside the "···" dropdown popup. */
   overflowTabs?: NavGroup[];
+  /** Popup title (header of dropdown). */
   popupTitle?: string;
+  /** Popup subtitle. */
   popupSubtitle?: string;
+  /** Hide the inline menu strip (e.g. on detail pages). */
   showTabs?: boolean;
 }
 
-/** Strip the last URL segment to get the parent path.
- *    "/inventory"            → "/"
- *    "/inventory/items"      → "/inventory"
- *    "/inventory/items/abc"  → "/inventory/items"
- *    "/" or ""               → "/" */
 function parentPath(pathname: string): string {
   if (!pathname || pathname === "/") return "/";
   const trimmed = pathname.replace(/\/+$/, "");
@@ -73,7 +85,8 @@ export default function PageHeader({
   showTabs = true,
 }: PageHeaderProps) {
   const pathname = usePathname() ?? "";
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const resolvedBackHref = backHref ?? parentPath(pathname);
 
   const hasTabs = showTabs && tabs && tabs.length > 0;
@@ -91,107 +104,174 @@ export default function PageHeader({
       .find((k) => pathname === k || (k !== resolvedBackHref && pathname.startsWith(k + "/"))) ??
     (tabs?.[0]?.key ?? "");
 
+  /* Close dropdown on outside click / Escape */
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setDropdownOpen(false); };
+    document.addEventListener("mousedown", onClick);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [dropdownOpen]);
+
   return (
     <div>
-      {/* ── Hero title row — bold + generous (matches Hub home greeting) ── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-5">
-        <div className="flex min-w-0 items-center gap-3 sm:items-start sm:gap-4">
-          {/* Back arrow — auto-computes parent path unless backHref overrides */}
-          <Link
-            href={resolvedBackHref}
-            aria-label="Back"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] sm:h-10 sm:w-10"
-          >
-            <RrIcon name="arrow-left" size={16} />
-          </Link>
+      {/* ── Compact Odoo-style menu row ───────────────────────────── */}
+      <div className="flex h-12 items-center gap-2 border-b border-[var(--border-subtle)]">
+        {/* Back arrow */}
+        <Link
+          href={resolvedBackHref}
+          aria-label="Back"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--text-dim)] transition-colors hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
+        >
+          <RrIcon name="arrow-left" size={15} />
+        </Link>
 
-          {/* Identity icon chip — squared to match Hub app cards */}
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)] sm:h-10 sm:w-10">
+        {/* App icon + name */}
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--text-primary)]">
             {typeof icon === "string" ? (
-              <RrIcon name={icon as RrIconName} size={18} />
+              <RrIcon name={icon as RrIconName} size={16} />
             ) : isValidElement(icon) ? (
               icon
             ) : null}
-          </div>
-
-          {/* Title + subtitle — large + breathing room */}
-          <div className="flex min-w-0 flex-col">
-            <h1 className="text-[20px] font-bold tracking-tight leading-tight text-[var(--text-primary)] sm:text-[26px] md:text-[30px]">
-              {title}
-            </h1>
-            {subtitle && (
-              <p className="mt-0.5 truncate text-[12px] leading-snug text-[var(--text-muted)] sm:mt-1 sm:text-[13px] sm:whitespace-normal">
-                {subtitle}
-              </p>
-            )}
-          </div>
+          </span>
+          <span className="text-[14px] font-semibold tracking-tight text-[var(--text-primary)]">
+            {title}
+          </span>
         </div>
+
+        {/* Inline menu items */}
+        {hasTabs && (
+          <nav
+            aria-label={`${title} navigation`}
+            className="ml-2 flex flex-1 items-center gap-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {tabs!.map((tab) => {
+              const isActive = tab.active ?? (tab.key === active);
+              const tabClassName = `relative inline-flex h-12 shrink-0 items-center gap-1.5 px-3 text-[13px] transition-colors duration-150 ${
+                isActive
+                  ? "font-medium text-[var(--text-primary)]"
+                  : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+              }`;
+              const tabInner = (
+                <>
+                  {tab.icon && (
+                    <span aria-hidden className={isActive ? "" : "text-[var(--text-dim)]"}>
+                      {typeof tab.icon === "string" ? (
+                        <RrIcon name={tab.icon as RrIconName} size={12} />
+                      ) : (
+                        tab.icon
+                      )}
+                    </span>
+                  )}
+                  {tab.label}
+                  {isActive && (
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute inset-x-3 -bottom-px h-[2px] rounded-full bg-[var(--text-primary)]"
+                    />
+                  )}
+                </>
+              );
+              if (tab.onClick) {
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={tab.onClick}
+                    aria-current={isActive ? "page" : undefined}
+                    className={tabClassName}
+                  >
+                    {tabInner}
+                  </button>
+                );
+              }
+              return (
+                <Link
+                  key={tab.key}
+                  href={tab.key}
+                  aria-current={isActive ? "page" : undefined}
+                  className={tabClassName}
+                >
+                  {tabInner}
+                </Link>
+              );
+            })}
+
+            {hasOverflow && (
+              <div ref={dropdownRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setDropdownOpen((v) => !v)}
+                  aria-expanded={dropdownOpen}
+                  aria-haspopup="menu"
+                  className="inline-flex h-12 shrink-0 items-center gap-1 px-3 text-[13px] text-[var(--text-muted)] transition-colors duration-150 hover:text-[var(--text-primary)]"
+                >
+                  More
+                  <span aria-hidden className="text-[10px]">▾</span>
+                </button>
+                {dropdownOpen && (
+                  <div
+                    role="menu"
+                    className="absolute left-0 top-full z-50 mt-1 w-[280px] overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[0_12px_40px_rgba(0,0,0,0.5)]"
+                  >
+                    {overflowTabs!.map((group) => (
+                      <div key={group.id} className="py-1.5">
+                        <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-dim)]">
+                          {group.label}
+                        </div>
+                        {group.items.map((item) => (
+                          <Link
+                            key={item.key}
+                            href={item.key}
+                            onClick={() => setDropdownOpen(false)}
+                            className="flex items-center gap-2.5 px-3 py-2 text-[12.5px] text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
+                          >
+                            <RrIcon name={item.icon} size={13} className="text-[var(--text-dim)]" />
+                            <span>{item.label}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </nav>
+        )}
+
+        {/* Spacer to push controls to the right when no menu */}
+        {!hasTabs && <div className="flex-1" />}
 
         {/* Right slot: controls + action */}
         {(controls || action) && (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2 pl-2">
             {controls}
             {action}
           </div>
         )}
       </div>
 
-      {/* Optional meta row */}
-      {meta && <div className="mt-4">{meta}</div>}
-
-      {/* ── Tab strip — pill chips like Hub category filters ──────────── */}
-      {hasTabs && (
-        <nav
-          aria-label={`${title} navigation`}
-          className="mt-6 flex items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-          {tabs!.map((tab) => {
-            const isActive = tab.key === active;
-            return (
-              <Link
-                key={tab.key}
-                href={tab.key}
-                aria-current={isActive ? "page" : undefined}
-                title={tab.label}
-                className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-4 text-[12.5px] font-medium transition-all duration-200 ${
-                  isActive
-                    ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] shadow-sm"
-                    : "border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
-                }`}
-              >
-                <RrIcon name={tab.icon} size={12} className={isActive ? "" : "text-[var(--text-dim)]"} />
-                {tab.label}
-              </Link>
-            );
-          })}
-
-          {hasOverflow && (
-            <button
-              type="button"
-              onClick={() => setMenuOpen(true)}
-              data-testid="page-nav-menu-trigger"
-              aria-label="More routes"
-              title="More"
-              className="ml-0.5 inline-flex h-9 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 text-[var(--text-muted)] transition-all duration-200 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
-            >
-              <RrIcon name="books" size={12} />
-              <span className="ml-1 tracking-widest text-[11px]">···</span>
-            </button>
-          )}
-        </nav>
+      {/* Optional page-subtitle row */}
+      {subtitle && (
+        <div className="border-b border-[var(--border-subtle)] py-2.5">
+          <p className="text-[12.5px] text-[var(--text-muted)]">{subtitle}</p>
+        </div>
       )}
 
-      {hasOverflow && (
-        <PageNavPopup
-          open={menuOpen}
-          activeKey={active}
-          onClose={() => setMenuOpen(false)}
-          appIcon={typeof icon === "string" ? (icon as RrIconName) : "books"}
-          title={popupTitle ?? title}
-          subtitle={popupSubtitle ?? "Pick where to go."}
-          groups={overflowTabs!}
-        />
-      )}
+      {/* Optional meta row (kept for back-compat) */}
+      {meta && <div className="mt-3">{meta}</div>}
+
+      {/* PageNavPopup is no longer rendered separately — overflow lives in the dropdown above */}
+      {popupTitle === "__unused__" || popupSubtitle === "__unused__" ? null : null}
     </div>
   );
 }

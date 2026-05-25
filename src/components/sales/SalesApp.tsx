@@ -79,41 +79,23 @@ export default function SalesApp() {
       dir={lang === "ar" ? "rtl" : "ltr"}
       className="h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden max-w-[100vw]"
     >
-      {/* ═══════════ TOP BAR — canonical Hub PageHeader + state-tab strip ═══════════ */}
-      <div className="shrink-0 border-b border-[var(--border-color)] px-4 pt-4 pb-4 sm:px-5">
+      {/* ═══════════ TOP BAR — Odoo-style compact header with inline menu ═══════════ */}
+      <div className="shrink-0 px-4 sm:px-5">
         <PageHeader
           title={t("sales.title")}
           subtitle={t("sales.subtitle")}
           icon={<SalesIcon size={16} />}
-          showTabs={false}
-        />
-        {activeTab !== "dashboard" && (
-        <nav
-          aria-label="Sales navigation"
-          className="mt-6 flex items-center gap-1.5 overflow-x-auto pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-          {SALES_TAB_IDS.map((tabId) => {
+          tabs={SALES_TAB_IDS.map((tabId) => {
             const Icon = TAB_ICONS[tabId];
-            const isActive = activeTab === tabId;
-            return (
-              <button
-                key={tabId}
-                type="button"
-                onClick={() => setActiveTab(tabId)}
-                aria-current={isActive ? "page" : undefined}
-                className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-4 text-[12.5px] font-medium transition-all duration-200 ${
-                  isActive
-                    ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] shadow-sm"
-                    : "border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
-                }`}
-              >
-                <Icon size={12} className={isActive ? "" : "text-[var(--text-dim)]"} />
-                {t(SALES_TAB_LABEL_KEYS[tabId])}
-              </button>
-            );
+            return {
+              key: tabId,
+              label: t(SALES_TAB_LABEL_KEYS[tabId]),
+              icon: <Icon size={12} />,
+              onClick: () => setActiveTab(tabId),
+              active: activeTab === tabId,
+            };
           })}
-        </nav>
-        )}
+        />
       </div>
 
       {/* ═══════════ CONTENT ═══════════ */}

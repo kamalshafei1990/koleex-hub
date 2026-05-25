@@ -135,13 +135,6 @@ export default function DashboardModule({ t, setActiveTab }: SalesModuleProps) {
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      {/* Brand-aligned tile menu + search — same across every Hub app */}
-      <AppHomeMenu
-        navItems={navItems}
-        searchPlaceholder="Search opportunities, quotes, orders, customers…"
-        searchHref="/inventory/search"
-      />
-
       {/* KPI grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         {kpis.map((k) => (
