@@ -135,6 +135,7 @@ export default function PurchaseApp() {
           showTabs={false}
         />
         {/* Primary group strip — pill chips matching Hub home aesthetic */}
+        {activeTab !== "dashboard" && (
         <nav
           aria-label="Purchase navigation"
           className="mt-6 flex items-center gap-1.5 overflow-x-auto pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -158,6 +159,7 @@ export default function PurchaseApp() {
             );
           })}
         </nav>
+        )}
       </div>
 
       {/* Secondary sub-tab bar */}

@@ -34,7 +34,17 @@ interface Stats {
   wonThisMonth: number;
 }
 
-export default function DashboardModule({ t }: SalesModuleProps) {
+export default function DashboardModule({ t, setActiveTab }: SalesModuleProps) {
+  const navItems: AppHomeNavItem[] = [
+    { key: "dashboard",  onClick: () => setActiveTab?.("dashboard"),  icon: <BarChart3Icon size={22} />,    label: "Dashboard"  },
+    { key: "pipeline",   onClick: () => setActiveTab?.("pipeline"),   icon: <LayoutGridIcon size={22} />,   label: "Pipeline"   },
+    { key: "quotations", onClick: () => setActiveTab?.("quotations"), icon: <DocumentIcon size={22} />,     label: "Quotations" },
+    { key: "orders",     onClick: () => setActiveTab?.("orders"),     icon: <BoxesIcon size={22} />,        label: "Orders"     },
+    { key: "invoices",   onClick: () => setActiveTab?.("invoices"),   icon: <DocumentIcon size={22} />,     label: "Invoices"   },
+    { key: "customers",  onClick: () => setActiveTab?.("customers"),  icon: <UsersIcon size={22} />,        label: "Customers"  },
+    { key: "activities", onClick: () => setActiveTab?.("activities"), icon: <ActivityIcon size={22} />,     label: "Activities" },
+    { key: "reports",    onClick: () => setActiveTab?.("reports"),    icon: <LineChartIcon size={22} />,    label: "Reports"    },
+  ];
 
   const [stats, setStats] = useState<Stats | null>(null);
   const [recent, setRecent] = useState<{ id: string; kind: string; label: string; ts: string }[]>([]);
@@ -125,6 +135,13 @@ export default function DashboardModule({ t }: SalesModuleProps) {
 
   return (
     <div className="p-4 md:p-6 space-y-6">
+      {/* Brand-aligned tile menu + search — same across every Hub app */}
+      <AppHomeMenu
+        navItems={navItems}
+        searchPlaceholder="Search opportunities, quotes, orders, customers…"
+        searchHref="/inventory/search"
+      />
+
       {/* KPI grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         {kpis.map((k) => (

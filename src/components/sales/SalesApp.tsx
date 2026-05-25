@@ -87,6 +87,7 @@ export default function SalesApp() {
           icon={<SalesIcon size={16} />}
           showTabs={false}
         />
+        {activeTab !== "dashboard" && (
         <nav
           aria-label="Sales navigation"
           className="mt-6 flex items-center gap-1.5 overflow-x-auto pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -112,6 +113,7 @@ export default function SalesApp() {
             );
           })}
         </nav>
+        )}
       </div>
 
       {/* ═══════════ CONTENT ═══════════ */}

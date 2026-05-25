@@ -45,7 +45,7 @@ import AppHomeMenu from "@/components/ui/AppHomeMenu";
    MAIN COMPONENT
    ═══════════════════════════════════════════════════ */
 
-export default function DashboardModule({ employees, t, lang }: HRModuleProps) {
+export default function DashboardModule({ employees, t, lang, setActiveTab }: HRModuleProps) {
   /* ── state ── */
   const [dashStats, setDashStats] = useState<HrDashboardStats | null>(null);
   const [expiringItems, setExpiringItems] = useState<ExpiringItem[]>([]);
@@ -97,6 +97,23 @@ export default function DashboardModule({ employees, t, lang }: HRModuleProps) {
   /* ── render ── */
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      {/* Brand-aligned tile menu + search — same across every Hub app */}
+      <AppHomeMenu
+        navItems={[
+          { key: "dashboard",   onClick: () => setActiveTab?.("dashboard"),   icon: <BarChart3Icon size={22} />,    label: "Dashboard"   },
+          { key: "leave",       onClick: () => setActiveTab?.("leave"),       icon: <CalendarPlusIcon size={22} />, label: "Leave"       },
+          { key: "attendance",  onClick: () => setActiveTab?.("attendance"),  icon: <ClockIcon size={22} />,        label: "Attendance"  },
+          { key: "recruitment", onClick: () => setActiveTab?.("recruitment"), icon: <UserPlusIcon size={22} />,     label: "Recruitment" },
+          { key: "appraisals",  onClick: () => setActiveTab?.("appraisals"),  icon: <StarIcon size={22} />,         label: "Appraisals"  },
+          { key: "onboarding",  onClick: () => setActiveTab?.("onboarding"),  icon: <CheckCircleIcon size={22} />,  label: "Onboarding"  },
+          { key: "payroll",     onClick: () => setActiveTab?.("payroll"),     icon: <WalletIcon size={22} />,       label: "Payroll"     },
+          { key: "training",    onClick: () => setActiveTab?.("training"),    icon: <BookOpenIcon size={22} />,     label: "Training"    },
+          { key: "documents",   onClick: () => setActiveTab?.("documents"),   icon: <DocumentIcon size={22} />,     label: "Documents"   },
+          { key: "reports",     onClick: () => setActiveTab?.("reports"),     icon: <BarChart3Icon size={22} />,    label: "Reports"     },
+        ]}
+        searchPlaceholder="Search employees, leave, payroll, documents…"
+      />
+
       {/* ── Stat cards (2x2) ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Total Employees */}
