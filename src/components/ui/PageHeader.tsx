@@ -212,18 +212,31 @@ function SlidingPillNav({
     tabs.findIndex((t) => (t.active ?? (t.key === activeKey))),
   );
 
-  /* Scroll the active pill into view whenever it changes — important on
-     mobile where the nav has 10+ tabs and the active one is often off-screen
-     after navigation. Centers the active tab so the user sees adjacent
-     options. */
+  /* Scroll the active pill into view ONLY when it changes AND is currently
+     off-screen. Two guards stop the auto-scroll from fighting the user:
+       1. If the active tab is already fully visible, do nothing.
+       2. On the very first mount, jump instantly (no smooth animation) so
+          the page doesn't visibly scroll as it loads.
+     The smooth scroll only runs when the user navigates to a tab that's
+     genuinely out of the visible area. */
+  const firstMountRef = useRef(true);
   useEffect(() => {
     const track = trackRef.current;
     if (!track) return;
-    const target = TRACK_PADDING + activeIndex * tabWidth;
-    const center = target - track.clientWidth / 2 + tabWidth / 2;
+    const tabLeft  = TRACK_PADDING + activeIndex * tabWidth;
+    const tabRight = tabLeft + tabWidth;
+    const viewLeft  = track.scrollLeft;
+    const viewRight = viewLeft + track.clientWidth;
+    const inView = tabLeft >= viewLeft && tabRight <= viewRight;
+    if (inView) return;
+    const center = tabLeft - track.clientWidth / 2 + tabWidth / 2;
     const max = track.scrollWidth - track.clientWidth;
     const left = Math.max(0, Math.min(center, max));
-    track.scrollTo({ left, behavior: "smooth" });
+    track.scrollTo({
+      left,
+      behavior: firstMountRef.current ? "auto" : "smooth",
+    });
+    firstMountRef.current = false;
   }, [activeIndex, tabWidth]);
 
   /* Roving tabindex — arrow keys move focus between tabs. */
@@ -246,24 +259,31 @@ function SlidingPillNav({
       role="tablist"
       aria-label={ariaLabel}
       onKeyDown={onKeyDown}
+      /* overscroll-x-contain + touch-action: pan-x keep horizontal swipes
+         inside the pill bar (without them iOS Safari treats the gesture as
+         back-navigation). scroll-snap makes the bar settle cleanly on a
+         tab edge after a swipe, so it doesn't drift to a half-tab position. */
+      style={{
+        overscrollBehaviorX: "contain",
+        touchAction: "pan-x",
+        WebkitOverflowScrolling: "touch",
+        scrollSnapType: "x mandatory",
+        scrollPaddingLeft: `${TRACK_PADDING}px`,
+      }}
       className="relative inline-flex max-w-full overflow-x-auto rounded-[14px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
-      {/* The single sliding pill — only `left` animates */}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute top-1.5 bottom-1.5 rounded-[10px] bg-[var(--bg-inverted)] shadow-[0_1px_0_rgba(255,255,255,0.2),0_6px_20px_rgba(0,0,0,0.4)] transition-[left] duration-[350ms] ease-[cubic-bezier(.22,.61,.36,1)]"
-        style={{
-          left: `${TRACK_PADDING + activeIndex * tabWidth}px`,
-          width: `${tabWidth}px`,
-        }}
-      />
+      {/* Active background lives ON the active tab (not as a floating
+          absolute element) so it can never scroll out of view while the
+          user is swiping the menu. The previous floating-pill approach
+          worked on desktop but disappeared the moment a mobile user
+          swiped past the active tab — making the menu look "broken". */}
 
       {tabs.map((tab, i) => {
         const isActive = i === activeIndex;
         const tabClass =
-          "relative z-10 inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap py-2.5 text-[13px] outline-none transition-colors duration-[250ms] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[rgba(255,255,255,0.6)] " +
+          "relative z-10 inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-[10px] py-2.5 text-[13px] outline-none transition-colors duration-[250ms] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--border-focus)] " +
           (isActive
-            ? "font-semibold text-[var(--text-inverted)]"
+            ? "bg-[var(--bg-inverted)] font-semibold text-[var(--text-inverted)] shadow-sm"
             : "font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]");
         const inner = (
           <>
@@ -283,7 +303,9 @@ function SlidingPillNav({
           role: "tab" as const,
           "aria-selected": isActive,
           tabIndex: isActive ? 0 : -1,
-          style: { width: `${tabWidth}px` },
+          /* scroll-snap-align: start so each tab settles at the left edge
+             of the viewport when the user finishes a swipe. */
+          style: { width: `${tabWidth}px`, scrollSnapAlign: "start" as const },
           className: tabClass,
         };
         if (tab.onClick) {
