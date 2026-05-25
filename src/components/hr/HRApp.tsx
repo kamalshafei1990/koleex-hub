@@ -108,7 +108,7 @@ export default function HRApp() {
     <div dir={lang === "ar" ? "rtl" : "ltr"} className="h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden max-w-[100vw]">
 
       {/* ═══════════ TOP BAR — canonical Hub PageHeader + state tab strip ═══════════ */}
-      <div className="shrink-0 border-b border-[var(--border-color)] px-5 pt-4">
+      <div className="shrink-0 border-b border-[var(--border-color)] px-5 pt-4 pb-4">
         <PageHeader
           title={t("hr.title")}
           icon={<HrIcon size={16} />}
