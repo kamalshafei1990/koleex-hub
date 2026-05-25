@@ -58,6 +58,7 @@ export default function FinanceHome() {
         <FinanceHeader
           title={t("app.title", "Finance")}
           subtitle={t("app.subtitle", "Income · Balance Sheet · Cash Flow — your full picture at a glance.")}
+          showTabs={false}
         />
 
         {/* Canonical Hub tile menu + search — same as every other app */}

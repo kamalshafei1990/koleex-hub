@@ -34,17 +34,7 @@ interface Stats {
   wonThisMonth: number;
 }
 
-export default function DashboardModule({ t, setActiveTab }: SalesModuleProps) {
-  const navItems: AppHomeNavItem[] = [
-    { key: "dashboard",  onClick: () => setActiveTab?.("dashboard"),  icon: <BarChart3Icon size={15} />,    label: "Dashboard",  chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
-    { key: "pipeline",   onClick: () => setActiveTab?.("pipeline"),   icon: <LayoutGridIcon size={15} />,   label: "Pipeline",   chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
-    { key: "quotations", onClick: () => setActiveTab?.("quotations"), icon: <DocumentIcon size={15} />,     label: "Quotations", chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
-    { key: "orders",     onClick: () => setActiveTab?.("orders"),     icon: <BoxesIcon size={15} />,        label: "Orders",     chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
-    { key: "invoices",   onClick: () => setActiveTab?.("invoices"),   icon: <DocumentIcon size={15} />,     label: "Invoices",   chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
-    { key: "customers",  onClick: () => setActiveTab?.("customers"),  icon: <UsersIcon size={15} />,        label: "Customers",  chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
-    { key: "activities", onClick: () => setActiveTab?.("activities"), icon: <ActivityIcon size={15} />,     label: "Activities", chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
-    { key: "reports",    onClick: () => setActiveTab?.("reports"),    icon: <LineChartIcon size={15} />,    label: "Reports",    chipBg: "bg-amber-500/10", chipText: "text-amber-400" },
-  ];
+export default function DashboardModule({ t }: SalesModuleProps) {
 
   const [stats, setStats] = useState<Stats | null>(null);
   const [recent, setRecent] = useState<{ id: string; kind: string; label: string; ts: string }[]>([]);
@@ -135,13 +125,6 @@ export default function DashboardModule({ t, setActiveTab }: SalesModuleProps) {
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      {/* Tile menu + search — same shape as every other Hub app */}
-      <AppHomeMenu
-        navItems={navItems}
-        searchPlaceholder="Search opportunities, quotes, orders, customers…"
-        searchHref="/inventory/search"
-      />
-
       {/* KPI grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         {kpis.map((k) => (
