@@ -154,122 +154,141 @@ function catColor(typeKey: string): CategoryColor {
  */
 
 const SUB_ICON_EXACT: Record<string, RrIconName> = {
-  /* ── Office Supplies ─────────────────────────────────────── */
-  "printer paper":      "file",         "pens":               "pencil",
-  "pencils":            "palette",      "notebooks":          "clipboard",
-  "files":              "document",     "envelopes":          "paper-plane",
-  "folders":            "books",        "ink":                "print",
-  "toner":              "cloud-download","desk accessories":   "briefcase",
-  "sticky notes":       "stamp",        "staplers":           "tools",
+  /* ── Office Supplies (13) — unique within group ───────────────────────── */
+  "printer paper":      "file",           "pens":               "pencil",
+  "pencils":            "palette",        "notebooks":          "clipboard",
+  "files":              "document",       "envelopes":          "paper-plane",
+  "folders":            "books",          "ink":                "print",
+  "toner":              "cloud-download", "desk accessories":   "balance-scale-left",
+  "sticky notes":       "stamp",          "staplers":           "badge-check",
   "binders":            "contract",
-  /* ── Marketing Materials ─────────────────────────────────── */
-  "catalogs":           "newspaper",    "flyers":             "megaphone",
-  "brochures":          "document",     "posters":            "flag-alt",
-  "samples":            "flask",        "rollups":            "flag-checkered",
-  "stickers":           "stamp",        "promotional gifts":  "gift",
-  "banners":            "paper-plane",  "business cards":     "id-badge",
-  /* ── Exhibition Materials ────────────────────────────────── */
-  "booth parts":        "building",     "lighting":           "bulb",
-  "screens":            "eye",          "demo units":         "laptop",
-  "display stands":     "award",        "furniture":          "chair-office",
-  "power strips":       "tools",        "carpets":            "home",
-  /* ── Employee Items ──────────────────────────────────────── */
-  "uniforms":           "users",        "id cards":           "id-badge",
-  "safety shoes":       "shield-check", "helmets":            "hard-hat",
-  "gloves":             "hand-holding-heart", "employee kits": "briefcase",
-  "lanyards":           "key",          "welcome packs":      "gift",
-  /* ── Packaging ───────────────────────────────────────────── */
-  "cartons":            "box-open",     "tape":               "stamp",
-  "foam":               "box-circle-check", "labels":         "badge-check",
-  "wrapping":           "recycle",      "pallets":            "pallet",
-  "bags":               "paper-plane",  "bubble wrap":        "cloud",
-  "strapping":          "contract",     "stretch film":       "receipt",
-  /* ── Maintenance ─────────────────────────────────────────── */
-  "repair kits":        "tools",        "lubricants":         "faucet",
-  "spare consumables":  "box-circle-check", "adhesives":      "stamp",
-  "sealants":           "shield-check", "fasteners":          "badge-check",
-  "belts":              "recycle",      "filters":            "cloud-download",
-  /* ── IT & Electronics ────────────────────────────────────── */
-  "laptops":            "laptop",       "desktops":           "computer",
-  "tablets":            "cloud",        "monitors":           "eye",
-  "keyboards":          "receipt",      "mice":               "bullseye-arrow",
-  "routers":            "wifi",         "switches":           "signal-stream",
-  "cables":             "contract",     "chargers":           "bulb",
-  "docking stations":   "cloud-download", "webcams":          "camera",
-  "hard drives":        "database",     "usb sticks":         "download",
+
+  /* ── Marketing Materials (10) ────────────────────────────────────────── */
+  "catalogs":           "newspaper",      "flyers":             "megaphone",
+  "brochures":          "ad",             "posters":            "flag-alt",
+  "samples":            "flask",          "rollups":            "flag-checkered",
+  "stickers":           "signature",      "promotional gifts":  "gift",
+  "banners":            "award",          "business cards":     "id-badge",
+
+  /* ── Exhibition Materials (8) ────────────────────────────────────────── */
+  "booth parts":        "building",       "lighting":           "bulb",
+  "screens":            "eye",            "demo units":         "laptop",
+  "display stands":     "ticket",         "furniture":          "chair-office",
+  "power strips":       "upload",         "carpets":            "home",
+
+  /* ── Employee Items (8) ──────────────────────────────────────────────── */
+  "uniforms":           "users",          "id cards":           "id-badge",
+  "safety shoes":       "shield-check",   "helmets":            "hard-hat",
+  "gloves":             "hand-holding-heart", "employee kits":  "briefcase",
+  "lanyards":           "key",            "welcome packs":      "graduation-cap",
+
+  /* ── Packaging (10) ──────────────────────────────────────────────────── */
+  "cartons":            "box-open",       "tape":               "stamp",
+  "foam":               "box-circle-check","labels":            "badge-check",
+  "wrapping":           "recycle",        "pallets":            "pallet",
+  "bags":               "delivery-truck", "bubble wrap":        "cloud",
+  "strapping":          "contract",       "stretch film":       "receipt",
+
+  /* ── Maintenance (8) ─────────────────────────────────────────────────── */
+  "repair kits":        "tools",          "lubricants":         "faucet",
+  "spare consumables":  "download",       "adhesives":          "lock",
+  "sealants":           "shield-check",   "fasteners":          "coins",
+  "belts":              "car-mechanic",   "filters":            "recycle",
+
+  /* ── IT & Electronics (15) ───────────────────────────────────────────── */
+  "laptops":            "laptop",         "desktops":           "computer",
+  "tablets":            "ad",             "monitors":           "eye",
+  "keyboards":          "receipt",        "mice":               "bullseye-arrow",
+  "routers":            "wifi",           "switches":           "signal-stream",
+  "cables":             "delivery-truck", "chargers":           "bulb",
+  "docking stations":   "cloud-download", "webcams":            "camera",
+  "hard drives":        "database",       "usb sticks":         "download",
   "memory cards":       "fingerprint",
-  /* ── Documents & Printing ───────────────────────────────── */
-  "manuals":            "document",     "certificates":       "award",
-  "printed labels":     "stamp",        "warranty cards":     "contract",
-  "internal documents": "clipboard",    "training booklets":  "graduation-cap",
-  "compliance sheets":  "gavel",        "tags":               "badge-check",
-  /* ── Safety & Facility ───────────────────────────────────── */
-  "fire extinguishers": "shield-check", "smoke detectors":    "signal-stream",
-  "first aid stations": "heart-rate",   "safety glasses":     "eye",
-  "hard hats":          "hard-hat",     "earplugs":           "user-headset",
-  "reflective vests":   "id-badge",     "safety harnesses":   "tools",
-  "emergency lights":   "bulb",         "safety signs":       "flag-alt",
-  /* ── Internal Assets ────────────────────────────────────── */
-  "office equipment":   "briefcase",    "storage racks":      "pallet",
-  "company tools":      "tools",        "whiteboards":        "palette",
-  "projectors":         "signal-stream","conference phones":  "user-headset",
+
+  /* ── Documents & Printing (8) ────────────────────────────────────────── */
+  "manuals":            "document",       "certificates":       "award",
+  "printed labels":     "stamp",          "warranty cards":     "contract",
+  "internal documents": "clipboard",      "training booklets":  "books",
+  "compliance sheets":  "gavel",          "tags":               "flag-checkered",
+
+  /* ── Safety & Facility (10) ──────────────────────────────────────────── */
+  "fire extinguishers": "shield-check",   "smoke detectors":    "cloud",
+  "first aid stations": "heart-rate",     "safety glasses":     "eye",
+  "hard hats":          "hard-hat",       "earplugs":           "user-headset",
+  "reflective vests":   "id-badge",       "safety harnesses":   "lock",
+  "emergency lights":   "bulb",           "safety signs":       "flag-alt",
+
+  /* ── Internal Assets (7) ─────────────────────────────────────────────── */
+  "office equipment":   "briefcase",      "storage racks":      "pallet",
+  "company tools":      "tools",          "whiteboards":        "palette",
+  "projectors":         "signal-stream",  "conference phones":  "microphone",
   "tvs":                "computer",
-  /* ── Branded Merchandise ─────────────────────────────────── */
-  "mugs":               "mug-hot",      "t-shirts":           "users",
-  "water bottles":      "cocktail",     "keychains":          "key",
-  "calendars":          "clock",        "caps":               "hard-hat",
-  /* (pens / notebooks / usb sticks / lanyards / bags / stickers share
-      icons with other categories — fine since they're never co-visible) */
-  /* ── Workshop & Tools ────────────────────────────────────── */
-  "hand tools":         "hammer",       "power tools":        "tools",
-  "measuring instruments": "scale",     "cutting tools":      "gavel",
-  "welding equipment":  "gas-pump",     "drill bits":         "bullseye-arrow",
-  "workbenches":        "building",     "tool boxes":         "briefcase",
+
+  /* ── Branded Merchandise (12) ────────────────────────────────────────── */
+  "mugs":               "mug-hot",        "t-shirts":           "users",
+  "water bottles":      "cocktail",       "keychains":          "fingerprint",
+  "calendars":          "clock",          "caps":               "award",
+  /* pens/notebooks/usb sticks/lanyards/bags/stickers reuse icons from
+     matching items in other categories — same physical item = same icon */
+
+  /* ── Workshop & Tools (10) ───────────────────────────────────────────── */
+  "hand tools":         "hammer",         "power tools":        "tools",
+  "measuring instruments": "scale",       "cutting tools":      "gavel",
+  "welding equipment":  "gas-pump",       "drill bits":         "bullseye-arrow",
+  "workbenches":        "building",       "tool boxes":         "box-open",
   "ladders":            "arrow-up-right",
-  /* ── Cleaning Supplies ───────────────────────────────────── */
-  "detergents":         "faucet",       "brooms":             "broom",
-  "mops":               "recycle",      "cleaning cloths":    "box-circle-check",
-  "trash bags":         "trash",        "sanitizers":         "flask",
-  "disinfectants":      "shield-check", "vacuum bags":        "cloud",
-  "glass cleaner":      "eye",          "floor cleaner":      "home",
+
+  /* ── Cleaning Supplies (12) ──────────────────────────────────────────── */
+  "detergents":         "faucet",         "brooms":             "broom",
+  "mops":               "recycle",        "cleaning cloths":    "box-circle-check",
+  "trash bags":         "trash",          "sanitizers":         "flask",
+  "disinfectants":      "shield-check",   "vacuum bags":        "cloud-download",
+  "glass cleaner":      "eye",            "floor cleaner":      "home",
   "air fresheners":     "leaf",
-  /* ── Kitchen & Pantry ────────────────────────────────────── */
-  "coffee":             "coffee",       "tea":                "mug-hot",
-  "snacks":             "restaurant",   "sugar":              "flask",
-  "milk":               "cocktail",     "cups":               "receipt",
-  "cutlery":            "tools",        "plates":             "coins",
-  "water dispenser":    "faucet",       "paper towels":       "file",
-  "napkins":            "document",     "bottled water":      "cloud-download",
+  /* gloves: shares hand-holding-heart with Employee > Gloves (same item) */
+
+  /* ── Kitchen & Pantry (13) ───────────────────────────────────────────── */
+  "coffee":             "coffee",         "tea":                "mug-hot",
+  "snacks":             "restaurant",     "sugar":              "flask",
+  "milk":               "cocktail",       "cups":               "ticket",
+  "cutlery":            "receipt",        "plates":             "coins",
+  "water dispenser":    "faucet",         "paper towels":       "file",
+  "napkins":            "leaf",           "bottled water":      "cloud",
   "cleaning sponges":   "broom",
-  /* ── First Aid ───────────────────────────────────────────── */
-  "bandages":           "heart-rate",   "antiseptics":        "flask",
-  "painkillers":        "stethoscope",  "thermometers":       "scale",
-  "first aid kits":     "briefcase",    "burn cream":         "hand-holding-heart",
-  "eye wash":           "eye",          "cold packs":         "cloud",
-  "sterile gauze":      "box-circle-check", "medical tape":   "stamp",
+
+  /* ── First Aid (11) ──────────────────────────────────────────────────── */
+  "bandages":           "heart-rate",     "antiseptics":        "flask",
+  "painkillers":        "stethoscope",    "thermometers":       "scale",
+  "first aid kits":     "briefcase",      "burn cream":         "hand-holding-heart",
+  "eye wash":           "eye",            "cold packs":         "cloud",
+  "sterile gauze":      "box-circle-check","medical tape":      "stamp",
   "defibrillators":     "signal-stream",
-  /* ── Vehicle & Fleet ─────────────────────────────────────── */
-  "fuel cards":         "credit-card",  "motor oil":          "gas-pump",
-  "tires":              "car-side",     "vehicle tools":      "car-mechanic",
-  "dashcams":           "camera",       "car cleaning":       "broom",
-  "engine coolant":     "faucet",       "wiper blades":       "eye",
-  "spare bulbs":        "bulb",         "jumper cables":      "signal-stream",
+
+  /* ── Vehicle & Fleet (11) ────────────────────────────────────────────── */
+  "fuel cards":         "credit-card",    "motor oil":          "gas-pump",
+  "tires":              "car-side",       "vehicle tools":      "car-mechanic",
+  "dashcams":           "camera",         "car cleaning":       "broom",
+  "engine coolant":     "faucet",         "wiper blades":       "eye",
+  "spare bulbs":        "bulb",           "jumper cables":      "signal-stream",
   "first aid (vehicle)":"heart-rate",
-  /* ── Photography & Video ─────────────────────────────────── */
-  "cameras":            "camera",       "lenses":             "eye",
-  "tripods":            "building",     "studio lights":      "bulb",
-  "microphones":        "microphone",   "sd cards":           "database",
-  "camera batteries":   "download",     "memory card readers":"fingerprint",
-  "light stands":       "flag-alt",     "reflectors":         "palette",
-  "backdrops":          "home",         "gimbal stabilizers": "tools",
-  /* ── Furniture ───────────────────────────────────────────── */
-  "office chairs":      "chair-office", "desks":              "briefcase",
-  "conference tables":  "users",        "shelves":            "books",
-  "partitions":         "building",     "filing cabinets":    "document",
-  "sofas":              "hotel",        "stools":             "ticket",
-  "side tables":        "clock",        "reception furniture":"handshake",
-  "bookcases":          "graduation-cap",
+
+  /* ── Photography & Video (12) ────────────────────────────────────────── */
+  "cameras":            "camera",         "lenses":             "eye",
+  "tripods":            "building",       "studio lights":      "bulb",
+  "microphones":        "microphone",     "sd cards":           "database",
+  "camera batteries":   "download",       "memory card readers":"fingerprint",
+  "light stands":       "flag-alt",       "reflectors":         "palette",
+  "backdrops":          "home",           "gimbal stabilizers": "scale",
+
+  /* ── Furniture (12) ──────────────────────────────────────────────────── */
+  "office chairs":      "chair-office",   "desks":              "briefcase",
+  "conference tables":  "users",          "shelves":            "books",
+  "partitions":         "building",
+  "filing cabinets":    "document",       "sofas":              "hotel",
+  "stools":             "cocktail",       "side tables":        "clock",
+  "reception furniture":"handshake",      "bookcases":          "graduation-cap",
 };
+
 
 function subIconFor(label: string): RrIconName {
   const l = label.toLowerCase().trim();
