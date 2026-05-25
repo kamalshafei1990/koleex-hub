@@ -22,6 +22,7 @@ import InventoryInternalItemDrawer from "@/components/inventory/InventoryInterna
 import RrIcon from "@/components/ui/RrIcon";
 import AppHomeMenu, { type AppHomeNavItem } from "@/components/ui/AppHomeMenu";
 import KpiCard from "@/components/ui/KpiCard";
+import Button from "@/components/ui/Button";
 import { ACCENT } from "@/lib/accentColors";
 import {
   ActionCard,
@@ -119,16 +120,16 @@ export default function InventoryDashboard() {
 
   /* Add Internal Item button — lives in the header action slot */
   const addInternalBtn = (
-    <button
-      type="button"
+    <Button
+      variant="secondary"
+      size="sm"
+      icon="briefcase"
       onClick={() => setInternalDrawerOpen(true)}
       data-testid="inv-home-add-internal"
       aria-label={t("inv.home.add_internal", "Add Internal Item")}
-      className="inline-flex min-h-[32px] items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-1 text-[11.5px] font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-elevated)]"
     >
-      <RrIcon name="briefcase" size={11} />
       {t("inv.home.add_internal", "Add Internal Item")}
-    </button>
+    </Button>
   );
 
   return (
@@ -150,7 +151,7 @@ export default function InventoryDashboard() {
 
         {/* Error banner */}
         {error && (
-          <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">
+          <div className="rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-700 dark:text-rose-300">
             {error}
           </div>
         )}

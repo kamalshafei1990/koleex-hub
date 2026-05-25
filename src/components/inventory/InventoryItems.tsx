@@ -25,6 +25,7 @@ import {
   TypeIcon,
 } from "@/components/inventory/InventoryUi";
 import RrIcon from "@/components/ui/RrIcon";
+import Button from "@/components/ui/Button";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation, type Translations } from "@/lib/i18n";
 import Link from "next/link";
@@ -186,20 +187,12 @@ export default function InventoryItems() {
           subtitle={t("inv.subtitle")}
           action={
             <div className="relative flex flex-wrap gap-2">
-              <button
-                onClick={() => setTypesPanelOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-strong,var(--bg-surface))]"
-              >
-                <RrIcon name="stamp" size={12} />
+              <Button variant="secondary" size="sm" icon="stamp" onClick={() => setTypesPanelOpen(true)}>
                 {t("inv.manage_types")}
-              </button>
-              <button
-                onClick={() => setAddMenuOpen((v) => !v)}
-                className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-strong,var(--bg-surface))]"
-              >
-                <RrIcon name="plus" size={12} />
+              </Button>
+              <Button variant="primary" size="sm" icon="plus" onClick={() => setAddMenuOpen((v) => !v)}>
                 {t("inv.add")}
-              </button>
+              </Button>
               {addMenuOpen && (
                 <>
                   <button

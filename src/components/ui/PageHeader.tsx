@@ -212,6 +212,20 @@ function SlidingPillNav({
     tabs.findIndex((t) => (t.active ?? (t.key === activeKey))),
   );
 
+  /* Scroll the active pill into view whenever it changes — important on
+     mobile where the nav has 10+ tabs and the active one is often off-screen
+     after navigation. Centers the active tab so the user sees adjacent
+     options. */
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    const target = TRACK_PADDING + activeIndex * tabWidth;
+    const center = target - track.clientWidth / 2 + tabWidth / 2;
+    const max = track.scrollWidth - track.clientWidth;
+    const left = Math.max(0, Math.min(center, max));
+    track.scrollTo({ left, behavior: "smooth" });
+  }, [activeIndex, tabWidth]);
+
   /* Roving tabindex — arrow keys move focus between tabs. */
   const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
