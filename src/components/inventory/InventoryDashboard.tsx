@@ -83,28 +83,30 @@ function KpiCard({
   );
 }
 
-/* ── Nav card entries ─────────────────────────────────────────────────────── */
+/* ── Nav card entries — all 10 routes, always shown (pages themselves are RLS-gated) ── */
 const NAV_CARDS = [
-  { href: "/inventory/items",     icon: "box-open"     as const, label: "Items",      chipBg: "bg-blue-500/10",  chipText: "text-blue-400" },
-  { href: "/inventory/movements", icon: "file-invoice" as const, label: "Movements",  chipBg: "bg-blue-500/10",  chipText: "text-blue-400" },
-  { href: "/inventory/transfers", icon: "truck-side"   as const, label: "Transfers",  chipBg: "bg-teal-500/10",  chipText: "text-teal-400" },
-  { href: "/inventory/returns",   icon: "recycle"      as const, label: "Returns",    chipBg: "bg-teal-500/10",  chipText: "text-teal-400" },
-  { href: "/inventory/balances",  icon: "badge-check"  as const, label: "Balances",   chipBg: "bg-blue-500/10",  chipText: "text-blue-400" },
-  { href: "/inventory/serials",   icon: "fingerprint"  as const, label: "Serials",    chipBg: "bg-teal-500/10",  chipText: "text-teal-400" },
-  { href: "/inventory/batches",   icon: "pallet"       as const, label: "Batches",    chipBg: "bg-teal-500/10",  chipText: "text-teal-400" },
-  { href: "/inventory/warehouses",icon: "building"     as const, label: "Warehouses", chipBg: "bg-amber-500/10", chipText: "text-amber-400", managerOnly: true },
+  { href: "/inventory",           icon: "home"         as const, label: "Home",       chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
+  { href: "/inventory/items",     icon: "box-open"     as const, label: "Items",      chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
+  { href: "/inventory/movements", icon: "file-invoice" as const, label: "Movements",  chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
+  { href: "/inventory/transfers", icon: "truck-side"   as const, label: "Transfers",  chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
+  { href: "/inventory/returns",   icon: "recycle"      as const, label: "Returns",    chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
+  { href: "/inventory/search",    icon: "search"       as const, label: "Search",     chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
+  { href: "/inventory/balances",  icon: "badge-check"  as const, label: "Balances",   chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
+  { href: "/inventory/serials",   icon: "fingerprint"  as const, label: "Serials",    chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
+  { href: "/inventory/batches",   icon: "pallet"       as const, label: "Batches",    chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
+  { href: "/inventory/warehouses",icon: "building"     as const, label: "Warehouses", chipBg: "bg-amber-500/10", chipText: "text-amber-400" },
 ] as const;
 
 function NavCard({ href, icon, label, chipBg, chipText }: { href: string; icon: Parameters<typeof RrIcon>[0]["name"]; label: string; chipBg: string; chipText: string }) {
   return (
     <Link
       href={href}
-      className="group flex flex-col items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-4 text-center transition-all hover:border-[var(--border-color)] hover:bg-[var(--bg-elevated)]"
+      className="group flex flex-col items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-1.5 py-3 text-center transition-all hover:border-[var(--border-color)] hover:bg-[var(--bg-elevated)]"
     >
-      <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${chipBg} transition-transform group-hover:scale-105`}>
-        <RrIcon name={icon} size={16} className={chipText} />
+      <span className={`flex h-9 w-9 items-center justify-center rounded-lg ${chipBg} transition-transform group-hover:scale-105`}>
+        <RrIcon name={icon} size={15} className={chipText} />
       </span>
-      <span className="text-[11.5px] font-medium leading-tight text-[var(--text-primary)]">{label}</span>
+      <span className="text-[10.5px] font-medium leading-tight text-[var(--text-primary)]">{label}</span>
     </Link>
   );
 }
@@ -226,8 +228,8 @@ export default function InventoryDashboard() {
 
         {/* ── 2. Nav cards + Search ────────────────────────────────── */}
         <section data-testid="inv-home-nav">
-          <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
-            {NAV_CARDS.filter((c) => !("managerOnly" in c) || !c.managerOnly || isManager).map((card) => (
+          <div className="grid grid-cols-5 gap-2">
+            {NAV_CARDS.map((card) => (
               <NavCard key={card.href} href={card.href} icon={card.icon} label={card.label} chipBg={card.chipBg} chipText={card.chipText} />
             ))}
           </div>
