@@ -421,47 +421,18 @@ export default function CRM() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      {/* ── Page header — canonical Hub PageHeader ── */}
+      {/* ── Page header — canonical Hub PageHeader with sliding-pill nav ── */}
       <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-6 md:pt-8 pb-4">
         <PageHeader
           title={t("title")}
           subtitle={t("subtitle")}
           icon={<TrendingUpIcon className="h-4 w-4" />}
-          showTabs={false}
+          tabs={[
+            { key: "pipeline",      label: t("nav.sales"),         icon: <LayoutGridIcon size={14} />, onClick: () => setMainView("pipeline"),      active: mainView === "pipeline" },
+            { key: "reporting",     label: t("nav.reporting"),     icon: <ChartPieIcon size={14} />,   onClick: () => setMainView("reporting"),     active: mainView === "reporting" },
+            { key: "configuration", label: t("nav.configuration"), icon: <SettingsIcon2 size={14} />,  onClick: () => setMainView("configuration"), active: mainView === "configuration" },
+          ]}
         />
-      </div>
-
-      {/* ── Sticky tab nav — Sales / Reporting / Configuration ── */}
-      <div className="sticky top-0 z-30 bg-[var(--bg-primary)]/95 backdrop-blur-md border-b border-[var(--border-subtle)]">
-        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8">
-          <div className="flex items-center gap-1 overflow-x-auto scrollbar-none py-2">
-            {(
-              [
-                { id: "pipeline",      label: t("nav.sales"),         icon: LayoutGridIcon },
-                { id: "reporting",     label: t("nav.reporting"),     icon: ChartPieIcon },
-                { id: "configuration", label: t("nav.configuration"), icon: SettingsIcon2 },
-              ] as const
-            ).map((tab) => {
-              const TabIcon = tab.icon;
-              const isActive = mainView === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setMainView(tab.id)}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-[12px] font-medium whitespace-nowrap transition-all shrink-0 ${
-                    isActive
-                      ? "bg-[var(--bg-inverted)]/[0.08] text-[var(--text-primary)] shadow-sm"
-                      : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-inverted)]/[0.04]"
-                  }`}
-                >
-                  <TabIcon className="h-3.5 w-3.5" />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
       </div>
 
       <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-4 pb-6">

@@ -14,6 +14,9 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import { useTranslation } from "@/lib/i18n";
 import { docsT } from "@/lib/translations/docs";
+import PageHeader from "@/components/ui/PageHeader";
+import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import { dialog } from "@/lib/ui-dialog";
 import QuotationA4Preview from "./QuotationA4Preview";
 import ProductPickerModal, { type PickResult } from "./ProductPickerModal";
@@ -1699,33 +1702,19 @@ export default function Quotations() {
       <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
         <style>{PRINT_AND_DOC_STYLES}</style>
 
-        {/* Top bar */}
-        <div className="max-w-[1500px] mx-auto px-4 pt-6 pb-2">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex flex-wrap items-center gap-3 mb-1">
-              <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-                <ArrowLeftIcon className="h-4 w-4" />
-              </Link>
-              <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-                <QuotationIcon size={16} />
-              </div>
-              <div className="flex items-center gap-2.5 min-w-0">
-                <h1 className="text-xl md:text-[22px] font-bold tracking-tight">
-                  {t("quot.title")}
-                </h1>
-                <p className="text-[12px] text-[var(--text-dim)]">
-                  {quotations.length} {quotations.length === 1 ? t("quot.singular") : t("quot.plural")}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={handleNew}
-              className="flex items-center gap-2 px-5 py-2.5 bg-[var(--bg-inverted)] hover:opacity-90 text-[var(--text-inverted)] rounded-xl text-sm font-medium transition active:scale-95"
-            >
-              <PlusIcon size={18} />
-              {t("quot.new")}
-            </button>
-          </div>
+        {/* Top bar — canonical Hub PageHeader */}
+        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-6 pb-2">
+          <PageHeader
+            title={t("quot.title")}
+            subtitle={`${quotations.length} ${quotations.length === 1 ? t("quot.singular") : t("quot.plural")}`}
+            icon={<QuotationIcon size={16} />}
+            showTabs={false}
+            action={
+              <Button onClick={handleNew} icon={<PlusIcon size={12} />}>
+                {t("quot.new")}
+              </Button>
+            }
+          />
         </div>
 
         {/* KPI strip */}
@@ -1752,15 +1741,15 @@ export default function Quotations() {
             }).length;
             return (
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                <KpiCard label={t("kpi.total")} value={String(quotations.length)} accent="text-blue-400" />
-                <KpiCard label={t("kpi.drafts")} value={String(drafts)} accent="text-amber-400" />
-                <KpiCard label="SENT" value={String(sent)} accent="text-sky-400" />
-                <KpiCard label="ACCEPTED" value={String(accepted)} accent="text-emerald-400" />
+                <KpiCard label={t("kpi.total")}  value={String(quotations.length)} icon="document"     tone="info"     />
+                <KpiCard label={t("kpi.drafts")} value={String(drafts)}            icon="file"         tone="warning"  />
+                <KpiCard label="SENT"            value={String(sent)}              icon="paper-plane"  tone="info"     />
+                <KpiCard label="ACCEPTED"        value={String(accepted)}          icon="check"        tone="positive" />
                 <KpiCard
                   label={t("kpi.totalValue")}
                   value={fmt(total)}
-                  accent="text-[var(--text-primary)]"
-                  sub={expiringSoon > 0 ? t("kpi.expiringSoon").replace("{n}", String(expiringSoon)) : undefined}
+                  icon="balance-scale-left"
+                  hint={expiringSoon > 0 ? t("kpi.expiringSoon").replace("{n}", String(expiringSoon)) : undefined}
                 />
               </div>
             );
@@ -2197,26 +2186,6 @@ function StatusMenu({
 
 /** Compact Hub-style KPI card, matched to the strip on Planning / Projects
  *  so all list-view dashboards share one visual language. */
-function KpiCard({
-  label,
-  value,
-  accent,
-  sub,
-}: {
-  label: string;
-  value: string;
-  accent?: string;
-  sub?: string;
-}) {
-  return (
-    <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-4">
-      <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)] mb-2">
-        {label}
-      </div>
-      <div className={`text-[20px] md:text-[24px] font-bold leading-none ${accent ?? "text-[var(--text-primary)]"}`}>
-        {value}
-      </div>
-      {sub && <div className="text-[10px] text-[var(--text-dim)] mt-2">{sub}</div>}
-    </div>
-  );
-}
+/* Local KpiCard replaced — use shared src/components/ui/KpiCard.tsx via the
+   import alias below. We re-export under the same name so existing call
+   sites keep working. */
