@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from "react";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation, type Translations } from "@/lib/i18n";
+import { useBaseCurrency } from "@/lib/hooks/useBaseCurrency";
 import {
   INTERNAL_TAXONOMY,
   suggestSubSubcategories,
@@ -425,6 +426,7 @@ type StepNo = 1 | 2 | 3 | 4;
 
 export default function InventoryInternalItemDrawer({ onClose, onSuccess }: Props) {
   const { t } = useTranslation(T);
+  const currency = useBaseCurrency("CNY");
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [types, setTypes] = useState<ItemType[]>([]);
   const [step, setStep] = useState<StepNo>(1);
@@ -511,6 +513,7 @@ export default function InventoryInternalItemDrawer({ onClose, onSuccess }: Prop
         item_name: name.trim(),
         type_key: category.type_key,
         unit_of_measure: unit,
+        currency,
       };
       if (typeRow) payload.item_type_id = typeRow.id;
       if (combinedSub) payload.subcategory = combinedSub;
@@ -640,6 +643,7 @@ export default function InventoryInternalItemDrawer({ onClose, onSuccess }: Prop
               warehouseId={warehouseId} setWarehouseId={setWarehouseId}
               qty={qty} setQty={setQty}
               unitCost={unitCost} setUnitCost={setUnitCost}
+              currency={currency}
               unit={unit} setUnit={setUnit}
               notes={notes} setNotes={setNotes}
               notesOpen={notesOpen} setNotesOpen={setNotesOpen}
@@ -1082,7 +1086,7 @@ function Step3SubSub({
 function Step4Details({
   t, category, categoryLabel, color, subcategory, subSub, warehouses,
   name, setName, warehouseId, setWarehouseId, qty, setQty, unitCost, setUnitCost,
-  unit, setUnit, notes, setNotes, notesOpen, setNotesOpen, error, onBack,
+  currency, unit, setUnit, notes, setNotes, notesOpen, setNotesOpen, error, onBack,
 }: {
   t: (k: string, fallback?: string) => string;
   category: InternalCategoryHint;
@@ -1095,6 +1099,7 @@ function Step4Details({
   warehouseId: string; setWarehouseId: (s: string) => void;
   qty: string; setQty: (s: string) => void;
   unitCost: string; setUnitCost: (s: string) => void;
+  currency: string;
   unit: UnitOfMeasure; setUnit: (u: UnitOfMeasure) => void;
   notes: string; setNotes: (s: string) => void;
   notesOpen: boolean; setNotesOpen: (b: boolean) => void;
@@ -1148,13 +1153,18 @@ function Step4Details({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="block">
           <div className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("inv.int.unit_cost")}</div>
-          <input
-            type="number" min="0" step="0.01"
-            value={unitCost}
-            onChange={(e) => setUnitCost(e.target.value)}
-            placeholder={t("inv.int.unit_cost.ph")}
-            className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2.5 text-[13px] tabular-nums outline-none focus:border-[var(--text-dim)] placeholder:text-[var(--text-dim)]"
-          />
+          <div className="flex overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] focus-within:border-[var(--text-dim)]">
+            <span className="flex shrink-0 items-center border-r border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2.5 text-[11px] font-semibold tabular-nums text-[var(--text-dim)]">
+              {currency || "CNY"}
+            </span>
+            <input
+              type="number" min="0" step="0.01"
+              value={unitCost}
+              onChange={(e) => setUnitCost(e.target.value)}
+              placeholder="0.00"
+              className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-[13px] tabular-nums outline-none placeholder:text-[var(--text-dim)]"
+            />
+          </div>
         </label>
         <label className="block">
           <div className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("inv.int.unit")}</div>
@@ -1171,7 +1181,14 @@ function Step4Details({
       {Number(qty) > 0 && warehouseId && (
         <div className={`flex items-start gap-2 rounded-lg border px-3 py-2.5 text-[11.5px] ${color.chipBg} border-[var(--border-subtle)]`}>
           <RrIcon name="info" size={12} className={`mt-0.5 shrink-0 ${color.chipText}`} />
-          <span className="text-[var(--text-dim)]">{t("inv.int.opening.note")}</span>
+          <span className="text-[var(--text-dim)]">
+            {t("inv.int.opening.note")}
+            {Number(unitCost) > 0 && (
+              <span className={`ml-1.5 font-semibold tabular-nums ${color.chipText}`}>
+                Stock value: {(Number(qty) * Number(unitCost)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
+              </span>
+            )}
+          </span>
         </div>
       )}
 
