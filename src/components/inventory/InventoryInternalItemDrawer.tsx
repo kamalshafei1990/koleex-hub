@@ -11,7 +11,6 @@ import { useEffect, useMemo, useState } from "react";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation, type Translations } from "@/lib/i18n";
-import { useBaseCurrency } from "@/lib/hooks/useBaseCurrency";
 import {
   INTERNAL_TAXONOMY,
   suggestSubSubcategories,
@@ -426,7 +425,7 @@ type StepNo = 1 | 2 | 3 | 4;
 
 export default function InventoryInternalItemDrawer({ onClose, onSuccess }: Props) {
   const { t } = useTranslation(T);
-  const currency = useBaseCurrency("CNY");
+  const [currency, setCurrency] = useState("CNY");
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [types, setTypes] = useState<ItemType[]>([]);
   const [step, setStep] = useState<StepNo>(1);
@@ -451,17 +450,21 @@ export default function InventoryInternalItemDrawer({ onClose, onSuccess }: Prop
     let cancelled = false;
     void (async () => {
       try {
-        const [wRes, tRes] = await Promise.all([
+        const [wRes, tRes, dRes] = await Promise.all([
           fetch("/api/inventory/warehouses", { credentials: "include", cache: "no-store" }),
           fetch("/api/inventory/item-types",  { credentials: "include", cache: "no-store" }),
+          fetch("/api/create/defaults",       { credentials: "include", cache: "no-store" }),
         ]);
         const wJ = await wRes.json();
         const tJ = await tRes.json();
+        const dJ = await dRes.json();
         if (cancelled) return;
         const wh = (wJ.warehouses ?? []) as Warehouse[];
         setWarehouses(wh);
         setWarehouseId(wh.find((w) => w.is_default)?.id ?? wh[0]?.id ?? "");
         setTypes((tJ.types ?? []) as ItemType[]);
+        const ccy = (dJ as { defaults?: { base_currency?: string } }).defaults?.base_currency;
+        if (ccy) setCurrency(ccy);
       } catch { /* best-effort */ }
     })();
     return () => { cancelled = true; };
@@ -1145,7 +1148,7 @@ function Step4Details({
             value={qty}
             onChange={(e) => setQty(e.target.value)}
             placeholder="0"
-            className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2.5 text-[13px] tabular-nums outline-none focus:border-[var(--text-dim)]"
+            className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2.5 text-[13px] tabular-nums outline-none focus:border-[var(--text-dim)] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
         </label>
       </div>
@@ -1162,7 +1165,7 @@ function Step4Details({
               value={unitCost}
               onChange={(e) => setUnitCost(e.target.value)}
               placeholder="0.00"
-              className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-[13px] tabular-nums outline-none placeholder:text-[var(--text-dim)]"
+              className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-[13px] tabular-nums outline-none placeholder:text-[var(--text-dim)] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
           </div>
         </label>
