@@ -4,10 +4,10 @@
    /inventory — INV-H10 visual redesign.
 
    Layout (top to bottom):
-     1. InventoryHeader (with tab strip + Add Internal Item action)
-     2. KPI strip — 4 stat cards (Total Items · Receipts · Shipments · Alerts)
-     3. Quick Actions — 4 large primary action tiles
-     4. Secondary map — 6 small explore tiles
+     1. InventoryHeader (no tab strip on home — nav cards replace it)
+     2. Nav cards grid — all routes as icon cards + search bar below
+     3. KPI strip — 4 stat cards (Total Items · Receipts · Shipments · Alerts)
+     4. Quick Actions — 4 large primary action tiles
      5. Alerts section — only when totalAlerts > 0; colored left-border cards
      6. Today's Activity — 4 stat tiles always visible
      7. Quick Lookup — 3 inline search inputs
@@ -15,8 +15,9 @@
      9. Manager-only deep links row (Balances + Movements ledger)
    --------------------------------------------------------------------------- */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
 import InventoryInternalItemDrawer from "@/components/inventory/InventoryInternalItemDrawer";
 import RrIcon from "@/components/ui/RrIcon";
@@ -79,6 +80,63 @@ function KpiCard({
         {loading ? <span className="text-[var(--text-dim)]">—</span> : value}
       </div>
     </div>
+  );
+}
+
+/* ── Nav card entries ─────────────────────────────────────────────────────── */
+const NAV_CARDS = [
+  { href: "/inventory/items",     icon: "box-open"     as const, label: "Items",      chipBg: "bg-blue-500/10",  chipText: "text-blue-400" },
+  { href: "/inventory/movements", icon: "file-invoice" as const, label: "Movements",  chipBg: "bg-blue-500/10",  chipText: "text-blue-400" },
+  { href: "/inventory/transfers", icon: "truck-side"   as const, label: "Transfers",  chipBg: "bg-teal-500/10",  chipText: "text-teal-400" },
+  { href: "/inventory/returns",   icon: "recycle"      as const, label: "Returns",    chipBg: "bg-teal-500/10",  chipText: "text-teal-400" },
+  { href: "/inventory/balances",  icon: "badge-check"  as const, label: "Balances",   chipBg: "bg-blue-500/10",  chipText: "text-blue-400" },
+  { href: "/inventory/serials",   icon: "fingerprint"  as const, label: "Serials",    chipBg: "bg-teal-500/10",  chipText: "text-teal-400" },
+  { href: "/inventory/batches",   icon: "pallet"       as const, label: "Batches",    chipBg: "bg-teal-500/10",  chipText: "text-teal-400" },
+  { href: "/inventory/warehouses",icon: "building"     as const, label: "Warehouses", chipBg: "bg-amber-500/10", chipText: "text-amber-400", managerOnly: true },
+] as const;
+
+function NavCard({ href, icon, label, chipBg, chipText }: { href: string; icon: Parameters<typeof RrIcon>[0]["name"]; label: string; chipBg: string; chipText: string }) {
+  return (
+    <Link
+      href={href}
+      className="group flex flex-col items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-4 text-center transition-all hover:border-[var(--border-color)] hover:bg-[var(--bg-elevated)]"
+    >
+      <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${chipBg} transition-transform group-hover:scale-105`}>
+        <RrIcon name={icon} size={16} className={chipText} />
+      </span>
+      <span className="text-[11.5px] font-medium leading-tight text-[var(--text-primary)]">{label}</span>
+    </Link>
+  );
+}
+
+function HomeSearchBar() {
+  const router = useRouter();
+  const [q, setQ] = useState("");
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    const trimmed = q.trim();
+    if (trimmed) router.push(`/inventory/search?q=${encodeURIComponent(trimmed)}`);
+  };
+  return (
+    <form onSubmit={handleSubmit}>
+      <div className="flex items-center gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-4 py-3.5 transition-colors focus-within:border-[var(--text-dim)]">
+        <RrIcon name="search" size={16} className="shrink-0 text-[var(--text-dim)]" />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search items, serials, batches, movements…"
+          className="min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-[var(--text-dim)]"
+        />
+        {q.trim() && (
+          <button
+            type="submit"
+            className="shrink-0 rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[11.5px] font-semibold text-[var(--bg-primary)] transition-opacity hover:opacity-80"
+          >
+            Search
+          </button>
+        )}
+      </div>
+    </form>
   );
 }
 
@@ -145,11 +203,12 @@ export default function InventoryDashboard() {
     <div className="min-h-screen bg-[var(--bg-primary)] pb-16 text-[var(--text-primary)] md:pb-6">
       <div className="mx-auto max-w-[1500px] space-y-6 px-4 py-6 sm:px-6">
 
-        {/* ── 1. Header ───────────────────────────────────────────── */}
+        {/* ── 1. Header (no tab strip — nav cards replace it) ─────── */}
         <InventoryHeader
           icon="home"
           title={t("inv.home.title")}
           subtitle={t("inv.home.subtitle")}
+          showTabs={false}
           action={
             <div className="flex items-center gap-2">
               {addInternalBtn}
@@ -165,7 +224,19 @@ export default function InventoryDashboard() {
           </div>
         )}
 
-        {/* ── 2. KPI strip ────────────────────────────────────────── */}
+        {/* ── 2. Nav cards + Search ────────────────────────────────── */}
+        <section data-testid="inv-home-nav">
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
+            {NAV_CARDS.filter((c) => !("managerOnly" in c) || !c.managerOnly || isManager).map((card) => (
+              <NavCard key={card.href} href={card.href} icon={card.icon} label={card.label} chipBg={card.chipBg} chipText={card.chipText} />
+            ))}
+          </div>
+          <div className="mt-3">
+            <HomeSearchBar />
+          </div>
+        </section>
+
+        {/* ── 3. KPI strip ────────────────────────────────────────── */}
         <section data-testid="inv-home-kpis">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <KpiCard
@@ -195,7 +266,7 @@ export default function InventoryDashboard() {
           </div>
         </section>
 
-        {/* ── 3. Quick Actions ────────────────────────────────────── */}
+        {/* ── 4. Quick Actions ────────────────────────────────────── */}
         <section data-testid="inv-home-actions">
           <SectionEyebrow>{t("inv.home.quick.title")}</SectionEyebrow>
           <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -203,19 +274,6 @@ export default function InventoryDashboard() {
             <ActionCard testId="action-ship"     icon="truck-side"     label={t("inv.action.ship")}     hint={t("inv.action.ship.hint")}     href="/inventory/movements?create=ship"       tone="info"     size="primary" />
             <ActionCard testId="action-transfer" icon="shipping-fast"  label={t("inv.action.transfer")} hint={t("inv.action.transfer.hint")} href="/inventory/transfers?create=1"          tone="info"     size="primary" />
             <ActionCard testId="action-adjust"   icon="pencil"         label={t("inv.action.adjust")}   hint={t("inv.action.adjust.hint")}   href="/inventory/movements?create=adjustment" tone="warning"  size="primary" />
-          </div>
-        </section>
-
-        {/* ── 4. Secondary explore map ────────────────────────────── */}
-        <section data-testid="inv-home-secondary">
-          <SectionEyebrow>{t("inv.home.map.title", "Explore inventory")}</SectionEyebrow>
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-            <ActionCard size="secondary" icon="search"        label="Search"     href="/inventory/search" />
-            <ActionCard size="secondary" icon="box-open"      label="Items"      href="/inventory/items" />
-            <ActionCard size="secondary" icon="interrogation" label="Low Stock"  href="/inventory/items?filter=low_stock" />
-            <ActionCard size="secondary" icon="recycle"       label="Returns"    href="/inventory/returns" />
-            <ActionCard size="secondary" icon="fingerprint"   label="Serials"    href="/inventory/serials" />
-            <ActionCard size="secondary" icon="pallet"        label="Batches"    href="/inventory/batches" />
           </div>
         </section>
 
@@ -250,6 +308,7 @@ export default function InventoryDashboard() {
         )}
 
         {/* ── 6. Today's Activity — always visible ─────────────────── */}
+
         <section data-testid="inv-home-today">
           <div className="flex items-center gap-2">
             <SectionEyebrow>{t("inv.home.today.title")}</SectionEyebrow>

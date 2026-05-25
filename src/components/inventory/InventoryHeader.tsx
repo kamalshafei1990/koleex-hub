@@ -33,7 +33,6 @@ const PRIMARY_TABS: TabEntry[] = [
   { key: "/inventory/movements", label: "Movements", icon: "file-invoice", i18nKey: "inv.nav.r.movements" },
   { key: "/inventory/transfers", label: "Transfers", icon: "truck-side",   i18nKey: "inv.nav.r.transfers" },
   { key: "/inventory/returns",   label: "Returns",   icon: "recycle",      i18nKey: "inv.nav.r.returns" },
-  { key: "/inventory/search",    label: "Search",    icon: "search",       i18nKey: "inv.nav.r.search" },
   { key: "/inventory/balances",  label: "Balances",  icon: "badge-check",  i18nKey: "inv.nav.r.balances" },
 ];
 
