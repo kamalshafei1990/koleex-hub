@@ -112,6 +112,8 @@ export default function HRApp() {
         <PageHeader
           title={t("hr.title")}
           icon={<HrIcon size={16} />}
+          searchPlaceholder="Search employees, leave, payroll, documents…"
+          searchHref="/inventory/search"
           tabs={TAB_IDS.map((tabId) => {
             const Icon = TAB_ICONS[tabId];
             return {

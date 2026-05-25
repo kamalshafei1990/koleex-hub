@@ -128,6 +128,8 @@ export default function InventoryHeader({
       popupTitle="Inventory"
       popupSubtitle="Pick where to go."
       showTabs={showTabs}
+      searchPlaceholder="Search items, serials, batches, movements…"
+      searchHref="/inventory/search"
     />
   );
 }

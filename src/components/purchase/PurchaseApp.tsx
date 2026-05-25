@@ -132,6 +132,8 @@ export default function PurchaseApp() {
           title={t("purchase.title")}
           subtitle={t("purchase.subtitle")}
           icon={<PurchaseIcon size={16} />}
+          searchPlaceholder="Search RFQs, POs, suppliers, bills…"
+          searchHref="/inventory/search"
           tabs={PURCHASE_GROUPS.map((g) => ({
             key: g.id,
             label: t(PURCHASE_GROUP_LABEL_KEYS[g.id]),

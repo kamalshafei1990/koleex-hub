@@ -220,6 +220,8 @@ export default function FinanceHeader({
       popupTitle={t("app.title", "Finance")}
       popupSubtitle={t("header.popupSubtitle", "Pick where to go.")}
       showTabs={showTabs}
+      searchPlaceholder="Search customers, suppliers, invoices, payments…"
+      searchHref="/inventory/search"
     />
   );
 }
