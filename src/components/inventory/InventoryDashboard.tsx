@@ -15,12 +15,12 @@
      9. Manager-only deep links row (Balances + Movements ledger)
    --------------------------------------------------------------------------- */
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
 import InventoryInternalItemDrawer from "@/components/inventory/InventoryInternalItemDrawer";
 import RrIcon from "@/components/ui/RrIcon";
+import AppHomeMenu, { type AppHomeNavItem } from "@/components/ui/AppHomeMenu";
 import {
   ActionCard,
   AlertCard,
@@ -84,63 +84,18 @@ function KpiCard({
 }
 
 /* ── Nav card entries — all 10 routes, always shown (pages themselves are RLS-gated) ── */
-const NAV_CARDS = [
-  { href: "/inventory",           icon: "home"         as const, label: "Home",       chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
-  { href: "/inventory/items",     icon: "box-open"     as const, label: "Items",      chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
-  { href: "/inventory/movements", icon: "file-invoice" as const, label: "Movements",  chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
-  { href: "/inventory/transfers", icon: "truck-side"   as const, label: "Transfers",  chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
-  { href: "/inventory/returns",   icon: "recycle"      as const, label: "Returns",    chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
-  { href: "/inventory/search",    icon: "search"       as const, label: "Search",     chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
-  { href: "/inventory/balances",  icon: "badge-check"  as const, label: "Balances",   chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
-  { href: "/inventory/serials",   icon: "fingerprint"  as const, label: "Serials",    chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
-  { href: "/inventory/batches",   icon: "pallet"       as const, label: "Batches",    chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
-  { href: "/inventory/warehouses",icon: "building"     as const, label: "Warehouses", chipBg: "bg-amber-500/10", chipText: "text-amber-400" },
-] as const;
-
-function NavCard({ href, icon, label, chipBg, chipText }: { href: string; icon: Parameters<typeof RrIcon>[0]["name"]; label: string; chipBg: string; chipText: string }) {
-  return (
-    <Link
-      href={href}
-      className="group flex flex-col items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-1.5 py-3 text-center transition-all hover:border-[var(--border-color)] hover:bg-[var(--bg-elevated)]"
-    >
-      <span className={`flex h-9 w-9 items-center justify-center rounded-lg ${chipBg} transition-transform group-hover:scale-105`}>
-        <RrIcon name={icon} size={15} className={chipText} />
-      </span>
-      <span className="text-[10.5px] font-medium leading-tight text-[var(--text-primary)]">{label}</span>
-    </Link>
-  );
-}
-
-function HomeSearchBar() {
-  const router = useRouter();
-  const [q, setQ] = useState("");
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    const trimmed = q.trim();
-    if (trimmed) router.push(`/inventory/search?q=${encodeURIComponent(trimmed)}`);
-  };
-  return (
-    <form onSubmit={handleSubmit}>
-      <div className="flex items-center gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-4 py-3.5 transition-colors focus-within:border-[var(--text-dim)]">
-        <RrIcon name="search" size={16} className="shrink-0 text-[var(--text-dim)]" />
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search items, serials, batches, movements…"
-          className="min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-[var(--text-dim)]"
-        />
-        {q.trim() && (
-          <button
-            type="submit"
-            className="shrink-0 rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[11.5px] font-semibold text-[var(--bg-primary)] transition-opacity hover:opacity-80"
-          >
-            Search
-          </button>
-        )}
-      </div>
-    </form>
-  );
-}
+const NAV_CARDS: AppHomeNavItem[] = [
+  { href: "/inventory",           icon: "home",         label: "Home",       chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
+  { href: "/inventory/items",     icon: "box-open",     label: "Items",      chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
+  { href: "/inventory/movements", icon: "file-invoice", label: "Movements",  chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
+  { href: "/inventory/transfers", icon: "truck-side",   label: "Transfers",  chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
+  { href: "/inventory/returns",   icon: "recycle",      label: "Returns",    chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
+  { href: "/inventory/search",    icon: "search",       label: "Search",     chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
+  { href: "/inventory/balances",  icon: "badge-check",  label: "Balances",   chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
+  { href: "/inventory/serials",   icon: "fingerprint",  label: "Serials",    chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
+  { href: "/inventory/batches",   icon: "pallet",       label: "Batches",    chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
+  { href: "/inventory/warehouses",icon: "building",     label: "Warehouses", chipBg: "bg-amber-500/10", chipText: "text-amber-400" },
+];
 
 /* ── Dashboard ────────────────────────────────────────────────────────────── */
 export default function InventoryDashboard() {
@@ -226,17 +181,12 @@ export default function InventoryDashboard() {
           </div>
         )}
 
-        {/* ── 2. Nav cards + Search ────────────────────────────────── */}
-        <section data-testid="inv-home-nav">
-          <div className="grid grid-cols-5 gap-2">
-            {NAV_CARDS.map((card) => (
-              <NavCard key={card.href} href={card.href} icon={card.icon} label={card.label} chipBg={card.chipBg} chipText={card.chipText} />
-            ))}
-          </div>
-          <div className="mt-3">
-            <HomeSearchBar />
-          </div>
-        </section>
+        {/* ── 2. Nav cards + Search (shared AppHomeMenu) ──────────── */}
+        <AppHomeMenu
+          navItems={NAV_CARDS}
+          searchPlaceholder="Search items, serials, batches, movements…"
+          searchHref="/inventory/search"
+        />
 
         {/* ── 3. KPI strip ────────────────────────────────────────── */}
         <section data-testid="inv-home-kpis">

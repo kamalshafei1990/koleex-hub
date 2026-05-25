@@ -54,6 +54,8 @@ const TAB_ICONS: Record<SalesTabId, ComponentType<{ size?: number; className?: s
 export interface SalesModuleProps {
   t: (key: string) => string;
   lang: string;
+  /** Allow modules (especially Dashboard) to switch to another tab. */
+  setActiveTab?: (next: SalesTabId) => void;
 }
 
 const MODULE_MAP: Record<SalesTabId, ComponentType<SalesModuleProps>> = {
@@ -116,7 +118,7 @@ export default function SalesApp() {
 
       {/* ═══════════ CONTENT ═══════════ */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <ActiveModule t={t} lang={lang} />
+        <ActiveModule t={t} lang={lang} setActiveTab={setActiveTab} />
       </div>
     </div>
   );

@@ -86,6 +86,7 @@ const TAB_ICONS: Record<PurchaseTabId, IconType> = {
 export interface PurchaseModuleProps {
   t: (key: string) => string;
   lang: string;
+  setActiveTab?: (next: PurchaseTabId) => void;
 }
 
 const MODULE_MAP: Record<PurchaseTabId, ComponentType<PurchaseModuleProps>> = {
@@ -191,7 +192,7 @@ export default function PurchaseApp() {
 
       {/* ═══════════ CONTENT ═══════════ */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <ActiveModule t={t} lang={lang} />
+        <ActiveModule t={t} lang={lang} setActiveTab={setActiveTab} />
       </div>
     </div>
   );

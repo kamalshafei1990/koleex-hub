@@ -18,9 +18,12 @@ import UsersIcon from "@/components/icons/ui/UsersIcon";
 import WalletIcon from "@/components/icons/ui/WalletIcon";
 import FilePlusIcon from "@/components/icons/ui/FilePlusIcon";
 import FileBadge2Icon from "@/components/icons/ui/FileBadge2Icon";
+import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
+import ClipboardCheckIcon from "@/components/icons/ui/ClipboardCheckIcon";
 import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
 import SparklesIcon from "@/components/icons/ui/SparklesIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import AppHomeMenu from "@/components/ui/AppHomeMenu";
 
 interface Stats {
   openPOs: number;
@@ -34,7 +37,7 @@ interface Stats {
   activeSuppliers: number;
 }
 
-export default function DashboardModule({ t }: PurchaseModuleProps) {
+export default function DashboardModule({ t, setActiveTab }: PurchaseModuleProps) {
   const [stats, setStats] = useState<Stats | null>(null);
   const [recent, setRecent] = useState<{ id: string; kind: string; label: string; ts: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -137,6 +140,23 @@ export default function DashboardModule({ t }: PurchaseModuleProps) {
 
   return (
     <div className="p-4 md:p-6 space-y-6">
+      {/* Canonical Hub tile menu + search — identical to every other app */}
+      <AppHomeMenu
+        navItems={[
+          { key: "dashboard",    onClick: () => setActiveTab?.("dashboard"),    icon: <BarChart3Icon size={15} />,   label: "Dashboard",    chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
+          { key: "requisitions", onClick: () => setActiveTab?.("requisitions"), icon: <FilePlusIcon size={15} />,    label: "Requisitions", chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
+          { key: "rfqs",         onClick: () => setActiveTab?.("rfqs"),         icon: <FileBadge2Icon size={15} />,  label: "RFQs",         chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
+          { key: "orders",       onClick: () => setActiveTab?.("orders"),       icon: <BoxesIcon size={15} />,       label: "Orders",       chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
+          { key: "receipts",     onClick: () => setActiveTab?.("receipts"),     icon: <ClipboardCheckIcon size={15} />, label: "Receipts",  chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
+          { key: "bills",        onClick: () => setActiveTab?.("bills"),        icon: <DocumentIcon size={15} />,    label: "Bills",        chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
+          { key: "payments",     onClick: () => setActiveTab?.("payments"),     icon: <WalletIcon size={15} />,      label: "Payments",     chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
+          { key: "suppliers",    onClick: () => setActiveTab?.("suppliers"),    icon: <UsersIcon size={15} />,       label: "Suppliers",    chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
+          { key: "categories",   onClick: () => setActiveTab?.("categories"),   icon: <LayoutGridIcon size={15} />,  label: "Categories",   chipBg: "bg-amber-500/10", chipText: "text-amber-400" },
+          { key: "reports",      onClick: () => setActiveTab?.("reports"),      icon: <LineChartIcon size={15} />,   label: "Reports",      chipBg: "bg-amber-500/10", chipText: "text-amber-400" },
+        ]}
+        searchPlaceholder="Search RFQs, POs, suppliers, bills…"
+      />
+
       {/* KPI grid. KPIs whose `href` points at an external app (e.g.
           /contacts) render as <Link>; the in-app `#tab` ones render
           as plain divs since the parent shell controls tab state. */}

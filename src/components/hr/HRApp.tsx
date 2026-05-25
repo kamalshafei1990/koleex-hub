@@ -56,6 +56,7 @@ export interface HRModuleProps {
   employees: EmployeeListItem[];
   t: (key: string) => string;
   lang: string;
+  setActiveTab?: (next: TabId) => void;
 }
 
 /* ── Module component map ── */
@@ -149,7 +150,7 @@ export default function HRApp() {
             <SpinnerIcon size={24} className="animate-spin text-[var(--text-dim)]" />
           </div>
         ) : (
-          <ActiveModule employees={employees} t={t} lang={lang} />
+          <ActiveModule employees={employees} t={t} lang={lang} setActiveTab={setActiveTab} />
         )}
       </div>
     </div>

@@ -31,14 +31,21 @@ import CalendarPlusIcon from "@/components/icons/ui/CalendarPlusIcon";
 import ClockIcon from "@/components/icons/ui/ClockIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import UserIcon from "@/components/icons/ui/UserIcon";
+import UserPlusIcon from "@/components/icons/ui/UserPlusIcon";
+import StarIcon from "@/components/icons/ui/StarIcon";
+import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
+import WalletIcon from "@/components/icons/ui/WalletIcon";
+import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
+import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
 import ShieldIcon from "@/components/icons/ui/ShieldIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import AppHomeMenu from "@/components/ui/AppHomeMenu";
 
 /* ═══════════════════════════════════════════════════
    MAIN COMPONENT
    ═══════════════════════════════════════════════════ */
 
-export default function DashboardModule({ employees, t, lang }: HRModuleProps) {
+export default function DashboardModule({ employees, t, lang, setActiveTab }: HRModuleProps) {
   /* ── state ── */
   const [dashStats, setDashStats] = useState<HrDashboardStats | null>(null);
   const [expiringItems, setExpiringItems] = useState<ExpiringItem[]>([]);
@@ -90,6 +97,23 @@ export default function DashboardModule({ employees, t, lang }: HRModuleProps) {
   /* ── render ── */
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      {/* Canonical Hub tile menu + search — identical to every other app */}
+      <AppHomeMenu
+        navItems={[
+          { key: "dashboard",   onClick: () => setActiveTab?.("dashboard"),   icon: <BarChart3Icon size={15} />,    label: "Dashboard",   chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
+          { key: "leave",       onClick: () => setActiveTab?.("leave"),       icon: <CalendarPlusIcon size={15} />, label: "Leave",       chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
+          { key: "attendance",  onClick: () => setActiveTab?.("attendance"),  icon: <ClockIcon size={15} />,        label: "Attendance",  chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
+          { key: "recruitment", onClick: () => setActiveTab?.("recruitment"), icon: <UserPlusIcon size={15} />,     label: "Recruitment", chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
+          { key: "appraisals",  onClick: () => setActiveTab?.("appraisals"),  icon: <StarIcon size={15} />,         label: "Appraisals",  chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
+          { key: "onboarding",  onClick: () => setActiveTab?.("onboarding"),  icon: <CheckCircleIcon size={15} />,  label: "Onboarding",  chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
+          { key: "payroll",     onClick: () => setActiveTab?.("payroll"),     icon: <WalletIcon size={15} />,       label: "Payroll",     chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
+          { key: "training",    onClick: () => setActiveTab?.("training"),    icon: <BookOpenIcon size={15} />,     label: "Training",    chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
+          { key: "documents",   onClick: () => setActiveTab?.("documents"),   icon: <DocumentIcon size={15} />,     label: "Documents",   chipBg: "bg-amber-500/10", chipText: "text-amber-400" },
+          { key: "reports",     onClick: () => setActiveTab?.("reports"),     icon: <BarChart3Icon size={15} />,    label: "Reports",     chipBg: "bg-amber-500/10", chipText: "text-amber-400" },
+        ]}
+        searchPlaceholder="Search employees, leave, payroll, documents…"
+      />
+
       {/* ── Stat cards (2x2) ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Total Employees */}
