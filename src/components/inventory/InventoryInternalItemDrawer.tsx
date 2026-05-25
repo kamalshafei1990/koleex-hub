@@ -223,13 +223,13 @@ export default function InventoryInternalItemDrawer({ onClose, onSuccess }: Prop
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex justify-end bg-black/60"
+      className="fixed inset-0 z-[120] flex items-stretch justify-center bg-black/65 backdrop-blur-sm sm:items-center"
       onClick={onClose}
       data-testid="inv-internal-drawer"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex w-full flex-col border-l border-[var(--border-color)] bg-[var(--bg-primary)] text-[var(--text-primary)] sm:max-w-xl"
+        className="flex h-full w-full flex-col overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-2xl sm:h-auto sm:max-h-[90vh] sm:w-[min(720px,92vw)] sm:rounded-2xl sm:border sm:border-[var(--border-color)]"
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--border-color)] px-4 py-3">
