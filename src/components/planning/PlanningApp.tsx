@@ -33,7 +33,7 @@ import PlanningIcon from "@/components/icons/PlanningIcon";
 import PageHeader from "@/components/ui/PageHeader";
 import AppHomeMenu from "@/components/ui/AppHomeMenu";
 import EntityPicker from "@/components/planning/EntityPicker";
-import { SEARCH_PLACEHOLDERS } from "@/lib/searchPlaceholders";
+import { useSearchPlaceholder } from "@/lib/searchPlaceholders";
 import {
   addDays,
   createItem,
@@ -68,6 +68,7 @@ type TabId = "schedule" | "open" | "mine" | "config";
 
 export default function PlanningApp() {
   const { t } = useTranslation(planningT);
+  const searchPlaceholder = useSearchPlaceholder("planning");
   const [tab, setTab] = useState<TabId>("schedule");
 
   // Shared data — the schedule tab consumes everything, so load it up front.
@@ -245,7 +246,7 @@ export default function PlanningApp() {
               { key: "new",       onClick: () => setModal({ open: true, editing: null }), icon: "plus", label: "New" },
               { key: "config",    onClick: () => setTab("config"),   icon: "cog",          label: "Configuration" },
             ]}
-            searchPlaceholder={SEARCH_PLACEHOLDERS.planning}
+            searchPlaceholder={searchPlaceholder}
           />
 
           {loading ? (

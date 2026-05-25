@@ -11,6 +11,7 @@ import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import CopyIcon from "@/components/icons/ui/CopyIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
+import SharedKpiCard from "@/components/ui/KpiCard";
 import { useTranslation } from "@/lib/i18n";
 import { docsT } from "@/lib/translations/docs";
 import { dialog } from "@/lib/ui-dialog";
@@ -1652,14 +1653,13 @@ export default function Quotations() {
                "expiring soon" sub-line on the totalValue card. */
             return (
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                <KpiCard label={t("kpi.total")} value={String(quotations.length)} accent="text-blue-400" />
-                <KpiCard label={t("kpi.drafts")} value={String(drafts)} accent="text-amber-400" />
-                <KpiCard label="SENT" value={String(sent)} accent="text-sky-400" />
-                <KpiCard label="PAID" value={String(paid)} accent="text-emerald-400" />
-                <KpiCard
+                <SharedKpiCard label={t("kpi.total")} value={String(quotations.length)} tone="info" />
+                <SharedKpiCard label={t("kpi.drafts")} value={String(drafts)} tone="warning" />
+                <SharedKpiCard label="SENT" value={String(sent)} tone="info" />
+                <SharedKpiCard label="PAID" value={String(paid)} tone="positive" />
+                <SharedKpiCard
                   label={t("kpi.totalValue")}
                   value={fmt(total)}
-                  accent="text-[var(--text-primary)]"
                 />
               </div>
             );
@@ -2089,28 +2089,3 @@ function StatusMenu({
   );
 }
 
-/** Compact Hub-style KPI card, matched to the strip on Planning / Projects
- *  so all list-view dashboards share one visual language. */
-function KpiCard({
-  label,
-  value,
-  accent,
-  sub,
-}: {
-  label: string;
-  value: string;
-  accent?: string;
-  sub?: string;
-}) {
-  return (
-    <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-4">
-      <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)] mb-2">
-        {label}
-      </div>
-      <div className={`text-[20px] md:text-[24px] font-bold leading-none ${accent ?? "text-[var(--text-primary)]"}`}>
-        {value}
-      </div>
-      {sub && <div className="text-[10px] text-[var(--text-dim)] mt-2">{sub}</div>}
-    </div>
-  );
-}

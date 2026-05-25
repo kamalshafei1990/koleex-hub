@@ -29,7 +29,7 @@ import { expensesT } from "@/lib/translations/expenses";
 import ExpensesHeader from "@/components/expenses/ExpensesHeader";
 import AppHomeMenu, { type AppHomeNavItem } from "@/components/ui/AppHomeMenu";
 import Button from "@/components/ui/Button";
-import { SEARCH_PLACEHOLDERS } from "@/lib/searchPlaceholders";
+import { useSearchPlaceholder } from "@/lib/searchPlaceholders";
 import type { ExpensesTabKey } from "@/components/expenses/ExpensesTabs";
 import { EmptyState, SectionCard, StatusBadge } from "@/components/finance/FinanceUi";
 import {
@@ -80,6 +80,7 @@ const CURRENCIES = ["USD", "EUR", "CNY", "EGP", "GBP"];
 
 export default function ExpensesApp() {
   const { t } = useTranslation(expensesT);
+  const searchPlaceholder = useSearchPlaceholder("expenses");
   const [expenses, setExpenses] = useState<FinanceExpense[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -231,7 +232,7 @@ export default function ExpensesApp() {
               { key: "approvals", onClick: () => setApprovalFilter("needs_review"), icon: "shield-check", label: "Approvals"  },
               { key: "analytics", href: "/finance/expenses",         icon: "signal-stream", label: "Analytics"    },
             ] as AppHomeNavItem[]}
-            searchPlaceholder={SEARCH_PLACEHOLDERS.expenses}
+            searchPlaceholder={searchPlaceholder}
             onSearchSubmit={(term) => setSearch(term)}
           />
         </div>

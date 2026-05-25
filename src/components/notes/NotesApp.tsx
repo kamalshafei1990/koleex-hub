@@ -13,7 +13,7 @@ import NotesIcon from "@/components/icons/NotesIcon";
 import PageHeader from "@/components/ui/PageHeader";
 import AppHomeMenu from "@/components/ui/AppHomeMenu";
 import Button from "@/components/ui/Button";
-import { SEARCH_PLACEHOLDERS } from "@/lib/searchPlaceholders";
+import { useSearchPlaceholder } from "@/lib/searchPlaceholders";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
@@ -46,6 +46,7 @@ import { PromptDialog, ConfirmDialog } from "./NotesDialog";
 
 export default function NotesApp() {
   const { t } = useTranslation(notesT);
+  const searchPlaceholder = useSearchPlaceholder("notes");
 
   const [folders, setFolders] = useState<NotesFolderRow[]>([]);
   const [notes, setNotes] = useState<NoteRow[]>([]);
@@ -453,7 +454,7 @@ export default function NotesApp() {
                 { key: "trash",   onClick: () => setSelection({ kind: "smart", key: "trash" }),  icon: "recycle",    label: "Trash"     },
                 { key: "new",     onClick: onCreateNote,                                          icon: "plus",       label: "New Note"  },
               ]}
-              searchPlaceholder={SEARCH_PLACEHOLDERS.notes}
+              searchPlaceholder={searchPlaceholder}
               onSearchSubmit={(term) => setSearch(term)}
             />
           </div>

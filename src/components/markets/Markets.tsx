@@ -606,7 +606,7 @@ export default function Markets() {
             <input
               id="markets-search"
               type="text"
-              placeholder="Search markets by name, band, or classification..."
+              placeholder="Search markets by name, band, or classification…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="flex-1 bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none h-12"

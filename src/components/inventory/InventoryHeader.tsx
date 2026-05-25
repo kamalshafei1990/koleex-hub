@@ -19,7 +19,7 @@ import type { NavGroup } from "@/components/ui/PageNavPopup";
 import type { RrIconName } from "@/components/ui/RrIcon";
 import { useTranslation, type Translations } from "@/lib/i18n";
 import { ACCENT } from "@/lib/accentColors";
-import { SEARCH_PLACEHOLDERS } from "@/lib/searchPlaceholders";
+import { useSearchPlaceholder } from "@/lib/searchPlaceholders";
 
 const PRIMARY_TABS_RAW: Array<PageTab & { i18nKey: string }> = [
   { key: "/inventory",           label: "Home",      icon: "home",         i18nKey: "inv.nav.r.home" },
@@ -92,6 +92,7 @@ export default function InventoryHeader({
   showTabs?: boolean;
 }) {
   const { t } = useTranslation(T);
+  const searchPlaceholder = useSearchPlaceholder("inventory");
 
   const tabs: PageTab[] = PRIMARY_TABS_RAW.map((tab) => ({
     key: tab.key,
@@ -115,7 +116,7 @@ export default function InventoryHeader({
       popupTitle="Inventory"
       popupSubtitle="Pick where to go."
       showTabs={showTabs}
-      searchPlaceholder={SEARCH_PLACEHOLDERS.inventory}
+      searchPlaceholder={searchPlaceholder}
       searchHref="/inventory/search"
     />
   );

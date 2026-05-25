@@ -24,7 +24,7 @@ import AppHomeMenu from "@/components/ui/AppHomeMenu";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import EntityPicker from "@/components/planning/EntityPicker";
-import { SEARCH_PLACEHOLDERS } from "@/lib/searchPlaceholders";
+import { useSearchPlaceholder } from "@/lib/searchPlaceholders";
 import {
   createInvoice,
   deleteInvoice,
@@ -59,6 +59,7 @@ export default function InvoicesApp() {
 
 function InvoiceListView({ onOpen }: { onOpen: (id: string) => void }) {
   const { t } = useTranslation(invoicesT);
+  const searchPlaceholder = useSearchPlaceholder("invoices");
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<InvoiceStatus | "all" | "open">("open");
@@ -148,7 +149,7 @@ function InvoiceListView({ onOpen }: { onOpen: (id: string) => void }) {
               { key: "new",        onClick: () => setFormOpen(true),    icon: "plus",        label: "New Invoice"  },
               { key: "customers",  href: "/customers",                  icon: "users",       label: "Customers"    },
             ]}
-            searchPlaceholder={SEARCH_PLACEHOLDERS.invoices}
+            searchPlaceholder={searchPlaceholder}
             onSearchSubmit={(term) => setSearch(term)}
           />
 

@@ -404,7 +404,7 @@ function ClassPanel({ title, items, selectedId, onSelect, childCounts, productCo
       {items.length > 5 && (
         <div className="px-3 py-2 border-b border-[var(--border-subtle)]">
           <div className="relative"><SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-dim)]" />
-            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search..." className="w-full h-7 pl-7 pr-3 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-subtle)]" />
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" className="w-full h-7 pl-7 pr-3 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-subtle)]" />
           </div>
         </div>
       )}
@@ -811,7 +811,7 @@ function BrandsTab({ brands, brandLogos, onAdd, onEdit, onDelete }: {
         <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]"><PackageIcon className="h-3 w-3 text-[var(--text-dim)]" /><span className="text-[16px] font-bold text-[var(--text-primary)] tabular-nums">{brands.reduce((s, b) => s + b.productCount, 0)}</span><span className="text-[11px] text-[var(--text-dim)]">products</span></div>
       </div>
       <div className="flex items-center justify-between gap-4 mb-4">
-        <div className="relative flex-1 max-w-sm"><SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)]" /><input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search brands..." className="w-full h-9 pl-9 pr-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-blue-500/50 transition-colors" /></div>
+        <div className="relative flex-1 max-w-sm"><SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)]" /><input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search brands…" className="w-full h-9 pl-9 pr-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-blue-500/50 transition-colors" /></div>
         <button onClick={onAdd} className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-colors shrink-0"><PlusIcon className="h-3.5 w-3.5" /> Add brand</button>
       </div>
       {filtered.length === 0 ? (

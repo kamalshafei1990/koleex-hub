@@ -30,7 +30,7 @@ import UsersIcon from "@/components/icons/ui/UsersIcon";
 import ActivityIcon from "@/components/icons/ui/ActivityIcon";
 import SalesIcon from "@/components/icons/SalesIcon";
 import PageHeader from "@/components/ui/PageHeader";
-import { SEARCH_PLACEHOLDERS } from "@/lib/searchPlaceholders";
+import { useSearchPlaceholder } from "@/lib/searchPlaceholders";
 
 import DashboardModule  from "./modules/Dashboard";
 import PipelineModule   from "./modules/Pipeline";
@@ -72,6 +72,7 @@ const MODULE_MAP: Record<SalesTabId, ComponentType<SalesModuleProps>> = {
 
 export default function SalesApp() {
   const { t, lang } = useTranslation(salesT);
+  const searchPlaceholder = useSearchPlaceholder("sales");
   const [activeTab, setActiveTab] = useState<SalesTabId>("dashboard");
   const ActiveModule = MODULE_MAP[activeTab];
 
@@ -86,7 +87,7 @@ export default function SalesApp() {
           title={t("sales.title")}
           subtitle={t("sales.subtitle")}
           icon={<SalesIcon size={16} />}
-          searchPlaceholder={SEARCH_PLACEHOLDERS.sales}
+          searchPlaceholder={searchPlaceholder}
           searchHref="/inventory/search"
           tabs={SALES_TAB_IDS.map((tabId) => {
             const Icon = TAB_ICONS[tabId];

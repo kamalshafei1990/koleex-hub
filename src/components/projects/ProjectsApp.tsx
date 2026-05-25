@@ -35,7 +35,8 @@ import ProjectsIcon from "@/components/icons/ProjectsIcon";
 import PageHeader from "@/components/ui/PageHeader";
 import AppHomeMenu from "@/components/ui/AppHomeMenu";
 import Button from "@/components/ui/Button";
-import { SEARCH_PLACEHOLDERS } from "@/lib/searchPlaceholders";
+import SharedKpiCard from "@/components/ui/KpiCard";
+import { useSearchPlaceholder } from "@/lib/searchPlaceholders";
 import EntityPlanningStrip from "@/components/planning/EntityPlanningStrip";
 import EntityPicker from "@/components/planning/EntityPicker";
 import {
@@ -70,6 +71,7 @@ type TabId = "projects" | "mine" | "all" | "reporting" | "config";
 
 export default function ProjectsApp() {
   const { t } = useTranslation(projectsT);
+  const searchPlaceholder = useSearchPlaceholder("projects");
   const [tab, setTab] = useState<TabId>("projects");
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
 
@@ -154,7 +156,7 @@ export default function ProjectsApp() {
               { key: "reporting", onClick: () => setTab("reporting"), icon: "chart-pie",     label: "Reporting"    },
               { key: "config",    onClick: () => setTab("config"),    icon: "cog",           label: "Configuration"},
             ]}
-            searchPlaceholder={SEARCH_PLACEHOLDERS.projects}
+            searchPlaceholder={searchPlaceholder}
           />
 
           {tab === "projects" && <ProjectsListView onOpenProject={setActiveProjectId} />}
@@ -1017,10 +1019,10 @@ function ReportingView() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard label={t("report.totalProjects")} value={totalProjects} accent="text-blue-400" />
-        <KpiCard label={t("report.openTasks")} value={openTasks} accent="text-amber-400" />
-        <KpiCard label={t("report.overdueTasks")} value={overdue} accent="text-rose-400" />
-        <KpiCard label={t("report.completedWk")} value={doneThisWeek} accent="text-emerald-400" />
+        <SharedKpiCard label={t("report.totalProjects")} value={totalProjects} tone="info" />
+        <SharedKpiCard label={t("report.openTasks")} value={openTasks} tone="warning" />
+        <SharedKpiCard label={t("report.overdueTasks")} value={overdue} tone="rose" />
+        <SharedKpiCard label={t("report.completedWk")} value={doneThisWeek} tone="positive" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -1070,17 +1072,6 @@ function ReportingView() {
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function KpiCard({ label, value, accent }: { label: string; value: number; accent: string }) {
-  return (
-    <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-4">
-      <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)] mb-2">
-        {label}
-      </div>
-      <div className={`text-[28px] font-bold leading-none ${accent}`}>{value}</div>
     </div>
   );
 }

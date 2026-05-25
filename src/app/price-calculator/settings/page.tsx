@@ -263,7 +263,7 @@ export default function PricingSettingsPage() {
             <div className="px-6 pb-3 border-t border-[var(--border-subtle)] pt-3">
               <div className="relative">
                 <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-ghost)]" />
-                <input type="text" value={countrySearch} onChange={e => setCountrySearch(e.target.value)} placeholder="Search countries..." className={`${inputCls} pl-9`} />
+                <input type="text" value={countrySearch} onChange={e => setCountrySearch(e.target.value)} placeholder="Search countries…" className={`${inputCls} pl-9`} />
               </div>
             </div>
             <div className="max-h-[500px] overflow-y-auto">

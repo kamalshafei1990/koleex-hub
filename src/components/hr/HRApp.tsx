@@ -24,7 +24,7 @@ import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import HrIcon from "@/components/icons/HrIcon";
 import PageHeader from "@/components/ui/PageHeader";
-import { SEARCH_PLACEHOLDERS } from "@/lib/searchPlaceholders";
+import { useSearchPlaceholder } from "@/lib/searchPlaceholders";
 
 /* ── Module components (lazy‑loaded) ── */
 import DashboardModule from "./modules/Dashboard";
@@ -80,6 +80,7 @@ const MODULE_MAP: Record<TabId, ComponentType<HRModuleProps>> = {
 
 export default function HRApp() {
   const { t, lang } = useTranslation(hrT);
+  const searchPlaceholder = useSearchPlaceholder("hr");
 
   /* ── Navigation ── */
   const [activeTab, setActiveTab] = useState<TabId>("dashboard");
@@ -113,7 +114,7 @@ export default function HRApp() {
         <PageHeader
           title={t("hr.title")}
           icon={<HrIcon size={16} />}
-          searchPlaceholder={SEARCH_PLACEHOLDERS.hr}
+          searchPlaceholder={searchPlaceholder}
           searchHref="/inventory/search"
           tabs={TAB_IDS.map((tabId) => {
             const Icon = TAB_ICONS[tabId];

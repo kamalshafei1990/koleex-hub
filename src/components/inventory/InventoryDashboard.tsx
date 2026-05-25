@@ -22,6 +22,7 @@ import InventoryInternalItemDrawer from "@/components/inventory/InventoryInterna
 import RrIcon from "@/components/ui/RrIcon";
 import AppHomeMenu, { type AppHomeNavItem } from "@/components/ui/AppHomeMenu";
 import KpiCard from "@/components/ui/KpiCard";
+import { ACCENT } from "@/lib/accentColors";
 import {
   ActionCard,
   AlertCard,
@@ -59,16 +60,16 @@ interface OperatorSummary {
 
 /* ── Nav card entries — all 10 routes, always shown (pages themselves are RLS-gated) ── */
 const NAV_CARDS: AppHomeNavItem[] = [
-  { href: "/inventory",           icon: "home",         label: "Home",       chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
-  { href: "/inventory/items",     icon: "box-open",     label: "Items",      chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
-  { href: "/inventory/movements", icon: "file-invoice", label: "Movements",  chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
-  { href: "/inventory/transfers", icon: "truck-side",   label: "Transfers",  chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
-  { href: "/inventory/returns",   icon: "recycle",      label: "Returns",    chipBg: "bg-blue-500/10",  chipText: "text-blue-400"  },
-  { href: "/inventory/search",    icon: "search",       label: "Search",     chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
-  { href: "/inventory/balances",  icon: "badge-check",  label: "Balances",   chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
-  { href: "/inventory/serials",   icon: "fingerprint",  label: "Serials",    chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
-  { href: "/inventory/batches",   icon: "box-circle-check", label: "Batches",    chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
-  { href: "/inventory/warehouses",icon: "building",     label: "Warehouses", chipBg: "bg-amber-500/10", chipText: "text-amber-400" },
+  { href: "/inventory",           icon: "home",         label: "Home",       chipBg: ACCENT.blue.chipBg,  chipText: ACCENT.blue.chipText  },
+  { href: "/inventory/items",     icon: "box-open",     label: "Items",      chipBg: ACCENT.blue.chipBg,  chipText: ACCENT.blue.chipText  },
+  { href: "/inventory/movements", icon: "file-invoice", label: "Movements",  chipBg: ACCENT.blue.chipBg,  chipText: ACCENT.blue.chipText  },
+  { href: "/inventory/transfers", icon: "truck-side",   label: "Transfers",  chipBg: ACCENT.blue.chipBg,  chipText: ACCENT.blue.chipText  },
+  { href: "/inventory/returns",   icon: "recycle",      label: "Returns",    chipBg: ACCENT.blue.chipBg,  chipText: ACCENT.blue.chipText  },
+  { href: "/inventory/search",    icon: "search",       label: "Search",     chipBg: ACCENT.teal.chipBg,  chipText: ACCENT.teal.chipText  },
+  { href: "/inventory/balances",  icon: "badge-check",  label: "Balances",   chipBg: ACCENT.teal.chipBg,  chipText: ACCENT.teal.chipText  },
+  { href: "/inventory/serials",   icon: "fingerprint",  label: "Serials",    chipBg: ACCENT.teal.chipBg,  chipText: ACCENT.teal.chipText  },
+  { href: "/inventory/batches",   icon: "box-circle-check", label: "Batches",chipBg: ACCENT.teal.chipBg,  chipText: ACCENT.teal.chipText  },
+  { href: "/inventory/warehouses",icon: "building",     label: "Warehouses", chipBg: ACCENT.amber.chipBg, chipText: ACCENT.amber.chipText },
 ];
 
 /* ── Dashboard ────────────────────────────────────────────────────────────── */

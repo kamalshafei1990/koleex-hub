@@ -18,7 +18,7 @@ import { openSmartCreate } from "@/components/ui/create/SmartCreateDrawer";
 import { useTranslation } from "@/lib/i18n";
 import { financeT } from "@/lib/translations/finance";
 import { ACCENT } from "@/lib/accentColors";
-import { SEARCH_PLACEHOLDERS } from "@/lib/searchPlaceholders";
+import { useSearchPlaceholder } from "@/lib/searchPlaceholders";
 
 export type HealthStatus = "healthy" | "watch" | "stress" | "unknown";
 
@@ -137,6 +137,7 @@ export default function FinanceHeader({
   showTabs?: boolean;
 }) {
   const { t } = useTranslation(financeT);
+  const searchPlaceholder = useSearchPlaceholder("finance");
 
   const tabs: PageTab[] = PRIMARY_TABS_RAW.map((tab) => ({
     key: tab.key,
@@ -185,7 +186,7 @@ export default function FinanceHeader({
       popupTitle={t("app.title", "Finance")}
       popupSubtitle={t("header.popupSubtitle", "Pick where to go.")}
       showTabs={showTabs}
-      searchPlaceholder={SEARCH_PLACEHOLDERS.finance}
+      searchPlaceholder={searchPlaceholder}
       searchHref="/inventory/search"
     />
   );

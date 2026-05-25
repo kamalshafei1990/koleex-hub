@@ -705,7 +705,7 @@ function CatalogModal({
                 <input type="text" value={contactSearch}
                   onChange={(e) => { setContactSearch(e.target.value); setShowContactDropdown(true); }}
                   onFocus={() => setShowContactDropdown(true)}
-                  placeholder="Search suppliers or companies..."
+                  placeholder="Search suppliers or companies…"
                   className={inp + " pl-9"} />
               </div>
             )}
@@ -1218,7 +1218,7 @@ export default function CatalogsPage() {
         <div className="flex flex-wrap items-center gap-3 mb-6">
           <div className="relative flex-1 min-w-[200px] max-w-sm">
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)]" />
-            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search catalogs..."
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search catalogs…"
               className="w-full h-9 pl-9 pr-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-blue-500/50 transition-colors" />
           </div>
 

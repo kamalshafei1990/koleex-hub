@@ -1222,7 +1222,7 @@ export default function AddEmployeePage() {
                 onChange={(v) => set("nationality", v)}
                 options={countryOptions}
                 placeholder="Select country..."
-                searchPlaceholder="Search 249 countries..."
+                searchPlaceholder="Search 249 countries…"
               />
               <SelectInput label="Marital Status" value={form.marital_status} onChange={(v) => set("marital_status", v)}
                 options={MARITAL_OPTIONS.map((m) => ({ value: m, label: m || "—" }))} placeholder="Select..." />
@@ -1261,7 +1261,7 @@ export default function AddEmployeePage() {
                 onChange={(v) => set("private_country", v)}
                 options={countryOptions}
                 placeholder="Select country..."
-                searchPlaceholder="Search 249 countries..."
+                searchPlaceholder="Search 249 countries…"
               />
               <TextInput label="Postal Code" value={form.private_postal_code} onChange={(v) => set("private_postal_code", v)} placeholder="ZIP" />
             </div>
@@ -1345,7 +1345,7 @@ export default function AddEmployeePage() {
                 onChange={(v) => set("manager_id", v)}
                 options={managerOptions}
                 placeholder={managerOptions.length ? "Select..." : "No active employees yet"}
-                searchPlaceholder="Search employees..."
+                searchPlaceholder="Search employees…"
                 emptyText="No employees match"
               />
               <DateInput name="contract_end_date" label="Contract End" value={form.contract_end_date} onChange={(v) => set("contract_end_date", v)} yearFrom={2024} yearTo={2035} error={errFor("contract_end_date")} />

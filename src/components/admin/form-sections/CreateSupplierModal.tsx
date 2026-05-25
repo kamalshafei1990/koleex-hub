@@ -116,7 +116,7 @@ function CountryPicker({ value, countryCode, onChange, label }: {
           value={open ? query : value}
           onChange={e => { setQuery(e.target.value); if (!open) setOpen(true); }}
           onFocus={() => setOpen(true)}
-          placeholder="Search country..."
+          placeholder="Search country…"
           className="flex-1 bg-transparent outline-none text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)]"
         />
         <AngleDownIcon className={`h-3.5 w-3.5 text-[var(--text-ghost)] transition-transform ${open ? "rotate-180" : ""}`} />
@@ -198,7 +198,7 @@ function ProvincePicker({ countryCode, value, stateCode, onChange, label }: {
           value={open ? query : value}
           onChange={e => { setQuery(e.target.value); if (!open) setOpen(true); }}
           onFocus={() => setOpen(true)}
-          placeholder="Search province..."
+          placeholder="Search province…"
           className="flex-1 bg-transparent outline-none text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)]"
         />
         <AngleDownIcon className={`h-3.5 w-3.5 text-[var(--text-ghost)] transition-transform ${open ? "rotate-180" : ""}`} />
@@ -290,7 +290,7 @@ function CityPicker({ countryCode, stateCode, value, onChange, label }: {
           value={open ? query : value}
           onChange={e => { setQuery(e.target.value); if (!open) setOpen(true); }}
           onFocus={() => setOpen(true)}
-          placeholder="Search city..."
+          placeholder="Search city…"
           className="flex-1 bg-transparent outline-none text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)]"
         />
         <AngleDownIcon className={`h-3.5 w-3.5 text-[var(--text-ghost)] transition-transform ${open ? "rotate-180" : ""}`} />

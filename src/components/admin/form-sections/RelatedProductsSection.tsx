@@ -48,7 +48,7 @@ export default function RelatedProductsSection({ related, onChange, currentProdu
           type="text"
           value={query}
           onChange={(e) => doSearch(e.target.value)}
-          placeholder="Search products to link..."
+          placeholder="Search products to link…"
           className="w-full h-10 pl-10 pr-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
         />
         {results.length > 0 && (
