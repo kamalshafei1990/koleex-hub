@@ -48,6 +48,8 @@ const T: Translations = {
   "inv.int.cancel":         { en: "Cancel",                   zh: "取消",               ar: "إلغاء" },
   "inv.int.close":          { en: "Close",                    zh: "关闭",               ar: "إغلاق" },
   "inv.int.opening.note":   { en: "An opening-balance movement will be posted automatically.", zh: "将自动过账期初余额。", ar: "سيتم ترحيل حركة رصيد افتتاحي تلقائياً." },
+  "inv.int.unit_cost":      { en: "Unit cost (optional)",     zh: "单价（可选）",         ar: "تكلفة الوحدة (اختياري)" },
+  "inv.int.unit_cost.ph":   { en: "0.00",                     zh: "0.00",                ar: "0.00" },
   "inv.int.err.name":       { en: "Item name required.",      zh: "请填写物品名称。",     ar: "اسم العنصر مطلوب." },
   "inv.int.err.warehouse":  { en: "Pick a warehouse for the opening quantity.", zh: "请选择期初数量的仓库。", ar: "اختر مستودعاً للكمية الافتتاحية." },
   "inv.int.search.ph":      { en: "Search items — laptop, A4 paper, helmet…", zh: "搜索物品：笔记本、A4纸、头盔…", ar: "ابحث: لاب توب، ورق A4، خوذة…" },
@@ -436,6 +438,7 @@ export default function InventoryInternalItemDrawer({ onClose, onSuccess }: Prop
   const [name, setName] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [qty, setQty] = useState("");
+  const [unitCost, setUnitCost] = useState("");
   const [unit, setUnit] = useState<UnitOfMeasure>("pcs");
   const [notes, setNotes] = useState("");
   const [notesOpen, setNotesOpen] = useState(false);
@@ -513,6 +516,8 @@ export default function InventoryInternalItemDrawer({ onClose, onSuccess }: Prop
       if (combinedSub) payload.subcategory = combinedSub;
       if (notes.trim()) payload.notes = notes.trim();
       if (customIconUrl) payload.metadata = { custom_icon: customIconUrl };
+      const numCost = parseFloat(unitCost) || 0;
+      if (numCost > 0) payload.cost_price = numCost;
       if (numQty > 0) {
         payload.initial_quantity = numQty;
         payload.initial_warehouse_id = warehouseId;
@@ -634,6 +639,7 @@ export default function InventoryInternalItemDrawer({ onClose, onSuccess }: Prop
               name={name} setName={setName}
               warehouseId={warehouseId} setWarehouseId={setWarehouseId}
               qty={qty} setQty={setQty}
+              unitCost={unitCost} setUnitCost={setUnitCost}
               unit={unit} setUnit={setUnit}
               notes={notes} setNotes={setNotes}
               notesOpen={notesOpen} setNotesOpen={setNotesOpen}
@@ -1075,8 +1081,8 @@ function Step3SubSub({
 
 function Step4Details({
   t, category, categoryLabel, color, subcategory, subSub, warehouses,
-  name, setName, warehouseId, setWarehouseId, qty, setQty, unit, setUnit,
-  notes, setNotes, notesOpen, setNotesOpen, error, onBack,
+  name, setName, warehouseId, setWarehouseId, qty, setQty, unitCost, setUnitCost,
+  unit, setUnit, notes, setNotes, notesOpen, setNotesOpen, error, onBack,
 }: {
   t: (k: string, fallback?: string) => string;
   category: InternalCategoryHint;
@@ -1088,6 +1094,7 @@ function Step4Details({
   name: string; setName: (s: string) => void;
   warehouseId: string; setWarehouseId: (s: string) => void;
   qty: string; setQty: (s: string) => void;
+  unitCost: string; setUnitCost: (s: string) => void;
   unit: UnitOfMeasure; setUnit: (u: UnitOfMeasure) => void;
   notes: string; setNotes: (s: string) => void;
   notesOpen: boolean; setNotesOpen: (b: boolean) => void;
@@ -1138,16 +1145,28 @@ function Step4Details({
         </label>
       </div>
 
-      <label className="block">
-        <div className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("inv.int.unit")}</div>
-        <select
-          value={unit}
-          onChange={(e) => setUnit(e.target.value as UnitOfMeasure)}
-          className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-2.5 text-[13px] sm:w-48"
-        >
-          {ALLOWED_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
-        </select>
-      </label>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label className="block">
+          <div className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("inv.int.unit_cost")}</div>
+          <input
+            type="number" min="0" step="0.01"
+            value={unitCost}
+            onChange={(e) => setUnitCost(e.target.value)}
+            placeholder={t("inv.int.unit_cost.ph")}
+            className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2.5 text-[13px] tabular-nums outline-none focus:border-[var(--text-dim)] placeholder:text-[var(--text-dim)]"
+          />
+        </label>
+        <label className="block">
+          <div className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--text-dim)]">{t("inv.int.unit")}</div>
+          <select
+            value={unit}
+            onChange={(e) => setUnit(e.target.value as UnitOfMeasure)}
+            className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-2.5 text-[13px]"
+          >
+            {ALLOWED_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+          </select>
+        </label>
+      </div>
 
       {Number(qty) > 0 && warehouseId && (
         <div className={`flex items-start gap-2 rounded-lg border px-3 py-2.5 text-[11.5px] ${color.chipBg} border-[var(--border-subtle)]`}>
