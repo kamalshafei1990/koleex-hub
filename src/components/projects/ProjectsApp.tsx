@@ -35,6 +35,7 @@ import ProjectsIcon from "@/components/icons/ProjectsIcon";
 import PageHeader from "@/components/ui/PageHeader";
 import AppHomeMenu from "@/components/ui/AppHomeMenu";
 import Button from "@/components/ui/Button";
+import { SEARCH_PLACEHOLDERS } from "@/lib/searchPlaceholders";
 import EntityPlanningStrip from "@/components/planning/EntityPlanningStrip";
 import EntityPicker from "@/components/planning/EntityPicker";
 import {
@@ -153,7 +154,7 @@ export default function ProjectsApp() {
               { key: "reporting", onClick: () => setTab("reporting"), icon: "chart-pie",     label: "Reporting"    },
               { key: "config",    onClick: () => setTab("config"),    icon: "cog",           label: "Configuration"},
             ]}
-            searchPlaceholder="Search projects, tasks, tags…"
+            searchPlaceholder={SEARCH_PLACEHOLDERS.projects}
           />
 
           {tab === "projects" && <ProjectsListView onOpenProject={setActiveProjectId} />}

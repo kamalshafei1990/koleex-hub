@@ -18,6 +18,8 @@ import type { PageTab } from "@/components/ui/PageHeader";
 import type { NavGroup } from "@/components/ui/PageNavPopup";
 import type { RrIconName } from "@/components/ui/RrIcon";
 import { useTranslation, type Translations } from "@/lib/i18n";
+import { ACCENT } from "@/lib/accentColors";
+import { SEARCH_PLACEHOLDERS } from "@/lib/searchPlaceholders";
 
 const PRIMARY_TABS_RAW: Array<PageTab & { i18nKey: string }> = [
   { key: "/inventory",           label: "Home",      icon: "home",         i18nKey: "inv.nav.r.home" },
@@ -32,12 +34,7 @@ const OVERFLOW_GROUPS: NavGroup[] = [
   {
     id: "do",
     label: "Actions",
-    accent: {
-      border:   "border-l-blue-500/70",
-      chipBg:   "bg-blue-500/10",
-      chipText: "text-blue-400",
-      header:   "text-blue-400",
-    },
+    accent: ACCENT.blue,
     items: [
       { key: "/inventory",           label: "Home",       icon: "home",         blurb: "Today's view + quick actions" },
       { key: "/inventory/items",     label: "Items",      icon: "box-open",     blurb: "Browse + add stocked items" },
@@ -49,12 +46,7 @@ const OVERFLOW_GROUPS: NavGroup[] = [
   {
     id: "lookup",
     label: "Look up",
-    accent: {
-      border:   "border-l-teal-500/70",
-      chipBg:   "bg-teal-500/10",
-      chipText: "text-teal-400",
-      header:   "text-teal-400",
-    },
+    accent: ACCENT.teal,
     items: [
       { key: "/inventory/search",    label: "Search",    icon: "search",      blurb: "Find anything fast" },
       { key: "/inventory/balances",  label: "Balances",  icon: "badge-check", blurb: "Live stock on hand" },
@@ -65,12 +57,7 @@ const OVERFLOW_GROUPS: NavGroup[] = [
   {
     id: "setup",
     label: "Setup",
-    accent: {
-      border:   "border-l-amber-500/70",
-      chipBg:   "bg-amber-500/10",
-      chipText: "text-amber-400",
-      header:   "text-amber-400",
-    },
+    accent: ACCENT.amber,
     items: [
       { key: "/inventory/warehouses", label: "Warehouses", icon: "building", blurb: "Locations + defaults" },
     ],
@@ -128,7 +115,7 @@ export default function InventoryHeader({
       popupTitle="Inventory"
       popupSubtitle="Pick where to go."
       showTabs={showTabs}
-      searchPlaceholder="Search items, serials, batches, movements…"
+      searchPlaceholder={SEARCH_PLACEHOLDERS.inventory}
       searchHref="/inventory/search"
     />
   );

@@ -29,6 +29,7 @@ import { expensesT } from "@/lib/translations/expenses";
 import ExpensesHeader from "@/components/expenses/ExpensesHeader";
 import AppHomeMenu, { type AppHomeNavItem } from "@/components/ui/AppHomeMenu";
 import Button from "@/components/ui/Button";
+import { SEARCH_PLACEHOLDERS } from "@/lib/searchPlaceholders";
 import type { ExpensesTabKey } from "@/components/expenses/ExpensesTabs";
 import { EmptyState, SectionCard, StatusBadge } from "@/components/finance/FinanceUi";
 import {
@@ -230,7 +231,7 @@ export default function ExpensesApp() {
               { key: "approvals", onClick: () => setApprovalFilter("needs_review"), icon: "shield-check", label: "Approvals"  },
               { key: "analytics", href: "/finance/expenses",         icon: "signal-stream", label: "Analytics"    },
             ] as AppHomeNavItem[]}
-            searchPlaceholder="Search expenses, categories, payments…"
+            searchPlaceholder={SEARCH_PLACEHOLDERS.expenses}
             onSearchSubmit={(term) => setSearch(term)}
           />
         </div>

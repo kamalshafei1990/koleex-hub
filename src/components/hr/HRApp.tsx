@@ -24,6 +24,7 @@ import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import HrIcon from "@/components/icons/HrIcon";
 import PageHeader from "@/components/ui/PageHeader";
+import { SEARCH_PLACEHOLDERS } from "@/lib/searchPlaceholders";
 
 /* ── Module components (lazy‑loaded) ── */
 import DashboardModule from "./modules/Dashboard";
@@ -112,7 +113,7 @@ export default function HRApp() {
         <PageHeader
           title={t("hr.title")}
           icon={<HrIcon size={16} />}
-          searchPlaceholder="Search employees, leave, payroll, documents…"
+          searchPlaceholder={SEARCH_PLACEHOLDERS.hr}
           searchHref="/inventory/search"
           tabs={TAB_IDS.map((tabId) => {
             const Icon = TAB_ICONS[tabId];

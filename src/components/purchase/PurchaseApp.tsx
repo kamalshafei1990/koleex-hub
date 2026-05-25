@@ -48,6 +48,7 @@ import ClipboardCheckIcon from "@/components/icons/ui/ClipboardCheckIcon";
 import CornerUpLeftIcon from "@/components/icons/ui/CornerUpLeftIcon";
 import PurchaseIcon from "@/components/icons/PurchaseIcon";
 import PageHeader from "@/components/ui/PageHeader";
+import { SEARCH_PLACEHOLDERS } from "@/lib/searchPlaceholders";
 
 import DashboardModule    from "./modules/Dashboard";
 import RequisitionsModule from "./modules/Requisitions";
@@ -132,7 +133,7 @@ export default function PurchaseApp() {
           title={t("purchase.title")}
           subtitle={t("purchase.subtitle")}
           icon={<PurchaseIcon size={16} />}
-          searchPlaceholder="Search RFQs, POs, suppliers, bills…"
+          searchPlaceholder={SEARCH_PLACEHOLDERS.purchase}
           searchHref="/inventory/search"
           tabs={PURCHASE_GROUPS.map((g) => ({
             key: g.id,

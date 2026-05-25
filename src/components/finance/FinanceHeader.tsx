@@ -17,6 +17,8 @@ import Button from "@/components/ui/Button";
 import { openSmartCreate } from "@/components/ui/create/SmartCreateDrawer";
 import { useTranslation } from "@/lib/i18n";
 import { financeT } from "@/lib/translations/finance";
+import { ACCENT } from "@/lib/accentColors";
+import { SEARCH_PLACEHOLDERS } from "@/lib/searchPlaceholders";
 
 export type HealthStatus = "healthy" | "watch" | "stress" | "unknown";
 
@@ -61,12 +63,7 @@ const OVERFLOW_GROUPS_RAW: Array<{ id: string; labelKey: string; fallback: strin
     id: "accounting",
     labelKey: "tabs.accounting",
     fallback: "Accounting",
-    accent: {
-      border:   "border-l-blue-500/70",
-      chipBg:   "bg-blue-500/10",
-      chipText: "text-blue-400",
-      header:   "text-blue-400",
-    },
+    accent: ACCENT.blue,
     items: [
       { key: "/finance/accounting/queue",          labelKey: "subtab.queue",         fallback: "Queue",          icon: "clock",                blurb: "Pending journal entries" },
       { key: "/finance/accounting/trial-balance",  labelKey: "subtab.trialBalance",  fallback: "Trial Balance",  icon: "badge-check",          blurb: "All accounts at a glance" },
@@ -80,12 +77,7 @@ const OVERFLOW_GROUPS_RAW: Array<{ id: string; labelKey: string; fallback: strin
     id: "banking",
     labelKey: "tabs.banking",
     fallback: "Banking",
-    accent: {
-      border:   "border-l-teal-500/70",
-      chipBg:   "bg-teal-500/10",
-      chipText: "text-teal-400",
-      header:   "text-teal-400",
-    },
+    accent: ACCENT.teal,
     items: [
       { key: "/finance/bank-accounts",   labelKey: "subtab.bankAccounts",   fallback: "Bank Accounts",   icon: "bank",        blurb: "Active accounts + balances" },
       { key: "/finance/bank-imports",    labelKey: "subtab.bankImports",    fallback: "Bank Imports",    icon: "upload",      blurb: "CSV / OFX statements" },
@@ -97,12 +89,7 @@ const OVERFLOW_GROUPS_RAW: Array<{ id: string; labelKey: string; fallback: strin
     id: "treasury",
     labelKey: "subtab.treasuryPlans",
     fallback: "Treasury",
-    accent: {
-      border:   "border-l-amber-500/70",
-      chipBg:   "bg-amber-500/10",
-      chipText: "text-amber-400",
-      header:   "text-amber-400",
-    },
+    accent: ACCENT.amber,
     items: [
       { key: "/finance/treasury-forecast", labelKey: "subtab.cashForecast",  fallback: "Cash Forecast",  icon: "arrow-up-right", blurb: "13-week cash projection" },
       { key: "/finance/treasury-plans",    labelKey: "subtab.treasuryPlans", fallback: "Treasury Plans", icon: "file-invoice",   blurb: "Long-range plans" },
@@ -113,12 +100,7 @@ const OVERFLOW_GROUPS_RAW: Array<{ id: string; labelKey: string; fallback: strin
     id: "reports",
     labelKey: "subtab.reports",
     fallback: "Reports",
-    accent: {
-      border:   "border-l-violet-500/70",
-      chipBg:   "bg-violet-500/10",
-      chipText: "text-violet-400",
-      header:   "text-violet-400",
-    },
+    accent: ACCENT.violet,
     items: [
       { key: "/finance/statements",    labelKey: "subtab.detailedStatements", fallback: "Statements",     icon: "balance-scale-left", blurb: "Detailed financial statements" },
       { key: "/finance/reports",       labelKey: "subtab.operationalReports", fallback: "Reports",        icon: "file-invoice",       blurb: "Operational reports" },
@@ -129,12 +111,7 @@ const OVERFLOW_GROUPS_RAW: Array<{ id: string; labelKey: string; fallback: strin
     id: "setup",
     labelKey: "subtab.setup",
     fallback: "Setup",
-    accent: {
-      border:   "border-l-rose-500/70",
-      chipBg:   "bg-rose-500/10",
-      chipText: "text-rose-400",
-      header:   "text-rose-400",
-    },
+    accent: ACCENT.rose,
     items: [
       { key: "/finance/approvals",     labelKey: "subtab.approvals",     fallback: "Approvals",     icon: "shield-check", blurb: "Approval workflows" },
       { key: "/finance/notifications", labelKey: "subtab.reminders",     fallback: "Notifications", icon: "clock",        blurb: "Reminders + alerts" },
@@ -208,7 +185,7 @@ export default function FinanceHeader({
       popupTitle={t("app.title", "Finance")}
       popupSubtitle={t("header.popupSubtitle", "Pick where to go.")}
       showTabs={showTabs}
-      searchPlaceholder="Search customers, suppliers, invoices, payments…"
+      searchPlaceholder={SEARCH_PLACEHOLDERS.finance}
       searchHref="/inventory/search"
     />
   );

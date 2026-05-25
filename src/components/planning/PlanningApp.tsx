@@ -33,6 +33,7 @@ import PlanningIcon from "@/components/icons/PlanningIcon";
 import PageHeader from "@/components/ui/PageHeader";
 import AppHomeMenu from "@/components/ui/AppHomeMenu";
 import EntityPicker from "@/components/planning/EntityPicker";
+import { SEARCH_PLACEHOLDERS } from "@/lib/searchPlaceholders";
 import {
   addDays,
   createItem,
@@ -244,7 +245,7 @@ export default function PlanningApp() {
               { key: "new",       onClick: () => setModal({ open: true, editing: null }), icon: "plus", label: "New" },
               { key: "config",    onClick: () => setTab("config"),   icon: "cog",          label: "Configuration" },
             ]}
-            searchPlaceholder="Search shifts, resources, roles…"
+            searchPlaceholder={SEARCH_PLACEHOLDERS.planning}
           />
 
           {loading ? (

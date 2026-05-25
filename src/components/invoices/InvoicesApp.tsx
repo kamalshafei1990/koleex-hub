@@ -24,6 +24,7 @@ import AppHomeMenu from "@/components/ui/AppHomeMenu";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import EntityPicker from "@/components/planning/EntityPicker";
+import { SEARCH_PLACEHOLDERS } from "@/lib/searchPlaceholders";
 import {
   createInvoice,
   deleteInvoice,
@@ -147,7 +148,7 @@ function InvoiceListView({ onOpen }: { onOpen: (id: string) => void }) {
               { key: "new",        onClick: () => setFormOpen(true),    icon: "plus",        label: "New Invoice"  },
               { key: "customers",  href: "/customers",                  icon: "users",       label: "Customers"    },
             ]}
-            searchPlaceholder="Search invoices, customers, amounts…"
+            searchPlaceholder={SEARCH_PLACEHOLDERS.invoices}
             onSearchSubmit={(term) => setSearch(term)}
           />
 

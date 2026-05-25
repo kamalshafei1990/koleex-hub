@@ -30,6 +30,7 @@ import UsersIcon from "@/components/icons/ui/UsersIcon";
 import ActivityIcon from "@/components/icons/ui/ActivityIcon";
 import SalesIcon from "@/components/icons/SalesIcon";
 import PageHeader from "@/components/ui/PageHeader";
+import { SEARCH_PLACEHOLDERS } from "@/lib/searchPlaceholders";
 
 import DashboardModule  from "./modules/Dashboard";
 import PipelineModule   from "./modules/Pipeline";
@@ -85,7 +86,7 @@ export default function SalesApp() {
           title={t("sales.title")}
           subtitle={t("sales.subtitle")}
           icon={<SalesIcon size={16} />}
-          searchPlaceholder="Search opportunities, quotes, orders, customers…"
+          searchPlaceholder={SEARCH_PLACEHOLDERS.sales}
           searchHref="/inventory/search"
           tabs={SALES_TAB_IDS.map((tabId) => {
             const Icon = TAB_ICONS[tabId];
