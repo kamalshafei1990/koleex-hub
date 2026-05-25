@@ -40,6 +40,7 @@ import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
 import ShieldIcon from "@/components/icons/ui/ShieldIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import AppHomeMenu from "@/components/ui/AppHomeMenu";
+import KpiCard from "@/components/ui/KpiCard";
 
 /* ═══════════════════════════════════════════════════
    MAIN COMPONENT
@@ -97,79 +98,30 @@ export default function DashboardModule({ employees, t, lang, setActiveTab }: HR
   /* ── render ── */
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6">
-      {/* ── Stat cards (2x2) ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Total Employees */}
-        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
-          <div className="h-1 bg-emerald-400 rounded-t-xl" />
-          <div className="p-4 flex items-start gap-3">
-            <div className="h-10 w-10 rounded-xl bg-emerald-500/15 flex items-center justify-center shrink-0">
-              <UsersIcon size={18} className="text-emerald-400" />
-            </div>
-            <div>
-              <div className="text-[24px] font-bold text-[var(--text-primary)]">
-                {dashStats?.headcount ?? "-"}
-              </div>
-              <div className="text-[12px] text-[var(--text-dim)]">
-                {t("hr.totalEmployees")}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* On Leave Today */}
-        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
-          <div className="h-1 bg-amber-400 rounded-t-xl" />
-          <div className="p-4 flex items-start gap-3">
-            <div className="h-10 w-10 rounded-xl bg-amber-500/15 flex items-center justify-center shrink-0">
-              <CalendarPlusIcon size={18} className="text-amber-400" />
-            </div>
-            <div>
-              <div className="text-[24px] font-bold text-[var(--text-primary)]">
-                {dashStats?.today_absences ?? "-"}
-              </div>
-              <div className="text-[12px] text-[var(--text-dim)]">
-                {t("hr.onLeaveToday")}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Pending Requests */}
-        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
-          <div className="h-1 bg-blue-400 rounded-t-xl" />
-          <div className="p-4 flex items-start gap-3">
-            <div className="h-10 w-10 rounded-xl bg-blue-500/15 flex items-center justify-center shrink-0">
-              <ClockIcon size={18} className="text-blue-400" />
-            </div>
-            <div>
-              <div className="text-[24px] font-bold text-[var(--text-primary)]">
-                {dashStats?.pending_leave_requests ?? "-"}
-              </div>
-              <div className="text-[12px] text-[var(--text-dim)]">
-                {t("hr.pendingRequests")}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Expiring Documents */}
-        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
-          <div className="h-1 bg-red-400 rounded-t-xl" />
-          <div className="p-4 flex items-start gap-3">
-            <div className="h-10 w-10 rounded-xl bg-red-500/15 flex items-center justify-center shrink-0">
-              <DocumentIcon size={18} className="text-red-400" />
-            </div>
-            <div>
-              <div className="text-[24px] font-bold text-[var(--text-primary)]">
-                {dashStats?.expiring_documents ?? "-"}
-              </div>
-              <div className="text-[12px] text-[var(--text-dim)]">
-                {t("hr.expiringDocuments")}
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* ── KPI cards — canonical monochrome KpiCard, same as every other app ── */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <KpiCard
+          label={t("hr.totalEmployees")}
+          value={dashStats?.headcount ?? "—"}
+          icon={<UsersIcon size={14} />}
+        />
+        <KpiCard
+          label={t("hr.onLeaveToday")}
+          value={dashStats?.today_absences ?? "—"}
+          icon={<CalendarPlusIcon size={14} />}
+        />
+        <KpiCard
+          label={t("hr.pendingRequests")}
+          value={dashStats?.pending_leave_requests ?? "—"}
+          icon={<ClockIcon size={14} />}
+          tone={(dashStats?.pending_leave_requests ?? 0) > 0 ? "warning" : "default"}
+        />
+        <KpiCard
+          label={t("hr.expiringDocuments")}
+          value={dashStats?.expiring_documents ?? "—"}
+          icon={<DocumentIcon size={14} />}
+          tone={(dashStats?.expiring_documents ?? 0) > 0 ? "rose" : "default"}
+        />
       </div>
 
       {/* ── Recent Leave Requests ── */}

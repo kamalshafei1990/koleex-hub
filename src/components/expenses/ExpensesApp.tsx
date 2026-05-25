@@ -28,6 +28,7 @@ import { useTranslation } from "@/lib/i18n";
 import { expensesT } from "@/lib/translations/expenses";
 import ExpensesHeader from "@/components/expenses/ExpensesHeader";
 import AppHomeMenu, { type AppHomeNavItem } from "@/components/ui/AppHomeMenu";
+import Button from "@/components/ui/Button";
 import type { ExpensesTabKey } from "@/components/expenses/ExpensesTabs";
 import { EmptyState, SectionCard, StatusBadge } from "@/components/finance/FinanceUi";
 import {
@@ -210,13 +211,9 @@ export default function ExpensesApp() {
           counts={counts}
           showTabs={false}
           action={
-            <button
-              type="button"
-              onClick={startNew}
-              className="rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-sm font-medium text-[var(--text-inverted)] transition hover:opacity-90 active:scale-95"
-            >
-              {t("header.addExpense", "+ Add Expense")}
-            </button>
+            <Button onClick={startNew} icon="plus">
+              {t("header.addExpense", "Add Expense")}
+            </Button>
           }
         />
 

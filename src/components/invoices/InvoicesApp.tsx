@@ -21,6 +21,7 @@ import { ScrollLockOverlay } from "@/hooks/useScrollLock";
 import RrIcon from "@/components/ui/RrIcon";
 import PageHeader from "@/components/ui/PageHeader";
 import AppHomeMenu from "@/components/ui/AppHomeMenu";
+import Button from "@/components/ui/Button";
 import EntityPicker from "@/components/planning/EntityPicker";
 import {
   createInvoice,
@@ -122,13 +123,9 @@ function InvoiceListView({ onOpen }: { onOpen: (id: string) => void }) {
             icon="file-invoice"
             showTabs={false}
             action={
-              <button
-                onClick={() => setFormOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-md bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] transition-opacity hover:opacity-90"
-              >
-                <RrIcon name="plus" size={12} />
+              <Button onClick={() => setFormOpen(true)} icon="plus">
                 <span className="hidden sm:inline">{t("action.new")}</span>
-              </button>
+              </Button>
             }
           />
         </div>

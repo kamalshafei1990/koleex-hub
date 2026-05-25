@@ -34,6 +34,7 @@ import ListTodoIcon from "@/components/icons/ui/ListTodoIcon";
 import ProjectsIcon from "@/components/icons/ProjectsIcon";
 import PageHeader from "@/components/ui/PageHeader";
 import AppHomeMenu from "@/components/ui/AppHomeMenu";
+import Button from "@/components/ui/Button";
 import EntityPlanningStrip from "@/components/planning/EntityPlanningStrip";
 import EntityPicker from "@/components/planning/EntityPicker";
 import {
@@ -268,13 +269,9 @@ function ProjectsListView({ onOpenProject }: { onOpenProject: (id: string) => vo
           ))}
         </div>
         <div className="flex-1" />
-        <button
-          onClick={() => { setEditingProject(null); setFormOpen(true); }}
-          className="h-9 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shrink-0"
-        >
-          <PlusIcon size={14} />
+        <Button onClick={() => { setEditingProject(null); setFormOpen(true); }} icon={<PlusIcon size={12} />}>
           {t("action.newProject")}
-        </button>
+        </Button>
       </div>
 
       {/* Grid */}
@@ -532,13 +529,9 @@ function ProjectDetailView({
             >
               <PencilIcon className="h-3.5 w-3.5" />
             </button>
-            <button
-              onClick={() => setTaskModal({ open: true, editing: null })}
-              className="h-9 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 shrink-0"
-            >
-              <PlusIcon size={14} />
+            <Button onClick={() => setTaskModal({ open: true, editing: null })} icon={<PlusIcon size={12} />}>
               <span className="hidden sm:inline">{t("btn.addTask")}</span>
-            </button>
+            </Button>
           </div>
         </div>
       </div>

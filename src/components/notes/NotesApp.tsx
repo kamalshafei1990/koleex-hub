@@ -12,6 +12,7 @@ import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import NotesIcon from "@/components/icons/NotesIcon";
 import PageHeader from "@/components/ui/PageHeader";
 import AppHomeMenu from "@/components/ui/AppHomeMenu";
+import Button from "@/components/ui/Button";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
@@ -476,13 +477,9 @@ export default function NotesApp() {
                 </button>
               )}
             </div>
-            <button
-              onClick={onCreateNote}
-              className="h-10 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shrink-0"
-            >
-              <PlusIcon className="h-4 w-4" />
+            <Button onClick={onCreateNote} icon={<PlusIcon className="h-3.5 w-3.5" />}>
               <span className="hidden md:inline">{t("newNote")}</span>
-            </button>
+            </Button>
           </div>
         </div>
       </div>

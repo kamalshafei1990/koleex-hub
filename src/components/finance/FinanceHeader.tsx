@@ -13,6 +13,7 @@ import type { ReactNode } from "react";
 import PageHeader, { type PageTab } from "@/components/ui/PageHeader";
 import type { NavGroup } from "@/components/ui/PageNavPopup";
 import RrIcon from "@/components/ui/RrIcon";
+import Button from "@/components/ui/Button";
 import { openSmartCreate } from "@/components/ui/create/SmartCreateDrawer";
 import { useTranslation } from "@/lib/i18n";
 import { financeT } from "@/lib/translations/finance";
@@ -179,32 +180,19 @@ export default function FinanceHeader({
   }));
 
   const createBtn = (
-    <button
-      type="button"
+    <Button
       onClick={() => openSmartCreate()}
-      className="inline-flex items-center gap-1.5 rounded-md bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] transition-opacity hover:opacity-90"
+      icon="plus"
       title={t("header.createTitle", "Create (c)")}
       aria-label={t("header.createAria", "Open Smart Create drawer (shortcut: c)")}
     >
-      <RrIcon name="plus" size={12} />
       {t("header.create", "Create")}
-    </button>
-  );
-
-  const titleWithHealth = (
-    <>
-      {title}
-      {health && health !== "unknown" && (
-        <span className="ml-2 inline-flex align-middle">
-          <HealthPill status={health} />
-        </span>
-      )}
-    </>
+    </Button>
   );
 
   return (
     <PageHeader
-      title={typeof titleWithHealth === "string" ? titleWithHealth : title}
+      title={title}
       subtitle={subtitle}
       icon="coins"
       action={
