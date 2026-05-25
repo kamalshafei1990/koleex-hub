@@ -93,7 +93,7 @@ const NAV_CARDS: AppHomeNavItem[] = [
   { href: "/inventory/search",    icon: "search",       label: "Search",     chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
   { href: "/inventory/balances",  icon: "badge-check",  label: "Balances",   chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
   { href: "/inventory/serials",   icon: "fingerprint",  label: "Serials",    chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
-  { href: "/inventory/batches",   icon: "pallet",       label: "Batches",    chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
+  { href: "/inventory/batches",   icon: "box-circle-check", label: "Batches",    chipBg: "bg-teal-500/10",  chipText: "text-teal-400"  },
   { href: "/inventory/warehouses",icon: "building",     label: "Warehouses", chipBg: "bg-amber-500/10", chipText: "text-amber-400" },
 ];
 

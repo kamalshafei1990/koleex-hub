@@ -59,7 +59,7 @@ const OVERFLOW_GROUPS: NavGroup[] = [
       { key: "/inventory/search",    label: "Search",    icon: "search",      blurb: "Find anything fast" },
       { key: "/inventory/balances",  label: "Balances",  icon: "badge-check", blurb: "Live stock on hand" },
       { key: "/inventory/serials",   label: "Serials",   icon: "fingerprint", blurb: "Trace by serial number" },
-      { key: "/inventory/batches",   label: "Batches",   icon: "pallet",      blurb: "Lots, expiry, FEFO" },
+      { key: "/inventory/batches",   label: "Batches",   icon: "box-circle-check", blurb: "Lots, expiry, FEFO" },
     ],
   },
   {
