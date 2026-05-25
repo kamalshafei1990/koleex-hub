@@ -23,6 +23,7 @@ export default function ExpensesHeader({
   tab,
   onTabChange,
   counts,
+  showTabs = true,
 }: {
   title: string;
   subtitle?: string;
@@ -30,6 +31,7 @@ export default function ExpensesHeader({
   tab: ExpensesTabKey;
   onTabChange: (next: ExpensesTabKey) => void;
   counts: { all: number; unpaid: number; paid: number; overdue: number };
+  showTabs?: boolean;
 }) {
   const { t } = useTranslation(expensesT);
 
@@ -58,10 +60,12 @@ export default function ExpensesHeader({
         }
         showTabs={false}
       />
-      {/* Filter tab strip — restyled to match canonical PageHeader tabs */}
-      <div className="mt-5">
-        <ExpensesTabs value={tab} onChange={onTabChange} counts={counts} />
-      </div>
+      {/* Filter tab strip — hidden when parent uses AppHomeMenu (single menu) */}
+      {showTabs && (
+        <div className="mt-5">
+          <ExpensesTabs value={tab} onChange={onTabChange} counts={counts} />
+        </div>
+      )}
     </div>
   );
 }

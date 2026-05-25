@@ -208,6 +208,7 @@ export default function ExpensesApp() {
           tab={tab}
           onTabChange={setTab}
           counts={counts}
+          showTabs={false}
           action={
             <button
               type="button"
@@ -219,14 +220,14 @@ export default function ExpensesApp() {
           }
         />
 
-        {/* Brand-aligned tile menu + search — same across every Hub app */}
+        {/* Single canonical menu — search + pill row with counts + active state */}
         <div className="mt-5">
           <AppHomeMenu
             navItems={[
-              { key: "all",       onClick: () => setTab("all"),     icon: "document",       label: "All Expenses" },
-              { key: "unpaid",    onClick: () => setTab("unpaid"),  icon: "clock",          label: "Unpaid"       },
-              { key: "paid",      onClick: () => setTab("paid"),    icon: "check",          label: "Paid"         },
-              { key: "overdue",   onClick: () => setTab("overdue"), icon: "info",           label: "Overdue"      },
+              { key: "all",       onClick: () => setTab("all"),     icon: "document",       label: "All",         count: counts.all,     active: tab === "all"     },
+              { key: "unpaid",    onClick: () => setTab("unpaid"),  icon: "clock",          label: "Unpaid",      count: counts.unpaid,  active: tab === "unpaid"  },
+              { key: "paid",      onClick: () => setTab("paid"),    icon: "check",          label: "Paid",        count: counts.paid,    active: tab === "paid"    },
+              { key: "overdue",   onClick: () => setTab("overdue"), icon: "info",           label: "Overdue",     count: counts.overdue, active: tab === "overdue" },
               { key: "new",       onClick: startNew,                 icon: "plus",          label: "New Expense"  },
               { key: "categories",href: "/categories",               icon: "books",         label: "Categories"   },
               { key: "approvals", onClick: () => setApprovalFilter("needs_review"), icon: "shield-check", label: "Approvals"  },

@@ -36,14 +36,14 @@ interface Stats {
 
 export default function DashboardModule({ t, setActiveTab }: SalesModuleProps) {
   const navItems: AppHomeNavItem[] = [
-    { key: "dashboard",  onClick: () => setActiveTab?.("dashboard"),  icon: <BarChart3Icon size={22} />,    label: "Dashboard"  },
-    { key: "pipeline",   onClick: () => setActiveTab?.("pipeline"),   icon: <LayoutGridIcon size={22} />,   label: "Pipeline"   },
-    { key: "quotations", onClick: () => setActiveTab?.("quotations"), icon: <DocumentIcon size={22} />,     label: "Quotations" },
-    { key: "orders",     onClick: () => setActiveTab?.("orders"),     icon: <BoxesIcon size={22} />,        label: "Orders"     },
-    { key: "invoices",   onClick: () => setActiveTab?.("invoices"),   icon: <DocumentIcon size={22} />,     label: "Invoices"   },
-    { key: "customers",  onClick: () => setActiveTab?.("customers"),  icon: <UsersIcon size={22} />,        label: "Customers"  },
-    { key: "activities", onClick: () => setActiveTab?.("activities"), icon: <ActivityIcon size={22} />,     label: "Activities" },
-    { key: "reports",    onClick: () => setActiveTab?.("reports"),    icon: <LineChartIcon size={22} />,    label: "Reports"    },
+    { key: "dashboard",  onClick: () => setActiveTab?.("dashboard"),  icon: <BarChart3Icon size={13} />,    label: "Dashboard",  active: true },
+    { key: "pipeline",   onClick: () => setActiveTab?.("pipeline"),   icon: <LayoutGridIcon size={13} />,   label: "Pipeline"    },
+    { key: "quotations", onClick: () => setActiveTab?.("quotations"), icon: <DocumentIcon size={13} />,     label: "Quotations"  },
+    { key: "orders",     onClick: () => setActiveTab?.("orders"),     icon: <BoxesIcon size={13} />,        label: "Orders"      },
+    { key: "invoices",   onClick: () => setActiveTab?.("invoices"),   icon: <DocumentIcon size={13} />,     label: "Invoices"    },
+    { key: "customers",  onClick: () => setActiveTab?.("customers"),  icon: <UsersIcon size={13} />,        label: "Customers"   },
+    { key: "activities", onClick: () => setActiveTab?.("activities"), icon: <ActivityIcon size={13} />,     label: "Activities"  },
+    { key: "reports",    onClick: () => setActiveTab?.("reports"),    icon: <LineChartIcon size={13} />,    label: "Reports"     },
   ];
 
   const [stats, setStats] = useState<Stats | null>(null);

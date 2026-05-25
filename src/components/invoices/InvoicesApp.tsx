@@ -137,17 +137,17 @@ function InvoiceListView({ onOpen }: { onOpen: (id: string) => void }) {
       {/* Body */}
       <div className="flex-1 overflow-y-auto w-full">
         <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-4 min-w-0 space-y-4">
-          {/* Brand-aligned tile menu + search — same across every Hub app */}
+          {/* Single canonical menu — search + pill row with active state */}
           <AppHomeMenu
             navItems={[
-              { key: "all",        onClick: () => setFilter("all"),     icon: "document",            label: "All Invoices" },
-              { key: "open",       onClick: () => setFilter("open"),    icon: "clock",               label: "Open"         },
-              { key: "draft",      onClick: () => setFilter("draft"),   icon: "file",                label: "Drafts"       },
-              { key: "sent",       onClick: () => setFilter("sent"),    icon: "paper-plane",         label: "Sent"         },
-              { key: "paid",       onClick: () => setFilter("paid"),    icon: "check",               label: "Paid"         },
-              { key: "overdue",    onClick: () => setFilter("overdue"), icon: "info",                label: "Overdue"      },
-              { key: "new",        onClick: () => setFormOpen(true),    icon: "plus",                label: "New Invoice"  },
-              { key: "customers",  href: "/customers",                  icon: "users",               label: "Customers"    },
+              { key: "open",       onClick: () => setFilter("open"),    icon: "clock",       label: "Open",        active: filter === "open"    },
+              { key: "all",        onClick: () => setFilter("all"),     icon: "document",    label: "All",         active: filter === "all"     },
+              { key: "draft",      onClick: () => setFilter("draft"),   icon: "file",        label: "Drafts",      active: filter === "draft"   },
+              { key: "sent",       onClick: () => setFilter("sent"),    icon: "paper-plane", label: "Sent",        active: filter === "sent"    },
+              { key: "paid",       onClick: () => setFilter("paid"),    icon: "check",       label: "Paid",        active: filter === "paid"    },
+              { key: "overdue",    onClick: () => setFilter("overdue"), icon: "info",        label: "Overdue",     active: filter === "overdue" },
+              { key: "new",        onClick: () => setFormOpen(true),    icon: "plus",        label: "New Invoice"  },
+              { key: "customers",  href: "/customers",                  icon: "users",       label: "Customers"    },
             ]}
             searchPlaceholder="Search invoices, customers, amounts…"
             onSearchSubmit={(term) => setSearch(term)}
@@ -161,32 +161,7 @@ function InvoiceListView({ onOpen }: { onOpen: (id: string) => void }) {
             <KpiCard label={t("kpi.count")} value={String(kpi.count)} accent="text-blue-400" />
           </div>
 
-          {/* Filters */}
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t("list.search")}
-              className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] outline-none focus:border-[var(--border-focus)] w-full sm:w-64"
-            />
-            <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
-              {(["open", "all", "draft", "sent", "partial", "paid", "overdue"] as const).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setFilter(s as InvoiceStatus | "all" | "open")}
-                  className={`h-7 px-3 rounded-full text-[11px] font-semibold border whitespace-nowrap transition-colors ${
-                    filter === s
-                      ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
-                      : "bg-transparent border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
-                  }`}
-                >
-                  {s === "open" && t("filter.open")}
-                  {s === "all" && t("filter.all")}
-                  {["draft", "sent", "partial", "paid", "overdue"].includes(s) && t(`status.${s}`)}
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* Filters row removed — AppHomeMenu above handles search + status filter */}
 
           {/* Table */}
           {loading ? (
