@@ -20,7 +20,7 @@
    · Menu pills at the bottom — text + active state + "More ▾" overflow
    --------------------------------------------------------------------------- */
 
-import { useEffect, useRef, useState, isValidElement, type FormEvent, type ReactNode } from "react";
+import { useState, isValidElement, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
@@ -83,42 +83,35 @@ export default function PageHeader({
   onSearchSubmit,
 }: PageHeaderProps) {
   const pathname = usePathname() ?? "";
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const resolvedBackHref = backHref ?? parentPath(pathname);
 
-  const hasTabs = showTabs && tabs && tabs.length > 0;
-  const hasOverflow = overflowTabs && overflowTabs.length > 0;
+  /* Flatten any overflow groups into the main tab list so every item
+     is visible inline (no "More" dropdown). De-dup by key to avoid
+     showing the same route twice when a primary tab also appears in
+     overflow groups. */
+  const tabsFromOverflow: PageTab[] =
+    overflowTabs?.flatMap((g) =>
+      g.items.map((i) => ({ key: i.key, label: i.label, icon: i.icon }))
+    ) ?? [];
+  const tabSet = new Set<string>();
+  const mergedTabs: PageTab[] = [];
+  for (const tab of [...(tabs ?? []), ...tabsFromOverflow]) {
+    if (tabSet.has(tab.key)) continue;
+    tabSet.add(tab.key);
+    mergedTabs.push(tab);
+  }
+
+  const hasTabs = showTabs && mergedTabs.length > 0;
   const hasSearch = !!searchPlaceholder;
 
   /* Longest-prefix match — detail pages still light the right tab. */
-  const allKeys = [
-    ...(tabs?.map((t) => t.key) ?? []),
-    ...(overflowTabs?.flatMap((g) => g.items.map((i) => i.key)) ?? []),
-  ];
+  const allKeys = mergedTabs.map((t) => t.key);
   const active =
     allKeys
       .slice()
       .sort((a, b) => b.length - a.length)
       .find((k) => pathname === k || (k !== resolvedBackHref && pathname.startsWith(k + "/"))) ??
-    (tabs?.[0]?.key ?? "");
-
-  /* Close dropdown on outside click / Escape */
-  useEffect(() => {
-    if (!dropdownOpen) return;
-    const onClick = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setDropdownOpen(false);
-      }
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setDropdownOpen(false); };
-    document.addEventListener("mousedown", onClick);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onClick);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [dropdownOpen]);
+    (mergedTabs[0]?.key ?? "");
 
   return (
     <div className="space-y-4 sm:space-y-5">
@@ -169,13 +162,13 @@ export default function PageHeader({
         />
       )}
 
-      {/* ── Menu row (pill chips with active underline + More dropdown) ── */}
+      {/* ── Menu row (all items inline — no "More" dropdown) ────── */}
       {hasTabs && (
         <nav
           aria-label={`${title} navigation`}
           className="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-1 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
-          {tabs!.map((tab) => {
+          {mergedTabs.map((tab) => {
             const isActive = tab.active ?? (tab.key === active);
             const tabClassName = `inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-4 text-[12.5px] font-medium transition-all duration-200 ${
               isActive
@@ -220,46 +213,6 @@ export default function PageHeader({
               </Link>
             );
           })}
-
-          {hasOverflow && (
-            <div ref={dropdownRef} className="relative">
-              <button
-                type="button"
-                onClick={() => setDropdownOpen((v) => !v)}
-                aria-expanded={dropdownOpen}
-                aria-haspopup="menu"
-                className="inline-flex h-9 shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 text-[12.5px] font-medium text-[var(--text-muted)] transition-all duration-200 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
-              >
-                More
-                <span aria-hidden className="text-[10px]">▾</span>
-              </button>
-              {dropdownOpen && (
-                <div
-                  role="menu"
-                  className="absolute left-0 top-full z-50 mt-1 w-[280px] overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[0_12px_40px_rgba(0,0,0,0.5)]"
-                >
-                  {overflowTabs!.map((group) => (
-                    <div key={group.id} className="py-1.5">
-                      <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-dim)]">
-                        {group.label}
-                      </div>
-                      {group.items.map((item) => (
-                        <Link
-                          key={item.key}
-                          href={item.key}
-                          onClick={() => setDropdownOpen(false)}
-                          className="flex items-center gap-2.5 px-3 py-2 text-[12.5px] text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
-                        >
-                          <RrIcon name={item.icon} size={13} className="text-[var(--text-dim)]" />
-                          <span>{item.label}</span>
-                        </Link>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
         </nav>
       )}
     </div>
