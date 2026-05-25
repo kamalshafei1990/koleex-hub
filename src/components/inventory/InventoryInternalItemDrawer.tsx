@@ -50,6 +50,9 @@ const T: Translations = {
   "inv.int.opening.note":   { en: "An opening-balance movement will be posted automatically.", zh: "将自动过账期初余额。", ar: "سيتم ترحيل حركة رصيد افتتاحي تلقائياً." },
   "inv.int.err.name":       { en: "Item name required.",      zh: "请填写物品名称。",     ar: "اسم العنصر مطلوب." },
   "inv.int.err.warehouse":  { en: "Pick a warehouse for the opening quantity.", zh: "请选择期初数量的仓库。", ar: "اختر مستودعاً للكمية الافتتاحية." },
+  "inv.int.search.ph":      { en: "Search items — laptop, A4 paper, helmet…", zh: "搜索物品：笔记本、A4纸、头盔…", ar: "ابحث: لاب توب، ورق A4، خوذة…" },
+  "inv.int.search.empty":   { en: "No items matched. Try a different keyword.", zh: "未找到匹配物品，请换个关键词。", ar: "لا توجد نتائج. جرب كلمة مختلفة." },
+  "inv.int.search.results": { en: "results", zh: "个结果", ar: "نتيجة" },
   "inv.int.cat.office_supply":        { en: "Office Supplies",      zh: "办公用品",     ar: "اللوازم المكتبية" },
   "inv.int.cat.marketing_material":   { en: "Marketing Materials",  zh: "营销物料",     ar: "مواد تسويقية" },
   "inv.int.cat.exhibition_material":  { en: "Exhibition Materials", zh: "展会物料",     ar: "مواد المعارض" },
@@ -271,6 +274,52 @@ function subIconFor(label: string): RrIconName {
   return "box-open";
 }
 
+/* ─── Search ────────────────────────────────────────────────── */
+
+interface SearchResult {
+  /** How deep the match is */
+  kind:        "category" | "subcategory" | "subsub";
+  category:    InternalCategoryHint;
+  subcategory?: string;
+  subSub?:      string;
+  /** The word(s) that matched the query */
+  matchText:   string;
+  /** Full breadcrumb path for the subtitle */
+  path:        string;
+}
+
+function searchTaxonomy(query: string): SearchResult[] {
+  const q = query.toLowerCase().trim();
+  if (!q) return [];
+  const results: SearchResult[] = [];
+
+  for (const cat of INTERNAL_TAXONOMY) {
+    const catLabel = cat.label;
+    const catKey   = cat.type_key.replace(/_/g, " ");
+
+    // Category-level match
+    if (catLabel.toLowerCase().includes(q) || catKey.includes(q) || cat.hint?.toLowerCase().includes(q)) {
+      results.push({ kind: "category", category: cat, matchText: catLabel, path: catLabel });
+    }
+
+    // Subcategory + sub-sub
+    for (const sub of cat.subcategories) {
+      if (sub.toLowerCase().includes(q)) {
+        results.push({ kind: "subcategory", category: cat, subcategory: sub, matchText: sub, path: `${catLabel} › ${sub}` });
+      }
+      const subs = cat.sub_subcategories?.[sub] ?? [];
+      for (const ss of subs) {
+        if (ss.toLowerCase().includes(q)) {
+          results.push({ kind: "subsub", category: cat, subcategory: sub, subSub: ss, matchText: ss, path: `${catLabel} › ${sub} › ${ss}` });
+        }
+      }
+    }
+  }
+
+  // Deduplicate and cap
+  return results.slice(0, 24);
+}
+
 /* ─── Types ─────────────────────────────────────────────────── */
 
 interface Warehouse { id: string; code: string; name: string; is_default: boolean }
@@ -302,6 +351,7 @@ export default function InventoryInternalItemDrawer({ onClose, onSuccess }: Prop
   const [subcategory, setSubcategory] = useState<string>("");
   const [subSub, setSubSub] = useState<string>("");
   const [customMode, setCustomMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [name, setName] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
@@ -345,6 +395,21 @@ export default function InventoryInternalItemDrawer({ onClose, onSuccess }: Prop
   );
   const hasSubSubStep = subSubList.length > 0;
   const totalSteps = hasSubSubStep ? 4 : 3;
+
+  const handleSearchSelect = (r: SearchResult) => {
+    setSearchQuery("");
+    setCategory(r.category);
+    setCustomMode(false);
+    if (r.kind === "category") {
+      setSubcategory(""); setSubSub(""); setStep(2);
+    } else if (r.kind === "subcategory" && r.subcategory) {
+      setSubcategory(r.subcategory); setSubSub("");
+      const ss = suggestSubSubcategories(r.category.type_key, r.subcategory);
+      setStep(ss.length > 0 ? 3 : 4);
+    } else if (r.kind === "subsub" && r.subcategory && r.subSub) {
+      setSubcategory(r.subcategory); setSubSub(r.subSub); setStep(4);
+    }
+  };
 
   const submit = async () => {
     if (!name.trim()) { setError(t("inv.int.err.name")); return; }
@@ -453,7 +518,13 @@ export default function InventoryInternalItemDrawer({ onClose, onSuccess }: Prop
         {/* ── Body ────────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto px-5 pb-24 pt-5 sm:pb-5">
           {step === 1 && (
-            <Step1 t={t} onPick={(c) => { setCategory(c); setSubcategory(""); setSubSub(""); setCustomMode(false); setStep(2); }} />
+            <Step1
+              t={t}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              onPick={(c) => { setCategory(c); setSubcategory(""); setSubSub(""); setCustomMode(false); setStep(2); }}
+              onSearchSelect={handleSearchSelect}
+            />
           )}
           {step === 2 && category && (
             <Step2
@@ -557,49 +628,153 @@ function StepStrip({
   );
 }
 
-/* ─── Step 1 — category grid ─────────────────────────────────── */
+/* ─── Step 1 — search bar + category grid ────────────────────── */
 
 function Step1({
-  t, onPick,
-}: { t: (k: string, fallback?: string) => string; onPick: (c: InternalCategoryHint) => void }) {
+  t, searchQuery, setSearchQuery, onPick, onSearchSelect,
+}: {
+  t: (k: string, fallback?: string) => string;
+  searchQuery: string;
+  setSearchQuery: (s: string) => void;
+  onPick: (c: InternalCategoryHint) => void;
+  onSearchSelect: (r: SearchResult) => void;
+}) {
+  const results = useMemo(() => searchTaxonomy(searchQuery), [searchQuery]);
+  const hasQuery = searchQuery.trim().length > 0;
+
   return (
     <div>
-      <h3 className="text-[17px] font-semibold tracking-tight">{t("inv.int.step1.title")}</h3>
-      <p className="mt-0.5 text-[12px] text-[var(--text-dim)]">Choose the type that best fits what you're adding.</p>
-      <div
-        data-testid="inv-internal-cat-grid"
-        className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4"
-      >
-        {INTERNAL_TAXONOMY.map((c) => {
-          const key    = `inv.int.cat.${c.type_key}`;
-          const label  = t(key) === key ? c.label : t(key);
-          const icon   = CATEGORY_ICON[c.type_key] ?? "box-open";
-          const col    = catColor(c.type_key);
-          return (
-            <button
-              key={c.type_key}
-              type="button"
-              onClick={() => onPick(c)}
-              data-testid={`inv-internal-cat-${c.type_key}`}
-              className={`group relative flex min-h-[100px] flex-col items-start gap-2 overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-3 text-left transition-all ${col.hoverBorder} hover:bg-[var(--bg-elevated)]`}
-            >
-              {/* Top color hairline */}
-              <span aria-hidden className={`absolute inset-x-0 top-0 h-0.5 ${col.topLine}`} />
-              {/* Icon chip */}
-              <span className={`flex h-9 w-9 items-center justify-center rounded-lg ${col.chipBg}`}>
-                <RrIcon name={icon} size={15} className={col.chipText} />
-              </span>
-              {/* Label */}
-              <div className="flex-1">
-                <div className="text-[12.5px] font-semibold leading-tight tracking-tight text-[var(--text-primary)]">
-                  {label}
-                </div>
-                <div className="mt-0.5 text-[10.5px] leading-snug text-[var(--text-dim)]">{c.hint}</div>
-              </div>
-            </button>
-          );
-        })}
+      {/* ── Search bar ────────────────────────────────────── */}
+      <div className="relative">
+        <span aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]">
+          <RrIcon name="search" size={14} />
+        </span>
+        <input
+          autoFocus
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder={t("inv.int.search.ph")}
+          className="w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] py-2.5 pl-9 pr-9 text-[13px] outline-none transition-colors focus:border-[var(--text-dim)] placeholder:text-[var(--text-dim)]"
+        />
+        {hasQuery && (
+          <button
+            type="button"
+            onClick={() => setSearchQuery("")}
+            aria-label="Clear search"
+            className="absolute right-3 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--bg-elevated)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+          >
+            <RrIcon name="cross" size={9} />
+          </button>
+        )}
       </div>
+
+      {/* ── Search results ────────────────────────────────── */}
+      {hasQuery ? (
+        <div className="mt-3">
+          {results.length > 0 && (
+            <div className="mb-2 text-[10.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
+              {results.length} {t("inv.int.search.results")}
+            </div>
+          )}
+          <SearchResultsList results={results} t={t} onSelect={onSearchSelect} />
+        </div>
+      ) : (
+        /* ── Category grid ──────────────────────────────── */
+        <>
+          <h3 className="mt-4 text-[17px] font-semibold tracking-tight">{t("inv.int.step1.title")}</h3>
+          <p className="mt-0.5 text-[12px] text-[var(--text-dim)]">Choose the type that best fits what you're adding.</p>
+          <div
+            data-testid="inv-internal-cat-grid"
+            className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4"
+          >
+            {INTERNAL_TAXONOMY.map((c) => {
+              const key   = `inv.int.cat.${c.type_key}`;
+              const label = t(key) === key ? c.label : t(key);
+              const icon  = CATEGORY_ICON[c.type_key] ?? "box-open";
+              const col   = catColor(c.type_key);
+              return (
+                <button
+                  key={c.type_key}
+                  type="button"
+                  onClick={() => onPick(c)}
+                  data-testid={`inv-internal-cat-${c.type_key}`}
+                  className={`group relative flex min-h-[100px] flex-col items-start gap-2 overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-3 text-left transition-all ${col.hoverBorder} hover:bg-[var(--bg-elevated)]`}
+                >
+                  <span aria-hidden className={`absolute inset-x-0 top-0 h-0.5 ${col.topLine}`} />
+                  <span className={`flex h-9 w-9 items-center justify-center rounded-lg ${col.chipBg}`}>
+                    <RrIcon name={icon} size={15} className={col.chipText} />
+                  </span>
+                  <div className="flex-1">
+                    <div className="text-[12.5px] font-semibold leading-tight tracking-tight text-[var(--text-primary)]">{label}</div>
+                    <div className="mt-0.5 text-[10.5px] leading-snug text-[var(--text-dim)]">{c.hint}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ─── Search results list ─────────────────────────────────────── */
+
+function SearchResultsList({
+  results, t, onSelect,
+}: {
+  results: SearchResult[];
+  t: (k: string, fallback?: string) => string;
+  onSelect: (r: SearchResult) => void;
+}) {
+  if (results.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-14 text-center">
+        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--bg-surface)] text-[var(--text-dim)]">
+          <RrIcon name="search" size={20} />
+        </span>
+        <div className="text-[13px] text-[var(--text-dim)]">{t("inv.int.search.empty")}</div>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-1.5">
+      {results.map((r, i) => {
+        const col  = catColor(r.category.type_key);
+        const icon = CATEGORY_ICON[r.category.type_key] ?? "box-open";
+        const kindIcon: RrIconName =
+          r.kind === "subsub"      ? "arrow-up-right" :
+          r.kind === "subcategory" ? "arrow-up-right" :
+                                     "box-open";
+        return (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onSelect(r)}
+            className={`flex w-full items-center gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2.5 text-left transition-all ${col.hoverBorder} hover:bg-[var(--bg-elevated)]`}
+          >
+            {/* Category color chip */}
+            <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${col.chipBg}`}>
+              <RrIcon name={icon} size={13} className={col.chipText} />
+            </span>
+
+            {/* Text */}
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[12.5px] font-medium text-[var(--text-primary)]">{r.matchText}</div>
+              {r.path !== r.matchText && (
+                <div className="mt-0.5 truncate text-[10.5px] text-[var(--text-dim)]">{r.path}</div>
+              )}
+            </div>
+
+            {/* Kind badge */}
+            <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9.5px] uppercase tracking-[0.08em] font-semibold ${col.chipBg} ${col.chipText}`}>
+              {r.kind === "subsub" ? "variant" : r.kind === "subcategory" ? "sub" : "cat"}
+            </span>
+
+            <RrIcon name={kindIcon} size={11} className="shrink-0 text-[var(--text-dim)]" />
+          </button>
+        );
+      })}
     </div>
   );
 }
