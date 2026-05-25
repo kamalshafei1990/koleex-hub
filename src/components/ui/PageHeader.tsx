@@ -20,11 +20,16 @@
    · Menu pills at the bottom — text + active state + "More ▾" overflow
    --------------------------------------------------------------------------- */
 
-import { useState, isValidElement, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, isValidElement, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
 import type { NavGroup } from "@/components/ui/PageNavPopup";
+
+/* Sliding-pill geometry — change in one place. */
+const TAB_WIDTH_LG = 148;
+const TAB_WIDTH_MD = 120;
+const TRACK_PADDING = 6;
 
 export interface PageTab {
   key: string;
@@ -162,60 +167,125 @@ export default function PageHeader({
         />
       )}
 
-      {/* ── Menu row (all items inline — no "More" dropdown) ────── */}
+      {/* ── Menu row — sliding pill ────────────────────────────── */}
       {hasTabs && (
-        <nav
-          aria-label={`${title} navigation`}
-          className="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-1 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-          {mergedTabs.map((tab) => {
-            const isActive = tab.active ?? (tab.key === active);
-            const tabClassName = `inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-4 text-[12.5px] font-medium transition-all duration-200 ${
-              isActive
-                ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] shadow-sm"
-                : "border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-muted)] hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
-            }`;
-            const tabInner = (
-              <>
-                {tab.icon && (
-                  <span aria-hidden className={isActive ? "" : "text-[var(--text-dim)]"}>
-                    {typeof tab.icon === "string" ? (
-                      <RrIcon name={tab.icon as RrIconName} size={12} />
-                    ) : (
-                      tab.icon
-                    )}
-                  </span>
-                )}
-                {tab.label}
-              </>
-            );
-            if (tab.onClick) {
-              return (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={tab.onClick}
-                  aria-current={isActive ? "page" : undefined}
-                  className={tabClassName}
-                >
-                  {tabInner}
-                </button>
-              );
-            }
-            return (
-              <Link
-                key={tab.key}
-                href={tab.key}
-                aria-current={isActive ? "page" : undefined}
-                className={tabClassName}
-              >
-                {tabInner}
-              </Link>
-            );
-          })}
-        </nav>
+        <SlidingPillNav
+          tabs={mergedTabs}
+          activeKey={active}
+          ariaLabel={`${title} navigation`}
+        />
       )}
     </div>
+  );
+}
+
+/* ===========================================================================
+   SlidingPillNav — single white pill that slides between fixed-width tabs.
+   One DOM pill, no per-tab background, no width animation (only `left`).
+   =========================================================================== */
+function SlidingPillNav({
+  tabs,
+  activeKey,
+  ariaLabel,
+}: {
+  tabs: PageTab[];
+  activeKey: string;
+  ariaLabel: string;
+}) {
+  const [tabWidth, setTabWidth] = useState<number>(TAB_WIDTH_LG);
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  /* Responsive tab width — 148px on ≥900px, 120px below. */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 900px)");
+    const update = () => setTabWidth(mq.matches ? TAB_WIDTH_MD : TAB_WIDTH_LG);
+    update();
+    const handler = (e: MediaQueryListEvent) => setTabWidth(e.matches ? TAB_WIDTH_MD : TAB_WIDTH_LG);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  /* Active index — supports both forced `tab.active` and longest-prefix `activeKey`. */
+  const activeIndex = Math.max(
+    0,
+    tabs.findIndex((t) => (t.active ?? (t.key === activeKey))),
+  );
+
+  /* Roving tabindex — arrow keys move focus between tabs. */
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    const els = trackRef.current?.querySelectorAll<HTMLElement>('[role="tab"]');
+    if (!els || els.length === 0) return;
+    const list = Array.from(els);
+    const focused = list.findIndex((el) => el === document.activeElement);
+    const start = focused >= 0 ? focused : activeIndex;
+    const delta = e.key === "ArrowLeft" ? -1 : 1;
+    const next = (start + delta + list.length) % list.length;
+    list[next]?.focus();
+  };
+
+  return (
+    <nav
+      ref={trackRef}
+      role="tablist"
+      aria-label={ariaLabel}
+      onKeyDown={onKeyDown}
+      className="relative inline-flex max-w-full overflow-x-auto rounded-[14px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      {/* The single sliding pill — only `left` animates */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute top-1.5 bottom-1.5 rounded-[10px] bg-[var(--bg-inverted)] shadow-[0_1px_0_rgba(255,255,255,0.2),0_6px_20px_rgba(0,0,0,0.4)] transition-[left] duration-[350ms] ease-[cubic-bezier(.22,.61,.36,1)]"
+        style={{
+          left: `${TRACK_PADDING + activeIndex * tabWidth}px`,
+          width: `${tabWidth}px`,
+        }}
+      />
+
+      {tabs.map((tab, i) => {
+        const isActive = i === activeIndex;
+        const tabClass =
+          "relative z-10 inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap py-2.5 text-[13px] outline-none transition-colors duration-[250ms] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[rgba(255,255,255,0.6)] " +
+          (isActive
+            ? "font-semibold text-[var(--text-inverted)]"
+            : "font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]");
+        const inner = (
+          <>
+            {tab.icon && (
+              <span aria-hidden className={isActive ? "opacity-90" : "opacity-70"}>
+                {typeof tab.icon === "string" ? (
+                  <RrIcon name={tab.icon as RrIconName} size={14} />
+                ) : (
+                  tab.icon
+                )}
+              </span>
+            )}
+            <span>{tab.label}</span>
+          </>
+        );
+        const baseProps = {
+          role: "tab" as const,
+          "aria-selected": isActive,
+          tabIndex: isActive ? 0 : -1,
+          style: { width: `${tabWidth}px` },
+          className: tabClass,
+        };
+        if (tab.onClick) {
+          return (
+            <button key={tab.key} type="button" onClick={tab.onClick} {...baseProps}>
+              {inner}
+            </button>
+          );
+        }
+        return (
+          <Link key={tab.key} href={tab.key} {...baseProps}>
+            {inner}
+          </Link>
+        );
+      })}
+    </nav>
   );
 }
 
