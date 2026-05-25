@@ -202,7 +202,7 @@ export default function PlanningApp() {
           />
 
           {/* Tabs */}
-          <nav aria-label="Planning navigation" className="mt-5 flex items-end gap-0.5 overflow-x-auto border-b border-[var(--border-subtle)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <nav aria-label="Planning navigation" className="mt-6 flex items-center gap-1.5 overflow-x-auto pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <TabButton
               active={tab === "schedule"}
               onClick={() => setTab("schedule")}
@@ -312,13 +312,13 @@ function TabButton({
       type="button"
       onClick={onClick}
       aria-current={active ? "page" : undefined}
-      className={`inline-flex h-10 shrink-0 items-center gap-1.5 px-3 text-[12px] transition-colors duration-150 whitespace-nowrap ${
+      className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-4 text-[12.5px] font-medium transition-all duration-200 whitespace-nowrap ${
         active
-          ? "border-b-2 border-[var(--text-primary)] pb-0 text-[var(--text-primary)]"
-          : "border-b-2 border-transparent text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+          ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] shadow-sm"
+          : "border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
       }`}
     >
-      <span aria-hidden>{icon}</span>
+      <span className={active ? "" : "text-[var(--text-dim)]"} aria-hidden>{icon}</span>
       {label}
     </button>
   );

@@ -1,25 +1,17 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   PageHeader — the canonical Hub-wide app header.
+   PageHeader — Koleex Hub brand-aligned app header.
 
-   Extracted from InventoryHeader (INV-H10) into a generic primitive so every
-   app (Sales, Purchase, HR, Finance, Expenses, Projects, Operations, ...)
-   shares the same chrome:
+   Matches the visual language of the Hub homepage (/):
+     · Large bold title (28–32px) — same scale as "Good evening, Kamal"
+     · Muted subtitle on its own line for proper hierarchy
+     · Generous whitespace and breathing room
+     · Pill-shaped tabs (rounded-full) — same as Hub category chips
+     · Back arrow + identity icon as compact circular controls
+     · Optional ··· overflow popup for secondary routes
 
-     [←] [appIcon] App · {title}                  {controls}{action}
-     ──────────────────────────────────────────────────────────────────
-     [Tab1] [Tab2] [Tab3] [Tab4] [Tab5] [Tab6] [···]
-
-   · Back arrow → backHref (default "/")
-   · App icon chip — app identity
-   · Title (h1) + optional inline muted subtitle (hidden on mobile)
-   · Action slot on the right (any ReactNode)
-   · Optional tab strip with horizontal scroll + overflow ··· popup
-   · `showTabs` prop to hide tabs on detail pages
-
-   Each app passes its own `tabs` + `overflowTabs` config so this stays
-   layout-only and never hardcodes app-specific routes.
+   Each app passes its own tabs config and identity icon; chrome is identical.
    --------------------------------------------------------------------------- */
 
 import { useState, isValidElement, type ReactNode } from "react";
@@ -29,38 +21,24 @@ import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
 import PageNavPopup, { type NavGroup } from "@/components/ui/PageNavPopup";
 
 export interface PageTab {
-  /** Route path (must match next/router pathname). */
   key: string;
-  /** Visible label. */
   label: string;
-  /** Icon name from RrIcon set. */
   icon: RrIconName;
 }
 
 export interface PageHeaderProps {
-  /** Page title (h1). */
   title: string;
-  /** Optional subtitle shown inline next to title (hidden on mobile). */
   subtitle?: string;
-  /** App icon — either an RrIcon name (string) or a custom ReactNode (e.g. SalesIcon size={16}). */
+  /** App icon — RrIcon name string OR custom ReactNode (e.g. SalesIcon). */
   icon: RrIconName | ReactNode;
-  /** Back-arrow link target. Defaults to "/". */
   backHref?: string;
-  /** Right-side action slot (button, link, etc.). */
   action?: ReactNode;
-  /** Secondary right-side controls slot (filters, toggles, etc.). */
   controls?: ReactNode;
-  /** Optional secondary line under the title row (status pills, counts). */
   meta?: ReactNode;
-  /** Primary tabs shown horizontally in the tab strip. */
   tabs?: PageTab[];
-  /** Optional secondary routes shown only in the ··· overflow popup. */
   overflowTabs?: NavGroup[];
-  /** Popup title (e.g. "Inventory"). Required if overflowTabs given. */
   popupTitle?: string;
-  /** Popup subtitle (e.g. "Pick where to go."). */
   popupSubtitle?: string;
-  /** Hide the tab strip (e.g. detail pages). */
   showTabs?: boolean;
 }
 
@@ -98,34 +76,34 @@ export default function PageHeader({
 
   return (
     <div>
-      {/* ── Title row ──────────────────────────────────────────── */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 items-center gap-3">
+      {/* ── Hero title row — bold + generous (matches Hub home greeting) ── */}
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-start gap-4">
           {/* Back arrow */}
           <Link
             href={backHref}
             aria-label="Back"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] transition-colors hover:border-[var(--border-color)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
           >
             <RrIcon name="arrow-left" size={16} />
           </Link>
 
-          {/* App identity icon chip */}
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)]">
+          {/* Identity icon chip — squared to match Hub app cards */}
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)]">
             {typeof icon === "string" ? (
-              <RrIcon name={icon as RrIconName} size={16} />
+              <RrIcon name={icon as RrIconName} size={18} />
             ) : isValidElement(icon) ? (
               icon
             ) : null}
           </div>
 
-          {/* Title + stacked subtitle */}
+          {/* Title + subtitle — large + breathing room */}
           <div className="flex min-w-0 flex-col">
-            <h1 className="text-[20px] font-bold tracking-tight leading-tight text-[var(--text-primary)] md:text-[22px]">
+            <h1 className="text-[26px] font-bold tracking-tight leading-tight text-[var(--text-primary)] md:text-[30px]">
               {title}
             </h1>
             {subtitle && (
-              <p className="mt-0.5 truncate text-[12px] leading-snug text-[var(--text-dim)]">
+              <p className="mt-1 text-[13px] leading-snug text-[var(--text-muted)]">
                 {subtitle}
               </p>
             )}
@@ -142,13 +120,13 @@ export default function PageHeader({
       </div>
 
       {/* Optional meta row */}
-      {meta && <div className="mt-3">{meta}</div>}
+      {meta && <div className="mt-4">{meta}</div>}
 
-      {/* ── Tab strip — bigger tap targets, calmer hover ──────────── */}
+      {/* ── Tab strip — pill chips like Hub category filters ──────────── */}
       {hasTabs && (
         <nav
           aria-label={`${title} navigation`}
-          className="mt-5 flex items-end gap-0.5 overflow-x-auto border-b border-[var(--border-subtle)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="mt-6 flex items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {tabs!.map((tab) => {
             const isActive = tab.key === active;
@@ -158,15 +136,13 @@ export default function PageHeader({
                 href={tab.key}
                 aria-current={isActive ? "page" : undefined}
                 title={tab.label}
-                className={`inline-flex h-11 shrink-0 items-center gap-1.5 px-3.5 text-[12.5px] font-medium transition-colors duration-150 ${
+                className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-4 text-[12.5px] font-medium transition-all duration-200 ${
                   isActive
-                    ? "border-b-2 border-[var(--text-primary)] pb-0 text-[var(--text-primary)]"
-                    : "border-b-2 border-transparent text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                    ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] shadow-sm"
+                    : "border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
                 }`}
               >
-                <span aria-hidden className={isActive ? "" : "text-[var(--text-ghost)]"}>
-                  <RrIcon name={tab.icon} size={13} />
-                </span>
+                <RrIcon name={tab.icon} size={12} className={isActive ? "" : "text-[var(--text-dim)]"} />
                 {tab.label}
               </Link>
             );
@@ -179,10 +155,10 @@ export default function PageHeader({
               data-testid="page-nav-menu-trigger"
               aria-label="More routes"
               title="More"
-              className="ml-1 inline-flex h-11 shrink-0 items-center gap-1 border-b-2 border-transparent px-3 text-[12.5px] text-[var(--text-dim)] transition-colors hover:text-[var(--text-primary)]"
+              className="ml-0.5 inline-flex h-9 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 text-[var(--text-muted)] transition-all duration-200 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
             >
-              <RrIcon name="books" size={13} />
-              <span className="tracking-widest">···</span>
+              <RrIcon name="books" size={12} />
+              <span className="ml-1 tracking-widest text-[11px]">···</span>
             </button>
           )}
         </nav>

@@ -29,7 +29,7 @@ export default function ExpensesTabs({
   return (
     <nav
       aria-label="Expenses filter"
-      className="flex items-end gap-0.5 overflow-x-auto border-b border-[var(--border-subtle)]"
+      className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {TABS.map((tab) => {
         const isActive = tab.key === value;
@@ -42,20 +42,18 @@ export default function ExpensesTabs({
             onClick={() => onChange(tab.key)}
             aria-current={isActive ? "page" : undefined}
             title={label}
-            className={`inline-flex h-10 shrink-0 items-center gap-1.5 px-3 text-[12px] transition-colors duration-150 ${
+            className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-4 text-[12.5px] font-medium transition-all duration-200 ${
               isActive
-                ? "border-b-2 border-[var(--text-primary)] pb-0 text-[var(--text-primary)]"
-                : "border-b-2 border-transparent text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] shadow-sm"
+                : "border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
             }`}
           >
-            <span aria-hidden>
-              <RrIcon name={tab.icon} size={12} />
-            </span>
+            <RrIcon name={tab.icon} size={12} className={isActive ? "" : "text-[var(--text-dim)]"} />
             {label}
             <span className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] tabular-nums ${
               isActive
-                ? "bg-[var(--bg-secondary)] text-[var(--text-primary)]"
-                : "bg-[var(--bg-surface)] text-[var(--text-dim)]"
+                ? "bg-[var(--text-inverted)]/15 text-[var(--text-inverted)]"
+                : "bg-[var(--bg-surface-hover)] text-[var(--text-dim)]"
             }`}>
               {count}
             </span>
