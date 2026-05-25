@@ -2,14 +2,9 @@
 
 import { useTranslation } from "@/lib/i18n";
 import { purchaseT } from "@/lib/translations/purchase";
-import PurchaseRouteShell from "@/components/purchase/PurchaseRouteShell";
 import PriceListsModule from "@/components/purchase/modules/PriceLists";
 
-export default function PurchasePriceListsRoute() {
+export default function PurchaseRoute() {
   const { t, lang } = useTranslation(purchaseT);
-  return (
-    <PurchaseRouteShell title="Price Lists" subtitle="Supplier catalog pricing. Drives PO line defaults and price-variance checks.">
-      <PriceListsModule t={t} lang={lang} />
-    </PurchaseRouteShell>
-  );
+  return <PriceListsModule t={t} lang={lang} />;
 }

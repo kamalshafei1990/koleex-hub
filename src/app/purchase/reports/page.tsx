@@ -2,14 +2,9 @@
 
 import { useTranslation } from "@/lib/i18n";
 import { purchaseT } from "@/lib/translations/purchase";
-import PurchaseRouteShell from "@/components/purchase/PurchaseRouteShell";
 import ReportsModule from "@/components/purchase/modules/Reports";
 
-export default function PurchaseReportsRoute() {
+export default function PurchaseRoute() {
   const { t, lang } = useTranslation(purchaseT);
-  return (
-    <PurchaseRouteShell title="Spend Analytics" subtitle="By supplier, category, period. Find savings, monitor variance, score vendors.">
-      <ReportsModule t={t} lang={lang} />
-    </PurchaseRouteShell>
-  );
+  return <ReportsModule t={t} lang={lang} />;
 }

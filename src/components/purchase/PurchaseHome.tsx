@@ -28,7 +28,6 @@ import KpiCard from "@/components/ui/KpiCard";
 import Button from "@/components/ui/Button";
 import RrIcon from "@/components/ui/RrIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
-import PurchaseRouteShell from "./PurchaseRouteShell";
 import { formatMoney, relativeTime } from "./shared";
 
 /* ---------------------------------------------------------------------------
@@ -243,34 +242,29 @@ export default function PurchaseHome() {
   }, []);
 
   /* Loading shimmer — same shape as Inventory home so the transition
-     between apps feels consistent. */
+     between apps feels consistent. The outer page wrapper + PurchaseHeader
+     are owned by /app/purchase/layout.tsx so this returns a body fragment. */
   if (loading || !stats) {
     return (
-      <PurchaseRouteShell title="Purchase" subtitle="From requisition to payment — the full procure-to-pay loop.">
-        <div className="flex items-center justify-center py-20 text-[var(--text-dim)]">
-          <SpinnerIcon size={20} className="animate-spin" />
-        </div>
-      </PurchaseRouteShell>
+      <div className="flex items-center justify-center py-20 text-[var(--text-dim)]">
+        <SpinnerIcon size={20} className="animate-spin" />
+      </div>
     );
   }
 
   const totalAlerts = stats.overdueBills + stats.pendingApprovals + stats.lateDeliveries;
 
   return (
-    <PurchaseRouteShell
-      title="Purchase"
-      subtitle="From requisition to payment — the full procure-to-pay loop."
-      action={
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="secondary" size="sm" icon="search" onClick={() => router.push("/inventory/search")}>
-            Search
-          </Button>
-          <Button variant="primary" size="sm" icon="plus" onClick={() => router.push("/purchase/orders?create=1")}>
-            New PO
-          </Button>
-        </div>
-      }
-    >
+    <div className="space-y-6">
+      {/* Quick-action row (action buttons used to live in the header) */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Button variant="secondary" size="sm" icon="search" onClick={() => router.push("/inventory/search")}>
+          Search
+        </Button>
+        <Button variant="primary" size="sm" icon="plus" onClick={() => router.push("/purchase/orders?create=1")}>
+          New PO
+        </Button>
+      </div>
       {/* ── 1. KPI strip ─────────────────────────────────────────── */}
       <section>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -401,6 +395,6 @@ export default function PurchaseHome() {
           </ul>
         )}
       </section>
-    </PurchaseRouteShell>
+    </div>
   );
 }

@@ -352,18 +352,32 @@ function SlidingPillNav({
       }}
       className="relative inline-flex max-w-full overflow-x-auto rounded-[14px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
-      {/* Active background lives ON the active tab (not as a floating
-          absolute element) so it can never scroll out of view while the
-          user is swiping the menu. The previous floating-pill approach
-          worked on desktop but disappeared the moment a mobile user
-          swiped past the active tab — making the menu look "broken". */}
+      {/* The sliding indicator — single absolutely-positioned element that
+          glides between active tabs via `transform: translateX(...)`.
+          It lives inside the scrolling track so it scrolls with its tab
+          (no "indicator vanishes off-screen" issue). When the active tab
+          changes, the transform animates smoothly between positions.
+          GPU-accelerated and respects prefers-reduced-motion. */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute top-1.5 bottom-1.5 left-0 rounded-[10px] bg-[var(--bg-inverted)] shadow-sm transition-transform motion-reduce:transition-none"
+        style={{
+          width: `${tabWidth}px`,
+          transform: `translateX(${TRACK_PADDING + activeIndex * tabWidth}px)`,
+          transitionDuration: "350ms",
+          transitionTimingFunction: "cubic-bezier(0.22, 0.61, 0.36, 1)",
+        }}
+      />
 
       {tabs.map((tab, i) => {
         const isActive = i === activeIndex;
+        /* Tab text fades color via transition-colors; the sliding indicator
+           (above) provides the moving background. Per-tab `bg-` is removed
+           so the indicator can sit underneath without visible seams. */
         const tabClass =
           "relative z-10 inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-[10px] py-2.5 text-[13px] outline-none transition-colors duration-[250ms] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--border-focus)] " +
           (isActive
-            ? "bg-[var(--bg-inverted)] font-semibold text-[var(--text-inverted)] shadow-sm"
+            ? "font-semibold text-[var(--text-inverted)]"
             : "font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]");
         const inner = (
           <>

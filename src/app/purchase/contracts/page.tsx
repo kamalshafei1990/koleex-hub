@@ -2,14 +2,9 @@
 
 import { useTranslation } from "@/lib/i18n";
 import { purchaseT } from "@/lib/translations/purchase";
-import PurchaseRouteShell from "@/components/purchase/PurchaseRouteShell";
 import ContractsModule from "@/components/purchase/modules/Contracts";
 
-export default function PurchaseContractsRoute() {
+export default function PurchaseRoute() {
   const { t, lang } = useTranslation(purchaseT);
-  return (
-    <PurchaseRouteShell title="Contracts" subtitle="Term agreements with suppliers — pricing, volumes, burn-down.">
-      <ContractsModule t={t} lang={lang} />
-    </PurchaseRouteShell>
-  );
+  return <ContractsModule t={t} lang={lang} />;
 }
