@@ -143,135 +143,195 @@ function catColor(typeKey: string): CategoryColor {
   return CATEGORY_COLOR[typeKey] ?? FALLBACK_COLOR;
 }
 
-/* ─── Subcategory icon lookup (keyword-based) ───────────────── */
+/* ─── Subcategory icon lookup ────────────────────────────────── */
+/*
+ * Rule: no two subcategories in the SAME category share an icon.
+ * Cross-category reuse is fine (you never see both at once in a grid).
+ *
+ * Lookup order:
+ *   1. Exact lowercase match against taxonomy subcategory names.
+ *   2. Keyword scan for custom / free-text subcategory names.
+ */
+
+const SUB_ICON_EXACT: Record<string, RrIconName> = {
+  /* ── Office Supplies ─────────────────────────────────────── */
+  "printer paper":      "file",         "pens":               "pencil",
+  "pencils":            "palette",      "notebooks":          "clipboard",
+  "files":              "document",     "envelopes":          "paper-plane",
+  "folders":            "books",        "ink":                "print",
+  "toner":              "cloud-download","desk accessories":   "briefcase",
+  "sticky notes":       "stamp",        "staplers":           "tools",
+  "binders":            "contract",
+  /* ── Marketing Materials ─────────────────────────────────── */
+  "catalogs":           "newspaper",    "flyers":             "megaphone",
+  "brochures":          "document",     "posters":            "flag-alt",
+  "samples":            "flask",        "rollups":            "flag-checkered",
+  "stickers":           "stamp",        "promotional gifts":  "gift",
+  "banners":            "paper-plane",  "business cards":     "id-badge",
+  /* ── Exhibition Materials ────────────────────────────────── */
+  "booth parts":        "building",     "lighting":           "bulb",
+  "screens":            "eye",          "demo units":         "laptop",
+  "display stands":     "award",        "furniture":          "chair-office",
+  "power strips":       "tools",        "carpets":            "home",
+  /* ── Employee Items ──────────────────────────────────────── */
+  "uniforms":           "users",        "id cards":           "id-badge",
+  "safety shoes":       "shield-check", "helmets":            "hard-hat",
+  "gloves":             "hand-holding-heart", "employee kits": "briefcase",
+  "lanyards":           "key",          "welcome packs":      "gift",
+  /* ── Packaging ───────────────────────────────────────────── */
+  "cartons":            "box-open",     "tape":               "stamp",
+  "foam":               "box-circle-check", "labels":         "badge-check",
+  "wrapping":           "recycle",      "pallets":            "pallet",
+  "bags":               "paper-plane",  "bubble wrap":        "cloud",
+  "strapping":          "contract",     "stretch film":       "receipt",
+  /* ── Maintenance ─────────────────────────────────────────── */
+  "repair kits":        "tools",        "lubricants":         "faucet",
+  "spare consumables":  "box-circle-check", "adhesives":      "stamp",
+  "sealants":           "shield-check", "fasteners":          "badge-check",
+  "belts":              "recycle",      "filters":            "cloud-download",
+  /* ── IT & Electronics ────────────────────────────────────── */
+  "laptops":            "laptop",       "desktops":           "computer",
+  "tablets":            "cloud",        "monitors":           "eye",
+  "keyboards":          "receipt",      "mice":               "bullseye-arrow",
+  "routers":            "wifi",         "switches":           "signal-stream",
+  "cables":             "contract",     "chargers":           "bulb",
+  "docking stations":   "cloud-download", "webcams":          "camera",
+  "hard drives":        "database",     "usb sticks":         "download",
+  "memory cards":       "fingerprint",
+  /* ── Documents & Printing ───────────────────────────────── */
+  "manuals":            "document",     "certificates":       "award",
+  "printed labels":     "stamp",        "warranty cards":     "contract",
+  "internal documents": "clipboard",    "training booklets":  "graduation-cap",
+  "compliance sheets":  "gavel",        "tags":               "badge-check",
+  /* ── Safety & Facility ───────────────────────────────────── */
+  "fire extinguishers": "shield-check", "smoke detectors":    "signal-stream",
+  "first aid stations": "heart-rate",   "safety glasses":     "eye",
+  "hard hats":          "hard-hat",     "earplugs":           "user-headset",
+  "reflective vests":   "id-badge",     "safety harnesses":   "tools",
+  "emergency lights":   "bulb",         "safety signs":       "flag-alt",
+  /* ── Internal Assets ────────────────────────────────────── */
+  "office equipment":   "briefcase",    "storage racks":      "pallet",
+  "company tools":      "tools",        "whiteboards":        "palette",
+  "projectors":         "signal-stream","conference phones":  "user-headset",
+  "tvs":                "computer",
+  /* ── Branded Merchandise ─────────────────────────────────── */
+  "mugs":               "mug-hot",      "t-shirts":           "users",
+  "water bottles":      "cocktail",     "keychains":          "key",
+  "calendars":          "clock",        "caps":               "hard-hat",
+  /* (pens / notebooks / usb sticks / lanyards / bags / stickers share
+      icons with other categories — fine since they're never co-visible) */
+  /* ── Workshop & Tools ────────────────────────────────────── */
+  "hand tools":         "hammer",       "power tools":        "tools",
+  "measuring instruments": "scale",     "cutting tools":      "gavel",
+  "welding equipment":  "gas-pump",     "drill bits":         "bullseye-arrow",
+  "workbenches":        "building",     "tool boxes":         "briefcase",
+  "ladders":            "arrow-up-right",
+  /* ── Cleaning Supplies ───────────────────────────────────── */
+  "detergents":         "faucet",       "brooms":             "broom",
+  "mops":               "recycle",      "cleaning cloths":    "box-circle-check",
+  "trash bags":         "trash",        "sanitizers":         "flask",
+  "disinfectants":      "shield-check", "vacuum bags":        "cloud",
+  "glass cleaner":      "eye",          "floor cleaner":      "home",
+  "air fresheners":     "leaf",
+  /* ── Kitchen & Pantry ────────────────────────────────────── */
+  "coffee":             "coffee",       "tea":                "mug-hot",
+  "snacks":             "restaurant",   "sugar":              "flask",
+  "milk":               "cocktail",     "cups":               "receipt",
+  "cutlery":            "tools",        "plates":             "coins",
+  "water dispenser":    "faucet",       "paper towels":       "file",
+  "napkins":            "document",     "bottled water":      "cloud-download",
+  "cleaning sponges":   "broom",
+  /* ── First Aid ───────────────────────────────────────────── */
+  "bandages":           "heart-rate",   "antiseptics":        "flask",
+  "painkillers":        "stethoscope",  "thermometers":       "scale",
+  "first aid kits":     "briefcase",    "burn cream":         "hand-holding-heart",
+  "eye wash":           "eye",          "cold packs":         "cloud",
+  "sterile gauze":      "box-circle-check", "medical tape":   "stamp",
+  "defibrillators":     "signal-stream",
+  /* ── Vehicle & Fleet ─────────────────────────────────────── */
+  "fuel cards":         "credit-card",  "motor oil":          "gas-pump",
+  "tires":              "car-side",     "vehicle tools":      "car-mechanic",
+  "dashcams":           "camera",       "car cleaning":       "broom",
+  "engine coolant":     "faucet",       "wiper blades":       "eye",
+  "spare bulbs":        "bulb",         "jumper cables":      "signal-stream",
+  "first aid (vehicle)":"heart-rate",
+  /* ── Photography & Video ─────────────────────────────────── */
+  "cameras":            "camera",       "lenses":             "eye",
+  "tripods":            "building",     "studio lights":      "bulb",
+  "microphones":        "microphone",   "sd cards":           "database",
+  "camera batteries":   "download",     "memory card readers":"fingerprint",
+  "light stands":       "flag-alt",     "reflectors":         "palette",
+  "backdrops":          "home",         "gimbal stabilizers": "tools",
+  /* ── Furniture ───────────────────────────────────────────── */
+  "office chairs":      "chair-office", "desks":              "briefcase",
+  "conference tables":  "users",        "shelves":            "books",
+  "partitions":         "building",     "filing cabinets":    "document",
+  "sofas":              "hotel",        "stools":             "ticket",
+  "side tables":        "clock",        "reception furniture":"handshake",
+  "bookcases":          "graduation-cap",
+};
 
 function subIconFor(label: string): RrIconName {
-  const l = label.toLowerCase();
+  const l = label.toLowerCase().trim();
 
-  /* IT / Electronics */
-  if (l.includes("laptop") || l.includes("desktop") || l.includes("tablet") || l.includes("notebook") && l.includes("tech")) return "laptop";
-  if (l.includes("monitor") || l.includes("screen") || l.includes("tv") || l.includes("display") || l.includes("projector") || l.includes("whiteboard")) return "computer";
-  if (l.includes("router") || l.includes("switch") || l.includes("wifi") || l.includes("network")) return "wifi";
-  if (l.includes("hard drive") || l.includes("usb stick") || l.includes("memory card") || l.includes("sd card") || l.includes("ssd") || l.includes("hdd")) return "database";
-  if (l.includes("dock") || l.includes("charger") || l.includes("cable") || l.includes("keyboard") || l.includes("mouse") || l.includes("webcam")) return "laptop";
+  /* 1 — exact taxonomy match */
+  const exact = SUB_ICON_EXACT[l];
+  if (exact) return exact;
 
-  /* Photo / Video */
-  if (l.includes("camera") || l.includes("lens") || l.includes("tripod") || l.includes("gimbal") || l.includes("backdrop") || l.includes("reflector")) return "camera";
-  if (l.includes("microphone") || l.includes("mic") || l.includes("lavalier") || l.includes("shotgun") || l.includes("handheld")) return "microphone";
-  if (l.includes("studio light") || l.includes("light stand")) return "bulb";
-
-  /* Furniture */
+  /* 2 — keyword fallback for custom / free-text entries */
+  if (l.includes("laptop") || (l.includes("notebook") && l.includes("computer"))) return "laptop";
+  if (l.includes("desktop") || l.includes("workstation")) return "computer";
+  if (l.includes("monitor") || l.includes("screen") || l.includes("display")) return "eye";
+  if (l.includes("tablet")) return "cloud";
+  if (l.includes("router") || l.includes("wifi") || l.includes("network")) return "wifi";
+  if (l.includes("hard drive") || l.includes("ssd") || l.includes("hdd") || l.includes("storage drive")) return "database";
+  if (l.includes("usb") || l.includes("memory card") || l.includes("sd card")) return "download";
+  if (l.includes("camera") || l.includes("lens") || l.includes("gimbal")) return "camera";
+  if (l.includes("tripod") || l.includes("light stand")) return "flag-alt";
+  if (l.includes("microphone") || l.includes(" mic ") || l.includes("audio recorder")) return "microphone";
+  if (l.includes("studio light") || l.includes("ring light")) return "bulb";
+  if (l.includes("backdrop") || l.includes("green screen")) return "home";
   if (l.includes("chair") || l.includes("stool")) return "chair-office";
-  if (l.includes("sofa") || l.includes("reception")) return "hotel";
-  if (l.includes("shelf") || l.includes("shelve") || l.includes("bookcase") || l.includes("bookshelf")) return "books";
-  if (l.includes("rack") || l.includes("pallet")) return "pallet";
-  if (l.includes("desk") || l.includes("table") || l.includes("workbench")) return "briefcase";
-  if (l.includes("cabinet") || l.includes("filing")) return "clipboard";
-  if (l.includes("partition")) return "building";
-
-  /* Kitchen & Pantry */
-  if (l.includes("coffee") || l.includes("cup") || l.includes("mug")) return "coffee";
+  if (l.includes("sofa") || l.includes("couch")) return "hotel";
+  if (l.includes("shelf") || l.includes("bookcase") || l.includes("bookshelf")) return "books";
+  if (l.includes("desk") || l.includes("workbench")) return "briefcase";
+  if (l.includes("cabinet") || l.includes("filing")) return "document";
+  if (l.includes("partition") || l.includes("divider")) return "building";
+  if (l.includes("coffee") || l.includes("espresso")) return "coffee";
   if (l.includes("tea") || l.includes("herbal")) return "mug-hot";
-  if (l.includes("snack") || l.includes("food") || l.includes("plate") || l.includes("cutlery")) return "restaurant";
-  if (l.includes("water") && (l.includes("bottle") || l.includes("dispenser"))) return "cocktail";
-  if (l.includes("sugar") || l.includes("milk")) return "restaurant";
-
-  /* Cleaning */
-  if (l.includes("broom") || l.includes("mop")) return "broom";
-  if (l.includes("detergent") || l.includes("cleaner") || l.includes("glass clean") || l.includes("floor clean") || l.includes("disinfect") || l.includes("sanitizer")) return "faucet";
-  if (l.includes("trash") || l.includes("garbage") || l.includes("waste")) return "trash";
-  if (l.includes("cloth") || l.includes("sponge") || l.includes("vacuum")) return "broom";
+  if (l.includes("snack") || l.includes("food") || l.includes("meal")) return "restaurant";
+  if (l.includes("water bottle") || l.includes("dispenser")) return "cocktail";
+  if (l.includes("broom") || l.includes("brush")) return "broom";
+  if (l.includes("mop") || l.includes("vacuum")) return "recycle";
+  if (l.includes("trash") || l.includes("garbage") || l.includes("waste bag")) return "trash";
+  if (l.includes("detergent") || l.includes("cleaner") || l.includes("disinfect")) return "faucet";
   if (l.includes("air freshener") || l.includes("freshener")) return "leaf";
-  if (l.includes("towel") || l.includes("napkin") || l.includes("paper towel")) return "clipboard";
-
-  /* Vehicle */
-  if (l.includes("fuel card") || l.includes("credit")) return "credit-card";
-  if (l.includes("motor oil") || l.includes("engine oil") || l.includes("lubricant") || l.includes("coolant") || l.includes("antifreeze")) return "gas-pump";
-  if (l.includes("tire") || l.includes("tyre") || l.includes("wheel")) return "car-side";
-  if (l.includes("dashcam")) return "camera";
-  if (l.includes("wiper") || l.includes("jumper") || l.includes("tool") && l.includes("car") || l.includes("vehicle tool") || l.includes("spare bulb") || l.includes("car cleaning")) return "car-mechanic";
-
-  /* First Aid */
-  if (l.includes("bandage") || l.includes("sterile") || l.includes("gauze") || l.includes("medical tape") || l.includes("first aid kit")) return "heart-rate";
-  if (l.includes("painkiller") || l.includes("burn") || l.includes("eye wash") || l.includes("cold pack") || l.includes("defibrillator") || l.includes("thermometer")) return "stethoscope";
-  if (l.includes("antiseptic") || l.includes("disinfect") && l.includes("medical")) return "flask";
-
-  /* Safety */
-  if (l.includes("fire extinguish") || l.includes("smoke detector") || l.includes("first aid station")) return "shield-check";
-  if (l.includes("safety glass") || l.includes("eyewear") || l.includes("goggles")) return "eye";
+  if (l.includes("fuel") || l.includes("motor oil") || l.includes("engine oil")) return "gas-pump";
+  if (l.includes("tire") || l.includes("tyre")) return "car-side";
+  if (l.includes("vehicle") || l.includes("car cleaning")) return "car-mechanic";
+  if (l.includes("bandage") || l.includes("first aid kit")) return "heart-rate";
+  if (l.includes("medicine") || l.includes("painkiller") || l.includes("antiseptic")) return "stethoscope";
+  if (l.includes("fire extinguish") || l.includes("smoke detector")) return "shield-check";
   if (l.includes("hard hat") || l.includes("helmet")) return "hard-hat";
-  if (l.includes("earplug") || l.includes("reflective vest") || l.includes("harness") || l.includes("ppe")) return "shield-check";
-  if (l.includes("emergency light")) return "bulb";
-  if (l.includes("sign") || l.includes("signage")) return "flag-alt";
-
-  /* Workshop */
-  if (l.includes("hammer") || l.includes("screwdriver") || l.includes("wrench") || l.includes("plier")) return "hammer";
-  if (l.includes("power tool") || l.includes("drill") || l.includes("saw") || l.includes("grinder") || l.includes("sander") || l.includes("impact driver")) return "tools";
-  if (l.includes("measure") || l.includes("caliper") || l.includes("multimeter") || l.includes("laser") || l.includes("level")) return "scale";
-  if (l.includes("ladder")) return "tools";
-  if (l.includes("tool box") || l.includes("toolbox")) return "briefcase";
-  if (l.includes("cutting") || l.includes("welding")) return "tools";
-
-  /* Maintenance */
-  if (l.includes("repair kit")) return "tools";
-  if (l.includes("adhesive") || l.includes("sealant") || l.includes("glue")) return "tools";
-  if (l.includes("fastener") || l.includes("belt") || l.includes("filter") || l.includes("consumable")) return "tools";
-  if (l.includes("lubricant") || l.includes("grease")) return "faucet";
-
-  /* Packaging */
-  if (l.includes("carton") || l.includes("box")) return "box-open";
+  if (l.includes("hammer") || l.includes("screwdriver") || l.includes("wrench")) return "hammer";
+  if (l.includes("drill") || l.includes("saw") || l.includes("grinder")) return "tools";
+  if (l.includes("measure") || l.includes("caliper") || l.includes("level")) return "scale";
+  if (l.includes("printer") || l.includes("toner") || l.includes(" ink ")) return "print";
+  if (l.includes("certificate") || l.includes("award")) return "award";
+  if (l.includes("manual") || l.includes("document") || l.includes("compliance")) return "file";
+  if (l.includes("carton") || l.includes("cardboard box")) return "box-open";
   if (l.includes("pallet")) return "pallet";
-  if (l.includes("bubble") || l.includes("foam") || l.includes("wrapping") || l.includes("stretch film")) return "box-open";
-  if (l.includes("tape") || l.includes("strapping")) return "tools";
+  if (l.includes("bubble") || l.includes("foam")) return "box-circle-check";
   if (l.includes("label") || l.includes("sticker")) return "stamp";
-  if (l.includes("bag") || l.includes("pouch")) return "briefcase";
+  if (l.includes("gift") || l.includes("promo")) return "gift";
+  if (l.includes("uniform") || l.includes("shirt") || l.includes("jacket")) return "users";
+  if (l.includes("pen") || l.includes("pencil") || l.includes("marker")) return "pencil";
+  if (l.includes("notebook") || l.includes("binder") || l.includes("folder")) return "clipboard";
+  if (l.includes("envelope") || l.includes("letter")) return "paper-plane";
+  if (l.includes("mug") || l.includes("cup")) return "mug-hot";
+  if (l.includes("key") || l.includes("keychain")) return "key";
 
-  /* Print / Documents */
-  if (l.includes("manual") || l.includes("document") || l.includes("warranty") || l.includes("compliance") || l.includes("certificate") || l.includes("booklet") || l.includes("training")) return "file";
-  if (l.includes("printed label") || l.includes("tag") || l.includes("stamp")) return "stamp";
-  if (l.includes("award") || l.includes("recognition")) return "award";
-  if (l.includes("print") || l.includes("ink") || l.includes("toner")) return "print";
-
-  /* Office */
-  if (l.includes("printer paper") || l.includes("paper")) return "file";
-  if (l.includes("pen") || l.includes("pencil") || l.includes("marker") || l.includes("highlighter") || l.includes("whiteboard marker")) return "pencil";
-  if (l.includes("notebook") || l.includes("folder") || l.includes("binder") || l.includes("file")) return "clipboard";
-  if (l.includes("envelope") || l.includes("sticky note")) return "clipboard";
-  if (l.includes("staple") || l.includes("desk accessory") || l.includes("desk acc")) return "briefcase";
-
-  /* Marketing */
-  if (l.includes("catalog") || l.includes("brochure") || l.includes("newspaper")) return "newspaper";
-  if (l.includes("flyer") || l.includes("poster") || l.includes("banner") || l.includes("rollup") || l.includes("roll-up")) return "megaphone";
-  if (l.includes("sticker")) return "stamp";
-  if (l.includes("business card") || l.includes("id card") || l.includes("lanyard") || l.includes("name badge")) return "id-badge";
-  if (l.includes("sample")) return "flask";
-  if (l.includes("promo gift") || l.includes("promotional gift") || l.includes("gift")) return "gift";
-
-  /* Employee / Branded */
-  if (l.includes("uniform") || l.includes("shirt") || l.includes("pant") || l.includes("jacket") || l.includes("cap") || l.includes("apron") || l.includes("coverall")) return "id-badge";
-  if (l.includes("safety shoe") || l.includes("boot") || l.includes("glove")) return "shield-check";
-  if (l.includes("welcome pack") || l.includes("employee kit") || l.includes("starter kit")) return "briefcase";
-  if (l.includes("mug")) return "mug-hot";
-  if (l.includes("water bottle")) return "cocktail";
-  if (l.includes("keychain") || l.includes("key")) return "key";
-  if (l.includes("calendar")) return "clipboard";
-  if (l.includes("tote") || l.includes("backpack") || l.includes("drawstring")) return "briefcase";
-  if (l.includes("t-shirt")) return "id-badge";
-
-  /* Exhibition */
-  if (l.includes("booth")) return "building";
-  if (l.includes("lighting") || l.includes("light")) return "bulb";
-  if (l.includes("demo unit") || l.includes("display stand")) return "laptop";
-  if (l.includes("carpet") || l.includes("floor mat")) return "home";
-  if (l.includes("power strip")) return "tools";
-
-  /* Internal assets */
-  if (l.includes("conference phone")) return "microphone";
-  if (l.includes("office equipment")) return "computer";
-  if (l.includes("storage rack")) return "pallet";
-  if (l.includes("company tool")) return "tools";
-
-  return "box-open";
+  return "box-open"; /* ultimate fallback */
 }
 
 /* ─── Search ────────────────────────────────────────────────── */
@@ -351,6 +411,7 @@ export default function InventoryInternalItemDrawer({ onClose, onSuccess }: Prop
   const [subcategory, setSubcategory] = useState<string>("");
   const [subSub, setSubSub] = useState<string>("");
   const [customMode, setCustomMode] = useState(false);
+  const [customIconUrl, setCustomIconUrl] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
   const [name, setName] = useState("");
@@ -400,6 +461,7 @@ export default function InventoryInternalItemDrawer({ onClose, onSuccess }: Prop
     setSearchQuery("");
     setCategory(r.category);
     setCustomMode(false);
+    setCustomIconUrl(null);
     if (r.kind === "category") {
       setSubcategory(""); setSubSub(""); setStep(2);
     } else if (r.kind === "subcategory" && r.subcategory) {
@@ -431,6 +493,7 @@ export default function InventoryInternalItemDrawer({ onClose, onSuccess }: Prop
       if (typeRow) payload.item_type_id = typeRow.id;
       if (combinedSub) payload.subcategory = combinedSub;
       if (notes.trim()) payload.notes = notes.trim();
+      if (customIconUrl) payload.metadata = { custom_icon: customIconUrl };
       if (numQty > 0) {
         payload.initial_quantity = numQty;
         payload.initial_warehouse_id = warehouseId;
@@ -522,7 +585,7 @@ export default function InventoryInternalItemDrawer({ onClose, onSuccess }: Prop
               t={t}
               searchQuery={searchQuery}
               setSearchQuery={setSearchQuery}
-              onPick={(c) => { setCategory(c); setSubcategory(""); setSubSub(""); setCustomMode(false); setStep(2); }}
+              onPick={(c) => { setCategory(c); setSubcategory(""); setSubSub(""); setCustomMode(false); setCustomIconUrl(null); setStep(2); }}
               onSearchSelect={handleSearchSelect}
             />
           )}
@@ -531,6 +594,7 @@ export default function InventoryInternalItemDrawer({ onClose, onSuccess }: Prop
               t={t} category={category} categoryLabel={categoryLabel} color={color}
               customMode={customMode} subcategory={subcategory}
               setSubcategory={setSubcategory} setCustomMode={setCustomMode}
+              customIconUrl={customIconUrl} setCustomIconUrl={setCustomIconUrl}
               onBack={() => setStep(1)}
               onPick={(s) => { setSubcategory(s); setSubSub(""); const ss = suggestSubSubcategories(category.type_key, s); setStep(ss.length > 0 ? 3 : 4); }}
             />
@@ -740,12 +804,23 @@ function SearchResultsList({
   return (
     <div className="space-y-1.5">
       {results.map((r, i) => {
-        const col  = catColor(r.category.type_key);
-        const icon = CATEGORY_ICON[r.category.type_key] ?? "box-open";
-        const kindIcon: RrIconName =
-          r.kind === "subsub"      ? "arrow-up-right" :
-          r.kind === "subcategory" ? "arrow-up-right" :
-                                     "box-open";
+        const col      = catColor(r.category.type_key);
+        const catIcon  = CATEGORY_ICON[r.category.type_key] ?? "box-open";
+        const catKey   = `inv.int.cat.${r.category.type_key}`;
+        const catLabel = t(catKey) === catKey ? r.category.label : t(catKey);
+
+        /* The "in" attribution line (always shown except top-level cat match) */
+        const inLine =
+          r.kind === "category"    ? null :
+          r.kind === "subcategory" ? catLabel :
+          /* subsub */               `${r.subcategory} · ${catLabel}`;
+
+        /* Kind badge label */
+        const kindLabel =
+          r.kind === "subsub"      ? "variant" :
+          r.kind === "subcategory" ? "subcategory" :
+                                     "category";
+
         return (
           <button
             key={i}
@@ -753,25 +828,28 @@ function SearchResultsList({
             onClick={() => onSelect(r)}
             className={`flex w-full items-center gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2.5 text-left transition-all ${col.hoverBorder} hover:bg-[var(--bg-elevated)]`}
           >
-            {/* Category color chip */}
+            {/* Category color chip — always the category's icon */}
             <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${col.chipBg}`}>
-              <RrIcon name={icon} size={13} className={col.chipText} />
+              <RrIcon name={catIcon} size={13} className={col.chipText} />
             </span>
 
-            {/* Text */}
+            {/* Name + category attribution */}
             <div className="min-w-0 flex-1">
-              <div className="truncate text-[12.5px] font-medium text-[var(--text-primary)]">{r.matchText}</div>
-              {r.path !== r.matchText && (
-                <div className="mt-0.5 truncate text-[10.5px] text-[var(--text-dim)]">{r.path}</div>
+              <div className="truncate text-[12.5px] font-medium text-[var(--text-primary)]">
+                {r.matchText}
+              </div>
+              {inLine && (
+                <div className={`mt-0.5 flex items-center gap-1 truncate text-[10.5px] font-medium ${col.labelText}`}>
+                  <RrIcon name={catIcon} size={9} />
+                  <span>{inLine}</span>
+                </div>
               )}
             </div>
 
             {/* Kind badge */}
-            <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9.5px] uppercase tracking-[0.08em] font-semibold ${col.chipBg} ${col.chipText}`}>
-              {r.kind === "subsub" ? "variant" : r.kind === "subcategory" ? "sub" : "cat"}
+            <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] uppercase tracking-[0.08em] font-semibold ${col.chipBg} ${col.chipText}`}>
+              {kindLabel}
             </span>
-
-            <RrIcon name={kindIcon} size={11} className="shrink-0 text-[var(--text-dim)]" />
           </button>
         );
       })}
@@ -783,7 +861,7 @@ function SearchResultsList({
 
 function Step2({
   t, category, categoryLabel, color, customMode, subcategory,
-  setSubcategory, setCustomMode, onBack, onPick,
+  setSubcategory, setCustomMode, customIconUrl, setCustomIconUrl, onBack, onPick,
 }: {
   t: (k: string, fallback?: string) => string;
   category: InternalCategoryHint;
@@ -793,10 +871,23 @@ function Step2({
   subcategory: string;
   setSubcategory: (s: string) => void;
   setCustomMode: (b: boolean) => void;
+  customIconUrl: string | null;
+  setCustomIconUrl: (u: string | null) => void;
   onBack: () => void;
   onPick: (s: string) => void;
 }) {
   const icon = CATEGORY_ICON[category.type_key] ?? "box-open";
+
+  function handleIconFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setCustomIconUrl((ev.target?.result as string) ?? null);
+    reader.readAsDataURL(file);
+    /* reset so re-picking same file fires onChange again */
+    e.target.value = "";
+  }
+
   return (
     <div>
       <BreadcrumbHeader t={t} icon={icon} color={color} categoryLabel={categoryLabel} sub={t("inv.int.step2.title")} onBack={onBack} />
@@ -830,7 +921,8 @@ function Step2({
             </button>
           );
         })}
-        {/* Custom */}
+
+        {/* ── Custom entry ─────────────────────────────────── */}
         {!customMode ? (
           <button
             type="button"
@@ -841,22 +933,64 @@ function Step2({
             {t("inv.int.custom")}
           </button>
         ) : (
-          <div className="col-span-2 flex items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2.5 sm:col-span-3 lg:col-span-4">
-            <input
-              autoFocus
-              value={subcategory}
-              onChange={(e) => setSubcategory(e.target.value)}
-              placeholder={t("inv.int.custom.placeholder")}
-              className="flex-1 bg-transparent text-[12.5px] outline-none placeholder:text-[var(--text-dim)]"
-            />
-            <button
-              type="button"
-              onClick={() => subcategory.trim() && onPick(subcategory.trim())}
-              disabled={!subcategory.trim()}
-              className={`inline-flex h-8 items-center gap-1 rounded-lg px-3 text-[11px] font-semibold ${color.chipBg} ${color.chipText} disabled:opacity-40`}
-            >
-              <RrIcon name="arrow-up-right" size={11} /> Next
-            </button>
+          <div className="col-span-2 space-y-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-3 sm:col-span-3 lg:col-span-4">
+            {/* Name + icon upload row */}
+            <div className="flex items-center gap-2">
+              {/* ── Icon upload chip ─────────────────────── */}
+              <label
+                htmlFor="custom-icon-upload"
+                title="Upload custom icon (PNG, SVG, JPG)"
+                className={`relative flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg border-2 border-dashed transition-colors ${color.chipBg} border-[var(--border-color)] hover:border-[var(--border-color)]`}
+              >
+                {customIconUrl ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={customIconUrl} alt="custom icon" className="h-6 w-6 object-contain" />
+                ) : (
+                  <RrIcon name="upload" size={13} className="text-[var(--text-dim)]" />
+                )}
+              </label>
+              <input
+                id="custom-icon-upload"
+                type="file"
+                accept="image/*,.svg"
+                className="hidden"
+                onChange={handleIconFile}
+              />
+
+              {/* ── Name input ───────────────────────────── */}
+              <input
+                autoFocus
+                value={subcategory}
+                onChange={(e) => setSubcategory(e.target.value)}
+                placeholder={t("inv.int.custom.placeholder")}
+                className="flex-1 bg-transparent text-[12.5px] outline-none placeholder:text-[var(--text-dim)]"
+              />
+
+              {/* ── Next button ──────────────────────────── */}
+              <button
+                type="button"
+                onClick={() => subcategory.trim() && onPick(subcategory.trim())}
+                disabled={!subcategory.trim()}
+                className={`inline-flex h-8 shrink-0 items-center gap-1 rounded-lg px-3 text-[11px] font-semibold ${color.chipBg} ${color.chipText} disabled:opacity-40`}
+              >
+                <RrIcon name="arrow-up-right" size={11} /> Next
+              </button>
+            </div>
+
+            {/* Hint row */}
+            <div className="flex items-center gap-1.5 text-[10px] text-[var(--text-dim)]">
+              <RrIcon name="upload" size={10} />
+              <span>Click the icon chip to upload a custom icon · PNG, SVG or JPG</span>
+              {customIconUrl && (
+                <button
+                  type="button"
+                  onClick={() => setCustomIconUrl(null)}
+                  className="ml-1 text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                >
+                  <RrIcon name="cross" size={9} />
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
