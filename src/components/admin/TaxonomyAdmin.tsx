@@ -13,6 +13,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import AngleUpIcon from "@/components/icons/ui/AngleUpIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import FolderTreeIcon from "@/components/icons/ui/FolderTreeIcon";
+import PageHeader from "@/components/ui/PageHeader";
 import UploadIcon from "@/components/icons/ui/UploadIcon";
 import PictureIcon from "@/components/icons/ui/PictureIcon";
 import { getDivisionIcon } from "@/components/icons/divisions";
@@ -210,30 +211,25 @@ export default function TaxonomyAdmin({
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
-        {/* Header */}
-        <div className="flex flex-wrap items-center gap-3 mb-1">
-          <Link
-            href={backHref}
-            className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
-          >
-            <ArrowLeftIcon className="h-4 w-4" />
-          </Link>
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-              <FolderTreeIcon className="h-4 w-4" />
-            </div>
-            <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">{title}</h1>
-          </div>
-          <button
-            onClick={openCreate}
-            className="h-9 md:h-10 px-4 md:px-5 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] md:text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-colors"
-          >
-            <PlusIcon className="h-4 w-4" />
-            <span className="hidden sm:inline">Add {singular}</span>
-            <span className="sm:hidden">Add</span>
-          </button>
-        </div>
-        <p className="text-[12px] text-[var(--text-dim)] mb-4 ml-0 md:ml-11">{items.length} {title.toLowerCase()} total</p>
+        {/* Header — canonical Hub PageHeader */}
+        <PageHeader
+          title={title}
+          subtitle={`${items.length} ${title.toLowerCase()} total`}
+          icon={<FolderTreeIcon className="h-4 w-4" />}
+          backHref={backHref}
+          showTabs={false}
+          action={
+            <button
+              onClick={openCreate}
+              className="inline-flex items-center gap-1.5 rounded-md bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] transition-opacity hover:opacity-90"
+            >
+              <PlusIcon className="h-3 w-3" />
+              <span className="hidden sm:inline">Add {singular}</span>
+              <span className="sm:hidden">Add</span>
+            </button>
+          }
+        />
+        <div className="mb-4" />
 
         {/* Search + filter */}
         <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] p-4 mb-6">

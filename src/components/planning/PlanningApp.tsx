@@ -30,6 +30,7 @@ import TrashIcon from "@/components/icons/ui/TrashIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PlanningIcon from "@/components/icons/PlanningIcon";
+import PageHeader from "@/components/ui/PageHeader";
 import EntityPicker from "@/components/planning/EntityPicker";
 import {
   addDays,
@@ -181,38 +182,27 @@ export default function PlanningApp() {
       className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
       style={{ height: "calc(100dvh - 3.5rem)" }}
     >
-      {/* ── Page header ── */}
+      {/* ── Page header — canonical Hub PageHeader ── */}
       <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] z-10 w-full overflow-x-hidden">
-        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 min-w-0">
-          <div className="flex flex-wrap items-center gap-3 pt-5 pb-1">
-            <Link
-              href="/"
-              className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
-            >
-              <ArrowLeftIcon className="h-4 w-4" />
-            </Link>
-            <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-                <PlanningIcon className="h-4 w-4" />
-              </div>
-              <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
-                {t("app.title")}
-              </h1>
-            </div>
-            <button
-              onClick={() => setModal({ open: true, editing: null })}
-              className="h-9 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shrink-0"
-            >
-              <PlusIcon size={16} />
-              <span className="hidden md:inline">{t("action.new")}</span>
-            </button>
-          </div>
-          <p className="text-[12px] text-[var(--text-dim)] mb-3 ml-0 md:ml-11">
-            {t("app.subtitle")}
-          </p>
+        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 min-w-0 pt-5 pb-3">
+          <PageHeader
+            title={t("app.title")}
+            subtitle={t("app.subtitle")}
+            icon={<PlanningIcon className="h-4 w-4" />}
+            showTabs={false}
+            action={
+              <button
+                onClick={() => setModal({ open: true, editing: null })}
+                className="inline-flex items-center gap-1.5 rounded-md bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] transition-opacity hover:opacity-90"
+              >
+                <PlusIcon size={12} />
+                <span className="hidden md:inline">{t("action.new")}</span>
+              </button>
+            }
+          />
 
           {/* Tabs */}
-          <div className="flex items-center gap-1 pb-3 overflow-x-auto scrollbar-none">
+          <nav aria-label="Planning navigation" className="mt-5 flex items-end gap-0.5 overflow-x-auto border-b border-[var(--border-subtle)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <TabButton
               active={tab === "schedule"}
               onClick={() => setTab("schedule")}
@@ -237,7 +227,7 @@ export default function PlanningApp() {
               icon={<CogIcon size={13} />}
               label={t("tab.configuration")}
             />
-          </div>
+          </nav>
         </div>
       </div>
 
@@ -319,14 +309,16 @@ function TabButton({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className={`h-8 px-3 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 transition-all whitespace-nowrap border ${
+      aria-current={active ? "page" : undefined}
+      className={`inline-flex h-10 shrink-0 items-center gap-1.5 px-3 text-[12px] transition-colors duration-150 whitespace-nowrap ${
         active
-          ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
-          : "bg-transparent border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+          ? "border-b-2 border-[var(--text-primary)] pb-0 text-[var(--text-primary)]"
+          : "border-b-2 border-transparent text-[var(--text-dim)] hover:text-[var(--text-primary)]"
       }`}
     >
-      {icon}
+      <span aria-hidden>{icon}</span>
       {label}
     </button>
   );

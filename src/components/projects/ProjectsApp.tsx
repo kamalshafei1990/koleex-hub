@@ -32,6 +32,7 @@ import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
 import CheckSquareIcon from "@/components/icons/ui/CheckSquareIcon";
 import ListTodoIcon from "@/components/icons/ui/ListTodoIcon";
 import ProjectsIcon from "@/components/icons/ProjectsIcon";
+import PageHeader from "@/components/ui/PageHeader";
 import EntityPlanningStrip from "@/components/planning/EntityPlanningStrip";
 import EntityPicker from "@/components/planning/EntityPicker";
 import {
@@ -96,37 +97,45 @@ export default function ProjectsApp() {
       className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
       style={{ height: "calc(100dvh - 3.5rem)" }}
     >
-      {/* Page header */}
+      {/* Page header — canonical Hub PageHeader + state tab strip */}
       <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] z-10 w-full overflow-x-hidden">
-        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 min-w-0">
-          <div className="flex flex-wrap items-center gap-3 pt-5 pb-1">
-            <Link
-              href="/"
-              className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
-            >
-              <ArrowLeftIcon className="h-4 w-4" />
-            </Link>
-            <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-                <ProjectsIcon className="h-4 w-4" />
-              </div>
-              <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
-                {t("app.title")}
-              </h1>
-            </div>
-          </div>
-          <p className="text-[12px] text-[var(--text-dim)] mb-3 ml-0 md:ml-11">
-            {t("app.subtitle")}
-          </p>
-
-          {/* Tabs */}
-          <div className="flex items-center gap-1 pb-3 overflow-x-auto scrollbar-none">
-            <Tab active={tab === "projects"} onClick={() => setTab("projects")} icon={<LayoutGridIcon size={13} />} label={t("tab.projects")} />
-            <Tab active={tab === "mine"} onClick={() => setTab("mine")} icon={<CheckSquareIcon size={13} />} label={t("tab.myTasks")} />
-            <Tab active={tab === "all"} onClick={() => setTab("all")} icon={<ListTodoIcon size={13} />} label={t("tab.allTasks")} />
-            <Tab active={tab === "reporting"} onClick={() => setTab("reporting")} icon={<BarChart3Icon size={13} />} label={t("tab.reporting")} />
-            <Tab active={tab === "config"} onClick={() => setTab("config")} icon={<CogIcon size={13} />} label={t("tab.configuration")} />
-          </div>
+        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 min-w-0 pt-5 pb-3">
+          <PageHeader
+            title={t("app.title")}
+            subtitle={t("app.subtitle")}
+            icon={<ProjectsIcon className="h-4 w-4" />}
+            showTabs={false}
+          />
+          <nav
+            aria-label="Projects navigation"
+            className="mt-5 flex items-end gap-0.5 overflow-x-auto border-b border-[var(--border-subtle)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {[
+              { key: "projects",  label: t("tab.projects"),     icon: <LayoutGridIcon size={12} /> },
+              { key: "mine",      label: t("tab.myTasks"),      icon: <CheckSquareIcon size={12} /> },
+              { key: "all",       label: t("tab.allTasks"),     icon: <ListTodoIcon size={12} /> },
+              { key: "reporting", label: t("tab.reporting"),    icon: <BarChart3Icon size={12} /> },
+              { key: "config",    label: t("tab.configuration"),icon: <CogIcon size={12} /> },
+            ].map((entry) => {
+              const isActive = tab === entry.key;
+              return (
+                <button
+                  key={entry.key}
+                  type="button"
+                  onClick={() => setTab(entry.key as typeof tab)}
+                  aria-current={isActive ? "page" : undefined}
+                  className={`inline-flex h-10 shrink-0 items-center gap-1.5 px-3 text-[12px] transition-colors duration-150 ${
+                    isActive
+                      ? "border-b-2 border-[var(--text-primary)] pb-0 text-[var(--text-primary)]"
+                      : "border-b-2 border-transparent text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  <span aria-hidden>{entry.icon}</span>
+                  {entry.label}
+                </button>
+              );
+            })}
+          </nav>
         </div>
       </div>
 

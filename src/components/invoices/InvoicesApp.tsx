@@ -19,6 +19,7 @@ import { useTranslation } from "@/lib/i18n";
 import { invoicesT } from "@/lib/translations/invoices";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
 import RrIcon from "@/components/ui/RrIcon";
+import PageHeader from "@/components/ui/PageHeader";
 import EntityPicker from "@/components/planning/EntityPicker";
 import {
   createInvoice,
@@ -111,35 +112,24 @@ function InvoiceListView({ onOpen }: { onOpen: (id: string) => void }) {
       className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
       style={{ height: "calc(100dvh - 3.5rem)" }}
     >
-      {/* Header */}
+      {/* Header — canonical Hub PageHeader */}
       <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] z-10 w-full overflow-x-hidden">
-        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 min-w-0">
-          <div className="flex flex-wrap items-center gap-3 pt-5 pb-1">
-            <Link
-              href="/"
-              className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] shrink-0"
-            >
-              <RrIcon name="arrow-left" size={16} />
-            </Link>
-            <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-                <RrIcon name="file-invoice" size={16} />
-              </div>
-              <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
-                {t("app.title")}
-              </h1>
-            </div>
-            <button
-              onClick={() => setFormOpen(true)}
-              className="h-9 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 shrink-0"
-            >
-              <RrIcon name="plus" size={14} />
-              <span className="hidden sm:inline">{t("action.new")}</span>
-            </button>
-          </div>
-          <p className="text-[12px] text-[var(--text-dim)] mb-3 ml-0 md:ml-11">
-            {t("app.subtitle")}
-          </p>
+        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 min-w-0 pt-5 pb-4">
+          <PageHeader
+            title={t("app.title")}
+            subtitle={t("app.subtitle")}
+            icon="file-invoice"
+            showTabs={false}
+            action={
+              <button
+                onClick={() => setFormOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-md bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] transition-opacity hover:opacity-90"
+              >
+                <RrIcon name="plus" size={12} />
+                <span className="hidden sm:inline">{t("action.new")}</span>
+              </button>
+            }
+          />
         </div>
       </div>
 

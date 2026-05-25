@@ -59,6 +59,7 @@ import SparklesIcon from "@/components/icons/ui/SparklesIcon";
 import StarIcon from "@/components/icons/ui/StarIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import TrendingUpIcon from "@/components/icons/ui/TrendingUpIcon";
+import PageHeader from "@/components/ui/PageHeader";
 import UserIcon from "@/components/icons/ui/UserIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
@@ -420,27 +421,14 @@ export default function CRM() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      {/* ── Page header — same pattern as Markets / Landed Cost ── */}
-      <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-6 md:pt-8">
-        <div className="flex flex-wrap items-center gap-3 mb-1">
-          <Link
-            href="/"
-            className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
-          >
-            <ArrowLeftIcon className="h-4 w-4" />
-          </Link>
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-              <TrendingUpIcon className="h-4 w-4" />
-            </div>
-            <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
-              {t("title")}
-            </h1>
-          </div>
-        </div>
-        <p className="text-[12px] text-[var(--text-dim)] mb-4 ml-0 md:ml-11">
-          {t("subtitle")}
-        </p>
+      {/* ── Page header — canonical Hub PageHeader ── */}
+      <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-6 md:pt-8 pb-4">
+        <PageHeader
+          title={t("title")}
+          subtitle={t("subtitle")}
+          icon={<TrendingUpIcon className="h-4 w-4" />}
+          showTabs={false}
+        />
       </div>
 
       {/* ── Sticky tab nav — Sales / Reporting / Configuration ── */}

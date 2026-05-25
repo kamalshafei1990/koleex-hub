@@ -24,8 +24,9 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
+import PageHeader from "@/components/ui/PageHeader";
 
-/* ─── Page ──────────────────────────────────────────────────── */
+/* ─── Page — thin wrapper around canonical PageHeader ───────── */
 
 export function ErpPage({
   title, subtitle, backHref = "/", icon, action, children,
@@ -40,25 +41,14 @@ export function ErpPage({
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap items-center gap-3">
-            <Link
-              href={backHref}
-              aria-label="Back"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] transition-colors hover:text-[var(--text-primary)]"
-            >
-              <RrIcon name="arrow-left" size={16} />
-            </Link>
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)]">
-              <RrIcon name={icon} size={16} />
-            </div>
-            <div className="flex min-w-0 items-center gap-2.5">
-              <h1 className="text-xl font-bold tracking-tight md:text-[22px]">{title}</h1>
-              {subtitle && <p className="hidden text-[12px] text-[var(--text-dim)] sm:block">{subtitle}</p>}
-            </div>
-          </div>
-          {action && <div className="flex flex-wrap items-center gap-2">{action}</div>}
-        </div>
+        <PageHeader
+          title={title}
+          subtitle={subtitle}
+          icon={icon}
+          backHref={backHref}
+          action={action}
+          showTabs={false}
+        />
         {children}
       </div>
     </div>
