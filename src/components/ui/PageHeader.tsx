@@ -77,19 +77,19 @@ export default function PageHeader({
   return (
     <div>
       {/* ── Hero title row — bold + generous (matches Hub home greeting) ── */}
-      <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 items-start gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-5">
+        <div className="flex min-w-0 items-center gap-3 sm:items-start sm:gap-4">
           {/* Back arrow */}
           <Link
             href={backHref}
             aria-label="Back"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] sm:h-10 sm:w-10"
           >
             <RrIcon name="arrow-left" size={16} />
           </Link>
 
           {/* Identity icon chip — squared to match Hub app cards */}
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)]">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)] sm:h-10 sm:w-10">
             {typeof icon === "string" ? (
               <RrIcon name={icon as RrIconName} size={18} />
             ) : isValidElement(icon) ? (
@@ -99,11 +99,11 @@ export default function PageHeader({
 
           {/* Title + subtitle — large + breathing room */}
           <div className="flex min-w-0 flex-col">
-            <h1 className="text-[26px] font-bold tracking-tight leading-tight text-[var(--text-primary)] md:text-[30px]">
+            <h1 className="text-[20px] font-bold tracking-tight leading-tight text-[var(--text-primary)] sm:text-[26px] md:text-[30px]">
               {title}
             </h1>
             {subtitle && (
-              <p className="mt-1 text-[13px] leading-snug text-[var(--text-muted)]">
+              <p className="mt-0.5 truncate text-[12px] leading-snug text-[var(--text-muted)] sm:mt-1 sm:text-[13px] sm:whitespace-normal">
                 {subtitle}
               </p>
             )}

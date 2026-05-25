@@ -67,10 +67,10 @@ export default function AppHomeMenu({
         onSearchSubmit={onSearchSubmit}
       />
 
-      {/* Single horizontal pill row — all nav items live here */}
+      {/* Single horizontal pill row — scrolls on mobile, wraps on desktop */}
       <nav
         aria-label="App navigation"
-        className="flex flex-wrap items-center gap-2"
+        className="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:gap-2 sm:px-0 sm:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {navItems.map((item, i) => (
           <HomePill key={item.key ?? item.href ?? `nav-${i}`} {...item} />
@@ -82,7 +82,7 @@ export default function AppHomeMenu({
 
 function HomePill({ href, onClick, icon, label, count, active }: AppHomeNavItem) {
   const isActive = !!active;
-  const baseClass = `inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-4 text-[12.5px] font-medium transition-all duration-200 ${
+  const baseClass = `inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[12px] font-medium transition-all duration-200 sm:h-9 sm:px-4 sm:text-[12.5px] ${
     isActive
       ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] shadow-sm"
       : "border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-muted)] hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
@@ -144,14 +144,14 @@ function HomeSearchBar({
   };
   return (
     <form onSubmit={handleSubmit}>
-      <div className="group flex items-center gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 py-3 transition-all duration-200 focus-within:border-[var(--border-focus)] hover:border-[var(--border-color)]">
-        <RrIcon name="search" size={16} className="shrink-0 text-[var(--text-dim)] transition-colors group-focus-within:text-[var(--text-muted)]" />
+      <div className="group flex items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 py-2.5 transition-all duration-200 focus-within:border-[var(--border-focus)] hover:border-[var(--border-color)] sm:gap-3 sm:px-4 sm:py-3">
+        <RrIcon name="search" size={15} className="shrink-0 text-[var(--text-dim)] transition-colors group-focus-within:text-[var(--text-muted)]" />
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder={placeholder}
           aria-label="Search"
-          className="min-w-0 flex-1 bg-transparent text-[13.5px] outline-none placeholder:text-[var(--text-dim)]"
+          className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--text-dim)] sm:text-[13.5px]"
         />
         {q.trim() ? (
           <button

@@ -127,7 +127,7 @@ export default function PurchaseApp() {
       className="h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden max-w-[100vw]"
     >
       {/* ═══════════ TOP BAR — canonical Hub PageHeader + state tab strips ═══════════ */}
-      <div className="shrink-0 border-b border-[var(--border-color)] px-5 pt-4 pb-4">
+      <div className="shrink-0 border-b border-[var(--border-color)] px-4 pt-4 pb-4 sm:px-5">
         <PageHeader
           title={t("purchase.title")}
           subtitle={t("purchase.subtitle")}
