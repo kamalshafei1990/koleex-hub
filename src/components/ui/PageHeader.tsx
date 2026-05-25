@@ -261,6 +261,57 @@ function SlidingPillNav({
     firstMountRef.current = false;
   }, [activeIndex, tabWidth]);
 
+  /* iOS Safari fix: when the user scrolls the page vertically, iOS leaks
+     a tiny amount of horizontal momentum into any sibling `overflow-x:auto`
+     element — making the pill bar appear to drift sideways during a
+     vertical body swipe. Lock the nav's scrollLeft whenever the user is
+     NOT actively touching the nav itself. The locked value stays at the
+     last position the user (or auto-scroll) put it.
+
+     Implementation: track whether a touch is on the nav. If not, any
+     `scroll` event on the nav that changes scrollLeft outside an
+     auto-scroll batch gets snapped back to the locked value. */
+  const lockedScrollRef = useRef<number | null>(null);
+  const userScrollingRef = useRef(false);
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    const onTouchStart = () => { userScrollingRef.current = true; lockedScrollRef.current = null; };
+    const onTouchEnd = () => {
+      userScrollingRef.current = false;
+      // After the user releases, lock the current scroll position.
+      lockedScrollRef.current = track.scrollLeft;
+    };
+    const onScroll = () => {
+      const locked = lockedScrollRef.current;
+      if (!userScrollingRef.current && locked != null && Math.abs(track.scrollLeft - locked) > 1) {
+        track.scrollLeft = locked;
+      }
+    };
+    track.addEventListener("touchstart", onTouchStart, { passive: true });
+    track.addEventListener("touchend", onTouchEnd, { passive: true });
+    track.addEventListener("touchcancel", onTouchEnd, { passive: true });
+    track.addEventListener("scroll", onScroll, { passive: true });
+    // Initial lock: whatever the active-pill effect just set.
+    lockedScrollRef.current = track.scrollLeft;
+    return () => {
+      track.removeEventListener("touchstart", onTouchStart);
+      track.removeEventListener("touchend", onTouchEnd);
+      track.removeEventListener("touchcancel", onTouchEnd);
+      track.removeEventListener("scroll", onScroll);
+    };
+  }, []);
+
+  /* Whenever the auto-scroll effect changes the active tab into view,
+     refresh the lock target so the new committed position is the one we
+     defend against iOS overscroll leakage. */
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    const t = setTimeout(() => { lockedScrollRef.current = track.scrollLeft; }, 400);
+    return () => clearTimeout(t);
+  }, [activeIndex, tabWidth]);
+
   /* Roving tabindex — arrow keys move focus between tabs. */
   const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
@@ -281,14 +332,21 @@ function SlidingPillNav({
       role="tablist"
       aria-label={ariaLabel}
       onKeyDown={onKeyDown}
-      /* overscroll-x-contain + touch-action: pan-x keep horizontal swipes
-         inside the pill bar (without them iOS Safari treats the gesture as
-         back-navigation). scroll-snap makes the bar settle cleanly on a
-         tab edge after a swipe, so it doesn't drift to a half-tab position. */
+      /* iOS-friendly scroll behavior:
+         · overscroll-behavior-x: contain — keep horizontal scroll inside
+           the bar (no back-nav hijack at edges).
+         · WebkitOverflowScrolling: "auto" — disable iOS momentum here.
+           "touch" momentum would let a vertical body fling leak tiny
+           horizontal motion into the bar (the bug the user reported).
+         · NO touch-action: pan-x — that was overrestricting and made
+           iOS more likely to apply unwanted horizontal deltas. Default
+           touch-action lets the page scroll vertically through the bar
+           and only lets the bar scroll horizontally on a deliberate
+           horizontal drag. The JS scrollLeft lock above defends against
+           any residual iOS leakage. */
       style={{
         overscrollBehaviorX: "contain",
-        touchAction: "pan-x",
-        WebkitOverflowScrolling: "touch",
+        WebkitOverflowScrolling: "auto",
         scrollSnapType: "x mandatory",
         scrollPaddingLeft: `${TRACK_PADDING}px`,
       }}
