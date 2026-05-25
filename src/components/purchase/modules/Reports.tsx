@@ -119,7 +119,7 @@ export default function ReportsModule({ t }: PurchaseModuleProps) {
   const maxSup     = Math.max(1, ...bySupplier.map((s) => s.total));
 
   return (
-    <div className="p-4 md:p-6 grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-5">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-5">
       {/* Spend trend */}
       <div className={`${cardCls} p-5 lg:col-span-2`}>
         <h2 className={sectionTitleCls}><LineChartIcon className="h-3 w-3" />Spend trend</h2>

@@ -136,32 +136,44 @@ export function relativeTime(d: string | Date | null | undefined): string {
   return dt.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-/* Status tones reused across PO / Bill / Return list rows so the
-   visual language stays coherent. Keys are lowercased to be
-   tolerant of how each table stores its enum text. */
+/* Status tones reused across PO / Bill / Return / Requisition / RFQ /
+   Receipt / Contract list rows. Each entry pairs a tinted background
+   with a saturated text color that's legible on light AND dark
+   surfaces — the dark mode brightener via `dark:text-{tint}-300` keeps
+   contrast acceptable on a near-black background while the base
+   `text-{tint}-700` stays readable on a near-white surface.
+
+   Keys are lowercased to be tolerant of how each table stores its
+   enum text. */
+const TONE_NEUTRAL = "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)]";
+const TONE_INFO    = "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300";
+const TONE_WARN    = "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300";
+const TONE_OK      = "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
+const TONE_BAD     = "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300";
+
 export const STATUS_TONE_PO: Record<string, string> = {
-  draft:     "bg-slate-500/15 text-slate-400 border-slate-500/20",
-  confirmed: "bg-blue-500/15 text-blue-400 border-blue-500/20",
-  partial:   "bg-amber-500/15 text-amber-400 border-amber-500/20",
-  received:  "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
-  closed:    "bg-slate-500/15 text-slate-400 border-slate-500/20",
-  cancelled: "bg-red-500/15 text-red-400 border-red-500/20",
+  draft:     TONE_NEUTRAL,
+  confirmed: TONE_INFO,
+  partial:   TONE_WARN,
+  received:  TONE_OK,
+  closed:    TONE_NEUTRAL,
+  cancelled: TONE_BAD,
 };
 
 export const STATUS_TONE_BILL: Record<string, string> = {
-  draft:     "bg-slate-500/15 text-slate-400 border-slate-500/20",
-  posted:    "bg-blue-500/15 text-blue-400 border-blue-500/20",
-  partial:   "bg-amber-500/15 text-amber-400 border-amber-500/20",
-  paid:      "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
-  overdue:   "bg-red-500/15 text-red-400 border-red-500/20",
-  cancelled: "bg-slate-500/15 text-slate-400 border-slate-500/20",
+  draft:     TONE_NEUTRAL,
+  posted:    TONE_INFO,
+  partial:   TONE_WARN,
+  paid:      TONE_OK,
+  overdue:   TONE_BAD,
+  cancelled: TONE_NEUTRAL,
 };
 
 export const STATUS_TONE_REQ: Record<string, string> = {
-  draft:     "bg-slate-500/15 text-slate-400 border-slate-500/20",
-  pending:   "bg-amber-500/15 text-amber-400 border-amber-500/20",
-  approved:  "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
-  rejected:  "bg-red-500/15 text-red-400 border-red-500/20",
-  converted: "bg-blue-500/15 text-blue-400 border-blue-500/20",
-  cancelled: "bg-slate-500/15 text-slate-400 border-slate-500/20",
+  draft:     TONE_NEUTRAL,
+  pending:   TONE_WARN,
+  approved:  TONE_OK,
+  rejected:  TONE_BAD,
+  converted: TONE_INFO,
+  cancelled: TONE_NEUTRAL,
 };

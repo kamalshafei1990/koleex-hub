@@ -19,11 +19,11 @@ type Return = {
 };
 
 const STATUS_TONE: Record<string, string> = {
-  draft:     "bg-slate-500/15 text-slate-400 border-slate-500/20",
-  sent:      "bg-blue-500/15 text-blue-400 border-blue-500/20",
-  refunded:  "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
-  closed:    "bg-slate-500/15 text-slate-400 border-slate-500/20",
-  cancelled: "bg-red-500/15 text-red-400 border-red-500/20",
+  draft:     "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)]",
+  sent:      "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300",
+  refunded:  "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  closed:    "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)]",
+  cancelled: "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300",
 };
 
 export default function ReturnsModule({ t }: PurchaseModuleProps) {
@@ -57,7 +57,7 @@ export default function ReturnsModule({ t }: PurchaseModuleProps) {
   if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>;
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
+    <div className="space-y-4">
       <h2 className={sectionTitleCls}><CornerUpLeftIcon className="h-3 w-3" />{t("purchase.recent")} {t("purchase.tabReturns").toLowerCase()}</h2>
 
       {rows.length === 0 ? (
@@ -79,7 +79,7 @@ export default function ReturnsModule({ t }: PurchaseModuleProps) {
                 <span className="hidden md:inline text-[11px] tabular-nums text-[var(--text-dim)]">{formatDate(r.return_date || r.created_at)}</span>
                 <div className="flex items-center gap-2 justify-end">
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border ${tone}`}>{status}</span>
-                  <span className="text-[13px] tabular-nums font-semibold text-emerald-400 min-w-[80px] text-right">{formatMoney(Number(r.refund_amount || r.total_value) || 0, r.currency || "USD")}</span>
+                  <span className="text-[13px] tabular-nums font-semibold text-emerald-700 dark:text-emerald-300 min-w-[80px] text-right">{formatMoney(Number(r.refund_amount || r.total_value) || 0, r.currency || "USD")}</span>
                 </div>
               </div>
             );

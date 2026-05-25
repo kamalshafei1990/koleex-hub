@@ -50,7 +50,7 @@ export default function BillsModule({ t }: PurchaseModuleProps) {
   if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>;
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className={sectionTitleCls}><DocumentIcon className="h-3 w-3" />{t("purchase.recent")} {t("purchase.tabBills").toLowerCase()}</h2>
         <button

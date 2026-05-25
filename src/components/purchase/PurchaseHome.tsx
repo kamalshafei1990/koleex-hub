@@ -22,11 +22,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import KpiCard from "@/components/ui/KpiCard";
 import Button from "@/components/ui/Button";
+import RrIcon from "@/components/ui/RrIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
-import PurchasePage from "./PurchasePage";
+import PurchaseRouteShell from "./PurchaseRouteShell";
 import { formatMoney, relativeTime } from "./shared";
 
 /* ---------------------------------------------------------------------------
@@ -43,7 +45,7 @@ function SectionEyebrow({ children }: { children: React.ReactNode }) {
 
 interface QuickActionProps {
   href: string;
-  icon: React.ReactNode;
+  icon: React.ComponentProps<typeof RrIcon>["name"];
   label: string;
   hint: string;
   tone: "blue" | "teal" | "amber" | "violet";
@@ -57,12 +59,12 @@ function QuickActionCard({ href, icon, label, hint, tone }: QuickActionProps) {
   return (
     <Link
       href={href}
-      className="group relative flex h-full min-h-[120px] flex-col rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-4 py-3.5 shadow-sm transition-colors hover:bg-[var(--bg-surface-hover)]"
+      className="group relative flex h-full min-h-[120px] flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3.5 shadow-sm transition-colors hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)]"
     >
       <span aria-hidden className={`absolute left-4 top-0 h-px w-12 ${accentBar}`} />
       <div className="flex items-center gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)]">
-          {icon}
+          <RrIcon name={icon} size={16} />
         </span>
         <div className="text-[14px] font-medium tracking-tight text-[var(--text-primary)]">
           {label}
@@ -144,6 +146,7 @@ interface RecentItem {
 }
 
 export default function PurchaseHome() {
+  const router = useRouter();
   const [stats, setStats] = useState<HomeStats | null>(null);
   const [recent, setRecent] = useState<RecentItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -243,26 +246,26 @@ export default function PurchaseHome() {
      between apps feels consistent. */
   if (loading || !stats) {
     return (
-      <PurchasePage title="Purchase" subtitle="From requisition to payment — the full procure-to-pay loop.">
+      <PurchaseRouteShell title="Purchase" subtitle="From requisition to payment — the full procure-to-pay loop.">
         <div className="flex items-center justify-center py-20 text-[var(--text-dim)]">
           <SpinnerIcon size={20} className="animate-spin" />
         </div>
-      </PurchasePage>
+      </PurchaseRouteShell>
     );
   }
 
   const totalAlerts = stats.overdueBills + stats.pendingApprovals + stats.lateDeliveries;
 
   return (
-    <PurchasePage
+    <PurchaseRouteShell
       title="Purchase"
       subtitle="From requisition to payment — the full procure-to-pay loop."
       action={
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="secondary" size="sm" icon="search" onClick={() => { window.location.href = "/inventory/search"; }}>
+          <Button variant="secondary" size="sm" icon="search" onClick={() => router.push("/inventory/search")}>
             Search
           </Button>
-          <Button variant="primary" size="sm" icon="plus" onClick={() => { window.location.href = "/purchase/orders?create=1"; }}>
+          <Button variant="primary" size="sm" icon="plus" onClick={() => router.push("/purchase/orders?create=1")}>
             New PO
           </Button>
         </div>
@@ -309,28 +312,28 @@ export default function PurchaseHome() {
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <QuickActionCard
             href="/purchase/requisitions?create=1"
-            icon={<span className="text-[16px] font-bold">＋</span>}
+            icon="plus"
             label="New Requisition"
             hint="Start an internal purchase request"
             tone="blue"
           />
           <QuickActionCard
             href="/purchase/rfqs?create=1"
-            icon={<span className="text-[16px] font-bold">？</span>}
+            icon="badge-check"
             label="Send RFQ"
             hint="Request quotes from suppliers"
             tone="teal"
           />
           <QuickActionCard
             href="/purchase/orders?create=1"
-            icon={<span className="text-[16px] font-bold">📦</span>}
+            icon="box-open"
             label="Create PO"
             hint="Confirm a buy with a supplier"
             tone="amber"
           />
           <QuickActionCard
             href="/purchase/payments?create=1"
-            icon={<span className="text-[16px] font-bold">$</span>}
+            icon="wallet"
             label="Record Payment"
             hint="Pay an outstanding vendor bill"
             tone="violet"
@@ -398,6 +401,6 @@ export default function PurchaseHome() {
           </ul>
         )}
       </section>
-    </PurchasePage>
+    </PurchaseRouteShell>
   );
 }

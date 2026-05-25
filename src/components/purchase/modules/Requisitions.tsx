@@ -25,10 +25,10 @@ type Requisition = {
 
 const PRIORITY_LABEL = ["Low", "Normal", "High", "Urgent"];
 const PRIORITY_TONE = [
-  "bg-slate-500/15 text-slate-400 border-slate-500/20",
-  "bg-blue-500/15 text-blue-400 border-blue-500/20",
-  "bg-amber-500/15 text-amber-400 border-amber-500/20",
-  "bg-red-500/15 text-red-400 border-red-500/20",
+  "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)]",
+  "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300",
+  "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300",
 ];
 
 export default function RequisitionsModule({ t }: PurchaseModuleProps) {
@@ -51,7 +51,7 @@ export default function RequisitionsModule({ t }: PurchaseModuleProps) {
   if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>;
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className={sectionTitleCls}><FilePlusIcon className="h-3 w-3" />{t("purchase.recent")} {t("purchase.tabRequisitions").toLowerCase()}</h2>
         <button

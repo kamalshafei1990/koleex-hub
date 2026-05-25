@@ -19,11 +19,11 @@ type RFQ = {
 };
 
 const STATUS_TONE: Record<string, string> = {
-  draft:     "bg-slate-500/15 text-slate-400 border-slate-500/20",
-  sent:      "bg-blue-500/15 text-blue-400 border-blue-500/20",
-  responded: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
-  closed:    "bg-slate-500/15 text-slate-400 border-slate-500/20",
-  cancelled: "bg-red-500/15 text-red-400 border-red-500/20",
+  draft:     "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)]",
+  sent:      "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300",
+  responded: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  closed:    "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)]",
+  cancelled: "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300",
 };
 
 export default function RFQsModule({ t }: PurchaseModuleProps) {
@@ -57,7 +57,7 @@ export default function RFQsModule({ t }: PurchaseModuleProps) {
   if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>;
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
+    <div className="space-y-4">
       <h2 className={sectionTitleCls}><FileBadge2Icon className="h-3 w-3" />{t("purchase.recent")} {t("purchase.tabRFQs").toLowerCase()}</h2>
 
       {rows.length === 0 ? (

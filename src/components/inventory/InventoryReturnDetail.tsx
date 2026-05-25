@@ -700,7 +700,7 @@ function MovementLink({ mv, onOpen }: { mv: { id: string; movement_no: string; d
 function sourceDocHref(type: string, id: string): string {
   if (type === "sales_shipment") return `/sales/shipments/${id}`;
   if (type === "invoice") return `/sales/invoices/${id}`;
-  if (type === "purchase_receipt") return `/purchases/receipts/${id}`;
-  if (type === "vendor_bill") return `/purchases/bills/${id}`;
+  if (type === "purchase_receipt") return `/purchase/receipts/${id}`;
+  if (type === "vendor_bill") return `/purchase/bills/${id}`;
   return "#";
 }

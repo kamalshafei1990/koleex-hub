@@ -55,7 +55,7 @@ export default function PriceListsModule({ t }: PurchaseModuleProps) {
   if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>;
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
+    <div className="space-y-4">
       <h2 className={sectionTitleCls}><TagsIcon className="h-3 w-3" />Vendor price lists</h2>
 
       {rows.length === 0 ? (
@@ -69,9 +69,9 @@ export default function PriceListsModule({ t }: PurchaseModuleProps) {
               <div className="flex items-start justify-between gap-2 mb-2">
                 <h3 className="text-[14px] font-semibold tracking-tight text-[var(--text-primary)] truncate">{p.name}</h3>
                 {p.is_active !== false ? (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 shrink-0">Active</span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 shrink-0">Active</span>
                 ) : (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider bg-slate-500/15 text-slate-400 border border-slate-500/20 shrink-0">Inactive</span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)] shrink-0">Inactive</span>
                 )}
               </div>
               <p className="text-[11px] text-[var(--text-dim)] truncate mb-2">{supplierName.get(p.supplier_id || "") || "—"}</p>

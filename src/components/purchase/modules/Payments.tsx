@@ -21,11 +21,11 @@ type Payment = {
 };
 
 const METHOD_TONE: Record<string, string> = {
-  bank_transfer: "bg-blue-500/15 text-blue-400 border-blue-500/20",
-  cash:          "bg-amber-500/15 text-amber-400 border-amber-500/20",
+  bank_transfer: "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300",
+  cash:          "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
   check:         "bg-violet-500/15 text-violet-400 border-violet-500/20",
-  card:          "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
-  wire:          "bg-blue-500/15 text-blue-400 border-blue-500/20",
+  card:          "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  wire:          "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300",
 };
 
 export default function PaymentsModule({ t }: PurchaseModuleProps) {
@@ -86,7 +86,7 @@ export default function PaymentsModule({ t }: PurchaseModuleProps) {
   if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>;
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className={sectionTitleCls}><WalletIcon className="h-3 w-3" />{t("purchase.recent")} {t("purchase.tabPayments").toLowerCase()}</h2>
         <button
@@ -123,7 +123,7 @@ export default function PaymentsModule({ t }: PurchaseModuleProps) {
         <div className={`${cardCls} divide-y divide-[var(--border-subtle)] overflow-hidden`}>
           {rows.map((p) => {
             const method = (p.method || "").toLowerCase();
-            const tone = METHOD_TONE[method] || "bg-slate-500/15 text-slate-400 border-slate-500/20";
+            const tone = METHOD_TONE[method] || "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)]";
             const linkedBill = p.bill_id ? billNo.get(p.bill_id) : null;
             return (
               <div key={p.id} className="grid grid-cols-[1fr_auto] md:grid-cols-[120px_1fr_120px_120px_auto] gap-3 md:gap-4 items-center px-4 py-3">
@@ -137,7 +137,7 @@ export default function PaymentsModule({ t }: PurchaseModuleProps) {
                     </span>
                   ) : <span className="text-[var(--text-ghost)] text-[11px]">—</span>}
                 </span>
-                <span className="text-[13px] tabular-nums font-semibold text-rose-400 min-w-[80px] text-right">{formatMoney(Number(p.amount) || 0, p.currency || "USD")}</span>
+                <span className="text-[13px] tabular-nums font-semibold text-rose-700 dark:text-rose-300 min-w-[80px] text-right">{formatMoney(Number(p.amount) || 0, p.currency || "USD")}</span>
               </div>
             );
           })}

@@ -22,10 +22,10 @@ type Receipt = {
 };
 
 const STATUS_TONE: Record<string, string> = {
-  draft:     "bg-slate-500/15 text-slate-400 border-slate-500/20",
-  partial:   "bg-amber-500/15 text-amber-400 border-amber-500/20",
-  complete:  "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
-  cancelled: "bg-red-500/15 text-red-400 border-red-500/20",
+  draft:     "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)]",
+  partial:   "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  complete:  "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  cancelled: "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300",
 };
 
 export default function ReceiptsModule({ t }: PurchaseModuleProps) {
@@ -69,7 +69,7 @@ export default function ReceiptsModule({ t }: PurchaseModuleProps) {
   if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>;
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className={sectionTitleCls}><ClipboardCheckIcon className="h-3 w-3" />{t("purchase.recent")} {t("purchase.tabReceipts").toLowerCase()}</h2>
         <button

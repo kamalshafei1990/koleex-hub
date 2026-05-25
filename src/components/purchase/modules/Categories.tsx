@@ -24,10 +24,10 @@ type Category = {
 };
 
 const KIND_TONE: Record<string, string> = {
-  direct:   "bg-blue-500/15 text-blue-400 border-blue-500/20",
-  indirect: "bg-amber-500/15 text-amber-400 border-amber-500/20",
+  direct:   "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300",
+  indirect: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
   services: "bg-violet-500/15 text-violet-400 border-violet-500/20",
-  capex:    "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
+  capex:    "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
 };
 
 const KIND_LABEL: Record<string, string> = {
@@ -80,7 +80,7 @@ export default function CategoriesModule({ t }: PurchaseModuleProps) {
   const order = ["direct", "indirect", "services", "capex"];
 
   return (
-    <div className="p-4 md:p-6 space-y-5">
+    <div className="space-y-5">
       <h2 className={sectionTitleCls}><LayoutGridIcon className="h-3 w-3" />Spend categories</h2>
 
       {order.map((kind) => {
@@ -102,7 +102,7 @@ export default function CategoriesModule({ t }: PurchaseModuleProps) {
                     <p className="text-[13px] font-medium text-[var(--text-primary)] truncate">{c.name}</p>
                     {c.description && <p className="text-[11px] text-[var(--text-dim)] truncate">{c.description}</p>}
                   </div>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border ${c.is_active !== false ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/20" : "bg-slate-500/15 text-slate-400 border-slate-500/20"}`}>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border ${c.is_active !== false ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)]"}`}>
                     {c.is_active !== false ? "Active" : "Off"}
                   </span>
                 </li>

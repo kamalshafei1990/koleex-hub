@@ -258,13 +258,13 @@ function sourceDocumentLink(
   sourceId: string,
 ): { href: string; label: string } | null {
   if (sourceType === "purchase_receipt" || sourceType === "purchase_receipt_item") {
-    return { href: `/purchases/receipts/${sourceId}`, label: "purchase receipt" };
+    return { href: `/purchase/receipts/${sourceId}`, label: "purchase receipt" };
   }
   if (sourceType === "sales_shipment" || sourceType === "sales_shipment_item") {
     return { href: `/sales/shipments/${sourceId}`, label: "sales shipment" };
   }
   if (sourceType === "purchase_order_item") {
-    return { href: `/purchases/orders/${sourceId}`, label: "purchase order" };
+    return { href: `/purchase/orders/${sourceId}`, label: "purchase order" };
   }
   if (sourceType === "sales_order_item") {
     return { href: `/sales/orders/${sourceId}`, label: "sales order" };

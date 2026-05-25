@@ -65,7 +65,7 @@ export default function SuppliersModule({ t }: PurchaseModuleProps) {
   });
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className={sectionTitleCls}><UsersIcon className="h-3 w-3" />Top suppliers by spend</h2>
         <Link href="/contacts" className={linkBtnCls}>{t("purchase.openInApp")}<AngleRightIcon className="h-3 w-3" /></Link>
@@ -86,7 +86,7 @@ export default function SuppliersModule({ t }: PurchaseModuleProps) {
             return (
               <Link
                 key={s.id}
-                href={`/contacts?id=${s.id}`}
+                href={`/contacts?selected=${s.id}`}
                 className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-[var(--bg-surface)] transition-colors"
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -97,7 +97,7 @@ export default function SuppliersModule({ t }: PurchaseModuleProps) {
                     <div className="flex items-center gap-2">
                       <p className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{display}</p>
                       {rating > 0 && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/20 shrink-0">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30 shrink-0">
                           ★ {rating}
                         </span>
                       )}
