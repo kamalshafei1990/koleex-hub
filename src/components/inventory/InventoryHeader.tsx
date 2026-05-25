@@ -1,67 +1,38 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   InventoryHeader — INV-H7 reorganized grouped navigation.
+   InventoryHeader — INV-H10 minimal primary nav + centered popup menu.
 
-   The sub-nav row is split into three role-aware groups so operators can
-   scan it without thinking:
+   The old grouped DO/LOOK-UP/SETUP sub-nav (a side-menu-like wall of chips)
+   is replaced by:
 
-     DO       — daily operational entry points (Home / Items / Movements /
-                Transfers / Returns)
-     LOOK UP  — read / track surfaces (Search / Balances / Serials / Batches)
-     SETUP    — admin-only configuration (Warehouses)
+     · A minimal primary tab strip with the 3 most-used routes
+       (Home · Items · Movements) — always one tap away.
+     · A single "Menu" button that opens InventoryNavPopup — a centered
+       modal listing every inventory route as a small card.
 
-   Each item is icon + label + active highlight, with longest-prefix match
-   for active route so detail pages still light the right tab. Group labels
-   are dim micro-eyebrows above each cluster.
-
-   On mobile the nav becomes a single horizontal scroll strip (no labels for
-   groups, items render as icon + short label) — operators reach what they
-   need by tapping; managers see the SETUP group only when their role allows.
+   This mirrors how Finance / Products surface their navigation: a calm
+   header with a clear escape hatch when the operator needs more.
    --------------------------------------------------------------------------- */
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
-import { useInventoryViewMode } from "@/components/inventory/InventoryUx";
+import InventoryNavPopup, { INVENTORY_NAV_KEYS } from "@/components/inventory/InventoryNavPopup";
+import { useTranslation, type Translations } from "@/lib/i18n";
 
-interface TabEntry { key: string; label: string; icon: RrIconName }
-interface NavGroup { id: "do" | "lookup" | "setup"; label: string; managerOnly?: boolean; items: TabEntry[] }
+interface TabEntry { key: string; label: string; icon: RrIconName; i18nKey: string }
 
-const NAV_GROUPS: NavGroup[] = [
-  {
-    id: "do",
-    label: "Do",
-    items: [
-      { key: "/inventory",           label: "Home",       icon: "home" },
-      { key: "/inventory/items",     label: "Items",      icon: "box-open" },
-      { key: "/inventory/movements", label: "Movements",  icon: "file-invoice" },
-      { key: "/inventory/transfers", label: "Transfers",  icon: "truck-side" },
-      { key: "/inventory/returns",   label: "Returns",    icon: "recycle" },
-    ],
-  },
-  {
-    id: "lookup",
-    label: "Look up",
-    items: [
-      { key: "/inventory/search",   label: "Search",   icon: "search" },
-      { key: "/inventory/balances", label: "Balances", icon: "badge-check" },
-      { key: "/inventory/serials",  label: "Serials",  icon: "fingerprint" },
-      { key: "/inventory/batches",  label: "Batches",  icon: "pallet" },
-    ],
-  },
-  {
-    id: "setup",
-    label: "Setup",
-    managerOnly: true,
-    items: [
-      { key: "/inventory/warehouses", label: "Warehouses", icon: "building" },
-    ],
-  },
+const PRIMARY_TABS: TabEntry[] = [
+  { key: "/inventory",           label: "Home",      icon: "home",         i18nKey: "inv.nav.r.home" },
+  { key: "/inventory/items",     label: "Items",     icon: "box-open",     i18nKey: "inv.nav.r.items" },
+  { key: "/inventory/movements", label: "Movements", icon: "file-invoice", i18nKey: "inv.nav.r.movements" },
 ];
 
-const ALL_TABS: TabEntry[] = NAV_GROUPS.flatMap((g) => g.items);
+const T: Translations = {
+  "inv.nav.menu": { en: "Menu", zh: "菜单", ar: "القائمة" },
+};
 
 export default function InventoryHeader({
   title,
@@ -83,20 +54,22 @@ export default function InventoryHeader({
   showTabs?: boolean;
 }) {
   const pathname = usePathname() ?? "/inventory";
-  const { isManager } = useInventoryViewMode();
+  const { t } = useTranslation(T);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  /* Longest-prefix match against every known inventory route so detail
+     pages still light the right primary tab when one matches. */
   const active =
-    ALL_TABS.slice()
-      .sort((a, b) => b.key.length - a.key.length)
-      .find((t) => pathname === t.key || (t.key !== "/inventory" && pathname.startsWith(t.key)))?.key
+    INVENTORY_NAV_KEYS.slice()
+      .sort((a, b) => b.length - a.length)
+      .find((k) => pathname === k || (k !== "/inventory" && pathname.startsWith(k)))
     ?? "/inventory";
 
-  const visibleGroups = NAV_GROUPS.filter((g) => !g.managerOnly || isManager);
   const heroIcon: RrIconName = icon ?? "box-open";
 
   return (
     <div>
-      {/* Top chrome strip: back · tiny app badge — kept compact so the
-          hero below is what carries the page identity. INV-H8 */}
+      {/* Top chrome strip: back · tiny app badge. */}
       <div className="flex items-center gap-2 text-[var(--text-dim)]">
         <Link
           href="/"
@@ -114,8 +87,7 @@ export default function InventoryHeader({
         </Link>
       </div>
 
-      {/* Hero: large icon chip · big title · roomy subtitle · action row.
-          INV-H8 — mirrors Finance/Products hero pattern. */}
+      {/* Hero. */}
       <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 items-start gap-3.5">
           <span
@@ -145,68 +117,47 @@ export default function InventoryHeader({
       </div>
 
       {showTabs && (
-        <nav aria-label="Inventory navigation" className="mt-6">
-          {/* Desktop: grouped clusters with eyebrow labels */}
-          <div className="hidden flex-wrap items-start gap-x-5 gap-y-3 sm:flex">
-            {visibleGroups.map((group) => (
-              <div key={group.id} className="flex min-w-0 flex-col gap-1.5" data-nav-group={group.id}>
-                <span className="px-1 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--text-dim)]">
-                  {group.label}
+        <nav aria-label="Inventory navigation" className="mt-6 flex items-center gap-1 overflow-x-auto pb-1">
+          {PRIMARY_TABS.map((tab) => {
+            const isActive = tab.key === active;
+            const label = t(tab.i18nKey);
+            return (
+              <Link
+                key={tab.key}
+                href={tab.key}
+                title={label === tab.i18nKey ? tab.label : label}
+                aria-current={isActive ? "page" : undefined}
+                className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border px-3 text-[12px] transition-colors duration-150 ${
+                  isActive
+                    ? "border-white/[0.10] bg-white/[0.04] text-[var(--text-primary)]"
+                    : "border-transparent text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                }`}
+              >
+                <span aria-hidden className={isActive ? "text-[var(--text-primary)]" : "text-[var(--text-dim)]"}>
+                  <RrIcon name={tab.icon} size={12} />
                 </span>
-                <div className="flex flex-wrap items-center gap-1">
-                  {group.items.map((t) => {
-                    const isActive = t.key === active;
-                    return (
-                      <Link
-                        key={t.key}
-                        href={t.key}
-                        title={t.label}
-                        aria-current={isActive ? "page" : undefined}
-                        className={`inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11.5px] transition-colors duration-150 ${
-                          isActive
-                            ? "border-white/[0.10] bg-white/[0.04] text-[var(--text-primary)]"
-                            : "border-transparent text-[var(--text-dim)] hover:border-white/[0.06] hover:text-[var(--text-primary)]"
-                        }`}
-                      >
-                        <span aria-hidden className={isActive ? "text-[var(--text-primary)]" : "text-[var(--text-dim)]"}>
-                          <RrIcon name={t.icon} size={11} />
-                        </span>
-                        {t.label}
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Mobile: single horizontal scroll strip, icons + label inline */}
-          <div className="-mx-1 flex items-center gap-1 overflow-x-auto px-1 pb-1 sm:hidden">
-            {visibleGroups.flatMap((group) => group.items).map((t) => {
-              const isActive = t.key === active;
-              return (
-                <Link
-                  key={t.key}
-                  href={t.key}
-                  title={t.label}
-                  aria-label={t.label}
-                  aria-current={isActive ? "page" : undefined}
-                  className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-[11.5px] transition-colors duration-150 ${
-                    isActive
-                      ? "border-white/[0.10] bg-white/[0.04] text-[var(--text-primary)]"
-                      : "border-transparent text-[var(--text-dim)] hover:text-[var(--text-primary)]"
-                  }`}
-                >
-                  <span aria-hidden className={isActive ? "text-[var(--text-primary)]" : "text-[var(--text-dim)]"}>
-                    <RrIcon name={t.icon} size={12} />
-                  </span>
-                  {t.label}
-                </Link>
-              );
-            })}
-          </div>
+                {label === tab.i18nKey ? tab.label : label}
+              </Link>
+            );
+          })}
+          <div className="ms-auto" />
+          <button
+            type="button"
+            onClick={() => setMenuOpen(true)}
+            data-testid="inv-nav-menu-trigger"
+            className="ms-1 inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 text-[12px] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-elevated)]"
+          >
+            <RrIcon name="books" size={12} />
+            {t("inv.nav.menu")}
+          </button>
         </nav>
       )}
+
+      <InventoryNavPopup
+        open={menuOpen}
+        activeKey={active}
+        onClose={() => setMenuOpen(false)}
+      />
     </div>
   );
 }
