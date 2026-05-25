@@ -22,6 +22,7 @@ import RrIcon from "@/components/ui/RrIcon";
 import PageHeader from "@/components/ui/PageHeader";
 import AppHomeMenu from "@/components/ui/AppHomeMenu";
 import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import EntityPicker from "@/components/planning/EntityPicker";
 import {
   createInvoice,
@@ -152,10 +153,10 @@ function InvoiceListView({ onOpen }: { onOpen: (id: string) => void }) {
 
           {/* KPI strip */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <KpiCard label={t("kpi.outstanding")} value={formatMoney(kpi.outstanding)} accent="text-amber-400" />
-            <KpiCard label={t("kpi.overdue")} value={formatMoney(kpi.overdue)} accent="text-rose-400" />
-            <KpiCard label={t("kpi.paidThisMonth")} value={formatMoney(kpi.paidThisMonth)} accent="text-emerald-400" />
-            <KpiCard label={t("kpi.count")} value={String(kpi.count)} accent="text-blue-400" />
+            <KpiCard label={t("kpi.outstanding")}   value={formatMoney(kpi.outstanding)}   icon="wallet"       tone="warning"  />
+            <KpiCard label={t("kpi.overdue")}       value={formatMoney(kpi.overdue)}       icon="info"         tone="rose"     />
+            <KpiCard label={t("kpi.paidThisMonth")} value={formatMoney(kpi.paidThisMonth)} icon="check"        tone="positive" />
+            <KpiCard label={t("kpi.count")}         value={String(kpi.count)}              icon="file-invoice" tone="info"     />
           </div>
 
           {/* Filters row removed — AppHomeMenu above handles search + status filter */}
@@ -234,17 +235,6 @@ function InvoiceListView({ onOpen }: { onOpen: (id: string) => void }) {
         onClose={() => setFormOpen(false)}
         onCreated={(id) => { setFormOpen(false); onOpen(id); }}
       />
-    </div>
-  );
-}
-
-function KpiCard({ label, value, accent }: { label: string; value: string; accent: string }) {
-  return (
-    <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-4">
-      <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)] mb-2">
-        {label}
-      </div>
-      <div className={`text-[20px] md:text-[22px] font-bold leading-none ${accent}`}>{value}</div>
     </div>
   );
 }

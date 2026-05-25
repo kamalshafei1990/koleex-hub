@@ -21,6 +21,7 @@ import InventoryHeader from "@/components/inventory/InventoryHeader";
 import InventoryInternalItemDrawer from "@/components/inventory/InventoryInternalItemDrawer";
 import RrIcon from "@/components/ui/RrIcon";
 import AppHomeMenu, { type AppHomeNavItem } from "@/components/ui/AppHomeMenu";
+import KpiCard from "@/components/ui/KpiCard";
 import {
   ActionCard,
   AlertCard,
@@ -54,33 +55,6 @@ interface OperatorSummary {
     busiest_warehouse: { warehouse_id: string; warehouse_code: string; warehouse_name: string; moves: number } | null;
     most_returned: { inventory_item_id: string; item_code: string; item_name: string | null; returns: number } | null;
   };
-}
-
-/* ── KPI card ─────────────────────────────────────────────────────────────── */
-function KpiCard({
-  icon,
-  label,
-  value,
-  loading,
-}: {
-  icon: Parameters<typeof RrIcon>[0]["name"];
-  label: string;
-  value: string | number;
-  loading?: boolean;
-}) {
-  return (
-    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3.5">
-      <div className="flex items-center gap-2.5">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-dim)]">
-          <RrIcon name={icon} size={14} />
-        </span>
-        <div className="text-[11px] uppercase tracking-[0.10em] text-[var(--text-dim)]">{label}</div>
-      </div>
-      <div className="mt-2 text-[26px] font-semibold tabular-nums tracking-tight text-[var(--text-primary)]">
-        {loading ? <span className="text-[var(--text-dim)]">—</span> : value}
-      </div>
-    </div>
-  );
 }
 
 /* ── Nav card entries — all 10 routes, always shown (pages themselves are RLS-gated) ── */

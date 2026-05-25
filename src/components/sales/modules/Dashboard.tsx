@@ -21,6 +21,7 @@ import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import SparklesIcon from "@/components/icons/ui/SparklesIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import AppHomeMenu, { type AppHomeNavItem } from "@/components/ui/AppHomeMenu";
+import KpiCard from "@/components/ui/KpiCard";
 
 interface Stats {
   pipelineValue: number;
@@ -135,23 +136,17 @@ export default function DashboardModule({ t, setActiveTab }: SalesModuleProps) {
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      {/* KPI grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+      {/* KPI grid — canonical shared KpiCard */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {kpis.map((k) => (
-          <Link
+          <KpiCard
             key={k.id}
             href={k.href}
-            className={`${cardCls} p-4 hover:border-[var(--border-focus)] transition-colors`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)] truncate">{k.label}</span>
-              <span className="h-7 w-7 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] shrink-0">
-                <k.icon size={13} />
-              </span>
-            </div>
-            <div className="text-[20px] md:text-[22px] font-bold tracking-tight text-[var(--text-primary)] leading-tight">{k.value}</div>
-            <div className="text-[10px] text-[var(--text-ghost)] mt-1 truncate">{k.sub}</div>
-          </Link>
+            label={k.label}
+            value={k.value}
+            hint={k.sub}
+            icon={<k.icon size={14} />}
+          />
         ))}
       </div>
 
