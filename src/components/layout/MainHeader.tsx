@@ -48,15 +48,19 @@ const languages: { code: Lang; label: string; short: string }[] = [
 export default function MainHeader() {
   const pathname = usePathname();
   const { t } = useTranslation(hubT);
-  const [theme, setTheme] = useState<"light" | "dark">("dark");
-  const [lang, setLang] = useState<Lang>("en");
-
-  useEffect(() => {
-    const savedTheme = localStorage.getItem("koleex-theme") as "light" | "dark" | null;
-    if (savedTheme) setTheme(savedTheme);
-    const savedLang = localStorage.getItem("koleex-lang") as Lang | null;
-    if (savedLang) setLang(savedLang);
-  }, []);
+  /* Initialize from localStorage on the first client render — prevents the
+     write-effect from clobbering the saved theme with the default "dark"
+     value before the read-effect can run. Falls back to "dark" on SSR. */
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    if (typeof window === "undefined") return "dark";
+    const saved = window.localStorage.getItem("koleex-theme");
+    return saved === "light" || saved === "dark" ? saved : "dark";
+  });
+  const [lang, setLang] = useState<Lang>(() => {
+    if (typeof window === "undefined") return "en";
+    const saved = window.localStorage.getItem("koleex-lang");
+    return saved === "en" || saved === "zh" || saved === "ar" ? (saved as Lang) : "en";
+  });
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
