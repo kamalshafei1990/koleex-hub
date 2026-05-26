@@ -15,7 +15,11 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "./supabase-server";
-import { getSessionAccountId, getViewAsAccountId } from "./session";
+import {
+  getSessionAccountId,
+  getViewAsAccountId,
+  getViewAsRoleId,
+} from "./session";
 import type { ScopeContext } from "../scope";
 
 export interface ServerAuthContext extends ScopeContext {
@@ -32,6 +36,17 @@ export interface ServerAuthContext extends ScopeContext {
      contract. `requireAuth` blocks mutations while `viewing_as` is true. */
   viewing_as: boolean;
   real_account_id: string | null;
+  /* When viewing-as is active, this tells downstream code WHICH variant
+     is in effect:
+       · "account" — every permission check evaluates as the target user
+         (role + their account-level overrides).
+       · "role"    — the SA stays themselves (own account_id + tenant)
+         but `role_id` is swapped to the target role and
+         `is_super_admin` is forced off. No account-level overrides are
+         applied. Useful for previewing a role template in isolation. */
+  view_as_kind: "account" | "role" | null;
+  /* Target role id when view_as_kind === "role". Null otherwise. */
+  view_as_role_id: string | null;
 }
 
 /**
@@ -44,15 +59,19 @@ export async function getServerAuth(): Promise<ServerAuthContext | null> {
   if (!realAccountId) return null;
 
   /* ── View-as resolution ──────────────────────────────────────────
-     If a `koleex_view_as` cookie is present AND its signature matches
-     the real session, this is a super admin viewing another user.
-     We must:
-       1. Verify the REAL session belongs to a super admin (cookie
-          alone isn't trusted — the SA flag is loaded from the DB).
-       2. Load the TARGET account instead of the real one.
-       3. Carry the real account id forward so the write-block check
-          in requireAuth() and the audit log can reference both. */
-  const overrideTargetId = await getViewAsAccountId(realAccountId);
+     Two flavours of view-as, both SA-only:
+       · account-mode: load the target user's account row + role +
+         overrides. Every permission check evaluates as that user.
+       · role-mode:    keep the SA's own account row but SWAP role_id
+         to the target role and force is_super_admin off. No account
+         overrides are applied — useful for previewing a role template
+         without any user-specific quirks.
+     Cookies are mutually exclusive (the setters clear the sibling),
+     but we still prefer account-mode if both happen to be present. */
+  const overrideTargetAccountId = await getViewAsAccountId(realAccountId);
+  const overrideTargetRoleId = overrideTargetAccountId
+    ? null
+    : await getViewAsRoleId(realAccountId);
 
   /* Two Supabase lookups are needed to build the auth context:
      - `accounts` row (with joined role)
@@ -62,11 +81,13 @@ export async function getServerAuth(): Promise<ServerAuthContext | null> {
      trip (~150–300ms) to EVERY authenticated request. Run them in
      parallel: both keys are known up front (accountId), so there's
      no dependency between the two queries. */
-  const accountIdToLoad = overrideTargetId ?? realAccountId;
+  const accountIdToLoad = overrideTargetAccountId ?? realAccountId;
   /* When view-as is active, ALSO verify the real session is a SA. We
      query the real account in parallel so the override doesn't add a
-     round-trip in the common (no-override) path. */
-  const [accountRes, empRes, realAccountRes] = await Promise.all([
+     round-trip in the common (no-override) path. Role-mode also needs
+     to load the target role's flags. */
+  const viewAsActive = !!overrideTargetAccountId || !!overrideTargetRoleId;
+  const [accountRes, empRes, realAccountRes, targetRoleRes] = await Promise.all([
     supabaseServer
       .from("accounts")
       .select(
@@ -81,11 +102,18 @@ export async function getServerAuth(): Promise<ServerAuthContext | null> {
       .select("department")
       .eq("account_id", accountIdToLoad)
       .maybeSingle(),
-    overrideTargetId
+    viewAsActive
       ? supabaseServer
           .from("accounts")
           .select(`id, is_super_admin, roles:role_id(is_super_admin)`)
           .eq("id", realAccountId)
+          .maybeSingle()
+      : Promise.resolve(null),
+    overrideTargetRoleId
+      ? supabaseServer
+          .from("roles")
+          .select("id, is_super_admin, can_view_private")
+          .eq("id", overrideTargetRoleId)
           .maybeSingle()
       : Promise.resolve(null),
   ]);
@@ -99,7 +127,7 @@ export async function getServerAuth(): Promise<ServerAuthContext | null> {
      viewing_as) — refusing here would turn any cookie-tamper into a
      500. */
   let viewingAs = false;
-  if (overrideTargetId && realAccountRes && "data" in realAccountRes) {
+  if (viewAsActive && realAccountRes && "data" in realAccountRes) {
     const realData = realAccountRes.data as
       | { is_super_admin?: boolean; roles?: unknown }
       | null;
@@ -120,19 +148,35 @@ export async function getServerAuth(): Promise<ServerAuthContext | null> {
   const effectiveSA =
     (data.is_super_admin ?? false) || (role?.is_super_admin ?? false);
 
+  /* Role-mode override: swap role_id to the target role, force SA off
+     so the permittedModules / requireModuleAccess paths evaluate from
+     the role's grants alone. Only honoured when viewingAs was actually
+     validated (real session is a SA). */
+  const targetRoleRow =
+    overrideTargetRoleId && targetRoleRes && "data" in targetRoleRes
+      ? (targetRoleRes.data as
+          | { id?: string; is_super_admin?: boolean; can_view_private?: boolean }
+          | null)
+      : null;
+  const roleModeActive = !!(viewingAs && overrideTargetRoleId && targetRoleRow);
+
   return {
     account_id: data.id,
     tenant_id: data.tenant_id,
-    role_id: data.role_id,
+    role_id: roleModeActive ? overrideTargetRoleId! : data.role_id,
     department: empRes.data?.department ?? null,
-    is_super_admin: effectiveSA,
-    can_view_private: role?.can_view_private ?? false,
+    is_super_admin: roleModeActive ? false : effectiveSA,
+    can_view_private: roleModeActive
+      ? (targetRoleRow!.can_view_private ?? false)
+      : (role?.can_view_private ?? false),
     username: data.username,
     login_email: data.login_email,
     status: data.status,
     user_type: data.user_type,
     viewing_as: viewingAs,
     real_account_id: viewingAs ? realAccountId : null,
+    view_as_kind: viewingAs ? (roleModeActive ? "role" : "account") : null,
+    view_as_role_id: roleModeActive ? overrideTargetRoleId : null,
   };
 }
 

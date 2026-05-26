@@ -27,9 +27,15 @@ export async function GET() {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
-  // Run the three DB queries in parallel — same work as three separate
-  // routes would do, but in one serverless invocation.
-  const [headerRes, rolePermsRes, overridesRes] = await Promise.all([
+  /* In role-mode the SA is still themselves — but we want the HEADER
+     row to reflect the target role too, so the picker / banner can
+     show "Viewing as <role name>". Fetch the target role's display
+     row in parallel. */
+  const roleMode = auth.view_as_kind === "role";
+
+  // Run the DB queries in parallel — same work as separate routes
+  // would do, but in one serverless invocation.
+  const [headerRes, rolePermsRes, overridesRes, targetRoleLabelRes] = await Promise.all([
     supabaseServer
       .from("accounts")
       .select(
@@ -51,12 +57,22 @@ export async function GET() {
             .eq("role_id", auth.role_id)
             .eq("can_view", true)
         : Promise.resolve({ data: [] as Array<{ module_name: string }> }),
-    auth.is_super_admin
+    /* Skip account-level overrides in role-mode — by definition there's
+       no specific target account, so any overrides on the SA's own
+       account would taint the role preview. */
+    auth.is_super_admin || roleMode
       ? Promise.resolve({ data: [] as Array<{ module_key: string; can_view: boolean }> })
       : supabaseServer
           .from("account_permission_overrides")
           .select("module_key, can_view")
           .eq("account_id", auth.account_id),
+    auth.view_as_role_id
+      ? supabaseServer
+          .from("roles")
+          .select("id, name")
+          .eq("id", auth.view_as_role_id)
+          .maybeSingle()
+      : Promise.resolve(null),
   ]);
 
   // Build permitted modules set.
@@ -73,21 +89,36 @@ export async function GET() {
     else allowed.delete(row.module_key);
   }
 
-  /* When the auth context is a view-as override, `auth.account_id` is
-     already the TARGET user — the header lookup above loaded the
-     target's account row. Expose a `viewingAs` block so the client
-     can render a banner and disable write affordances. `realAccountId`
-     is the SA's actual account so "Exit" knows where to return. */
+  /* When the auth context is a view-as override, expose a `viewingAs`
+     block so the client can render a banner and disable write
+     affordances. Two flavours:
+       · kind="account": `auth.account_id` is the TARGET user — the
+         header lookup above loaded the target's account row.
+       · kind="role":    `auth.account_id` is still the SA's own (the
+         header row is the SA), but `auth.role_id` is the target role.
+         We surface the role's name so the banner can read
+         "Viewing as Sales Rep (role)" without an extra round-trip. */
   const headerRow = headerRes.data as
     | { username?: string | null; person?: { full_name?: string | null } | null }
     | null;
+  const targetRoleLabel = targetRoleLabelRes && "data" in targetRoleLabelRes
+    ? (targetRoleLabelRes.data as { id?: string; name?: string | null } | null)
+    : null;
   const viewingAs = auth.viewing_as
-    ? {
-        targetAccountId: auth.account_id,
-        targetUsername: headerRow?.username ?? null,
-        targetDisplayName: headerRow?.person?.full_name ?? headerRow?.username ?? null,
-        realAccountId: auth.real_account_id,
-      }
+    ? roleMode
+      ? {
+          kind: "role" as const,
+          targetRoleId: auth.view_as_role_id,
+          targetRoleName: targetRoleLabel?.name ?? null,
+          realAccountId: auth.real_account_id,
+        }
+      : {
+          kind: "account" as const,
+          targetAccountId: auth.account_id,
+          targetUsername: headerRow?.username ?? null,
+          targetDisplayName: headerRow?.person?.full_name ?? headerRow?.username ?? null,
+          realAccountId: auth.real_account_id,
+        }
     : null;
 
   const payload = {

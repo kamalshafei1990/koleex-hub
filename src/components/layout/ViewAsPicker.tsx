@@ -3,16 +3,18 @@
 /* ---------------------------------------------------------------------------
    ViewAsPicker — top-bar dropdown for Super Admin only.
 
-   Twin of TenantPicker but for USERS instead of tenants. Lets a SA see
-   the Hub through any other account's eyes: the sidebar shows what they
-   see, every API call enforces their permissions, the bootstrap returns
-   their data. Useful for verifying role configuration without juggling
-   accounts.
+   Two modes, switchable via a tab strip inside the dropdown:
+     · User — view the system as a specific user (their role + their
+       account-level overrides). POST /api/auth/view-as { accountId }.
+     · Role — view the system as if you had only that role's grants,
+       no account-level overrides. The SA stays themselves; only the
+       effective role swaps. POST /api/auth/view-as/role { roleId }.
 
-   On pick: POST /api/auth/view-as { accountId } → cookie set → hard
-   reload so every cached fetch is re-issued under the new identity.
+   On pick the appropriate cookie is set, then a hard reload re-issues
+   every cached fetch under the new identity.
 
-   Non-SA: returns null.
+   Non-SA: returns null. While viewing-as is already active, the
+   picker hides (the banner's "Exit" is the only way out).
    --------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState } from "react";
@@ -31,47 +33,62 @@ interface AccountRow {
   role_name: string | null;
 }
 
+interface RoleRow {
+  id: string;
+  name: string;
+  description: string | null;
+  can_view_private: boolean;
+  module_count: number;
+}
+
+type Mode = "user" | "role";
+
 export default function ViewAsPicker({ dk }: { dk: boolean }) {
   const { data: bootstrap } = useMeBootstrap();
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
+  const [roles, setRoles] = useState<RoleRow[]>([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<Mode>("user");
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
-  /* ── SA check + roster load on mount ────────────────────────────
-     We piggy-back on the bootstrap response for the SA flag (already
-     cached); the account list is a separate query because it's only
-     needed when the picker actually opens. */
+  /* ── SA check on mount ─────────────────────────────────────── */
   useEffect(() => {
     const accountId = getCurrentAccountIdSync();
     if (!accountId) return;
     setIsSuperAdmin(bootstrap?.isSuperAdmin ?? false);
   }, [bootstrap]);
 
-  /* Load roster on first open via the API route. The route uses the
-     service-role client + a server-side SA check, which avoids the
-     RLS dance the anon client would otherwise hit on the `accounts`
-     table. */
-  const [loadError, setLoadError] = useState<string | null>(null);
+  /* Lazy-load the active mode's list on first open / mode switch. */
   useEffect(() => {
-    if (!open || accounts.length > 0) return;
+    if (!open) return;
+    if (mode === "user" && accounts.length > 0) return;
+    if (mode === "role" && roles.length > 0) return;
+    setLoadError(null);
     (async () => {
       try {
-        const res = await fetch("/api/auth/view-as/users", { credentials: "include" });
+        const url =
+          mode === "user"
+            ? "/api/auth/view-as/users"
+            : "/api/auth/view-as/roles";
+        const res = await fetch(url, { credentials: "include" });
         if (!res.ok) {
           const j = (await res.json().catch(() => ({}))) as { error?: string };
           setLoadError(j.error ?? `Failed (${res.status})`);
           return;
         }
-        const j = (await res.json()) as { accounts: AccountRow[] };
-        setAccounts(j.accounts ?? []);
+        const j = (await res.json()) as
+          | { accounts?: AccountRow[]; roles?: RoleRow[] };
+        if (mode === "user") setAccounts(j.accounts ?? []);
+        else setRoles(j.roles ?? []);
       } catch (e) {
         setLoadError(e instanceof Error ? e.message : "Failed to load");
       }
     })();
-  }, [open, accounts.length]);
+  }, [open, mode, accounts.length, roles.length]);
 
   /* Close on outside click. */
   useEffect(() => {
@@ -84,7 +101,7 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
     return () => document.removeEventListener("mousedown", handle);
   }, [open]);
 
-  async function handlePick(targetId: string) {
+  async function handlePickUser(targetId: string) {
     if (busy) return;
     setBusy(true);
     try {
@@ -100,8 +117,29 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
         setBusy(false);
         return;
       }
-      /* Hard reload so every cached fetch is re-issued under the
-         target user's identity. */
+      window.location.reload();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "view-as failed");
+      setBusy(false);
+    }
+  }
+
+  async function handlePickRole(roleId: string) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/auth/view-as/role", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ roleId }),
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        alert(j.error ?? `view-as failed (${res.status})`);
+        setBusy(false);
+        return;
+      }
       window.location.reload();
     } catch (e) {
       alert(e instanceof Error ? e.message : "view-as failed");
@@ -110,11 +148,10 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
   }
 
   if (!isSuperAdmin) return null;
-  /* If already viewing-as, hide the picker — the banner's "Exit" is
-     the only way out so the user can't accidentally chain view-as. */
   if (bootstrap?.viewingAs) return null;
 
-  const filtered = search.trim()
+  /* Filter the active list. */
+  const filteredUsers = search.trim()
     ? accounts.filter((a) => {
         const s = search.toLowerCase();
         return (
@@ -124,6 +161,16 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
         );
       })
     : accounts;
+
+  const filteredRoles = search.trim()
+    ? roles.filter((r) => {
+        const s = search.toLowerCase();
+        return (
+          r.name.toLowerCase().includes(s) ||
+          (r.description ?? "").toLowerCase().includes(s)
+        );
+      })
+    : roles;
 
   return (
     <div ref={wrapRef} className="relative">
@@ -135,7 +182,7 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
             ? "bg-white/[0.04] border-white/10 text-white/85 hover:bg-white/[0.08]"
             : "bg-black/[0.04] border-black/10 text-black/80 hover:bg-black/[0.08]"
         }`}
-        title="Super Admin — view the system as another user"
+        title="Super Admin — view the system as another user or role"
       >
         <UsersIcon size={13} className="shrink-0" />
         <span className="max-w-[120px] truncate hidden sm:inline">View as</span>
@@ -144,19 +191,63 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
 
       {open && (
         <div
-          className={`absolute right-0 top-11 z-50 min-w-[320px] rounded-xl border shadow-2xl overflow-hidden ${
+          className={`absolute right-0 top-11 z-50 min-w-[340px] rounded-xl border shadow-2xl overflow-hidden ${
             dk ? "bg-[#141414] border-white/10" : "bg-white border-black/10"
           }`}
         >
-          <div className={`px-3 py-2 text-[10px] font-bold uppercase tracking-wider ${dk ? "text-white/50" : "text-black/50"}`}>
-            View as user
+          {/* Header label */}
+          <div
+            className={`px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider ${
+              dk ? "text-white/50" : "text-black/50"
+            }`}
+          >
+            View as
           </div>
-          <div className={`px-2 pb-2 border-b ${dk ? "border-white/[0.06]" : "border-black/[0.06]"}`}>
+
+          {/* Mode tabs */}
+          <div className={`px-2 pb-2 flex gap-1 ${dk ? "" : ""}`}>
+            {(["user", "role"] as Mode[]).map((m) => {
+              const active = mode === m;
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => {
+                    setMode(m);
+                    setSearch("");
+                    setLoadError(null);
+                  }}
+                  className={`flex-1 h-7 rounded-md text-[11.5px] font-semibold transition-all ${
+                    active
+                      ? dk
+                        ? "bg-white/[0.12] text-white"
+                        : "bg-black/[0.08] text-black"
+                      : dk
+                        ? "text-white/55 hover:bg-white/[0.04]"
+                        : "text-black/55 hover:bg-black/[0.04]"
+                  }`}
+                >
+                  {m === "user" ? "By user" : "By role"}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Search */}
+          <div
+            className={`px-2 pb-2 border-b ${
+              dk ? "border-white/[0.06]" : "border-black/[0.06]"
+            }`}
+          >
             <input
               autoFocus
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name, email, role…"
+              placeholder={
+                mode === "user"
+                  ? "Search by name, email, role…"
+                  : "Search roles…"
+              }
               className={`w-full h-8 px-2.5 rounded-md border text-[12px] outline-none ${
                 dk
                   ? "bg-white/[0.04] border-white/[0.08] text-white placeholder:text-white/35"
@@ -164,29 +255,119 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
               }`}
             />
           </div>
-          <div className="max-h-[320px] overflow-y-auto">
-            {filtered.length === 0 ? (
-              <div className={`px-3 py-4 text-[12px] ${dk ? "text-white/45" : "text-black/45"}`}>
-                {accounts.length === 0 ? "Loading users…" : "No matches"}
-              </div>
-            ) : (
-              filtered.map((a) => (
-                <button
-                  key={a.id}
-                  type="button"
-                  disabled={busy}
-                  onClick={() => handlePick(a.id)}
-                  className={`w-full px-3 py-2.5 text-left flex items-center gap-2 transition-colors disabled:opacity-50 ${
-                    dk ? "hover:bg-white/[0.04]" : "hover:bg-black/[0.03]"
+
+          {/* Error banner */}
+          {loadError && (
+            <div
+              className={`px-3 py-2 text-[11px] ${
+                dk
+                  ? "bg-red-500/10 text-red-300 border-b border-red-500/20"
+                  : "bg-red-500/10 text-red-700 border-b border-red-500/20"
+              }`}
+            >
+              {loadError}
+            </div>
+          )}
+
+          {/* List */}
+          <div className="max-h-[340px] overflow-y-auto">
+            {mode === "user" ? (
+              filteredUsers.length === 0 ? (
+                <div
+                  className={`px-3 py-4 text-[12px] ${
+                    dk ? "text-white/45" : "text-black/45"
                   }`}
                 >
-                  <UsersIcon size={13} className={`shrink-0 ${dk ? "text-white/60" : "text-black/60"}`} />
-                  <div className="flex-1 min-w-0">
-                    <div className={`text-[12.5px] font-semibold truncate ${dk ? "text-white" : "text-black"}`}>
-                      {a.username}
+                  {loadError
+                    ? "—"
+                    : accounts.length === 0
+                      ? "Loading users…"
+                      : "No matches"}
+                </div>
+              ) : (
+                filteredUsers.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => handlePickUser(a.id)}
+                    className={`w-full px-3 py-2.5 text-left flex items-center gap-2 transition-colors disabled:opacity-50 ${
+                      dk
+                        ? "hover:bg-white/[0.04]"
+                        : "hover:bg-black/[0.03]"
+                    }`}
+                  >
+                    <UsersIcon
+                      size={13}
+                      className={`shrink-0 ${
+                        dk ? "text-white/60" : "text-black/60"
+                      }`}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div
+                        className={`text-[12.5px] font-semibold truncate ${
+                          dk ? "text-white" : "text-black"
+                        }`}
+                      >
+                        {a.username}
+                      </div>
+                      <div
+                        className={`text-[10.5px] truncate ${
+                          dk ? "text-white/45" : "text-black/45"
+                        }`}
+                      >
+                        {a.role_name ?? a.user_type} · {a.login_email}
+                      </div>
                     </div>
-                    <div className={`text-[10.5px] truncate ${dk ? "text-white/45" : "text-black/45"}`}>
-                      {a.role_name ?? a.user_type} · {a.login_email}
+                  </button>
+                ))
+              )
+            ) : filteredRoles.length === 0 ? (
+              <div
+                className={`px-3 py-4 text-[12px] ${
+                  dk ? "text-white/45" : "text-black/45"
+                }`}
+              >
+                {loadError
+                  ? "—"
+                  : roles.length === 0
+                    ? "Loading roles…"
+                    : "No matches"}
+              </div>
+            ) : (
+              filteredRoles.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => handlePickRole(r.id)}
+                  className={`w-full px-3 py-2.5 text-left flex items-center gap-2 transition-colors disabled:opacity-50 ${
+                    dk
+                      ? "hover:bg-white/[0.04]"
+                      : "hover:bg-black/[0.03]"
+                  }`}
+                >
+                  <UsersIcon
+                    size={13}
+                    className={`shrink-0 ${
+                      dk ? "text-white/60" : "text-black/60"
+                    }`}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div
+                      className={`text-[12.5px] font-semibold truncate ${
+                        dk ? "text-white" : "text-black"
+                      }`}
+                    >
+                      {r.name}
+                    </div>
+                    <div
+                      className={`text-[10.5px] truncate ${
+                        dk ? "text-white/45" : "text-black/45"
+                      }`}
+                    >
+                      {r.module_count} modules
+                      {r.description ? ` · ${r.description}` : ""}
                     </div>
                   </div>
                 </button>

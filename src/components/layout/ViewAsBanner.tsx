@@ -34,7 +34,13 @@ export default function ViewAsBanner() {
     }
   }
 
-  const label = viewingAs.targetDisplayName || viewingAs.targetUsername || "another user";
+  const isRole = viewingAs.kind === "role";
+  const label = isRole
+    ? viewingAs.targetRoleName || "a role"
+    : viewingAs.targetDisplayName || viewingAs.targetUsername || "another user";
+  const subtext = isRole
+    ? "— read-only. Permission checks evaluate as this role only (no account overrides)."
+    : "— read-only. All permission checks evaluate as this user.";
 
   return (
     <div
@@ -44,8 +50,11 @@ export default function ViewAsBanner() {
     >
       <span className="flex h-2 w-2 shrink-0 animate-pulse rounded-full bg-amber-500" aria-hidden />
       <span className="text-amber-900 dark:text-amber-100">
-        <strong className="font-semibold">Viewing as {label}</strong>
-        <span className="ml-2 opacity-80 hidden sm:inline">— read-only. All permission checks evaluate as this user.</span>
+        <strong className="font-semibold">
+          Viewing as {label}
+          {isRole ? " (role)" : ""}
+        </strong>
+        <span className="ml-2 opacity-80 hidden sm:inline">{subtext}</span>
       </span>
       <button
         type="button"

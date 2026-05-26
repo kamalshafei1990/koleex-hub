@@ -50,6 +50,13 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
    Short max age (2 hours): view-as is a debugging tool, not a persistent
    state. The picker can re-issue if needed. */
 const VIEW_AS_COOKIE_NAME = "koleex_view_as";
+/* Sibling cookie for "view as role" — same SA-only feature, but the
+   target is a ROLE (no specific account). The auth layer treats this
+   as the SA's own account with the role swapped + super-admin forced
+   off, so every permission check evaluates as if they had only that
+   role's grants. The two cookies are mutually exclusive at the
+   write-side: setting either clears the other. */
+const VIEW_AS_ROLE_COOKIE_NAME = "koleex_view_as_role";
 const VIEW_AS_MAX_AGE = 60 * 60 * 2; // 2 hours
 
 function signViewAs(targetAccountId: string, actorAccountId: string): string {
@@ -59,6 +66,15 @@ function signViewAs(targetAccountId: string, actorAccountId: string): string {
      new session's accountId. */
   return createHmac("sha256", getSecret())
     .update(`${actorAccountId}:${targetAccountId}`)
+    .digest("base64url");
+}
+
+function signViewAsRole(targetRoleId: string, actorAccountId: string): string {
+  /* Separate domain-tag (`role:` prefix) so an account-mode cookie can
+     never be replayed as a role-mode cookie even if a UUID happened to
+     collide. */
+  return createHmac("sha256", getSecret())
+    .update(`role:${actorAccountId}:${targetRoleId}`)
     .digest("base64url");
 }
 
@@ -74,6 +90,9 @@ export async function setViewAsCookie(
   const sig = signViewAs(targetAccountId, actorAccountId);
   const value = `${targetAccountId}.${actorAccountId}.${sig}`;
   const store = await cookies();
+  /* Setting account-mode clears any existing role-mode cookie so the
+     two modes can never both be active. */
+  store.delete(VIEW_AS_ROLE_COOKIE_NAME);
   store.set(VIEW_AS_COOKIE_NAME, value, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -83,10 +102,35 @@ export async function setViewAsCookie(
   });
 }
 
-/** Clear the view-as cookie. Called from POST /api/auth/view-as/exit. */
+/** Mint the view-as-role cookie. Called from POST /api/auth/view-as/role
+ *  after verifying the caller is a super admin and the role exists. */
+export async function setViewAsRoleCookie(
+  targetRoleId: string,
+  actorAccountId: string,
+): Promise<void> {
+  if (!UUID_RE.test(targetRoleId) || !UUID_RE.test(actorAccountId)) {
+    throw new Error("[session] view-as-role ids must be UUIDs");
+  }
+  const sig = signViewAsRole(targetRoleId, actorAccountId);
+  const value = `${targetRoleId}.${actorAccountId}.${sig}`;
+  const store = await cookies();
+  /* Setting role-mode clears any existing account-mode cookie so the
+     two modes can never both be active. */
+  store.delete(VIEW_AS_COOKIE_NAME);
+  store.set(VIEW_AS_ROLE_COOKIE_NAME, value, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: VIEW_AS_MAX_AGE,
+  });
+}
+
+/** Clear both view-as cookies. Called from POST /api/auth/view-as/exit. */
 export async function clearViewAsCookie(): Promise<void> {
   const store = await cookies();
   store.delete(VIEW_AS_COOKIE_NAME);
+  store.delete(VIEW_AS_ROLE_COOKIE_NAME);
 }
 
 /** Read the view-as override and return the target account id, but ONLY
@@ -118,6 +162,35 @@ export async function getViewAsAccountId(
     return null;
   }
   return targetId;
+}
+
+/** Read the view-as-role override and return the target role id, but ONLY
+ *  if the signature matches the supplied real-session account id. Returns
+ *  null if no override, signature mismatch, or malformed. */
+export async function getViewAsRoleId(
+  realAccountId: string,
+): Promise<string | null> {
+  const store = await cookies();
+  const raw = store.get(VIEW_AS_ROLE_COOKIE_NAME)?.value;
+  if (!raw) return null;
+
+  const parts = raw.split(".");
+  if (parts.length !== 3) return null;
+  const [roleId, actorId, sig] = parts;
+  if (!UUID_RE.test(roleId) || !UUID_RE.test(actorId)) return null;
+
+  if (actorId !== realAccountId) return null;
+
+  try {
+    const expected = signViewAsRole(roleId, actorId);
+    const a = Buffer.from(expected);
+    const b = Buffer.from(sig);
+    if (a.length !== b.length) return null;
+    if (!timingSafeEqual(a, b)) return null;
+  } catch {
+    return null;
+  }
+  return roleId;
 }
 
 function getSecret(): string {

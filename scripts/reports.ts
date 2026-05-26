@@ -293,6 +293,8 @@ async function main() {
       can_view_private: true,
       viewing_as: false,
       real_account_id: null,
+      view_as_kind: null,
+      view_as_role_id: null,
       username: "validator",
       login_email: "validator@example.com",
       status: "active",
