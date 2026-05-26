@@ -16,12 +16,10 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState } from "react";
-import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getCurrentAccountIdSync } from "@/lib/identity";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
-import CheckIcon from "@/components/icons/ui/CheckIcon";
 
 interface AccountRow {
   id: string;
@@ -52,37 +50,28 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
     setIsSuperAdmin(bootstrap?.isSuperAdmin ?? false);
   }, [bootstrap]);
 
-  /* Load roster on first open. Scope to the SA's tenant — view-as is
-     only valid within one tenant (cross-tenant view = TenantPicker). */
+  /* Load roster on first open via the API route. The route uses the
+     service-role client + a server-side SA check, which avoids the
+     RLS dance the anon client would otherwise hit on the `accounts`
+     table. */
+  const [loadError, setLoadError] = useState<string | null>(null);
   useEffect(() => {
     if (!open || accounts.length > 0) return;
-    const tenantId = bootstrap?.auth?.tenant_id;
-    if (!tenantId) return;
     (async () => {
-      const { data } = await supabaseAdmin
-        .from("accounts")
-        .select(
-          "id, username, login_email, user_type, status, role_id, role:roles(name)",
-        )
-        .eq("tenant_id", tenantId)
-        .eq("status", "active")
-        .order("username", { ascending: true });
-      const rows = ((data as Array<Record<string, unknown>>) ?? []).map((r) => {
-        const role = r.role as { name?: string } | { name?: string }[] | null;
-        const roleName = Array.isArray(role) ? role[0]?.name ?? null : role?.name ?? null;
-        return {
-          id: r.id as string,
-          username: r.username as string,
-          login_email: r.login_email as string,
-          user_type: r.user_type as string,
-          status: r.status as string,
-          role_id: r.role_id as string | null,
-          role_name: roleName,
-        };
-      });
-      setAccounts(rows);
+      try {
+        const res = await fetch("/api/auth/view-as/users", { credentials: "include" });
+        if (!res.ok) {
+          const j = (await res.json().catch(() => ({}))) as { error?: string };
+          setLoadError(j.error ?? `Failed (${res.status})`);
+          return;
+        }
+        const j = (await res.json()) as { accounts: AccountRow[] };
+        setAccounts(j.accounts ?? []);
+      } catch (e) {
+        setLoadError(e instanceof Error ? e.message : "Failed to load");
+      }
     })();
-  }, [open, bootstrap?.auth?.tenant_id, accounts.length]);
+  }, [open, accounts.length]);
 
   /* Close on outside click. */
   useEffect(() => {
