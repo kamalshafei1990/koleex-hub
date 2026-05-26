@@ -12,6 +12,7 @@ import { hubT } from "@/lib/translations/hub";
 import UserMenu from "./UserMenu";
 import NotificationBell from "./NotificationBell";
 import TenantPicker from "./TenantPicker";
+import ViewAsPicker from "./ViewAsPicker";
 import KoleexLogo from "./KoleexLogo";
 import { useSidebar } from "./SidebarContext";
 import { APP_REGISTRY } from "@/lib/navigation";
@@ -250,6 +251,12 @@ export default function MainHeader() {
             load, loadScopeContext() reads the override and scopes every
             query accordingly. */}
         <TenantPicker dk={dk} />
+
+        {/* View-as picker — Super Admin only. Lets the SA view the
+            system as any other user in their tenant (read-only). The
+            picker disappears once view-as is active; the persistent
+            banner is the only way to exit. */}
+        <ViewAsPicker dk={dk} />
 
         {/* Notification bell — system-wide notifications dropdown
             covering Discuss messages and inbox alerts from every app. */}

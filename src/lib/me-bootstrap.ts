@@ -24,10 +24,24 @@ export interface MeBootstrapPayload {
     login_email: string;
     status: string;
     user_type: string;
+    /* Present even when no view-as is active (false / null) so the
+       client can branch on it without optional-chaining surprises. */
+    viewing_as?: boolean;
+    real_account_id?: string | null;
   }) | null;
   header: Record<string, unknown> | null;
   permittedModules: string[];
   isSuperAdmin: boolean;
+  /* When a super admin is "viewing as" another user, the server fills
+     this with the target's identity + the SA's real account id. The
+     ViewAsBanner renders on this; the ViewAsPicker hides itself when
+     it's set (the banner's Exit button is the only way out). */
+  viewingAs?: {
+    targetAccountId: string;
+    targetUsername: string | null;
+    targetDisplayName: string | null;
+    realAccountId: string | null;
+  } | null;
 }
 
 /* Client-side bootstrap cache.

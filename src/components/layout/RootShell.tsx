@@ -13,6 +13,7 @@ import AuthGate from "@/components/admin/AuthGate";
 import MainHeader from "./MainHeader";
 import Sidebar from "./Sidebar";
 import FloatingPanel from "./FloatingPanel";
+import ViewAsBanner from "./ViewAsBanner";
 import {
   SidebarProvider,
   useSidebar,
@@ -51,6 +52,11 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   return (
     <>
       <MainHeader />
+      {/* Persistent banner shown when a Super Admin is "viewing as"
+          another user. Sits below MainHeader (fixed, top-14) and is
+          dismissed by clicking "Exit view-as" inside it. Returns null
+          when no view-as is active. */}
+      <ViewAsBanner />
       <Sidebar />
       {/* pt-14 = header height. Desktop: offset by sidebar width. */}
       <div
