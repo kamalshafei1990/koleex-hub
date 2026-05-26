@@ -128,11 +128,23 @@ export interface BootstrapFailure {
 let _lastError: BootstrapFailure | null = null;
 export function getMeBootstrapLastError(): BootstrapFailure | null { return _lastError; }
 
-async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
+async function fetchWithTimeout(
+  url: string,
+  timeoutMs: number,
+  noStore = false,
+): Promise<Response> {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { credentials: "include", signal: controller.signal });
+    return await fetch(url, {
+      credentials: "include",
+      signal: controller.signal,
+      /* When the caller knows we just did something that changes the
+         server-side identity (entering / exiting view-as), force the
+         browser to skip its HTTP cache for THIS request. Default path
+         keeps the normal caching so most page loads stay cheap. */
+      cache: noStore ? "no-store" : "default",
+    });
   } finally {
     clearTimeout(t);
   }
@@ -146,15 +158,21 @@ async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Respons
  * backoff retries. On total failure resolves to null but records
  * _lastError so the UI can show "Retry".
  */
-export async function getMeBootstrap(): Promise<MeBootstrapPayload | null> {
-  if (cache && cache.expiresAt > Date.now()) return cache.payload;
-  if (inflight) return inflight;
+export async function getMeBootstrap(opts?: {
+  noStore?: boolean;
+}): Promise<MeBootstrapPayload | null> {
+  const noStore = !!opts?.noStore;
+  /* Skip the in-memory cache when noStore is set — the caller just
+     changed identity (entered or exited view-as) and needs the freshest
+     possible payload. */
+  if (!noStore && cache && cache.expiresAt > Date.now()) return cache.payload;
+  if (!noStore && inflight) return inflight;
   inflight = (async () => {
     try {
       for (let attempt = 0; attempt < MAX_RETRIES; attempt += 1) {
         const timeoutMs = TIMEOUTS_MS[attempt];
         try {
-          const res = await fetchWithTimeout("/api/me/bootstrap", timeoutMs);
+          const res = await fetchWithTimeout("/api/me/bootstrap", timeoutMs, noStore);
           if (!res.ok) {
             /* Capture status so the UI can hint specifically — 401 →
                "please sign in again", 5xx → "server is having a
@@ -214,10 +232,12 @@ export async function getMeBootstrap(): Promise<MeBootstrapPayload | null> {
   return inflight;
 }
 
-/** Force a re-fetch from a UI Retry button. Bypasses the dedupe path. */
+/** Force a re-fetch from a UI Retry button. Bypasses the dedupe path
+ *  AND the browser HTTP cache (necessary after a view-as toggle, where
+ *  the server response shape changes but the URL is unchanged). */
 export async function retryMeBootstrap(): Promise<MeBootstrapPayload | null> {
   invalidateMeBootstrap();
-  return getMeBootstrap();
+  return getMeBootstrap({ noStore: true });
 }
 
 /**

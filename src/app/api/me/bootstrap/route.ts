@@ -129,15 +129,17 @@ export async function GET() {
     viewingAs,
   };
 
-  /* Cache aggressively when NOT viewing-as — bootstrap payload barely
-     changes during a normal session (role / perms / dept / tenant are
-     admin-edited once in a while). When viewing-as IS active, skip the
-     cache so picker enter/exit takes effect immediately instead of
-     waiting up to 60s for a fresh bootstrap. */
+  /* Cache aggressively when NOT viewing-as — payload barely changes
+     during a normal session (role / perms / dept / tenant are admin-
+     edited once in a while). When viewing-as IS active, use a SHORT
+     cache (10s) instead of no-store: every navigation inside view-as
+     was previously hitting the DB, which made the mode feel sluggish.
+     The 10s window is short enough that exits / re-picks (which call
+     retryMeBootstrap with cache:no-store) still feel instant. */
   return NextResponse.json(payload, {
     headers: {
       "Cache-Control": viewingAs
-        ? "private, no-store"
+        ? "private, max-age=10, stale-while-revalidate=30"
         : "private, max-age=60, stale-while-revalidate=300",
     },
   });

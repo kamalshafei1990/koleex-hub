@@ -24,13 +24,18 @@ export async function POST(req: NextRequest) {
   await clearViewAsCookie();
 
   if (targetAccountId) {
-    await supabaseServer.from("koleex_security_audit").insert({
-      actor_account_id: actorAccountId,
-      target_account_id: targetAccountId,
-      action: "view_as.exit",
-      ip: ipFor(req),
-      user_agent: req.headers.get("user-agent") ?? null,
-    });
+    /* Best-effort audit — never block exit on a slow audit insert. */
+    try {
+      await supabaseServer.from("koleex_security_audit").insert({
+        actor_account_id: actorAccountId,
+        target_account_id: targetAccountId,
+        action: "view_as.exit",
+        ip: ipFor(req),
+        user_agent: req.headers.get("user-agent") ?? null,
+      });
+    } catch {
+      /* swallow */
+    }
   }
 
   return NextResponse.json({ ok: true });

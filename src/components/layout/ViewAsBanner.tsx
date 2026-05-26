@@ -12,9 +12,11 @@
    --------------------------------------------------------------------------- */
 
 import { useState } from "react";
-import { useMeBootstrap } from "@/lib/me-bootstrap";
+import { useRouter } from "next/navigation";
+import { useMeBootstrap, retryMeBootstrap } from "@/lib/me-bootstrap";
 
 export default function ViewAsBanner() {
+  const router = useRouter();
   const { data: bootstrap } = useMeBootstrap();
   const [busy, setBusy] = useState(false);
   const viewingAs = bootstrap?.viewingAs;
@@ -24,12 +26,25 @@ export default function ViewAsBanner() {
     if (busy) return;
     setBusy(true);
     try {
-      await fetch("/api/auth/view-as/exit", {
+      const res = await fetch("/api/auth/view-as/exit", {
         method: "POST",
         credentials: "include",
       });
-      window.location.reload();
+      if (!res.ok) {
+        /* Fall back to a hard reload only if the soft path failed —
+           otherwise the user could end up stuck mid-state. */
+        window.location.reload();
+        return;
+      }
+      /* Soft exit: bust the bootstrap cache + retry with `no-store` so
+         listeners (banner, picker, sidebar) update in place, then
+         router.refresh() updates any RSC. No full page reload — saves
+         the 1–3s window.location.reload() costs. */
+      await retryMeBootstrap();
+      router.refresh();
     } catch {
+      window.location.reload();
+    } finally {
       setBusy(false);
     }
   }

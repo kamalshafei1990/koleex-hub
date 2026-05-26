@@ -41,13 +41,18 @@ export async function POST(req: NextRequest) {
   }
 
   if (!auth.is_super_admin) {
-    /* Log the denial — useful for security review. */
-    await supabaseServer.from("koleex_security_audit").insert({
-      actor_account_id: auth.account_id,
-      action: "view_as.denied",
-      ip: ipFor(req),
-      user_agent: req.headers.get("user-agent") ?? null,
-    });
+    /* Log the denial — useful for security review. Best-effort:
+       audit failures never block the user-facing response. */
+    try {
+      await supabaseServer.from("koleex_security_audit").insert({
+        actor_account_id: auth.account_id,
+        action: "view_as.denied",
+        ip: ipFor(req),
+        user_agent: req.headers.get("user-agent") ?? null,
+      });
+    } catch {
+      /* swallow */
+    }
     return NextResponse.json(
       { error: "Only super admins can view as another user." },
       { status: 403 },
@@ -98,14 +103,21 @@ export async function POST(req: NextRequest) {
 
   await setViewAsCookie(targetId, auth.account_id);
 
-  await supabaseServer.from("koleex_security_audit").insert({
-    actor_account_id: auth.account_id,
-    target_account_id: targetId,
-    action: "view_as.enter",
-    ip: ipFor(req),
-    user_agent: req.headers.get("user-agent") ?? null,
-    details: { target_username: target.username },
-  });
+  /* Best-effort audit. Do NOT block the response on it — a slow
+     audit insert was previously a major source of "view-as feels
+     sluggish" complaints. */
+  try {
+    await supabaseServer.from("koleex_security_audit").insert({
+      actor_account_id: auth.account_id,
+      target_account_id: targetId,
+      action: "view_as.enter",
+      ip: ipFor(req),
+      user_agent: req.headers.get("user-agent") ?? null,
+      details: { target_username: target.username },
+    });
+  } catch {
+    /* swallow */
+  }
 
   return NextResponse.json({ ok: true, targetAccountId: targetId, targetUsername: target.username });
 }

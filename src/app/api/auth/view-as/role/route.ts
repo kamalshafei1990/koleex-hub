@@ -41,12 +41,16 @@ export async function POST(req: NextRequest) {
   }
 
   if (!auth.is_super_admin) {
-    await supabaseServer.from("koleex_security_audit").insert({
-      actor_account_id: auth.account_id,
-      action: "view_as.denied_role",
-      ip: ipFor(req),
-      user_agent: req.headers.get("user-agent") ?? null,
-    });
+    try {
+      await supabaseServer.from("koleex_security_audit").insert({
+        actor_account_id: auth.account_id,
+        action: "view_as.denied_role",
+        ip: ipFor(req),
+        user_agent: req.headers.get("user-agent") ?? null,
+      });
+    } catch {
+      /* swallow */
+    }
     return NextResponse.json(
       { error: "Only super admins can view as a role." },
       { status: 403 },
@@ -93,13 +97,18 @@ export async function POST(req: NextRequest) {
 
   await setViewAsRoleCookie(roleId, auth.account_id);
 
-  await supabaseServer.from("koleex_security_audit").insert({
-    actor_account_id: auth.account_id,
-    action: "view_as.enter_role",
-    ip: ipFor(req),
-    user_agent: req.headers.get("user-agent") ?? null,
-    details: { target_role_id: roleId, target_role_name: role.name },
-  });
+  /* Best-effort audit — never block the response on it. */
+  try {
+    await supabaseServer.from("koleex_security_audit").insert({
+      actor_account_id: auth.account_id,
+      action: "view_as.enter_role",
+      ip: ipFor(req),
+      user_agent: req.headers.get("user-agent") ?? null,
+      details: { target_role_id: roleId, target_role_name: role.name },
+    });
+  } catch {
+    /* swallow */
+  }
 
   return NextResponse.json({
     ok: true,
