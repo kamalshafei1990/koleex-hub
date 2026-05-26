@@ -190,47 +190,58 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
       </button>
 
       {open && (
+        /* Fixed width: was `min-w-[340px]`, which let long role
+           descriptions push the dropdown wider than the viewport. The
+           `max-w` clamp keeps mobile happy. `overflow-hidden` guards
+           against any stray overflow inside the rows. */
         <div
-          className={`absolute right-0 top-11 z-50 min-w-[340px] rounded-xl border shadow-2xl overflow-hidden ${
+          className={`absolute right-0 top-11 z-50 w-[360px] max-w-[calc(100vw-1rem)] rounded-xl border shadow-2xl overflow-hidden ${
             dk ? "bg-[#141414] border-white/10" : "bg-white border-black/10"
           }`}
         >
           {/* Header label */}
           <div
-            className={`px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider ${
+            className={`px-3 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider ${
               dk ? "text-white/50" : "text-black/50"
             }`}
           >
             View as
           </div>
 
-          {/* Mode tabs */}
-          <div className={`px-2 pb-2 flex gap-1 ${dk ? "" : ""}`}>
-            {(["user", "role"] as Mode[]).map((m) => {
-              const active = mode === m;
-              return (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => {
-                    setMode(m);
-                    setSearch("");
-                    setLoadError(null);
-                  }}
-                  className={`flex-1 h-7 rounded-md text-[11.5px] font-semibold transition-all ${
-                    active
-                      ? dk
-                        ? "bg-white/[0.12] text-white"
-                        : "bg-black/[0.08] text-black"
-                      : dk
-                        ? "text-white/55 hover:bg-white/[0.04]"
-                        : "text-black/55 hover:bg-black/[0.04]"
-                  }`}
-                >
-                  {m === "user" ? "By user" : "By role"}
-                </button>
-              );
-            })}
+          {/* Mode tabs — segmented pill, equal width via grid so the
+              active state never visually dominates the inactive one. */}
+          <div className="px-2 pb-2">
+            <div
+              className={`grid grid-cols-2 gap-0.5 rounded-lg p-0.5 ${
+                dk ? "bg-white/[0.06]" : "bg-black/[0.05]"
+              }`}
+            >
+              {(["user", "role"] as Mode[]).map((m) => {
+                const active = mode === m;
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => {
+                      setMode(m);
+                      setSearch("");
+                      setLoadError(null);
+                    }}
+                    className={`h-7 rounded-md text-[11.5px] font-semibold transition-all ${
+                      active
+                        ? dk
+                          ? "bg-[#1f1f1f] text-white shadow-sm"
+                          : "bg-white text-black shadow-sm"
+                        : dk
+                          ? "text-white/55 hover:text-white/80"
+                          : "text-black/55 hover:text-black/80"
+                    }`}
+                  >
+                    {m === "user" ? "By user" : "By role"}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Search */}
@@ -341,7 +352,7 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
                   type="button"
                   disabled={busy}
                   onClick={() => handlePickRole(r.id)}
-                  className={`w-full px-3 py-2.5 text-left flex items-center gap-2 transition-colors disabled:opacity-50 ${
+                  className={`w-full px-3 py-2.5 text-left flex items-start gap-2 transition-colors disabled:opacity-50 ${
                     dk
                       ? "hover:bg-white/[0.04]"
                       : "hover:bg-black/[0.03]"
@@ -349,26 +360,40 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
                 >
                   <UsersIcon
                     size={13}
-                    className={`shrink-0 ${
+                    className={`shrink-0 mt-[3px] ${
                       dk ? "text-white/60" : "text-black/60"
                     }`}
                   />
+                  {/* Title row — name on the left, "N modules" pill on the right. */}
                   <div className="flex-1 min-w-0">
-                    <div
-                      className={`text-[12.5px] font-semibold truncate ${
-                        dk ? "text-white" : "text-black"
-                      }`}
-                    >
-                      {r.name}
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`text-[12.5px] font-semibold truncate ${
+                          dk ? "text-white" : "text-black"
+                        }`}
+                      >
+                        {r.name}
+                      </span>
+                      <span
+                        className={`ml-auto shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                          dk
+                            ? "bg-white/[0.08] text-white/65"
+                            : "bg-black/[0.06] text-black/55"
+                        }`}
+                      >
+                        {r.module_count} {r.module_count === 1 ? "module" : "modules"}
+                      </span>
                     </div>
-                    <div
-                      className={`text-[10.5px] truncate ${
-                        dk ? "text-white/45" : "text-black/45"
-                      }`}
-                    >
-                      {r.module_count} modules
-                      {r.description ? ` · ${r.description}` : ""}
-                    </div>
+                    {r.description && (
+                      <div
+                        className={`mt-0.5 text-[10.5px] truncate ${
+                          dk ? "text-white/45" : "text-black/45"
+                        }`}
+                        title={r.description}
+                      >
+                        {r.description}
+                      </div>
+                    )}
                   </div>
                 </button>
               ))
