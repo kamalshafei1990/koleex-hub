@@ -72,6 +72,11 @@ export interface ProductTemplateSection {
 export interface ProductTemplateField {
   id: string;
   section_id: string;
+  /* Denormalized from product_template_sections.template_id by a DB
+     trigger. Powers the UNIQUE (template_id, field_key) lock — see
+     migration lock_field_key_unique_per_template.sql. Never written
+     by API callers; always derived from the parent section. */
+  template_id: string;
   field_key: string;
   field_label: string;
   field_type: FieldType;

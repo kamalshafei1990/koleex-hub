@@ -44,10 +44,11 @@ async function loadTemplateFieldsBySlug(slug: string) {
   const fieldsRes = await supabaseServer
     .from("product_template_fields")
     .select(
-      `id, section_id, field_key, field_label, field_type, unit, placeholder,
-       help_text, icon, sort_order, is_required, is_public, is_searchable,
-       ai_readable, show_in_brochure, show_in_quotation, show_in_catalog,
-       options_json, is_active, created_at,
+      `id, section_id, template_id, field_key, field_label, field_type,
+       unit, placeholder, help_text, icon, sort_order, is_required,
+       is_public, is_searchable, ai_readable, show_in_brochure,
+       show_in_quotation, show_in_catalog, options_json, is_active,
+       created_at,
        section:product_template_sections!inner(template_id, is_active)`,
     )
     .eq("section.template_id", templateId)
