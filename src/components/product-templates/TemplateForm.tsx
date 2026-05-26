@@ -114,9 +114,31 @@ export default function TemplateForm({
     return { total, filled };
   }, [tree, values]);
 
+  /* Strip the renderer-internal `__rid` markers from repeater /
+     feature_card rows before sending to the API. The DB never sees
+     these — they exist only so React can use a stable key per row. */
+  function sanitizeForSave(input: FieldValueMap): FieldValueMap {
+    const out: FieldValueMap = {};
+    for (const [k, v] of Object.entries(input)) {
+      if (Array.isArray(v)) {
+        out[k] = v.map((row) => {
+          if (row && typeof row === "object" && !Array.isArray(row)) {
+            const { __rid: _drop, ...rest } = row as Record<string, unknown>;
+            return rest;
+          }
+          return row;
+        });
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
   async function handleSave() {
+    const payload = sanitizeForSave(values);
     if (previewOnly) {
-      setSaveMsg(`Preview only — payload: ${JSON.stringify(values).slice(0, 200)}…`);
+      setSaveMsg(`Preview only — payload: ${JSON.stringify(payload).slice(0, 200)}…`);
       return;
     }
     if (!productId) {
@@ -133,7 +155,7 @@ export default function TemplateForm({
           method: "POST",
           headers: { "content-type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ values }),
+          body: JSON.stringify({ values: payload }),
         },
       );
       if (!res.ok) {

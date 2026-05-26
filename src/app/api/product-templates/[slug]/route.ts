@@ -1,7 +1,7 @@
 import "server-only";
 
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import type {
   ProductTemplate,
@@ -24,6 +24,10 @@ export async function GET(
 ) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
+  /* Same gate the product CRUD uses — anyone with Product Data access
+     can read template structure; everyone else gets 403. */
+  const deny = await requireModuleAccess(auth, "Product Data");
+  if (deny) return deny;
 
   const { slug } = await ctx.params;
   if (!slug) {
@@ -48,11 +52,14 @@ export async function GET(
     return NextResponse.json({ error: "Template not found" }, { status: 404 });
   }
 
+  /* Filter to is_active rows only — soft-archived sections / fields
+     are kept in the DB for audit but never rendered. */
   const [sectionsRes, fieldsRes] = await Promise.all([
     supabaseServer
       .from("product_template_sections")
       .select("*")
       .eq("template_id", template.id)
+      .eq("is_active", true)
       .order("sort_order", { ascending: true }),
     supabaseServer
       .from("product_template_fields")
@@ -60,10 +67,12 @@ export async function GET(
         `id, section_id, field_key, field_label, field_type, unit, placeholder,
          help_text, icon, sort_order, is_required, is_public, is_searchable,
          ai_readable, show_in_brochure, show_in_quotation, show_in_catalog,
-         options_json, created_at,
-         section:product_template_sections!inner(template_id)`,
+         options_json, is_active, created_at,
+         section:product_template_sections!inner(template_id, is_active)`,
       )
       .eq("section.template_id", template.id)
+      .eq("section.is_active", true)
+      .eq("is_active", true)
       .order("sort_order", { ascending: true }),
   ]);
 

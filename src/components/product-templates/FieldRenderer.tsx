@@ -22,6 +22,30 @@ import {
   type RepeaterItemSchema,
 } from "@/lib/product-templates/types";
 
+/* Stable per-row id used as React `key` for repeater / feature-card
+   rows. Without this, removing a row caused the OTHER rows to inherit
+   stale local input state (the audit's "repeater state corruption"
+   finding). The id lives inside the row object as `__rid` and is
+   stripped before save by TemplateForm. */
+function genRowId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `rid-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function rowKey(row: unknown, idx: number): string {
+  if (row && typeof row === "object" && typeof (row as { __rid?: unknown }).__rid === "string") {
+    return (row as { __rid: string }).__rid;
+  }
+  return `__idx-${idx}`;
+}
+
+function ensureRid(row: Record<string, unknown>): Record<string, unknown> {
+  if (typeof row.__rid === "string") return row;
+  return { ...row, __rid: genRowId() };
+}
+
 interface Props {
   field: ProductTemplateField;
   value: unknown;
@@ -310,12 +334,16 @@ export default function FieldRenderer({ field, value, onChange, disabled }: Prop
       const rows: Array<Record<string, unknown>> = Array.isArray(value)
         ? (value as Array<Record<string, unknown>>)
         : [];
+      /* Updates assign a stable `__rid` to the touched row so the React
+         key stays the same across re-renders even after a remove. */
       function update(rowIdx: number, key: string, v: unknown) {
-        const next = rows.map((r, i) => (i === rowIdx ? { ...r, [key]: v } : r));
+        const next = rows.map((r, i) =>
+          i === rowIdx ? { ...ensureRid(r), [key]: v } : r,
+        );
         onChange(next);
       }
       function addRow() {
-        onChange([...rows, {}]);
+        onChange([...rows, { __rid: genRowId() }]);
       }
       function removeRow(idx: number) {
         const next = rows.filter((_, i) => i !== idx);
@@ -332,7 +360,7 @@ export default function FieldRenderer({ field, value, onChange, disabled }: Prop
             )}
             {rows.map((row, idx) => (
               <RepeaterRow
-                key={idx}
+                key={rowKey(row, idx)}
                 schema={schema}
                 row={row}
                 disabled={disabled}
@@ -363,11 +391,13 @@ export default function FieldRenderer({ field, value, onChange, disabled }: Prop
         ? (value as Array<Record<string, unknown>>)
         : [];
       function update(rowIdx: number, key: string, v: unknown) {
-        const next = rows.map((r, i) => (i === rowIdx ? { ...r, [key]: v } : r));
+        const next = rows.map((r, i) =>
+          i === rowIdx ? { ...ensureRid(r), [key]: v } : r,
+        );
         onChange(next);
       }
       function addRow() {
-        onChange([...rows, {}]);
+        onChange([...rows, { __rid: genRowId() }]);
       }
       function removeRow(idx: number) {
         const next = rows.filter((_, i) => i !== idx);
@@ -384,7 +414,7 @@ export default function FieldRenderer({ field, value, onChange, disabled }: Prop
             )}
             {rows.map((row, idx) => (
               <div
-                key={idx}
+                key={rowKey(row, idx)}
                 className="rounded-lg border border-black/[0.08] dark:border-white/[0.08] p-3 space-y-2"
               >
                 {schema.map((s) => (
