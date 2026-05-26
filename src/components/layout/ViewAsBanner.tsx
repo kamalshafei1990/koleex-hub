@@ -14,6 +14,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMeBootstrap, retryMeBootstrap } from "@/lib/me-bootstrap";
+import { invalidateViewAsLists } from "./ViewAsPicker";
 
 export default function ViewAsBanner() {
   const router = useRouter();
@@ -38,8 +39,11 @@ export default function ViewAsBanner() {
       }
       /* Soft exit: bust the bootstrap cache + retry with `no-store` so
          listeners (banner, picker, sidebar) update in place, then
-         router.refresh() updates any RSC. No full page reload — saves
-         the 1–3s window.location.reload() costs. */
+         router.refresh() updates any RSC. Also drop the picker's
+         lists cache so re-opening it after exit shows fresh data
+         (the user just changed identities — what they could see
+         before may differ now). */
+      invalidateViewAsLists();
       await retryMeBootstrap();
       router.refresh();
     } catch {

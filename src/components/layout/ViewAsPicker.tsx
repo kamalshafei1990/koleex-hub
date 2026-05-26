@@ -54,69 +54,151 @@ type Mode = "user" | "role";
    Lists are shared across the whole app — there's only one picker
    instance, but if the picker remounts (route changes inside RootShell,
    theme flip, etc.) we don't want to refetch the same lists. */
+/* Structured fetch result so callers can surface SPECIFIC errors
+   ("HTTP 500", "Network error", "Timed out") instead of a generic
+   "couldn't load" — that opacity was the worst part of the previous
+   build, especially on a hot-reloading dev server where the first
+   request can hit a still-compiling route. */
+type FetchResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; status: number | null; message: string };
+
 const moduleCache: {
   users: AccountRow[] | null;
   roles: RoleRow[] | null;
-  fetchedAt: number;
-  inflightUsers: Promise<AccountRow[] | null> | null;
-  inflightRoles: Promise<RoleRow[] | null> | null;
+  usersFetchedAt: number;
+  rolesFetchedAt: number;
+  inflightUsers: Promise<FetchResult<AccountRow[]>> | null;
+  inflightRoles: Promise<FetchResult<RoleRow[]>> | null;
 } = {
   users: null,
   roles: null,
-  fetchedAt: 0,
+  usersFetchedAt: 0,
+  rolesFetchedAt: 0,
   inflightUsers: null,
   inflightRoles: null,
 };
-/* Refresh module cache after this many ms — short enough to pick up
-   new users / roles within a session, long enough to keep the picker
-   snappy. */
+/* Refresh module cache after this many ms. */
 const CACHE_TTL_MS = 60_000;
+const FETCH_TIMEOUT_MS = 8_000;
 
-function cacheFresh(): boolean {
-  return Date.now() - moduleCache.fetchedAt < CACHE_TTL_MS;
+function isFresh(ts: number): boolean {
+  return Date.now() - ts < CACHE_TTL_MS;
 }
 
-async function fetchUsers(): Promise<AccountRow[] | null> {
-  if (moduleCache.users && cacheFresh()) return moduleCache.users;
+/** Public hook so other components (e.g. ViewAsBanner) can invalidate
+ *  the picker's caches on exit. */
+export function invalidateViewAsLists(): void {
+  moduleCache.users = null;
+  moduleCache.roles = null;
+  moduleCache.usersFetchedAt = 0;
+  moduleCache.rolesFetchedAt = 0;
+}
+
+async function fetchWithTimeout(url: string): Promise<Response> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(url, { credentials: "include", signal: ctrl.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+async function rawFetchUsers(): Promise<FetchResult<AccountRow[]>> {
+  try {
+    const res = await fetchWithTimeout("/api/auth/view-as/users");
+    if (!res.ok) {
+      const j = (await res.json().catch(() => ({}))) as { error?: string };
+      return {
+        ok: false,
+        status: res.status,
+        message: j.error ?? `HTTP ${res.status}`,
+      };
+    }
+    const j = (await res.json()) as { accounts?: AccountRow[] };
+    return { ok: true, data: j.accounts ?? [] };
+  } catch (e) {
+    const isAbort =
+      (e as Error)?.name === "AbortError" ||
+      String(e).includes("aborted");
+    return {
+      ok: false,
+      status: null,
+      message: isAbort ? `Timed out after ${FETCH_TIMEOUT_MS / 1000}s` : "Network error",
+    };
+  }
+}
+
+async function rawFetchRoles(): Promise<FetchResult<RoleRow[]>> {
+  try {
+    const res = await fetchWithTimeout("/api/auth/view-as/roles");
+    if (!res.ok) {
+      const j = (await res.json().catch(() => ({}))) as { error?: string };
+      return {
+        ok: false,
+        status: res.status,
+        message: j.error ?? `HTTP ${res.status}`,
+      };
+    }
+    const j = (await res.json()) as { roles?: RoleRow[] };
+    return { ok: true, data: j.roles ?? [] };
+  } catch (e) {
+    const isAbort =
+      (e as Error)?.name === "AbortError" ||
+      String(e).includes("aborted");
+    return {
+      ok: false,
+      status: null,
+      message: isAbort ? `Timed out after ${FETCH_TIMEOUT_MS / 1000}s` : "Network error",
+    };
+  }
+}
+
+async function fetchUsers(): Promise<FetchResult<AccountRow[]>> {
+  if (moduleCache.users && isFresh(moduleCache.usersFetchedAt)) {
+    return { ok: true, data: moduleCache.users };
+  }
   if (moduleCache.inflightUsers) return moduleCache.inflightUsers;
   moduleCache.inflightUsers = (async () => {
-    try {
-      const res = await fetch("/api/auth/view-as/users", {
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const j = (await res.json()) as { accounts: AccountRow[] };
-      moduleCache.users = j.accounts ?? [];
-      moduleCache.fetchedAt = Date.now();
-      return moduleCache.users;
-    } catch {
-      return null;
-    } finally {
-      moduleCache.inflightUsers = null;
+    let res = await rawFetchUsers();
+    /* One soft retry on transient failure — dev hot-reload often
+       compiles the route on first request and fails, then succeeds on
+       second. 250ms backoff is enough to clear most cases. */
+    if (!res.ok && (res.status == null || res.status >= 500)) {
+      await new Promise((r) => setTimeout(r, 250));
+      res = await rawFetchUsers();
     }
-  })();
+    if (res.ok) {
+      moduleCache.users = res.data;
+      moduleCache.usersFetchedAt = Date.now();
+    }
+    return res;
+  })().finally(() => {
+    moduleCache.inflightUsers = null;
+  });
   return moduleCache.inflightUsers;
 }
 
-async function fetchRoles(): Promise<RoleRow[] | null> {
-  if (moduleCache.roles && cacheFresh()) return moduleCache.roles;
+async function fetchRoles(): Promise<FetchResult<RoleRow[]>> {
+  if (moduleCache.roles && isFresh(moduleCache.rolesFetchedAt)) {
+    return { ok: true, data: moduleCache.roles };
+  }
   if (moduleCache.inflightRoles) return moduleCache.inflightRoles;
   moduleCache.inflightRoles = (async () => {
-    try {
-      const res = await fetch("/api/auth/view-as/roles", {
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const j = (await res.json()) as { roles: RoleRow[] };
-      moduleCache.roles = j.roles ?? [];
-      moduleCache.fetchedAt = Date.now();
-      return moduleCache.roles;
-    } catch {
-      return null;
-    } finally {
-      moduleCache.inflightRoles = null;
+    let res = await rawFetchRoles();
+    if (!res.ok && (res.status == null || res.status >= 500)) {
+      await new Promise((r) => setTimeout(r, 250));
+      res = await rawFetchRoles();
     }
-  })();
+    if (res.ok) {
+      moduleCache.roles = res.data;
+      moduleCache.rolesFetchedAt = Date.now();
+    }
+    return res;
+  })().finally(() => {
+    moduleCache.inflightRoles = null;
+  });
   return moduleCache.inflightRoles;
 }
 
@@ -134,20 +216,24 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
 
   const isSuperAdmin = bootstrap?.isSuperAdmin ?? false;
 
-  /* Prefetch BOTH lists in parallel on first open. Tab switching becomes
-     instant because data is already on the client by the time the user
-     interacts. */
+  /* Prefetch BOTH lists in parallel on first open. Errors are surfaced
+     specifically per-list so the user can see the actual HTTP status
+     or "timed out" instead of an opaque "couldn't load". Partial
+     success is also handled — if users loaded but roles failed, the
+     User tab still works. */
   const ensureLoaded = useCallback(async () => {
     setLoadError(null);
     const [u, r] = await Promise.all([fetchUsers(), fetchRoles()]);
-    if (u !== null) setAccounts(u);
-    if (r !== null) setRoles(r);
-    if (u === null && r === null) {
-      setLoadError("Couldn't load users or roles. Tap to retry.");
-    } else if (u === null) {
-      setLoadError("Couldn't load users.");
-    } else if (r === null) {
-      setLoadError("Couldn't load roles.");
+    if (u.ok) setAccounts(u.data);
+    if (r.ok) setRoles(r.data);
+    if (!u.ok && !r.ok) {
+      setLoadError(
+        `Couldn't load lists — users: ${u.message}; roles: ${r.message}`,
+      );
+    } else if (!u.ok) {
+      setLoadError(`Couldn't load users: ${u.message}`);
+    } else if (!r.ok) {
+      setLoadError(`Couldn't load roles: ${r.message}`);
     }
   }, []);
 
@@ -157,10 +243,18 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
   }, [open, ensureLoaded]);
 
   /* Warm the cache on hover of the trigger button — typically buys
-     ~150ms before the user actually clicks open. */
+     ~150ms before the user actually clicks open. Silent — errors here
+     are not surfaced so a transient hover-prefetch failure can't
+     poison the UI. */
   function handleTriggerHover() {
     if (!isSuperAdmin || bootstrap?.viewingAs) return;
-    if (moduleCache.users && moduleCache.roles && cacheFresh()) return;
+    if (
+      moduleCache.users &&
+      moduleCache.roles &&
+      isFresh(moduleCache.usersFetchedAt) &&
+      isFresh(moduleCache.rolesFetchedAt)
+    )
+      return;
     void fetchUsers();
     void fetchRoles();
   }
@@ -183,9 +277,7 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
     /* Invalidate the lists cache too — entering view-as changes which
        users / roles the new identity can see. Picker hides anyway, but
        this avoids stale data on Exit. */
-    moduleCache.users = null;
-    moduleCache.roles = null;
-    moduleCache.fetchedAt = 0;
+    invalidateViewAsLists();
     await retryMeBootstrap();
     router.refresh();
   }
@@ -368,9 +460,7 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
             <button
               type="button"
               onClick={() => {
-                moduleCache.users = null;
-                moduleCache.roles = null;
-                moduleCache.fetchedAt = 0;
+                invalidateViewAsLists();
                 void ensureLoaded();
               }}
               className={`block w-full text-left px-3 py-2 text-[11px] ${
