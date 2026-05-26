@@ -33,6 +33,93 @@ const COOKIE_NAME = "koleex_session";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/* ── View-as override (super-admin only) ─────────────────────────────────
+   When a super admin clicks "View as <user>", we set a SECOND cookie
+   carrying the target account id. Server-side `getServerAuth()` reads
+   this cookie AFTER validating the primary session belongs to a SA, and
+   swaps the loaded account id to the target — making every downstream
+   permission check (role, overrides) evaluate as that user.
+
+   Why a separate cookie:
+     · Keeps the real SA session intact so "Exit view-as" is one cookie
+       delete, not a re-sign-in.
+     · Server-only HttpOnly cookie can't be tampered with from the page.
+     · HMAC signature prevents a malicious client from setting the cookie
+       directly with someone else's account id.
+
+   Short max age (2 hours): view-as is a debugging tool, not a persistent
+   state. The picker can re-issue if needed. */
+const VIEW_AS_COOKIE_NAME = "koleex_view_as";
+const VIEW_AS_MAX_AGE = 60 * 60 * 2; // 2 hours
+
+function signViewAs(targetAccountId: string, actorAccountId: string): string {
+  /* Bind the signature to BOTH the target and the actor so the cookie is
+     only valid for the SA who issued it. Stealing the cookie and pasting
+     it into another session won't work — the actor side won't match the
+     new session's accountId. */
+  return createHmac("sha256", getSecret())
+    .update(`${actorAccountId}:${targetAccountId}`)
+    .digest("base64url");
+}
+
+/** Mint the view-as cookie. Called from POST /api/auth/view-as after
+ *  verifying the caller is a super admin and the target is valid. */
+export async function setViewAsCookie(
+  targetAccountId: string,
+  actorAccountId: string,
+): Promise<void> {
+  if (!UUID_RE.test(targetAccountId) || !UUID_RE.test(actorAccountId)) {
+    throw new Error("[session] view-as ids must be UUIDs");
+  }
+  const sig = signViewAs(targetAccountId, actorAccountId);
+  const value = `${targetAccountId}.${actorAccountId}.${sig}`;
+  const store = await cookies();
+  store.set(VIEW_AS_COOKIE_NAME, value, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: VIEW_AS_MAX_AGE,
+  });
+}
+
+/** Clear the view-as cookie. Called from POST /api/auth/view-as/exit. */
+export async function clearViewAsCookie(): Promise<void> {
+  const store = await cookies();
+  store.delete(VIEW_AS_COOKIE_NAME);
+}
+
+/** Read the view-as override and return the target account id, but ONLY
+ *  if the signature matches the supplied real-session account id. This
+ *  guarantees the cookie was issued for THIS session. Returns null if
+ *  no override, signature mismatch, or malformed. */
+export async function getViewAsAccountId(
+  realAccountId: string,
+): Promise<string | null> {
+  const store = await cookies();
+  const raw = store.get(VIEW_AS_COOKIE_NAME)?.value;
+  if (!raw) return null;
+
+  const parts = raw.split(".");
+  if (parts.length !== 3) return null;
+  const [targetId, actorId, sig] = parts;
+  if (!UUID_RE.test(targetId) || !UUID_RE.test(actorId)) return null;
+
+  /* Cookie was issued for a different session — ignore. */
+  if (actorId !== realAccountId) return null;
+
+  try {
+    const expected = signViewAs(targetId, actorId);
+    const a = Buffer.from(expected);
+    const b = Buffer.from(sig);
+    if (a.length !== b.length) return null;
+    if (!timingSafeEqual(a, b)) return null;
+  } catch {
+    return null;
+  }
+  return targetId;
+}
+
 function getSecret(): string {
   // Match the defensive reader in supabase-server.ts — same failure
   // mode (stray quotes / trailing newline from `vercel env pull`)

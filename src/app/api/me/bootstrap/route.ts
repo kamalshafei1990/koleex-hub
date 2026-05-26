@@ -73,23 +73,41 @@ export async function GET() {
     else allowed.delete(row.module_key);
   }
 
+  /* When the auth context is a view-as override, `auth.account_id` is
+     already the TARGET user — the header lookup above loaded the
+     target's account row. Expose a `viewingAs` block so the client
+     can render a banner and disable write affordances. `realAccountId`
+     is the SA's actual account so "Exit" knows where to return. */
+  const headerRow = headerRes.data as
+    | { username?: string | null; person?: { full_name?: string | null } | null }
+    | null;
+  const viewingAs = auth.viewing_as
+    ? {
+        targetAccountId: auth.account_id,
+        targetUsername: headerRow?.username ?? null,
+        targetDisplayName: headerRow?.person?.full_name ?? headerRow?.username ?? null,
+        realAccountId: auth.real_account_id,
+      }
+    : null;
+
   const payload = {
     auth,
     header: headerRes.data ?? null,
     permittedModules: Array.from(allowed),
     isSuperAdmin: auth.is_super_admin,
+    viewingAs,
   };
 
-  /* Cache aggressively — bootstrap payload barely changes during a
-     session (role / perms / dept / tenant are all admin-edited once
-     in a while). Bumped from max-age=10 to match the 60 s client
-     cache. stale-while-revalidate lets the browser serve the old
-     response instantly while we refresh in the background. Writes
-     that DO change perms call invalidateMeBootstrap() to force a
-     re-fetch. */
+  /* Cache aggressively when NOT viewing-as — bootstrap payload barely
+     changes during a normal session (role / perms / dept / tenant are
+     admin-edited once in a while). When viewing-as IS active, skip the
+     cache so picker enter/exit takes effect immediately instead of
+     waiting up to 60s for a fresh bootstrap. */
   return NextResponse.json(payload, {
     headers: {
-      "Cache-Control": "private, max-age=60, stale-while-revalidate=300",
+      "Cache-Control": viewingAs
+        ? "private, no-store"
+        : "private, max-age=60, stale-while-revalidate=300",
     },
   });
 }

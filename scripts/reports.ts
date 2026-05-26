@@ -291,6 +291,8 @@ async function main() {
       department: null,
       is_super_admin: true,
       can_view_private: true,
+      viewing_as: false,
+      real_account_id: null,
       username: "validator",
       login_email: "validator@example.com",
       status: "active",
