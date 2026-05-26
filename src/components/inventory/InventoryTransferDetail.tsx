@@ -248,54 +248,58 @@ export default function InventoryTransferDetail({ transferId }: { transferId: st
   });
   const canShip = isApproved && offendingLines.length === 0;
 
+  /* Page wrapper + InventoryHeader provided by /app/inventory/layout.tsx.
+     The detail-page hero (doc number + action buttons) renders inside
+     the body so the layout's generic "Transfers" title still gives the
+     user context while the doc-specific actions stay close to its data. */
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
-        <InventoryHeader
-          icon="truck-side"
-          title={transfer.transfer_no}
-          subtitle={t("inv.transfers.title")}
-          action={
-            <div className="flex flex-wrap items-center gap-2">
-              <Link
-                href="/inventory/transfers"
-                className="rounded-md border border-[var(--border-color)] px-2.5 py-1 text-[11px] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
-              >
-                ← {t("inv.transfers.title")}
-              </Link>
-              {isDraft && (
-                <ActionBtn busy={busy} onClick={() => act("submit")}>
-                  {t("inv.transfers.act.submit")}
-                </ActionBtn>
-              )}
-              {isPending && (
-                <ActionBtn busy={busy} onClick={() => act("approve")}>
-                  {t("inv.transfers.act.approve")}
-                </ActionBtn>
-              )}
-              {isApproved && (
-                <ActionBtn busy={busy} disabled={!canShip} onClick={() => act("ship")}>
-                  {t("inv.transfers.act.ship")}
-                </ActionBtn>
-              )}
-              {isShipped && (
-                <ActionBtn busy={busy} onClick={() => act("receive")}>
-                  {t("inv.transfers.act.receive")}
-                </ActionBtn>
-              )}
-              {canCancel && (
-                <ActionBtn busy={busy} onClick={() => act("cancel")}>
-                  {t("inv.transfers.act.cancel")}
-                </ActionBtn>
-              )}
-              {canVoid && (
-                <ActionBtn busy={busy} onClick={() => setShowVoid(true)}>
-                  {t("inv.transfers.act.void")}
-                </ActionBtn>
-              )}
-            </div>
-          }
-        />
+    <div className="space-y-5">
+        {/* Doc number sub-hero + action row */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/inventory/transfers"
+              className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1 text-[11px] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+            >
+              ← {t("inv.transfers.title")}
+            </Link>
+            <h2 className="font-mono text-[16px] font-semibold tracking-tight text-[var(--text-primary)]">
+              {transfer.transfer_no}
+            </h2>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {isDraft && (
+              <ActionBtn busy={busy} onClick={() => act("submit")}>
+                {t("inv.transfers.act.submit")}
+              </ActionBtn>
+            )}
+            {isPending && (
+              <ActionBtn busy={busy} onClick={() => act("approve")}>
+                {t("inv.transfers.act.approve")}
+              </ActionBtn>
+            )}
+            {isApproved && (
+              <ActionBtn busy={busy} disabled={!canShip} onClick={() => act("ship")}>
+                {t("inv.transfers.act.ship")}
+              </ActionBtn>
+            )}
+            {isShipped && (
+              <ActionBtn busy={busy} onClick={() => act("receive")}>
+                {t("inv.transfers.act.receive")}
+              </ActionBtn>
+            )}
+            {canCancel && (
+              <ActionBtn busy={busy} onClick={() => act("cancel")}>
+                {t("inv.transfers.act.cancel")}
+              </ActionBtn>
+            )}
+            {canVoid && (
+              <ActionBtn busy={busy} onClick={() => setShowVoid(true)}>
+                {t("inv.transfers.act.void")}
+              </ActionBtn>
+            )}
+          </div>
+        </div>
 
         {actionError && (
           <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-300 dark:text-rose-200">
@@ -503,7 +507,6 @@ export default function InventoryTransferDetail({ transferId }: { transferId: st
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 }

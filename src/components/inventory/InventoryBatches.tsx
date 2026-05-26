@@ -106,23 +106,19 @@ export default function InventoryBatches() {
     return batches.filter((b) => b.expiry_status === tab);
   }, [batches, tab]);
 
+  /* InventoryHeader provided by /app/inventory/layout.tsx. */
   return (
     <div className="space-y-6">
-      <InventoryHeader
-        icon="pallet"
-        title={t("inv.batches.title")}
-        subtitle={t("inv.batches.subtitle")}
-        action={
-          <button
-            type="button"
-            onClick={() => setCreateOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-elevated)]"
-          >
-            <RrIcon name="plus" size={12} />
-            {t("inv.batches.new")}
-          </button>
-        }
-      />
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => setCreateOpen(true)}
+          className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-surface-hover)]"
+        >
+          <RrIcon name="plus" size={12} />
+          {t("inv.batches.new")}
+        </button>
+      </div>
 
       {/* tabs */}
       <div className="flex flex-wrap items-center gap-1">

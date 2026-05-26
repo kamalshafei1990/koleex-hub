@@ -186,24 +186,19 @@ export default function InventoryReturns() {
     return returns.filter((r) => r.status === tab);
   }, [returns, tab]);
 
+  /* Page wrapper + InventoryHeader provided by /app/inventory/layout.tsx. */
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
-        <InventoryHeader
-          icon="recycle"
-          title={t("inv.returns.title")}
-          subtitle={t("inv.returns.subtitle")}
-          action={
-            <button
-              type="button"
-              onClick={() => setCreateOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-elevated)]"
-            >
-              <RrIcon name="plus" size={12} />
-              {t("inv.returns.new")}
-            </button>
-          }
-        />
+    <div className="space-y-5">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]"
+          >
+            <RrIcon name="plus" size={12} />
+            {t("inv.returns.new")}
+          </button>
+        </div>
 
         {error && (
           <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11.5px] text-rose-300 dark:text-rose-200">
@@ -345,7 +340,6 @@ export default function InventoryReturns() {
             }}
           />
         )}
-      </div>
     </div>
   );
 }

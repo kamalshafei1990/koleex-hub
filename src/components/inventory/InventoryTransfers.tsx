@@ -177,24 +177,21 @@ export default function InventoryTransfers() {
     return transfers.filter((t) => t.status === tab);
   }, [transfers, tab]);
 
+  /* Page wrapper + InventoryHeader provided by /app/inventory/layout.tsx.
+     The "New transfer" action button used to live in the header — it now
+     renders as the first row inside the body so it stays with the list. */
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] pb-16 text-[var(--text-primary)] md:pb-6">
-      <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
-        <InventoryHeader
-          icon="truck-side"
-          title={t("inv.transfers.title")}
-          subtitle={t("inv.transfers.subtitle")}
-          action={
-            <button
-              type="button"
-              onClick={() => setCreateOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-elevated)]"
-            >
-              <RrIcon name="plus" size={12} />
-              {t("inv.transfers.new")}
-            </button>
-          }
-        />
+    <div className="space-y-5">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]"
+          >
+            <RrIcon name="plus" size={12} />
+            {t("inv.transfers.new")}
+          </button>
+        </div>
         <OperatorMovementMenu />
 
         {error && (
@@ -388,7 +385,6 @@ export default function InventoryTransfers() {
             }}
           />
         )}
-      </div>
       <BulkActionBar
         count={selection.count}
         onClear={selection.clear}

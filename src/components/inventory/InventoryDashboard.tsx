@@ -132,22 +132,15 @@ export default function InventoryDashboard() {
     </Button>
   );
 
+  /* Page wrapper + InventoryHeader provided by /app/inventory/layout.tsx.
+     Action buttons (Add Internal Item + ViewModeToggle) now render as the
+     first body row instead of in the header slot. */
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] pb-16 text-[var(--text-primary)] md:pb-6">
-      <div className="mx-auto max-w-[1500px] space-y-6 px-4 py-6 sm:px-6">
-
-        {/* ── 1. Odoo-style compact header (menu inline) ──────────── */}
-        <InventoryHeader
-          icon="home"
-          title={t("inv.home.title")}
-          subtitle={t("inv.home.subtitle")}
-          action={
-            <div className="flex items-center gap-2">
-              {addInternalBtn}
-              <ViewModeToggle />
-            </div>
-          }
-        />
+    <div className="space-y-6">
+        <div className="flex items-center justify-end gap-2">
+          {addInternalBtn}
+          <ViewModeToggle />
+        </div>
 
         {/* Error banner */}
         {error && (
@@ -321,8 +314,6 @@ export default function InventoryDashboard() {
             </div>
           </section>
         )}
-
-      </div>
 
       <MobileFab />
       <MobileBottomBar />

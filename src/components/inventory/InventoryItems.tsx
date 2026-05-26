@@ -178,74 +178,67 @@ export default function InventoryItems() {
     return m;
   }, [types]);
 
+  /* Page wrapper + InventoryHeader provided by /app/inventory/layout.tsx. */
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
-        <InventoryHeader
-          icon="box-open"
-          title={t("inv.title")}
-          subtitle={t("inv.subtitle")}
-          action={
-            <div className="relative flex flex-wrap gap-2">
-              <Button variant="secondary" size="sm" icon="stamp" onClick={() => setTypesPanelOpen(true)}>
-                {t("inv.manage_types")}
-              </Button>
-              <Button variant="primary" size="sm" icon="plus" onClick={() => setAddMenuOpen((v) => !v)}>
-                {t("inv.add")}
-              </Button>
-              {addMenuOpen && (
-                <>
-                  <button
-                    type="button"
-                    aria-label="Close menu"
-                    onClick={() => setAddMenuOpen(false)}
-                    className="fixed inset-0 z-40 cursor-default"
-                  />
-                  <div className="absolute right-0 top-full z-50 mt-2 w-[300px] rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] p-1.5 shadow-lg">
-                    <Link
-                      href="/products/new"
-                      onClick={() => setAddMenuOpen(false)}
-                      className="flex items-start gap-2 rounded-md px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
-                    >
-                      <RrIcon name="plus" size={12} />
-                      <span>{t("inv.add_via_product")}</span>
-                    </Link>
-                    <Link
-                      href="/products"
-                      onClick={() => setAddMenuOpen(false)}
-                      className="flex items-start gap-2 rounded-md px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
-                    >
-                      <RrIcon name="box-open" size={12} />
-                      <span>{t("inv.open_products")}</span>
-                    </Link>
-                    <Link
-                      href="/products?stock_profile=open"
-                      onClick={() => setAddMenuOpen(false)}
-                      className="flex items-start gap-2 rounded-md px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
-                    >
-                      <RrIcon name="box-circle-check" size={12} />
-                      <span>{t("inv.create_for_existing")}</span>
-                    </Link>
-                    <button
-                      onClick={() => { setAddMenuOpen(false); setInternalDrawerOpen(true); }}
-                      className="flex w-full items-start gap-2 rounded-md px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
-                    >
-                      <RrIcon name="briefcase" size={12} />
-                      <span>{t("inv.add_internal_use")}</span>
-                    </button>
-                    <button
-                      onClick={() => { setAddMenuOpen(false); setQuickAddOpen(true); }}
-                      className="flex w-full items-start gap-2 rounded-md px-3 py-2 text-[12px] text-[var(--text-dim)] hover:bg-[var(--bg-surface)]"
-                    >
-                      <RrIcon name="tools" size={12} />
-                      <span>{t("inv.link_existing")}</span>
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          }
-        />
+    <div className="space-y-5">
+        <div className="relative flex flex-wrap items-center justify-end gap-2">
+          <Button variant="secondary" size="sm" icon="stamp" onClick={() => setTypesPanelOpen(true)}>
+            {t("inv.manage_types")}
+          </Button>
+          <Button variant="primary" size="sm" icon="plus" onClick={() => setAddMenuOpen((v) => !v)}>
+            {t("inv.add")}
+          </Button>
+          {addMenuOpen && (
+            <>
+              <button
+                type="button"
+                aria-label="Close menu"
+                onClick={() => setAddMenuOpen(false)}
+                className="fixed inset-0 z-40 cursor-default"
+              />
+              <div className="absolute right-0 top-full z-50 mt-2 w-[300px] rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] p-1.5 shadow-lg">
+                <Link
+                  href="/products/new"
+                  onClick={() => setAddMenuOpen(false)}
+                  className="flex items-start gap-2 rounded-md px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+                >
+                  <RrIcon name="plus" size={12} />
+                  <span>{t("inv.add_via_product")}</span>
+                </Link>
+                <Link
+                  href="/products"
+                  onClick={() => setAddMenuOpen(false)}
+                  className="flex items-start gap-2 rounded-md px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+                >
+                  <RrIcon name="box-open" size={12} />
+                  <span>{t("inv.open_products")}</span>
+                </Link>
+                <Link
+                  href="/products?stock_profile=open"
+                  onClick={() => setAddMenuOpen(false)}
+                  className="flex items-start gap-2 rounded-md px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+                >
+                  <RrIcon name="box-circle-check" size={12} />
+                  <span>{t("inv.create_for_existing")}</span>
+                </Link>
+                <button
+                  onClick={() => { setAddMenuOpen(false); setInternalDrawerOpen(true); }}
+                  className="flex w-full items-start gap-2 rounded-md px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+                >
+                  <RrIcon name="briefcase" size={12} />
+                  <span>{t("inv.add_internal_use")}</span>
+                </button>
+                <button
+                  onClick={() => { setAddMenuOpen(false); setQuickAddOpen(true); }}
+                  className="flex w-full items-start gap-2 rounded-md px-3 py-2 text-[12px] text-[var(--text-dim)] hover:bg-[var(--bg-surface)]"
+                >
+                  <RrIcon name="tools" size={12} />
+                  <span>{t("inv.link_existing")}</span>
+                </button>
+              </div>
+            </>
+          )}
+        </div>
 
         {error && (
           <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">
@@ -409,7 +402,6 @@ export default function InventoryItems() {
             </tbody>
           </table>
         </Panel>
-      </div>
 
       {quickAddOpen && (
         <QuickAddDrawer

@@ -156,11 +156,9 @@ export default function InventoryBalances() {
     );
   }, [filteredRows]);
 
+  /* Page wrapper + InventoryHeader provided by /app/inventory/layout.tsx. */
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
-        <InventoryHeader icon="badge-check" title="Stock Balances" subtitle="Derived truth — never edited directly. One row per item × location." />
-
+    <div className="space-y-5">
         {error && (
           <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">
             {error}
@@ -359,7 +357,6 @@ export default function InventoryBalances() {
           </table>
         </Panel>
         )}
-      </div>
     </div>
   );
 }

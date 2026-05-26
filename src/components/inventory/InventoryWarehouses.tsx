@@ -76,23 +76,18 @@ export default function InventoryWarehouses() {
     return acc;
   }, [rows]);
 
+  /* Page wrapper + InventoryHeader provided by /app/inventory/layout.tsx. */
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
-        <InventoryHeader
-          icon="building"
-          title="Locations"
-          subtitle="Warehouses, ports, forwarders, customer sites — anywhere stock can sit."
-          action={
-            <button
-              onClick={() => setDrawerOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.06] px-3 py-1.5 text-[12px] hover:bg-white/[0.10]"
-            >
-              <RrIcon name="plus" size={12} />
-              New Location
-            </button>
-          }
-        />
+    <div className="space-y-5">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button
+            onClick={() => setDrawerOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]"
+          >
+            <RrIcon name="plus" size={12} />
+            New Location
+          </button>
+        </div>
 
         {error && (
           <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">
@@ -186,7 +181,6 @@ export default function InventoryWarehouses() {
             </tbody>
           </table>
         </Panel>
-      </div>
 
       {drawerOpen && (
         <NewLocationDrawer
