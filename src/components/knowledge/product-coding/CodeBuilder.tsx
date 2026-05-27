@@ -202,173 +202,180 @@ export default function CodeBuilder() {
 function MachineSilhouette({
   activeRegion,
 }: {
-  activeRegion: "head" | "motor" | "bed" | "length" | "fabric" | "hook" | "special" | null;
+  activeRegion:
+    | "head"
+    | "motor"
+    | "bed"
+    | "length"
+    | "fabric"
+    | "hook"
+    | "special"
+    | null;
 }) {
   const baseStroke = "var(--border-subtle)";
   const activeStroke = "var(--text-primary)";
 
-  function stroke(region: typeof activeRegion) {
-    return activeRegion === region ? activeStroke : baseStroke;
-  }
-  function strokeWidth(region: typeof activeRegion) {
-    return activeRegion === region ? 1.6 : 1;
-  }
+  /* Helpers — return the right stroke + width for each region so we
+     don't repeat the conditional 30 times below. */
+  const sw = (region: typeof activeRegion, active = 1.8, idle = 1) =>
+    activeRegion === region ? active : idle;
+  const st = (region: typeof activeRegion) =>
+    activeRegion === region ? activeStroke : baseStroke;
 
   return (
     <svg
-      viewBox="0 0 240 140"
-      className="w-full max-w-[240px]"
+      viewBox="0 0 300 220"
+      className="w-full max-w-[300px]"
       style={{ color: "var(--text-primary)" }}
+      fill="none"
+      strokeLinecap="round"
+      strokeLinejoin="round"
     >
-      {/* Bed / workbench (long horizontal — controlled by Length + Bed type) */}
-      <rect
-        x="10"
-        y="92"
-        width="220"
-        height="14"
-        rx="2"
-        fill="none"
-        stroke={
-          activeRegion === "length" || activeRegion === "bed"
-            ? activeStroke
-            : baseStroke
-        }
-        strokeWidth={
-          activeRegion === "length" || activeRegion === "bed" ? 1.8 : 1
-        }
-      />
-      {/* Length tick marks under the bed */}
-      {[20, 60, 100, 140, 180, 220].map((x) => (
-        <line
-          key={x}
-          x1={x}
-          y1={106}
-          x2={x}
-          y2={111}
-          stroke={activeRegion === "length" ? activeStroke : baseStroke}
-          strokeWidth={1}
+      {/* ─────────────────────────────────────────────────────────────
+         INDUSTRIAL LOCKSTITCH — proper proportions.
+         · Long bed across the bottom (the workbench)
+         · Tall head on the LEFT with the spool tower above
+         · Horizontal arm extending RIGHT, ending in the needle drop
+         · Servo motor mounted UNDER the bed (with cable)
+         · Hand wheel on the head's right side
+         ───────────────────────────────────────────────────────────── */}
+
+      {/* Spool stand — the thread tower on top */}
+      <g stroke={st("head")} strokeWidth={sw("head")}>
+        <line x1="60" y1="10" x2="60" y2="44" />
+        <circle cx="60" cy="10" r="2.5" />
+        {/* Thread cone */}
+        <path d="M 56 22 L 60 14 L 64 22 L 56 22 Z" />
+      </g>
+
+      {/* HEAD — main vertical body (left), with the curved top profile
+         characteristic of industrial sewing machines. */}
+      <g stroke={st("head")} strokeWidth={sw("head")}>
+        <path
+          d="
+            M 30 130
+            L 30 78
+            Q 30 60 48 60
+            L 78 60
+            Q 88 60 88 70
+            L 88 130
+            Z
+          "
         />
-      ))}
+        {/* Brand stripe across the head */}
+        <line x1="38" y1="98" x2="80" y2="98" strokeWidth={0.6} />
+      </g>
 
-      {/* Head — main body */}
-      <rect
-        x="50"
-        y="30"
-        width="120"
-        height="50"
-        rx="6"
-        fill="none"
-        stroke={stroke("head")}
-        strokeWidth={strokeWidth("head")}
-      />
-      {/* Head arm */}
-      <rect
-        x="120"
-        y="32"
-        width="48"
-        height="20"
-        rx="3"
-        fill="none"
-        stroke={stroke("head")}
-        strokeWidth={strokeWidth("head")}
-      />
-      {/* Needle bar drop */}
-      <line
-        x1="160"
-        y1="50"
-        x2="160"
-        y2="88"
-        stroke={stroke("head")}
-        strokeWidth={strokeWidth("head")}
-      />
-      <line
-        x1="156"
-        y1="82"
-        x2="164"
-        y2="82"
-        stroke={stroke("head")}
-        strokeWidth={strokeWidth("head")}
-      />
+      {/* ARM — extends right from the head, ends just above the needle */}
+      <g stroke={st("head")} strokeWidth={sw("head")}>
+        <path
+          d="
+            M 88 72
+            L 220 72
+            Q 232 72 232 84
+            L 232 110
+            L 218 110
+            L 218 84
+            L 88 84
+            Z
+          "
+        />
+      </g>
 
-      {/* Motor — left of head */}
-      <circle
-        cx="38"
-        cy="55"
-        r="13"
-        fill="none"
-        stroke={stroke("motor")}
-        strokeWidth={strokeWidth("motor")}
-      />
-      <circle
-        cx="38"
-        cy="55"
-        r="5"
-        fill={activeRegion === "motor" ? activeStroke : "none"}
-        stroke={stroke("motor")}
-        strokeWidth={1}
-      />
-      <line
-        x1="51"
-        y1="55"
-        x2="60"
-        y2="55"
-        stroke={stroke("motor")}
-        strokeWidth={strokeWidth("motor")}
-      />
+      {/* Needle bar drop — vertical rod from arm down to bed */}
+      <g stroke={st("head")} strokeWidth={sw("head")}>
+        <line x1="225" y1="110" x2="225" y2="148" />
+        {/* Presser foot pad */}
+        <rect x="219" y="147" width="14" height="3.5" rx="0.5" />
+      </g>
 
-      {/* Hook — small ring just below the needle drop */}
-      <circle
-        cx="160"
-        cy="96"
-        r="5"
-        fill={activeRegion === "hook" ? activeStroke : "none"}
-        stroke={stroke("hook")}
-        strokeWidth={strokeWidth("hook")}
-      />
+      {/* HANDWHEEL — characteristic circle on the right side of the head */}
+      <g stroke={st("head")} strokeWidth={sw("head")}>
+        <circle cx="88" cy="100" r="10" />
+        <circle cx="88" cy="100" r="3" fill={st("head")} />
+        <line x1="88" y1="90" x2="88" y2="110" strokeWidth={0.6} />
+        <line x1="78" y1="100" x2="98" y2="100" strokeWidth={0.6} />
+      </g>
 
-      {/* Fabric pad — under the bed, left of needle */}
-      <rect
-        x="100"
-        y="86"
-        width="50"
-        height="6"
-        rx="1"
-        fill={activeRegion === "fabric" ? activeStroke : "none"}
-        stroke={stroke("fabric")}
-        strokeWidth={strokeWidth("fabric")}
-      />
+      {/* BED — long horizontal work surface */}
+      <g stroke={st("bed")} strokeWidth={sw("bed")}>
+        <path
+          d="
+            M 18 152
+            L 282 152
+            L 282 168
+            L 18 168
+            Z
+          "
+        />
+        {/* The bed slot / needle plate cutout */}
+        <rect x="218" y="153" width="14" height="6" rx="0.5" />
+      </g>
 
-      {/* Special accessories rail — right side of bed */}
-      <line
-        x1="195"
-        y1="86"
-        x2="225"
-        y2="86"
-        stroke={stroke("special")}
-        strokeWidth={strokeWidth("special")}
-        strokeDasharray={activeRegion === "special" ? "0" : "3,2"}
-      />
-      <rect
-        x="200"
-        y="80"
-        width="20"
-        height="6"
-        rx="1"
-        fill="none"
-        stroke={stroke("special")}
-        strokeWidth={strokeWidth("special")}
-      />
+      {/* LENGTH ruler — tick marks underneath the bed, highlight when
+         the "operation length" axis is active. */}
+      <g stroke={st("length")} strokeWidth={sw("length", 1.2, 0.8)}>
+        {[40, 90, 140, 190, 240].map((x) => (
+          <line key={x} x1={x} y1="168" x2={x} y2="174" />
+        ))}
+        <line x1="40" y1="174" x2="240" y2="174" />
+      </g>
 
-      {/* Footer caption labels — only the active region's label shows */}
+      {/* MOTOR — direct-drive servo, mounted at the back of the head
+         (industrial machines have the motor at the rear, not below). */}
+      <g stroke={st("motor")} strokeWidth={sw("motor")}>
+        <rect x="6" y="86" width="24" height="36" rx="3" />
+        <circle cx="18" cy="104" r="6" />
+        {/* fan vent slots */}
+        <line x1="10" y1="93" x2="26" y2="93" strokeWidth={0.6} />
+        <line x1="10" y1="116" x2="26" y2="116" strokeWidth={0.6} />
+        {/* power cable */}
+        <path d="M 18 122 Q 18 138 8 142" strokeWidth={0.8} />
+      </g>
+
+      {/* FABRIC — small folded square sitting under the presser foot */}
+      <g stroke={st("fabric")} strokeWidth={sw("fabric")}>
+        <path
+          d="M 200 152 L 216 145 L 226 148 L 224 152 Z"
+          fill={
+            activeRegion === "fabric" ? activeStroke : "transparent"
+          }
+          opacity={activeRegion === "fabric" ? 0.18 : 1}
+        />
+        <line x1="206" y1="148" x2="220" y2="147" strokeWidth={0.6} />
+      </g>
+
+      {/* HOOK — bobbin/rotary hook under the bed, just below the needle */}
+      <g stroke={st("hook")} strokeWidth={sw("hook")}>
+        <circle cx="225" cy="180" r="9" />
+        <circle cx="225" cy="180" r="3" />
+        <line x1="225" y1="168" x2="225" y2="172" strokeWidth={0.6} />
+      </g>
+
+      {/* SPECIAL — accessory rail at the right edge of the bed
+         (puller / folder / etc clip on here). */}
+      <g stroke={st("special")} strokeWidth={sw("special")}>
+        <line
+          x1="248"
+          y1="148"
+          x2="278"
+          y2="148"
+          strokeDasharray={activeRegion === "special" ? "0" : "3 2"}
+        />
+        <rect x="252" y="139" width="22" height="9" rx="1.5" />
+        <line x1="258" y1="143" x2="270" y2="143" strokeWidth={0.6} />
+      </g>
+
+      {/* Footer caption — only shows when a region is active */}
       {activeRegion && (
         <text
-          x="120"
-          y="130"
+          x="150"
+          y="208"
           textAnchor="middle"
-          fontSize="9"
+          fontSize="9.5"
           fill={activeStroke}
           fontFamily="ui-monospace, SFMono-Regular, monospace"
-          style={{ letterSpacing: "0.12em" }}
+          style={{ letterSpacing: "0.14em" }}
         >
           {regionLabel(activeRegion)}
         </text>

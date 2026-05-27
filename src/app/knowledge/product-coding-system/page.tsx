@@ -22,9 +22,6 @@
 import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import {
-  CodeSegment,
-  CodePrefix,
-  Dash,
   SystemStatus,
   SectionHeader,
 } from "@/components/knowledge/product-coding/primitives";
@@ -48,11 +45,11 @@ import {
   AI_CAPABILITIES,
 } from "@/components/knowledge/product-coding/data";
 
-/* TOC entries kept in sync with the section anchors below. */
+/* TOC entries kept in sync with the section anchors below.
+   v6: hero IS the division layer — they share section #1. */
 const TOC = [
-  { id: "hero", label: "Overview" },
-  { id: "divisions", label: "1. Division layer" },
-  { id: "categories", label: "2. Category layer" },
+  { id: "divisions", label: "1. The KOLEEX universe" },
+  { id: "categories", label: "2. Categories" },
   { id: "subcategories", label: "3. Subcategories" },
   { id: "technical-breakdown", label: "4. Technical breakdown" },
   { id: "builder", label: "5. SKU builder" },
@@ -100,8 +97,12 @@ export default function ProductCodingSystemPage() {
         <div className="lg:grid lg:grid-cols-[1fr_220px] lg:gap-10">
           <div className="space-y-16 md:space-y-20 min-w-0">
 
-            {/* ═══ 0 · HERO ═══════════════════════════════════════════ */}
-            <header id="hero" className="scroll-mt-20">
+            {/* ═══ 1 · HERO + DIVISION LAYER (the universe) ═══════════
+                v6: page opens with "The KOLEEX universe." The hero
+                and the division strip share one section — the page's
+                first visual is the full taxonomy at the highest level. */}
+            <section id="divisions" className="scroll-mt-20">
+              {/* eyebrow */}
               <div className="flex flex-wrap items-center gap-3 mb-5">
                 <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)]">
                   <HubIcon domain="section" k="breakdown" size={16} />
@@ -112,15 +113,17 @@ export default function ProductCodingSystemPage() {
               </div>
 
               <h1 className="text-[34px] sm:text-[44px] md:text-[58px] font-semibold tracking-tight leading-[1.02] text-[var(--text-primary)] max-w-5xl">
-                The code is the DNA of the machine.
+                The KOLEEX universe.
               </h1>
               <p className="mt-4 text-[15px] md:text-[16px] text-[var(--text-faint)] max-w-2xl leading-relaxed">
-                One grammar drives the catalog, the ERP, the BOM, the
-                spare-parts engine, the quotation system, and the AI
-                assistant. This page is the master reference, read top
-                to bottom from division to single-machine breakdown.
+                Nine divisions share one identity grammar. Every product
+                — from a sewing machine to a smart-home sensor — gets
+                its code from the same system. You are reading the
+                Garment Machinery division, the first one to ship full
+                coding coverage.
               </p>
 
+              {/* Status pills */}
               <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                 {SYSTEM_STATUS.map((s, i) => (
                   <SystemStatus
@@ -132,57 +135,17 @@ export default function ProductCodingSystemPage() {
                 ))}
               </div>
 
-              {/* Canonical example chip */}
-              <div
-                className="mt-10 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 sm:p-7 relative overflow-hidden"
-                style={{
-                  background:
-                    "radial-gradient(120% 100% at 10% 0%, var(--bg-surface) 0%, var(--bg-secondary) 60%)",
-                }}
-              >
-                <div className="flex items-center justify-between gap-3 mb-5">
-                  <div className="text-[10.5px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)]">
-                    Canonical example · Lockstitch
-                  </div>
-                  <div className="hidden sm:block text-[10.5px] font-mono text-[var(--text-dim)]">
-                    XSL-Q10-5-E-560-M
-                  </div>
-                </div>
-                <div className="overflow-x-auto -mx-2 px-2">
-                  <div className="flex items-end gap-1.5 min-w-max">
-                    <CodePrefix value="XSL" />
-                    <Dash />
-                    <CodeSegment value="Q10" index={1} />
-                    <CodeSegment value="5" index={2} />
-                    <CodeSegment value="" index={3} empty />
-                    <CodeSegment value="E" index={4} />
-                    <Dash />
-                    <CodeSegment value="560" index={5} />
-                    <Dash />
-                    <CodeSegment value="M" index={6} />
-                    <CodeSegment value="" index={7} empty />
-                    <CodeSegment value="" index={8} empty />
-                  </div>
-                </div>
+              {/* The 9 divisions, right under the headline */}
+              <div className="mt-10">
+                <DivisionStrip divisions={DIVISIONS} currentId="garment-machinery" />
               </div>
-            </header>
-
-            {/* ═══ 1 · DIVISION LAYER ════════════════════════════════ */}
-            <section id="divisions" className="scroll-mt-20">
-              <SectionHeader
-                number="01"
-                eyebrow="Division layer"
-                title="The KOLEEX universe."
-                sub="Six divisions share the same identity grammar. You are reading the Garment Machinery division — the first one to ship full coding coverage."
-              />
-              <DivisionStrip divisions={DIVISIONS} currentId="garment" />
             </section>
 
             {/* ═══ 2 · CATEGORY LAYER ════════════════════════════════ */}
             <section id="categories" className="scroll-mt-20">
               <SectionHeader
                 number="02"
-                eyebrow="Category layer"
+                eyebrow="Categories"
                 title="Eleven categories of garment machinery."
                 sub="Every product code begins with one of these prefixes. Click any tile to jump to its subcategory table below."
                 trailing={
@@ -200,7 +163,7 @@ export default function ProductCodingSystemPage() {
             <section id="subcategories" className="scroll-mt-20">
               <SectionHeader
                 number="03"
-                eyebrow="Subcategory layer"
+                eyebrow="Subcategories"
                 title="The full reference."
                 sub="One card per category, in the canonical order. Codes here flow back into product SKUs through the technical breakdown below."
               />
