@@ -4,6 +4,7 @@ import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import KnowledgeIcon from "@/components/icons/KnowledgeIcon";
 import CommercialPolicyIcon from "@/components/icons/CommercialPolicyIcon";
+import FileCode2Icon from "@/components/icons/ui/FileCode2Icon";
 
 const knowledgeBases = [
   {
@@ -15,6 +16,26 @@ const knowledgeBases = [
     pages: 75,
     sections: ["Pricing", "Commission", "Credit", "Discount", "Approval", "Tools"],
     color: "#007AFF",
+  },
+  {
+    id: "product-coding-system",
+    title: "KOLEEX Product Coding System",
+    description:
+      "Enterprise product coding architecture for KOLEEX garment machinery — category structures, technical configurations, ERP intelligence, and AI-readable product identity systems.",
+    icon: FileCode2Icon,
+    href: "/knowledge/product-coding-system",
+    pages: 1,
+    sections: [
+      "Coding",
+      "ERP",
+      "Products",
+      "Architecture",
+      "AI",
+      "Database",
+      "Models",
+      "Garment Machinery",
+    ],
+    color: "#5E5CE6",
   },
 ];
 
