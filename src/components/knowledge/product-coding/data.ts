@@ -45,35 +45,218 @@ export interface CodingBreakdownDef {
   tables: ConfigTable[];
 }
 
-/* ── Main category taxonomy ────────────────────────────────────────────── */
+/* ── Divisions (top of the KOLEEX universe) ────────────────────────────── */
 
-export const MAIN_CATEGORIES: Array<{ code: string; label: string }> = [
-  { code: "XPR", label: "Fabric Preparation" },
-  { code: "XC", label: "Cutting Equipment" },
-  { code: "XS", label: "Industrial Sewing Machines" },
-  { code: "XA", label: "Automatic Sewing Systems" },
-  { code: "XSE", label: "Leather & Footwear" },
-  { code: "XE", label: "Embroidery" },
-  { code: "XP", label: "Printing & Heat Press" },
-  { code: "XF", label: "Finishing Equipment" },
-  { code: "XPC", label: "Packing & Inspection" },
-  { code: "XD", label: "Domestic Sewing" },
-  { code: "XSP", label: "Spare Parts & Accessories" },
+export interface Division {
+  id: string;
+  prefix: string;
+  name: string;
+  description: string;
+  status: "live" | "planned";
+}
+
+/* ── Category + subcategory model ──────────────────────────────────────── */
+
+export interface Subcategory {
+  code: string;
+  label: string;
+}
+
+export interface Category {
+  code: string;
+  label: string;
+  /** One-line description used on tiles + headers. */
+  blurb: string;
+  /** All subcategories under this category (in canonical order). */
+  subcategories: Subcategory[];
+  /** Url-safe id for scroll anchors. */
+  anchor: string;
+  /** True when this category has a documented technical breakdown in §5. */
+  hasBreakdown?: boolean;
+}
+
+export const CATEGORIES: Category[] = [
+  {
+    code: "XPR",
+    label: "Fabric Preparation",
+    blurb: "Spreading, relaxing, inspecting, and rolling fabric before cutting.",
+    anchor: "cat-xpr",
+    subcategories: [
+      { code: "XPRS", label: "Spreading Machines" },
+      { code: "XPRR", label: "Fabric Relaxing Machines" },
+      { code: "XPRI", label: "Fabric Inspection Machines" },
+      { code: "XPRL", label: "Fabric Rolling Machines" },
+      { code: "XPRT", label: "Fabric Cutting Tables" },
+      { code: "XPRH", label: "Fabric Handling Systems" },
+    ],
+  },
+  {
+    code: "XC",
+    label: "Cutting Equipment",
+    blurb: "Manual, mechanical, and CNC cutting across knife, laser, and drilling.",
+    anchor: "cat-xc",
+    subcategories: [
+      { code: "XCS", label: "Straight Knife Cutting Machines" },
+      { code: "XCR", label: "Round Knife Cutting Machines" },
+      { code: "XCB", label: "Band Knife Cutting Machines" },
+      { code: "XCE", label: "End Cutters" },
+      { code: "XCT", label: "Strip Cutting Machines" },
+      { code: "XCP", label: "Tape Cutting Machines" },
+      { code: "XCC", label: "CNC Cutting Machines" },
+      { code: "XCL", label: "Laser Cutting Machines" },
+      { code: "XCD", label: "Fabric Drilling Machines" },
+    ],
+  },
+  {
+    code: "XS",
+    label: "Industrial Sewing Machines",
+    blurb:
+      "The core of the garment line — lockstitch, overlock, interlock, and specialty stitch.",
+    anchor: "cat-xs",
+    hasBreakdown: true,
+    subcategories: [
+      { code: "XSL", label: "Lockstitch Machines" },
+      { code: "XSO", label: "Overlock Machines" },
+      { code: "XSI", label: "Interlock Machines" },
+      { code: "XSC", label: "Chainstitch Machines" },
+      { code: "XSD", label: "Double Needle Machines" },
+      { code: "XSM", label: "Multi-Needle Machines" },
+      { code: "XPA", label: "Pattern Sewing Machines" },
+      { code: "XSH", label: "Heavy Duty Machines" },
+      { code: "XSS", label: "Special Machines" },
+    ],
+  },
+  {
+    code: "XA",
+    label: "Automatic Sewing Systems",
+    blurb:
+      "Single-purpose automation for pockets, plackets, collars, hems, and buttons.",
+    anchor: "cat-xa",
+    subcategories: [
+      { code: "XAP", label: "Pocket Setter Machines" },
+      { code: "XAW", label: "Pocket Welting Machines" },
+      { code: "XAK", label: "Placket Sewing Units" },
+      { code: "XAS", label: "Side Seam Units" },
+      { code: "XAC", label: "Collar Machines" },
+      { code: "XAV", label: "Sleeve Setting Machines" },
+      { code: "XAH", label: "Hemming Machines" },
+      { code: "XAB", label: "Bartacking Machines" },
+      { code: "XAA", label: "Button Attaching Machines" },
+      { code: "XAO", label: "Buttonhole Machines" },
+    ],
+  },
+  {
+    code: "XSE",
+    label: "Leather & Footwear Machinery",
+    blurb: "Shoe, bag, and leather goods — including edge binding and tape attaching.",
+    anchor: "cat-xse",
+    subcategories: [
+      { code: "XSES", label: "Shoe Sewing Machines" },
+      { code: "XSEB", label: "Bag Sewing Machines" },
+      { code: "XSEL", label: "Leather Sewing Machines" },
+      { code: "XSEE", label: "Edge Binding Machines" },
+      { code: "XSET", label: "Tape Attaching Machines" },
+    ],
+  },
+  {
+    code: "XE",
+    label: "Embroidery Equipment",
+    blurb: "Single-head, multi-head, computerized, sequin, and cording machines.",
+    anchor: "cat-xe",
+    subcategories: [
+      { code: "XES", label: "Single Head Embroidery Machines" },
+      { code: "XEM", label: "Multi Head Embroidery Machines" },
+      { code: "XEC", label: "Computerized Embroidery Machines" },
+      { code: "XEQ", label: "Sequin Embroidery Machines" },
+      { code: "XEB", label: "Cording / Beading Machines" },
+    ],
+  },
+  {
+    code: "XP",
+    label: "Printing & Heat Press Equipment",
+    blurb: "Heat presses, screen, DTG, sublimation, and pneumatic stations.",
+    anchor: "cat-xp",
+    subcategories: [
+      { code: "XPH", label: "Heat Press Machines" },
+      { code: "XPR", label: "Rotary Heat Press Machines" },
+      { code: "XPP", label: "Pneumatic Heat Press Machines" },
+      { code: "XPD", label: "Double Station Heat Press Machines" },
+      { code: "XPS", label: "Screen Printing Machines" },
+      { code: "XPT", label: "Digital Textile Printers (DTG)" },
+      { code: "XPU", label: "Sublimation Printers" },
+    ],
+  },
+  {
+    code: "XF",
+    label: "Finishing Equipment",
+    blurb: "Irons, boilers, finishing forms, fusing presses, and washing lines.",
+    anchor: "cat-xf",
+    subcategories: [
+      { code: "XFI", label: "Steam Irons" },
+      { code: "XFB", label: "Steam Boilers" },
+      { code: "XFT", label: "Ironing Tables" },
+      { code: "XFV", label: "Vacuum Ironing Tables" },
+      { code: "XFF", label: "Form Finishing Machines" },
+      { code: "XFC", label: "Collar & Cuff Press Machines" },
+      { code: "XFS", label: "Thread Sucking Machines" },
+      { code: "XFP", label: "Fusing Press Machines" },
+      { code: "XFW", label: "Washing Machines" },
+    ],
+  },
+  {
+    code: "XPC",
+    label: "Packing & Inspection",
+    blurb:
+      "Quality and packout — needle/metal/X-ray detectors, folders, sealers.",
+    anchor: "cat-xpc",
+    subcategories: [
+      { code: "XPCN", label: "Needle Detectors" },
+      { code: "XPCM", label: "Metal Detectors" },
+      { code: "XPCI", label: "Fabric Inspection Machines (Final)" },
+      { code: "XPCX", label: "X-Ray Inspection Machines" },
+      { code: "XPCF", label: "Folding Machines" },
+      { code: "XPCT", label: "Packing Tables" },
+      { code: "XPCC", label: "Carton Sealing Machines" },
+    ],
+  },
+  {
+    code: "XD",
+    label: "Domestic Sewing Machines",
+    blurb: "Household lockstitch, overlock, embroidery, and portable units.",
+    anchor: "cat-xd",
+    subcategories: [
+      { code: "XDL", label: "Household Lockstitch Machines" },
+      { code: "XDO", label: "Household Overlock Machines" },
+      { code: "XDE", label: "Household Embroidery Machines" },
+      { code: "XDP", label: "Portable Sewing Machines" },
+    ],
+  },
+  {
+    code: "XSP",
+    label: "Spare Parts & Accessories",
+    blurb:
+      "Motors, drives, control panels, attachments, and replaceable machine parts.",
+    anchor: "cat-xsp",
+    subcategories: [
+      { code: "XSPS", label: "Servo Motors" },
+      { code: "XSPD", label: "Direct Drive Motors" },
+      { code: "XSPC", label: "Control Panels" },
+      { code: "XSPT", label: "Touch Screens" },
+      { code: "XSPP", label: "Machine Parts" },
+      { code: "XSPA", label: "Attachments & Folders" },
+    ],
+  },
 ];
 
-/* ── XS family (industrial sewing subcategories) ───────────────────────── */
+/* ── Back-compat exports for the V2 page (will be removed by the rewrite) ── */
+export const MAIN_CATEGORIES: Array<{ code: string; label: string }> =
+  CATEGORIES.map((c) => ({ code: c.code, label: c.label }));
 
-export const SEWING_CATEGORIES: Array<{ code: string; label: string }> = [
-  { code: "XSL", label: "Lockstitch" },
-  { code: "XSO", label: "Overlock" },
-  { code: "XSI", label: "Interlock" },
-  { code: "XSC", label: "Chainstitch" },
-  { code: "XSD", label: "Double-needle" },
-  { code: "XSM", label: "Multi-needle" },
-  { code: "XPA", label: "Pattern sewing" },
-  { code: "XSH", label: "Heavy duty" },
-  { code: "XSS", label: "Special machines" },
-];
+export const SEWING_CATEGORIES: Array<{ code: string; label: string }> =
+  CATEGORIES.find((c) => c.code === "XS")!.subcategories.map((s) => ({
+    code: s.code,
+    label: s.label.replace(/ Machines?$/i, ""),
+  }));
 
 /* ── Lockstitch coding breakdown ───────────────────────────────────────── */
 
@@ -474,13 +657,7 @@ export const AI_CAPABILITIES: Array<{
 
 /* ── Ecosystem map nodes ───────────────────────────────────────────────── */
 
-export const DIVISIONS: Array<{
-  id: string;
-  prefix: string;
-  name: string;
-  description: string;
-  status: "live" | "planned";
-}> = [
+export const DIVISIONS: Division[] = [
   {
     id: "garment",
     prefix: "X•",
