@@ -208,52 +208,13 @@ function MachineMap({
 }: {
   activeRegion: AxisRegion | null;
 }) {
-  /* Lookup order — first one that exists wins:
-       1. /knowledge/lockstitch.png   (bundled with the repo, no upload needed)
-       2. /knowledge/lockstitch.svg   (same — for vector assets)
-       3. Supabase Storage PNG        (for brand-team uploads without code change)
-       4. Supabase Storage SVG
-       5. Placeholder ("awaiting asset" card)
-     Each step on error falls to the next. */
-  const sources: Array<{ id: string; url: string | null }> = [
-    { id: "public-png", url: "/knowledge/lockstitch.png" },
-    { id: "public-svg", url: "/knowledge/lockstitch.svg" },
-    { id: "storage-png", url: taxonomyLogoUrl("machines", "lockstitch", "png") },
-    { id: "storage-svg", url: taxonomyLogoUrl("machines", "lockstitch", "svg") },
-  ].filter((s) => !!s.url);
-
-  const [step, setStep] = useState(0);
-  const current = sources[step];
-  const src = current?.url ?? null;
-
   return (
     <div className="w-full">
-      {src ? (
-        /* eslint-disable-next-line @next/next/no-img-element */
-        <img
-          src={src}
-          alt="KOLEEX Lockstitch — technical line drawing"
-          className="w-full h-auto rounded-lg border border-[var(--border-faint)] bg-[var(--bg-primary)] p-2"
-          /* Invert the line drawing in dark mode so black lines on
-             white become white lines on dark. Light mode renders
-             unmodified. */
-          style={{
-            filter: "invert(0)",
-          }}
-          onError={() => {
-            /* Try the next source in priority order. When we've
-               exhausted all of them, step++ goes past the array
-               length and `current` becomes undefined → src becomes
-               null → placeholder renders. */
-            if (step < sources.length - 1) setStep((s) => s + 1);
-            else setStep(sources.length);
-          }}
-        />
-      ) : (
-        <MachineMapPlaceholder />
-      )}
+      <div className="rounded-lg border border-[var(--border-faint)] bg-[var(--bg-primary)] p-2">
+        <LockstitchLineDrawing activeRegion={activeRegion} />
+      </div>
 
-      {/* Caption strip — shows the active axis label or a hint */}
+      {/* Caption strip */}
       <div className="mt-3 px-3 py-2 rounded-md border border-[var(--border-faint)] bg-[var(--bg-surface-subtle)] text-center">
         {activeRegion ? (
           <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--text-primary)] font-mono">
@@ -266,6 +227,363 @@ function MachineMap({
         )}
       </div>
     </div>
+  );
+}
+
+/* ── Inline line drawing of an industrial lockstitch sewing machine.
+   Modeled on the KOLEEX reference: long bed, head on the left with
+   spool tower and take-up lever, arm extending right with a large
+   digital control panel (LCD + S-button + function grid), handwheel
+   on the right side, four legs, underbed motor + belt.
+
+   All strokes use currentColor so the same component renders cleanly
+   in light and dark themes. Active region gets stroke-width:1.8;
+   idle is 1. Fine details run at 0.5–0.6 for the technical-drawing
+   feel from the reference. */
+
+function LockstitchLineDrawing({
+  activeRegion,
+}: {
+  activeRegion: AxisRegion | null;
+}) {
+  const sw = (region: AxisRegion, active = 1.8, idle = 1) =>
+    activeRegion === region ? active : idle;
+
+  return (
+    <svg
+      viewBox="0 0 640 460"
+      className="w-full h-auto"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ color: "var(--text-primary)" }}
+    >
+      {/* ── BED — long workbench across the bottom ─────────────────── */}
+      <g strokeWidth={sw("bed")}>
+        {/* Top deck */}
+        <path d="M 30 310 L 590 310 L 605 322 L 605 360 L 25 360 L 25 322 Z" />
+        {/* Front lip seam */}
+        <line x1="25" y1="340" x2="605" y2="340" strokeWidth={0.6} />
+        {/* Needle plate cutout — top of the bed near the needle */}
+        <rect x="195" y="305" width="38" height="8" rx="1" strokeWidth={0.7} />
+        {/* Bobbin plate cover */}
+        <ellipse cx="280" cy="320" rx="14" ry="4" strokeWidth={0.7} />
+      </g>
+
+      {/* ── LENGTH ruler — tick marks under the bed (axis 5) ───────── */}
+      <g strokeWidth={sw("length", 1.2, 0.7)}>
+        {[60, 120, 180, 260, 340, 420, 500, 560].map((x) => (
+          <line key={x} x1={x} y1="360" x2={x} y2="370" />
+        ))}
+        <line x1="30" y1="372" x2="590" y2="372" strokeWidth={0.5} />
+      </g>
+
+      {/* ── HEAD — left vertical body with the iconic Z-profile ─────── */}
+      <g strokeWidth={sw("head")}>
+        {/* Main head silhouette */}
+        <path
+          d="
+            M 70 310
+            L 70 110
+            Q 70 75 110 75
+            L 220 75
+            Q 250 75 260 95
+            L 280 130
+            L 290 170
+            L 280 200
+            L 280 260
+            Q 280 290 250 300
+            L 230 308
+            L 220 310
+            Z
+          "
+        />
+        {/* Top deck of the head — small flat where bobbin winder + tensioner sit */}
+        <line x1="110" y1="78" x2="220" y2="78" strokeWidth={0.6} />
+        {/* KOLEEX label box on the front face */}
+        <rect x="100" y="190" width="56" height="28" rx="2" strokeWidth={0.8} />
+        <text
+          x="128"
+          y="208"
+          textAnchor="middle"
+          fontSize="9"
+          fontFamily="ui-sans-serif, system-ui"
+          fontWeight="700"
+          fill="currentColor"
+          stroke="none"
+          style={{ letterSpacing: "0.08em" }}
+        >
+          KOLEEX
+        </text>
+        {/* Inspection oval cut-out on the face */}
+        <ellipse cx="180" cy="260" rx="6" ry="9" strokeWidth={0.5} />
+        {/* Oil sight glass */}
+        <circle cx="155" cy="265" r="2" strokeWidth={0.5} />
+      </g>
+
+      {/* ── TENSIONER + TAKE-UP LEVER on the front of the head ─────── */}
+      <g strokeWidth={sw("head", 1.3, 0.7)}>
+        {/* Tensioner disc */}
+        <circle cx="135" cy="160" r="8" />
+        <circle cx="135" cy="160" r="2.5" fill="currentColor" />
+        {/* Take-up lever — diagonal arm */}
+        <path d="M 145 152 L 175 130 L 192 142 L 162 162 Z" strokeWidth={0.8} />
+        <circle cx="186" cy="138" r="2" fill="currentColor" />
+        {/* Small lever pivot */}
+        <circle cx="145" cy="155" r="1.5" fill="currentColor" />
+      </g>
+
+      {/* ── BOBBIN WINDER on top of the head ───────────────────────── */}
+      <g strokeWidth={sw("head", 1.3, 0.7)}>
+        <rect x="118" y="58" width="20" height="16" rx="1" />
+        <circle cx="128" cy="66" r="3.5" />
+        <circle cx="128" cy="66" r="1" fill="currentColor" />
+      </g>
+
+      {/* ── SPOOL STAND with thread cone on top of the head ────────── */}
+      <g strokeWidth={sw("head", 1.2, 0.6)}>
+        {/* Vertical rod */}
+        <line x1="180" y1="20" x2="180" y2="75" />
+        {/* Top knob */}
+        <circle cx="180" cy="20" r="3" />
+        {/* Thread cone */}
+        <path d="M 170 60 L 180 30 L 190 60 Z" strokeWidth={0.8} />
+        {/* Cone base ring */}
+        <ellipse cx="180" cy="60" rx="11" ry="3" strokeWidth={0.6} />
+        {/* Second spool (smaller, behind) */}
+        <line x1="210" y1="30" x2="210" y2="75" strokeWidth={0.6} />
+        <circle cx="210" cy="30" r="2" strokeWidth={0.5} />
+      </g>
+
+      {/* ── ARM — horizontal body extending right from the head ────── */}
+      <g strokeWidth={sw("head")}>
+        <path
+          d="
+            M 220 145
+            L 540 145
+            Q 560 145 560 162
+            L 560 270
+            Q 560 280 550 282
+            L 295 282
+            Q 285 280 285 270
+            L 285 200
+            L 220 200
+            Z
+          "
+        />
+        {/* Brand stripe along the arm */}
+        <line x1="305" y1="160" x2="540" y2="160" strokeWidth={0.5} />
+      </g>
+
+      {/* ── DIGITAL CONTROL PANEL on the front of the arm (special) ── */}
+      <g strokeWidth={sw("special")}>
+        {/* Panel bezel */}
+        <rect x="370" y="160" width="180" height="120" rx="4" />
+        {/* LCD display */}
+        <rect x="382" y="170" width="156" height="46" rx="2" strokeWidth={0.8} />
+        <text
+          x="416"
+          y="196"
+          fontSize="13"
+          fontFamily="ui-monospace, SFMono-Regular, monospace"
+          fontWeight="700"
+          fill="currentColor"
+          stroke="none"
+          style={{ letterSpacing: "0.05em" }}
+        >
+          3333
+        </text>
+        {/* Boxed sub-value */}
+        <rect x="486" y="184" width="40" height="20" rx="1" strokeWidth={0.5} />
+        <text
+          x="506"
+          y="200"
+          textAnchor="middle"
+          fontSize="11"
+          fontFamily="ui-monospace, SFMono-Regular, monospace"
+          fontWeight="700"
+          fill="currentColor"
+          stroke="none"
+        >
+          3.5
+        </text>
+        <text
+          x="390"
+          y="212"
+          fontSize="6.5"
+          fontFamily="ui-monospace, SFMono-Regular, monospace"
+          fill="currentColor"
+          stroke="none"
+        >
+          A1
+        </text>
+
+        {/* S button + arrows cluster */}
+        <circle cx="460" cy="240" r="11" strokeWidth={0.8} />
+        <text
+          x="460"
+          y="244"
+          textAnchor="middle"
+          fontSize="11"
+          fontFamily="ui-sans-serif, system-ui"
+          fontWeight="700"
+          fill="currentColor"
+          stroke="none"
+        >
+          S
+        </text>
+        {/* + above */}
+        <line x1="460" y1="222" x2="460" y2="226" strokeWidth={0.6} />
+        <line x1="458" y1="224" x2="462" y2="224" strokeWidth={0.6} />
+        {/* − below */}
+        <line x1="458" y1="256" x2="462" y2="256" strokeWidth={0.6} />
+        {/* ← left */}
+        <path d="M 442 240 L 446 237 M 442 240 L 446 243" strokeWidth={0.6} />
+        {/* → right */}
+        <path d="M 478 240 L 474 237 M 478 240 L 474 243" strokeWidth={0.6} />
+
+        {/* Side circular buttons */}
+        <circle cx="420" cy="240" r="6" strokeWidth={0.7} />
+        <circle cx="500" cy="240" r="6" strokeWidth={0.7} />
+        <text
+          x="420"
+          y="243"
+          textAnchor="middle"
+          fontSize="6"
+          fontFamily="ui-sans-serif, system-ui"
+          fontWeight="700"
+          fill="currentColor"
+          stroke="none"
+        >
+          W
+        </text>
+        <text
+          x="500"
+          y="243"
+          textAnchor="middle"
+          fontSize="6"
+          fontFamily="ui-sans-serif, system-ui"
+          fontWeight="700"
+          fill="currentColor"
+          stroke="none"
+        >
+          P
+        </text>
+
+        {/* Function key grid below (4 × 2) */}
+        {[
+          [0, 0],
+          [1, 0],
+          [2, 0],
+          [3, 0],
+          [0, 1],
+          [1, 1],
+          [2, 1],
+          [3, 1],
+        ].map(([cx, ry], i) => (
+          <rect
+            key={i}
+            x={386 + cx * 39}
+            y={258 + ry * 12}
+            width="36"
+            height="10"
+            rx="1.5"
+            strokeWidth={0.5}
+          />
+        ))}
+      </g>
+
+      {/* ── NEEDLE BAR + presser foot ──────────────────────────────── */}
+      <g strokeWidth={sw("head")}>
+        <line x1="215" y1="282" x2="215" y2="310" />
+        {/* Presser foot */}
+        <path d="M 208 310 L 222 310 L 218 318 L 212 318 Z" strokeWidth={0.7} />
+      </g>
+
+      {/* ── FABRIC sliver under the presser foot ───────────────────── */}
+      <g
+        strokeWidth={sw("fabric", 1.4, 0.7)}
+        fill={activeRegion === "fabric" ? "currentColor" : "none"}
+        opacity={activeRegion === "fabric" ? 0.2 : 1}
+      >
+        <path d="M 165 312 L 240 312 L 235 318 L 170 318 Z" />
+      </g>
+
+      {/* ── HOOK / bobbin area below the needle ─────────────────────── */}
+      <g strokeWidth={sw("hook")}>
+        <circle cx="215" cy="338" r="8" />
+        <circle cx="215" cy="338" r="3" />
+        <line x1="215" y1="318" x2="215" y2="330" strokeWidth={0.6} />
+      </g>
+
+      {/* ── HANDWHEEL on the right side of the arm ─────────────────── */}
+      <g strokeWidth={sw("head", 1.4, 0.9)}>
+        <circle cx="585" cy="215" r="22" />
+        <circle cx="585" cy="215" r="6" fill="currentColor" />
+        {/* Spokes */}
+        {[0, 45, 90, 135].map((deg) => {
+          const a = (deg * Math.PI) / 180;
+          const x1 = 585 + Math.cos(a) * 8;
+          const y1 = 215 + Math.sin(a) * 8;
+          const x2 = 585 + Math.cos(a) * 20;
+          const y2 = 215 + Math.sin(a) * 20;
+          return (
+            <line
+              key={deg}
+              x1={x1}
+              y1={y1}
+              x2={x2}
+              y2={y2}
+              strokeWidth={0.5}
+            />
+          );
+        })}
+      </g>
+
+      {/* ── LEGS — four verticals from bed to floor ────────────────── */}
+      <g strokeWidth={sw("bed", 1.2, 0.8)}>
+        <line x1="60" y1="360" x2="60" y2="440" />
+        <line x1="240" y1="360" x2="240" y2="440" />
+        <line x1="430" y1="360" x2="430" y2="440" />
+        <line x1="580" y1="360" x2="580" y2="440" />
+        {/* Foot caps */}
+        {[60, 240, 430, 580].map((x) => (
+          <line key={x} x1={x - 4} y1="440" x2={x + 4} y2="440" strokeWidth={1} />
+        ))}
+      </g>
+
+      {/* ── MOTOR + belt linkage under the bed ─────────────────────── */}
+      <g strokeWidth={sw("motor")}>
+        {/* Motor housing */}
+        <rect x="290" y="370" width="120" height="48" rx="3" />
+        {/* Pulley on the bed underside */}
+        <circle cx="280" cy="370" r="8" strokeWidth={0.8} />
+        {/* Motor pulley */}
+        <circle cx="350" cy="394" r="6" strokeWidth={0.8} />
+        {/* Belt */}
+        <path d="M 280 378 Q 310 396 350 388" strokeWidth={0.7} />
+        <path d="M 280 362 Q 320 376 350 400" strokeWidth={0.7} />
+        {/* Power cable */}
+        <path d="M 410 410 Q 440 420 460 432" strokeWidth={0.8} />
+        {/* Fan vents */}
+        <line x1="298" y1="380" x2="314" y2="380" strokeWidth={0.5} />
+        <line x1="298" y1="390" x2="314" y2="390" strokeWidth={0.5} />
+        <line x1="298" y1="400" x2="314" y2="400" strokeWidth={0.5} />
+      </g>
+
+      {/* ── ACCESSORY rail on the right edge of the bed ─────────────── */}
+      <g strokeWidth={sw("special", 1.2, 0.6)}>
+        <line
+          x1="490"
+          y1="306"
+          x2="595"
+          y2="306"
+          strokeDasharray={activeRegion === "special" ? "0" : "3 2"}
+        />
+        <rect x="510" y="297" width="32" height="9" rx="1.5" strokeWidth={0.7} />
+      </g>
+    </svg>
   );
 }
 
