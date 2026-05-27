@@ -208,10 +208,47 @@ function MachineMap({
 }: {
   activeRegion: AxisRegion | null;
 }) {
+  /* Source priority — first that loads wins:
+       1. /knowledge/lockstitch.svg   ← KOLEEX vector trace (canonical)
+       2. /knowledge/lockstitch.png
+       3. Supabase Storage SVG / PNG
+       4. Inline schematic fallback (hand-coded SVG)
+  */
+  const sources: Array<{ id: string; url: string | null }> = [
+    { id: "public-svg", url: "/knowledge/lockstitch.svg" },
+    { id: "public-png", url: "/knowledge/lockstitch.png" },
+    { id: "storage-svg", url: taxonomyLogoUrl("machines", "lockstitch", "svg") },
+    { id: "storage-png", url: taxonomyLogoUrl("machines", "lockstitch", "png") },
+  ].filter((s) => !!s.url);
+
+  const [step, setStep] = useState(0);
+  const current = sources[step];
+  const src = current?.url ?? null;
+  const exhausted = step >= sources.length;
+
   return (
     <div className="w-full">
-      <div className="rounded-lg border border-[var(--border-faint)] bg-[var(--bg-primary)] p-2">
-        <LockstitchLineDrawing activeRegion={activeRegion} />
+      <div className="rounded-lg border border-[var(--border-faint)] bg-[var(--bg-primary)] p-2 overflow-hidden">
+        {exhausted ? (
+          /* All remote sources failed — drop in the hand-coded schematic
+             so the section never goes blank. */
+          <LockstitchLineDrawing activeRegion={activeRegion} />
+        ) : src ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={src}
+            alt="KOLEEX Lockstitch — technical line drawing"
+            className="w-full h-auto"
+            /* The vector trace is black-on-white. In dark mode invert so
+               the strokes read on a dark background; light mode passes
+               through unchanged. */
+            style={{
+              filter: "var(--lockstitch-filter, none)",
+              mixBlendMode: "normal",
+            }}
+            onError={() => setStep((s) => s + 1)}
+          />
+        ) : null}
       </div>
 
       {/* Caption strip */}
@@ -222,7 +259,7 @@ function MachineMap({
           </div>
         ) : (
           <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-faint)]">
-            Hover an axis to highlight what it controls
+            Hover an axis on the left — caption updates below
           </div>
         )}
       </div>
