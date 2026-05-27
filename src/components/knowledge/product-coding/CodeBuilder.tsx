@@ -208,14 +208,23 @@ function MachineMap({
 }: {
   activeRegion: AxisRegion | null;
 }) {
-  const pngUrl = taxonomyLogoUrl("machines", "lockstitch", "png");
-  const svgUrl = taxonomyLogoUrl("machines", "lockstitch", "svg");
-  const [loadState, setLoadState] = useState<"png" | "svg" | "failed">(
-    pngUrl ? "png" : svgUrl ? "svg" : "failed",
-  );
+  /* Lookup order — first one that exists wins:
+       1. /knowledge/lockstitch.png   (bundled with the repo, no upload needed)
+       2. /knowledge/lockstitch.svg   (same — for vector assets)
+       3. Supabase Storage PNG        (for brand-team uploads without code change)
+       4. Supabase Storage SVG
+       5. Placeholder ("awaiting asset" card)
+     Each step on error falls to the next. */
+  const sources: Array<{ id: string; url: string | null }> = [
+    { id: "public-png", url: "/knowledge/lockstitch.png" },
+    { id: "public-svg", url: "/knowledge/lockstitch.svg" },
+    { id: "storage-png", url: taxonomyLogoUrl("machines", "lockstitch", "png") },
+    { id: "storage-svg", url: taxonomyLogoUrl("machines", "lockstitch", "svg") },
+  ].filter((s) => !!s.url);
 
-  const src =
-    loadState === "png" ? pngUrl : loadState === "svg" ? svgUrl : null;
+  const [step, setStep] = useState(0);
+  const current = sources[step];
+  const src = current?.url ?? null;
 
   return (
     <div className="w-full">
@@ -232,8 +241,12 @@ function MachineMap({
             filter: "invert(0)",
           }}
           onError={() => {
-            if (loadState === "png" && svgUrl) setLoadState("svg");
-            else setLoadState("failed");
+            /* Try the next source in priority order. When we've
+               exhausted all of them, step++ goes past the array
+               length and `current` becomes undefined → src becomes
+               null → placeholder renders. */
+            if (step < sources.length - 1) setStep((s) => s + 1);
+            else setStep(sources.length);
           }}
         />
       ) : (
@@ -266,8 +279,8 @@ type AxisRegion =
   | "hook"
   | "special";
 
-/* Fallback shown when the storage image isn't uploaded yet. Cleaner
-   than a broken-image placeholder. */
+/* Fallback when no machine image is available at any of the
+   configured paths. Names both options so the operator can pick. */
 function MachineMapPlaceholder() {
   return (
     <div className="w-full aspect-[4/3] rounded-lg border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] flex flex-col items-center justify-center text-center px-6 py-8 gap-3">
@@ -275,11 +288,15 @@ function MachineMapPlaceholder() {
         Machine map · awaiting asset
       </div>
       <p className="text-[12.5px] text-[var(--text-muted)] max-w-sm leading-relaxed">
-        Upload the KOLEEX Lockstitch line drawing to Supabase Storage at
+        Drop the KOLEEX Lockstitch line drawing at{" "}
         <span className="font-mono text-[var(--text-primary)]">
-          {" "}media/machines/lockstitch.png
+          public/knowledge/lockstitch.png
         </span>{" "}
-        and the map appears automatically.
+        in the repo (or upload to Supabase Storage at{" "}
+        <span className="font-mono text-[var(--text-primary)]">
+          media/machines/lockstitch.png
+        </span>
+        ) and the map appears automatically.
       </p>
     </div>
   );
