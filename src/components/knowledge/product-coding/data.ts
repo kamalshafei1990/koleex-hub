@@ -655,50 +655,73 @@ export const AI_CAPABILITIES: Array<{
   },
 ];
 
-/* ── Ecosystem map nodes ───────────────────────────────────────────────── */
+/* ── KOLEEX divisions ──────────────────────────────────────────────────
+   Source of truth: the `divisions` table in Supabase. Order + slug
+   match what /products and /product-data render. Each id maps to a
+   canonical SVG in src/components/icons/divisions/. */
 
 export const DIVISIONS: Division[] = [
   {
-    id: "garment",
-    prefix: "X•",
+    id: "garment-machinery",
+    prefix: "X",
     name: "Garment Machinery",
-    description: "11 categories, 9 sewing subcategories, full coding live.",
+    description: "Sewing, cutting, finishing, embroidery — full apparel pipeline.",
     status: "live",
   },
   {
-    id: "smart-devices",
-    prefix: "S•",
-    name: "Smart Devices",
-    description: "Wearables, sensors, IoT controllers — same identity grammar.",
+    id: "digital-devices",
+    prefix: "D",
+    name: "Digital Devices",
+    description: "Compute, displays, peripherals, IoT controllers.",
     status: "planned",
   },
   {
-    id: "smart-home",
-    prefix: "H•",
-    name: "Smart Home",
-    description: "Lighting, climate, surveillance product lines.",
+    id: "smart-living",
+    prefix: "S",
+    name: "Smart Living",
+    description: "Lighting, climate, kitchen, surveillance product lines.",
     status: "planned",
   },
   {
-    id: "automation",
-    prefix: "A•",
-    name: "Industrial Automation",
-    description: "Conveyors, robotic arms, vision systems.",
+    id: "lifestyle",
+    prefix: "L",
+    name: "Lifestyle",
+    description: "Personal care, wellness, leisure consumer goods.",
     status: "planned",
   },
   {
-    id: "vehicles",
-    prefix: "V•",
-    name: "Vehicles",
-    description: "EV scooter / e-bike SKUs with battery + motor axes.",
+    id: "mobility",
+    prefix: "M",
+    name: "Mobility",
+    description: "EV scooter, e-bike, drive systems — battery + motor axes.",
     status: "planned",
   },
   {
-    id: "technology",
-    prefix: "T•",
-    name: "Technology Products",
-    description:
-      "Compute, displays, peripherals — cross-division compatibility.",
+    id: "industrial-solutions",
+    prefix: "I",
+    name: "Industrial Solutions",
+    description: "Automation, conveyors, robotic arms, vision systems.",
+    status: "planned",
+  },
+  {
+    id: "fabrics",
+    prefix: "F",
+    name: "Fabrics",
+    description: "Textiles, non-wovens, technical fabrics, finishing chemistry.",
+    status: "planned",
+  },
+  {
+    id: "energy",
+    prefix: "E",
+    name: "Energy",
+    description: "Power systems, storage, solar, industrial energy management.",
+    status: "planned",
+  },
+  {
+    id: "medical",
+    prefix: "Md",
+    name: "Medical",
+    description: "Medical devices, diagnostics, healthcare equipment.",
     status: "planned",
   },
 ];
