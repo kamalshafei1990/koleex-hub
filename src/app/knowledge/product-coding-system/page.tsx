@@ -1,22 +1,25 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   /knowledge/product-coding-system  ·  v3
+   /knowledge/product-coding-system  ·  v10
 
-   Reorganized around the actual product hierarchy:
+   Five-section layout, expanded categories swallow the subcategory wall:
 
-     1. Hero                — the page mission
-     2. Division layer      — KOLEEX universe (you-are-here on Garment)
-     3. Category layer      — 11 garment-machinery categories (links down)
-     4. Subcategory tables  — full reference, one card per category
-     5. Technical breakdown — XSL / XSO / XSI as tabs (one at a time)
-     6. Live SKU builder    — marquee interaction
-     7. Intelligence layer  — ERP pipeline + AI parse flow merged
-     8. Footer signature
+     1. Hero + Division layer      — the universe (you-are-here on Garment)
+     2. Category layer (expandable) — 11 tiles, inline subs on click
+     3. Technical breakdown        — XSL / XSO / XSI as tabs
+     4. Live SKU builder           — marquee interaction
+     5. Intelligence layer         — pipeline + AI + capabilities, compressed
 
-   Sections 2→3→4→5 read top-down through the taxonomy. The interactive
-   pieces (5–7) stay below the reference material because they require
-   the reference to make sense.
+   v10 changes vs v6:
+     · Hero headline larger (80px on lg) — dominant first impression.
+     · Subcategories no longer have a dedicated section. Each category
+       tile in §2 is an expandable button revealing its sub-table inline.
+     · Strong horizontal dividers between sections so they read as
+       distinct chapters.
+     · Intelligence layer compressed into a single 3-column strip on
+       desktop (pipeline | unlocks | AI parse), with capability cards
+       in a tighter row underneath.
    --------------------------------------------------------------------------- */
 
 import Link from "next/link";
@@ -28,7 +31,6 @@ import {
 import {
   DivisionStrip,
   CategoryGrid,
-  SubcategoryTable,
 } from "@/components/knowledge/product-coding/HierarchyBlocks";
 import BreakdownTabs from "@/components/knowledge/product-coding/BreakdownTabs";
 import CodeBuilder from "@/components/knowledge/product-coding/CodeBuilder";
@@ -45,16 +47,22 @@ import {
   AI_CAPABILITIES,
 } from "@/components/knowledge/product-coding/data";
 
-/* TOC entries kept in sync with the section anchors below.
-   v6: hero IS the division layer — they share section #1. */
 const TOC = [
   { id: "divisions", label: "1. The KOLEEX universe" },
   { id: "categories", label: "2. Categories" },
-  { id: "subcategories", label: "3. Subcategories" },
-  { id: "technical-breakdown", label: "4. Technical breakdown" },
-  { id: "builder", label: "5. SKU builder" },
-  { id: "intelligence", label: "6. Intelligence layer" },
+  { id: "technical-breakdown", label: "3. Technical breakdown" },
+  { id: "builder", label: "4. SKU builder" },
+  { id: "intelligence", label: "5. Intelligence layer" },
 ];
+
+/* Thin reusable divider between top-level sections. */
+function SectionDivider() {
+  return (
+    <div className="relative py-2" aria-hidden>
+      <div className="h-px w-full bg-[var(--border-faint)]" />
+    </div>
+  );
+}
 
 export default function ProductCodingSystemPage() {
   return (
@@ -95,15 +103,12 @@ export default function ProductCodingSystemPage() {
 
       <div className="relative max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-8 md:py-12">
         <div className="lg:grid lg:grid-cols-[1fr_220px] lg:gap-10">
-          <div className="space-y-16 md:space-y-20 min-w-0">
+          <div className="space-y-14 md:space-y-20 min-w-0">
 
-            {/* ═══ 1 · HERO + DIVISION LAYER (the universe) ═══════════
-                v6: page opens with "The KOLEEX universe." The hero
-                and the division strip share one section — the page's
-                first visual is the full taxonomy at the highest level. */}
+            {/* ═══ 1 · HERO + DIVISION LAYER ═══════════════════════════ */}
             <section id="divisions" className="scroll-mt-20">
               {/* eyebrow */}
-              <div className="flex flex-wrap items-center gap-3 mb-5">
+              <div className="flex flex-wrap items-center gap-3 mb-6">
                 <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)]">
                   <HubIcon domain="section" k="breakdown" size={16} />
                 </div>
@@ -112,10 +117,10 @@ export default function ProductCodingSystemPage() {
                 </div>
               </div>
 
-              <h1 className="text-[34px] sm:text-[44px] md:text-[58px] font-semibold tracking-tight leading-[1.02] text-[var(--text-primary)] max-w-5xl">
+              <h1 className="text-[40px] sm:text-[56px] md:text-[72px] lg:text-[80px] font-semibold tracking-[-0.02em] leading-[0.98] text-[var(--text-primary)] max-w-5xl">
                 The KOLEEX universe.
               </h1>
-              <p className="mt-4 text-[15px] md:text-[16px] text-[var(--text-faint)] max-w-2xl leading-relaxed">
+              <p className="mt-6 text-[15px] md:text-[17px] text-[var(--text-faint)] max-w-2xl leading-relaxed">
                 Nine divisions share one identity grammar. Every product
                 — from a sewing machine to a smart-home sensor — gets
                 its code from the same system. You are reading the
@@ -124,7 +129,7 @@ export default function ProductCodingSystemPage() {
               </p>
 
               {/* Status pills */}
-              <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+              <div className="mt-10 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                 {SYSTEM_STATUS.map((s, i) => (
                   <SystemStatus
                     key={s.label}
@@ -141,13 +146,15 @@ export default function ProductCodingSystemPage() {
               </div>
             </section>
 
-            {/* ═══ 2 · CATEGORY LAYER ════════════════════════════════ */}
+            <SectionDivider />
+
+            {/* ═══ 2 · CATEGORY LAYER (expandable) ═════════════════════ */}
             <section id="categories" className="scroll-mt-20">
               <SectionHeader
                 number="02"
                 eyebrow="Categories"
                 title="Eleven categories of garment machinery."
-                sub="Every product code begins with one of these prefixes. Click any tile to jump to its subcategory table below."
+                sub="Each category begins with one of these prefixes. Click any tile to expand its subcategory table inline — the full reference lives inside the browse, not in a separate wall of cards."
                 trailing={
                   <span className="text-[10.5px] font-mono text-[var(--text-faint)]">
                     11 categories ·{" "}
@@ -159,29 +166,12 @@ export default function ProductCodingSystemPage() {
               <CategoryGrid categories={CATEGORIES} />
             </section>
 
-            {/* ═══ 3 · SUBCATEGORY TABLES ════════════════════════════ */}
-            <section id="subcategories" className="scroll-mt-20">
-              <SectionHeader
-                number="03"
-                eyebrow="Subcategories"
-                title="The full reference."
-                sub="One card per category, in the canonical order. Codes here flow back into product SKUs through the technical breakdown below."
-              />
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {CATEGORIES.map((c) => (
-                  <SubcategoryTable
-                    key={c.code}
-                    category={c}
-                    showBreakdownLink={c.hasBreakdown}
-                  />
-                ))}
-              </div>
-            </section>
+            <SectionDivider />
 
-            {/* ═══ 4 · TECHNICAL BREAKDOWN (tabs) ════════════════════ */}
+            {/* ═══ 3 · TECHNICAL BREAKDOWN ═════════════════════════════ */}
             <section id="technical-breakdown" className="scroll-mt-20">
               <SectionHeader
-                number="04"
+                number="03"
                 eyebrow="Technical breakdown"
                 title="Decoding the technical identity."
                 sub="Switch between XSL, XSO, and XSI. Hover or click any numbered segment in the diagram — the matching configuration table lights up and the others soft-fade."
@@ -189,10 +179,12 @@ export default function ProductCodingSystemPage() {
               <BreakdownTabs defs={[LOCKSTITCH, OVERLOCK, INTERLOCK]} />
             </section>
 
-            {/* ═══ 5 · LIVE BUILDER ══════════════════════════════════ */}
+            <SectionDivider />
+
+            {/* ═══ 4 · LIVE BUILDER ════════════════════════════════════ */}
             <section id="builder" className="scroll-mt-20">
               <SectionHeader
-                number="05"
+                number="04"
                 eyebrow="Live SKU builder"
                 title="Compose a technical SKU."
                 sub="Pick a value on each axis. The code assembles in real time and the silhouette highlights the part of the machine each axis controls."
@@ -200,18 +192,24 @@ export default function ProductCodingSystemPage() {
               <CodeBuilder />
             </section>
 
-            {/* ═══ 6 · INTELLIGENCE LAYER ════════════════════════════ */}
+            <SectionDivider />
+
+            {/* ═══ 5 · INTELLIGENCE LAYER ══════════════════════════════ */}
             <section id="intelligence" className="scroll-mt-20">
               <SectionHeader
-                number="06"
+                number="05"
                 eyebrow="Intelligence layer"
                 title="What the code unlocks."
-                sub="Every segment feeds a different system: ERP routing, BOM resolution, AI reasoning, quotation engine. The code is parsed once and reused by every consumer."
+                sub="Every segment feeds a different system: ERP routing, BOM resolution, AI reasoning, quotation engine. Parsed once, reused by every consumer."
               />
-              <div className="space-y-5">
-                {/* ERP pipeline + segment unlocks */}
-                <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 sm:p-7">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6 items-start">
+
+              {/* Top strip: pipeline + segment unlocks side by side */}
+              <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 sm:p-7">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 items-start">
+                  <div>
+                    <div className="text-[10.5px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)] mb-5">
+                      ERP pipeline
+                    </div>
                     <ol className="relative space-y-0">
                       {PIPELINE.map((p, i) => (
                         <li key={p.label} className="relative pl-10">
@@ -235,66 +233,68 @@ export default function ProductCodingSystemPage() {
                         </li>
                       ))}
                     </ol>
+                  </div>
 
-                    <div className="rounded-xl border border-[var(--border-faint)] bg-[var(--bg-surface-subtle)] p-5">
-                      <div className="text-[10.5px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)]">
-                        What each segment unlocks
-                      </div>
-                      <ul className="mt-3 space-y-2.5">
-                        {[
-                          { k: "Model code", v: "Catalog lineage · price-list anchor" },
-                          { k: "Function", v: "Capability filter · brochure features" },
-                          { k: "Motor / table", v: "Inventory variants · packing weight" },
-                          { k: "Operation length", v: "Workbench compatibility" },
-                          { k: "Fabric", v: "Recommendation engine input" },
-                          { k: "Hook / stitch", v: "Spare-parts BOM resolution" },
-                          { k: "Special config", v: "Quotation surcharges + add-ons" },
-                        ].map((row) => (
-                          <li
-                            key={row.k}
-                            className="grid grid-cols-[120px_1fr] gap-3 text-[12px]"
-                          >
-                            <span className="text-[var(--text-muted)]">
-                              {row.k}
-                            </span>
-                            <span className="text-[var(--text-primary)] font-medium">
-                              {row.v}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
+                  <div className="rounded-xl border border-[var(--border-faint)] bg-[var(--bg-surface-subtle)] p-5">
+                    <div className="text-[10.5px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)]">
+                      What each segment unlocks
                     </div>
+                    <ul className="mt-3 space-y-2.5">
+                      {[
+                        { k: "Model code", v: "Catalog lineage · price-list anchor" },
+                        { k: "Function", v: "Capability filter · brochure features" },
+                        { k: "Motor / table", v: "Inventory variants · packing weight" },
+                        { k: "Operation length", v: "Workbench compatibility" },
+                        { k: "Fabric", v: "Recommendation engine input" },
+                        { k: "Hook / stitch", v: "Spare-parts BOM resolution" },
+                        { k: "Special config", v: "Quotation surcharges + add-ons" },
+                      ].map((row) => (
+                        <li
+                          key={row.k}
+                          className="grid grid-cols-[120px_1fr] gap-3 text-[12px]"
+                        >
+                          <span className="text-[var(--text-muted)]">
+                            {row.k}
+                          </span>
+                          <span className="text-[var(--text-primary)] font-medium">
+                            {row.v}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 </div>
+              </div>
 
-                {/* AI parse flow */}
+              {/* AI parse flow */}
+              <div className="mt-5">
                 <AIParseFlow />
+              </div>
 
-                {/* AI capability cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {AI_CAPABILITIES.map((c) => (
-                    <div
-                      key={c.title}
-                      className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4"
-                    >
-                      <div className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[12px] font-bold text-[var(--text-primary)]">
-                        {c.glyph}
-                      </div>
-                      <div className="mt-3 text-[13.5px] font-semibold text-[var(--text-primary)]">
-                        {c.title}
-                      </div>
-                      <div className="mt-1 text-[11.5px] text-[var(--text-faint)] leading-snug">
-                        {c.detail}
-                      </div>
+              {/* AI capability cards — tighter row */}
+              <div className="mt-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                {AI_CAPABILITIES.map((c) => (
+                  <div
+                    key={c.title}
+                    className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4"
+                  >
+                    <div className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[12px] font-bold text-[var(--text-primary)]">
+                      {c.glyph}
                     </div>
-                  ))}
-                </div>
+                    <div className="mt-3 text-[13px] font-semibold text-[var(--text-primary)]">
+                      {c.title}
+                    </div>
+                    <div className="mt-1 text-[11px] text-[var(--text-faint)] leading-snug">
+                      {c.detail}
+                    </div>
+                  </div>
+                ))}
               </div>
             </section>
 
-            {/* ═══ Footer signature ════════════════════════════════ */}
-            <div className="text-center text-[10.5px] font-medium tracking-[0.18em] uppercase text-[var(--text-faint)]">
-              KOLEEX Enterprise Product Intelligence Architecture · v3
+            {/* ═══ Footer signature ════════════════════════════════════ */}
+            <div className="text-center text-[10.5px] font-medium tracking-[0.18em] uppercase text-[var(--text-faint)] pt-6 border-t border-[var(--border-faint)]">
+              KOLEEX Enterprise Product Intelligence Architecture · v10
             </div>
           </div>
 
