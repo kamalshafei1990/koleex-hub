@@ -220,10 +220,37 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
      specifically per-list so the user can see the actual HTTP status
      or "timed out" instead of an opaque "couldn't load". Partial
      success is also handled — if users loaded but roles failed, the
-     User tab still works. */
+     User tab still works.
+
+     Self-heal step: when both calls fail with auth-shaped errors
+     (401/403), the most likely cause is a stale view-as cookie that
+     didn't get cleared on a previous exit (Next.js cookies().delete()
+     occasionally fails to round-trip a Set-Cookie). The bootstrap
+     in-memory cache has SA=true (which is why the picker is even
+     showing), but the server sees the lingering cookie and answers
+     under role-mode. We re-fetch the bootstrap with `no-store` —
+     either it confirms the SA state and the lists work on retry, or
+     it picks up the cookie and the picker auto-hides. */
   const ensureLoaded = useCallback(async () => {
     setLoadError(null);
-    const [u, r] = await Promise.all([fetchUsers(), fetchRoles()]);
+    let [u, r] = await Promise.all([fetchUsers(), fetchRoles()]);
+
+    const bothAuthShaped =
+      !u.ok &&
+      !r.ok &&
+      (u.status === 401 || u.status === 403) &&
+      (r.status === 401 || r.status === 403);
+    if (bothAuthShaped) {
+      /* Bust the bootstrap, then retry once. */
+      invalidateViewAsLists();
+      try {
+        await retryMeBootstrap();
+      } catch {
+        /* ignore — fall through to whichever error message we have */
+      }
+      [u, r] = await Promise.all([fetchUsers(), fetchRoles()]);
+    }
+
     if (u.ok) setAccounts(u.data);
     if (r.ok) setRoles(r.data);
     if (!u.ok && !r.ok) {

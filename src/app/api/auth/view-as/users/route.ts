@@ -50,5 +50,8 @@ export async function GET() {
     };
   });
 
-  return NextResponse.json({ accounts });
+  return NextResponse.json(
+    { accounts },
+    { headers: { "Cache-Control": "private, no-store" } },
+  );
 }

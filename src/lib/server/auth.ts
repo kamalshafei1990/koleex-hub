@@ -119,7 +119,20 @@ export async function getServerAuth(): Promise<ServerAuthContext | null> {
   ]);
 
   const { data, error } = accountRes;
-  if (error || !data) return null;
+  if (error) {
+    /* Transient DB errors were previously swallowed and reported to
+       the client as "Not signed in", which led the picker to a dead
+       end (the user is signed in — the lookup just failed). Log them
+       loudly so the cause is visible in Vercel logs / dev console. */
+    console.error(
+      "[auth.getServerAuth] accounts lookup failed:",
+      error.message,
+      "accountId=",
+      accountIdToLoad,
+    );
+    return null;
+  }
+  if (!data) return null;
   if (data.status !== "active") return null;
 
   /* If view-as was requested, validate the real session is a SA. If

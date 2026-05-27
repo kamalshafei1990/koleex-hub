@@ -59,6 +59,30 @@ const VIEW_AS_COOKIE_NAME = "koleex_view_as";
 const VIEW_AS_ROLE_COOKIE_NAME = "koleex_view_as_role";
 const VIEW_AS_MAX_AGE = 60 * 60 * 2; // 2 hours
 
+/** Robust cookie clear. `cookies().delete(name)` in Next.js route
+ *  handlers occasionally fails to round-trip a working Set-Cookie
+ *  header — observed in production where the role cookie survived an
+ *  exit, leaving the auth layer half-stuck (the bootstrap showed SA
+ *  while concurrent API routes saw role-mode `is_super_admin=false`).
+ *
+ *  Setting the cookie to an empty value with maxAge=0 + expires in
+ *  the past + explicit path/sameSite forces the browser to drop it
+ *  every time. */
+function clearCookieFromStore(
+  store: Awaited<ReturnType<typeof cookies>>,
+  name: string,
+): void {
+  store.delete(name);
+  store.set(name, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+    expires: new Date(0),
+  });
+}
+
 function signViewAs(targetAccountId: string, actorAccountId: string): string {
   /* Bind the signature to BOTH the target and the actor so the cookie is
      only valid for the SA who issued it. Stealing the cookie and pasting
@@ -92,7 +116,7 @@ export async function setViewAsCookie(
   const store = await cookies();
   /* Setting account-mode clears any existing role-mode cookie so the
      two modes can never both be active. */
-  store.delete(VIEW_AS_ROLE_COOKIE_NAME);
+  clearCookieFromStore(store, VIEW_AS_ROLE_COOKIE_NAME);
   store.set(VIEW_AS_COOKIE_NAME, value, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -116,7 +140,7 @@ export async function setViewAsRoleCookie(
   const store = await cookies();
   /* Setting role-mode clears any existing account-mode cookie so the
      two modes can never both be active. */
-  store.delete(VIEW_AS_COOKIE_NAME);
+  clearCookieFromStore(store, VIEW_AS_COOKIE_NAME);
   store.set(VIEW_AS_ROLE_COOKIE_NAME, value, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -129,8 +153,8 @@ export async function setViewAsRoleCookie(
 /** Clear both view-as cookies. Called from POST /api/auth/view-as/exit. */
 export async function clearViewAsCookie(): Promise<void> {
   const store = await cookies();
-  store.delete(VIEW_AS_COOKIE_NAME);
-  store.delete(VIEW_AS_ROLE_COOKIE_NAME);
+  clearCookieFromStore(store, VIEW_AS_COOKIE_NAME);
+  clearCookieFromStore(store, VIEW_AS_ROLE_COOKIE_NAME);
 }
 
 /** Read the view-as override and return the target account id, but ONLY

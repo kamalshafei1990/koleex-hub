@@ -64,5 +64,8 @@ export async function GET() {
       module_count: counts.get(r.id) ?? 0,
     }));
 
-  return NextResponse.json({ roles });
+  return NextResponse.json(
+    { roles },
+    { headers: { "Cache-Control": "private, no-store" } },
+  );
 }
