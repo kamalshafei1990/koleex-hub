@@ -16,6 +16,7 @@
 import { useMemo, useState } from "react";
 import { LOCKSTITCH } from "./data";
 import { HubIcon } from "./icon-registry";
+import { taxonomyLogoUrl } from "./taxonomy-logo";
 
 type Selection = Record<number, string | null>;
 
@@ -181,7 +182,7 @@ export default function CodeBuilder() {
           <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)] mb-3 self-start">
             Machine map
           </div>
-          <MachineSilhouette
+          <MachineMap
             activeRegion={activeAxis ? AXIS_REGION[activeAxis] : null}
           />
           <div className="mt-4 text-[11px] text-[var(--text-faint)] leading-relaxed self-start">
@@ -194,197 +195,98 @@ export default function CodeBuilder() {
   );
 }
 
-/* ── Minimal sewing-machine silhouette ──────────────────────────────────
-   Single SVG, all strokes use currentColor so theme inheritance works
-   without per-region tinting. Active region gets stroke-width:2 + a
-   soft glow filter. */
+/* ── Machine map ────────────────────────────────────────────────────────
+   v7: pulls the real KOLEEX lockstitch line drawing from Supabase
+   Storage at media/machines/lockstitch.png. Falls back to .svg, then
+   to a "upload pending" placeholder so the page still works before
+   the image lands. A small caption strip below the image identifies
+   the active region — minimal interaction by design (the image
+   carries all the visual weight). */
 
-function MachineSilhouette({
+function MachineMap({
   activeRegion,
 }: {
-  activeRegion:
-    | "head"
-    | "motor"
-    | "bed"
-    | "length"
-    | "fabric"
-    | "hook"
-    | "special"
-    | null;
+  activeRegion: AxisRegion | null;
 }) {
-  const baseStroke = "var(--border-subtle)";
-  const activeStroke = "var(--text-primary)";
+  const pngUrl = taxonomyLogoUrl("machines", "lockstitch", "png");
+  const svgUrl = taxonomyLogoUrl("machines", "lockstitch", "svg");
+  const [loadState, setLoadState] = useState<"png" | "svg" | "failed">(
+    pngUrl ? "png" : svgUrl ? "svg" : "failed",
+  );
 
-  /* Helpers — return the right stroke + width for each region so we
-     don't repeat the conditional 30 times below. */
-  const sw = (region: typeof activeRegion, active = 1.8, idle = 1) =>
-    activeRegion === region ? active : idle;
-  const st = (region: typeof activeRegion) =>
-    activeRegion === region ? activeStroke : baseStroke;
+  const src =
+    loadState === "png" ? pngUrl : loadState === "svg" ? svgUrl : null;
 
   return (
-    <svg
-      viewBox="0 0 300 220"
-      className="w-full max-w-[300px]"
-      style={{ color: "var(--text-primary)" }}
-      fill="none"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      {/* ─────────────────────────────────────────────────────────────
-         INDUSTRIAL LOCKSTITCH — proper proportions.
-         · Long bed across the bottom (the workbench)
-         · Tall head on the LEFT with the spool tower above
-         · Horizontal arm extending RIGHT, ending in the needle drop
-         · Servo motor mounted UNDER the bed (with cable)
-         · Hand wheel on the head's right side
-         ───────────────────────────────────────────────────────────── */}
-
-      {/* Spool stand — the thread tower on top */}
-      <g stroke={st("head")} strokeWidth={sw("head")}>
-        <line x1="60" y1="10" x2="60" y2="44" />
-        <circle cx="60" cy="10" r="2.5" />
-        {/* Thread cone */}
-        <path d="M 56 22 L 60 14 L 64 22 L 56 22 Z" />
-      </g>
-
-      {/* HEAD — main vertical body (left), with the curved top profile
-         characteristic of industrial sewing machines. */}
-      <g stroke={st("head")} strokeWidth={sw("head")}>
-        <path
-          d="
-            M 30 130
-            L 30 78
-            Q 30 60 48 60
-            L 78 60
-            Q 88 60 88 70
-            L 88 130
-            Z
-          "
+    <div className="w-full">
+      {src ? (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={src}
+          alt="KOLEEX Lockstitch — technical line drawing"
+          className="w-full h-auto rounded-lg border border-[var(--border-faint)] bg-[var(--bg-primary)] p-2"
+          /* Invert the line drawing in dark mode so black lines on
+             white become white lines on dark. Light mode renders
+             unmodified. */
+          style={{
+            filter: "invert(0)",
+          }}
+          onError={() => {
+            if (loadState === "png" && svgUrl) setLoadState("svg");
+            else setLoadState("failed");
+          }}
         />
-        {/* Brand stripe across the head */}
-        <line x1="38" y1="98" x2="80" y2="98" strokeWidth={0.6} />
-      </g>
-
-      {/* ARM — extends right from the head, ends just above the needle */}
-      <g stroke={st("head")} strokeWidth={sw("head")}>
-        <path
-          d="
-            M 88 72
-            L 220 72
-            Q 232 72 232 84
-            L 232 110
-            L 218 110
-            L 218 84
-            L 88 84
-            Z
-          "
-        />
-      </g>
-
-      {/* Needle bar drop — vertical rod from arm down to bed */}
-      <g stroke={st("head")} strokeWidth={sw("head")}>
-        <line x1="225" y1="110" x2="225" y2="148" />
-        {/* Presser foot pad */}
-        <rect x="219" y="147" width="14" height="3.5" rx="0.5" />
-      </g>
-
-      {/* HANDWHEEL — characteristic circle on the right side of the head */}
-      <g stroke={st("head")} strokeWidth={sw("head")}>
-        <circle cx="88" cy="100" r="10" />
-        <circle cx="88" cy="100" r="3" fill={st("head")} />
-        <line x1="88" y1="90" x2="88" y2="110" strokeWidth={0.6} />
-        <line x1="78" y1="100" x2="98" y2="100" strokeWidth={0.6} />
-      </g>
-
-      {/* BED — long horizontal work surface */}
-      <g stroke={st("bed")} strokeWidth={sw("bed")}>
-        <path
-          d="
-            M 18 152
-            L 282 152
-            L 282 168
-            L 18 168
-            Z
-          "
-        />
-        {/* The bed slot / needle plate cutout */}
-        <rect x="218" y="153" width="14" height="6" rx="0.5" />
-      </g>
-
-      {/* LENGTH ruler — tick marks underneath the bed, highlight when
-         the "operation length" axis is active. */}
-      <g stroke={st("length")} strokeWidth={sw("length", 1.2, 0.8)}>
-        {[40, 90, 140, 190, 240].map((x) => (
-          <line key={x} x1={x} y1="168" x2={x} y2="174" />
-        ))}
-        <line x1="40" y1="174" x2="240" y2="174" />
-      </g>
-
-      {/* MOTOR — direct-drive servo, mounted at the back of the head
-         (industrial machines have the motor at the rear, not below). */}
-      <g stroke={st("motor")} strokeWidth={sw("motor")}>
-        <rect x="6" y="86" width="24" height="36" rx="3" />
-        <circle cx="18" cy="104" r="6" />
-        {/* fan vent slots */}
-        <line x1="10" y1="93" x2="26" y2="93" strokeWidth={0.6} />
-        <line x1="10" y1="116" x2="26" y2="116" strokeWidth={0.6} />
-        {/* power cable */}
-        <path d="M 18 122 Q 18 138 8 142" strokeWidth={0.8} />
-      </g>
-
-      {/* FABRIC — small folded square sitting under the presser foot */}
-      <g stroke={st("fabric")} strokeWidth={sw("fabric")}>
-        <path
-          d="M 200 152 L 216 145 L 226 148 L 224 152 Z"
-          fill={
-            activeRegion === "fabric" ? activeStroke : "transparent"
-          }
-          opacity={activeRegion === "fabric" ? 0.18 : 1}
-        />
-        <line x1="206" y1="148" x2="220" y2="147" strokeWidth={0.6} />
-      </g>
-
-      {/* HOOK — bobbin/rotary hook under the bed, just below the needle */}
-      <g stroke={st("hook")} strokeWidth={sw("hook")}>
-        <circle cx="225" cy="180" r="9" />
-        <circle cx="225" cy="180" r="3" />
-        <line x1="225" y1="168" x2="225" y2="172" strokeWidth={0.6} />
-      </g>
-
-      {/* SPECIAL — accessory rail at the right edge of the bed
-         (puller / folder / etc clip on here). */}
-      <g stroke={st("special")} strokeWidth={sw("special")}>
-        <line
-          x1="248"
-          y1="148"
-          x2="278"
-          y2="148"
-          strokeDasharray={activeRegion === "special" ? "0" : "3 2"}
-        />
-        <rect x="252" y="139" width="22" height="9" rx="1.5" />
-        <line x1="258" y1="143" x2="270" y2="143" strokeWidth={0.6} />
-      </g>
-
-      {/* Footer caption — only shows when a region is active */}
-      {activeRegion && (
-        <text
-          x="150"
-          y="208"
-          textAnchor="middle"
-          fontSize="9.5"
-          fill={activeStroke}
-          fontFamily="ui-monospace, SFMono-Regular, monospace"
-          style={{ letterSpacing: "0.14em" }}
-        >
-          {regionLabel(activeRegion)}
-        </text>
+      ) : (
+        <MachineMapPlaceholder />
       )}
-    </svg>
+
+      {/* Caption strip — shows the active axis label or a hint */}
+      <div className="mt-3 px-3 py-2 rounded-md border border-[var(--border-faint)] bg-[var(--bg-surface-subtle)] text-center">
+        {activeRegion ? (
+          <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--text-primary)] font-mono">
+            ◉ {regionLabel(activeRegion)}
+          </div>
+        ) : (
+          <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-faint)]">
+            Hover an axis to highlight what it controls
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
-function regionLabel(r: NonNullable<Parameters<typeof MachineSilhouette>[0]["activeRegion"]>): string {
+/* Discriminated union for the axis-region mapping, declared once. */
+type AxisRegion =
+  | "head"
+  | "motor"
+  | "bed"
+  | "length"
+  | "fabric"
+  | "hook"
+  | "special";
+
+/* Fallback shown when the storage image isn't uploaded yet. Cleaner
+   than a broken-image placeholder. */
+function MachineMapPlaceholder() {
+  return (
+    <div className="w-full aspect-[4/3] rounded-lg border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] flex flex-col items-center justify-center text-center px-6 py-8 gap-3">
+      <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)]">
+        Machine map · awaiting asset
+      </div>
+      <p className="text-[12.5px] text-[var(--text-muted)] max-w-sm leading-relaxed">
+        Upload the KOLEEX Lockstitch line drawing to Supabase Storage at
+        <span className="font-mono text-[var(--text-primary)]">
+          {" "}media/machines/lockstitch.png
+        </span>{" "}
+        and the map appears automatically.
+      </p>
+    </div>
+  );
+}
+
+
+function regionLabel(r: AxisRegion): string {
   switch (r) {
     case "head":
       return "MACHINE HEAD";

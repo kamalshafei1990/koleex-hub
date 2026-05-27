@@ -16,12 +16,16 @@
 const SUPABASE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "") ?? "";
 
-export type TaxonomyFolder = "divisions" | "categories" | "subcategories";
+export type TaxonomyFolder =
+  | "divisions"
+  | "categories"
+  | "subcategories"
+  | "machines";
 
 /**
- * Returns the public URL for a taxonomy logo, or null when the
- * NEXT_PUBLIC_SUPABASE_URL env var is missing (e.g. local dev without
- * .env set — the caller should fall back to text in that case).
+ * Returns the public URL for a taxonomy / machine asset, or null when
+ * the NEXT_PUBLIC_SUPABASE_URL env var is missing (e.g. local dev
+ * without .env set — the caller should fall back to text in that case).
  */
 export function taxonomyLogoUrl(
   folder: TaxonomyFolder,
