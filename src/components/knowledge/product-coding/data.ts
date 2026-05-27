@@ -60,6 +60,8 @@ export interface Division {
 export interface Subcategory {
   code: string;
   label: string;
+  /** Matches the filename in storage (media/subcategories/<slug>.svg). */
+  slug?: string;
 }
 
 export interface Category {
@@ -67,6 +69,9 @@ export interface Category {
   label: string;
   /** One-line description used on tiles + headers. */
   blurb: string;
+  /** Matches the filename in storage (media/categories/<slug>.svg).
+   *  Same source the Product Data UI reads. */
+  slug: string;
   /** All subcategories under this category (in canonical order). */
   subcategories: Subcategory[];
   /** Url-safe id for scroll anchors. */
@@ -80,6 +85,7 @@ export const CATEGORIES: Category[] = [
     code: "XPR",
     label: "Fabric Preparation",
     blurb: "Spreading, relaxing, inspecting, and rolling fabric before cutting.",
+    slug: "fabric-preparation",
     anchor: "cat-xpr",
     subcategories: [
       { code: "XPRS", label: "Spreading Machines" },
@@ -94,6 +100,7 @@ export const CATEGORIES: Category[] = [
     code: "XC",
     label: "Cutting Equipment",
     blurb: "Manual, mechanical, and CNC cutting across knife, laser, and drilling.",
+    slug: "cutting-equipment",
     anchor: "cat-xc",
     subcategories: [
       { code: "XCS", label: "Straight Knife Cutting Machines" },
@@ -112,6 +119,7 @@ export const CATEGORIES: Category[] = [
     label: "Industrial Sewing Machines",
     blurb:
       "The core of the garment line — lockstitch, overlock, interlock, and specialty stitch.",
+    slug: "industrial-sewing-machines",
     anchor: "cat-xs",
     hasBreakdown: true,
     subcategories: [
@@ -131,6 +139,7 @@ export const CATEGORIES: Category[] = [
     label: "Automatic Sewing Systems",
     blurb:
       "Single-purpose automation for pockets, plackets, collars, hems, and buttons.",
+    slug: "automatic-sewing-systems",
     anchor: "cat-xa",
     subcategories: [
       { code: "XAP", label: "Pocket Setter Machines" },
@@ -149,6 +158,7 @@ export const CATEGORIES: Category[] = [
     code: "XSE",
     label: "Leather & Footwear Machinery",
     blurb: "Shoe, bag, and leather goods — including edge binding and tape attaching.",
+    slug: "leather-footwear-machinery",
     anchor: "cat-xse",
     subcategories: [
       { code: "XSES", label: "Shoe Sewing Machines" },
@@ -162,6 +172,7 @@ export const CATEGORIES: Category[] = [
     code: "XE",
     label: "Embroidery Equipment",
     blurb: "Single-head, multi-head, computerized, sequin, and cording machines.",
+    slug: "embroidery-equipment",
     anchor: "cat-xe",
     subcategories: [
       { code: "XES", label: "Single Head Embroidery Machines" },
@@ -175,6 +186,7 @@ export const CATEGORIES: Category[] = [
     code: "XP",
     label: "Printing & Heat Press Equipment",
     blurb: "Heat presses, screen, DTG, sublimation, and pneumatic stations.",
+    slug: "printing-heat-press-equipment",
     anchor: "cat-xp",
     subcategories: [
       { code: "XPH", label: "Heat Press Machines" },
@@ -190,6 +202,7 @@ export const CATEGORIES: Category[] = [
     code: "XF",
     label: "Finishing Equipment",
     blurb: "Irons, boilers, finishing forms, fusing presses, and washing lines.",
+    slug: "finishing-equipment",
     anchor: "cat-xf",
     subcategories: [
       { code: "XFI", label: "Steam Irons" },
@@ -208,6 +221,7 @@ export const CATEGORIES: Category[] = [
     label: "Packing & Inspection",
     blurb:
       "Quality and packout — needle/metal/X-ray detectors, folders, sealers.",
+    slug: "packing-inspection",
     anchor: "cat-xpc",
     subcategories: [
       { code: "XPCN", label: "Needle Detectors" },
@@ -223,6 +237,7 @@ export const CATEGORIES: Category[] = [
     code: "XD",
     label: "Domestic Sewing Machines",
     blurb: "Household lockstitch, overlock, embroidery, and portable units.",
+    slug: "domestic-sewing-machines",
     anchor: "cat-xd",
     subcategories: [
       { code: "XDL", label: "Household Lockstitch Machines" },
@@ -236,6 +251,7 @@ export const CATEGORIES: Category[] = [
     label: "Spare Parts & Accessories",
     blurb:
       "Motors, drives, control panels, attachments, and replaceable machine parts.",
+    slug: "spare-parts-accessories",
     anchor: "cat-xsp",
     subcategories: [
       { code: "XSPS", label: "Servo Motors" },

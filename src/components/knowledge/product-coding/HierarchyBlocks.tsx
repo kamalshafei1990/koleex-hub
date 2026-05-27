@@ -1,22 +1,54 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   HierarchyBlocks — Division / Category / Subcategory tiles, v4.
+   HierarchyBlocks — Division / Category / Subcategory tiles, v5.
 
-   v4 changes (from user feedback):
-   - DIVISION tiles use the canonical SVG components from
-     src/components/icons/divisions/ — same icons /products and
-     /product-data render.
-   - CATEGORY tiles drop the made-up icons entirely. The CODE itself
-     is now the dominant visual: large monospace badge as the hero,
-     name + blurb as supporting metadata.
-   - Subcategory tables get a stronger code column so the codes read
-     at a glance.
+   v5 (the right way):
+   - DIVISION tiles render the same SVG that lives in Supabase Storage
+     under media/divisions/<slug>.svg — exact match with /products and
+     /product-data.
+   - CATEGORY tiles render media/categories/<slug>.svg, paired with a
+     dominant monospace code as the secondary visual anchor.
+   - Both fall back to the code-only layout if the storage URL can't
+     be built (no NEXT_PUBLIC_SUPABASE_URL).
    --------------------------------------------------------------------------- */
 
 import Link from "next/link";
-import { HubIcon } from "./icon-registry";
 import type { Category, Division, Subcategory } from "./data";
+import { taxonomyLogoUrl } from "./taxonomy-logo";
+
+/* Shared logo renderer. Returns null when no URL is available so the
+   caller can decide whether to show a placeholder. */
+function TaxonomyLogo({
+  folder,
+  slug,
+  alt,
+  size = 32,
+  className,
+}: {
+  folder: "divisions" | "categories" | "subcategories";
+  slug: string;
+  alt: string;
+  size?: number;
+  className?: string;
+}) {
+  const url = taxonomyLogoUrl(folder, slug);
+  if (!url) return null;
+  /* Plain <img> on purpose — these are small inline SVGs from our own
+     storage bucket. next/image would force a remote-pattern allowlist
+     dance for marginal benefit. */
+  /* eslint-disable-next-line @next/next/no-img-element */
+  return (
+    <img
+      src={url}
+      alt={alt}
+      width={size}
+      height={size}
+      className={className}
+      style={{ width: size, height: size }}
+    />
+  );
+}
 
 /* ── 1. DivisionStrip ─────────────────────────────────────────────────── */
 export function DivisionStrip({
@@ -41,11 +73,13 @@ export function DivisionStrip({
             }`}
           >
             <div className="flex items-center justify-between gap-2">
-              {/* Canonical division icon — falls back gracefully when
-                  the registry returns null (which it shouldn't for
-                  any real division id). */}
-              <div className="flex h-9 w-9 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)]">
-                <HubIcon domain="division" k={d.id} size={20} />
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] overflow-hidden">
+                <TaxonomyLogo
+                  folder="divisions"
+                  slug={d.id}
+                  alt={d.name}
+                  size={28}
+                />
               </div>
               <span
                 className={`text-[9.5px] font-bold uppercase tracking-[0.16em] px-1.5 py-0.5 rounded-full border flex items-center gap-1 ${
@@ -79,8 +113,8 @@ export function DivisionStrip({
 }
 
 /* ── 2. CategoryGrid ──────────────────────────────────────────────────
-   v4: the CODE is the visual anchor. No icons. Tile is dominated by
-   a giant monospace code, with the label + sub-count below. */
+   The tile has BOTH: the canonical category SVG (top-left) and the
+   monospace code as the dominant visual centerpiece. */
 export function CategoryGrid({ categories }: { categories: Category[] }) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -91,12 +125,17 @@ export function CategoryGrid({ categories }: { categories: Category[] }) {
           scroll
           className="group rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 hover:border-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-all block"
         >
-          {/* Top row: tiny eyebrow + sub-count chip */}
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <span className="text-[9.5px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)]">
-              Category
-            </span>
-            <div className="flex items-center gap-1.5">
+          {/* Top row: canonical SVG + sub-count + decoded badge */}
+          <div className="flex items-start justify-between gap-2 mb-4">
+            <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] overflow-hidden">
+              <TaxonomyLogo
+                folder="categories"
+                slug={c.slug}
+                alt={c.label}
+                size={28}
+              />
+            </div>
+            <div className="flex items-center gap-1.5 pt-1">
               <span className="text-[10px] font-bold text-[var(--text-faint)] font-mono">
                 {c.subcategories.length}{" "}
                 {c.subcategories.length === 1 ? "sub" : "subs"}
@@ -109,7 +148,7 @@ export function CategoryGrid({ categories }: { categories: Category[] }) {
             </div>
           </div>
 
-          {/* THE CODE — dominant visual element */}
+          {/* THE CODE — still dominant */}
           <div className="font-mono text-[34px] sm:text-[40px] font-bold tracking-[0.04em] text-[var(--text-primary)] leading-none">
             {c.code}
           </div>
@@ -131,9 +170,7 @@ export function CategoryGrid({ categories }: { categories: Category[] }) {
   );
 }
 
-/* ── 3. SubcategoryTable ─────────────────────────────────────────────
-   v4: header uses a code-first layout (big mono code | name).
-   Rows show the code in a strong column with a subtle background. */
+/* ── 3. SubcategoryTable ────────────────────────────────────────────── */
 export function SubcategoryTable({
   category,
   showBreakdownLink,
@@ -146,10 +183,17 @@ export function SubcategoryTable({
       id={category.anchor}
       className="scroll-mt-20 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden"
     >
-      {/* Header: big code, label, blurb */}
+      {/* Header: canonical logo + code + label */}
       <header className="flex items-center justify-between gap-4 px-5 py-4 border-b border-[var(--border-faint)] bg-[var(--bg-surface)]">
         <div className="flex items-center gap-4 min-w-0">
-          {/* Code badge */}
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-primary)] overflow-hidden shrink-0">
+            <TaxonomyLogo
+              folder="categories"
+              slug={category.slug}
+              alt={category.label}
+              size={26}
+            />
+          </div>
           <div className="font-mono text-[22px] font-bold tracking-[0.04em] text-[var(--text-primary)] leading-none shrink-0">
             {category.code}
           </div>
@@ -184,7 +228,6 @@ export function SubcategoryTable({
         ))}
       </ul>
 
-      {/* Breakdown bridge for XS */}
       {showBreakdownLink && (
         <div className="border-t border-[var(--border-faint)] px-5 py-3 bg-[var(--bg-surface-subtle)]">
           <Link
