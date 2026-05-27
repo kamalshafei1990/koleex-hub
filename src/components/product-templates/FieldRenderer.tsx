@@ -428,7 +428,15 @@ export default function FieldRenderer({ field, value, onChange, disabled }: Prop
                 ))}
                 <button
                   type="button"
-                  onClick={() => removeRow(idx)}
+                  onClick={() => {
+                    if (
+                      typeof window !== "undefined" &&
+                      !window.confirm("Remove this card? This can't be undone in the form — save discards it.")
+                    ) {
+                      return;
+                    }
+                    removeRow(idx);
+                  }}
                   disabled={disabled}
                   className="text-[11px] text-red-500 hover:text-red-600 disabled:opacity-50"
                 >
@@ -490,7 +498,15 @@ function RepeaterRow({
       ))}
       <button
         type="button"
-        onClick={onRemove}
+        onClick={() => {
+          if (
+            typeof window !== "undefined" &&
+            !window.confirm("Remove this row? You'll lose its values for this product.")
+          ) {
+            return;
+          }
+          onRemove();
+        }}
         disabled={disabled}
         className="self-center justify-self-end text-[11px] text-red-500 hover:text-red-600 disabled:opacity-50"
       >

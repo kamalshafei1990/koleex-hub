@@ -3,19 +3,13 @@
 /* ---------------------------------------------------------------------------
    TemplateView — read-mode renderer for a product's template values.
 
-   Phase 2 validator. Reads:
-     · the template structure (sections + fields)
-     · the saved values for one product
-     · the product row itself (for hero / highlights / brand)
-
-   Renders a visual-first product page:
-     · Hero block (product name + short description + highlight pills)
-     · Section cards with sensible value formatting per field_type
-     · Long description prose
-     · Accessory repeater rendered as a table
-
-   Complementary to TemplateForm — same data, different surface.
-   No editing. No state. Pure read.
+   Phase 2.1: the renderer now owns the hero. It reads:
+     · template structure (sections + fields)
+     · saved field values
+     · product_media (via /api/products/[id]/media) — hero + gallery
+     · the `highlights` feature_cards field, with a fallback to the
+       legacy products.highlights[] column for products that haven't
+       been migrated yet
    --------------------------------------------------------------------------- */
 
 import { useEffect, useState } from "react";
@@ -39,6 +33,29 @@ interface ProductHeader {
   status: string | null;
 }
 
+interface MediaRow {
+  id: string;
+  url: string;
+  alt_text: string | null;
+  order: number;
+  role: "hero" | "gallery" | "detail" | "video" | "document";
+  type: string;
+  model_id: string | null;
+}
+interface MediaBundle {
+  hero: MediaRow | null;
+  gallery: MediaRow[];
+  detail: MediaRow[];
+  video: MediaRow[];
+  document: MediaRow[];
+}
+
+interface HighlightCard {
+  title?: string;
+  blurb?: string;
+  icon?: string;
+}
+
 interface Props {
   productSlug: string;
 }
@@ -47,6 +64,7 @@ export default function TemplateView({ productSlug }: Props) {
   const [product, setProduct] = useState<ProductHeader | null>(null);
   const [tree, setTree] = useState<TemplateTree | null>(null);
   const [values, setValues] = useState<FieldValueMap>({});
+  const [media, setMedia] = useState<MediaBundle | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,7 +74,7 @@ export default function TemplateView({ productSlug }: Props) {
     setError(null);
     (async () => {
       try {
-        /* 1. Resolve product by slug (cheap public route). */
+        /* 1. Resolve product by slug. */
         const prodRes = await fetch(
           `/api/products/by-slug/${encodeURIComponent(productSlug)}`,
           { credentials: "include" },
@@ -69,30 +87,41 @@ export default function TemplateView({ productSlug }: Props) {
         if (cancelled) return;
         setProduct(prodJson.product);
 
-        if (!prodJson.templateSlug) {
-          setLoading(false);
-          return; // product without template — header-only
+        /* 2. Fetch template + values + media in parallel. Media is
+           independent of the template — fetch even when the product
+           has no template assigned. */
+        const slug = prodJson.templateSlug;
+        const productId = prodJson.product.id;
+        const [treeRes, valuesRes, mediaRes] = await Promise.all([
+          slug
+            ? fetch(`/api/product-templates/${encodeURIComponent(slug)}`, {
+                credentials: "include",
+              })
+            : Promise.resolve(null),
+          slug
+            ? fetch(
+                `/api/product-templates/${encodeURIComponent(slug)}/values/${encodeURIComponent(productId)}`,
+                { credentials: "include" },
+              )
+            : Promise.resolve(null),
+          fetch(`/api/products/${encodeURIComponent(productId)}/media`, {
+            credentials: "include",
+          }),
+        ]);
+
+        if (mediaRes && mediaRes.ok) {
+          const mediaJson = (await mediaRes.json()) as MediaBundle;
+          if (!cancelled) setMedia(mediaJson);
         }
 
-        /* 2. Fetch template structure + values in parallel. */
-        const [treeRes, valuesRes] = await Promise.all([
-          fetch(
-            `/api/product-templates/${encodeURIComponent(prodJson.templateSlug)}`,
-            { credentials: "include" },
-          ),
-          fetch(
-            `/api/product-templates/${encodeURIComponent(prodJson.templateSlug)}/values/${encodeURIComponent(prodJson.product.id)}`,
-            { credentials: "include" },
-          ),
-        ]);
-        if (!treeRes.ok) throw new Error(`Template fetch: HTTP ${treeRes.status}`);
-        if (!valuesRes.ok) throw new Error(`Values fetch: HTTP ${valuesRes.status}`);
-
-        const treeJson = (await treeRes.json()) as TemplateTree;
-        const valuesJson = (await valuesRes.json()) as { values: FieldValueMap };
-        if (cancelled) return;
-        setTree(treeJson);
-        setValues(valuesJson.values ?? {});
+        if (slug && treeRes && treeRes.ok) {
+          const treeJson = (await treeRes.json()) as TemplateTree;
+          if (!cancelled) setTree(treeJson);
+        }
+        if (slug && valuesRes && valuesRes.ok) {
+          const valuesJson = (await valuesRes.json()) as { values: FieldValueMap };
+          if (!cancelled) setValues(valuesJson.values ?? {});
+        }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load");
       } finally {
@@ -120,36 +149,94 @@ export default function TemplateView({ productSlug }: Props) {
   }
   if (!product) return null;
 
+  /* Highlights: prefer the template-engine field; fall back to the
+     legacy products.highlights[] for products not yet migrated. */
+  const highlightsField = pickHighlightsValue(values);
+  const legacyHighlights: HighlightCard[] = (product.highlights ?? []).map((t) => ({
+    title: t,
+  }));
+  const highlights = highlightsField.length > 0 ? highlightsField : legacyHighlights;
+
   return (
     <div className="space-y-6">
       {/* ── Hero ─────────────────────────────────────────────────── */}
-      <header className="space-y-3">
-        {product.brand && (
-          <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-black/45 dark:text-white/40">
-            {product.brand}
+      <header className="grid grid-cols-1 md:grid-cols-[1.2fr_1fr] gap-6 items-start">
+        <div className="space-y-3">
+          {product.brand && (
+            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-black/45 dark:text-white/40">
+              {product.brand}
+            </div>
+          )}
+          <h1 className="text-[28px] sm:text-[34px] font-semibold tracking-tight text-black dark:text-white leading-[1.1]">
+            {product.product_name}
+          </h1>
+          {(asString(values["short_description"]) || product.excerpt) && (
+            <p className="text-[14.5px] text-black/65 dark:text-white/65 max-w-2xl leading-relaxed">
+              {asString(values["short_description"]) || product.excerpt}
+            </p>
+          )}
+          {highlights.length > 0 && (
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
+              {highlights.map((h, i) => (
+                <li
+                  key={i}
+                  className="flex items-start gap-2 rounded-lg border border-black/[0.06] dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-3"
+                >
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-black/[0.05] dark:bg-white/[0.08] text-[11px] font-bold text-black/60 dark:text-white/60">
+                    ✓
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-[12.5px] font-semibold text-black dark:text-white truncate">
+                      {h.title ?? "—"}
+                    </div>
+                    {h.blurb && (
+                      <div className="mt-0.5 text-[11px] text-black/55 dark:text-white/50 line-clamp-2">
+                        {h.blurb}
+                      </div>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Hero image */}
+        {media?.hero && (
+          <div className="rounded-2xl border border-black/[0.06] dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-2 overflow-hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={media.hero.url}
+              alt={media.hero.alt_text ?? product.product_name}
+              className="w-full h-auto rounded-xl object-contain max-h-[320px]"
+            />
           </div>
         )}
-        <h1 className="text-[28px] sm:text-[34px] font-semibold tracking-tight text-black dark:text-white leading-[1.1]">
-          {product.product_name}
-        </h1>
-        {(asString(values["short_description"]) || product.excerpt) && (
-          <p className="text-[14.5px] text-black/65 dark:text-white/65 max-w-2xl leading-relaxed">
-            {asString(values["short_description"]) || product.excerpt}
-          </p>
-        )}
-        {product.highlights && product.highlights.length > 0 && (
-          <ul className="flex flex-wrap gap-2 pt-1">
-            {product.highlights.map((h, i) => (
-              <li
-                key={i}
-                className="text-[11.5px] font-medium px-2.5 py-1 rounded-full bg-black/[0.05] dark:bg-white/[0.06] text-black/70 dark:text-white/70"
-              >
-                {h}
-              </li>
-            ))}
-          </ul>
-        )}
       </header>
+
+      {/* ── Gallery strip ───────────────────────────────────────── */}
+      {media && media.gallery.length > 0 && (
+        <section className="rounded-2xl border border-black/[0.06] dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-4 sm:p-5">
+          <h2 className="text-[15px] font-semibold tracking-tight text-black dark:text-white mb-3">
+            Gallery
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {media.gallery.map((m) => (
+              <div
+                key={m.id}
+                className="aspect-square rounded-lg border border-black/[0.06] dark:border-white/[0.06] overflow-hidden bg-black/[0.02] dark:bg-white/[0.03]"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={m.url}
+                  alt={m.alt_text ?? ""}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ── Long description ─────────────────────────────────────── */}
       {(asString(values["long_description"]) || product.description) && (
@@ -160,28 +247,16 @@ export default function TemplateView({ productSlug }: Props) {
         </section>
       )}
 
-      {/* ── Section cards (everything except descriptions which we showed above) */}
+      {/* ── Section cards. Skip Basic Information (already in hero) and
+            Features & Highlights (already rendered above the fold). */}
       {tree?.sections
         .filter(
           (s) =>
-            s.slug !== "basic-information" || /* basic = hero already */
-            s.fields.some(
-              (f) =>
-                f.field_key !== "short_description" &&
-                f.field_key !== "long_description",
-            ),
+            s.slug !== "basic-information" &&
+            s.slug !== "features-highlights",
         )
         .map((section) => {
-          const visibleFields = section.fields.filter((f) => {
-            if (
-              section.slug === "basic-information" &&
-              (f.field_key === "short_description" || f.field_key === "long_description")
-            ) {
-              return false;
-            }
-            const v = values[f.field_key];
-            return !isEmpty(v);
-          });
+          const visibleFields = section.fields.filter((f) => !isEmpty(values[f.field_key]));
           if (visibleFields.length === 0) return null;
           return (
             <section
@@ -202,6 +277,30 @@ export default function TemplateView({ productSlug }: Props) {
             </section>
           );
         })}
+
+      {/* ── Detail images at the bottom ─────────────────────────── */}
+      {media && media.detail.length > 0 && (
+        <section className="rounded-2xl border border-black/[0.06] dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-4 sm:p-5">
+          <h2 className="text-[15px] font-semibold tracking-tight text-black dark:text-white mb-3">
+            Detail views
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {media.detail.map((m) => (
+              <div
+                key={m.id}
+                className="rounded-lg border border-black/[0.06] dark:border-white/[0.06] overflow-hidden bg-black/[0.02] dark:bg-white/[0.03]"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={m.url}
+                  alt={m.alt_text ?? ""}
+                  className="w-full h-auto"
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
@@ -219,6 +318,19 @@ function isEmpty(v: unknown): boolean {
   return false;
 }
 
+function pickHighlightsValue(values: FieldValueMap): HighlightCard[] {
+  const v = values["highlights"];
+  if (!Array.isArray(v)) return [];
+  return (v as Array<Record<string, unknown>>)
+    .filter((row) => row && typeof row === "object")
+    .map((row) => ({
+      title: typeof row.title === "string" ? row.title : undefined,
+      blurb: typeof row.blurb === "string" ? row.blurb : undefined,
+      icon: typeof row.icon === "string" ? row.icon : undefined,
+    }))
+    .filter((c) => !!c.title);
+}
+
 function SpecBlock({
   fields,
   values,
@@ -226,8 +338,6 @@ function SpecBlock({
   fields: ProductTemplateField[];
   values: FieldValueMap;
 }) {
-  /* Group fields so repeaters / feature_cards / multi_selects get their
-     own row, while simple scalar fields land in a 2-column grid. */
   const scalar: ProductTemplateField[] = [];
   const wide: ProductTemplateField[] = [];
   for (const f of fields) {
@@ -248,7 +358,10 @@ function SpecBlock({
       {scalar.length > 0 && (
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
           {scalar.map((f) => (
-            <div key={f.id} className="flex items-start justify-between gap-3 border-b border-black/[0.04] dark:border-white/[0.04] pb-2">
+            <div
+              key={f.id}
+              className="flex items-start justify-between gap-3 border-b border-black/[0.04] dark:border-white/[0.04] pb-2"
+            >
               <dt className="text-[12px] text-black/55 dark:text-white/50 shrink-0">
                 {f.field_label}
               </dt>
@@ -293,9 +406,7 @@ function formatScalar(field: ProductTemplateField, v: unknown): string {
 }
 
 function formatNumber(n: number): string {
-  return n.toLocaleString(undefined, {
-    maximumFractionDigits: 3,
-  });
+  return n.toLocaleString(undefined, { maximumFractionDigits: 3 });
 }
 
 function renderWide(field: ProductTemplateField, v: unknown): React.ReactNode {
@@ -308,8 +419,7 @@ function renderWide(field: ProductTemplateField, v: unknown): React.ReactNode {
   }
   if (field.field_type === "multi_select" && Array.isArray(v)) {
     const opts = getFieldOptions(field);
-    const labelOf = (val: string) =>
-      opts.find((o) => o.value === val)?.label ?? val;
+    const labelOf = (val: string) => opts.find((o) => o.value === val)?.label ?? val;
     return (
       <div className="flex flex-wrap gap-1.5">
         {(v as string[]).map((val) => (
