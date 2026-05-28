@@ -86,12 +86,18 @@ export function DivisionStrip({
                 <TaxonomyLogo folder="divisions" slug={d.id} alt={d.name} size={28} />
               </div>
               <span
-                className={`text-[9.5px] font-bold uppercase tracking-[0.16em] px-1.5 py-0.5 rounded-full border ${
+                className={`text-[9.5px] font-bold uppercase tracking-[0.16em] px-1.5 py-0.5 rounded-full border flex items-center gap-1 ${
                   live
-                    ? "border-[var(--text-primary)] text-[var(--text-primary)]"
+                    ? "border-emerald-500/50 text-emerald-600 dark:text-emerald-300"
                     : "border-[var(--border-subtle)] text-[var(--text-faint)]"
                 }`}
               >
+                {live && (
+                  <span aria-hidden className="relative flex h-1.5 w-1.5 shrink-0">
+                    <span className="absolute inset-0 rounded-full bg-emerald-500/70 animate-ping" />
+                    <span className="relative rounded-full h-1.5 w-1.5 bg-emerald-500" />
+                  </span>
+                )}
                 {live ? t("status.live") : t("status.planned")}
               </span>
             </div>

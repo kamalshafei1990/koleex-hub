@@ -453,7 +453,7 @@ function PageInner() {
           {/* ═══ Document signature ════════════════════════════════════ */}
           <div className="border-t border-[var(--border-faint)] pt-6 flex flex-wrap items-center justify-between gap-3 text-[10.5px] font-medium tracking-[0.18em] uppercase text-[var(--text-faint)]">
             <span>{t("footer.architecture")}</span>
-            <span className="font-mono" dir="ltr">v28 · {tl("Garment Machinery")}</span>
+            <span className="font-mono" dir="ltr">v29 · {tl("Garment Machinery")}</span>
           </div>
         </div>
       </div>
