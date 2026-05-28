@@ -17,6 +17,7 @@ import { memo, useMemo, useState } from "react";
 import { LOCKSTITCH } from "./data";
 import { HubIcon } from "./icon-registry";
 import { useT, useTL } from "./i18n";
+import { HeaderShell } from "./primitives";
 
 type Selection = Record<number, string | null>;
 
@@ -72,37 +73,31 @@ export default function CodeBuilder() {
   return (
     <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
       {/* ── Live code header ── */}
-      <div
-        className="px-5 sm:px-7 py-5 border-b border-[var(--border-faint)] flex flex-wrap items-center justify-between gap-4"
-        style={{
-          background:
-            "radial-gradient(120% 80% at 20% 0%, var(--bg-surface-hover) 0%, transparent 60%), var(--bg-secondary)",
-        }}
-      >
-        <div className="min-w-0">
-          <div className="text-[10.5px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)]">
-            {t("builder.live_builder")}
-          </div>
+      <HeaderShell
+        eyebrow={<>{t("builder.live_builder")}</>}
+        primary={
           <div
-            className="mt-2 font-mono text-[22px] sm:text-[28px] font-bold tracking-wider text-[var(--text-primary)] truncate"
+            className="font-mono text-[22px] sm:text-[28px] font-bold tracking-wider text-[var(--text-primary)] truncate"
             dir="ltr"
           >
             {built}
           </div>
-        </div>
-        <button
-          type="button"
-          onClick={copy}
-          className="flex items-center gap-2 px-3 h-9 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[12px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"
-        >
-          <HubIcon
-            domain="utility"
-            k={copied ? "check" : "copy"}
-            size={13}
-          />
-          {copied ? t("builder.copied") : t("builder.copy_code")}
-        </button>
-      </div>
+        }
+        trailing={
+          <button
+            type="button"
+            onClick={copy}
+            className="no-print flex items-center gap-2 px-3 h-9 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[12px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"
+          >
+            <HubIcon
+              domain="utility"
+              k={copied ? "check" : "copy"}
+              size={13}
+            />
+            {copied ? t("builder.copied") : t("builder.copy_code")}
+          </button>
+        }
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px]">
         {/* ── Axis selectors ── */}

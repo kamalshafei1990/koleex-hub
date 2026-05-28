@@ -2,12 +2,17 @@
 
 /* ---------------------------------------------------------------------------
    AIParseFlow — visualizes what the assistant understands when handed
-   a technical product code. Six derived facts from one technical
-   identity, plus an output strip below.
+   a technical product code. The technical identity at the top is parsed
+   into six derived facts shown as small terminals below, then an output
+   strip lists what the downstream consumers receive (recommendation,
+   BOM resolution, spare-parts match, compatible accessories, auto-
+   quotation surcharges). No connection lines are drawn — the numbered
+   circles + matching axis index on each fact card carry the mapping.
    --------------------------------------------------------------------------- */
 
 import { HubIcon } from "./icon-registry";
 import { useT } from "./i18n";
+import { HeaderShell } from "./primitives";
 
 const FACTS: Array<{
   axis: number;
@@ -27,30 +32,28 @@ export default function AIParseFlow() {
   const t = useT();
   return (
     <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
-      {/* Code input at top */}
-      <div
-        className="px-5 sm:px-7 py-5 border-b border-[var(--border-faint)] flex flex-wrap items-baseline gap-4 justify-between"
-        style={{
-          background:
-            "linear-gradient(180deg, var(--bg-surface) 0%, var(--bg-secondary) 100%)",
-        }}
-      >
-        <div>
-          <div className="text-[10.5px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)] flex items-center gap-2">
+      {/* Code input at top — unified HeaderShell grammar */}
+      <HeaderShell
+        eyebrow={
+          <>
             <HubIcon domain="utility" k="cpu" size={13} />
             {t("ai.input_eyebrow")}
-          </div>
+          </>
+        }
+        primary={
           <div
-            className="mt-2 font-mono text-[20px] sm:text-[24px] font-bold tracking-wider text-[var(--text-primary)]"
+            className="font-mono text-[20px] sm:text-[24px] font-bold tracking-wider text-[var(--text-primary)]"
             dir="ltr"
           >
             XSL-Q10-5-E-560-M-HJ
           </div>
-        </div>
-        <div className="text-[10.5px] text-[var(--text-faint)] max-w-sm leading-relaxed">
-          {t("ai.input_lead")}
-        </div>
-      </div>
+        }
+        trailing={
+          <div className="text-[10.5px] text-[var(--text-faint)] max-w-sm leading-relaxed">
+            {t("ai.input_lead")}
+          </div>
+        }
+      />
 
       {/* Six derived facts */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-5 sm:p-7">

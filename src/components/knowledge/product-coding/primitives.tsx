@@ -2,13 +2,42 @@
    primitives — small reusable building blocks for the Product Coding
    System knowledge document.
 
-   v26: stripped down to the only primitive the live page still uses.
-   The earlier CodeSegment / CodePrefix / Dash / ColumnHeaderRow /
-   ConfigCard / SystemStatus exports were consumed only by the
-   now-deleted CodingBreakdown / BreakdownTabs / EcosystemMap.
+   v28: adds <HeaderShell>, the unified header strip used by the live
+   BreakdownCard / CodeBuilder / AIParseFlow components.
    --------------------------------------------------------------------------- */
 
 import type { ReactNode } from "react";
+
+/* ── HeaderShell — unified gradient bar at the top of every primary
+      panel on the page (BreakdownCard / CodeBuilder / AIParseFlow). One
+      gradient, one padding rhythm, one border treatment. */
+export function HeaderShell({
+  eyebrow,
+  primary,
+  trailing,
+}: {
+  eyebrow: ReactNode;
+  primary: ReactNode;
+  trailing?: ReactNode;
+}) {
+  return (
+    <div
+      className="px-5 sm:px-7 py-5 border-b border-[var(--border-faint)] flex flex-wrap items-center justify-between gap-4"
+      style={{
+        background:
+          "radial-gradient(120% 80% at 20% 0%, var(--bg-surface-hover) 0%, transparent 60%), var(--bg-secondary)",
+      }}
+    >
+      <div className="min-w-0">
+        <div className="text-[10.5px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)] flex items-center gap-2">
+          {eyebrow}
+        </div>
+        <div className="mt-2">{primary}</div>
+      </div>
+      {trailing && <div className="flex items-center gap-2 shrink-0">{trailing}</div>}
+    </div>
+  );
+}
 
 /* ── Section header with eyebrow + number ─────────────────────────────── */
 export function SectionHeader({

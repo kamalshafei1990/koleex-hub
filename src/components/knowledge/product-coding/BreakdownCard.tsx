@@ -23,6 +23,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CodingBreakdownDef } from "./data";
 import { HubIcon } from "./icon-registry";
 import { useT, useTL, useLang } from "./i18n";
+import { HeaderShell } from "./primitives";
 
 /* Map breakdown id → subtitle translation key. */
 const SUBTITLE_KEY: Record<string, string> = {
@@ -38,9 +39,9 @@ const NAME_KEY: Record<string, string> = {
   interlock: "Interlock Machines",
 };
 
-type Selection = Record<number, string>;
+export type Selection = Record<number, string>;
 
-function initialFromDef(def: CodingBreakdownDef): Selection {
+export function initialFromDef(def: CodingBreakdownDef): Selection {
   const s: Selection = {};
   for (const seg of def.segments) {
     s[seg.index] = seg.empty ? "" : seg.value;
@@ -135,7 +136,19 @@ function Dash() {
   );
 }
 
-export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
+export default function BreakdownCard({
+  def,
+  showPermalink = true,
+  onSelChange,
+}: {
+  def: CodingBreakdownDef;
+  /** When true, the URL ?code= is synced and a "Copy link" button shows.
+      Default true. Compare passes false so its two cards stay independent. */
+  showPermalink?: boolean;
+  /** Optional observer fired on every selection change. Used by Compare
+      to compute axis-level diffs between the two cards. */
+  onSelChange?: (sel: Selection) => void;
+}) {
   const t = useT();
   const tl = useTL();
   const { dir } = useLang();
@@ -153,6 +166,48 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
   const builtCode = useMemo(() => buildCode(def, sel), [def, sel]);
 
   const [copied, setCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const isDirty = def.segments.some((s) => sel[s.index] !== initial[s.index]);
+
+  /* Permalink read — on mount, restore sel from ?code= if present and
+     matches this def's prefix. Silent on parse failure. */
+  useEffect(() => {
+    if (!showPermalink) return;
+    if (typeof window === "undefined") return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const queryCode = params.get("code");
+      if (!queryCode || !queryCode.startsWith(def.prefix + "-")) return;
+      const parts = queryCode.slice(def.prefix.length + 1).split("-");
+      const next: Selection = { ...initial };
+      let pi = 0;
+      for (const seg of def.segments) {
+        if (pi >= parts.length) break;
+        if (next[seg.index] === "" || next[seg.index] === "/") continue;
+        next[seg.index] = parts[pi];
+        pi++;
+      }
+      setSel(next);
+    } catch {
+      /* malformed URL — ignore */
+    }
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [def.id, showPermalink]);
+
+  /* Permalink write — sync the URL ?code= as the user composes. */
+  useEffect(() => {
+    if (!showPermalink) return;
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (isDirty) {
+      url.searchParams.set("code", builtCode);
+    } else {
+      url.searchParams.delete("code");
+    }
+    window.history.replaceState({}, "", url.toString());
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [builtCode, showPermalink]);
 
   const [flash, setFlash] = useState(false);
   useEffect(() => {
@@ -160,6 +215,12 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
     const id = window.setTimeout(() => setFlash(false), 240);
     return () => window.clearTimeout(id);
   }, [builtCode]);
+
+  /* Fire the observer callback when selection changes. */
+  useEffect(() => {
+    onSelChange?.(sel);
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [sel]);
 
   function toggleAxis(idx: number) {
     setActive((cur) => (cur === idx ? null : idx));
@@ -184,9 +245,19 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
     }
   }
 
-  /* Shallow compare against initial — both objects have identical keys
-     (the segment indices), so comparing values is enough. */
-  const isDirty = def.segments.some((s) => sel[s.index] !== initial[s.index]);
+  async function copyLink() {
+    if (typeof window === "undefined") return;
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set("code", builtCode);
+      url.hash = def.id;
+      await navigator.clipboard.writeText(url.toString());
+      setLinkCopied(true);
+      window.setTimeout(() => setLinkCopied(false), 1500);
+    } catch {
+      /* ignore */
+    }
+  }
 
   return (
     <article
@@ -194,19 +265,11 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
       className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden"
     >
       {/* ── Header ────────────────────────────────────────────── */}
-      <div
-        className="px-5 sm:px-7 py-5 border-b border-[var(--border-faint)] flex flex-wrap items-center justify-between gap-4"
-        style={{
-          background:
-            "radial-gradient(120% 80% at 20% 0%, var(--bg-surface-hover) 0%, transparent 60%), var(--bg-secondary)",
-        }}
-      >
-        <div className="min-w-0">
-          <div className="text-[10.5px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)]">
-            {t("bd.eyebrow", { name: headerName })}
-          </div>
+      <HeaderShell
+        eyebrow={<>{t("bd.eyebrow", { name: headerName })}</>}
+        primary={
           <div
-            className={`mt-2 font-mono text-[22px] sm:text-[28px] font-bold tracking-wider text-[var(--text-primary)] break-all transition-colors duration-200 ${
+            className={`font-mono text-[22px] sm:text-[28px] font-bold tracking-wider text-[var(--text-primary)] break-all transition-colors duration-200 ${
               flash ? "bg-[var(--bg-surface-active)] rounded-md px-1 -mx-1" : ""
             }`}
             aria-live="polite"
@@ -214,30 +277,42 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
           >
             {builtCode}
           </div>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={reset}
-            disabled={!isDirty}
-            className="h-9 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11.5px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
-            aria-label={t("bd.reset")}
-          >
-            <span aria-hidden>↺</span>
-            {t("bd.reset")}
-          </button>
-          <button
-            type="button"
-            onClick={copy}
-            className="h-9 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11.5px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors flex items-center gap-1.5"
-            aria-label={t("bd.copy")}
-          >
-            <HubIcon domain="utility" k={copied ? "check" : "copy"} size={13} />
-            {copied ? t("bd.copied") : t("bd.copy")}
-          </button>
-        </div>
-      </div>
+        }
+        trailing={
+          <div className="no-print flex items-center gap-2">
+            <button
+              type="button"
+              onClick={reset}
+              disabled={!isDirty}
+              className="h-9 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11.5px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+              aria-label={t("bd.reset")}
+            >
+              <span aria-hidden>↺</span>
+              {t("bd.reset")}
+            </button>
+            <button
+              type="button"
+              onClick={copy}
+              className="h-9 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11.5px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors flex items-center gap-1.5"
+              aria-label={t("bd.copy")}
+            >
+              <HubIcon domain="utility" k={copied ? "check" : "copy"} size={13} />
+              {copied ? t("bd.copied") : t("bd.copy")}
+            </button>
+            {showPermalink && (
+              <button
+                type="button"
+                onClick={copyLink}
+                className="h-9 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11.5px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors flex items-center gap-1.5"
+                aria-label={t("bd.copy_link")}
+              >
+                <span aria-hidden>🔗</span>
+                {linkCopied ? t("bd.link_copied") : t("bd.copy_link")}
+              </button>
+            )}
+          </div>
+        }
+      />
 
       {/* ── Subtitle ────────────────────────────────────────────── */}
       <div className="px-5 sm:px-7 pt-5 text-[12.5px] text-[var(--text-faint)] leading-relaxed max-w-3xl">

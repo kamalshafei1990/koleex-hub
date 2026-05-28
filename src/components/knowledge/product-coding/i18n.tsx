@@ -18,6 +18,7 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useState,
   type ReactNode,
 } from "react";
@@ -436,7 +437,95 @@ const UI: Record<string, Record<Lang, string>> = {
     ar: "v26 · آلات الملابس",
   },
 
-  // Language selector
+  // Category decoded / planned meta
+  "cat.coverage": {
+    en: "{decoded}/{total} decoded",
+    zh: "已解码 {decoded}/{total}",
+    ar: "موثّقة {decoded}/{total}",
+  },
+  "cat.planned_badge": {
+    en: "Planned",
+    zh: "计划中",
+    ar: "مخطّط",
+  },
+
+  // Compare two codes
+  "compare.eyebrow": {
+    en: "Compare",
+    zh: "比较",
+    ar: "مقارنة",
+  },
+  "compare.title": {
+    en: "Compare two codes.",
+    zh: "比较两个编码。",
+    ar: "قارن بين رمزين.",
+  },
+  "compare.sub": {
+    en: "Pick a machine type, build two codes, and the axes that differ light up.",
+    zh: "选择一个机型，组合两个编码，差异轴会高亮显示。",
+    ar: "اختر نوع آلة، اِبنِ رمزين، وستُضاء المحاور المختلفة.",
+  },
+  "compare.side_a": {
+    en: "Code A",
+    zh: "编码 A",
+    ar: "الرمز A",
+  },
+  "compare.side_b": {
+    en: "Code B",
+    zh: "编码 B",
+    ar: "الرمز B",
+  },
+  "compare.diff_axes": {
+    en: "{n} axes differ",
+    zh: "{n} 个轴存在差异",
+    ar: "اختلاف في {n} من المحاور",
+  },
+  "compare.no_diff": {
+    en: "Codes match exactly",
+    zh: "两个编码完全相同",
+    ar: "الرمزان متطابقان تماماً",
+  },
+  "compare.pick_type": {
+    en: "Machine type:",
+    zh: "机型：",
+    ar: "نوع الآلة:",
+  },
+
+  // Permalink
+  "bd.copy_link": {
+    en: "Copy link",
+    zh: "复制链接",
+    ar: "نسخ الرابط",
+  },
+  "bd.link_copied": {
+    en: "Link copied",
+    zh: "已复制链接",
+    ar: "تم نسخ الرابط",
+  },
+
+  // Search by code
+  "search.placeholder": {
+    en: "Search by code or label (e.g. XSEB, embroidery)…",
+    zh: "按编码或标签搜索（例如 XSEB、刺绣）…",
+    ar: "البحث بالرمز أو الاسم (مثال: XSEB، تطريز)…",
+  },
+  "search.clear": {
+    en: "Clear",
+    zh: "清除",
+    ar: "مسح",
+  },
+  "search.no_results": {
+    en: "No matches",
+    zh: "无匹配",
+    ar: "لا توجد نتائج",
+  },
+  "search.result_count": {
+    en: "{n} matches",
+    zh: "{n} 个匹配",
+    ar: "{n} نتيجة",
+  },
+
+  // Language selector (removed locally — Hub header drives it)
   "lang.label": {
     en: "Language",
     zh: "语言",
@@ -984,12 +1073,45 @@ const LangContext = createContext<LangCtx>({
   dir: "ltr",
 });
 
+/* Reads from the Hub-wide language signal:
+     · localStorage["koleex-lang"]   ← initial value, written by MainHeader
+     · window "langchange" event     ← live updates when the user picks a
+       new language from the main system header.
+
+   Setting a language locally (rare) also writes back to localStorage and
+   dispatches "langchange" so the rest of the page tree stays in sync. */
 export function LangProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>("en");
   const dir: Dir = lang === "ar" ? "rtl" : "ltr";
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("koleex-lang") as Lang | null;
+      if (saved === "en" || saved === "zh" || saved === "ar") {
+        setLangState(saved);
+      }
+    } catch {
+      /* localStorage may be unavailable (SSR, sandbox) — fall back to en */
+    }
+    const handler = ((e: CustomEvent<Lang>) => {
+      if (e.detail === "en" || e.detail === "zh" || e.detail === "ar") {
+        setLangState(e.detail);
+      }
+    }) as EventListener;
+    window.addEventListener("langchange", handler);
+    return () => window.removeEventListener("langchange", handler);
+  }, []);
+
   function setLang(l: Lang) {
     setLangState(l);
+    try {
+      window.localStorage.setItem("koleex-lang", l);
+      window.dispatchEvent(new CustomEvent("langchange", { detail: l }));
+    } catch {
+      /* ignore */
+    }
   }
+
   return (
     <LangContext.Provider value={{ lang, setLang, dir }}>
       {children}

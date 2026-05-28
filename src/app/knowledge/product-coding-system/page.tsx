@@ -18,14 +18,14 @@ import {
 import BreakdownCard from "@/components/knowledge/product-coding/BreakdownCard";
 import CodeBuilder from "@/components/knowledge/product-coding/CodeBuilder";
 import AIParseFlow from "@/components/knowledge/product-coding/AIParseFlow";
+import CompareCodes from "@/components/knowledge/product-coding/CompareCodes";
+import SearchByCode from "@/components/knowledge/product-coding/SearchByCode";
 import { taxonomyLogoUrl } from "@/components/knowledge/product-coding/taxonomy-logo";
 import {
   LangProvider,
   useLang,
   useT,
   useTL,
-  LANGS,
-  type Lang,
 } from "@/components/knowledge/product-coding/i18n";
 import {
   CATEGORIES,
@@ -56,39 +56,6 @@ function CategoryIcon({ slug, label }: { slug: string; label: string }) {
   );
 }
 
-/* ── Language selector — three-pill segmented control ──────────── */
-function LangSelector() {
-  const { lang, setLang } = useLang();
-  return (
-    <div
-      role="radiogroup"
-      aria-label="Language"
-      className="inline-flex items-center gap-0.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-0.5"
-    >
-      {LANGS.map((l) => {
-        const isActive = lang === l.code;
-        return (
-          <button
-            key={l.code}
-            type="button"
-            role="radio"
-            aria-checked={isActive}
-            onClick={() => setLang(l.code as Lang)}
-            dir={l.dir}
-            className={`h-7 px-2.5 rounded-md text-[11.5px] font-semibold transition-colors ${
-              isActive
-                ? "bg-[var(--text-primary)] text-[var(--bg-primary)]"
-                : "text-[var(--text-faint)] hover:text-[var(--text-primary)]"
-            }`}
-          >
-            {l.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 export default function ProductCodingSystemPage() {
   return (
     <LangProvider>
@@ -107,28 +74,35 @@ function PageInner() {
       dir={dir}
       className="relative min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]"
     >
+      {/* ── Print stylesheet — hide page chrome, keep document content ── */}
+      <style jsx global>{`
+        @media print {
+          @page { size: A4; margin: 14mm 12mm; }
+          html, body { background: #fff !important; color: #000 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .no-print { display: none !important; }
+          a { color: inherit !important; text-decoration: none !important; }
+          section { break-inside: avoid; }
+        }
+      `}</style>
       {/* ── Breadcrumb bar ─────────────────────────────────────────── */}
-      <div className="border-b border-[var(--border-faint)]">
-        <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <Link
-              href="/knowledge"
-              aria-label={t("nav.back")}
-              className="h-8 w-8 flex items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--text-primary)] transition-colors"
-            >
-              <ArrowLeftIcon className={`h-4 w-4 ${dir === "rtl" ? "rotate-180" : ""}`} />
+      <div className="border-b border-[var(--border-faint)] no-print">
+        <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-4 flex items-center gap-3">
+          <Link
+            href="/knowledge"
+            aria-label={t("nav.back")}
+            className="h-8 w-8 flex items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--text-primary)] transition-colors"
+          >
+            <ArrowLeftIcon className={`h-4 w-4 ${dir === "rtl" ? "rotate-180" : ""}`} />
+          </Link>
+          <div className="flex items-center gap-2 text-[12px] text-[var(--text-faint)]">
+            <Link href="/knowledge" className="hover:text-[var(--text-primary)]">
+              {t("nav.knowledge")}
             </Link>
-            <div className="flex items-center gap-2 text-[12px] text-[var(--text-faint)]">
-              <Link href="/knowledge" className="hover:text-[var(--text-primary)]">
-                {t("nav.knowledge")}
-              </Link>
-              <span className="text-[var(--text-dim)]">/</span>
-              <span className="text-[var(--text-primary)] font-medium">
-                {t("doc.title_short")}
-              </span>
-            </div>
+            <span className="text-[var(--text-dim)]">/</span>
+            <span className="text-[var(--text-primary)] font-medium">
+              {t("doc.title_short")}
+            </span>
           </div>
-          <LangSelector />
         </div>
       </div>
 
@@ -204,6 +178,9 @@ function PageInner() {
                 </span>
               }
             />
+            <div className="mb-5 no-print max-w-md">
+              <SearchByCode />
+            </div>
             <CategoryGrid categories={CATEGORIES} />
 
             {/* ── Subcategory index ── */}
@@ -226,7 +203,8 @@ function PageInner() {
                 {CATEGORIES.map((c) => (
                   <div
                     key={c.code}
-                    className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5"
+                    data-cat-anchor={c.code}
+                    className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 transition-shadow scroll-mt-24"
                   >
                     {/* Category header — icon + code + label + count */}
                     <div className="flex items-center gap-3 pb-3 mb-3 border-b border-[var(--border-faint)]">
@@ -349,6 +327,17 @@ function PageInner() {
             </div>
           </section>
 
+          {/* ═══ 03b · COMPARE TWO CODES ═══════════════════════════════ */}
+          <section id="compare" className="scroll-mt-20 no-print">
+            <SectionHeader
+              number="03b"
+              eyebrow={t("compare.eyebrow")}
+              title={t("compare.title")}
+              sub={t("compare.sub")}
+            />
+            <CompareCodes />
+          </section>
+
           {/* ═══ 04 · SKU BUILDER ════════════════════════════════════ */}
           <section id="builder" className="scroll-mt-20">
             <SectionHeader
@@ -464,7 +453,7 @@ function PageInner() {
           {/* ═══ Document signature ════════════════════════════════════ */}
           <div className="border-t border-[var(--border-faint)] pt-6 flex flex-wrap items-center justify-between gap-3 text-[10.5px] font-medium tracking-[0.18em] uppercase text-[var(--text-faint)]">
             <span>{t("footer.architecture")}</span>
-            <span className="font-mono" dir="ltr">v27 · {tl("Garment Machinery")}</span>
+            <span className="font-mono" dir="ltr">v28 · {tl("Garment Machinery")}</span>
           </div>
         </div>
       </div>

@@ -19,6 +19,18 @@ import type { Category, Division, Subcategory } from "./data";
 import { taxonomyLogoUrl } from "./taxonomy-logo";
 import { useT, useTL } from "./i18n";
 
+/* Set of subcategory codes that ship full technical decoding today.
+   Drives the coverage badge on every category tile. Update this when
+   new BreakdownCards land. */
+const DECODED_SUBCATEGORY_CODES = new Set(["XSL", "XSO", "XSI"]);
+
+function decodedCountFor(c: Category): number {
+  return c.subcategories.reduce(
+    (n, s) => n + (DECODED_SUBCATEGORY_CODES.has(s.code) ? 1 : 0),
+    0,
+  );
+}
+
 /* Storage-hosted SVG renderer for taxonomy logos. */
 function TaxonomyLogo({
   folder,
@@ -137,11 +149,24 @@ export function CategoryGrid({ categories }: { categories: Category[] }) {
                       ? t("cat.subs_short_singular")
                       : t("cat.subs_short_plural")}
                   </span>
-                  {c.hasBreakdown && (
-                    <span className="text-[8.5px] font-bold uppercase tracking-[0.16em] px-1.5 py-0.5 rounded-full border border-[var(--text-primary)] text-[var(--text-primary)]">
-                      {t("cat.decoded_badge")}
-                    </span>
-                  )}
+                  {(() => {
+                    const decoded = decodedCountFor(c);
+                    if (decoded > 0) {
+                      return (
+                        <span className="text-[8.5px] font-bold uppercase tracking-[0.16em] px-1.5 py-0.5 rounded-full border border-[var(--text-primary)] text-[var(--text-primary)]">
+                          {t("cat.coverage", {
+                            decoded,
+                            total: c.subcategories.length,
+                          })}
+                        </span>
+                      );
+                    }
+                    return (
+                      <span className="text-[8.5px] font-bold uppercase tracking-[0.16em] px-1.5 py-0.5 rounded-full border border-dashed border-[var(--border-subtle)] text-[var(--text-faint)]">
+                        {t("cat.planned_badge")}
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
 
