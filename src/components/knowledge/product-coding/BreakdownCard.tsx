@@ -1,24 +1,47 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   BreakdownCard — v17.
+   BreakdownCard — v22.
 
-   Visual grammar is now identical to the Live SKU builder:
+   Each XSL / XSO / XSI card is now a live mini SKU builder:
 
-     · rounded-2xl outer shell, border-[var(--border-subtle)]
-     · header with the radial-gradient bg, an eyebrow label (uppercase
-       tracking), and the example code in big monospace bold (22/28px)
-     · body is a vertical stack of axis blocks — each block has the
-       same hover bg-swap + number-circle + UPPERCASE label header +
-       wrap-flow of code/meaning pill buttons that the builder uses.
-
-   The card stays interactive on the formula row: hovering a numbered
-   axis pill OR an axis block highlights the matching axis everywhere
-   on the card. Click to lock.
+     · The big monospace code in the header updates in real time as the
+       user clicks value pills. Pills behave exactly like the Live SKU
+       builder selectors — selected pill inverts to black-on-white.
+     · A Copy button writes the live code to clipboard; a Reset button
+       restores the canonical example. Both sit in the header.
+     · Formula cells reflect the LIVE state, not the static example.
+       Empty axes render as a dashed empty box; filled axes show their
+       current value.
+     · Hover/click on a formula cell or its axis block still highlights
+       the matching axis everywhere on the card (the V17 affordance).
    --------------------------------------------------------------------------- */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { CodingBreakdownDef } from "./data";
+import { HubIcon } from "./icon-registry";
+
+type Selection = Record<number, string>;
+
+function initialFromDef(def: CodingBreakdownDef): Selection {
+  const s: Selection = {};
+  for (const seg of def.segments) {
+    s[seg.index] = seg.empty ? "" : seg.value;
+  }
+  return s;
+}
+
+/* Build a canonical code string from the current selection. Mirrors the
+   SKU-builder rule: empty + "/" segments are skipped from the joined
+   code; everything else is dash-joined after the prefix. */
+function buildCode(def: CodingBreakdownDef, sel: Selection): string {
+  const parts: string[] = [def.prefix];
+  for (const seg of def.segments) {
+    const v = sel[seg.index];
+    if (v && v !== "" && v !== "/") parts.push(v);
+  }
+  return parts.join("-");
+}
 
 function FormulaCell({
   value,
@@ -98,13 +121,43 @@ function Dash() {
 }
 
 export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
+  /* Hover/active axis highlight (kept from v17). */
   const [active, setActive] = useState<number | null>(null);
   const [hover, setHover] = useState<number | null>(null);
   const effective = hover ?? active;
 
-  function toggle(idx: number) {
+  /* Live selection state — each axis carries the current picked value. */
+  const initial = useMemo(() => initialFromDef(def), [def]);
+  const [sel, setSel] = useState<Selection>(initial);
+  const builtCode = useMemo(() => buildCode(def, sel), [def, sel]);
+
+  /* Copy-to-clipboard state. */
+  const [copied, setCopied] = useState(false);
+
+  function toggleAxis(idx: number) {
     setActive((cur) => (cur === idx ? null : idx));
   }
+
+  function pickValue(segNumber: number, code: string) {
+    setSel((cur) => ({ ...cur, [segNumber]: code }));
+  }
+
+  function reset() {
+    setSel(initial);
+    setActive(null);
+  }
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(builtCode);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const isDirty = JSON.stringify(sel) !== JSON.stringify(initial);
 
   return (
     <article
@@ -121,23 +174,46 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
       >
         <div className="min-w-0">
           <div className="text-[10.5px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)]">
-            {def.title.split(" · ")[0]} · Reference card
+            {def.title.split(" · ")[0]} · Live reference
           </div>
           <div className="mt-2 font-mono text-[22px] sm:text-[28px] font-bold tracking-wider text-[var(--text-primary)] truncate">
-            {def.example}
+            {builtCode}
           </div>
         </div>
-        <div className="px-3 h-9 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] flex items-center font-mono text-[12px] font-bold tracking-wider text-[var(--text-primary)] shrink-0">
-          {def.prefix}
+
+        {/* Header toolbar — Reset + Copy */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={reset}
+            disabled={!isDirty}
+            className="h-9 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11.5px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+            aria-label="Reset to canonical example"
+          >
+            <span aria-hidden>↺</span>
+            Reset
+          </button>
+          <button
+            type="button"
+            onClick={copy}
+            className="h-9 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11.5px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors flex items-center gap-1.5"
+            aria-label="Copy code"
+          >
+            <HubIcon domain="utility" k={copied ? "check" : "copy"} size={13} />
+            {copied ? "Copied" : "Copy"}
+          </button>
         </div>
       </div>
 
       {/* ── Subtitle ───────────────────────────────────────────── */}
       <div className="px-5 sm:px-7 pt-5 text-[12.5px] text-[var(--text-faint)] leading-relaxed max-w-3xl">
-        {def.subtitle}
+        {def.subtitle}{" "}
+        <span className="text-[var(--text-primary)] font-medium">
+          Click any value below to compose a code — reset returns to the canonical example.
+        </span>
       </div>
 
-      {/* ── Formula anatomy strip ───────────────────────────────── */}
+      {/* ── Formula anatomy strip — reflects LIVE selection ─────── */}
       <div className="px-5 sm:px-7 pt-5 pb-2">
         <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)] mb-3">
           Code anatomy
@@ -146,37 +222,41 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
           <div className="flex items-end gap-1.5 min-w-max justify-center">
             <FormulaCell value={def.prefix} prefix />
             <Dash />
-            {def.segments.map((s, i) => (
-              <span key={i} className="flex items-end gap-1.5">
-                {s.sep === "before" && <Dash />}
-                <FormulaCell
-                  value={s.value}
-                  index={s.index}
-                  empty={s.empty}
-                  active={effective === s.index}
-                  dimmed={effective !== null && effective !== s.index}
-                  onEnter={() => setHover(s.index)}
-                  onLeave={() => setHover(null)}
-                  onClick={() => toggle(s.index)}
-                />
-              </span>
-            ))}
+            {def.segments.map((s, i) => {
+              const v = sel[s.index] ?? "";
+              const isEmpty = v === "" || v === "/";
+              return (
+                <span key={i} className="flex items-end gap-1.5">
+                  {s.sep === "before" && <Dash />}
+                  <FormulaCell
+                    value={isEmpty ? "" : v}
+                    index={s.index}
+                    empty={isEmpty}
+                    active={effective === s.index}
+                    dimmed={effective !== null && effective !== s.index}
+                    onEnter={() => setHover(s.index)}
+                    onLeave={() => setHover(null)}
+                    onClick={() => toggleAxis(s.index)}
+                  />
+                </span>
+              );
+            })}
           </div>
         </div>
       </div>
 
-      {/* ── Axis selector list — IDENTICAL to SKU builder ──────── */}
+      {/* ── Axis selector list — clickable pills set the segment ── */}
       <div className="p-5 sm:p-7 pt-3 space-y-4">
         {def.tables.map((t) => {
           const isActive = effective === t.segmentNumber;
           const isDimmed = effective !== null && !isActive;
+          const current = sel[t.segmentNumber] ?? "";
           return (
             <div
               key={t.segmentNumber}
               onMouseEnter={() => setHover(t.segmentNumber)}
               onMouseLeave={() => setHover(null)}
-              onClick={() => toggle(t.segmentNumber)}
-              className={`rounded-lg p-3 transition-colors cursor-pointer ${
+              className={`rounded-lg p-3 transition-colors ${
                 isActive
                   ? "bg-[var(--bg-surface-subtle)]"
                   : "hover:bg-[var(--bg-surface-subtle)]"
@@ -189,23 +269,41 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
                 <div className="text-[11.5px] font-semibold text-[var(--text-primary)] uppercase tracking-wider">
                   {t.title}
                 </div>
+                {current && current !== "" && current !== "/" && (
+                  <div className="ml-auto text-[10px] font-mono font-bold text-[var(--text-faint)] uppercase tracking-wider">
+                    {current}
+                  </div>
+                )}
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {t.rows.map((r) => (
-                  <button
-                    key={r.code}
-                    type="button"
-                    title={r.meaning}
-                    className="h-7 px-2.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[11px] font-mono text-[var(--text-muted)] hover:bg-[var(--bg-surface)] transition-colors flex items-center"
-                  >
-                    <span className="font-bold text-[var(--text-primary)]">
-                      {r.code}
-                    </span>
-                    <span className="ml-1.5 hidden sm:inline opacity-80 font-sans font-medium">
-                      {r.meaning}
-                    </span>
-                  </button>
-                ))}
+                {t.rows.map((r) => {
+                  const isSelected = current === r.code;
+                  return (
+                    <button
+                      key={r.code}
+                      type="button"
+                      title={r.meaning}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        pickValue(t.segmentNumber, r.code);
+                      }}
+                      className={`h-7 px-2.5 rounded-md border text-[11px] font-mono transition-colors flex items-center ${
+                        isSelected
+                          ? "border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-primary)]"
+                          : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[var(--text-muted)] hover:bg-[var(--bg-surface)]"
+                      }`}
+                    >
+                      <span
+                        className={`font-bold ${isSelected ? "" : "text-[var(--text-primary)]"}`}
+                      >
+                        {r.code}
+                      </span>
+                      <span className="ml-1.5 hidden sm:inline opacity-80 font-sans font-medium">
+                        {r.meaning}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           );
