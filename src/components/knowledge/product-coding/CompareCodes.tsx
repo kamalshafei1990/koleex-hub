@@ -149,6 +149,7 @@ export default function CompareCodes() {
           <BreakdownCard
             def={def}
             showPermalink={false}
+            compact
             onSelChange={setSelA}
             key={`A-${defId}`}
           />
@@ -160,6 +161,7 @@ export default function CompareCodes() {
           <BreakdownCard
             def={def}
             showPermalink={false}
+            compact
             onSelChange={setSelB}
             key={`B-${defId}`}
           />

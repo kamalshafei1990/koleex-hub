@@ -140,12 +140,17 @@ function Dash() {
 export default function BreakdownCard({
   def,
   showPermalink = true,
+  compact = false,
   onSelChange,
 }: {
   def: CodingBreakdownDef;
   /** When true, the URL ?code= is synced and a "Copy link" button shows.
       Default true. Compare passes false so its two cards stay independent. */
   showPermalink?: boolean;
+  /** Compact mode (Compare children): hides the Reset/Copy/Copy-link
+      toolbar and the ProductMatches block so the card stays focused on
+      composition. */
+  compact?: boolean;
   /** Optional observer fired on every selection change. Used by Compare
       to compute axis-level diffs between the two cards. */
   onSelChange?: (sel: Selection) => void;
@@ -280,38 +285,40 @@ export default function BreakdownCard({
           </div>
         }
         trailing={
-          <div className="no-print flex items-center gap-2">
-            <button
-              type="button"
-              onClick={reset}
-              disabled={!isDirty}
-              className="h-9 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11.5px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
-              aria-label={t("bd.reset")}
-            >
-              <span aria-hidden>↺</span>
-              {t("bd.reset")}
-            </button>
-            <button
-              type="button"
-              onClick={copy}
-              className="h-9 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11.5px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors flex items-center gap-1.5"
-              aria-label={t("bd.copy")}
-            >
-              <HubIcon domain="utility" k={copied ? "check" : "copy"} size={13} />
-              {copied ? t("bd.copied") : t("bd.copy")}
-            </button>
-            {showPermalink && (
+          compact ? undefined : (
+            <div className="no-print flex items-center gap-2">
               <button
                 type="button"
-                onClick={copyLink}
-                className="h-9 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11.5px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors flex items-center gap-1.5"
-                aria-label={t("bd.copy_link")}
+                onClick={reset}
+                disabled={!isDirty}
+                className="h-9 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11.5px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                aria-label={t("bd.reset")}
               >
-                <span aria-hidden>🔗</span>
-                {linkCopied ? t("bd.link_copied") : t("bd.copy_link")}
+                <span aria-hidden>↺</span>
+                {t("bd.reset")}
               </button>
-            )}
-          </div>
+              <button
+                type="button"
+                onClick={copy}
+                className="h-9 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11.5px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors flex items-center gap-1.5"
+                aria-label={t("bd.copy")}
+              >
+                <HubIcon domain="utility" k={copied ? "check" : "copy"} size={13} />
+                {copied ? t("bd.copied") : t("bd.copy")}
+              </button>
+              {showPermalink && (
+                <button
+                  type="button"
+                  onClick={copyLink}
+                  className="h-9 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11.5px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors flex items-center gap-1.5"
+                  aria-label={t("bd.copy_link")}
+                >
+                  <span aria-hidden>🔗</span>
+                  {linkCopied ? t("bd.link_copied") : t("bd.copy_link")}
+                </button>
+              )}
+            </div>
+          )
         }
       />
 
@@ -438,8 +445,8 @@ export default function BreakdownCard({
         </div>
       </div>
 
-      {/* ── v30: Real products using this configuration ─────────── */}
-      {showPermalink && <ProductMatches prefix={def.prefix} sel={sel} />}
+      {/* ── v30: Real products using this configuration (hidden in compact mode) ── */}
+      {showPermalink && !compact && <ProductMatches prefix={def.prefix} sel={sel} />}
     </article>
   );
 }

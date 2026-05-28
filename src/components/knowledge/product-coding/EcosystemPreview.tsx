@@ -23,15 +23,9 @@ type Preview = {
   capabilities: Array<"ai" | "erp" | "compat">;
 };
 
+/* Future-state preview only — Garment Machinery is already covered by
+   the DivisionStrip above this component. */
 const PREVIEWS: Preview[] = [
-  {
-    divisionId: "garment-machinery",
-    divisionLabel: "Garment Machinery",
-    prefix: "X",
-    exampleCode: "XSL-Q10-5-E-560-M",
-    status: "live",
-    capabilities: ["ai", "erp", "compat"],
-  },
   {
     divisionId: "smart-living",
     divisionLabel: "Smart Living",

@@ -65,7 +65,7 @@ function ActionLink({ children }: { children: React.ReactNode }) {
   return (
     <button
       type="button"
-      className="h-7 px-2.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[10.5px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors whitespace-nowrap"
+      className="h-7 px-2.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[10px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors whitespace-nowrap shrink-0"
     >
       {children}
     </button>
