@@ -1,29 +1,27 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   BreakdownCard — v11.
+   BreakdownCard — v12.
 
-   One self-contained, interactive AND print-friendly card for a single
-   subcategory (XSL / XSO / XSI). The visual grammar mirrors the printed
-   reference cards Kimo uses:
+   One self-contained interactive reference card for a single subcategory
+   (XSL / XSO / XSI). The visual grammar mirrors the printed reference
+   cards: formula row of bordered, numbered axis cells across the top,
+   bilingual label strip beneath, then a column-grid of value tables —
+   one per axis.
 
-     · Big formula row across the top — bordered boxes per axis with
-       a numbered circle below each. Hovering / clicking a box highlights
-       the matching value table below.
-     · Bilingual label strip (Chinese 中 + English) under the formula —
-       same layout as the printed cards.
-     · Value tables in a column grid, one per axis. Code cell on the
-       left (dark), meaning on the right (subtle bg).
-     · Print: each card forces a page break before, and the interactive
-       chrome (hover hints, copy button) is hidden via @media print.
-
-   Used as a stack of three on the knowledge page — NOT as tabs.
+   Brand-aligned (Koleex monochrome):
+     · No accent colors, no glows, no scale animations.
+     · Hover/focus on any axis → matching value table inverts (white-on-
+       black). Other tables fade. Click locks the state.
+     · Sharp 1px hairline borders. No rounded-2xl decorative shells.
+     · Reads cleanly at any size, on any device, printed or on-screen —
+       without needing a dedicated print stylesheet.
    --------------------------------------------------------------------------- */
 
 import { useState } from "react";
 import type { CodingBreakdownDef } from "./data";
 
-/* ── Single bordered formula cell with optional numbered circle. ────── */
+/* ── Single formula cell with optional numbered circle below. ─────────── */
 function FormulaCell({
   value,
   index,
@@ -38,7 +36,6 @@ function FormulaCell({
   value: string;
   index?: number;
   empty?: boolean;
-  /** Render as the leading prefix block (XSL / XSO / XSI). No number circle, no interaction. */
   prefix?: boolean;
   active?: boolean;
   dimmed?: boolean;
@@ -46,41 +43,48 @@ function FormulaCell({
   onLeave?: () => void;
   onClick?: () => void;
 }) {
-  const Box = prefix ? "div" : "button";
+  const interactive = !prefix;
+  const Box: "div" | "button" = interactive ? "button" : "div";
+
   return (
     <Box
-      type={prefix ? undefined : "button"}
-      onMouseEnter={onEnter}
-      onMouseLeave={onLeave}
-      onFocus={onEnter}
-      onBlur={onLeave}
-      onClick={onClick}
-      aria-pressed={!prefix ? (active ? "true" : "false") : undefined}
-      className="group flex flex-col items-center gap-2 shrink-0 outline-none"
+      {...(interactive
+        ? {
+            type: "button" as const,
+            onMouseEnter: onEnter,
+            onMouseLeave: onLeave,
+            onFocus: onEnter,
+            onBlur: onLeave,
+            onClick,
+            "aria-pressed": active ? "true" : "false",
+          }
+        : {})}
+      className="flex flex-col items-center gap-2 shrink-0 outline-none"
     >
       <div
-        className={`relative flex items-center justify-center min-w-[60px] h-12 sm:h-14 px-3 rounded-md border-2 text-[16px] sm:text-[18px] font-bold tracking-wider font-mono transition-all duration-200 ${
+        className={`flex items-center justify-center min-w-[60px] h-12 px-3 border text-[16px] font-bold tracking-wider font-mono transition-colors duration-150 ${
           empty
-            ? "border-dashed border-[var(--border-subtle)] text-[var(--text-dim)] bg-[var(--bg-surface)] print:border-gray-400 print:text-gray-400 print:bg-white"
+            ? "border-dashed border-[var(--border-subtle)] text-[var(--text-dim)] bg-[var(--bg-surface)]"
             : prefix
-              ? "border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-primary)] print:bg-black print:text-white print:border-black"
+              ? "border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-primary)]"
               : active
-                ? "border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-primary)] scale-[1.05] print:bg-black print:text-white print:border-black"
-                : "border-[var(--text-primary)] bg-[var(--bg-surface)] text-[var(--text-primary)] group-hover:bg-[var(--bg-surface-hover)] print:bg-white print:text-black print:border-black"
-        } ${dimmed ? "opacity-40 print:opacity-100" : "opacity-100"}`}
+                ? "border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-primary)]"
+                : "border-[var(--text-primary)] bg-[var(--bg-surface)] text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]"
+        } ${dimmed ? "opacity-40" : ""}`}
       >
-        {empty ? "" : value || (prefix ? "" : "")}
+        {empty ? "" : value}
       </div>
-      {!prefix && typeof index === "number" && (
+      {interactive && typeof index === "number" ? (
         <div
-          className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold leading-none transition-all duration-200 bg-[var(--text-primary)] text-[var(--bg-primary)] print:bg-black print:text-white ${
-            active ? "scale-110 ring-2 ring-[var(--text-primary)]/30 print:ring-0" : ""
-          } ${dimmed ? "opacity-40 print:opacity-100" : ""}`}
+          className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold leading-none bg-[var(--text-primary)] text-[var(--bg-primary)] ${
+            dimmed ? "opacity-40" : ""
+          }`}
         >
           {index}
         </div>
+      ) : (
+        <div className="h-6" aria-hidden />
       )}
-      {prefix && <div className="h-6" />}
     </Box>
   );
 }
@@ -88,16 +92,15 @@ function FormulaCell({
 function Dash() {
   return (
     <div className="flex flex-col items-center gap-2 shrink-0">
-      <div className="flex items-center justify-center h-12 sm:h-14 px-1 text-[var(--text-dim)] text-[18px] font-bold print:text-black">
+      <div className="flex items-center justify-center h-12 px-1 text-[var(--text-dim)] text-[18px] font-bold">
         —
       </div>
-      <div className="h-6" />
+      <div className="h-6" aria-hidden />
     </div>
   );
 }
 
 export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
-  /* active = locked (click); hover = transient. Effective = hover ?? active. */
   const [active, setActive] = useState<number | null>(null);
   const [hover, setHover] = useState<number | null>(null);
   const effective = hover ?? active;
@@ -106,49 +109,35 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
     setActive((cur) => (cur === idx ? null : idx));
   }
 
-  function handlePrint() {
-    if (typeof window !== "undefined") window.print();
-  }
-
   return (
     <article
       id={def.id}
-      className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden print:bg-white print:border-black print:rounded-none print:break-inside-avoid print:break-before-page"
+      className="border border-[var(--text-primary)] bg-[var(--bg-secondary)] overflow-hidden"
     >
-      {/* ── Card header ────────────────────────────────────────────── */}
-      <header className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-7 sm:py-5 border-b border-[var(--border-faint)] bg-[var(--bg-surface)] print:bg-white print:border-black">
-        <div className="flex items-center gap-4 min-w-0">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg border-2 border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-primary)] font-mono font-bold text-[15px] tracking-wider print:bg-black print:text-white print:border-black">
+      {/* ── Card header — black bar, prefix + title + example ─────── */}
+      <header className="flex flex-wrap items-center justify-between gap-4 px-6 py-4 bg-[var(--text-primary)] text-[var(--bg-primary)]">
+        <div className="flex items-baseline gap-4 min-w-0">
+          <div className="font-mono font-bold text-[18px] tracking-[0.06em] shrink-0">
             {def.prefix}
           </div>
-          <div className="min-w-0">
-            <h3 className="text-[18px] sm:text-[20px] font-semibold tracking-tight text-[var(--text-primary)] print:text-black">
-              {def.title}
-            </h3>
-            <p className="mt-0.5 text-[12px] text-[var(--text-faint)] max-w-2xl leading-relaxed print:text-gray-700">
-              {def.subtitle}
-            </p>
-          </div>
+          <div className="h-5 w-px bg-[var(--bg-primary)]/40 shrink-0" aria-hidden />
+          <h3 className="text-[15px] font-semibold tracking-tight truncate">
+            {def.title.split(" · ")[0]}
+          </h3>
         </div>
-        <div className="flex items-center gap-2 print:hidden">
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[var(--bg-secondary)] border border-[var(--border-faint)] font-mono text-[11px] text-[var(--text-dim)]">
-            <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500/70" />
-            {def.example}
-          </div>
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="h-8 px-3 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"
-            aria-label={`Print ${def.title} card`}
-          >
-            Print ⎙
-          </button>
+        <div className="font-mono text-[11.5px] tracking-wider opacity-80 shrink-0">
+          {def.example}
         </div>
       </header>
 
-      {/* ── Formula row ────────────────────────────────────────────── */}
-      <div className="px-5 sm:px-7 pt-6 print:pt-4">
-        <div className="overflow-x-auto -mx-2 px-2 pb-2 print:overflow-visible">
+      {/* ── Subtitle ─────────────────────────────────────────────── */}
+      <div className="px-6 pt-4 pb-2 text-[12.5px] text-[var(--text-faint)] leading-relaxed max-w-3xl">
+        {def.subtitle}
+      </div>
+
+      {/* ── Formula row ──────────────────────────────────────────── */}
+      <div className="px-6 pt-4">
+        <div className="overflow-x-auto -mx-2 px-2 pb-2">
           <div className="flex items-end gap-1.5 min-w-max justify-center">
             <FormulaCell value={def.prefix} prefix />
             <Dash />
@@ -170,14 +159,14 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
           </div>
         </div>
 
-        {/* Bilingual labels strip — Chinese on top, English below */}
+        {/* Bilingual labels strip */}
         <div
-          className="mt-4 grid gap-px"
+          className="mt-4 grid"
           style={{
             gridTemplateColumns: `repeat(${def.segments.length}, minmax(0, 1fr))`,
           }}
         >
-          {def.segments.map((s) => {
+          {def.segments.map((s, i) => {
             const isActive = effective === s.index;
             const isDimmed = effective !== null && !isActive;
             return (
@@ -187,38 +176,31 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
                 onMouseEnter={() => setHover(s.index)}
                 onMouseLeave={() => setHover(null)}
                 onClick={() => toggle(s.index)}
-                className={`px-1.5 py-2 rounded-md border text-center transition-all duration-200 ${
+                className={`px-2 py-2 border-t border-b border-r text-center transition-colors duration-150 ${
+                  i === 0 ? "border-l" : ""
+                } ${
                   isActive
-                    ? "border-[var(--text-primary)] bg-[var(--bg-surface-active)] print:bg-gray-100 print:border-black"
-                    : "border-[var(--border-faint)] bg-[var(--bg-surface-subtle)] print:bg-white print:border-gray-400"
-                } ${isDimmed ? "opacity-50 print:opacity-100" : "opacity-100"}`}
+                    ? "border-[var(--text-primary)] bg-[var(--bg-surface-active)]"
+                    : "border-[var(--border-faint)] bg-[var(--bg-surface-subtle)]"
+                } ${isDimmed ? "opacity-50" : ""}`}
               >
                 {s.sub && (
-                  <div className="text-[10px] text-[var(--text-faint)] leading-tight print:text-gray-700">
+                  <div className="text-[10px] text-[var(--text-faint)] leading-tight">
                     {s.sub}
                   </div>
                 )}
-                <div className="text-[10.5px] font-semibold text-[var(--text-primary)] leading-tight mt-0.5 print:text-black">
+                <div className="text-[10.5px] font-semibold text-[var(--text-primary)] leading-tight mt-0.5">
                   {s.header}
                 </div>
               </button>
             );
           })}
         </div>
-
-        {/* Hover hint — interactive only, hidden in print */}
-        <div className="mt-4 text-[10.5px] font-medium tracking-[0.18em] uppercase text-[var(--text-faint)] text-center print:hidden">
-          {active !== null
-            ? `Segment ${String(active).padStart(2, "0")} locked · click again to release`
-            : effective !== null
-              ? `Hovering segment ${String(effective).padStart(2, "0")} · click to lock`
-              : "Hover or click any segment to see its allowed values"}
-        </div>
       </div>
 
-      {/* ── Value tables grid ──────────────────────────────────────── */}
-      <div className="px-5 sm:px-7 py-6 print:py-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 print:grid-cols-3 print:gap-2">
+      {/* ── Value tables grid ────────────────────────────────────── */}
+      <div className="px-6 py-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px bg-[var(--border-faint)] border border-[var(--border-faint)]">
           {def.tables.map((t) => {
             const isActive = effective === t.segmentNumber;
             const isDimmed = effective !== null && !isActive;
@@ -228,14 +210,24 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
                 onMouseEnter={() => setHover(t.segmentNumber)}
                 onMouseLeave={() => setHover(null)}
                 onClick={() => toggle(t.segmentNumber)}
-                className={`rounded-xl border overflow-hidden transition-all duration-200 cursor-pointer print:break-inside-avoid print:rounded-md ${
-                  isActive
-                    ? "border-[var(--text-primary)] bg-[var(--bg-surface)] shadow-[0_0_0_1px_var(--text-primary)] print:shadow-none print:border-black print:bg-white"
-                    : "border-[var(--border-subtle)] bg-[var(--bg-secondary)] print:bg-white print:border-gray-400"
-                } ${isDimmed ? "opacity-50 print:opacity-100" : "opacity-100"}`}
+                className={`overflow-hidden transition-opacity duration-150 cursor-pointer ${
+                  isActive ? "bg-[var(--bg-surface)]" : "bg-[var(--bg-secondary)]"
+                } ${isDimmed ? "opacity-50" : ""}`}
               >
-                <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-[var(--text-primary)] text-[var(--bg-primary)] print:bg-black print:text-white">
-                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--bg-primary)] text-[var(--text-primary)] text-[10px] font-bold print:bg-white print:text-black">
+                <div
+                  className={`flex items-center gap-2.5 px-3.5 py-2.5 ${
+                    isActive
+                      ? "bg-[var(--text-primary)] text-[var(--bg-primary)]"
+                      : "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]"
+                  }`}
+                >
+                  <div
+                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                      isActive
+                        ? "bg-[var(--bg-primary)] text-[var(--text-primary)]"
+                        : "bg-[var(--text-primary)] text-[var(--bg-primary)]"
+                    }`}
+                  >
                     {t.segmentNumber}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -243,20 +235,22 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
                       {t.title}
                     </div>
                     {t.sub && (
-                      <div className="text-[10px] opacity-75 truncate">{t.sub}</div>
+                      <div className="text-[10px] opacity-75 truncate">
+                        {t.sub}
+                      </div>
                     )}
                   </div>
                 </div>
-                <div className="divide-y divide-[var(--border-faint)] print:divide-gray-300">
+                <div className="divide-y divide-[var(--border-faint)]">
                   {t.rows.map((r) => (
                     <div
                       key={r.code}
-                      className="grid grid-cols-[80px_1fr] gap-2 print:grid-cols-[64px_1fr]"
+                      className="grid grid-cols-[68px_1fr]"
                     >
-                      <div className="px-3 py-2 text-[12px] font-bold text-[var(--text-primary)] font-mono tracking-wider bg-[var(--bg-surface-subtle)] border-r border-[var(--border-faint)] print:bg-gray-100 print:text-black print:border-gray-300">
+                      <div className="px-3 py-2 text-[12px] font-bold text-[var(--text-primary)] font-mono tracking-wider bg-[var(--bg-surface-subtle)] border-r border-[var(--border-faint)]">
                         {r.code}
                       </div>
-                      <div className="px-3 py-2 text-[12px] text-[var(--text-faint)] leading-snug print:text-black">
+                      <div className="px-3 py-2 text-[12px] text-[var(--text-faint)] leading-snug">
                         {r.meaning}
                       </div>
                     </div>

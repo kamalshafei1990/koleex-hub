@@ -53,31 +53,30 @@ export function DivisionStrip({
   currentId: string;
 }) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-px bg-[var(--border-faint)] border border-[var(--border-faint)]">
       {divisions.map((d) => {
         const isCurrent = d.id === currentId;
         const live = d.status === "live";
         return (
           <div
             key={d.id}
-            className={`relative rounded-xl border p-4 transition-colors ${
+            className={`relative p-4 transition-colors ${
               isCurrent
-                ? "border-[var(--text-primary)] bg-[var(--bg-surface)]"
-                : "border-[var(--border-subtle)] bg-[var(--bg-secondary)]"
+                ? "bg-[var(--bg-surface)]"
+                : "bg-[var(--bg-secondary)]"
             }`}
           >
             <div className="flex items-center justify-between gap-2">
-              <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] overflow-hidden">
-                <TaxonomyLogo folder="divisions" slug={d.id} alt={d.name} size={28} />
+              <div className="flex h-10 w-10 items-center justify-center bg-[var(--bg-surface-subtle)] text-[var(--text-primary)] overflow-hidden">
+                <TaxonomyLogo folder="divisions" slug={d.id} alt={d.name} size={26} />
               </div>
               <span
-                className={`text-[9.5px] font-bold uppercase tracking-[0.16em] px-1.5 py-0.5 rounded-full border flex items-center gap-1 ${
+                className={`text-[9.5px] font-bold uppercase tracking-[0.16em] px-1.5 py-0.5 rounded-sm border ${
                   live
-                    ? "border-emerald-500/40 text-emerald-600 dark:text-emerald-300"
+                    ? "border-[var(--text-primary)] text-[var(--text-primary)]"
                     : "border-[var(--border-subtle)] text-[var(--text-faint)]"
                 }`}
               >
-                {live && <span aria-hidden className="h-1 w-1 rounded-full bg-emerald-500" />}
                 {live ? "Live" : "Planned"}
               </span>
             </div>
@@ -115,24 +114,24 @@ export function CategoryGrid({ categories }: { categories: Category[] }) {
               type="button"
               onClick={() => setOpenCode(isOpen ? null : c.code)}
               aria-expanded={isOpen}
-              className={`group rounded-2xl border p-5 transition-all text-left block ${
+              className={`group border p-5 transition-colors text-left block ${
                 isOpen
                   ? "border-[var(--text-primary)] bg-[var(--bg-surface)]"
-                  : "border-[var(--border-subtle)] bg-[var(--bg-secondary)] hover:border-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
+                  : "border-[var(--border-subtle)] bg-[var(--bg-secondary)] hover:border-[var(--text-primary)]"
               }`}
             >
               {/* Top row: icon + sub-count + decoded badge */}
               <div className="flex items-start justify-between gap-2 mb-4">
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] overflow-hidden">
-                  <TaxonomyLogo folder="categories" slug={c.slug} alt={c.label} size={28} />
+                <div className="flex h-10 w-10 items-center justify-center bg-[var(--bg-surface-subtle)] text-[var(--text-primary)] overflow-hidden">
+                  <TaxonomyLogo folder="categories" slug={c.slug} alt={c.label} size={26} />
                 </div>
                 <div className="flex items-center gap-1.5 pt-1">
-                  <span className="text-[10px] font-bold text-[var(--text-faint)] font-mono">
+                  <span className="text-[10px] font-medium text-[var(--text-faint)] font-mono">
                     {c.subcategories.length}{" "}
                     {c.subcategories.length === 1 ? "sub" : "subs"}
                   </span>
                   {c.hasBreakdown && (
-                    <span className="text-[8.5px] font-bold uppercase tracking-[0.16em] px-1.5 py-0.5 rounded-full border border-emerald-500/40 text-emerald-600 dark:text-emerald-300">
+                    <span className="text-[8.5px] font-bold uppercase tracking-[0.16em] px-1.5 py-0.5 border border-[var(--text-primary)] text-[var(--text-primary)]">
                       Decoded
                     </span>
                   )}
@@ -167,11 +166,11 @@ export function CategoryGrid({ categories }: { categories: Category[] }) {
 
       {/* Inline expanded panel — full grid width */}
       {open && (
-        <div className="mt-4 rounded-2xl border border-[var(--text-primary)] bg-[var(--bg-secondary)] overflow-hidden">
+        <div className="mt-4 border border-[var(--text-primary)] bg-[var(--bg-secondary)] overflow-hidden">
           {/* Header */}
           <header className="flex items-center justify-between gap-4 px-5 py-4 border-b border-[var(--border-faint)] bg-[var(--bg-surface)]">
             <div className="flex items-center gap-4 min-w-0">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-primary)] overflow-hidden shrink-0">
+              <div className="flex h-10 w-10 items-center justify-center bg-[var(--bg-surface-subtle)] text-[var(--text-primary)] overflow-hidden shrink-0">
                 <TaxonomyLogo folder="categories" slug={open.slug} alt={open.label} size={26} />
               </div>
               <div className="font-mono text-[22px] font-bold tracking-[0.04em] text-[var(--text-primary)] leading-none shrink-0">
