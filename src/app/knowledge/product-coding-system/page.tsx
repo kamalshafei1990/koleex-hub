@@ -32,6 +32,7 @@ import {
 import BreakdownCard from "@/components/knowledge/product-coding/BreakdownCard";
 import CodeBuilder from "@/components/knowledge/product-coding/CodeBuilder";
 import AIParseFlow from "@/components/knowledge/product-coding/AIParseFlow";
+import { taxonomyLogoUrl } from "@/components/knowledge/product-coding/taxonomy-logo";
 import {
   CATEGORIES,
   DIVISIONS,
@@ -41,6 +42,24 @@ import {
   PIPELINE,
   AI_CAPABILITIES,
 } from "@/components/knowledge/product-coding/data";
+
+/* Subcategory icon — pulls media/subcategories/<slug>.svg from Storage.
+   Falls back to a small dot if Storage is unreachable or the slug
+   isn't on file yet, so the row layout never breaks. */
+function SubcategoryIcon({ code, slug }: { code: string; slug?: string }) {
+  const candidate = (slug ?? code).toLowerCase();
+  const url = taxonomyLogoUrl("subcategories", candidate);
+  return (
+    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] overflow-hidden">
+      {url ? (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img src={url} alt="" width={22} height={22} style={{ width: 22, height: 22 }} />
+      ) : (
+        <span className="h-1.5 w-1.5 rounded-full bg-[var(--text-dim)]" aria-hidden />
+      )}
+    </div>
+  );
+}
 
 export default function ProductCodingSystemPage() {
   return (
@@ -189,17 +208,18 @@ export default function ProductCodingSystemPage() {
                         </div>
                       </div>
 
-                      {/* Subcategory list — label on the left, code on the right (mono) */}
+                      {/* Subcategory list — icon + label + prominent code chip */}
                       <ul className="divide-y divide-[var(--border-faint)]">
                         {c.subcategories.map((s) => (
                           <li
                             key={s.code}
-                            className="grid grid-cols-[1fr_auto] gap-3 items-center py-2"
+                            className="flex items-center gap-3 py-2.5"
                           >
-                            <span className="text-[12.5px] text-[var(--text-primary)]">
+                            <SubcategoryIcon code={s.code} slug={s.slug} />
+                            <span className="flex-1 min-w-0 text-[13px] text-[var(--text-primary)] font-medium truncate">
                               {s.label}
                             </span>
-                            <span className="font-mono text-[12.5px] font-bold tracking-[0.04em] text-[var(--text-primary)]">
+                            <span className="shrink-0 h-7 px-2.5 rounded-md border border-[var(--text-primary)] bg-[var(--bg-surface)] flex items-center font-mono text-[12px] font-bold tracking-[0.06em] text-[var(--text-primary)]">
                               {s.code}
                             </span>
                           </li>
@@ -396,7 +416,7 @@ export default function ProductCodingSystemPage() {
             {/* ═══ Document signature ══════════════════════════════════ */}
             <div className="border-t border-[var(--border-faint)] pt-6 flex flex-wrap items-center justify-between gap-3 text-[10.5px] font-medium tracking-[0.18em] uppercase text-[var(--text-faint)]">
               <span>KOLEEX Enterprise Product Intelligence Architecture</span>
-              <span className="font-mono">v19 · Garment Machinery</span>
+              <span className="font-mono">v20 · Garment Machinery</span>
             </div>
         </div>
       </div>
