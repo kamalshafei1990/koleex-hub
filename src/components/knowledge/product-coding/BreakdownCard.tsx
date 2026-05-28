@@ -24,6 +24,7 @@ import type { CodingBreakdownDef } from "./data";
 import { HubIcon } from "./icon-registry";
 import { useT, useTL, useLang } from "./i18n";
 import { HeaderShell } from "./primitives";
+import ProductMatches from "./ProductMatches";
 
 /* Map breakdown id → subtitle translation key. */
 const SUBTITLE_KEY: Record<string, string> = {
@@ -436,6 +437,9 @@ export default function BreakdownCard({
           })}
         </div>
       </div>
+
+      {/* ── v30: Real products using this configuration ─────────── */}
+      {showPermalink && <ProductMatches prefix={def.prefix} sel={sel} />}
     </article>
   );
 }

@@ -20,6 +20,8 @@ import CodeBuilder from "@/components/knowledge/product-coding/CodeBuilder";
 import AIParseFlow from "@/components/knowledge/product-coding/AIParseFlow";
 import CompareCodes from "@/components/knowledge/product-coding/CompareCodes";
 import SearchByCode from "@/components/knowledge/product-coding/SearchByCode";
+import StickyNav from "@/components/knowledge/product-coding/StickyNav";
+import EcosystemPreview from "@/components/knowledge/product-coding/EcosystemPreview";
 import { taxonomyLogoUrl } from "@/components/knowledge/product-coding/taxonomy-logo";
 import {
   LangProvider,
@@ -84,6 +86,9 @@ function PageInner() {
           section { break-inside: avoid; }
         }
       `}</style>
+      {/* v30: persistent section navigator */}
+      <StickyNav />
+
       {/* ── Breadcrumb bar ─────────────────────────────────────────── */}
       <div className="border-b border-[var(--border-faint)] no-print">
         <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-4 flex items-center gap-3">
@@ -163,6 +168,9 @@ function PageInner() {
             <div className="mt-12">
               <DivisionStrip divisions={DIVISIONS} currentId="garment-machinery" />
             </div>
+
+            {/* v30: Unified Product Intelligence Architecture preview */}
+            <EcosystemPreview />
           </section>
 
           {/* ═══ 02 · CATEGORIES ═══════════════════════════════════════ */}
@@ -453,7 +461,7 @@ function PageInner() {
           {/* ═══ Document signature ════════════════════════════════════ */}
           <div className="border-t border-[var(--border-faint)] pt-6 flex flex-wrap items-center justify-between gap-3 text-[10.5px] font-medium tracking-[0.18em] uppercase text-[var(--text-faint)]">
             <span>{t("footer.architecture")}</span>
-            <span className="font-mono" dir="ltr">v29 · {tl("Garment Machinery")}</span>
+            <span className="font-mono" dir="ltr">v30 · {tl("Garment Machinery")}</span>
           </div>
         </div>
       </div>

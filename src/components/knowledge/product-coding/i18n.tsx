@@ -532,6 +532,139 @@ const UI: Record<string, Record<Lang, string>> = {
     ar: "اللغة",
   },
 
+  // ── v30 — Real products section ────────────────────────────
+  "bd.products.title": {
+    en: "Real products using this configuration",
+    zh: "使用此配置的实际产品",
+    ar: "المنتجات الحقيقية باستخدام هذا التكوين",
+  },
+  "bd.products.meta": {
+    en: "{products} compatible products · {accessories} compatible accessories · {bom} compatible BOM variants",
+    zh: "{products} 件兼容产品 · {accessories} 件兼容配件 · {bom} 种兼容 BOM 变体",
+    ar: "{products} منتجات متوافقة · {accessories} ملحقات متوافقة · {bom} متغيرات BOM متوافقة",
+  },
+  "bd.products.none": {
+    en: "No exact matches — adjust the configuration above.",
+    zh: "暂无精确匹配 — 请调整上方配置。",
+    ar: "لا توجد مطابقات دقيقة — عدّل التكوين أعلاه.",
+  },
+  "bd.products.partial_hint": {
+    en: "Partial matches shown below — these products share some axes with your build.",
+    zh: "以下为部分匹配的产品 — 它们与您构建的编码共享部分轴。",
+    ar: "نتائج جزئية أدناه — تشترك هذه المنتجات في بعض المحاور مع رمزك.",
+  },
+  "bd.products.match_pct": {
+    en: "{pct}% match",
+    zh: "{pct}% 匹配",
+    ar: "تطابق {pct}%",
+  },
+  "bd.products.view": { en: "View product", zh: "查看产品", ar: "عرض المنتج" },
+  "bd.products.bom": { en: "Open BOM", zh: "打开 BOM", ar: "فتح BOM" },
+  "bd.products.accessories": {
+    en: "Compatible accessories",
+    zh: "兼容配件",
+    ar: "ملحقات متوافقة",
+  },
+  "bd.products.spare": { en: "Spare parts", zh: "备件", ar: "قطع الغيار" },
+  "bd.products.datasheet": { en: "Datasheet", zh: "技术参数表", ar: "ورقة البيانات" },
+
+  // ── v30 — Sticky page navigator ────────────────────────────
+  "nav.section.universe": { en: "Universe", zh: "宇宙", ar: "الكون" },
+  "nav.section.categories": { en: "Categories", zh: "类别", ar: "الفئات" },
+  "nav.section.tech": {
+    en: "Technical specs",
+    zh: "技术规范",
+    ar: "المواصفات التقنية",
+  },
+  "nav.section.compare": { en: "Compare", zh: "比较", ar: "مقارنة" },
+  "nav.section.builder": { en: "SKU builder", zh: "SKU 构建器", ar: "منشئ SKU" },
+  "nav.section.intelligence": {
+    en: "Intelligence",
+    zh: "智能层",
+    ar: "الذكاء",
+  },
+  "nav.contents": { en: "Contents", zh: "目录", ar: "المحتويات" },
+
+  // ── v30 — Compare diff + impact + score ─────────────────────
+  "compare.summary.title": {
+    en: "Difference summary",
+    zh: "差异概要",
+    ar: "ملخّص الاختلافات",
+  },
+  "compare.summary.row_differs": {
+    en: "{axis} differs",
+    zh: "{axis} 不同",
+    ar: "{axis} مختلف",
+  },
+  "compare.score.label": {
+    en: "Compatibility score",
+    zh: "兼容性评分",
+    ar: "درجة التوافق",
+  },
+  "compare.score.value": {
+    en: "{pct}% compatible",
+    zh: "兼容度 {pct}%",
+    ar: "توافق {pct}%",
+  },
+  "compare.impact.title": {
+    en: "Commercial impact",
+    zh: "商业影响",
+    ar: "الأثر التجاري",
+  },
+  "compare.impact.packing": {
+    en: "Packing size changes",
+    zh: "包装尺寸变化",
+    ar: "تغيّرات حجم التعبئة",
+  },
+  "compare.impact.price": {
+    en: "Price category changes",
+    zh: "价格类别变化",
+    ar: "تغيّرات فئة السعر",
+  },
+  "compare.impact.bom": {
+    en: "BOM changes",
+    zh: "BOM 变化",
+    ar: "تغيّرات قائمة المواد",
+  },
+  "compare.impact.accessories": {
+    en: "Accessory compatibility changes",
+    zh: "配件兼容性变化",
+    ar: "تغيّرات توافق الملحقات",
+  },
+  "compare.impact.none": {
+    en: "No commercial impact — configurations match.",
+    zh: "无商业影响 — 配置相同。",
+    ar: "لا أثر تجاري — التكوينان متطابقان.",
+  },
+
+  // ── v30 — Ecosystem preview ─────────────────────────────────
+  "eco.eyebrow": { en: "Ecosystem", zh: "生态系统", ar: "النظام البيئي" },
+  "eco.title": {
+    en: "Unified Product Intelligence Architecture",
+    zh: "统一产品智能架构",
+    ar: "بنية ذكاء المنتجات الموحّدة",
+  },
+  "eco.sub": {
+    en: "Every division will inherit the same coding grammar. The codes below are illustrative previews of how the system scales beyond Garment Machinery.",
+    zh: "每个事业部都将继承同一套编码语法。下方的编码是该系统在服装机械之外如何扩展的示意性预览。",
+    ar: "سيرث كل قسم القواعد ذاتها للترميز. الرموز أدناه أمثلة توضيحية لكيفية اتساع النظام خارج آلات الملابس.",
+  },
+  "eco.status.live": { en: "Live", zh: "已上线", ar: "مفعّل" },
+  "eco.status.in_design": {
+    en: "In design",
+    zh: "设计中",
+    ar: "قيد التصميم",
+  },
+  "eco.status.planned": { en: "Planned", zh: "计划中", ar: "مخطّط" },
+  "eco.capability.ai": { en: "AI-ready", zh: "AI 就绪", ar: "جاهز للذكاء الاصطناعي" },
+  "eco.capability.erp": { en: "ERP-ready", zh: "ERP 就绪", ar: "جاهز لـ ERP" },
+  "eco.capability.compat": {
+    en: "Compatibility-ready",
+    zh: "兼容性就绪",
+    ar: "جاهز للتوافق",
+  },
+  "eco.preview_code": { en: "Preview code", zh: "示例编码", ar: "رمز توضيحي" },
+
   // AI Parse Flow
   "ai.input_eyebrow": {
     en: "AI input · technical identity",

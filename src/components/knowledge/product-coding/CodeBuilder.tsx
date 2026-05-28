@@ -210,7 +210,12 @@ const MachineMap = memo(function MachineMap({
 }) {
   const t = useT();
   const tl = useTL();
-  const sw = (region: AxisRegion, active = 2.2, idle = 1.3) =>
+  /* v30: thinner, more consistent line weights for engineering-schematic
+     quality. Idle strokes drop from 1.3 → 1.05; active drops from 2.2
+     → 1.75 so the hover feedback stays visible without ever looking
+     "bold-ed". Sub-detail lines (vents, belts, ruler ticks) inherit
+     either the active or a 0.7-0.85 idle. */
+  const sw = (region: AxisRegion, active = 1.75, idle = 1.05) =>
     activeRegion === region ? active : idle;
 
   /* Active-region fill helpers — solid parts get a subtle inverted fill
@@ -227,9 +232,12 @@ const MachineMap = memo(function MachineMap({
           stroke="currentColor"
           strokeLinecap="round"
           strokeLinejoin="round"
-          style={{ color: "var(--text-primary)" }}
+          style={{
+            color: "var(--text-primary)",
+            transition: "stroke-width 180ms ease, fill 180ms ease",
+          }}
           role="img"
-          aria-label="Industrial lockstitch sewing machine diagram"
+          aria-label="Industrial lockstitch sewing machine technical schematic"
         >
           {/* ── Floor line ─────────────────────────────────────────── */}
           <line

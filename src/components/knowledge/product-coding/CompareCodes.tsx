@@ -44,14 +44,49 @@ export default function CompareCodes() {
     setSelB(initialFromDef(nextDef));
   }
 
-  const diffCount = useMemo(() => {
-    return def.segments.reduce(
-      (n, s) =>
-        n +
-        ((selA[s.index] ?? "") !== (selB[s.index] ?? "") ? 1 : 0),
-      0,
+  const diffSegments = useMemo(() => {
+    return def.segments.filter(
+      (s) => (selA[s.index] ?? "") !== (selB[s.index] ?? ""),
     );
   }, [def, selA, selB]);
+  const diffCount = diffSegments.length;
+  const totalAxes = def.segments.length;
+  const compatibilityPct = useMemo(() => {
+    return totalAxes === 0
+      ? 100
+      : Math.round(((totalAxes - diffCount) / totalAxes) * 100);
+  }, [diffCount, totalAxes]);
+
+  /* Each diffing axis maps to one or more commercial impact tags. */
+  const impactTags = useMemo(() => {
+    const tags = new Set<string>();
+    for (const s of diffSegments) {
+      const h = s.header.toLowerCase();
+      if (h.includes("model") || h.includes("function")) {
+        tags.add("compare.impact.price");
+        tags.add("compare.impact.bom");
+      }
+      if (h.includes("seam") || h.includes("table") || h.includes("length")) {
+        tags.add("compare.impact.packing");
+      }
+      if (h.includes("motor")) {
+        tags.add("compare.impact.bom");
+        tags.add("compare.impact.price");
+      }
+      if (h.includes("hook") || h.includes("stitch")) {
+        tags.add("compare.impact.bom");
+        tags.add("compare.impact.accessories");
+      }
+      if (h.includes("fabric")) {
+        tags.add("compare.impact.accessories");
+      }
+      if (h.includes("special") || h.includes("needle") || h.includes("thread")) {
+        tags.add("compare.impact.accessories");
+        tags.add("compare.impact.bom");
+      }
+    }
+    return Array.from(tags);
+  }, [diffSegments]);
 
   return (
     <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
@@ -128,6 +163,101 @@ export default function CompareCodes() {
             onSelChange={setSelB}
             key={`B-${defId}`}
           />
+        </div>
+      </div>
+
+      {/* ── v30: Diff summary + compatibility score + impact ───── */}
+      <div className="border-t border-[var(--border-faint)] px-5 sm:px-7 py-5 grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Difference summary */}
+        <div className="rounded-xl border border-[var(--border-faint)] bg-[var(--bg-surface-subtle)] p-4">
+          <div className="text-[10.5px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)] mb-2">
+            {t("compare.summary.title")}
+          </div>
+          {diffCount === 0 ? (
+            <div className="text-[12.5px] text-[var(--text-faint)]">
+              {t("compare.no_diff")}
+            </div>
+          ) : (
+            <ul className="space-y-1">
+              {diffSegments.map((s) => (
+                <li
+                  key={s.index}
+                  className="text-[12px] text-[var(--text-primary)] flex items-center gap-2"
+                >
+                  <span
+                    className="font-mono text-[10.5px] text-[var(--text-faint)] w-4 text-center"
+                    dir="ltr"
+                  >
+                    {s.index}
+                  </span>
+                  <span>
+                    {t("compare.summary.row_differs", {
+                      axis: tl(s.header),
+                    })}
+                  </span>
+                  <span className="ml-auto flex items-center gap-1 font-mono text-[10.5px]" dir="ltr">
+                    <span className="text-[var(--text-faint)]">
+                      {selA[s.index] || "—"}
+                    </span>
+                    <span className="text-[var(--text-dim)]">→</span>
+                    <span className="text-[var(--text-primary)] font-bold">
+                      {selB[s.index] || "—"}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Compatibility score */}
+        <div className="rounded-xl border border-[var(--border-faint)] bg-[var(--bg-surface-subtle)] p-4">
+          <div className="text-[10.5px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)] mb-2">
+            {t("compare.score.label")}
+          </div>
+          <div
+            className="font-mono text-[28px] font-bold tracking-tight text-[var(--text-primary)] leading-none"
+            dir="ltr"
+          >
+            {compatibilityPct}%
+          </div>
+          <div className="mt-1 text-[11px] text-[var(--text-faint)]">
+            {t("compare.score.value", { pct: compatibilityPct })}
+          </div>
+          {/* Bar */}
+          <div className="mt-3 h-1 rounded-sm bg-[var(--border-faint)] overflow-hidden">
+            <div
+              className="h-full bg-[var(--text-primary)] transition-all duration-300"
+              style={{ width: `${compatibilityPct}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Commercial impact */}
+        <div className="rounded-xl border border-[var(--border-faint)] bg-[var(--bg-surface-subtle)] p-4">
+          <div className="text-[10.5px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)] mb-2">
+            {t("compare.impact.title")}
+          </div>
+          {impactTags.length === 0 ? (
+            <div className="text-[12.5px] text-[var(--text-faint)]">
+              {t("compare.impact.none")}
+            </div>
+          ) : (
+            <ul className="space-y-1.5">
+              {impactTags.map((tag) => (
+                <li
+                  key={tag}
+                  className="text-[12px] text-[var(--text-primary)] flex items-center gap-2"
+                >
+                  <span
+                    aria-hidden
+                    className="h-1 w-1 rounded-full bg-[var(--text-primary)]"
+                  />
+                  {t(tag)}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </div>
