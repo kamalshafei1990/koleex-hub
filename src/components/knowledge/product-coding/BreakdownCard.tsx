@@ -189,54 +189,53 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
         </div>
       </div>
 
-      {/* ── Value tables — SKU-builder pill grammar ───────────────── */}
-      <div className="px-6 py-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {def.tables.map((t) => {
-            const isActive = effective === t.segmentNumber;
-            const isDimmed = effective !== null && !isActive;
-            return (
-              <div
-                key={t.segmentNumber}
-                onMouseEnter={() => setHover(t.segmentNumber)}
-                onMouseLeave={() => setHover(null)}
-                onClick={() => toggle(t.segmentNumber)}
-                className={`rounded-xl border p-3 cursor-pointer transition-colors duration-150 ${
-                  isActive
-                    ? "border-[var(--text-primary)] bg-[var(--bg-surface-subtle)]"
-                    : "border-[var(--border-subtle)] bg-[var(--bg-secondary)]"
-                } ${isDimmed ? "opacity-50" : ""}`}
-              >
-                {/* Axis header — same grammar as the SKU builder */}
-                <div className="flex items-center gap-2.5 mb-2.5">
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--text-primary)] text-[var(--bg-primary)] text-[10px] font-bold leading-none">
-                    {t.segmentNumber}
-                  </div>
-                  <div className="text-[11.5px] font-semibold text-[var(--text-primary)] uppercase tracking-wider">
-                    {t.title}
-                  </div>
+      {/* ── Value tables — identical grammar to the SKU builder ─── */}
+      <div className="px-6 py-6 space-y-4">
+        {def.tables.map((t) => {
+          const isActive = effective === t.segmentNumber;
+          const isDimmed = effective !== null && !isActive;
+          return (
+            <div
+              key={t.segmentNumber}
+              onMouseEnter={() => setHover(t.segmentNumber)}
+              onMouseLeave={() => setHover(null)}
+              onClick={() => toggle(t.segmentNumber)}
+              className={`rounded-lg p-3 transition-colors cursor-pointer ${
+                isActive
+                  ? "bg-[var(--bg-surface-subtle)]"
+                  : "hover:bg-[var(--bg-surface-subtle)]"
+              } ${isDimmed ? "opacity-50" : ""}`}
+            >
+              {/* Axis header — same as SKU builder */}
+              <div className="flex items-center gap-2.5 mb-2">
+                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--text-primary)] text-[var(--bg-primary)] text-[10px] font-bold leading-none">
+                  {t.segmentNumber}
                 </div>
-                {/* Value pills */}
-                <div className="flex flex-wrap gap-1.5">
-                  {t.rows.map((r) => (
-                    <div
-                      key={r.code}
-                      title={r.meaning}
-                      className="h-7 px-2.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[11px] text-[var(--text-muted)] flex items-center"
-                    >
-                      <span className="font-mono font-bold text-[var(--text-primary)]">
-                        {r.code}
-                      </span>
-                      <span className="ml-1.5 opacity-80 font-medium">
-                        {r.meaning}
-                      </span>
-                    </div>
-                  ))}
+                <div className="text-[11.5px] font-semibold text-[var(--text-primary)] uppercase tracking-wider">
+                  {t.title}
                 </div>
               </div>
-            );
-          })}
-        </div>
+              {/* Value pills — identical to SKU builder option buttons */}
+              <div className="flex flex-wrap gap-1.5">
+                {t.rows.map((r) => (
+                  <button
+                    key={r.code}
+                    type="button"
+                    title={r.meaning}
+                    className="h-7 px-2.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[11px] font-mono text-[var(--text-muted)] hover:bg-[var(--bg-surface)] transition-colors flex items-center"
+                  >
+                    <span className="font-bold text-[var(--text-primary)]">
+                      {r.code}
+                    </span>
+                    <span className="ml-1.5 hidden sm:inline opacity-80 font-sans font-medium">
+                      {r.meaning}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </article>
   );
