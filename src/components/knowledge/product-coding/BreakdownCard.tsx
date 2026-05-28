@@ -1,7 +1,7 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   BreakdownCard — v24.
+   BreakdownCard — v26.
 
    Layout grammar now mirrors the canonical KOLEEX printed reference
    cards (XSL / XSO / XSI):
@@ -161,7 +161,9 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
     }
   }
 
-  const isDirty = JSON.stringify(sel) !== JSON.stringify(initial);
+  /* Shallow compare against initial — both objects have identical keys
+     (the segment indices), so comparing values is enough. */
+  const isDirty = def.segments.some((s) => sel[s.index] !== initial[s.index]);
 
   return (
     <article
@@ -230,11 +232,11 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
           <div className="flex items-end gap-1.5 min-w-max justify-center">
             <FormulaCell value={def.prefix} prefix />
             <Dash />
-            {def.segments.map((s, i) => {
+            {def.segments.map((s) => {
               const v = sel[s.index] ?? "";
               const isEmpty = v === "" || v === "/";
               return (
-                <span key={i} className="flex items-end gap-1.5">
+                <span key={s.index} className="flex items-end gap-1.5">
                   {s.sep === "before" && <Dash />}
                   <FormulaCell
                     value={isEmpty ? "" : v}
@@ -296,7 +298,6 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
                         <button
                           type="button"
                           onClick={() => pickValue(t.segmentNumber, r.code)}
-                          title={r.meaning}
                           aria-pressed={isSelected}
                           className={`w-full grid grid-cols-[56px_1fr] items-stretch text-left transition-colors ${
                             isSelected

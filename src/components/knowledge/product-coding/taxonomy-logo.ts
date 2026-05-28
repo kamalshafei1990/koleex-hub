@@ -33,5 +33,5 @@ export function taxonomyLogoUrl(
   ext: "svg" | "png" = "svg",
 ): string | null {
   if (!SUPABASE_URL || !slug) return null;
-  return `${SUPABASE_URL}/storage/v1/object/public/media/${folder}/${slug}.${ext}`;
+  return `${SUPABASE_URL}/storage/v1/object/public/media/${folder}/${encodeURIComponent(slug)}.${ext}`;
 }

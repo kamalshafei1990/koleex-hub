@@ -264,16 +264,6 @@ export const CATEGORIES: Category[] = [
   },
 ];
 
-/* ── Back-compat exports for the V2 page (will be removed by the rewrite) ── */
-export const MAIN_CATEGORIES: Array<{ code: string; label: string }> =
-  CATEGORIES.map((c) => ({ code: c.code, label: c.label }));
-
-export const SEWING_CATEGORIES: Array<{ code: string; label: string }> =
-  CATEGORIES.find((c) => c.code === "XS")!.subcategories.map((s) => ({
-    code: s.code,
-    label: s.label.replace(/ Machines?$/i, ""),
-  }));
-
 /* ── Lockstitch coding breakdown ───────────────────────────────────────── */
 
 export const LOCKSTITCH: CodingBreakdownDef = {
@@ -575,27 +565,11 @@ export const INTERLOCK: CodingBreakdownDef = {
         { code: "Tk", meaning: "Rolled-edge trimmer" },
       ],
     },
-    {
-      segmentNumber: 5,
-      title: "Needle position",
-      sub: "针位组",
-      rows: [
-        { code: "—", meaning: "Defined per model line; see spec sheet." },
-      ],
-    },
+    /* Segment 5 (Needle position) has no documented value list yet —
+       it still appears in the formula row but no value table is rendered
+       until canonical codes are defined. */
   ],
 };
-
-/* ── System status badges (rendered top of page) ───────────────────────── */
-
-export const SYSTEM_STATUS: Array<{ label: string; value: string }> = [
-  { label: "System", value: "Live" },
-  { label: "Coverage", value: "9 sewing subcategories" },
-  { label: "ERP", value: "Connected" },
-  { label: "AI", value: "Parseable" },
-  { label: "BOM engine", value: "Ready" },
-  { label: "Quotation", value: "Auto-priced" },
-];
 
 /* ── ERP pipeline (vertical flow) ──────────────────────────────────────── */
 

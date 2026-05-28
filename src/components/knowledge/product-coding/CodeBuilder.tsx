@@ -13,7 +13,7 @@
    currentColor so it matches both dark and light Hub themes.
    --------------------------------------------------------------------------- */
 
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { LOCKSTITCH } from "./data";
 import { HubIcon } from "./icon-registry";
 
@@ -205,7 +205,7 @@ export default function CodeBuilder() {
      · Fabric pad + bobbin/hook circle under the presser foot
 */
 
-function MachineMap({
+const MachineMap = memo(function MachineMap({
   activeRegion,
 }: {
   activeRegion: AxisRegion | null;
@@ -687,7 +687,7 @@ function MachineMap({
       </div>
     </div>
   );
-}
+});
 
 /* Discriminated union for the axis-region mapping, declared once. */
 type AxisRegion =

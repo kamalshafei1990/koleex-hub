@@ -1,7 +1,7 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   /knowledge/product-coding-system  ·  v12
+   /knowledge/product-coding-system  ·  v26
 
    Document-grade redesign. The page itself is the deliverable — it reads
    cleanly on any device, at any width, on a printed sheet, without any
@@ -42,6 +42,12 @@ import {
   PIPELINE,
   AI_CAPABILITIES,
 } from "@/components/knowledge/product-coding/data";
+
+/* Hoisted aggregate counts — cheap module-level reductions over the
+   canonical CATEGORIES list. Saves three identical reduce() calls
+   inside the render tree. */
+const TOTAL_SUBS = CATEGORIES.reduce((n, c) => n + c.subcategories.length, 0);
+const DECODED_SUBS = 3; // XSL · XSO · XSI
 
 /* Category icon — pulls media/categories/<slug>.svg from Storage,
    same source the Product Data UI reads. Falls back to a neutral
@@ -137,7 +143,7 @@ export default function ProductCodingSystemPage() {
                     Subcategories
                   </dt>
                   <dd className="mt-1 text-[var(--text-primary)] font-medium font-mono">
-                    {CATEGORIES.reduce((n, c) => n + c.subcategories.length, 0)}
+                    {TOTAL_SUBS}
                   </dd>
                 </div>
               </dl>
@@ -161,7 +167,7 @@ export default function ProductCodingSystemPage() {
                 trailing={
                   <span className="text-[10.5px] font-mono text-[var(--text-faint)]">
                     11 categories ·{" "}
-                    {CATEGORIES.reduce((n, c) => n + c.subcategories.length, 0)}{" "}
+                    {TOTAL_SUBS}{" "}
                     subs
                   </span>
                 }
@@ -180,7 +186,7 @@ export default function ProductCodingSystemPage() {
                     </h3>
                   </div>
                   <span className="text-[10.5px] font-mono text-[var(--text-faint)]">
-                    {CATEGORIES.reduce((n, c) => n + c.subcategories.length, 0)}{" "}
+                    {TOTAL_SUBS}{" "}
                     codes across 11 categories
                   </span>
                 </div>
@@ -237,6 +243,12 @@ export default function ProductCodingSystemPage() {
                 eyebrow="Technical specifications"
                 title="One card per machine type."
                 sub="Three industrial sewing subcategories (under category XS) ship full technical decoding today. The rest are coded but await their reference card. Hover or click any axis on a card to highlight its allowed values."
+                trailing={
+                  <span className="text-[10.5px] font-mono text-[var(--text-faint)]">
+                    {DECODED_SUBS} of {TOTAL_SUBS} subs decoded ·{" "}
+                    {Math.round((DECODED_SUBS / TOTAL_SUBS) * 100)}% coverage
+                  </span>
+                }
               />
 
               {/* XS subcategory codes strip — full taxonomy at a glance */}
@@ -262,39 +274,29 @@ export default function ProductCodingSystemPage() {
 
                 <div className="flex flex-wrap gap-1.5">
                   {(CATEGORIES.find((c) => c.code === "XS")?.subcategories ?? []).map((s) => {
-                    const isDecoded =
-                      s.code === "XSL" || s.code === "XSO" || s.code === "XSI";
-                    const href = isDecoded
-                      ? `#${s.code.toLowerCase().replace("xs", "")}` // matches BreakdownCard id (lockstitch/overlock/interlock)
-                      : undefined;
-                    const targetId = isDecoded
-                      ? s.code === "XSL"
+                    const targetId =
+                      s.code === "XSL"
                         ? "#lockstitch"
                         : s.code === "XSO"
                           ? "#overlock"
-                          : "#interlock"
-                      : undefined;
-                    const className = `h-8 px-3 rounded-md border text-[11.5px] font-mono flex items-center gap-2 transition-colors ${
+                          : s.code === "XSI"
+                            ? "#interlock"
+                            : null;
+                    const isDecoded = !!targetId;
+                    const cls = `h-8 px-3 rounded-md border text-[11.5px] font-mono flex items-center gap-2 transition-colors ${
                       isDecoded
                         ? "border-[var(--text-primary)] bg-[var(--bg-surface)] text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]"
                         : "border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[var(--text-faint)]"
                     }`;
-                    if (isDecoded && targetId) {
-                      return (
-                        <a key={s.code} href={targetId} className={className}>
-                          <span className="font-bold">{s.code}</span>
-                          <span className="opacity-75 font-sans font-medium">
-                            {s.label}
-                          </span>
-                        </a>
-                      );
-                    }
-                    return (
-                      <div key={s.code} className={className}>
+                    return isDecoded ? (
+                      <a key={s.code} href={targetId!} className={cls}>
                         <span className="font-bold">{s.code}</span>
-                        <span className="opacity-75 font-sans font-medium">
-                          {s.label}
-                        </span>
+                        <span className="opacity-75 font-sans font-medium">{s.label}</span>
+                      </a>
+                    ) : (
+                      <div key={s.code} className={cls}>
+                        <span className="font-bold">{s.code}</span>
+                        <span className="opacity-75 font-sans font-medium">{s.label}</span>
                       </div>
                     );
                   })}
@@ -415,7 +417,7 @@ export default function ProductCodingSystemPage() {
             {/* ═══ Document signature ══════════════════════════════════ */}
             <div className="border-t border-[var(--border-faint)] pt-6 flex flex-wrap items-center justify-between gap-3 text-[10.5px] font-medium tracking-[0.18em] uppercase text-[var(--text-faint)]">
               <span>KOLEEX Enterprise Product Intelligence Architecture</span>
-              <span className="font-mono">v25 · Garment Machinery</span>
+              <span className="font-mono">v26 · Garment Machinery</span>
             </div>
         </div>
       </div>

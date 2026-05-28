@@ -157,7 +157,15 @@ export function CategoryGrid({ categories }: { categories: Category[] }) {
                     : "text-[var(--text-faint)] group-hover:text-[var(--text-primary)]"
                 }`}
               >
-                {isOpen ? "Close ▴" : "Open subcategories ▾"}
+                {isOpen ? (
+                  <>
+                    Close <span aria-hidden>▴</span>
+                  </>
+                ) : (
+                  <>
+                    Open subcategories <span aria-hidden>▾</span>
+                  </>
+                )}
               </div>
             </button>
           );
@@ -191,7 +199,7 @@ export function CategoryGrid({ categories }: { categories: Category[] }) {
               className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--text-faint)] hover:text-[var(--text-primary)] px-2 py-1"
               aria-label="Close subcategories"
             >
-              Close ✕
+              Close <span aria-hidden>✕</span>
             </button>
           </header>
 
@@ -231,7 +239,7 @@ export function CategoryGrid({ categories }: { categories: Category[] }) {
                 href="#technical-breakdown"
                 className="text-[11.5px] font-semibold text-[var(--text-primary)] hover:underline underline-offset-2"
               >
-                View technical breakdown for XSL · XSO · XSI ↓
+                View technical breakdown for XSL · XSO · XSI <span aria-hidden>↓</span>
               </a>
             </div>
           )}
