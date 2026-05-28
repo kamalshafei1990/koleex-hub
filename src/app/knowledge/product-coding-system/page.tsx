@@ -42,14 +42,6 @@ import {
   AI_CAPABILITIES,
 } from "@/components/knowledge/product-coding/data";
 
-const TOC = [
-  { id: "divisions", label: "01 — The KOLEEX universe" },
-  { id: "categories", label: "02 — Categories" },
-  { id: "technical-breakdown", label: "03 — Technical specifications" },
-  { id: "builder", label: "04 — SKU builder" },
-  { id: "intelligence", label: "05 — Intelligence layer" },
-];
-
 export default function ProductCodingSystemPage() {
   return (
     <div className="relative min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
@@ -59,7 +51,7 @@ export default function ProductCodingSystemPage() {
           <Link
             href="/knowledge"
             aria-label="Back to Knowledge"
-            className="h-8 w-8 flex items-center justify-center border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--text-primary)] transition-colors"
+            className="h-8 w-8 flex items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--text-primary)] transition-colors"
           >
             <ArrowLeftIcon className="h-4 w-4" />
           </Link>
@@ -77,8 +69,7 @@ export default function ProductCodingSystemPage() {
 
       {/* ── Document body ──────────────────────────────────────────────── */}
       <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-10 md:py-16">
-        <div className="lg:grid lg:grid-cols-[1fr_200px] lg:gap-12">
-          <div className="space-y-20 md:space-y-28 min-w-0">
+        <div className="space-y-20 md:space-y-28 min-w-0">
 
             {/* ═══ 01 · HERO + DIVISIONS ═══════════════════════════════ */}
             <section id="divisions" className="scroll-mt-20">
@@ -196,7 +187,7 @@ export default function ProductCodingSystemPage() {
                 sub="Every segment feeds a different system: ERP routing, BOM resolution, AI reasoning, quotation engine. Parsed once, reused by every consumer."
               />
 
-              <div className="border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-6 sm:p-8">
+              <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-6 sm:p-8">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start">
                   <div>
                     <div className="text-[10.5px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)] mb-5">
@@ -211,7 +202,7 @@ export default function ProductCodingSystemPage() {
                               className="absolute left-[14px] top-7 bottom-[-12px] w-px bg-[var(--border-subtle)]"
                             />
                           )}
-                          <div className="absolute left-0 top-1 flex h-7 w-7 items-center justify-center border border-[var(--text-primary)] bg-[var(--bg-surface)] text-[10px] font-bold text-[var(--text-primary)] font-mono">
+                          <div className="absolute left-0 top-1 flex h-7 w-7 items-center justify-center rounded-full border border-[var(--text-primary)] bg-[var(--bg-surface)] text-[10px] font-bold text-[var(--text-primary)] font-mono">
                             {String(i + 1).padStart(2, "0")}
                           </div>
                           <div className="pb-5">
@@ -227,7 +218,7 @@ export default function ProductCodingSystemPage() {
                     </ol>
                   </div>
 
-                  <div className="border border-[var(--border-faint)] bg-[var(--bg-surface-subtle)] p-5">
+                  <div className="rounded-xl border border-[var(--border-faint)] bg-[var(--bg-surface-subtle)] p-5">
                     <div className="text-[10.5px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)]">
                       What each segment unlocks
                     </div>
@@ -260,13 +251,13 @@ export default function ProductCodingSystemPage() {
                 <AIParseFlow />
               </div>
 
-              <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-px bg-[var(--border-faint)] border border-[var(--border-faint)]">
+              <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                 {AI_CAPABILITIES.map((c) => (
                   <div
                     key={c.title}
-                    className="bg-[var(--bg-secondary)] p-4"
+                    className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4"
                   >
-                    <div className="flex h-7 w-7 items-center justify-center border border-[var(--text-primary)] bg-[var(--bg-surface)] text-[12px] font-bold text-[var(--text-primary)] font-mono">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--text-primary)] bg-[var(--bg-surface)] text-[12px] font-bold text-[var(--text-primary)] font-mono">
                       {c.glyph}
                     </div>
                     <div className="mt-3 text-[13px] font-semibold text-[var(--text-primary)]">
@@ -283,30 +274,8 @@ export default function ProductCodingSystemPage() {
             {/* ═══ Document signature ══════════════════════════════════ */}
             <div className="border-t border-[var(--border-faint)] pt-6 flex flex-wrap items-center justify-between gap-3 text-[10.5px] font-medium tracking-[0.18em] uppercase text-[var(--text-faint)]">
               <span>KOLEEX Enterprise Product Intelligence Architecture</span>
-              <span className="font-mono">v12 · Garment Machinery</span>
+              <span className="font-mono">v13 · Garment Machinery</span>
             </div>
-          </div>
-
-          {/* ── Sticky TOC (lg+ only) ── */}
-          <aside className="hidden lg:block">
-            <nav className="sticky top-20">
-              <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)] mb-3">
-                Contents
-              </div>
-              <ul className="space-y-0 border-l border-[var(--border-faint)]">
-                {TOC.map((t) => (
-                  <li key={t.id}>
-                    <a
-                      href={`#${t.id}`}
-                      className="block pl-3 -ml-px py-1.5 border-l border-transparent text-[12px] text-[var(--text-faint)] hover:text-[var(--text-primary)] hover:border-[var(--text-primary)] transition-colors"
-                    >
-                      {t.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          </aside>
         </div>
       </div>
     </div>

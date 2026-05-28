@@ -1,27 +1,23 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   BreakdownCard — v12.
+   BreakdownCard — v13.
 
-   One self-contained interactive reference card for a single subcategory
-   (XSL / XSO / XSI). The visual grammar mirrors the printed reference
-   cards: formula row of bordered, numbered axis cells across the top,
-   bilingual label strip beneath, then a column-grid of value tables —
-   one per axis.
+   English-only, rounded edges, brand-aligned. One self-contained card
+   per subcategory (XSL / XSO / XSI):
 
-   Brand-aligned (Koleex monochrome):
-     · No accent colors, no glows, no scale animations.
-     · Hover/focus on any axis → matching value table inverts (white-on-
-       black). Other tables fade. Click locks the state.
-     · Sharp 1px hairline borders. No rounded-2xl decorative shells.
-     · Reads cleanly at any size, on any device, printed or on-screen —
-       without needing a dedicated print stylesheet.
+     · Black rounded header bar — prefix + title + example code.
+     · Subtitle paragraph.
+     · Formula row — rounded bordered axis cells with numbered circles.
+     · English label strip (Chinese sub fields are intentionally not
+       rendered — the page is English-only).
+     · Value-table grid — one rounded card per axis. Hover/click any
+       axis to highlight its matching table (and vice versa).
    --------------------------------------------------------------------------- */
 
 import { useState } from "react";
 import type { CodingBreakdownDef } from "./data";
 
-/* ── Single formula cell with optional numbered circle below. ─────────── */
 function FormulaCell({
   value,
   index,
@@ -44,37 +40,41 @@ function FormulaCell({
   onClick?: () => void;
 }) {
   const interactive = !prefix;
-  const Box: "div" | "button" = interactive ? "button" : "div";
+
+  if (!interactive) {
+    return (
+      <div className="flex flex-col items-center gap-2 shrink-0">
+        <div className="flex items-center justify-center min-w-[60px] h-12 px-3 rounded-lg border border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-primary)] text-[16px] font-bold tracking-wider font-mono">
+          {value}
+        </div>
+        <div className="h-6" aria-hidden />
+      </div>
+    );
+  }
 
   return (
-    <Box
-      {...(interactive
-        ? {
-            type: "button" as const,
-            onMouseEnter: onEnter,
-            onMouseLeave: onLeave,
-            onFocus: onEnter,
-            onBlur: onLeave,
-            onClick,
-            "aria-pressed": active ? "true" : "false",
-          }
-        : {})}
+    <button
+      type="button"
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
+      onFocus={onEnter}
+      onBlur={onLeave}
+      onClick={onClick}
+      aria-pressed={active ? "true" : "false"}
       className="flex flex-col items-center gap-2 shrink-0 outline-none"
     >
       <div
-        className={`flex items-center justify-center min-w-[60px] h-12 px-3 border text-[16px] font-bold tracking-wider font-mono transition-colors duration-150 ${
+        className={`flex items-center justify-center min-w-[60px] h-12 px-3 rounded-lg border text-[16px] font-bold tracking-wider font-mono transition-colors duration-150 ${
           empty
             ? "border-dashed border-[var(--border-subtle)] text-[var(--text-dim)] bg-[var(--bg-surface)]"
-            : prefix
+            : active
               ? "border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-primary)]"
-              : active
-                ? "border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-primary)]"
-                : "border-[var(--text-primary)] bg-[var(--bg-surface)] text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]"
+              : "border-[var(--text-primary)] bg-[var(--bg-surface)] text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]"
         } ${dimmed ? "opacity-40" : ""}`}
       >
         {empty ? "" : value}
       </div>
-      {interactive && typeof index === "number" ? (
+      {typeof index === "number" && (
         <div
           className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold leading-none bg-[var(--text-primary)] text-[var(--bg-primary)] ${
             dimmed ? "opacity-40" : ""
@@ -82,10 +82,8 @@ function FormulaCell({
         >
           {index}
         </div>
-      ) : (
-        <div className="h-6" aria-hidden />
       )}
-    </Box>
+    </button>
   );
 }
 
@@ -112,9 +110,9 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
   return (
     <article
       id={def.id}
-      className="border border-[var(--text-primary)] bg-[var(--bg-secondary)] overflow-hidden"
+      className="rounded-2xl border border-[var(--text-primary)] bg-[var(--bg-secondary)] overflow-hidden"
     >
-      {/* ── Card header — black bar, prefix + title + example ─────── */}
+      {/* ── Header — black bar with prefix · title · example ─────── */}
       <header className="flex flex-wrap items-center justify-between gap-4 px-6 py-4 bg-[var(--text-primary)] text-[var(--bg-primary)]">
         <div className="flex items-baseline gap-4 min-w-0">
           <div className="font-mono font-bold text-[18px] tracking-[0.06em] shrink-0">
@@ -131,7 +129,7 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
       </header>
 
       {/* ── Subtitle ─────────────────────────────────────────────── */}
-      <div className="px-6 pt-4 pb-2 text-[12.5px] text-[var(--text-faint)] leading-relaxed max-w-3xl">
+      <div className="px-6 pt-5 pb-1 text-[12.5px] text-[var(--text-faint)] leading-relaxed max-w-3xl">
         {def.subtitle}
       </div>
 
@@ -159,14 +157,14 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
           </div>
         </div>
 
-        {/* Bilingual labels strip */}
+        {/* English-only label strip */}
         <div
-          className="mt-4 grid"
+          className="mt-4 grid gap-1.5"
           style={{
             gridTemplateColumns: `repeat(${def.segments.length}, minmax(0, 1fr))`,
           }}
         >
-          {def.segments.map((s, i) => {
+          {def.segments.map((s) => {
             const isActive = effective === s.index;
             const isDimmed = effective !== null && !isActive;
             return (
@@ -176,20 +174,13 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
                 onMouseEnter={() => setHover(s.index)}
                 onMouseLeave={() => setHover(null)}
                 onClick={() => toggle(s.index)}
-                className={`px-2 py-2 border-t border-b border-r text-center transition-colors duration-150 ${
-                  i === 0 ? "border-l" : ""
-                } ${
+                className={`px-2 py-2 rounded-md border text-center transition-colors duration-150 ${
                   isActive
                     ? "border-[var(--text-primary)] bg-[var(--bg-surface-active)]"
                     : "border-[var(--border-faint)] bg-[var(--bg-surface-subtle)]"
                 } ${isDimmed ? "opacity-50" : ""}`}
               >
-                {s.sub && (
-                  <div className="text-[10px] text-[var(--text-faint)] leading-tight">
-                    {s.sub}
-                  </div>
-                )}
-                <div className="text-[10.5px] font-semibold text-[var(--text-primary)] leading-tight mt-0.5">
+                <div className="text-[11px] font-semibold text-[var(--text-primary)] leading-tight">
                   {s.header}
                 </div>
               </button>
@@ -200,7 +191,7 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
 
       {/* ── Value tables grid ────────────────────────────────────── */}
       <div className="px-6 py-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px bg-[var(--border-faint)] border border-[var(--border-faint)]">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {def.tables.map((t) => {
             const isActive = effective === t.segmentNumber;
             const isDimmed = effective !== null && !isActive;
@@ -210,8 +201,10 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
                 onMouseEnter={() => setHover(t.segmentNumber)}
                 onMouseLeave={() => setHover(null)}
                 onClick={() => toggle(t.segmentNumber)}
-                className={`overflow-hidden transition-opacity duration-150 cursor-pointer ${
-                  isActive ? "bg-[var(--bg-surface)]" : "bg-[var(--bg-secondary)]"
+                className={`rounded-xl overflow-hidden border transition-colors duration-150 cursor-pointer ${
+                  isActive
+                    ? "border-[var(--text-primary)] bg-[var(--bg-surface)]"
+                    : "border-[var(--border-subtle)] bg-[var(--bg-secondary)]"
                 } ${isDimmed ? "opacity-50" : ""}`}
               >
                 <div
@@ -234,11 +227,6 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
                     <div className="text-[11px] font-bold uppercase tracking-[0.12em] truncate">
                       {t.title}
                     </div>
-                    {t.sub && (
-                      <div className="text-[10px] opacity-75 truncate">
-                        {t.sub}
-                      </div>
-                    )}
                   </div>
                 </div>
                 <div className="divide-y divide-[var(--border-faint)]">
