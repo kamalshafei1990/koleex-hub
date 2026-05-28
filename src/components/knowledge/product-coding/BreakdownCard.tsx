@@ -1,20 +1,22 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   BreakdownCard — v22.
+   BreakdownCard — v24.
 
-   Each XSL / XSO / XSI card is now a live mini SKU builder:
+   Layout grammar now mirrors the canonical KOLEEX printed reference
+   cards (XSL / XSO / XSI):
 
-     · The big monospace code in the header updates in real time as the
-       user clicks value pills. Pills behave exactly like the Live SKU
-       builder selectors — selected pill inverts to black-on-white.
-     · A Copy button writes the live code to clipboard; a Reset button
-       restores the canonical example. Both sit in the header.
-     · Formula cells reflect the LIVE state, not the static example.
-       Empty axes render as a dashed empty box; filled axes show their
-       current value.
-     · Hover/click on a formula cell or its axis block still highlights
-       the matching axis everywhere on the card (the V17 affordance).
+     1. Header — eyebrow + live mono code + Reset / Copy toolbar.
+     2. Subtitle.
+     3. Code anatomy — bordered numbered formula boxes for the whole code.
+     4. Value tables — a column-flow grid (1 → 2 → 4 columns) of mini
+        tables, one per axis. Each mini table has a black header
+        (segment number + title) and stacked code|meaning rows. Code
+        cell sits on black, meaning cell on subtle bg. Clicking any
+        row picks that value for the segment — the big mono code at
+        the top updates in real time. Selected row is ringed.
+
+   English-only, brand-monochrome.
    --------------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useState } from "react";
@@ -31,9 +33,6 @@ function initialFromDef(def: CodingBreakdownDef): Selection {
   return s;
 }
 
-/* Build a canonical code string from the current selection. Mirrors the
-   SKU-builder rule: empty + "/" segments are skipped from the joined
-   code; everything else is dash-joined after the prefix. */
 function buildCode(def: CodingBreakdownDef, sel: Selection): string {
   const parts: string[] = [def.prefix];
   for (const seg of def.segments) {
@@ -43,6 +42,7 @@ function buildCode(def: CodingBreakdownDef, sel: Selection): string {
   return parts.join("-");
 }
 
+/* ── Formula cell — bordered numbered axis box in the anatomy row. ─── */
 function FormulaCell({
   value,
   index,
@@ -121,21 +121,16 @@ function Dash() {
 }
 
 export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
-  /* Hover/active axis highlight (kept from v17). */
   const [active, setActive] = useState<number | null>(null);
   const [hover, setHover] = useState<number | null>(null);
   const effective = hover ?? active;
 
-  /* Live selection state — each axis carries the current picked value. */
   const initial = useMemo(() => initialFromDef(def), [def]);
   const [sel, setSel] = useState<Selection>(initial);
   const builtCode = useMemo(() => buildCode(def, sel), [def, sel]);
 
-  /* Copy-to-clipboard state. */
   const [copied, setCopied] = useState(false);
 
-  /* Brief visual flash when the built code changes so the user can
-     see the click landed in the header. */
   const [flash, setFlash] = useState(false);
   useEffect(() => {
     setFlash(true);
@@ -173,7 +168,7 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
       id={def.id}
       className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden"
     >
-      {/* ── Header — same shell as the Live SKU builder ─────────── */}
+      {/* ── Header ────────────────────────────────────────────── */}
       <div
         className="px-5 sm:px-7 py-5 border-b border-[var(--border-faint)] flex flex-wrap items-center justify-between gap-4"
         style={{
@@ -195,7 +190,6 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
           </div>
         </div>
 
-        {/* Header toolbar — Reset + Copy */}
         <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
@@ -219,15 +213,15 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
         </div>
       </div>
 
-      {/* ── Subtitle ───────────────────────────────────────────── */}
+      {/* ── Subtitle ────────────────────────────────────────────── */}
       <div className="px-5 sm:px-7 pt-5 text-[12.5px] text-[var(--text-faint)] leading-relaxed max-w-3xl">
         {def.subtitle}{" "}
         <span className="text-[var(--text-primary)] font-medium">
-          Click any value below to compose a code — reset returns to the canonical example.
+          Click any row in a table to compose a code — Reset returns to the canonical example.
         </span>
       </div>
 
-      {/* ── Formula anatomy strip — reflects LIVE selection ─────── */}
+      {/* ── Code anatomy ─────────────────────────────────────────── */}
       <div className="px-5 sm:px-7 pt-5 pb-2">
         <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)] mb-3">
           Code anatomy
@@ -259,66 +253,80 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
         </div>
       </div>
 
-      {/* ── Axis selector list — clickable pills set the segment ── */}
-      <div className="p-5 sm:p-7 pt-3 space-y-4">
-        {def.tables.map((t) => {
-          const isActive = effective === t.segmentNumber;
-          const isDimmed = effective !== null && !isActive;
-          const current = sel[t.segmentNumber] ?? "";
-          return (
-            <div
-              key={t.segmentNumber}
-              onMouseEnter={() => setHover(t.segmentNumber)}
-              onMouseLeave={() => setHover(null)}
-              className={`rounded-lg p-3 transition-colors ${
-                isActive
-                  ? "bg-[var(--bg-surface-subtle)]"
-                  : "hover:bg-[var(--bg-surface-subtle)]"
-              } ${isDimmed ? "opacity-50" : ""}`}
-            >
-              <div className="flex items-center gap-2.5 mb-2">
-                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--text-primary)] text-[var(--bg-primary)] text-[10px] font-bold leading-none">
-                  {t.segmentNumber}
+      {/* ── Value tables — reference-card grammar ───────────────── */}
+      <div className="px-5 sm:px-7 pt-3 pb-6">
+        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)] mb-3">
+          Allowed values
+        </div>
+        {/* Column-flow grid — auto-balances mini tables across columns. */}
+        <div
+          className="columns-1 sm:columns-2 lg:columns-4 gap-3"
+          style={{ columnFill: "balance" }}
+        >
+          {def.tables.map((t) => {
+            const isActive = effective === t.segmentNumber;
+            const current = sel[t.segmentNumber] ?? "";
+            return (
+              <div
+                key={t.segmentNumber}
+                onMouseEnter={() => setHover(t.segmentNumber)}
+                onMouseLeave={() => setHover(null)}
+                className={`break-inside-avoid mb-3 rounded-xl overflow-hidden border transition-colors ${
+                  isActive
+                    ? "border-[var(--text-primary)]"
+                    : "border-[var(--border-subtle)]"
+                }`}
+              >
+                {/* Black header bar — segment number + title */}
+                <div className="bg-[var(--text-primary)] text-[var(--bg-primary)] px-3 py-2 flex items-center gap-2">
+                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--bg-primary)] text-[var(--text-primary)] text-[10px] font-bold leading-none">
+                    {t.segmentNumber}
+                  </div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.14em] truncate">
+                    {t.title}
+                  </div>
                 </div>
-                <div className="text-[11.5px] font-semibold text-[var(--text-primary)] uppercase tracking-wider">
-                  {t.title}
-                </div>
-                <div className="ml-auto h-6 px-2 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] flex items-center font-mono text-[10.5px] font-bold tracking-wider text-[var(--text-primary)]">
-                  <span className="opacity-50 mr-1">=</span>
-                  {current === ""
-                    ? "—"
-                    : current === "/"
-                      ? "default"
-                      : current}
-                </div>
+
+                {/* Rows: code cell (black) + meaning cell (subtle bg) */}
+                <ul>
+                  {t.rows.map((r) => {
+                    const isSelected = current === r.code;
+                    return (
+                      <li key={r.code}>
+                        <button
+                          type="button"
+                          onClick={() => pickValue(t.segmentNumber, r.code)}
+                          title={r.meaning}
+                          aria-pressed={isSelected}
+                          className={`w-full grid grid-cols-[56px_1fr] items-stretch text-left transition-colors border-t border-[var(--border-faint)] ${
+                            isSelected
+                              ? "ring-2 ring-inset ring-[var(--text-primary)]"
+                              : ""
+                          }`}
+                        >
+                          {/* Code cell — always inverted (black bg) */}
+                          <div className="flex items-center justify-center px-2 py-2 bg-[var(--text-primary)] text-[var(--bg-primary)] font-mono font-bold text-[12px] tracking-wider">
+                            {r.code}
+                          </div>
+                          {/* Meaning cell — subtle bg, brighter when selected */}
+                          <div
+                            className={`px-3 py-2 text-[12px] leading-snug ${
+                              isSelected
+                                ? "bg-[var(--bg-surface-hover)] text-[var(--text-primary)] font-semibold"
+                                : "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)] font-medium hover:bg-[var(--bg-surface)]"
+                            }`}
+                          >
+                            {r.meaning}
+                          </div>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                {t.rows.map((r) => {
-                  const isSelected = current === r.code;
-                  return (
-                    <button
-                      key={r.code}
-                      type="button"
-                      title={r.meaning}
-                      onClick={() => pickValue(t.segmentNumber, r.code)}
-                      aria-pressed={isSelected}
-                      className={`h-7 px-2.5 rounded-md border text-[11px] font-mono transition-all flex items-center ${
-                        isSelected
-                          ? "border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-primary)] shadow-sm scale-[1.04]"
-                          : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:border-[var(--text-primary)]"
-                      }`}
-                    >
-                      <span className="font-bold">{r.code}</span>
-                      <span className="ml-1.5 hidden sm:inline opacity-80 font-sans font-medium">
-                        {r.meaning}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </article>
   );
