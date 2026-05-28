@@ -157,8 +157,70 @@ export default function ProductCodingSystemPage() {
                 number="03"
                 eyebrow="Technical specifications"
                 title="One card per machine type."
-                sub="Three industrial sewing subcategories with full technical decoding — Lockstitch (XSL), Overlock (XSO), Interlock (XSI). Hover or click any axis to highlight its allowed values."
+                sub="Three industrial sewing subcategories (under category XS) ship full technical decoding today. The rest are coded but await their reference card. Hover or click any axis on a card to highlight its allowed values."
               />
+
+              {/* XS subcategory codes strip — full taxonomy at a glance */}
+              <div className="mb-8 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">
+                <div className="flex flex-wrap items-baseline justify-between gap-3 mb-4">
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)]">
+                      Category XS — Industrial Sewing Machines
+                    </div>
+                    <div className="mt-1 text-[13px] text-[var(--text-faint)]">
+                      Subcategories under XS, in canonical order. Decoded
+                      ones link to their reference card below.
+                    </div>
+                  </div>
+                  <div className="text-[10.5px] font-mono text-[var(--text-faint)]">
+                    {
+                      (CATEGORIES.find((c) => c.code === "XS")?.subcategories ?? [])
+                        .length
+                    }{" "}
+                    subs · 3 decoded
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {(CATEGORIES.find((c) => c.code === "XS")?.subcategories ?? []).map((s) => {
+                    const isDecoded =
+                      s.code === "XSL" || s.code === "XSO" || s.code === "XSI";
+                    const href = isDecoded
+                      ? `#${s.code.toLowerCase().replace("xs", "")}` // matches BreakdownCard id (lockstitch/overlock/interlock)
+                      : undefined;
+                    const targetId = isDecoded
+                      ? s.code === "XSL"
+                        ? "#lockstitch"
+                        : s.code === "XSO"
+                          ? "#overlock"
+                          : "#interlock"
+                      : undefined;
+                    const className = `h-8 px-3 rounded-md border text-[11.5px] font-mono flex items-center gap-2 transition-colors ${
+                      isDecoded
+                        ? "border-[var(--text-primary)] bg-[var(--bg-surface)] text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]"
+                        : "border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[var(--text-faint)]"
+                    }`;
+                    if (isDecoded && targetId) {
+                      return (
+                        <a key={s.code} href={targetId} className={className}>
+                          <span className="font-bold">{s.code}</span>
+                          <span className="opacity-75 font-sans font-medium">
+                            {s.label}
+                          </span>
+                        </a>
+                      );
+                    }
+                    return (
+                      <div key={s.code} className={className}>
+                        <span className="font-bold">{s.code}</span>
+                        <span className="opacity-75 font-sans font-medium">
+                          {s.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
 
               <div className="space-y-10">
                 <BreakdownCard def={LOCKSTITCH} />
@@ -274,7 +336,7 @@ export default function ProductCodingSystemPage() {
             {/* ═══ Document signature ══════════════════════════════════ */}
             <div className="border-t border-[var(--border-faint)] pt-6 flex flex-wrap items-center justify-between gap-3 text-[10.5px] font-medium tracking-[0.18em] uppercase text-[var(--text-faint)]">
               <span>KOLEEX Enterprise Product Intelligence Architecture</span>
-              <span className="font-mono">v16 · Garment Machinery</span>
+              <span className="font-mono">v17 · Garment Machinery</span>
             </div>
         </div>
       </div>

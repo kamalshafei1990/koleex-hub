@@ -1,18 +1,20 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   BreakdownCard — v13.
+   BreakdownCard — v17.
 
-   English-only, rounded edges, brand-aligned. One self-contained card
-   per subcategory (XSL / XSO / XSI):
+   Visual grammar is now identical to the Live SKU builder:
 
-     · Black rounded header bar — prefix + title + example code.
-     · Subtitle paragraph.
-     · Formula row — rounded bordered axis cells with numbered circles.
-     · English label strip (Chinese sub fields are intentionally not
-       rendered — the page is English-only).
-     · Value-table grid — one rounded card per axis. Hover/click any
-       axis to highlight its matching table (and vice versa).
+     · rounded-2xl outer shell, border-[var(--border-subtle)]
+     · header with the radial-gradient bg, an eyebrow label (uppercase
+       tracking), and the example code in big monospace bold (22/28px)
+     · body is a vertical stack of axis blocks — each block has the
+       same hover bg-swap + number-circle + UPPERCASE label header +
+       wrap-flow of code/meaning pill buttons that the builder uses.
+
+   The card stays interactive on the formula row: hovering a numbered
+   axis pill OR an axis block highlights the matching axis everywhere
+   on the card. Click to lock.
    --------------------------------------------------------------------------- */
 
 import { useState } from "react";
@@ -39,19 +41,16 @@ function FormulaCell({
   onLeave?: () => void;
   onClick?: () => void;
 }) {
-  const interactive = !prefix;
-
-  if (!interactive) {
+  if (prefix) {
     return (
       <div className="flex flex-col items-center gap-2 shrink-0">
-        <div className="flex items-center justify-center min-w-[60px] h-12 px-3 rounded-lg border border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-primary)] text-[16px] font-bold tracking-wider font-mono">
+        <div className="flex items-center justify-center min-w-[54px] h-11 px-3 rounded-lg border border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-primary)] text-[14px] font-bold tracking-wider font-mono">
           {value}
         </div>
-        <div className="h-6" aria-hidden />
+        <div className="h-5" aria-hidden />
       </div>
     );
   }
-
   return (
     <button
       type="button"
@@ -64,7 +63,7 @@ function FormulaCell({
       className="flex flex-col items-center gap-2 shrink-0 outline-none"
     >
       <div
-        className={`flex items-center justify-center min-w-[60px] h-12 px-3 rounded-lg border text-[16px] font-bold tracking-wider font-mono transition-colors duration-150 ${
+        className={`flex items-center justify-center min-w-[54px] h-11 px-3 rounded-lg border text-[14px] font-bold tracking-wider font-mono transition-colors duration-150 ${
           empty
             ? "border-dashed border-[var(--border-subtle)] text-[var(--text-dim)] bg-[var(--bg-surface)]"
             : active
@@ -76,7 +75,7 @@ function FormulaCell({
       </div>
       {typeof index === "number" && (
         <div
-          className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold leading-none bg-[var(--text-primary)] text-[var(--bg-primary)] ${
+          className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold leading-none bg-[var(--text-primary)] text-[var(--bg-primary)] ${
             dimmed ? "opacity-40" : ""
           }`}
         >
@@ -90,10 +89,10 @@ function FormulaCell({
 function Dash() {
   return (
     <div className="flex flex-col items-center gap-2 shrink-0">
-      <div className="flex items-center justify-center h-12 px-1 text-[var(--text-dim)] text-[18px] font-bold">
+      <div className="flex items-center justify-center h-11 px-1 text-[var(--text-dim)] text-[16px] font-bold">
         —
       </div>
-      <div className="h-6" aria-hidden />
+      <div className="h-5" aria-hidden />
     </div>
   );
 }
@@ -110,32 +109,40 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
   return (
     <article
       id={def.id}
-      className="rounded-2xl border border-[var(--text-primary)] bg-[var(--bg-secondary)] overflow-hidden"
+      className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden"
     >
-      {/* ── Header — black bar with prefix · title · example ─────── */}
-      <header className="flex flex-wrap items-center justify-between gap-4 px-6 py-4 bg-[var(--text-primary)] text-[var(--bg-primary)]">
-        <div className="flex items-baseline gap-4 min-w-0">
-          <div className="font-mono font-bold text-[18px] tracking-[0.06em] shrink-0">
-            {def.prefix}
+      {/* ── Header — same shell as the Live SKU builder ─────────── */}
+      <div
+        className="px-5 sm:px-7 py-5 border-b border-[var(--border-faint)] flex flex-wrap items-center justify-between gap-4"
+        style={{
+          background:
+            "radial-gradient(120% 80% at 20% 0%, var(--bg-surface-hover) 0%, transparent 60%), var(--bg-secondary)",
+        }}
+      >
+        <div className="min-w-0">
+          <div className="text-[10.5px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)]">
+            {def.title.split(" · ")[0]} · Reference card
           </div>
-          <div className="h-5 w-px bg-[var(--bg-primary)]/40 shrink-0" aria-hidden />
-          <h3 className="text-[15px] font-semibold tracking-tight truncate">
-            {def.title.split(" · ")[0]}
-          </h3>
+          <div className="mt-2 font-mono text-[22px] sm:text-[28px] font-bold tracking-wider text-[var(--text-primary)] truncate">
+            {def.example}
+          </div>
         </div>
-        <div className="font-mono text-[11.5px] tracking-wider opacity-80 shrink-0">
-          {def.example}
+        <div className="px-3 h-9 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] flex items-center font-mono text-[12px] font-bold tracking-wider text-[var(--text-primary)] shrink-0">
+          {def.prefix}
         </div>
-      </header>
+      </div>
 
-      {/* ── Subtitle ─────────────────────────────────────────────── */}
-      <div className="px-6 pt-5 pb-1 text-[12.5px] text-[var(--text-faint)] leading-relaxed max-w-3xl">
+      {/* ── Subtitle ───────────────────────────────────────────── */}
+      <div className="px-5 sm:px-7 pt-5 text-[12.5px] text-[var(--text-faint)] leading-relaxed max-w-3xl">
         {def.subtitle}
       </div>
 
-      {/* ── Formula row ──────────────────────────────────────────── */}
-      <div className="px-6 pt-4">
-        <div className="overflow-x-auto -mx-2 px-2 pb-2">
+      {/* ── Formula anatomy strip ───────────────────────────────── */}
+      <div className="px-5 sm:px-7 pt-5 pb-2">
+        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)] mb-3">
+          Code anatomy
+        </div>
+        <div className="rounded-xl border border-[var(--border-faint)] bg-[var(--bg-surface-subtle)] p-4 overflow-x-auto">
           <div className="flex items-end gap-1.5 min-w-max justify-center">
             <FormulaCell value={def.prefix} prefix />
             <Dash />
@@ -156,41 +163,10 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
             ))}
           </div>
         </div>
-
-        {/* English-only label strip */}
-        <div
-          className="mt-4 grid gap-1.5"
-          style={{
-            gridTemplateColumns: `repeat(${def.segments.length}, minmax(0, 1fr))`,
-          }}
-        >
-          {def.segments.map((s) => {
-            const isActive = effective === s.index;
-            const isDimmed = effective !== null && !isActive;
-            return (
-              <button
-                key={s.index}
-                type="button"
-                onMouseEnter={() => setHover(s.index)}
-                onMouseLeave={() => setHover(null)}
-                onClick={() => toggle(s.index)}
-                className={`px-2 py-2 rounded-md border text-center transition-colors duration-150 ${
-                  isActive
-                    ? "border-[var(--text-primary)] bg-[var(--bg-surface-active)]"
-                    : "border-[var(--border-faint)] bg-[var(--bg-surface-subtle)]"
-                } ${isDimmed ? "opacity-50" : ""}`}
-              >
-                <div className="text-[11px] font-semibold text-[var(--text-primary)] leading-tight">
-                  {s.header}
-                </div>
-              </button>
-            );
-          })}
-        </div>
       </div>
 
-      {/* ── Value tables — identical grammar to the SKU builder ─── */}
-      <div className="px-6 py-6 space-y-4">
+      {/* ── Axis selector list — IDENTICAL to SKU builder ──────── */}
+      <div className="p-5 sm:p-7 pt-3 space-y-4">
         {def.tables.map((t) => {
           const isActive = effective === t.segmentNumber;
           const isDimmed = effective !== null && !isActive;
@@ -206,7 +182,6 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
                   : "hover:bg-[var(--bg-surface-subtle)]"
               } ${isDimmed ? "opacity-50" : ""}`}
             >
-              {/* Axis header — same as SKU builder */}
               <div className="flex items-center gap-2.5 mb-2">
                 <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--text-primary)] text-[var(--bg-primary)] text-[10px] font-bold leading-none">
                   {t.segmentNumber}
@@ -215,7 +190,6 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
                   {t.title}
                 </div>
               </div>
-              {/* Value pills — identical to SKU builder option buttons */}
               <div className="flex flex-wrap gap-1.5">
                 {t.rows.map((r) => (
                   <button
