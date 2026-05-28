@@ -17,6 +17,7 @@
 import { useState } from "react";
 import type { Category, Division, Subcategory } from "./data";
 import { taxonomyLogoUrl } from "./taxonomy-logo";
+import { useT, useTL } from "./i18n";
 
 /* Storage-hosted SVG renderer for taxonomy logos. */
 function TaxonomyLogo({
@@ -52,6 +53,8 @@ export function DivisionStrip({
   divisions: Division[];
   currentId: string;
 }) {
+  const t = useT();
+  const tl = useTL();
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
       {divisions.map((d) => {
@@ -77,15 +80,15 @@ export function DivisionStrip({
                     : "border-[var(--border-subtle)] text-[var(--text-faint)]"
                 }`}
               >
-                {live ? "Live" : "Planned"}
+                {live ? t("status.live") : t("status.planned")}
               </span>
             </div>
             <div className="mt-3 text-[13px] font-semibold text-[var(--text-primary)]">
-              {d.name}
+              {tl(d.name)}
             </div>
             {isCurrent && (
               <div className="mt-1 text-[9.5px] font-bold uppercase tracking-[0.16em] text-[var(--text-faint)]">
-                You are here
+                {t("division.youre_here")}
               </div>
             )}
           </div>
@@ -100,6 +103,8 @@ export function DivisionStrip({
    that spans the full grid row width. State is local: one tile open
    at a time, clicking again closes. */
 export function CategoryGrid({ categories }: { categories: Category[] }) {
+  const t = useT();
+  const tl = useTL();
   const [openCode, setOpenCode] = useState<string | null>(null);
   const open = categories.find((c) => c.code === openCode) ?? null;
 
@@ -127,27 +132,32 @@ export function CategoryGrid({ categories }: { categories: Category[] }) {
                 </div>
                 <div className="flex items-center gap-1.5 pt-1">
                   <span className="text-[10px] font-medium text-[var(--text-faint)] font-mono">
-                    {c.subcategories.length}{" "}
-                    {c.subcategories.length === 1 ? "sub" : "subs"}
+                    <span dir="ltr">{c.subcategories.length}</span>{" "}
+                    {c.subcategories.length === 1
+                      ? t("cat.subs_short_singular")
+                      : t("cat.subs_short_plural")}
                   </span>
                   {c.hasBreakdown && (
                     <span className="text-[8.5px] font-bold uppercase tracking-[0.16em] px-1.5 py-0.5 rounded-full border border-[var(--text-primary)] text-[var(--text-primary)]">
-                      Decoded
+                      {t("cat.decoded_badge")}
                     </span>
                   )}
                 </div>
               </div>
 
-              {/* THE CODE — dominant */}
-              <div className="font-mono text-[34px] sm:text-[40px] font-bold tracking-[0.04em] text-[var(--text-primary)] leading-none">
+              {/* THE CODE — dominant, always LTR */}
+              <div
+                className="font-mono text-[34px] sm:text-[40px] font-bold tracking-[0.04em] text-[var(--text-primary)] leading-none"
+                dir="ltr"
+              >
                 {c.code}
               </div>
 
               <div className="mt-3 text-[13.5px] font-semibold text-[var(--text-primary)] leading-snug">
-                {c.label}
+                {tl(c.label)}
               </div>
               <div className="mt-1 text-[11px] text-[var(--text-faint)] leading-snug line-clamp-2">
-                {c.blurb}
+                {tl(c.blurb)}
               </div>
 
               <div
@@ -159,11 +169,11 @@ export function CategoryGrid({ categories }: { categories: Category[] }) {
               >
                 {isOpen ? (
                   <>
-                    Close <span aria-hidden>▴</span>
+                    {t("cat.close")} <span aria-hidden>▴</span>
                   </>
                 ) : (
                   <>
-                    Open subcategories <span aria-hidden>▾</span>
+                    {t("cat.open_subs")} <span aria-hidden>▾</span>
                   </>
                 )}
               </div>
@@ -181,15 +191,18 @@ export function CategoryGrid({ categories }: { categories: Category[] }) {
               <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-primary)] overflow-hidden shrink-0">
                 <TaxonomyLogo folder="categories" slug={open.slug} alt={open.label} size={26} />
               </div>
-              <div className="font-mono text-[22px] font-bold tracking-[0.04em] text-[var(--text-primary)] leading-none shrink-0">
+              <div
+                className="font-mono text-[22px] font-bold tracking-[0.04em] text-[var(--text-primary)] leading-none shrink-0"
+                dir="ltr"
+              >
                 {open.code}
               </div>
               <div className="min-w-0">
                 <h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)] truncate">
-                  {open.label}
+                  {tl(open.label)}
                 </h3>
                 <p className="mt-0.5 text-[11.5px] text-[var(--text-faint)] truncate">
-                  {open.blurb}
+                  {tl(open.blurb)}
                 </p>
               </div>
             </div>
@@ -197,9 +210,9 @@ export function CategoryGrid({ categories }: { categories: Category[] }) {
               type="button"
               onClick={() => setOpenCode(null)}
               className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--text-faint)] hover:text-[var(--text-primary)] px-2 py-1"
-              aria-label="Close subcategories"
+              aria-label={t("cat.close")}
             >
-              Close <span aria-hidden>✕</span>
+              {t("cat.close")} <span aria-hidden>✕</span>
             </button>
           </header>
 
@@ -223,9 +236,12 @@ export function CategoryGrid({ categories }: { categories: Category[] }) {
                 }`}
               >
                 <span className="text-[13px] text-[var(--text-primary)] px-5 py-2.5">
-                  {s.label}
+                  {tl(s.label)}
                 </span>
-                <span className="font-mono text-[13px] font-bold tracking-[0.04em] text-[var(--text-primary)] text-right px-5 py-2.5 border-l border-[var(--border-faint)] bg-[var(--bg-surface-subtle)]">
+                <span
+                  className="font-mono text-[13px] font-bold tracking-[0.04em] text-[var(--text-primary)] text-right px-5 py-2.5 border-l border-[var(--border-faint)] bg-[var(--bg-surface-subtle)]"
+                  dir="ltr"
+                >
                   {s.code}
                 </span>
               </li>
@@ -239,7 +255,7 @@ export function CategoryGrid({ categories }: { categories: Category[] }) {
                 href="#technical-breakdown"
                 className="text-[11.5px] font-semibold text-[var(--text-primary)] hover:underline underline-offset-2"
               >
-                View technical breakdown for XSL · XSO · XSI <span aria-hidden>↓</span>
+                {t("cat.view_breakdown")} <span aria-hidden>↓</span>
               </a>
             </div>
           )}

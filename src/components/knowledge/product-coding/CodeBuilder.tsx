@@ -16,6 +16,7 @@
 import { memo, useMemo, useState } from "react";
 import { LOCKSTITCH } from "./data";
 import { HubIcon } from "./icon-registry";
+import { useT, useTL } from "./i18n";
 
 type Selection = Record<number, string | null>;
 
@@ -32,6 +33,8 @@ const AXIS_REGION: Record<number, "head" | "motor" | "bed" | "length" | "fabric"
 };
 
 export default function CodeBuilder() {
+  const t = useT();
+  const tl = useTL();
   const initial: Selection = useMemo(() => {
     const s: Selection = {};
     for (const seg of LOCKSTITCH.segments) {
@@ -78,9 +81,12 @@ export default function CodeBuilder() {
       >
         <div className="min-w-0">
           <div className="text-[10.5px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)]">
-            Live SKU builder
+            {t("builder.live_builder")}
           </div>
-          <div className="mt-2 font-mono text-[22px] sm:text-[28px] font-bold tracking-wider text-[var(--text-primary)] truncate">
+          <div
+            className="mt-2 font-mono text-[22px] sm:text-[28px] font-bold tracking-wider text-[var(--text-primary)] truncate"
+            dir="ltr"
+          >
             {built}
           </div>
         </div>
@@ -94,7 +100,7 @@ export default function CodeBuilder() {
             k={copied ? "check" : "copy"}
             size={13}
           />
-          {copied ? "Copied" : "Copy code"}
+          {copied ? t("builder.copied") : t("builder.copy_code")}
         </button>
       </div>
 
@@ -124,17 +130,15 @@ export default function CodeBuilder() {
                 }`}
               >
                 <div className="flex items-center gap-2.5 mb-2">
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--text-primary)] text-[var(--bg-primary)] text-[10px] font-bold leading-none">
+                  <div
+                    className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--text-primary)] text-[var(--bg-primary)] text-[10px] font-bold leading-none"
+                    dir="ltr"
+                  >
                     {seg.index}
                   </div>
                   <div className="text-[11.5px] font-semibold text-[var(--text-primary)] uppercase tracking-wider">
-                    {seg.header}
+                    {tl(seg.header)}
                   </div>
-                  {seg.sub && (
-                    <div className="text-[10px] text-[var(--text-faint)]">
-                      {seg.sub}
-                    </div>
-                  )}
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {options.map((o) => {
@@ -154,11 +158,11 @@ export default function CodeBuilder() {
                             ? "bg-[var(--text-primary)] text-[var(--bg-primary)] border-[var(--text-primary)]"
                             : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[var(--text-muted)] hover:bg-[var(--bg-surface)]"
                         }`}
-                        title={o.label}
+                        title={tl(o.label)}
                       >
-                        <span className="font-bold">{o.code}</span>
+                        <span className="font-bold" dir="ltr">{o.code}</span>
                         <span className="ml-1.5 hidden sm:inline opacity-80 font-sans font-medium">
-                          {o.label}
+                          {tl(o.label)}
                         </span>
                       </button>
                     );
@@ -172,14 +176,13 @@ export default function CodeBuilder() {
         {/* ── Machine silhouette ── */}
         <div className="p-5 sm:p-7 flex flex-col items-center justify-start text-[var(--text-primary)] bg-[var(--bg-surface-subtle)]">
           <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)] mb-3 self-start">
-            Machine map
+            {t("builder.machine_map")}
           </div>
           <MachineMap
             activeRegion={activeAxis ? AXIS_REGION[activeAxis] : null}
           />
           <div className="mt-4 text-[11px] text-[var(--text-faint)] leading-relaxed self-start">
-            Each axis lights up the part of the machine it controls.
-            Hover any axis on the left to map it onto the silhouette.
+            {t("builder.hint")}
           </div>
         </div>
       </div>
@@ -210,6 +213,8 @@ const MachineMap = memo(function MachineMap({
 }: {
   activeRegion: AxisRegion | null;
 }) {
+  const t = useT();
+  const tl = useTL();
   const sw = (region: AxisRegion, active = 2.2, idle = 1.3) =>
     activeRegion === region ? active : idle;
 
@@ -677,11 +682,11 @@ const MachineMap = memo(function MachineMap({
       <div className="mt-3 px-3 py-2 rounded-md border border-[var(--border-faint)] bg-[var(--bg-surface-subtle)] text-center">
         {activeRegion ? (
           <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--text-primary)] font-mono">
-            ◉ {regionLabel(activeRegion)}
+            <span aria-hidden>◉</span> {tl(regionLabel(activeRegion))}
           </div>
         ) : (
           <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-faint)]">
-            Hover an axis on the left to map it onto the machine
+            {t("builder.caption_default")}
           </div>
         )}
       </div>

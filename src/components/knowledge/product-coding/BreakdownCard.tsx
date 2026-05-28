@@ -22,6 +22,21 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CodingBreakdownDef } from "./data";
 import { HubIcon } from "./icon-registry";
+import { useT, useTL, useLang } from "./i18n";
+
+/* Map breakdown id → subtitle translation key. */
+const SUBTITLE_KEY: Record<string, string> = {
+  lockstitch: "bd.subtitle_lockstitch",
+  overlock: "bd.subtitle_overlock",
+  interlock: "bd.subtitle_interlock",
+};
+
+/* Display name for each breakdown (shown in the header eyebrow). */
+const NAME_KEY: Record<string, string> = {
+  lockstitch: "Lockstitch Machines",
+  overlock: "Overlock Machines",
+  interlock: "Interlock Machines",
+};
 
 type Selection = Record<number, string>;
 
@@ -121,6 +136,14 @@ function Dash() {
 }
 
 export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
+  const t = useT();
+  const tl = useTL();
+  const { dir } = useLang();
+  const headerName = NAME_KEY[def.id]
+    ? tl(NAME_KEY[def.id])
+    : def.title.split(" · ")[0];
+  const subtitleKey = SUBTITLE_KEY[def.id];
+
   const [active, setActive] = useState<number | null>(null);
   const [hover, setHover] = useState<number | null>(null);
   const effective = hover ?? active;
@@ -180,13 +203,14 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
       >
         <div className="min-w-0">
           <div className="text-[10.5px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)]">
-            {def.title.split(" · ")[0]} · Live reference
+            {t("bd.eyebrow", { name: headerName })}
           </div>
           <div
             className={`mt-2 font-mono text-[22px] sm:text-[28px] font-bold tracking-wider text-[var(--text-primary)] break-all transition-colors duration-200 ${
               flash ? "bg-[var(--bg-surface-active)] rounded-md px-1 -mx-1" : ""
             }`}
             aria-live="polite"
+            dir="ltr"
           >
             {builtCode}
           </div>
@@ -198,37 +222,37 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
             onClick={reset}
             disabled={!isDirty}
             className="h-9 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11.5px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
-            aria-label="Reset to canonical example"
+            aria-label={t("bd.reset")}
           >
             <span aria-hidden>↺</span>
-            Reset
+            {t("bd.reset")}
           </button>
           <button
             type="button"
             onClick={copy}
             className="h-9 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11.5px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors flex items-center gap-1.5"
-            aria-label="Copy code"
+            aria-label={t("bd.copy")}
           >
             <HubIcon domain="utility" k={copied ? "check" : "copy"} size={13} />
-            {copied ? "Copied" : "Copy"}
+            {copied ? t("bd.copied") : t("bd.copy")}
           </button>
         </div>
       </div>
 
       {/* ── Subtitle ────────────────────────────────────────────── */}
       <div className="px-5 sm:px-7 pt-5 text-[12.5px] text-[var(--text-faint)] leading-relaxed max-w-3xl">
-        {def.subtitle}{" "}
+        {subtitleKey ? t(subtitleKey) : def.subtitle}{" "}
         <span className="text-[var(--text-primary)] font-medium">
-          Click any row in a table to compose a code — Reset returns to the canonical example.
+          {t("bd.compose_hint")}
         </span>
       </div>
 
       {/* ── Code anatomy ─────────────────────────────────────────── */}
       <div className="px-5 sm:px-7 pt-5 pb-2">
         <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)] mb-3">
-          Code anatomy
+          {t("bd.code_anatomy")}
         </div>
-        <div className="rounded-xl border border-[var(--border-faint)] bg-[var(--bg-surface-subtle)] p-4 overflow-x-auto">
+        <div className="rounded-xl border border-[var(--border-faint)] bg-[var(--bg-surface-subtle)] p-4 overflow-x-auto" dir="ltr">
           <div className="flex items-end gap-1.5 min-w-max justify-center">
             <FormulaCell value={def.prefix} prefix />
             <Dash />
@@ -258,20 +282,20 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
       {/* ── Value tables — reference-card grammar ───────────────── */}
       <div className="px-5 sm:px-7 pt-3 pb-6">
         <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)] mb-3">
-          Allowed values
+          {t("bd.allowed_values")}
         </div>
         {/* Column-flow grid — auto-balances mini tables across columns. */}
         <div
           className="columns-1 sm:columns-2 lg:columns-4 gap-3"
           style={{ columnFill: "balance" }}
         >
-          {def.tables.map((t) => {
-            const isActive = effective === t.segmentNumber;
-            const current = sel[t.segmentNumber] ?? "";
+          {def.tables.map((table) => {
+            const isActive = effective === table.segmentNumber;
+            const current = sel[table.segmentNumber] ?? "";
             return (
               <div
-                key={t.segmentNumber}
-                onMouseEnter={() => setHover(t.segmentNumber)}
+                key={table.segmentNumber}
+                onMouseEnter={() => setHover(table.segmentNumber)}
                 onMouseLeave={() => setHover(null)}
                 className={`break-inside-avoid mb-3 rounded-xl overflow-hidden border bg-[var(--bg-secondary)] transition-colors ${
                   isActive
@@ -281,23 +305,26 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
               >
                 {/* Header — Hub grammar: subtle bg, numbered circle + uppercase label */}
                 <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-[var(--bg-surface-subtle)] border-b border-[var(--border-faint)]">
-                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--text-primary)] text-[var(--bg-primary)] text-[10px] font-bold leading-none">
-                    {t.segmentNumber}
+                  <div
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--text-primary)] text-[var(--bg-primary)] text-[10px] font-bold leading-none"
+                    dir="ltr"
+                  >
+                    {table.segmentNumber}
                   </div>
                   <div className="text-[11.5px] font-semibold text-[var(--text-primary)] uppercase tracking-wider truncate">
-                    {t.title}
+                    {tl(table.title)}
                   </div>
                 </div>
 
-                {/* Rows — hairline-divided. Code on the left as plain mono, meaning on the right as faint sans. Selected row inverts both cells. */}
+                {/* Rows */}
                 <ul className="divide-y divide-[var(--border-faint)]">
-                  {t.rows.map((r) => {
+                  {table.rows.map((r) => {
                     const isSelected = current === r.code;
                     return (
                       <li key={r.code}>
                         <button
                           type="button"
-                          onClick={() => pickValue(t.segmentNumber, r.code)}
+                          onClick={() => pickValue(table.segmentNumber, r.code)}
                           aria-pressed={isSelected}
                           className={`w-full grid grid-cols-[56px_1fr] items-stretch text-left transition-colors ${
                             isSelected
@@ -305,15 +332,16 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
                               : "hover:bg-[var(--bg-surface-subtle)]"
                           }`}
                         >
-                          {/* Code cell */}
+                          {/* Code cell — codes are identifiers, always LTR. */}
                           <div
                             className={`flex items-center justify-center px-2 py-2.5 font-mono font-bold text-[12px] tracking-wider ${
                               isSelected ? "" : "text-[var(--text-primary)]"
                             }`}
+                            dir="ltr"
                           >
                             {r.code}
                           </div>
-                          {/* Meaning cell */}
+                          {/* Meaning cell — translated */}
                           <div
                             className={`px-3 py-2.5 text-[12.5px] leading-snug border-l ${
                               isSelected
@@ -321,7 +349,7 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
                                 : "border-[var(--border-faint)] text-[var(--text-faint)] font-medium"
                             }`}
                           >
-                            {r.meaning}
+                            {tl(r.meaning)}
                           </div>
                         </button>
                       </li>
