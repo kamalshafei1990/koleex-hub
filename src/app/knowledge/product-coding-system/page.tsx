@@ -1,25 +1,23 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   /knowledge/product-coding-system  ·  v10
+   /knowledge/product-coding-system  ·  v11
 
-   Five-section layout, expanded categories swallow the subcategory wall:
+   Redesigned for interactivity AND printability.
 
-     1. Hero + Division layer      — the universe (you-are-here on Garment)
-     2. Category layer (expandable) — 11 tiles, inline subs on click
-     3. Technical breakdown        — XSL / XSO / XSI as tabs
-     4. Live SKU builder           — marquee interaction
-     5. Intelligence layer         — pipeline + AI + capabilities, compressed
+     1. Hero + Division layer        — the universe, with print/share toolbar
+     2. Category layer (expandable)  — 11 tiles, inline subs on click
+     3. Technical breakdowns         — XSL / XSO / XSI as THREE separate
+                                       interactive cards (NOT tabs). Each
+                                       card prints to a single A4 page.
+     4. Live SKU builder             — composer (screen only)
+     5. Intelligence layer           — pipeline + AI + capabilities (screen only)
 
-   v10 changes vs v6:
-     · Hero headline larger (80px on lg) — dominant first impression.
-     · Subcategories no longer have a dedicated section. Each category
-       tile in §2 is an expandable button revealing its sub-table inline.
-     · Strong horizontal dividers between sections so they read as
-       distinct chapters.
-     · Intelligence layer compressed into a single 3-column strip on
-       desktop (pipeline | unlocks | AI parse), with capability cards
-       in a tighter row underneath.
+   Print model:
+     · Hide breadcrumb, TOC, builder, intelligence on print.
+     · Each breakdown card forces page-break-before so a clean A4 packet
+       comes out: Cover (hero + divisions) → XSL → XSO → XSI.
+     · `.print-only` shows a print-only signature line on the last page.
    --------------------------------------------------------------------------- */
 
 import Link from "next/link";
@@ -32,7 +30,7 @@ import {
   DivisionStrip,
   CategoryGrid,
 } from "@/components/knowledge/product-coding/HierarchyBlocks";
-import BreakdownTabs from "@/components/knowledge/product-coding/BreakdownTabs";
+import BreakdownCard from "@/components/knowledge/product-coding/BreakdownCard";
 import CodeBuilder from "@/components/knowledge/product-coding/CodeBuilder";
 import AIParseFlow from "@/components/knowledge/product-coding/AIParseFlow";
 import { HubIcon } from "@/components/knowledge/product-coding/icon-registry";
@@ -55,22 +53,56 @@ const TOC = [
   { id: "intelligence", label: "5. Intelligence layer" },
 ];
 
-/* Thin reusable divider between top-level sections. */
 function SectionDivider() {
   return (
-    <div className="relative py-2" aria-hidden>
+    <div className="relative py-2 print:hidden" aria-hidden>
       <div className="h-px w-full bg-[var(--border-faint)]" />
     </div>
   );
 }
 
+function handlePrint() {
+  if (typeof window !== "undefined") window.print();
+}
+
 export default function ProductCodingSystemPage() {
   return (
-    <div className="relative min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      {/* ── Page-wide depth: faint grid + radial mask ── */}
+    <div className="relative min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] print:bg-white print:text-black">
+      {/* ── Print stylesheet — only loaded on print, no runtime cost ── */}
+      <style jsx global>{`
+        @media print {
+          @page {
+            size: A4;
+            margin: 14mm 12mm;
+          }
+          html,
+          body {
+            background: #ffffff !important;
+            color: #000000 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .no-print,
+          aside,
+          nav {
+            display: none !important;
+          }
+          a {
+            color: inherit !important;
+            text-decoration: none !important;
+          }
+        }
+        @media screen {
+          .print-only {
+            display: none;
+          }
+        }
+      `}</style>
+
+      {/* ── Page-wide depth: faint grid + radial mask (screen only) ── */}
       <div
         aria-hidden
-        className="fixed inset-0 pointer-events-none opacity-[0.04]"
+        className="fixed inset-0 pointer-events-none opacity-[0.04] print:hidden"
         style={{
           backgroundImage:
             "linear-gradient(var(--text-primary) 1px, transparent 1px), linear-gradient(90deg, var(--text-primary) 1px, transparent 1px)",
@@ -81,46 +113,60 @@ export default function ProductCodingSystemPage() {
       />
 
       {/* ── Breadcrumb bar ── */}
-      <div className="relative border-b border-[var(--border-faint)] bg-[var(--bg-primary)]/80 backdrop-blur-sm">
-        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-4 flex items-center gap-3">
-          <Link
-            href="/knowledge"
-            className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
-          >
-            <ArrowLeftIcon className="h-4 w-4" />
-          </Link>
-          <div className="flex items-center gap-2 text-[12px] text-[var(--text-faint)]">
-            <Link href="/knowledge" className="hover:text-[var(--text-primary)]">
-              Knowledge
+      <div className="relative border-b border-[var(--border-faint)] bg-[var(--bg-primary)]/80 backdrop-blur-sm print:hidden">
+        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <Link
+              href="/knowledge"
+              className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
+            >
+              <ArrowLeftIcon className="h-4 w-4" />
             </Link>
-            <span className="text-[var(--text-dim)]">/</span>
-            <span className="text-[var(--text-primary)] font-medium">
-              Product Coding System
-            </span>
+            <div className="flex items-center gap-2 text-[12px] text-[var(--text-faint)]">
+              <Link href="/knowledge" className="hover:text-[var(--text-primary)]">
+                Knowledge
+              </Link>
+              <span className="text-[var(--text-dim)]">/</span>
+              <span className="text-[var(--text-primary)] font-medium">
+                Product Coding System
+              </span>
+            </div>
+          </div>
+
+          {/* Toolbar — Print + Copy URL */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="h-8 px-3 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11.5px] font-semibold uppercase tracking-[0.14em] text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors flex items-center gap-1.5"
+              aria-label="Print full document"
+            >
+              <span aria-hidden>⎙</span>
+              <span className="hidden sm:inline">Print PDF</span>
+            </button>
           </div>
         </div>
       </div>
 
-      <div className="relative max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-8 md:py-12">
-        <div className="lg:grid lg:grid-cols-[1fr_220px] lg:gap-10">
-          <div className="space-y-14 md:space-y-20 min-w-0">
+      <div className="relative max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-8 md:py-12 print:max-w-none print:px-0 print:py-0">
+        <div className="lg:grid lg:grid-cols-[1fr_220px] lg:gap-10 print:block">
+          <div className="space-y-14 md:space-y-20 min-w-0 print:space-y-6">
 
-            {/* ═══ 1 · HERO + DIVISION LAYER ═══════════════════════════ */}
-            <section id="divisions" className="scroll-mt-20">
-              {/* eyebrow */}
+            {/* ═══ 1 · HERO + DIVISION LAYER ══════════════════════════ */}
+            <section id="divisions" className="scroll-mt-20 print:break-after-page">
               <div className="flex flex-wrap items-center gap-3 mb-6">
-                <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)]">
+                <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] print:hidden">
                   <HubIcon domain="section" k="breakdown" size={16} />
                 </div>
-                <div className="text-[10.5px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)]">
+                <div className="text-[10.5px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)] print:text-black">
                   Enterprise Product Intelligence · Garment Machinery Division
                 </div>
               </div>
 
-              <h1 className="text-[40px] sm:text-[56px] md:text-[72px] lg:text-[80px] font-semibold tracking-[-0.02em] leading-[0.98] text-[var(--text-primary)] max-w-5xl">
+              <h1 className="text-[40px] sm:text-[56px] md:text-[72px] lg:text-[80px] font-semibold tracking-[-0.02em] leading-[0.98] text-[var(--text-primary)] max-w-5xl print:text-[42px] print:text-black">
                 The KOLEEX universe.
               </h1>
-              <p className="mt-6 text-[15px] md:text-[17px] text-[var(--text-faint)] max-w-2xl leading-relaxed">
+              <p className="mt-6 text-[15px] md:text-[17px] text-[var(--text-faint)] max-w-2xl leading-relaxed print:text-[12px] print:text-gray-700">
                 Nine divisions share one identity grammar. Every product
                 — from a sewing machine to a smart-home sensor — gets
                 its code from the same system. You are reading the
@@ -128,8 +174,7 @@ export default function ProductCodingSystemPage() {
                 coding coverage.
               </p>
 
-              {/* Status pills */}
-              <div className="mt-10 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+              <div className="mt-10 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 print:hidden">
                 {SYSTEM_STATUS.map((s, i) => (
                   <SystemStatus
                     key={s.label}
@@ -140,7 +185,6 @@ export default function ProductCodingSystemPage() {
                 ))}
               </div>
 
-              {/* The 9 divisions, right under the headline */}
               <div className="mt-10">
                 <DivisionStrip divisions={DIVISIONS} currentId="garment-machinery" />
               </div>
@@ -148,8 +192,8 @@ export default function ProductCodingSystemPage() {
 
             <SectionDivider />
 
-            {/* ═══ 2 · CATEGORY LAYER (expandable) ═════════════════════ */}
-            <section id="categories" className="scroll-mt-20">
+            {/* ═══ 2 · CATEGORY LAYER (expandable) ════════════════════ */}
+            <section id="categories" className="scroll-mt-20 print:hidden">
               <SectionHeader
                 number="02"
                 eyebrow="Categories"
@@ -168,21 +212,49 @@ export default function ProductCodingSystemPage() {
 
             <SectionDivider />
 
-            {/* ═══ 3 · TECHNICAL BREAKDOWN ═════════════════════════════ */}
+            {/* ═══ 3 · TECHNICAL BREAKDOWNS (3 separate cards) ════════ */}
             <section id="technical-breakdown" className="scroll-mt-20">
               <SectionHeader
                 number="03"
-                eyebrow="Technical breakdown"
-                title="Decoding the technical identity."
-                sub="Switch between XSL, XSO, and XSI. Hover or click any numbered segment in the diagram — the matching configuration table lights up and the others soft-fade."
+                eyebrow="Technical breakdowns"
+                title="One card per machine type."
+                sub="Three subcategories with full technical decoding — Lockstitch (XSL), Overlock (XSO), Interlock (XSI). Each card is interactive on screen and prints to a single page."
+                trailing={
+                  <div className="flex items-center gap-2 print:hidden">
+                    <span className="text-[10.5px] font-mono text-[var(--text-faint)]">
+                      Hover · Click · Print
+                    </span>
+                  </div>
+                }
               />
-              <BreakdownTabs defs={[LOCKSTITCH, OVERLOCK, INTERLOCK]} />
+
+              {/* Quick-jump pills (screen only) */}
+              <div className="mb-5 flex flex-wrap items-center gap-2 print:hidden">
+                {[LOCKSTITCH, OVERLOCK, INTERLOCK].map((d) => (
+                  <a
+                    key={d.id}
+                    href={`#${d.id}`}
+                    className="inline-flex items-center gap-2 px-3 h-8 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[11.5px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"
+                  >
+                    <span className="font-mono tracking-wider">{d.prefix}</span>
+                    <span className="opacity-70 font-medium">
+                      {d.title.split(" · ")[0]}
+                    </span>
+                  </a>
+                ))}
+              </div>
+
+              <div className="space-y-6 print:space-y-0">
+                <BreakdownCard def={LOCKSTITCH} />
+                <BreakdownCard def={OVERLOCK} />
+                <BreakdownCard def={INTERLOCK} />
+              </div>
             </section>
 
             <SectionDivider />
 
-            {/* ═══ 4 · LIVE BUILDER ════════════════════════════════════ */}
-            <section id="builder" className="scroll-mt-20">
+            {/* ═══ 4 · LIVE BUILDER (screen only) ═════════════════════ */}
+            <section id="builder" className="scroll-mt-20 print:hidden">
               <SectionHeader
                 number="04"
                 eyebrow="Live SKU builder"
@@ -194,8 +266,8 @@ export default function ProductCodingSystemPage() {
 
             <SectionDivider />
 
-            {/* ═══ 5 · INTELLIGENCE LAYER ══════════════════════════════ */}
-            <section id="intelligence" className="scroll-mt-20">
+            {/* ═══ 5 · INTELLIGENCE LAYER (screen only) ═══════════════ */}
+            <section id="intelligence" className="scroll-mt-20 print:hidden">
               <SectionHeader
                 number="05"
                 eyebrow="Intelligence layer"
@@ -203,7 +275,6 @@ export default function ProductCodingSystemPage() {
                 sub="Every segment feeds a different system: ERP routing, BOM resolution, AI reasoning, quotation engine. Parsed once, reused by every consumer."
               />
 
-              {/* Top strip: pipeline + segment unlocks side by side */}
               <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 sm:p-7">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 items-start">
                   <div>
@@ -253,9 +324,7 @@ export default function ProductCodingSystemPage() {
                           key={row.k}
                           className="grid grid-cols-[120px_1fr] gap-3 text-[12px]"
                         >
-                          <span className="text-[var(--text-muted)]">
-                            {row.k}
-                          </span>
+                          <span className="text-[var(--text-muted)]">{row.k}</span>
                           <span className="text-[var(--text-primary)] font-medium">
                             {row.v}
                           </span>
@@ -266,12 +335,10 @@ export default function ProductCodingSystemPage() {
                 </div>
               </div>
 
-              {/* AI parse flow */}
               <div className="mt-5">
                 <AIParseFlow />
               </div>
 
-              {/* AI capability cards — tighter row */}
               <div className="mt-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                 {AI_CAPABILITIES.map((c) => (
                   <div
@@ -292,14 +359,19 @@ export default function ProductCodingSystemPage() {
               </div>
             </section>
 
-            {/* ═══ Footer signature ════════════════════════════════════ */}
-            <div className="text-center text-[10.5px] font-medium tracking-[0.18em] uppercase text-[var(--text-faint)] pt-6 border-t border-[var(--border-faint)]">
-              KOLEEX Enterprise Product Intelligence Architecture · v10
+            {/* ═══ Footer signature (screen) ══════════════════════════ */}
+            <div className="text-center text-[10.5px] font-medium tracking-[0.18em] uppercase text-[var(--text-faint)] pt-6 border-t border-[var(--border-faint)] print:hidden">
+              KOLEEX Enterprise Product Intelligence Architecture · v11
+            </div>
+
+            {/* Print-only footer signature */}
+            <div className="print-only mt-4 text-center text-[9px] tracking-[0.18em] uppercase text-gray-700 border-t border-gray-400 pt-3">
+              KOLEEX Enterprise Product Intelligence Architecture · v11 · printed reference
             </div>
           </div>
 
-          {/* ── Sticky TOC (lg+ only) ── */}
-          <aside className="hidden lg:block">
+          {/* ── Sticky TOC (lg+ only, screen only) ── */}
+          <aside className="hidden lg:block print:hidden">
             <nav className="sticky top-20 space-y-1">
               <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)] mb-2.5">
                 Contents
@@ -313,6 +385,15 @@ export default function ProductCodingSystemPage() {
                   {t.label}
                 </a>
               ))}
+              <div className="mt-4 pt-4 border-t border-[var(--border-faint)]">
+                <button
+                  type="button"
+                  onClick={handlePrint}
+                  className="w-full h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <span aria-hidden>⎙</span> Print as PDF
+                </button>
+              </div>
             </nav>
           </aside>
         </div>
