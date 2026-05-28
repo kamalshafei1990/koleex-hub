@@ -17,7 +17,7 @@
        the matching axis everywhere on the card (the V17 affordance).
    --------------------------------------------------------------------------- */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CodingBreakdownDef } from "./data";
 import { HubIcon } from "./icon-registry";
 
@@ -134,6 +134,15 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
   /* Copy-to-clipboard state. */
   const [copied, setCopied] = useState(false);
 
+  /* Brief visual flash when the built code changes so the user can
+     see the click landed in the header. */
+  const [flash, setFlash] = useState(false);
+  useEffect(() => {
+    setFlash(true);
+    const id = window.setTimeout(() => setFlash(false), 240);
+    return () => window.clearTimeout(id);
+  }, [builtCode]);
+
   function toggleAxis(idx: number) {
     setActive((cur) => (cur === idx ? null : idx));
   }
@@ -176,7 +185,12 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
           <div className="text-[10.5px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)]">
             {def.title.split(" · ")[0]} · Live reference
           </div>
-          <div className="mt-2 font-mono text-[22px] sm:text-[28px] font-bold tracking-wider text-[var(--text-primary)] truncate">
+          <div
+            className={`mt-2 font-mono text-[22px] sm:text-[28px] font-bold tracking-wider text-[var(--text-primary)] break-all transition-colors duration-200 ${
+              flash ? "bg-[var(--bg-surface-active)] rounded-md px-1 -mx-1" : ""
+            }`}
+            aria-live="polite"
+          >
             {builtCode}
           </div>
         </div>
@@ -269,11 +283,14 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
                 <div className="text-[11.5px] font-semibold text-[var(--text-primary)] uppercase tracking-wider">
                   {t.title}
                 </div>
-                {current && current !== "" && current !== "/" && (
-                  <div className="ml-auto text-[10px] font-mono font-bold text-[var(--text-faint)] uppercase tracking-wider">
-                    {current}
-                  </div>
-                )}
+                <div className="ml-auto h-6 px-2 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] flex items-center font-mono text-[10.5px] font-bold tracking-wider text-[var(--text-primary)]">
+                  <span className="opacity-50 mr-1">=</span>
+                  {current === ""
+                    ? "—"
+                    : current === "/"
+                      ? "default"
+                      : current}
+                </div>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {t.rows.map((r) => {
@@ -283,21 +300,15 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
                       key={r.code}
                       type="button"
                       title={r.meaning}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        pickValue(t.segmentNumber, r.code);
-                      }}
-                      className={`h-7 px-2.5 rounded-md border text-[11px] font-mono transition-colors flex items-center ${
+                      onClick={() => pickValue(t.segmentNumber, r.code)}
+                      aria-pressed={isSelected}
+                      className={`h-7 px-2.5 rounded-md border text-[11px] font-mono transition-all flex items-center ${
                         isSelected
-                          ? "border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-primary)]"
-                          : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[var(--text-muted)] hover:bg-[var(--bg-surface)]"
+                          ? "border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-primary)] shadow-sm scale-[1.04]"
+                          : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:border-[var(--text-primary)]"
                       }`}
                     >
-                      <span
-                        className={`font-bold ${isSelected ? "" : "text-[var(--text-primary)]"}`}
-                      >
-                        {r.code}
-                      </span>
+                      <span className="font-bold">{r.code}</span>
                       <span className="ml-1.5 hidden sm:inline opacity-80 font-sans font-medium">
                         {r.meaning}
                       </span>
