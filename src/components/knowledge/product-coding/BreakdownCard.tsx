@@ -271,24 +271,24 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
                 key={t.segmentNumber}
                 onMouseEnter={() => setHover(t.segmentNumber)}
                 onMouseLeave={() => setHover(null)}
-                className={`break-inside-avoid mb-3 rounded-xl overflow-hidden border transition-colors ${
+                className={`break-inside-avoid mb-3 rounded-xl overflow-hidden border bg-[var(--bg-secondary)] transition-colors ${
                   isActive
                     ? "border-[var(--text-primary)]"
                     : "border-[var(--border-subtle)]"
                 }`}
               >
-                {/* Black header bar — segment number + title */}
-                <div className="bg-[var(--text-primary)] text-[var(--bg-primary)] px-3 py-2 flex items-center gap-2">
-                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--bg-primary)] text-[var(--text-primary)] text-[10px] font-bold leading-none">
+                {/* Header — Hub grammar: subtle bg, numbered circle + uppercase label */}
+                <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-[var(--bg-surface-subtle)] border-b border-[var(--border-faint)]">
+                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--text-primary)] text-[var(--bg-primary)] text-[10px] font-bold leading-none">
                     {t.segmentNumber}
                   </div>
-                  <div className="text-[11px] font-bold uppercase tracking-[0.14em] truncate">
+                  <div className="text-[11.5px] font-semibold text-[var(--text-primary)] uppercase tracking-wider truncate">
                     {t.title}
                   </div>
                 </div>
 
-                {/* Rows: code cell (black) + meaning cell (subtle bg) */}
-                <ul>
+                {/* Rows — hairline-divided. Code on the left as plain mono, meaning on the right as faint sans. Selected row inverts both cells. */}
+                <ul className="divide-y divide-[var(--border-faint)]">
                   {t.rows.map((r) => {
                     const isSelected = current === r.code;
                     return (
@@ -298,22 +298,26 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
                           onClick={() => pickValue(t.segmentNumber, r.code)}
                           title={r.meaning}
                           aria-pressed={isSelected}
-                          className={`w-full grid grid-cols-[56px_1fr] items-stretch text-left transition-colors border-t border-[var(--border-faint)] ${
+                          className={`w-full grid grid-cols-[56px_1fr] items-stretch text-left transition-colors ${
                             isSelected
-                              ? "ring-2 ring-inset ring-[var(--text-primary)]"
-                              : ""
+                              ? "bg-[var(--text-primary)] text-[var(--bg-primary)]"
+                              : "hover:bg-[var(--bg-surface-subtle)]"
                           }`}
                         >
-                          {/* Code cell — always inverted (black bg) */}
-                          <div className="flex items-center justify-center px-2 py-2 bg-[var(--text-primary)] text-[var(--bg-primary)] font-mono font-bold text-[12px] tracking-wider">
+                          {/* Code cell */}
+                          <div
+                            className={`flex items-center justify-center px-2 py-2.5 font-mono font-bold text-[12px] tracking-wider ${
+                              isSelected ? "" : "text-[var(--text-primary)]"
+                            }`}
+                          >
                             {r.code}
                           </div>
-                          {/* Meaning cell — subtle bg, brighter when selected */}
+                          {/* Meaning cell */}
                           <div
-                            className={`px-3 py-2 text-[12px] leading-snug ${
+                            className={`px-3 py-2.5 text-[12.5px] leading-snug border-l ${
                               isSelected
-                                ? "bg-[var(--bg-surface-hover)] text-[var(--text-primary)] font-semibold"
-                                : "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)] font-medium hover:bg-[var(--bg-surface)]"
+                                ? "border-[var(--bg-primary)]/30 font-semibold"
+                                : "border-[var(--border-faint)] text-[var(--text-faint)] font-medium"
                             }`}
                           >
                             {r.meaning}
