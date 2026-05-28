@@ -43,17 +43,16 @@ import {
   AI_CAPABILITIES,
 } from "@/components/knowledge/product-coding/data";
 
-/* Subcategory icon — pulls media/subcategories/<slug>.svg from Storage.
-   Falls back to a small dot if Storage is unreachable or the slug
-   isn't on file yet, so the row layout never breaks. */
-function SubcategoryIcon({ code, slug }: { code: string; slug?: string }) {
-  const candidate = (slug ?? code).toLowerCase();
-  const url = taxonomyLogoUrl("subcategories", candidate);
+/* Category icon — pulls media/categories/<slug>.svg from Storage,
+   same source the Product Data UI reads. Falls back to a neutral
+   placeholder tile if the asset can't be resolved. */
+function CategoryIcon({ slug, label }: { slug: string; label: string }) {
+  const url = taxonomyLogoUrl("categories", slug);
   return (
-    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] overflow-hidden">
+    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] overflow-hidden">
       {url ? (
         /* eslint-disable-next-line @next/next/no-img-element */
-        <img src={url} alt="" width={22} height={22} style={{ width: 22, height: 22 }} />
+        <img src={url} alt={label} width={28} height={28} style={{ width: 28, height: 28 }} />
       ) : (
         <span className="h-1.5 w-1.5 rounded-full bg-[var(--text-dim)]" aria-hidden />
       )}
@@ -192,12 +191,13 @@ export default function ProductCodingSystemPage() {
                       key={c.code}
                       className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5"
                     >
-                      {/* Category header */}
-                      <div className="flex items-baseline gap-3 pb-3 mb-3 border-b border-[var(--border-faint)]">
+                      {/* Category header — icon · code · label · count */}
+                      <div className="flex items-center gap-3 pb-3 mb-3 border-b border-[var(--border-faint)]">
+                        <CategoryIcon slug={c.slug} label={c.label} />
                         <div className="font-mono text-[20px] font-bold tracking-[0.04em] text-[var(--text-primary)] shrink-0">
                           {c.code}
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <div className="text-[13.5px] font-semibold text-[var(--text-primary)] truncate">
                             {c.label}
                           </div>
@@ -208,18 +208,17 @@ export default function ProductCodingSystemPage() {
                         </div>
                       </div>
 
-                      {/* Subcategory list — icon + label + prominent code chip */}
+                      {/* Subcategory list — label on the left, plain mono code on the right */}
                       <ul className="divide-y divide-[var(--border-faint)]">
                         {c.subcategories.map((s) => (
                           <li
                             key={s.code}
-                            className="flex items-center gap-3 py-2.5"
+                            className="grid grid-cols-[1fr_auto] gap-3 items-center py-2"
                           >
-                            <SubcategoryIcon code={s.code} slug={s.slug} />
-                            <span className="flex-1 min-w-0 text-[13px] text-[var(--text-primary)] font-medium truncate">
+                            <span className="text-[13px] text-[var(--text-primary)] truncate">
                               {s.label}
                             </span>
-                            <span className="shrink-0 h-7 px-2.5 rounded-md border border-[var(--text-primary)] bg-[var(--bg-surface)] flex items-center font-mono text-[12px] font-bold tracking-[0.06em] text-[var(--text-primary)]">
+                            <span className="font-mono text-[13px] font-bold tracking-[0.06em] text-[var(--text-primary)]">
                               {s.code}
                             </span>
                           </li>
@@ -416,7 +415,7 @@ export default function ProductCodingSystemPage() {
             {/* ═══ Document signature ══════════════════════════════════ */}
             <div className="border-t border-[var(--border-faint)] pt-6 flex flex-wrap items-center justify-between gap-3 text-[10.5px] font-medium tracking-[0.18em] uppercase text-[var(--text-faint)]">
               <span>KOLEEX Enterprise Product Intelligence Architecture</span>
-              <span className="font-mono">v20 · Garment Machinery</span>
+              <span className="font-mono">v21 · Garment Machinery</span>
             </div>
         </div>
       </div>
