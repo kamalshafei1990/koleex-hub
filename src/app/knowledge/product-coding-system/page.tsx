@@ -139,7 +139,7 @@ export default function ProductCodingSystemPage() {
                 number="02"
                 eyebrow="Categories"
                 title="Eleven categories of garment machinery."
-                sub="Every product code begins with one of these prefixes. Each tile expands to show its subcategories — the full reference lives inside the browse."
+                sub="Every product code begins with one of these prefixes. Each tile expands to show its subcategories — the full reference also lives in the index below."
                 trailing={
                   <span className="text-[10.5px] font-mono text-[var(--text-faint)]">
                     11 categories ·{" "}
@@ -149,6 +149,66 @@ export default function ProductCodingSystemPage() {
                 }
               />
               <CategoryGrid categories={CATEGORIES} />
+
+              {/* ── Subcategory index — every category laid flat ── */}
+              <div className="mt-12">
+                <div className="flex flex-wrap items-baseline justify-between gap-3 mb-5">
+                  <div>
+                    <div className="text-[10.5px] font-bold uppercase tracking-[0.22em] text-[var(--text-faint)]">
+                      Subcategory index
+                    </div>
+                    <h3 className="mt-1 text-[18px] sm:text-[20px] font-semibold tracking-tight text-[var(--text-primary)]">
+                      KOLEEX Garment Machinery Subcategories Coding System
+                    </h3>
+                  </div>
+                  <span className="text-[10.5px] font-mono text-[var(--text-faint)]">
+                    {CATEGORIES.reduce((n, c) => n + c.subcategories.length, 0)}{" "}
+                    codes across 11 categories
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {CATEGORIES.map((c) => (
+                    <div
+                      key={c.code}
+                      className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5"
+                    >
+                      {/* Category header */}
+                      <div className="flex items-baseline gap-3 pb-3 mb-3 border-b border-[var(--border-faint)]">
+                        <div className="font-mono text-[20px] font-bold tracking-[0.04em] text-[var(--text-primary)] shrink-0">
+                          {c.code}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-[13.5px] font-semibold text-[var(--text-primary)] truncate">
+                            {c.label}
+                          </div>
+                          <div className="text-[10.5px] font-mono text-[var(--text-faint)] mt-0.5">
+                            {c.subcategories.length}{" "}
+                            {c.subcategories.length === 1 ? "subcategory" : "subcategories"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Subcategory list — label on the left, code on the right (mono) */}
+                      <ul className="divide-y divide-[var(--border-faint)]">
+                        {c.subcategories.map((s) => (
+                          <li
+                            key={s.code}
+                            className="grid grid-cols-[1fr_auto] gap-3 items-center py-2"
+                          >
+                            <span className="text-[12.5px] text-[var(--text-primary)]">
+                              {s.label}
+                            </span>
+                            <span className="font-mono text-[12.5px] font-bold tracking-[0.04em] text-[var(--text-primary)]">
+                              {s.code}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </section>
 
             {/* ═══ 03 · TECHNICAL SPECIFICATIONS ═══════════════════════ */}
@@ -336,7 +396,7 @@ export default function ProductCodingSystemPage() {
             {/* ═══ Document signature ══════════════════════════════════ */}
             <div className="border-t border-[var(--border-faint)] pt-6 flex flex-wrap items-center justify-between gap-3 text-[10.5px] font-medium tracking-[0.18em] uppercase text-[var(--text-faint)]">
               <span>KOLEEX Enterprise Product Intelligence Architecture</span>
-              <span className="font-mono">v18 · Garment Machinery</span>
+              <span className="font-mono">v19 · Garment Machinery</span>
             </div>
         </div>
       </div>
