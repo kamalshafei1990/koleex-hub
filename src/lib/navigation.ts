@@ -210,7 +210,7 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "settings",         tKey: "app.settings",         name: "Settings",          icon: SettingsIcon,  route: "/settings",         active: true,  newSince: "2026-04-19" },
 
   /* ── Not in sidebar — accessible via All Apps or direct URL ── */
-  { id: "inbox",            tKey: "app.inbox",            name: "Koleex Mail",       icon: MailIcon,      route: "/inbox",            active: true  },
+  { id: "inbox",            tKey: "app.inbox",            name: "Mail",              icon: MailIcon,      route: "/inbox",            active: true  },
   { id: "price-calculator", tKey: "app.price-calculator", name: "Price Calculator",  icon: PriceCalculatorIcon, route: "/price-calculator", active: true  },
   { id: "brands",           tKey: "app.brands",           name: "Brands",            icon: BrandIcon,     route: "/brands",           active: true  },
   { id: "dashboard",        tKey: "app.dashboard",        name: "Dashboard",         icon: AppsIcon,    route: "/dashboard",        active: false },
