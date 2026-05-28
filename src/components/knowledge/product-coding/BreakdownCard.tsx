@@ -189,9 +189,9 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
         </div>
       </div>
 
-      {/* ── Value tables grid ────────────────────────────────────── */}
+      {/* ── Value tables — SKU-builder pill grammar ───────────────── */}
       <div className="px-6 py-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {def.tables.map((t) => {
             const isActive = effective === t.segmentNumber;
             const isDimmed = effective !== null && !isActive;
@@ -201,46 +201,35 @@ export default function BreakdownCard({ def }: { def: CodingBreakdownDef }) {
                 onMouseEnter={() => setHover(t.segmentNumber)}
                 onMouseLeave={() => setHover(null)}
                 onClick={() => toggle(t.segmentNumber)}
-                className={`rounded-xl overflow-hidden border transition-colors duration-150 cursor-pointer ${
+                className={`rounded-xl border p-3 cursor-pointer transition-colors duration-150 ${
                   isActive
-                    ? "border-[var(--text-primary)] bg-[var(--bg-surface)]"
+                    ? "border-[var(--text-primary)] bg-[var(--bg-surface-subtle)]"
                     : "border-[var(--border-subtle)] bg-[var(--bg-secondary)]"
                 } ${isDimmed ? "opacity-50" : ""}`}
               >
-                <div
-                  className={`flex items-center gap-2.5 px-3.5 py-2.5 ${
-                    isActive
-                      ? "bg-[var(--text-primary)] text-[var(--bg-primary)]"
-                      : "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]"
-                  }`}
-                >
-                  <div
-                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-                      isActive
-                        ? "bg-[var(--bg-primary)] text-[var(--text-primary)]"
-                        : "bg-[var(--text-primary)] text-[var(--bg-primary)]"
-                    }`}
-                  >
+                {/* Axis header — same grammar as the SKU builder */}
+                <div className="flex items-center gap-2.5 mb-2.5">
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--text-primary)] text-[var(--bg-primary)] text-[10px] font-bold leading-none">
                     {t.segmentNumber}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[11px] font-bold uppercase tracking-[0.12em] truncate">
-                      {t.title}
-                    </div>
+                  <div className="text-[11.5px] font-semibold text-[var(--text-primary)] uppercase tracking-wider">
+                    {t.title}
                   </div>
                 </div>
-                <div className="divide-y divide-[var(--border-faint)]">
+                {/* Value pills */}
+                <div className="flex flex-wrap gap-1.5">
                   {t.rows.map((r) => (
                     <div
                       key={r.code}
-                      className="grid grid-cols-[68px_1fr]"
+                      title={r.meaning}
+                      className="h-7 px-2.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[11px] text-[var(--text-muted)] flex items-center"
                     >
-                      <div className="px-3 py-2 text-[12px] font-bold text-[var(--text-primary)] font-mono tracking-wider bg-[var(--bg-surface-subtle)] border-r border-[var(--border-faint)]">
+                      <span className="font-mono font-bold text-[var(--text-primary)]">
                         {r.code}
-                      </div>
-                      <div className="px-3 py-2 text-[12px] text-[var(--text-faint)] leading-snug">
+                      </span>
+                      <span className="ml-1.5 opacity-80 font-medium">
                         {r.meaning}
-                      </div>
+                      </span>
                     </div>
                   ))}
                 </div>
