@@ -145,6 +145,36 @@ export const FIELD_VISUAL_DOMAIN: Record<string, OptionVisualType> = {
   material_weight: "weight",
 };
 
+/* ── Spec-group emphasis ───────────────────────────────────────────
+   Not all groups deserve equal visual weight. Selling-relevant groups
+   (performance, automation, materials, applications, mechanical) get a
+   prominent treatment; commodity/compliance groups (electrical, physical,
+   compliance, customs, purchase, fulfillment) recede into a quiet
+   key-value list. Keyed by the conventional group id so any schema
+   reusing these ids inherits the tiering. Default is 'standard'. */
+export type GroupEmphasis = "primary" | "standard" | "quiet";
+
+export const GROUP_EMPHASIS: Record<string, GroupEmphasis> = {
+  performance: "primary",
+  automation: "primary",
+  material: "primary",
+  application: "primary",
+  "needle-thread": "standard",
+  mechanical: "standard",
+  "lockstitch-config": "standard",
+  "stitch-feed": "standard",
+  electrical: "quiet",
+  physical: "quiet",
+  compliance: "quiet",
+  customs: "quiet",
+  "purchase-options": "quiet",
+  fulfillment: "quiet",
+};
+
+export function emphasisForGroup(groupId: string): GroupEmphasis {
+  return GROUP_EMPHASIS[groupId] ?? "standard";
+}
+
 /* Resolve the visual domain for a field. */
 export function domainForField(field: Pick<SpecField, "key" | "optionSet">): OptionVisualType | null {
   if (field.optionSet) return field.optionSet;

@@ -1,22 +1,35 @@
 "use client";
 
+/* ---------------------------------------------------------------------------
+   ProductPreview — the single, schema-driven product experience surface.
+
+   Renders a resolved ProductSchemaDefinition + values + knowledge + media
+   into a premium, scan-first industrial product page. Used by the admin
+   Review step AND the public /products/preview/[slug] page; both pass a
+   `surface` and the component filters visibility internally.
+
+   This file is PRESENTATION ONLY — no fetch, no Supabase, no Lockstitch
+   literals. Visual metadata (swatches/glyphs/emphasis) comes from the
+   central visual-options registry, so every schema inherits the same
+   visual language without re-declaring it.
+   --------------------------------------------------------------------------- */
+
 import { useMemo } from "react";
 import type {
   ProductSchemaDefinition,
   ProductKnowledgeBlock,
   ProductSchemaSurface,
   SpecField,
-  SpecGroup,
 } from "@/types/product-schema";
 import {
   filterFieldsForSurface,
   filterKnowledgeForSurface,
   resolveOptionVisual,
+  emphasisForGroup,
 } from "@/lib/product-schema";
 import VisualGlyph from "./VisualGlyph";
 
 interface ProductPreviewProps {
-  // --- MUST STAY (Review-step call site, A4) ---
   productName: string;
   primaryModel?: string | null;
   tagline?: string | null;
@@ -28,8 +41,6 @@ interface ProductPreviewProps {
   galleryUrls?: string[];
   mediaCounts?: { photos?: number; videos?: number; manuals?: number };
   surface?: ProductSchemaSurface;
-
-  // --- NEW (additive, all optional → call site unaffected) ---
   videoUrls?: string[];
   manuals?: { url: string; label?: string | null }[];
   ar3dUrl?: string | null;
@@ -37,9 +48,7 @@ interface ProductPreviewProps {
   warranty?: string | null;
 }
 
-/* The canonical SpecField type is imported from "@/types/product-schema".
-   We do not redeclare it here — drift between local and canonical shapes
-   was the root cause of the build failure. */
+/* ── value helpers ─────────────────────────────────────────────── */
 
 const isEmptyValue = (value: unknown): boolean => {
   if (value === null || value === undefined) return true;
@@ -52,9 +61,7 @@ const getInitials = (label: string): string => {
   const cleaned = label.trim();
   if (!cleaned) return "?";
   const parts = cleaned.split(/\s+/).filter(Boolean);
-  if (parts.length === 1) {
-    return parts[0].slice(0, 2).toUpperCase();
-  }
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[1][0]).toUpperCase();
 };
 
@@ -83,11 +90,35 @@ const fileNameFromUrl = (url: string): string => {
   }
 };
 
-/* Shared section heading. */
-const SectionTitle = ({ children }: { children: React.ReactNode }) => (
-  <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-    {children}
-  </h3>
+const asKnowledgeList = (
+  content: ProductKnowledgeBlock["content"] | undefined,
+): string[] => {
+  if (Array.isArray(content)) return content.map((c) => String(c));
+  if (typeof content === "string") return content.trim() ? [content] : [];
+  return [];
+};
+
+/* ── small presentational atoms ────────────────────────────────── */
+
+/* Eyebrow + title section header — the single rhythm device for every
+   major band so vertical pacing stays consistent. */
+const SectionHead = ({
+  eyebrow,
+  title,
+}: {
+  eyebrow?: string;
+  title: string;
+}) => (
+  <div className="space-y-1">
+    {eyebrow ? (
+      <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-faint)]">
+        {eyebrow}
+      </div>
+    ) : null}
+    <h3 className="text-[13px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+      {title}
+    </h3>
+  </div>
 );
 
 export const ProductPreview = (props: ProductPreviewProps) => {
@@ -114,192 +145,83 @@ export const ProductPreview = (props: ProductPreviewProps) => {
 
   const visibleFields = useMemo<SpecField[]>(() => {
     if (!schema) return [];
-    const all = schema.groups.flatMap((g) => g.fields);
-    return filterFieldsForSurface(all, effectiveSurface);
+    return filterFieldsForSurface(schema.groups.flatMap((g) => g.fields), effectiveSurface);
   }, [schema, effectiveSurface]);
+
+  const visibleFieldKeys = useMemo(
+    () => new Set(visibleFields.map((f) => f.key)),
+    [visibleFields],
+  );
 
   const visibleKnowledge = useMemo(
     () => filterKnowledgeForSurface(knowledge, effectiveSurface),
     [knowledge, effectiveSurface],
   );
 
-  // Fast lookup of which fields survived surface filtering.
-  const visibleFieldKeys = useMemo(
-    () => new Set(visibleFields.map((f) => f.key)),
-    [visibleFields],
-  );
+  // key → group id (drives emphasis + automation/compliance split)
+  const fieldGroupId = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const g of schema?.groups ?? []) {
+      for (const f of g.fields) m.set(f.key, g.id);
+    }
+    return m;
+  }, [schema]);
 
   const isEmptyState =
     !schema &&
     Object.keys(values || {}).length === 0 &&
     (!knowledge || knowledge.length === 0);
 
-  if (isEmptyState) {
-    return (
-      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]/40 p-6 md:p-8">
-        <p className="text-sm text-[var(--text-secondary)]">
-          No schema for this classification. The public preview will appear
-          once a schema is registered for this subcategory.
-        </p>
-      </div>
-    );
-  }
+  /* ── derived: knowledge by type ── */
+  const kbByType = useMemo(() => {
+    const m = new Map<string, ProductKnowledgeBlock[]>();
+    for (const b of visibleKnowledge) {
+      const arr = m.get(b.type) ?? [];
+      arr.push(b);
+      m.set(b.type, arr);
+    }
+    return m;
+  }, [visibleKnowledge]);
+  const firstKb = (t: string) => kbByType.get(t)?.[0];
 
-  // ---- Boolean / compliance feature badges (true booleans only) ----
-  const trueBooleanFields = visibleFields.filter(
+  /* ── derived: metric anchors (the big numbers) ── */
+  const metricAnchors = visibleFields
+    .filter((f) => f.visualRenderType === "metric_block" && !isEmptyValue(values[f.key]))
+    .slice(0, 6);
+
+  /* ── derived: booleans split by group ── */
+  const trueBooleans = visibleFields.filter(
     (f) => f.visualRenderType === "boolean_feature" && values[f.key] === true,
   );
-  const badgeFields = trueBooleanFields.slice(0, 8);
-  const badgeKeys = new Set(badgeFields.map((f) => f.key));
-  const remainingBooleanFields = trueBooleanFields.filter(
-    (f) => !badgeKeys.has(f.key),
+  const automationFeatures = trueBooleans.filter(
+    (f) => fieldGroupId.get(f.key) === "automation",
+  );
+  const complianceFeatures = trueBooleans.filter((f) => {
+    const g = fieldGroupId.get(f.key);
+    return g === "compliance" || g === "customs";
+  });
+  const otherFeatures = trueBooleans.filter(
+    (f) => !automationFeatures.includes(f) && !complianceFeatures.includes(f),
   );
 
-  // ---- Field renderer keyed by visualRenderType ----
-  // Used both inside grouped sections and any flat fallback.
-  const renderField = (f: SpecField): React.ReactNode => {
-    const raw = values[f.key];
-    if (isEmptyValue(raw)) return null;
+  /* ── derived: material + application cards ── */
+  const materialEntries = visibleFields
+    .filter((f) => f.visualRenderType === "material_card")
+    .map((field) => ({ field, selected: selectedValuesOf(values[field.key]) }))
+    .filter((e) => e.selected.length > 0);
 
-    switch (f.visualRenderType) {
-      case "metric_block": {
-        return (
-          <div
-            key={f.key}
-            className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-4 space-y-1"
-          >
-            <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-bold font-mono text-[var(--text-primary)]">
-                {displayScalar(raw)}
-              </span>
-              {f.unit ? (
-                <span className="text-xs text-[var(--text-ghost)]">
-                  {f.unit}
-                </span>
-              ) : null}
-            </div>
-            <div className="text-[11px] uppercase tracking-wider text-[var(--text-ghost)]">
-              {f.label ?? f.key}
-            </div>
-          </div>
-        );
-      }
+  const applicationEntries = visibleFields
+    .filter((f) => f.visualRenderType === "application_card")
+    .map((field) => ({ field, selected: selectedValuesOf(values[field.key]) }))
+    .filter((e) => e.selected.length > 0);
 
-      case "technical_badge": {
-        // For single-select badges, resolve a glyph + the option's label
-        // from the visual registry so e.g. motor_type shows a motor icon
-        // and the human label ("Direct Drive") rather than the raw value.
-        const singleVal = typeof raw === "string" ? raw : null;
-        const option = singleVal
-          ? f.options?.find((o) => o.value === singleVal)
-          : undefined;
-        const visual = singleVal ? resolveOptionVisual(f, option, singleVal) : {};
-        const display = option?.label ?? displayScalar(raw);
-        return (
-          <div
-            key={f.key}
-            className="inline-flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2"
-            title={visual.description ?? undefined}
-          >
-            {visual.icon ? (
-              <VisualGlyph token={visual.icon} className="h-4 w-4 text-[var(--text-secondary)] shrink-0" />
-            ) : null}
-            <span className="text-[10px] uppercase tracking-wider text-[var(--text-ghost)]">
-              {f.label ?? f.key}
-            </span>
-            <span className="text-sm font-semibold text-[var(--text-primary)]">
-              {display}
-              {f.unit ? (
-                <span className="ms-1 text-xs font-normal text-[var(--text-ghost)]">
-                  {f.unit}
-                </span>
-              ) : null}
-            </span>
-          </div>
-        );
-      }
-
-      case "icon_chip":
-      case "image_chip": {
-        const selected = selectedValuesOf(raw);
-        return (
-          <div key={f.key} className="space-y-2">
-            <div className="text-[10px] uppercase tracking-wider text-[var(--text-ghost)]">
-              {f.label ?? f.key}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {selected.map((val) => {
-                const option = f.options?.find((o) => o.value === val);
-                const label = option?.label ?? val;
-                const visual = resolveOptionVisual(f, option, val);
-                const image =
-                  f.visualRenderType === "image_chip"
-                    ? option?.image
-                    : undefined;
-                return (
-                  <span
-                    key={`${f.key}-${val}`}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] ps-1.5 pe-2.5 py-1 text-xs text-[var(--text-primary)]"
-                    title={visual.description ?? label}
-                  >
-                    {image ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={image} alt="" className="h-4 w-4 rounded object-cover" />
-                    ) : visual.swatch ? (
-                      <span
-                        className="h-3.5 w-3.5 rounded-sm border border-black/10 shrink-0"
-                        style={{ backgroundColor: visual.swatch }}
-                      />
-                    ) : visual.icon ? (
-                      <VisualGlyph token={visual.icon} className="h-4 w-4 text-[var(--text-secondary)] shrink-0" />
-                    ) : null}
-                    {label}
-                    {visual.badge ? (
-                      <span className="ms-0.5 rounded-sm bg-[var(--bg-primary)] px-1 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-ghost)]">
-                        {visual.badge}
-                      </span>
-                    ) : null}
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-        );
-      }
-
-      // spec_card + plain_text + range (fieldType) + any other scalar
-      // renderer fall here. Note "range" is a SpecFieldType, not a
-      // VisualRenderType, so it is handled generically by default.
-      default: {
-        return (
-          <div
-            key={f.key}
-            className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-4 space-y-1"
-          >
-            <div className="text-[10px] uppercase tracking-wider text-[var(--text-ghost)]">
-              {f.label ?? f.key}
-            </div>
-            <div className="text-sm font-medium text-[var(--text-primary)]">
-              {displayScalar(raw)}
-              {f.unit ? (
-                <span className="ms-1 text-xs text-[var(--text-ghost)]">
-                  {f.unit}
-                </span>
-              ) : null}
-            </div>
-          </div>
-        );
-      }
-    }
-  };
-
-  // Render-types that are handled by dedicated sections below, not in the
-  // generic grouped grid.
+  /* ── derived: grouped spec sections (excluding fields rendered in
+       dedicated bands above), carrying their emphasis tier ── */
   const dedicatedRenderTypes = new Set([
     "boolean_feature",
     "material_card",
     "application_card",
-    "comparison_row",
+    "metric_block", // promoted into the anchors strip
     "gallery_block",
     "packing_block",
     "download_block",
@@ -307,9 +229,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
     "brochure_block",
   ]);
 
-  // ---- Grouped spec sections (ordered) ----
-  type GroupBundle = { group: SpecGroup; fields: SpecField[] };
-  const groupedSpecSections: GroupBundle[] = (schema?.groups ?? [])
+  const specGroups = (schema?.groups ?? [])
     .slice()
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
     .map((group) => {
@@ -322,152 +242,245 @@ export const ProductPreview = (props: ProductPreviewProps) => {
             !dedicatedRenderTypes.has(f.visualRenderType) &&
             !isEmptyValue(values[f.key]),
         );
-      return { group, fields };
+      return { group, fields, emphasis: emphasisForGroup(group.id) };
     })
     .filter((b) => b.fields.length > 0);
 
-  // ---- Material cards ----
-  const materialEntries = visibleFields
-    .filter((f) => f.visualRenderType === "material_card")
-    .map((field) => ({ field, selected: selectedValuesOf(values[field.key]) }))
-    .filter((e) => e.selected.length > 0);
+  /* ── derived: hero highlight chips (from key_features) ── */
+  const heroHighlights = asKnowledgeList(firstKb("key_features")?.content).slice(0, 4);
 
-  // ---- Application cards ----
-  const applicationEntries = visibleFields
-    .filter((f) => f.visualRenderType === "application_card")
-    .map((field) => ({ field, selected: selectedValuesOf(values[field.key]) }))
-    .filter((e) => e.selected.length > 0);
-
-  // ---- Comparison rows ----
-  const comparisonFields = visibleFields.filter(
-    (f) =>
-      f.visualRenderType === "comparison_row" && !isEmptyValue(values[f.key]),
-  );
-
-  // ---- Media-derived flags ----
+  /* ── media flags ── */
   const hasGallery = Array.isArray(galleryUrls) && galleryUrls.length > 0;
   const hasVideos = Array.isArray(videoUrls) && videoUrls.length > 0;
   const hasManuals = Array.isArray(manuals) && manuals.length > 0;
 
-  // ---- Hero meta chips ----
-  const machineKindLabel = schema?.name ?? schema?.machineKindId ?? null;
+  const machineKindLabel = schema?.name ?? null;
 
-  return (
-    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]/40 p-6 md:p-8 space-y-8">
-      {/* 1. Hero */}
-      <div className="rounded-2xl border border-[var(--border-subtle)] overflow-hidden bg-[var(--bg-surface-subtle)]">
-        <div className="relative w-full aspect-[16/9] bg-[var(--bg-primary)] flex items-center justify-center">
-          {mainImageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={mainImageUrl}
-              alt={productName}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <span className="text-sm text-[var(--text-faint)]">
-              No main image
+  if (isEmptyState) {
+    return (
+      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]/40 p-6 md:p-8">
+        <p className="text-sm text-[var(--text-secondary)]">
+          No schema for this classification. The public preview will appear once
+          a schema is registered for this subcategory.
+        </p>
+      </div>
+    );
+  }
+
+  /* ── value renderer for a single non-dedicated field ── */
+  const renderFieldValue = (f: SpecField): React.ReactNode => {
+    const raw = values[f.key];
+    if (isEmptyValue(raw)) return null;
+
+    if (f.visualRenderType === "technical_badge") {
+      const singleVal = typeof raw === "string" ? raw : null;
+      const option = singleVal ? f.options?.find((o) => o.value === singleVal) : undefined;
+      const visual = singleVal ? resolveOptionVisual(f, option, singleVal) : {};
+      const display = option?.label ?? displayScalar(raw);
+      return (
+        <div className="flex items-center gap-2.5">
+          {visual.icon ? (
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] text-[var(--text-secondary)]">
+              <VisualGlyph token={visual.icon} className="h-4 w-4" />
             </span>
-          )}
-        </div>
-        <div className="p-5 md:p-6 space-y-3">
-          <div className="flex flex-col gap-2">
-            <h1 className="text-2xl md:text-3xl font-bold text-[var(--text-primary)] leading-tight">
-              {productName || "Untitled product"}
-            </h1>
-            <div className="flex flex-wrap items-center gap-3">
-              {primaryModel ? (
-                <span className="font-mono text-sm text-[var(--text-ghost)]">
-                  {primaryModel}
-                </span>
-              ) : null}
-              {brand ? (
-                <span className="inline-flex items-center rounded-full border border-[var(--border-subtle)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
-                  {brand}
-                </span>
-              ) : null}
-              {machineKindLabel ? (
-                <span className="inline-flex items-center rounded-full border border-[var(--border-subtle)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
-                  {machineKindLabel}
-                </span>
-              ) : null}
+          ) : null}
+          <div className="min-w-0">
+            <div className="text-[10px] uppercase tracking-wider text-[var(--text-ghost)]">
+              {f.label ?? f.key}
+            </div>
+            <div className="text-sm font-semibold text-[var(--text-primary)] truncate">
+              {display}
+              {f.unit ? <span className="ms-1 text-xs font-normal text-[var(--text-ghost)]">{f.unit}</span> : null}
             </div>
           </div>
-          {tagline ? (
-            <p className="text-base italic text-[var(--text-secondary)]">
-              {tagline}
-            </p>
+        </div>
+      );
+    }
+
+    if (f.visualRenderType === "icon_chip" || f.visualRenderType === "image_chip") {
+      const selected = selectedValuesOf(raw);
+      return (
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-[var(--text-ghost)] mb-1.5">
+            {f.label ?? f.key}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {selected.map((val) => {
+              const option = f.options?.find((o) => o.value === val);
+              const label = option?.label ?? val;
+              const visual = resolveOptionVisual(f, option, val);
+              return (
+                <span
+                  key={`${f.key}-${val}`}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)] ps-1.5 pe-2.5 py-1 text-xs text-[var(--text-primary)]"
+                  title={visual.description ?? label}
+                >
+                  {visual.swatch ? (
+                    <span className="h-3.5 w-3.5 rounded-sm border border-black/10 shrink-0" style={{ backgroundColor: visual.swatch }} />
+                  ) : visual.icon ? (
+                    <VisualGlyph token={visual.icon} className="h-4 w-4 text-[var(--text-secondary)] shrink-0" />
+                  ) : null}
+                  {label}
+                  {visual.badge ? (
+                    <span className="ms-0.5 rounded-sm bg-[var(--bg-surface-subtle)] px-1 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-ghost)]">
+                      {visual.badge}
+                    </span>
+                  ) : null}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // spec_card / plain_text / range / comparison_row / fallback
+    return (
+      <div>
+        <div className="text-[10px] uppercase tracking-wider text-[var(--text-ghost)]">
+          {f.label ?? f.key}
+        </div>
+        <div className="text-sm font-medium text-[var(--text-primary)]">
+          {displayScalar(raw)}
+          {f.unit ? <span className="ms-1 text-xs text-[var(--text-ghost)]">{f.unit}</span> : null}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-12 md:space-y-16">
+      {/* ═══ 1. HERO ═══ */}
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 items-start">
+        {/* LEFT — identity + highlights */}
+        <div className="order-2 lg:order-1 space-y-5">
+          <div className="space-y-2.5">
+            {(machineKindLabel || brand) ? (
+              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-faint)]">
+                {brand ? <span>{brand}</span> : null}
+                {brand && machineKindLabel ? <span className="text-[var(--border-subtle)]">/</span> : null}
+                {machineKindLabel ? <span>{machineKindLabel}</span> : null}
+              </div>
+            ) : null}
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-[var(--text-primary)] leading-[1.1]">
+              {productName || "Untitled product"}
+            </h1>
+            {tagline ? (
+              <p className="text-base md:text-lg text-[var(--text-secondary)] leading-relaxed">
+                {tagline}
+              </p>
+            ) : null}
+            {primaryModel ? (
+              <div className="font-mono text-sm text-[var(--text-ghost)]">{primaryModel}</div>
+            ) : null}
+          </div>
+
+          {/* hero highlights — scan-first key_features */}
+          {heroHighlights.length > 0 ? (
+            <ul className="space-y-2">
+              {heroHighlights.map((h, i) => (
+                <li key={i} className="flex items-start gap-2.5 text-sm text-[var(--text-primary)]">
+                  <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)]">
+                    <VisualGlyph token="check" className="h-2.5 w-2.5" />
+                  </span>
+                  <span className="leading-snug">{h}</span>
+                </li>
+              ))}
+            </ul>
           ) : null}
-          {warranty || countryOfOrigin ? (
-            <div className="flex flex-wrap items-center gap-2 pt-1">
+
+          {/* quick automation badges */}
+          {automationFeatures.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {automationFeatures.slice(0, 6).map((f) => (
+                <span
+                  key={f.key}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-secondary)]"
+                >
+                  <VisualGlyph token="automation" className="h-3 w-3" />
+                  {f.label ?? f.key}
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          {/* warranty / origin */}
+          {(warranty || countryOfOrigin) ? (
+            <div className="flex flex-wrap gap-2 pt-1">
               {warranty ? (
-                <span className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2.5 py-1 text-[11px] text-[var(--text-secondary)]">
-                  <span className="uppercase tracking-wider text-[var(--text-ghost)]">
-                    Warranty
-                  </span>
-                  <span className="font-medium text-[var(--text-primary)]">
-                    {warranty}
-                  </span>
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-2.5 py-1 text-[11px] text-[var(--text-secondary)]">
+                  <span className="uppercase tracking-wider text-[var(--text-ghost)]">Warranty</span>
+                  <span className="font-medium text-[var(--text-primary)]">{warranty}</span>
                 </span>
               ) : null}
               {countryOfOrigin ? (
-                <span className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2.5 py-1 text-[11px] text-[var(--text-secondary)]">
-                  <span className="uppercase tracking-wider text-[var(--text-ghost)]">
-                    Origin
-                  </span>
-                  <span className="font-medium text-[var(--text-primary)]">
-                    {countryOfOrigin}
-                  </span>
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-2.5 py-1 text-[11px] text-[var(--text-secondary)]">
+                  <span className="uppercase tracking-wider text-[var(--text-ghost)]">Origin</span>
+                  <span className="font-medium text-[var(--text-primary)]">{countryOfOrigin}</span>
                 </span>
               ) : null}
             </div>
           ) : null}
         </div>
-      </div>
 
-      {/* 2. Compliance & feature badges */}
-      {badgeFields.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
-          {badgeFields.map((f) => (
-            <span
-              key={f.key}
-              className="inline-flex items-center rounded-full border border-emerald-500/50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-300"
-            >
-              {f.label ?? f.key}
-            </span>
-          ))}
+        {/* RIGHT — main image */}
+        <div className="order-1 lg:order-2">
+          <div className="relative w-full aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] flex items-center justify-center">
+            {mainImageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={mainImageUrl} alt={productName} className="h-full w-full object-cover" />
+            ) : (
+              <span className="text-sm text-[var(--text-faint)]">No main image</span>
+            )}
+          </div>
         </div>
+      </section>
+
+      {/* ═══ 2. METRIC ANCHORS ═══ */}
+      {metricAnchors.length > 0 ? (
+        <section className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-2xl border border-[var(--border-subtle)] bg-[var(--border-subtle)] overflow-hidden">
+          {metricAnchors.map((f) => (
+            <div key={f.key} className="bg-[var(--bg-surface)] p-5 flex flex-col justify-center gap-1">
+              <div className="flex items-baseline gap-1">
+                <span className="text-2xl md:text-3xl font-bold font-mono text-[var(--text-primary)] leading-none">
+                  {displayScalar(values[f.key])}
+                </span>
+                {f.unit ? <span className="text-xs text-[var(--text-ghost)]">{f.unit}</span> : null}
+              </div>
+              <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-ghost)]">
+                {f.label ?? f.key}
+              </div>
+            </div>
+          ))}
+        </section>
       ) : null}
 
-      {/* 3. Material cards */}
+      {/* ═══ 3. OVERVIEW ═══ */}
+      {firstKb("overview") ? (
+        <section className="max-w-3xl">
+          <p className="text-lg md:text-xl font-light leading-relaxed text-[var(--text-secondary)]">
+            {asKnowledgeList(firstKb("overview")!.content).join(" ")}
+          </p>
+        </section>
+      ) : null}
+
+      {/* ═══ 4. MATERIALS ═══ */}
       {materialEntries.length > 0 ? (
-        <section className="space-y-3">
-          <SectionTitle>Suitable Materials</SectionTitle>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <section className="space-y-4">
+          <SectionHead eyebrow="Capability" title="Suitable Materials" />
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
             {materialEntries.flatMap(({ field, selected }) =>
               selected.map((val) => {
                 const option = field.options?.find((o) => o.value === val);
                 const label = labelForOption(field, val);
                 const visual = resolveOptionVisual(field, option, val);
                 return (
-                  <div
-                    key={`${field.key}-${val}`}
-                    className="flex flex-col items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-2"
-                    title={visual.description ?? label}
-                  >
-                    <div
-                      className="relative flex items-center justify-center rounded-lg overflow-hidden border border-[var(--border-subtle)]"
-                      style={{ width: 80, height: 80 }}
-                    >
+                  <div key={`${field.key}-${val}`} className="group" title={visual.description ?? label}>
+                    <div className="aspect-square w-full overflow-hidden rounded-xl border border-[var(--border-subtle)]">
                       {option?.image ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={option.image}
-                          alt={label}
-                          className="h-full w-full object-cover"
-                        />
+                        <img src={option.image} alt={label} className="h-full w-full object-cover" />
                       ) : visual.swatch ? (
-                        /* Muted material swatch + subtle woven texture. */
                         <div
                           className="h-full w-full"
                           style={{
@@ -477,19 +490,12 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                           }}
                         />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-[var(--bg-primary)] text-[var(--text-primary)] font-mono font-bold">
-                          <span className="text-lg">{getInitials(label)}</span>
+                        <div className="flex h-full w-full items-center justify-center bg-[var(--bg-surface-subtle)] font-mono font-bold text-[var(--text-primary)]">
+                          {getInitials(label)}
                         </div>
                       )}
                     </div>
-                    <span className="mt-2 text-[11px] font-medium text-[var(--text-primary)] text-center">
-                      {label}
-                    </span>
-                    {visual.description ? (
-                      <span className="mt-0.5 text-[9.5px] leading-tight text-[var(--text-ghost)] text-center line-clamp-2">
-                        {visual.description}
-                      </span>
-                    ) : null}
+                    <div className="mt-1.5 text-[11px] font-medium text-[var(--text-primary)] text-center">{label}</div>
                   </div>
                 );
               }),
@@ -498,11 +504,11 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         </section>
       ) : null}
 
-      {/* 4. Application cards */}
+      {/* ═══ 5. APPLICATIONS ═══ */}
       {applicationEntries.length > 0 ? (
-        <section className="space-y-3">
-          <SectionTitle>Applications</SectionTitle>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <section className="space-y-4">
+          <SectionHead eyebrow="Built for" title="Applications" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {applicationEntries.flatMap(({ field, selected }) =>
               selected.map((val) => {
                 const option = field.options?.find((o) => o.value === val);
@@ -511,29 +517,17 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                 return (
                   <div
                     key={`${field.key}-${val}`}
-                    className="flex flex-col items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-2"
+                    className="flex items-center gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-3"
                     title={visual.description ?? label}
                   >
-                    <div
-                      className="flex items-center justify-center rounded-lg bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden"
-                      style={{ width: 80, height: 80 }}
-                    >
-                      {option?.image ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={option.image}
-                          alt={label}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : visual.icon ? (
-                        <VisualGlyph token={visual.icon} className="h-9 w-9 text-[var(--text-secondary)]" />
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]">
+                      {visual.icon ? (
+                        <VisualGlyph token={visual.icon} className="h-5 w-5" />
                       ) : (
-                        <span className="font-mono font-bold text-lg">{getInitials(label)}</span>
+                        <span className="font-mono text-xs font-bold">{getInitials(label)}</span>
                       )}
-                    </div>
-                    <span className="mt-2 text-[11px] font-medium text-[var(--text-primary)] text-center">
-                      {label}
                     </span>
+                    <span className="text-sm font-medium text-[var(--text-primary)]">{label}</span>
                   </div>
                 );
               }),
@@ -542,51 +536,111 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         </section>
       ) : null}
 
-      {/* 5. Grouped visual spec sections (ordered) */}
-      {groupedSpecSections.map(({ group, fields }) => (
-        <section key={group.id} className="space-y-3">
-          <SectionTitle>{group.title}</SectionTitle>
+      {/* ═══ 6. AUTOMATION ═══ */}
+      {automationFeatures.length > 0 ? (
+        <section className="space-y-4">
+          <SectionHead eyebrow="Hands-off" title="Automation" />
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-            {fields.map((f) => renderField(f))}
-          </div>
-        </section>
-      ))}
-
-      {/* 6. Comparison rows */}
-      {comparisonFields.length > 0 ? (
-        <section className="space-y-3">
-          <SectionTitle>Comparison</SectionTitle>
-          <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]">
-            {comparisonFields.map((f, idx) => (
+            {automationFeatures.map((f) => (
               <div
                 key={f.key}
-                className={`flex items-center justify-between gap-4 px-4 py-2.5 ${
-                  idx % 2 === 0 ? "bg-[var(--bg-surface-subtle)]" : ""
-                }`}
+                className="flex items-center gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3.5"
               >
-                <span className="text-xs text-[var(--text-secondary)]">
-                  {f.label ?? f.key}
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]">
+                  <VisualGlyph token="automation" className="h-4 w-4" />
                 </span>
-                <span className="text-sm font-medium text-[var(--text-primary)] text-end">
-                  {displayScalar(values[f.key])}
-                  {f.unit ? (
-                    <span className="ms-1 text-xs text-[var(--text-ghost)]">
-                      {f.unit}
-                    </span>
-                  ) : null}
-                </span>
+                <span className="text-sm font-medium text-[var(--text-primary)]">{f.label ?? f.key}</span>
               </div>
             ))}
           </div>
         </section>
       ) : null}
 
-      {/* 7. Feature list (overflow booleans) */}
-      {remainingBooleanFields.length > 0 ? (
-        <section className="space-y-3">
-          <SectionTitle>Features</SectionTitle>
+      {/* ═══ 7. SELLING POINTS / TECHNICAL ADVANTAGES (knowledge cards) ═══ */}
+      {(firstKb("selling_points") || firstKb("technical_advantages")) ? (
+        <section className="space-y-4">
+          <SectionHead eyebrow="Why it wins" title="Advantages" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {[
+              ...asKnowledgeList(firstKb("selling_points")?.content),
+              ...asKnowledgeList(firstKb("technical_advantages")?.content),
+            ].map((point, i) => (
+              <div
+                key={i}
+                className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 text-sm leading-relaxed text-[var(--text-primary)]"
+              >
+                {point}
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {/* ═══ 8. SPEC GROUPS (emphasis-tiered) ═══ */}
+      {specGroups.map(({ group, fields, emphasis }) => {
+        if (emphasis === "quiet") {
+          // Quiet: compact key→value rows, recessive.
+          return (
+            <section key={group.id} className="space-y-3">
+              <SectionHead title={group.title} />
+              <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]">
+                {fields.map((f, idx) => {
+                  const raw = values[f.key];
+                  const single = typeof raw === "string" ? raw : null;
+                  const opt = single ? f.options?.find((o) => o.value === single) : undefined;
+                  const display = opt?.label ?? displayScalar(raw);
+                  return (
+                    <div
+                      key={f.key}
+                      className={`flex items-center justify-between gap-4 px-4 py-2.5 ${
+                        idx % 2 === 0 ? "bg-[var(--bg-surface-subtle)]/50" : ""
+                      }`}
+                    >
+                      <span className="text-xs text-[var(--text-ghost)]">{f.label ?? f.key}</span>
+                      <span className="text-sm font-medium text-[var(--text-primary)] text-end">
+                        {display}
+                        {f.unit ? <span className="ms-1 text-xs text-[var(--text-ghost)]">{f.unit}</span> : null}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        }
+        // primary / standard: card grid
+        return (
+          <section key={group.id} className="space-y-4">
+            <SectionHead
+              eyebrow={emphasis === "primary" ? "Core" : undefined}
+              title={group.title}
+            />
+            <div
+              className={`grid gap-3 ${
+                emphasis === "primary"
+                  ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+                  : "grid-cols-1 sm:grid-cols-2 md:grid-cols-4"
+              }`}
+            >
+              {fields.map((f) => (
+                <div
+                  key={f.key}
+                  className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4"
+                >
+                  {renderFieldValue(f)}
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+      })}
+
+      {/* ═══ 9. APPLICATIONS DETAIL / OTHER FEATURES ═══ */}
+      {otherFeatures.length > 0 ? (
+        <section className="space-y-4">
+          <SectionHead title="Features" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {remainingBooleanFields.map((f) => (
+            {otherFeatures.map((f) => (
               <div
                 key={f.key}
                 className="flex items-center gap-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-sm text-[var(--text-primary)]"
@@ -601,186 +655,144 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         </section>
       ) : null}
 
-      {/* 8. Gallery grid */}
+      {/* ═══ 10. BUYER QUESTIONS ═══ */}
+      {firstKb("buyer_questions") ? (() => {
+        const c = firstKb("buyer_questions")!.content;
+        const qs =
+          c && typeof c === "object" && !Array.isArray(c) && Array.isArray((c as Record<string, unknown>).questions)
+            ? ((c as Record<string, unknown>).questions as { question: string; answer: string }[])
+            : [];
+        if (qs.length === 0) return null;
+        return (
+          <section className="space-y-4">
+            <SectionHead eyebrow="Good to know" title="Buyer Questions" />
+            <div className="space-y-2.5">
+              {qs.map((q, i) => (
+                <div key={i} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
+                  <div className="text-sm font-semibold text-[var(--text-primary)]">{q.question}</div>
+                  <div className="mt-1 text-sm leading-relaxed text-[var(--text-secondary)]">{q.answer}</div>
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+      })() : null}
+
+      {/* ═══ 11. WHAT'S INCLUDED / WARRANTY (knowledge) ═══ */}
+      {(firstKb("package_contents") || firstKb("warranty_notes")) ? (
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {firstKb("package_contents") ? (
+            <div className="space-y-3">
+              <SectionHead title="What's Included" />
+              <ul className="space-y-2">
+                {asKnowledgeList(firstKb("package_contents")!.content).map((item, i) => (
+                  <li key={i} className="flex items-start gap-2.5 text-sm text-[var(--text-primary)]">
+                    <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)]">
+                      <VisualGlyph token="check" className="h-2.5 w-2.5" />
+                    </span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {firstKb("warranty_notes") ? (
+            <div className="space-y-3">
+              <SectionHead title="Warranty" />
+              <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
+                {asKnowledgeList(firstKb("warranty_notes")!.content).join(" ")}
+              </p>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {/* ═══ 12. GALLERY ═══ */}
       {hasGallery ? (
-        <section className="space-y-3">
-          <SectionTitle>Gallery</SectionTitle>
+        <section className="space-y-4">
+          <SectionHead title="Gallery" />
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {galleryUrls!.map((url, i) => (
-              <div
-                key={`${url}-${i}`}
-                className="aspect-square overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]"
-              >
+              <div key={`${url}-${i}`} className="aspect-square overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={url}
-                  alt={`${productName} ${i + 1}`}
-                  className="h-full w-full object-cover"
-                />
+                <img src={url} alt={`${productName} ${i + 1}`} className="h-full w-full object-cover" />
               </div>
             ))}
           </div>
         </section>
       ) : null}
 
-      {/* 9. Videos */}
-      {hasVideos ? (
-        <section className="space-y-3">
-          <SectionTitle>Videos</SectionTitle>
+      {/* ═══ 13. VIDEO + AR ═══ */}
+      {(hasVideos || ar3dUrl) ? (
+        <section className="space-y-4">
+          <SectionHead title="Media" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {videoUrls!.map((url, i) => (
-              <div
-                key={`${url}-${i}`}
-                className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)]"
-              >
-                <video
-                  controls
-                  preload="metadata"
-                  className="h-full w-full"
-                  src={url}
-                />
+            {hasVideos
+              ? videoUrls!.map((url, i) => (
+                  <div key={`${url}-${i}`} className="aspect-video overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt={`Video ${i + 1}`} className="h-full w-full object-cover" />
+                  </div>
+                ))
+              : null}
+            {ar3dUrl ? (
+              <div className="aspect-video overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] flex items-center justify-center">
+                <span className="text-xs uppercase tracking-wider text-[var(--text-ghost)]">3D / AR view available</span>
               </div>
-            ))}
+            ) : null}
           </div>
         </section>
       ) : null}
 
-      {/* 10. AR / 3D placeholder */}
-      {ar3dUrl ? (
-        <section className="space-y-3">
-          <SectionTitle>3D / AR</SectionTitle>
-          <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-6 text-center">
-            <p className="text-sm font-medium text-[var(--text-primary)]">
-              3D / AR view available
-            </p>
-            <p className="mt-1 text-xs text-[var(--text-ghost)]">
-              Interactive model attached to this product.
-            </p>
-          </div>
-        </section>
-      ) : null}
-
-      {/* 11. Manuals / datasheets */}
+      {/* ═══ 14. DOWNLOADS ═══ */}
       {hasManuals ? (
-        <section className="space-y-3">
-          <SectionTitle>Manuals &amp; Datasheets</SectionTitle>
-          <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]">
+        <section className="space-y-4">
+          <SectionHead title="Documents" />
+          <div className="space-y-2">
             {manuals!.map((m, i) => (
               <a
                 key={`${m.url}-${i}`}
                 href={m.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                download
-                className={`flex items-center justify-between gap-4 px-4 py-3 text-sm transition-colors hover:bg-[var(--bg-surface)] ${
-                  i > 0 ? "border-t border-[var(--border-subtle)]" : ""
-                }`}
+                className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3 hover:bg-[var(--bg-surface-hover)] transition-colors"
               >
-                <span className="truncate text-[var(--text-primary)]">
+                <span className="text-sm font-medium text-[var(--text-primary)] truncate">
                   {m.label || fileNameFromUrl(m.url)}
                 </span>
-                <span className="shrink-0 text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">
-                  Download
-                </span>
+                <span className="text-[11px] uppercase tracking-wider text-[var(--text-ghost)] shrink-0">Download</span>
               </a>
             ))}
           </div>
         </section>
       ) : null}
 
-      {/* 12. Knowledge blocks (all surface-visible types) */}
-      {visibleKnowledge.length > 0 ? (
-        <section className="space-y-6">
-          {visibleKnowledge.map((block, idx) => {
-            const content = block.content as unknown;
-
-            // buyer_questions: { questions: [{ question, answer }] }
-            const questions =
-              content &&
-              typeof content === "object" &&
-              !Array.isArray(content) &&
-              Array.isArray(
-                (content as { questions?: unknown }).questions,
-              )
-                ? ((content as { questions: unknown[] }).questions as Array<{
-                    question?: string;
-                    answer?: string;
-                  }>)
-                : null;
-
-            const recordEntries =
-              !questions &&
-              content &&
-              typeof content === "object" &&
-              !Array.isArray(content)
-                ? Object.entries(content as Record<string, unknown>)
-                : null;
-
-            return (
-              <div key={`${block.type}-${idx}`} className="space-y-2">
-                {block.title ? (
-                  <SectionTitle>{block.title}</SectionTitle>
-                ) : null}
-
-                {typeof content === "string" ? (
-                  <p className="text-sm text-[var(--text-primary)] leading-relaxed whitespace-pre-line">
-                    {content}
-                  </p>
-                ) : Array.isArray(content) ? (
-                  <ul className="list-disc ps-5 space-y-1 text-sm text-[var(--text-primary)]">
-                    {(content as unknown[]).map((item, i) => (
-                      <li key={i}>{String(item)}</li>
-                    ))}
-                  </ul>
-                ) : questions ? (
-                  <div className="space-y-3">
-                    {questions.map((qa, i) => (
-                      <div
-                        key={i}
-                        className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-4 space-y-1"
-                      >
-                        <p className="text-sm font-semibold text-[var(--text-primary)]">
-                          {qa.question}
-                        </p>
-                        {qa.answer ? (
-                          <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
-                            {qa.answer}
-                          </p>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                ) : recordEntries ? (
-                  <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]">
-                    {recordEntries.map(([k, v], i) => (
-                      <div
-                        key={k}
-                        className={`flex items-start justify-between gap-4 px-4 py-2.5 ${
-                          i % 2 === 0 ? "bg-[var(--bg-surface-subtle)]" : ""
-                        }`}
-                      >
-                        <span className="text-xs text-[var(--text-secondary)]">
-                          {k}
-                        </span>
-                        <span className="text-sm text-[var(--text-primary)] text-end">
-                          {Array.isArray(v)
-                            ? (v as unknown[]).map((x) => String(x)).join(", ")
-                            : String(v)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
+      {/* ═══ 15. COMPLIANCE (quiet) ═══ */}
+      {complianceFeatures.length > 0 ? (
+        <section className="flex flex-wrap items-center gap-2 border-t border-[var(--border-subtle)] pt-6">
+          <span className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-faint)] me-1">Compliance</span>
+          {complianceFeatures.map((f) => (
+            <span
+              key={f.key}
+              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-secondary)]"
+            >
+              <VisualGlyph token="check" className="h-3 w-3" />
+              {f.label ?? f.key}
+            </span>
+          ))}
         </section>
       ) : null}
 
-      {/* 13. Media count strip */}
-      {mediaCounts ? (
-        <div className="border-t border-[var(--border-subtle)] pt-4 text-xs text-[var(--text-ghost)]">
-          {`${mediaCounts.photos ?? 0} photos · ${mediaCounts.videos ?? 0} videos · ${mediaCounts.manuals ?? 0} manuals`}
+      {/* ═══ 16. MEDIA COUNT FOOTER ═══ */}
+      {mediaCounts && (mediaCounts.photos || mediaCounts.videos || mediaCounts.manuals) ? (
+        <div className="text-xs text-[var(--text-ghost)]">
+          {[
+            mediaCounts.photos ? `${mediaCounts.photos} photos` : null,
+            mediaCounts.videos ? `${mediaCounts.videos} videos` : null,
+            mediaCounts.manuals ? `${mediaCounts.manuals} documents` : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
         </div>
       ) : null}
     </div>

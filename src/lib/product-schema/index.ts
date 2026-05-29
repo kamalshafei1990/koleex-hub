@@ -25,10 +25,12 @@ export {
 export {
   VISUAL_OPTIONS,
   FIELD_VISUAL_DOMAIN,
+  GROUP_EMPHASIS,
   domainForField,
   resolveOptionVisual,
+  emphasisForGroup,
 } from "./visual-options";
-export type { OptionVisual } from "./visual-options";
+export type { OptionVisual, GroupEmphasis } from "./visual-options";
 
 export { computeReadiness } from "./readiness";
 export type {
