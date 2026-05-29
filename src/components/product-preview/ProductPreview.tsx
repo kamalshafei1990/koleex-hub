@@ -438,36 +438,38 @@ export const ProductPreview = (props: ProductPreviewProps) => {
 
   return (
     <div className="space-y-12 md:space-y-16">
-      {/* ═══ 1. HERO ═══ */}
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 items-start">
-        {/* LEFT — identity + highlights */}
-        <div className="order-2 lg:order-1 space-y-5">
-          <div className="space-y-2.5">
+      {/* ═══ 1. CINEMATIC HERO ═══
+          The machine is the main character: a dominant render with two
+          floating intelligence cards overlapping it (desktop), an
+          asymmetric identity column, and generous breathing room. */}
+      <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center pt-2 md:pt-4">
+        {/* LEFT — identity */}
+        <div className="order-2 lg:order-1 lg:col-span-5 space-y-6">
+          <div className="space-y-3">
             {(machineKindLabel || brand) ? (
-              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-faint)]">
+              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-faint)]">
                 {brand ? <span>{brand}</span> : null}
                 {brand && machineKindLabel ? <span className="text-[var(--border-subtle)]">/</span> : null}
                 {machineKindLabel ? <span>{machineKindLabel}</span> : null}
               </div>
             ) : null}
-            <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-[var(--text-primary)] leading-[1.1]">
+            <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-[var(--text-primary)] leading-[1.04]">
               {productName || "Untitled product"}
             </h1>
             {tagline ? (
-              <p className="text-base md:text-lg text-[var(--text-secondary)] leading-relaxed">
+              <p className="text-lg md:text-xl font-light text-[var(--text-secondary)] leading-relaxed">
                 {tagline}
               </p>
             ) : null}
             {primaryModel ? (
-              <div className="font-mono text-sm text-[var(--text-ghost)]">{primaryModel}</div>
+              <div className="font-mono text-sm text-[var(--text-ghost)] tracking-wide">{primaryModel}</div>
             ) : null}
           </div>
 
-          {/* hero highlights — scan-first key_features */}
           {heroHighlights.length > 0 ? (
-            <ul className="space-y-2">
+            <ul className="space-y-2.5">
               {heroHighlights.map((h, i) => (
-                <li key={i} className="flex items-start gap-2.5 text-sm text-[var(--text-primary)]">
+                <li key={i} className="flex items-start gap-2.5 text-[15px] text-[var(--text-primary)]">
                   <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)]">
                     <VisualGlyph token="check" className="h-2.5 w-2.5" />
                   </span>
@@ -477,7 +479,6 @@ export const ProductPreview = (props: ProductPreviewProps) => {
             </ul>
           ) : null}
 
-          {/* warranty / origin */}
           {(warranty || countryOfOrigin) ? (
             <div className="flex flex-wrap gap-2 pt-1">
               {warranty ? (
@@ -496,15 +497,61 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           ) : null}
         </div>
 
-        {/* RIGHT — main image */}
-        <div className="order-1 lg:order-2">
-          <div className="relative w-full aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] flex items-center justify-center">
-            {mainImageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={mainImageUrl} alt={productName} className="h-full w-full object-cover" />
-            ) : (
-              <span className="text-sm text-[var(--text-faint)]">No main image</span>
-            )}
+        {/* RIGHT — dominant render + floating intelligence cards */}
+        <div className="order-1 lg:order-2 lg:col-span-7">
+          <div className="relative">
+            <div className="relative w-full aspect-[4/3] md:aspect-[5/4] overflow-hidden rounded-3xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] flex items-center justify-center">
+              {mainImageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={mainImageUrl} alt={productName} className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-sm text-[var(--text-faint)]">No main image</span>
+              )}
+              {/* subtle inner edge for depth (monochrome, no gradient fill) */}
+              <div className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-inset ring-black/5" />
+            </div>
+
+            {/* Floating intelligence cards — desktop only; mobile uses the
+                anchor band below. Pulls the top 2 anchors. */}
+            {coreAnchors.length > 0 ? (
+              <div className="hidden lg:flex absolute -bottom-6 left-6 right-6 gap-3">
+                {coreAnchors.slice(0, 2).map(({ field: f, kind }) => {
+                  const raw = values[f.key];
+                  let icon: string | null = null;
+                  let headline: string;
+                  if (kind === "metric") {
+                    headline = `${displayScalar(raw)}${f.unit ? " " + f.unit : ""}`;
+                  } else if (kind === "boolean") {
+                    icon = "automation";
+                    headline = f.label ?? f.key;
+                  } else {
+                    const single = typeof raw === "string" ? raw : selectedValuesOf(raw)[0] ?? "";
+                    const opt = f.options?.find((o) => o.value === single);
+                    const v = resolveOptionVisual(f, opt, single);
+                    icon = v.icon ?? null;
+                    headline = opt?.label ?? displayScalar(raw);
+                  }
+                  return (
+                    <div
+                      key={f.key}
+                      className="flex-1 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]/90 backdrop-blur px-4 py-3 shadow-sm"
+                    >
+                      <div className="flex items-center gap-2">
+                        {icon ? (
+                          <VisualGlyph token={icon} className="h-4 w-4 text-[var(--text-secondary)] shrink-0" />
+                        ) : null}
+                        <span className="text-lg font-bold font-mono text-[var(--text-primary)] leading-none truncate">
+                          {headline}
+                        </span>
+                      </div>
+                      <div className="mt-1 text-[10px] uppercase tracking-[0.14em] text-[var(--text-ghost)]">
+                        {f.label ?? f.key}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
         </div>
       </section>
