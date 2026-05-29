@@ -845,47 +845,43 @@ export const ProductPreview = (props: ProductPreviewProps) => {
               eyebrow={emphasis === "primary" ? "Core" : undefined}
               defaultOpen={emphasis === "primary"}
             >
-              {emphasis === "quiet" ? (
-                <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]">
-                  {fields.map((f, idx) => {
+              <table className="w-full border-collapse text-sm">
+                <tbody>
+                  {fields.map((f) => {
                     const raw = values[f.key];
-                    const single = typeof raw === "string" ? raw : null;
-                    const opt = single ? f.options?.find((o) => o.value === single) : undefined;
-                    const display = opt?.label ?? displayScalar(raw);
+                    // Resolve a human display value: option labels for
+                    // single/multi selects, joined; else the raw scalar.
+                    let display: string;
+                    if (Array.isArray(raw)) {
+                      display = raw
+                        .map((v) => f.options?.find((o) => o.value === String(v))?.label ?? String(v))
+                        .join(", ");
+                    } else if (typeof raw === "string") {
+                      display = f.options?.find((o) => o.value === raw)?.label ?? raw;
+                    } else if (typeof raw === "boolean") {
+                      display = raw ? "Yes" : "No";
+                    } else {
+                      display = displayScalar(raw);
+                    }
                     return (
-                      <div
-                        key={f.key}
-                        className={`flex items-center justify-between gap-4 px-4 py-2.5 ${
-                          idx % 2 === 0 ? "bg-[var(--bg-surface-subtle)]/50" : ""
-                        }`}
-                      >
-                        <span className="text-xs text-[var(--text-ghost)]">{f.label ?? f.key}</span>
-                        <span className="text-sm font-medium text-[var(--text-primary)] text-end">
+                      <tr key={f.key} className="border-b border-[var(--border-subtle)] last:border-0">
+                        <th
+                          scope="row"
+                          className="w-[45%] py-3 pe-4 text-start align-top font-normal text-[var(--text-ghost)]"
+                        >
+                          {f.label ?? f.key}
+                        </th>
+                        <td className="py-3 align-top font-medium text-[var(--text-primary)]">
                           {display}
-                          {f.unit ? <span className="ms-1 text-xs text-[var(--text-ghost)]">{f.unit}</span> : null}
-                        </span>
-                      </div>
+                          {f.unit ? (
+                            <span className="ms-1 text-xs font-normal text-[var(--text-ghost)]">{f.unit}</span>
+                          ) : null}
+                        </td>
+                      </tr>
                     );
                   })}
-                </div>
-              ) : (
-                <div
-                  className={`grid gap-3 ${
-                    emphasis === "primary"
-                      ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-                      : "grid-cols-1 sm:grid-cols-2 md:grid-cols-4"
-                  }`}
-                >
-                  {fields.map((f) => (
-                    <div
-                      key={f.key}
-                      className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4"
-                    >
-                      {renderFieldValue(f)}
-                    </div>
-                  ))}
-                </div>
-              )}
+                </tbody>
+              </table>
             </Disclosure>
           ))}
         </div>
