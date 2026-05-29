@@ -60,6 +60,7 @@ import {
   type ProductKnowledgeBlock,
 } from "@/lib/product-schema";
 import { ProductPreview } from "@/components/product-preview/ProductPreview";
+import SchemaSpecsSection from "./form-sections/SchemaSpecsSection";
 import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
 import EyeIcon from "@/components/icons/ui/EyeIcon";
 import EyeOffIcon from "@/components/icons/ui/EyeOffIcon";
@@ -1965,18 +1966,52 @@ export default function ProductForm({ productId }: Props) {
            so this step only renders the dynamic spec fields driven
            by the template the kind chose.
            ═══════════════════════════════════════════════════════════ */}
-        {steps[currentStep]?.id === "sewing-specs" && (
-          <div className="space-y-5 animate-in fade-in duration-300">
-            <Section id="sewing" icon={<Settings2Icon className="h-4 w-4" />} title="Machine Specs" badge={sewingSpecs.template_slug ? sewingSpecs.template_slug.replace(/-/g, " ") : undefined}>
-              <SewingMachineSection
-                data={sewingSpecs}
-                onChange={setSewingSpecs}
-                subcategorySlug={product.subcategory_slug}
-                mode="specs"
-              />
-            </Section>
-          </div>
-        )}
+        {steps[currentStep]?.id === "sewing-specs" && (() => {
+          /* Schema-driven specs — the canonical structured editor that
+             writes product.schema_specs (the data that lights up the
+             public product page, quotes, brochures, AI). Resolved from
+             the current Division → Category → Subcategory classification.
+             The legacy free-form SewingMachineSection stays below as a
+             fallback for classifications without a published schema. */
+          const specsSchema = resolveSchema({
+            divisionCode: product.division_slug || "",
+            categoryCode: product.category_slug || "",
+            subcategoryCode: selectedSubcategory?.code || "",
+          }).schema;
+          return (
+            <div className="space-y-5 animate-in fade-in duration-300">
+              {specsSchema ? (
+                <Section
+                  id="schema-specs"
+                  icon={<Settings2Icon className="h-4 w-4" />}
+                  title="Product Specs"
+                  badge="Structured · Multi-surface"
+                >
+                  <SchemaSpecsSection
+                    schema={specsSchema}
+                    values={product.schema_specs || {}}
+                    onChange={(next) => updateProduct_({ schema_specs: next })}
+                  />
+                </Section>
+              ) : null}
+
+              <Section
+                id="sewing"
+                icon={<Settings2Icon className="h-4 w-4" />}
+                title={specsSchema ? "Additional / Legacy Specs" : "Machine Specs"}
+                badge={sewingSpecs.template_slug ? sewingSpecs.template_slug.replace(/-/g, " ") : undefined}
+                defaultOpen={!specsSchema}
+              >
+                <SewingMachineSection
+                  data={sewingSpecs}
+                  onChange={setSewingSpecs}
+                  subcategorySlug={product.subcategory_slug}
+                  mode="specs"
+                />
+              </Section>
+            </div>
+          );
+        })()}
 
         {/* ═══════════════════════════════════════════════════════════
            STEP N: TECHNICAL DETAILS
