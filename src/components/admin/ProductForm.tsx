@@ -54,6 +54,12 @@ import type {
   TranslationFormState, MarketPriceFormState, RelatedProductFormState,
 } from "@/types/product-form";
 import { EMPTY_PRODUCT, createEmptyModel, COUNTRIES } from "@/types/product-form";
+import {
+  resolveSchema,
+  computeReadiness,
+  type ProductKnowledgeBlock,
+} from "@/lib/product-schema";
+import { ProductPreview } from "@/components/product-preview/ProductPreview";
 import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
 import EyeIcon from "@/components/icons/ui/EyeIcon";
 import EyeOffIcon from "@/components/icons/ui/EyeOffIcon";
@@ -442,6 +448,14 @@ export default function ProductForm({ productId }: Props) {
           country_of_origin: p.country_of_origin || "",
           moq: p.moq?.toString() || "",
           lead_time: p.lead_time || "",
+          /* Product Schema Engine v1 — hydrate the 5 schema columns
+             with safe defaults so the new readiness panel + preview
+             still render for legacy products with NULL values. */
+          schema_id: p.schema_id || "",
+          schema_version: p.schema_version || "",
+          schema_specs: (p.schema_specs as Record<string, unknown>) || {},
+          schema_knowledge: (p.schema_knowledge as unknown[]) || [],
+          schema_visibility: (p.schema_visibility as Record<string, unknown>) || {},
         });
         setSlugEdited(true);
 
@@ -848,6 +862,18 @@ export default function ProductForm({ productId }: Props) {
     setError("");
     setSuccess("");
 
+    /* Product Schema Engine v1 — resolve the schema definition for the
+       chosen classification so we can persist {schema_id, schema_version}
+       alongside the form values. Resolution is pure / synchronous and
+       returns { schema: null } when no schema is registered for the
+       (division, category, subcategory) triple, which we treat as "no
+       schema bound" (nulls in DB). */
+    const resolvedSchemaForSave = resolveSchema({
+      divisionCode: product.division_slug || "",
+      categoryCode: product.category_slug || "",
+      subcategoryCode: selectedSubcategory?.code || "",
+    });
+
     try {
       const productData: Record<string, unknown> = {
         product_name: product.product_name,
@@ -892,6 +918,15 @@ export default function ProductForm({ productId }: Props) {
         country_of_origin: product.country_of_origin || null,
         moq: product.moq ? parseInt(product.moq) : null,
         lead_time: product.lead_time || null,
+        /* Product Schema Engine v1 — persist the 5 new columns.
+           schema_id / schema_version come from the resolved schema
+           registry entry; the other three are passed straight from
+           form state (currently always empty until editors land). */
+        schema_id: resolvedSchemaForSave.schema?.id ?? null,
+        schema_version: resolvedSchemaForSave.schema?.version ?? null,
+        schema_specs: product.schema_specs || {},
+        schema_knowledge: product.schema_knowledge || [],
+        schema_visibility: product.schema_visibility || {},
       };
 
       let pid: string;
@@ -2189,6 +2224,54 @@ export default function ProductForm({ productId }: Props) {
           const essentialTotal = isSewing ? 13 : 10;
           const completionPct = Math.round((essentialFilled / essentialTotal) * 100);
 
+          /* ── Product Schema Engine — readiness + preview inputs ──
+                The new schema-driven Intelligence panel sits ABOVE the
+                legacy readiness card. We resolve the schema for the
+                current classification and derive media counts from the
+                actual ProductMediaType values used elsewhere in this
+                file (main_image, gallery, manual, video, packing_photo).
+                Plain consts (not useMemo) because this IIFE runs
+                conditionally on the current step, and hooks can't sit
+                inside a conditional branch. */
+          const resolvedSchemaForReview = resolveSchema({
+            divisionCode: product.division_slug || "",
+            categoryCode: product.category_slug || "",
+            subcategoryCode: selectedSubcategory?.code || "",
+          });
+          const primaryModelForReview = models[0];
+          const galleryCount = media.filter((m) => m.type === "gallery").length;
+          const packingCount = media.filter((m) => m.type === "packing_photo").length;
+          const manualCount = media.filter((m) => m.type === "manual").length;
+          const videoCount = media.filter((m) => m.type === "video").length;
+          const mainImageCount = media.some((m) => m.type === "main_image") ? 1 : 0;
+          const readinessReport = computeReadiness({
+            schema: resolvedSchemaForReview.schema,
+            values: product.schema_specs || {},
+            media: {
+              main: mainImageCount,
+              gallery: galleryCount,
+              packing: packingCount,
+              manual: manualCount,
+              video: videoCount,
+            },
+            commercial: {
+              product_name: product.product_name,
+              primary_model: primaryModelForReview?.primary_model || null,
+              supplier_model: primaryModelForReview?.reference_model || null,
+              cost_price: primaryModelForReview?.cost_price || null,
+              global_price: primaryModelForReview?.global_price || null,
+              warranty: product.warranty || null,
+              moq: product.moq || null,
+              lead_time: product.lead_time || null,
+            },
+            knowledge: (product.schema_knowledge as ProductKnowledgeBlock[]) || [],
+          });
+          const mainImageUrlForPreview =
+            media.find((m) => m.type === "main_image")?.url || null;
+          const galleryUrlsForPreview = media
+            .filter((m) => m.type === "gallery")
+            .map((m) => m.url);
+
           /* Status meaning for the publish card. */
           const statusCopy = product.status === "active"
             ? { headline: "Ready to publish", body: "Status is Active — this product will go live on the public catalog as soon as you save." }
@@ -2271,6 +2354,128 @@ export default function ProductForm({ productId }: Props) {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* ══════════════════════════════════════════════════════
+                  PRODUCT INTELLIGENCE READINESS — Schema Engine v1
+                  Sits above the legacy readiness meter. Shows a 7-dim
+                  breakdown (data / media / commercial / technical /
+                  website / ai / brochure) sourced from computeReadiness
+                  against the resolved schema for this classification.
+                  Both panels coexist on purpose — the new one is rich
+                  but additive; the legacy meter still drives the
+                  publish-action card colour below. */}
+              <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5 md:p-6 mb-5">
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div>
+                    <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">
+                      Product Intelligence Readiness
+                    </h3>
+                    <p className="text-[11px] text-[var(--text-faint)] mt-1">
+                      Schema-driven completeness across data, media, commercial, and AI dimensions.
+                    </p>
+                  </div>
+                  <div className="text-3xl font-bold font-mono text-[var(--text-primary)] tabular-nums leading-none">
+                    {readinessReport.overall}%
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {readinessReport.dimensions.map((dim) => {
+                    const labelMap: Record<string, string> = {
+                      data: "Data",
+                      media: "Media",
+                      commercial: "Commercial",
+                      technical: "Technical",
+                      website: "Website",
+                      ai: "AI",
+                      brochure: "Brochure",
+                    };
+                    const statusLabel =
+                      dim.status === "ready"
+                        ? "Ready"
+                        : dim.status === "incomplete"
+                          ? "Incomplete"
+                          : "Empty";
+                    const statusCls =
+                      dim.status === "ready"
+                        ? "border-emerald-500/40 text-emerald-400 bg-emerald-500/5"
+                        : dim.status === "incomplete"
+                          ? "border-[var(--border-subtle)] text-[var(--text-ghost)]"
+                          : "border-[var(--border-subtle)]/50 text-[var(--text-faint)]";
+                    return (
+                      <div key={dim.dimension} className="flex items-center gap-3">
+                        <div className="w-20 text-[10px] uppercase tracking-wider text-[var(--text-ghost)]">
+                          {labelMap[dim.dimension] || dim.dimension}
+                        </div>
+                        <div className="h-2 rounded-full bg-[var(--bg-surface-subtle)] flex-1 overflow-hidden">
+                          <div
+                            className="h-full bg-[var(--text-primary)] rounded-full transition-all"
+                            style={{ width: `${dim.score}%` }}
+                          />
+                        </div>
+                        <div className="w-10 text-right text-[11px] font-mono text-[var(--text-primary)] tabular-nums">
+                          {dim.score}%
+                        </div>
+                        <div
+                          className={`inline-flex items-center justify-center h-5 px-2 rounded-full text-[9px] font-bold uppercase tracking-wider border ${statusCls}`}
+                        >
+                          {statusLabel}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {readinessReport.topMissing.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]">
+                    <div className="text-[10px] uppercase tracking-wider text-[var(--text-faint)] mb-2">
+                      Top missing
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {readinessReport.topMissing.slice(0, 5).map((m, i) => (
+                        <span
+                          key={`${m.dimension}:${m.key}:${i}`}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-ghost)]"
+                        >
+                          <span className="text-[var(--text-primary)]">{m.label}</span>
+                          <span className="text-[var(--text-faint)]">· {m.dimension}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ══════════════════════════════════════════════════════
+                  PUBLIC PREVIEW — Schema-driven public render
+                  Renders the resolved schema + values + knowledge using
+                  the same component the public website will use, so the
+                  admin sees the customer-facing surface before save. */}
+              <div className="mb-5">
+                <div className="flex items-baseline justify-between gap-3 mb-3">
+                  <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">
+                    Public Preview
+                  </h3>
+                  <p className="text-[11px] text-[var(--text-faint)]">
+                    This is what customers will see on the website.
+                  </p>
+                </div>
+                <ProductPreview
+                  productName={product.product_name}
+                  primaryModel={primaryModelForReview?.primary_model || null}
+                  tagline={primaryModelForReview?.tagline || null}
+                  brand={product.brand || null}
+                  schema={resolvedSchemaForReview.schema}
+                  values={product.schema_specs || {}}
+                  knowledge={(product.schema_knowledge as ProductKnowledgeBlock[]) || []}
+                  mainImageUrl={mainImageUrlForPreview}
+                  galleryUrls={galleryUrlsForPreview}
+                  mediaCounts={{
+                    photos: galleryCount,
+                    videos: videoCount,
+                    manuals: manualCount,
+                  }}
+                  surface="website"
+                />
               </div>
 
               {/* ── Completion meter ──

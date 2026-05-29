@@ -70,6 +70,15 @@ export interface ProductFormState {
   country_of_origin: string;
   moq: string;
   lead_time: string;
+  /* Product Schema Engine v1 — additive, optional fields. Populated
+     by the schema resolver (registry → division/category/subcategory)
+     and persisted into 5 new columns on the products table. None of
+     the legacy fields above changed shape — these are pure extras. */
+  schema_id: string;
+  schema_version: string;
+  schema_specs: Record<string, unknown>;
+  schema_knowledge: unknown[];
+  schema_visibility: Record<string, unknown>;
 }
 
 export interface ModelFormState {
@@ -219,6 +228,11 @@ export const EMPTY_PRODUCT: ProductFormState = {
   country_of_origin: "CN",
   moq: "",
   lead_time: "",
+  schema_id: "",
+  schema_version: "",
+  schema_specs: {},
+  schema_knowledge: [],
+  schema_visibility: {},
 };
 
 export function createEmptyModel(): ModelFormState {

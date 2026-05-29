@@ -305,6 +305,13 @@ export interface ProductRow {
   country_of_origin: string | null;
   moq: number | null;
   lead_time: string | null;
+  /* Product Schema Engine v1 — 5 new columns added in a recent
+     migration. All nullable so existing rows keep working untouched. */
+  schema_id: string | null;
+  schema_version: string | null;
+  schema_specs: Record<string, unknown> | null;
+  schema_knowledge: unknown[] | null;
+  schema_visibility: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }
