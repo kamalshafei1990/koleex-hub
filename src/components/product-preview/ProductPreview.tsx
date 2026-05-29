@@ -787,16 +787,19 @@ export const ProductPreview = (props: ProductPreviewProps) => {
       {(firstKb("selling_points") || firstKb("technical_advantages")) ? (
         <section className="space-y-4">
           <SectionHead eyebrow="Why it wins" title="Advantages" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[
               ...asKnowledgeList(firstKb("selling_points")?.content),
               ...asKnowledgeList(firstKb("technical_advantages")?.content),
             ].map((point, i) => (
               <div
                 key={i}
-                className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 text-sm leading-relaxed text-[var(--text-primary)]"
+                className="flex items-start gap-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5"
               >
-                {point}
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]">
+                  <VisualGlyph token="spark" className="h-5 w-5" />
+                </span>
+                <p className="text-[15px] leading-relaxed text-[var(--text-primary)]">{point}</p>
               </div>
             ))}
           </div>
@@ -921,11 +924,16 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         return (
           <section className="space-y-4">
             <SectionHead eyebrow="Good to know" title="Buyer Questions" />
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               {qs.map((q, i) => (
-                <div key={i} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
-                  <div className="text-sm font-semibold text-[var(--text-primary)]">{q.question}</div>
-                  <div className="mt-1 text-sm leading-relaxed text-[var(--text-secondary)]">{q.answer}</div>
+                <div key={i} className="flex items-start gap-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]">
+                    <VisualGlyph token="question" className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-[15px] font-semibold text-[var(--text-primary)]">{q.question}</div>
+                    <div className="mt-1.5 text-sm leading-relaxed text-[var(--text-secondary)]">{q.answer}</div>
+                  </div>
                 </div>
               ))}
             </div>

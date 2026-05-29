@@ -43,6 +43,16 @@ function paths(token: string): React.ReactNode {
           <circle cx="12" cy="15" r="1.2" {...S} />
         </>
       );
+    case "spark":
+      return <path d="M12 3v6M12 15v6M3 12h6M15 12h6M12 9a3 3 0 0 0 3 3 3 3 0 0 0-3 3 3 3 0 0 0-3-3 3 3 0 0 0 3-3z" {...S} />;
+    case "question":
+      return (
+        <>
+          <circle cx="12" cy="12" r="9" {...S} />
+          <path d="M9.2 9.3a2.8 2.8 0 0 1 5.3 1.2c0 1.8-2.7 2.2-2.7 4" {...S} />
+          <circle cx="11.8" cy="17" r="0.6" {...S} />
+        </>
+      );
 
     /* ── Motors ── */
     case "motor-servo":
