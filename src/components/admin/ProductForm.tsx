@@ -626,8 +626,13 @@ export default function ProductForm({ productId }: Props) {
     const status = primaryModel.coding_status;
     if (status === "edited" || status === "locked") return;
     if (primaryModel.primary_model === suggestedPrimaryModel) return;
+    /* Mirror the suggestion into model_name + slug too so the hero
+       "Primary Model" input — bound to primary_model with a model_name
+       fallback — picks it up regardless of how the form loaded. */
     updatePrimaryModel({
       primary_model: suggestedPrimaryModel,
+      model_name: primaryModel.model_name || suggestedPrimaryModel,
+      slug: primaryModel.slug || slugify(suggestedPrimaryModel),
       code_prefix: resolvedPrefix,
       coding_status: "auto_suggested",
     });
@@ -1249,18 +1254,74 @@ export default function ProductForm({ productId }: Props) {
                     />
                   </div>
 
-                  {/* Primary Model Name */}
+                  {/* Primary Model — the canonical KOLEEX commercial code.
+                      Now bound to product_models.primary_model so the
+                      hero shows whatever the KOLEEX Identity panel below
+                      composed (auto-suggested or manually approved).
+                      Writes are mirrored into model_name + slug so the
+                      downstream barcode / URL / SKU paths keep working
+                      without a separate display-name field. */}
                   <div>
-                    <label className="block text-[10px] font-bold text-[var(--text-ghost)] uppercase tracking-wider mb-2">
-                      <span className="inline-flex items-center gap-1.5"><TagsIcon className="h-3 w-3" /> Primary Model</span>
-                    </label>
+                    <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+                      <label className="block text-[10px] font-bold text-[var(--text-ghost)] uppercase tracking-wider">
+                        <span className="inline-flex items-center gap-1.5"><TagsIcon className="h-3 w-3" /> Primary Model</span>
+                      </label>
+                      {(() => {
+                        const s = primaryModel?.coding_status;
+                        if (!s) return null;
+                        const label =
+                          s === "approved" ? "Approved" :
+                          s === "locked" ? "Locked" :
+                          s === "edited" ? "Edited" :
+                          s === "auto_suggested" ? "Auto" :
+                          null;
+                        if (!label) return null;
+                        const cls =
+                          s === "approved" || s === "locked"
+                            ? "border-emerald-500/50 text-emerald-600 dark:text-emerald-300"
+                            : "border-[var(--border-subtle)] text-[var(--text-ghost)]";
+                        return (
+                          <span className={`text-[9.5px] font-bold uppercase tracking-[0.16em] px-1.5 py-0.5 rounded-full border ${cls}`}>
+                            {label}
+                          </span>
+                        );
+                      })()}
+                    </div>
                     <input
                       type="text"
-                      value={primaryModel?.model_name || ""}
-                      onChange={(e) => updatePrimaryModel({ model_name: e.target.value, slug: slugify(e.target.value) })}
-                      placeholder="e.g. KX-9500-D"
-                      className="w-full h-12 px-5 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[15px] font-semibold text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all"
+                      value={primaryModel?.primary_model || primaryModel?.model_name || ""}
+                      onChange={(e) => {
+                        const next = e.target.value.toUpperCase().replace(/\s+/g, "");
+                        updatePrimaryModel({
+                          primary_model: next,
+                          model_name: next,
+                          slug: slugify(next),
+                          code_prefix: resolvedPrefix || primaryModel?.code_prefix || "",
+                          coding_status:
+                            next === suggestedPrimaryModel
+                              ? "auto_suggested"
+                              : "edited",
+                        });
+                      }}
+                      onBlur={(e) => {
+                        const normalized = normalizeKoleexCode(e.target.value);
+                        if (normalized !== e.target.value) {
+                          updatePrimaryModel({
+                            primary_model: normalized,
+                            model_name: normalized,
+                            slug: slugify(normalized),
+                          });
+                        }
+                      }}
+                      placeholder={
+                        suggestedPrimaryModel ||
+                        (resolvedPrefix ? `${resolvedPrefix}-…` : "e.g. XCS-7800")
+                      }
+                      className="w-full h-12 px-5 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[15px] font-bold font-mono tracking-[0.04em] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all"
                     />
+                    <p className="text-[10px] text-[var(--text-ghost)] mt-1.5 leading-relaxed">
+                      KOLEEX commercial code. Auto-suggested from the classification + supplier model below; freely editable. Use the KOLEEX Product Identity panel further down to Reset / Approve.
+                    </p>
                   </div>
 
                   {/* Slug / URL preview — SEO-friendly URL that can be
