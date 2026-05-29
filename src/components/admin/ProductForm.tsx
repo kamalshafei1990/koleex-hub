@@ -1412,154 +1412,187 @@ export default function ProductForm({ productId }: Props) {
                 </div>
 
                 {/* ── v30: KOLEEX Product Identity (Primary Model) ── */}
-                <div className="mt-5 pt-5 border-t border-[var(--border-subtle)]">
-                  <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-                    <div className="flex items-center gap-2">
-                      <div className="h-6 w-6 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
-                        <span className="text-[10px] font-bold text-[var(--text-ghost)] font-mono">K</span>
-                      </div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">
-                        KOLEEX Product Identity
-                      </span>
-                    </div>
-                    {(() => {
-                      const s = primaryModel?.coding_status;
-                      const label =
-                        s === "edited" ? "Edited" :
-                        s === "approved" ? "Approved" :
-                        s === "locked" ? "Locked" :
-                        s === "auto_suggested" ? "Auto-suggested" :
-                        "Unset";
-                      const cls =
-                        s === "edited" ? "border-[var(--text-primary)] text-[var(--text-primary)]" :
-                        s === "approved" || s === "locked" ? "border-emerald-500/50 text-emerald-600 dark:text-emerald-300" :
-                        "border-[var(--border-subtle)] text-[var(--text-ghost)]";
-                      return (
-                        <span className={`text-[9.5px] font-bold uppercase tracking-[0.16em] px-1.5 py-0.5 rounded-full border ${cls}`}>
-                          {label}
+                {(() => {
+                  const code = primaryModel?.primary_model || "";
+                  const status = primaryModel?.coding_status;
+                  const validation = code ? validatePrimaryModel(code, resolvedPrefix) : null;
+                  const validationError = validation && !validation.ok ? validation.reason : null;
+                  const validationWarning = validation && validation.ok ? validation.warning : null;
+                  const canApprove = !!code && !validationError && status !== "approved";
+                  const canReset =
+                    !!suggestedPrimaryModel && code !== suggestedPrimaryModel;
+                  const statusLabel =
+                    status === "edited" ? "Edited" :
+                    status === "approved" ? "Approved" :
+                    status === "locked" ? "Locked" :
+                    status === "auto_suggested" ? "Auto-suggested" :
+                    "Unset";
+                  const statusCls =
+                    status === "approved" || status === "locked"
+                      ? "border-emerald-500/50 text-emerald-600 dark:text-emerald-300"
+                      : status === "edited"
+                        ? "border-[var(--text-primary)] text-[var(--text-primary)]"
+                        : "border-[var(--border-subtle)] text-[var(--text-ghost)]";
+
+                  return (
+                    <div className="mt-5 pt-5 border-t border-[var(--border-subtle)]">
+                      {/* Section header — title + status pill */}
+                      <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <div className="h-6 w-6 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
+                            <span className="text-[10px] font-bold text-[var(--text-ghost)] font-mono">K</span>
+                          </div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">
+                            KOLEEX Product Identity
+                          </span>
+                        </div>
+                        <span className={`text-[9.5px] font-bold uppercase tracking-[0.16em] px-1.5 py-0.5 rounded-full border ${statusCls}`}>
+                          {statusLabel}
                         </span>
-                      );
-                    })()}
-                  </div>
+                      </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-[120px_1fr_auto] gap-3 items-end">
-                    {/* Prefix badge */}
-                    <div>
-                      <label className={lbl}>Classification prefix</label>
-                      {resolvedPrefix ? (
-                        <div className="h-10 px-3 rounded-md border border-[var(--text-primary)] bg-[var(--bg-surface)] flex items-center font-mono text-[15px] font-bold tracking-[0.06em] text-[var(--text-primary)]">
-                          {resolvedPrefix}
+                      {/* Saved code strip — shows the live primary model big + mono.
+                          This is what the user wanted to "see after Approve". */}
+                      <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-4 mb-4">
+                        <div className="flex items-baseline justify-between gap-3 mb-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">
+                            Primary Model
+                          </span>
+                          {suggestedPrimaryModel && code && code !== suggestedPrimaryModel && (
+                            <span className="text-[10px] text-[var(--text-ghost)]">
+                              Suggested: <span className="font-mono font-semibold text-[var(--text-primary)]">{suggestedPrimaryModel}</span>
+                            </span>
+                          )}
                         </div>
-                      ) : (
-                        <div className="h-10 px-3 rounded-md border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] flex items-center text-[11px] text-[var(--text-faint)]">
-                          Pick subcategory
+                        <div className="font-mono font-bold text-[20px] sm:text-[24px] tracking-[0.04em] text-[var(--text-primary)] break-all">
+                          {code || (
+                            <span className="text-[var(--text-faint)] font-sans text-[13px] font-normal">
+                              {resolvedPrefix
+                                ? "Type the supplier model above to generate."
+                                : "Pick a subcategory first."}
+                            </span>
+                          )}
                         </div>
-                      )}
-                    </div>
+                      </div>
 
-                    {/* Editable primary model code */}
-                    <div>
-                      <label className={lbl}>Primary Model code</label>
-                      <input
-                        type="text"
-                        value={primaryModel?.primary_model || ""}
-                        onChange={(e) => {
-                          const next = e.target.value.toUpperCase().replace(/\s+/g, "");
-                          updatePrimaryModel({
-                            primary_model: next,
-                            code_prefix: resolvedPrefix || primaryModel?.code_prefix || "",
-                            coding_status: next === suggestedPrimaryModel ? "auto_suggested" : "edited",
-                          });
-                        }}
-                        onBlur={(e) => {
-                          const normalized = normalizeKoleexCode(e.target.value);
-                          if (normalized !== e.target.value) {
-                            updatePrimaryModel({ primary_model: normalized });
-                          }
-                        }}
-                        placeholder={suggestedPrimaryModel || `${resolvedPrefix || "PREFIX"}-…`}
-                        className={`${inp} font-mono`}
-                      />
+                      {/* Editor row — prefix badge + editable input. Buttons sit on
+                          their own row underneath so they never crowd the input. */}
+                      <div className="grid grid-cols-1 md:grid-cols-[120px_1fr] gap-3 items-end">
+                        <div>
+                          <label className={lbl}>Classification prefix</label>
+                          {resolvedPrefix ? (
+                            <div className="h-10 px-3 rounded-md border border-[var(--text-primary)] bg-[var(--bg-surface)] flex items-center font-mono text-[15px] font-bold tracking-[0.06em] text-[var(--text-primary)]">
+                              {resolvedPrefix}
+                            </div>
+                          ) : (
+                            <div className="h-10 px-3 rounded-md border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] flex items-center text-[11px] text-[var(--text-faint)]">
+                              Pick subcategory
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <label className={lbl}>Edit Primary Model code</label>
+                          <input
+                            type="text"
+                            value={code}
+                            onChange={(e) => {
+                              const next = e.target.value.toUpperCase().replace(/\s+/g, "");
+                              updatePrimaryModel({
+                                primary_model: next,
+                                code_prefix: resolvedPrefix || primaryModel?.code_prefix || "",
+                                coding_status:
+                                  next === suggestedPrimaryModel
+                                    ? "auto_suggested"
+                                    : "edited",
+                              });
+                            }}
+                            onBlur={(e) => {
+                              const normalized = normalizeKoleexCode(e.target.value);
+                              if (normalized !== e.target.value) {
+                                updatePrimaryModel({ primary_model: normalized });
+                              }
+                            }}
+                            placeholder={suggestedPrimaryModel || `${resolvedPrefix || "PREFIX"}-…`}
+                            className={`${inp} font-mono`}
+                          />
+                        </div>
+                      </div>
+
                       {/* Validation hint */}
-                      {(() => {
-                        const code = primaryModel?.primary_model || "";
-                        if (!code) {
-                          return (
-                            <p className="text-[10px] text-[var(--text-ghost)] mt-1">
-                              Suggested from supplier model. Editable.
-                            </p>
-                          );
-                        }
-                        const v = validatePrimaryModel(code, resolvedPrefix);
-                        if (!v.ok) {
-                          return (
-                            <p className="text-[10px] text-red-500 mt-1">{v.reason}</p>
-                          );
-                        }
-                        if (v.warning) {
-                          return (
-                            <p className="text-[10px] text-amber-500 mt-1">{v.warning}</p>
-                          );
-                        }
-                        return (
-                          <p className="text-[10px] text-[var(--text-ghost)] mt-1">
-                            Saved on the product as the commercial identity. Supplier model stays untouched.
-                          </p>
-                        );
-                      })()}
+                      {validationError ? (
+                        <p className="text-[11px] text-red-500 mt-2">{validationError}</p>
+                      ) : validationWarning ? (
+                        <p className="text-[11px] text-amber-500 mt-2">{validationWarning}</p>
+                      ) : code ? (
+                        <p className="text-[10.5px] text-[var(--text-ghost)] mt-2">
+                          Saved on the product as the commercial identity. Supplier model stays untouched.
+                        </p>
+                      ) : null}
+
+                      {/* Action row — Reset + Approve, never cramped. */}
+                      <div className="mt-4 flex items-center justify-end gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!suggestedPrimaryModel) return;
+                            updatePrimaryModel({
+                              primary_model: suggestedPrimaryModel,
+                              code_prefix: resolvedPrefix,
+                              coding_status: "auto_suggested",
+                            });
+                          }}
+                          disabled={!canReset}
+                          className="h-9 px-3 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11.5px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                          title="Reset to the auto-suggested code"
+                        >
+                          <span aria-hidden>↺</span>
+                          Reset to auto
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!canApprove) return;
+                            updatePrimaryModel({ coding_status: "approved" });
+                          }}
+                          disabled={!canApprove}
+                          className="h-9 px-3 rounded-md border border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-primary)] text-[11.5px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                          title="Mark as approved — locks the auto-resync"
+                        >
+                          <span aria-hidden>✓</span>
+                          {status === "approved" ? "Approved" : "Approve"}
+                        </button>
+                      </div>
+
+                      {/* Helper strip */}
+                      <p className="text-[10px] text-[var(--text-ghost)] mt-4 leading-relaxed border-t border-[var(--border-subtle)] pt-3">
+                        Supplier model stays as the original factory reference. KOLEEX Primary Model is the commercial identity used in catalog, quotations, website, and internal product data.
+                      </p>
                     </div>
+                  );
+                })()}
 
-                    {/* Reset / approve buttons */}
-                    <div className="flex items-center gap-2 md:flex-col md:items-stretch">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!suggestedPrimaryModel) return;
-                          updatePrimaryModel({
-                            primary_model: suggestedPrimaryModel,
-                            code_prefix: resolvedPrefix,
-                            coding_status: "auto_suggested",
-                          });
-                        }}
-                        disabled={!suggestedPrimaryModel || primaryModel?.primary_model === suggestedPrimaryModel}
-                        className="h-9 px-3 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
-                        title="Reset to the auto-suggested code"
-                      >
-                        ↺ Reset
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!primaryModel?.primary_model) return;
-                          const v = validatePrimaryModel(primaryModel.primary_model, resolvedPrefix);
-                          if (!v.ok) return;
-                          updatePrimaryModel({ coding_status: "approved" });
-                        }}
-                        disabled={!primaryModel?.primary_model || primaryModel?.coding_status === "approved"}
-                        className="h-9 px-3 rounded-md border border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-primary)] text-[11px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
-                        title="Mark as approved — locks the auto-resync"
-                      >
-                        ✓ Approve
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Helper strip */}
-                  <p className="text-[10px] text-[var(--text-ghost)] mt-3 leading-relaxed">
-                    Supplier model stays as the original factory reference. KOLEEX Primary Model is the commercial identity used in catalog, quotations, website, and internal product data.
-                  </p>
-                </div>
-
-                {/* Auto-generated codes for the primary model */}
+                {/* Auto-generated codes for the primary model — uses the
+                    KOLEEX primary_model when set so the approved code is
+                    the one that lands on the barcode + QR. */}
                 {primaryModel?.model_name && (
                   <div className="mt-5 pt-5 border-t border-[var(--border-subtle)]">
                     <div className="flex items-center gap-2 mb-3">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">Auto-Generated Codes</span>
                     </div>
                     <BarcodeQRDisplay
-                      value={primaryModel.barcode || primaryModel.slug || primaryModel.model_name}
-                      label={primaryModel.model_name}
-                      qrPayload={JSON.stringify({ sku: primaryModel.slug, name: primaryModel.model_name, ref: primaryModel.reference_model })}
+                      value={
+                        primaryModel.primary_model ||
+                        primaryModel.barcode ||
+                        primaryModel.slug ||
+                        primaryModel.model_name
+                      }
+                      label={primaryModel.primary_model || primaryModel.model_name}
+                      qrPayload={JSON.stringify({
+                        koleex_code: primaryModel.primary_model || null,
+                        sku: primaryModel.slug,
+                        name: primaryModel.model_name,
+                        ref: primaryModel.reference_model,
+                      })}
                       compact
                     />
                   </div>
