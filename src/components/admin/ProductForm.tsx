@@ -639,6 +639,85 @@ export default function ProductForm({ productId }: Props) {
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [suggestedPrimaryModel, resolvedPrefix]);
 
+  /* ── Live uniqueness check ──────────────────────────────────────
+     The DB owns the hard guarantee via the partial unique index on
+     upper(primary_model). This client check is the friendly mirror —
+     it pings /api/products/check-primary-model on each (debounced)
+     change so the operator sees "this code is already used by X" the
+     moment they type a duplicate, instead of finding out on Save.
+
+     codeCheck shape:
+       status   — "idle" | "checking" | "available" | "taken" | "error"
+       conflict — populated only when status === "taken"           */
+  type CodeCheck =
+    | { status: "idle" }
+    | { status: "checking" }
+    | { status: "available" }
+    | { status: "error" }
+    | {
+        status: "taken";
+        conflict: {
+          product_id: string;
+          product_name: string;
+          product_slug: string | null;
+          model_id: string;
+          model_name: string;
+          primary_model: string;
+        };
+      };
+  const [codeCheck, setCodeCheck] = useState<CodeCheck>({ status: "idle" });
+
+  useEffect(() => {
+    const code = (primaryModel?.primary_model || "").trim();
+    if (!code) {
+      setCodeCheck({ status: "idle" });
+      return;
+    }
+    /* Bail on incomplete / structurally invalid codes — the
+       validatePrimaryModel hint already covers those, no need to ping
+       the server for them. */
+    const v = validatePrimaryModel(code, resolvedPrefix);
+    if (!v.ok) {
+      setCodeCheck({ status: "idle" });
+      return;
+    }
+
+    let cancelled = false;
+    setCodeCheck({ status: "checking" });
+    const timer = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ code });
+        if (productId) params.set("excludeProductId", productId);
+        const res = await fetch(
+          `/api/products/check-primary-model?${params.toString()}`,
+          { credentials: "include" },
+        );
+        if (cancelled) return;
+        if (!res.ok) {
+          setCodeCheck({ status: "error" });
+          return;
+        }
+        const payload = await res.json();
+        if (cancelled) return;
+        if (payload?.available === false && payload?.conflict) {
+          setCodeCheck({ status: "taken", conflict: payload.conflict });
+        } else {
+          setCodeCheck({ status: "available" });
+        }
+      } catch (err) {
+        if (cancelled) return;
+        console.warn("[primary-model uniqueness] check failed", err);
+        setCodeCheck({ status: "error" });
+      }
+    }, 350); /* 350ms debounce — fast enough to feel live, slow enough
+                to not hammer the API on every keystroke */
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [primaryModel?.primary_model, productId, resolvedPrefix]);
+
   /* Smart save-button label + styling based on the chosen status.
      Shared between the Review step's preview card and the bottom
      nav's primary action so both stay in sync. Draft = grey
@@ -743,6 +822,24 @@ export default function ProductForm({ productId }: Props) {
     }
     if (!product.division_slug || !product.category_slug || !product.subcategory_slug) {
       setError("Classification is required");
+      setCurrentStep(0);
+      return;
+    }
+
+    /* ── Primary-Model uniqueness guard ──────────────────────────
+       The DB has a partial unique index on upper(primary_model), so
+       this is belt-and-braces — but blocking save here lets us point
+       the operator straight back to the hero strip with a clear
+       message instead of surfacing a raw Postgres error toast. */
+    if (codeCheck.status === "taken") {
+      setError(
+        `Primary Model "${codeCheck.conflict.primary_model}" is already used by "${codeCheck.conflict.product_name}". Pick a different code.`,
+      );
+      setCurrentStep(0);
+      return;
+    }
+    if (codeCheck.status === "checking") {
+      setError("Still checking if the Primary Model code is available — try again in a moment.");
       setCurrentStep(0);
       return;
     }
@@ -1267,7 +1364,18 @@ export default function ProductForm({ productId }: Props) {
                     const validation = code ? validatePrimaryModel(code, resolvedPrefix) : null;
                     const validationError = validation && !validation.ok ? validation.reason : null;
                     const validationWarning = validation && validation.ok ? validation.warning : null;
-                    const canApprove = !!code && !validationError && status !== "approved" && status !== "locked";
+                    /* Live-uniqueness state — checked against the server.
+                       A taken code blocks Approve AND Save (see canSave
+                       below the action row). */
+                    const isTaken = codeCheck.status === "taken";
+                    const isChecking = codeCheck.status === "checking";
+                    const canApprove =
+                      !!code &&
+                      !validationError &&
+                      !isTaken &&
+                      !isChecking &&
+                      status !== "approved" &&
+                      status !== "locked";
                     const canReset = !!suggestedPrimaryModel && code !== suggestedPrimaryModel && status !== "locked";
                     const isLocked = status === "locked";
                     const statusLabel =
@@ -1358,7 +1466,11 @@ export default function ProductForm({ productId }: Props) {
                               suggestedPrimaryModel ||
                               (resolvedPrefix ? `${resolvedPrefix}-…` : "e.g. XCS-7800")
                             }
-                            className="flex-1 min-w-[180px] h-12 px-5 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[15px] font-bold font-mono tracking-[0.04em] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                            className={`flex-1 min-w-[180px] h-12 px-5 rounded-xl bg-[var(--bg-surface-subtle)]/70 border ${
+                              isTaken
+                                ? "border-red-500/70 focus:border-red-500"
+                                : "border-[var(--border-subtle)] focus:border-[var(--border-focus)]"
+                            } text-[15px] font-bold font-mono tracking-[0.04em] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none transition-all disabled:opacity-60 disabled:cursor-not-allowed`}
                           />
 
                           {/* Reset to auto-suggested — only enabled when the
@@ -1401,14 +1513,50 @@ export default function ProductForm({ productId }: Props) {
                         </div>
 
                         {/* Validation + helper line. Single source of truth — no
-                            duplicate panel below. */}
+                            duplicate panel below. Order of precedence:
+                              1. Structural validation error
+                              2. Live uniqueness collision (taken)
+                              3. Uniqueness checking spinner
+                              4. Uniqueness all-clear (only when code differs
+                                 from the suggestion, to avoid noise)
+                              5. Prefix-mismatch warning
+                              6. Default helper text. */}
                         {validationError ? (
                           <p className="text-[11px] text-red-500 mt-2">{validationError}</p>
+                        ) : isTaken && codeCheck.status === "taken" ? (
+                          <p className="text-[11px] text-red-500 mt-2 leading-relaxed">
+                            <span className="font-semibold">Code already in use.</span>{" "}
+                            <span className="font-mono font-bold">{codeCheck.conflict.primary_model}</span>{" "}
+                            belongs to{" "}
+                            {codeCheck.conflict.product_slug ? (
+                              <a
+                                href={`/admin/products/${codeCheck.conflict.product_id}`}
+                                className="font-semibold underline underline-offset-2 hover:text-red-400"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                {codeCheck.conflict.product_name} · {codeCheck.conflict.model_name}
+                              </a>
+                            ) : (
+                              <span className="font-semibold">
+                                {codeCheck.conflict.product_name} · {codeCheck.conflict.model_name}
+                              </span>
+                            )}
+                            . Pick a different number after the prefix.
+                          </p>
+                        ) : isChecking ? (
+                          <p className="text-[11px] text-[var(--text-ghost)] mt-2">
+                            Checking if this code is available…
+                          </p>
+                        ) : codeCheck.status === "available" && code && code !== suggestedPrimaryModel ? (
+                          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-2">
+                            ✓ Available — no other product uses this code.
+                          </p>
                         ) : validationWarning ? (
                           <p className="text-[11px] text-amber-500 mt-2">{validationWarning}</p>
                         ) : (
                           <p className="text-[10px] text-[var(--text-ghost)] mt-2 leading-relaxed">
-                            KOLEEX commercial code — auto-suggested from the classification prefix + supplier model below, freely editable. Supplier model stays untouched as the factory reference.
+                            KOLEEX commercial code — auto-suggested from the classification prefix + supplier model below, freely editable. Codes are unique across the catalog. Supplier model stays untouched as the factory reference.
                           </p>
                         )}
                       </div>
