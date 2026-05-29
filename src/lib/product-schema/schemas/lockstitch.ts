@@ -27,10 +27,17 @@ void commercial;
 
 export const LOCKSTITCH_SCHEMA: ProductSchemaDefinition = {
   id: "lockstitch.standard-single-needle.v1",
-  divisionCode: "XS",
-  categoryCode: "XSL",
-  subcategoryCode: "XCS",
-  machineKindId: "standard-single-needle-lockstitch",
+  /* Keyed to the ACTUAL taxonomy the resolver is fed (see resolveSchema
+     call sites): products carry division_slug + category_slug (slugs, not
+     codes — divisions/categories have no code column) and we resolve the
+     subcategory via subcategories.code. The real Lockstitch subcategory
+     code is XSL (XCS is straight-knife cutting). machineKindId is omitted
+     so the schema registers at the SUBCATEGORY level — the ladder step that
+     products actually hit, since resolveSchema is called without a machine
+     kind. The machine kind lives in `name`. */
+  divisionCode: "garment-machinery",
+  categoryCode: "industrial-sewing-machines",
+  subcategoryCode: "XSL",
   name: "Standard Single Needle Lockstitch",
   version: "1.0.0",
   appliesTo: {

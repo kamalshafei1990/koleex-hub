@@ -20,7 +20,11 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
 import { getSupabaseServer } from "@/lib/server/supabase-server";
-import { resolveSchema } from "@/lib/product-schema";
+import {
+  resolveSchema,
+  filterFieldsForSurface,
+  filterKnowledgeForSurface,
+} from "@/lib/product-schema";
 import type { ProductKnowledgeBlock } from "@/types/product-schema";
 import { ProductPreview } from "@/components/product-preview/ProductPreview";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
@@ -160,6 +164,48 @@ export default async function PublicProductPage({
     subcategoryCode: subcategoryCode || "",
   });
 
+  /* ── Server-side surface filtering (DATA BOUNDARY) ────────────────
+     ProductPreview filters by surface at DISPLAY time, but it is a client
+     component — anything we pass as props is serialized into the HTML
+     payload and reaches the browser even if not visually rendered. So we
+     strip internal-only data HERE, on the server, before it crosses the
+     boundary. Only website-visible spec keys + knowledge blocks leave the
+     server. (hs_code, moq, lead_time, head-only flags, the limitations
+     block, etc. never reach the client.) */
+  const rawSpecs = (product.schema_specs ?? {}) as Record<string, unknown>;
+  const rawKnowledge = (product.schema_knowledge ?? []) as ProductKnowledgeBlock[];
+
+  const websiteFieldKeys = schema
+    ? new Set(
+        filterFieldsForSurface(
+          schema.groups.flatMap((g) => g.fields),
+          "website",
+        ).map((f) => f.key),
+      )
+    : new Set<string>();
+
+  const publicSpecs: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(rawSpecs)) {
+    if (websiteFieldKeys.has(k)) publicSpecs[k] = v;
+  }
+  const publicKnowledge = filterKnowledgeForSurface(rawKnowledge, "website");
+
+  /* Also strip internal field DEFINITIONS from the schema we hand to the
+     client — otherwise internal field keys/labels (hs_code, lead_time,
+     head-only flags) serialize into the payload even with no values.
+     Groups left with zero website-visible fields drop out entirely. */
+  const publicSchema = schema
+    ? {
+        ...schema,
+        groups: schema.groups
+          .map((g) => ({
+            ...g,
+            fields: filterFieldsForSurface(g.fields, "website"),
+          }))
+          .filter((g) => g.fields.length > 0),
+      }
+    : null;
+
   // ── Media derivation using the real ProductMediaType union values ──
   const byType = (t: string) => media.filter((m) => m.type === t);
   const gallery = byType("gallery");
@@ -202,9 +248,9 @@ export default async function PublicProductPage({
           primaryModel={model?.primary_model ?? null}
           tagline={model?.tagline ?? null}
           brand={product.brand}
-          schema={schema}
-          values={product.schema_specs ?? {}}
-          knowledge={(product.schema_knowledge ?? []) as ProductKnowledgeBlock[]}
+          schema={publicSchema}
+          values={publicSpecs}
+          knowledge={publicKnowledge}
           mainImageUrl={mainImageUrl}
           galleryUrls={galleryUrls}
           videoUrls={videoUrls}

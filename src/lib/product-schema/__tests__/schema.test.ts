@@ -17,14 +17,14 @@ import {
 } from "../index";
 
 describe('resolveSchema', () => {
-  it('returns LOCKSTITCH_SCHEMA when classification matches exactly', () => {
-    const r = resolveSchema({ divisionCode: 'XS', categoryCode: 'XSL', subcategoryCode: 'XCS', machineKindId: 'standard-single-needle-lockstitch' });
+  it('resolves the Lockstitch schema at the subcategory level (real taxonomy, no machine kind)', () => {
+    const r = resolveSchema({ divisionCode: 'garment-machinery', categoryCode: 'industrial-sewing-machines', subcategoryCode: 'XSL' });
     expect(r.schema?.id).toBe('lockstitch.standard-single-needle.v1');
-    expect(r.source).toBe('exact');
+    expect(r.source).toBe('subcategory');
   });
 
-  it('falls back to subcategory match when machineKindId is unknown', () => {
-    const r = resolveSchema({ divisionCode: 'XS', categoryCode: 'XSL', subcategoryCode: 'XCS', machineKindId: 'unknown-kind' });
+  it('still resolves when a machineKindId is supplied (falls through to subcategory)', () => {
+    const r = resolveSchema({ divisionCode: 'garment-machinery', categoryCode: 'industrial-sewing-machines', subcategoryCode: 'XSL', machineKindId: 'anything' });
     expect(r.schema?.id).toBe('lockstitch.standard-single-needle.v1');
     expect(r.source).toBe('subcategory');
   });
