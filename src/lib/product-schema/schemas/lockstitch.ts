@@ -56,6 +56,8 @@ export const LOCKSTITCH_SCHEMA: ProductSchemaDefinition = {
         {
           id: "max_sewing_speed",
           key: "max_sewing_speed",
+          importance: "critical",
+          anchorPriority: 10,
           label: "Max Sewing Speed",
           order: 10,
           fieldType: "unit_number",
@@ -180,6 +182,9 @@ export const LOCKSTITCH_SCHEMA: ProductSchemaDefinition = {
         {
           id: "motor_type",
           key: "motor_type",
+          anchor: true,
+          importance: "high",
+          anchorPriority: 20,
           label: "Motor Type",
           order: 10,
           fieldType: "select",
@@ -233,6 +238,9 @@ export const LOCKSTITCH_SCHEMA: ProductSchemaDefinition = {
         {
           id: "lubrication_system",
           key: "lubrication_system",
+          anchor: true,
+          importance: "high",
+          anchorPriority: 30,
           label: "Lubrication System",
           order: 40,
           fieldType: "select",
@@ -262,6 +270,9 @@ export const LOCKSTITCH_SCHEMA: ProductSchemaDefinition = {
         {
           id: "material_weight",
           key: "material_weight",
+          anchor: true,
+          importance: "high",
+          anchorPriority: 40,
           label: "Material Weight",
           order: 10,
           fieldType: "select",
@@ -372,6 +383,9 @@ export const LOCKSTITCH_SCHEMA: ProductSchemaDefinition = {
         {
           id: "bed_type",
           key: "bed_type",
+          anchor: true,
+          importance: "normal",
+          anchorPriority: 60,
           label: "Bed Type",
           order: 10,
           fieldType: "select",
@@ -426,6 +440,7 @@ export const LOCKSTITCH_SCHEMA: ProductSchemaDefinition = {
         {
           id: "max_material_thickness",
           key: "max_material_thickness",
+          anchor: false,
           label: "Max Material Thickness",
           order: 40,
           fieldType: "unit_number",
@@ -491,6 +506,9 @@ export const LOCKSTITCH_SCHEMA: ProductSchemaDefinition = {
         {
           id: "auto_thread_trimmer",
           key: "auto_thread_trimmer",
+          anchor: true,
+          importance: "high",
+          anchorPriority: 50,
           label: "Auto Thread Trimmer",
           order: 10,
           fieldType: "boolean",
@@ -601,6 +619,9 @@ export const LOCKSTITCH_SCHEMA: ProductSchemaDefinition = {
         {
           id: "motor_power_w",
           key: "motor_power_w",
+          anchor: true,
+          anchorGroup: "performance",
+          anchorPriority: 25,
           label: "Motor Power",
           order: 30,
           fieldType: "unit_number",
@@ -615,6 +636,7 @@ export const LOCKSTITCH_SCHEMA: ProductSchemaDefinition = {
         {
           id: "power_consumption_w",
           key: "power_consumption_w",
+          anchor: false,
           label: "Power Consumption",
           order: 40,
           fieldType: "unit_number",

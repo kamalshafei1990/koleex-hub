@@ -121,6 +121,19 @@ export interface SpecField extends VisibilityFlags {
      registry resolves swatches/glyphs/descriptions for each option value
      from this domain. Falls back to a field-key map in the registry. */
   optionSet?: OptionVisualType;
+  /* ── Product Intelligence Anchors ──
+     Lets a field declare it deserves hero-level visual priority — even
+     when it isn't numeric (e.g. "Direct Drive", "Semi-Dry Head", "Auto
+     Thread Trimmer"). Generic + schema-driven: ProductPreview (and future
+     surfaces) collect anchored fields into the top anchor strip.
+       importance     — semantic weight; drives default ordering.
+       anchor         — force into / out of the anchor strip explicitly.
+       anchorGroup    — optional cluster label (e.g. "Drive", "Automation").
+       anchorPriority — explicit sort key (lower = earlier); overrides importance. */
+  importance?: "critical" | "high" | "normal" | "quiet";
+  anchor?: boolean;
+  anchorGroup?: string;
+  anchorPriority?: number;
 }
 
 export interface SpecGroup {

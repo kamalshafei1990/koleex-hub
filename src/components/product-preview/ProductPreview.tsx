@@ -26,6 +26,7 @@ import {
   filterKnowledgeForSurface,
   resolveOptionVisual,
   emphasisForGroup,
+  collectAnchors,
 } from "@/lib/product-schema";
 import VisualGlyph from "./VisualGlyph";
 
@@ -184,14 +185,28 @@ export const ProductPreview = (props: ProductPreviewProps) => {
   }, [visibleKnowledge]);
   const firstKb = (t: string) => kbByType.get(t)?.[0];
 
-  /* ── derived: metric anchors (the big numbers) ── */
-  const metricAnchors = visibleFields
-    .filter((f) => f.visualRenderType === "metric_block" && !isEmptyValue(values[f.key]))
-    .slice(0, 6);
+  /* ── derived: anchors (schema-driven importance — any field type) ──
+       Quiet groups (compliance/customs/fulfillment) never auto-anchor.
+       Split into a prominent CORE band + a compact SECONDARY chip row. */
+  const anchors = useMemo(
+    () =>
+      collectAnchors(visibleFields, values, {
+        limit: 10,
+        groupOf: (k) => fieldGroupId.get(k),
+        isQuietGroup: (k) => emphasisForGroup(fieldGroupId.get(k) ?? "") === "quiet",
+      }),
+    [visibleFields, values, fieldGroupId],
+  );
+  const coreAnchors = anchors.slice(0, 6);
+  const secondaryAnchors = anchors.slice(6);
+  const anchorKeys = useMemo(() => new Set(anchors.map((a) => a.field.key)), [anchors]);
 
-  /* ── derived: booleans split by group ── */
+  /* ── derived: booleans split by group (anchored ones excluded) ── */
   const trueBooleans = visibleFields.filter(
-    (f) => f.visualRenderType === "boolean_feature" && values[f.key] === true,
+    (f) =>
+      f.visualRenderType === "boolean_feature" &&
+      values[f.key] === true &&
+      !anchorKeys.has(f.key),
   );
   const automationFeatures = trueBooleans.filter(
     (f) => fieldGroupId.get(f.key) === "automation",
@@ -240,6 +255,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           (f) =>
             visibleFieldKeys.has(f.key) &&
             !dedicatedRenderTypes.has(f.visualRenderType) &&
+            !anchorKeys.has(f.key) &&
             !isEmptyValue(values[f.key]),
         );
       return { group, fields, emphasis: emphasisForGroup(group.id) };
@@ -389,21 +405,6 @@ export const ProductPreview = (props: ProductPreviewProps) => {
             </ul>
           ) : null}
 
-          {/* quick automation badges */}
-          {automationFeatures.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {automationFeatures.slice(0, 6).map((f) => (
-                <span
-                  key={f.key}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-secondary)]"
-                >
-                  <VisualGlyph token="automation" className="h-3 w-3" />
-                  {f.label ?? f.key}
-                </span>
-              ))}
-            </div>
-          ) : null}
-
           {/* warranty / origin */}
           {(warranty || countryOfOrigin) ? (
             <div className="flex flex-wrap gap-2 pt-1">
@@ -436,22 +437,93 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         </div>
       </section>
 
-      {/* ═══ 2. METRIC ANCHORS ═══ */}
-      {metricAnchors.length > 0 ? (
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-2xl border border-[var(--border-subtle)] bg-[var(--border-subtle)] overflow-hidden">
-          {metricAnchors.map((f) => (
-            <div key={f.key} className="bg-[var(--bg-surface)] p-5 flex flex-col justify-center gap-1">
-              <div className="flex items-baseline gap-1">
-                <span className="text-2xl md:text-3xl font-bold font-mono text-[var(--text-primary)] leading-none">
-                  {displayScalar(values[f.key])}
-                </span>
-                {f.unit ? <span className="text-xs text-[var(--text-ghost)]">{f.unit}</span> : null}
+      {/* ═══ 2. INTELLIGENCE ANCHORS (schema-driven importance, any type) ═══ */}
+      {coreAnchors.length > 0 ? (
+        <section className="space-y-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-2xl border border-[var(--border-subtle)] bg-[var(--border-subtle)] overflow-hidden">
+          {coreAnchors.map(({ field: f, kind }) => {
+            const raw = values[f.key];
+            if (kind === "metric") {
+              return (
+                <div key={f.key} className="bg-[var(--bg-surface)] p-5 flex flex-col justify-center gap-1">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-2xl md:text-3xl font-bold font-mono text-[var(--text-primary)] leading-none">
+                      {displayScalar(raw)}
+                    </span>
+                    {f.unit ? <span className="text-xs text-[var(--text-ghost)]">{f.unit}</span> : null}
+                  </div>
+                  <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-ghost)]">
+                    {f.label ?? f.key}
+                  </div>
+                </div>
+              );
+            }
+            if (kind === "boolean") {
+              // a true flag — the field label IS the headline (e.g. "Auto Thread Trimmer")
+              return (
+                <div key={f.key} className="bg-[var(--bg-surface)] p-5 flex flex-col justify-center gap-1.5">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-secondary)]">
+                    <VisualGlyph token="automation" className="h-4 w-4" />
+                  </span>
+                  <div className="text-sm font-semibold text-[var(--text-primary)] leading-snug">
+                    {f.label ?? f.key}
+                  </div>
+                </div>
+              );
+            }
+            // badge — a selected option is the headline (e.g. "Direct Drive")
+            const single = typeof raw === "string" ? raw : selectedValuesOf(raw)[0] ?? "";
+            const option = f.options?.find((o) => o.value === single);
+            const visual = resolveOptionVisual(f, option, single);
+            const headline = option?.label ?? displayScalar(raw);
+            return (
+              <div key={f.key} className="bg-[var(--bg-surface)] p-5 flex flex-col justify-center gap-1.5">
+                {visual.swatch ? (
+                  <span className="h-8 w-8 rounded-lg border border-[var(--border-subtle)]" style={{ backgroundColor: visual.swatch }} />
+                ) : visual.icon ? (
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-secondary)]">
+                    <VisualGlyph token={visual.icon} className="h-4 w-4" />
+                  </span>
+                ) : null}
+                <div className="text-sm font-semibold text-[var(--text-primary)] leading-snug">{headline}</div>
+                <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-ghost)]">
+                  {f.label ?? f.key}
+                </div>
               </div>
-              <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-ghost)]">
-                {f.label ?? f.key}
-              </div>
+            );
+          })}
+          </div>
+
+          {/* secondary anchors — compact chip row */}
+          {secondaryAnchors.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {secondaryAnchors.map(({ field: f, kind }) => {
+                const raw = values[f.key];
+                let label = f.label ?? f.key;
+                let icon: string | null = null;
+                if (kind === "boolean") {
+                  icon = "automation";
+                } else if (kind === "badge") {
+                  const single = typeof raw === "string" ? raw : selectedValuesOf(raw)[0] ?? "";
+                  const option = f.options?.find((o) => o.value === single);
+                  const v = resolveOptionVisual(f, option, single);
+                  icon = v.icon ?? null;
+                  label = option?.label ?? displayScalar(raw);
+                } else {
+                  label = `${displayScalar(raw)}${f.unit ? " " + f.unit : ""}`;
+                }
+                return (
+                  <span
+                    key={f.key}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2.5 py-1 text-[12px] font-medium text-[var(--text-secondary)]"
+                  >
+                    {icon ? <VisualGlyph token={icon} className="h-3.5 w-3.5" /> : null}
+                    {label}
+                  </span>
+                );
+              })}
             </div>
-          ))}
+          ) : null}
         </section>
       ) : null}
 

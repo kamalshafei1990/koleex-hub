@@ -29,8 +29,16 @@ export {
   domainForField,
   resolveOptionVisual,
   emphasisForGroup,
+  collectAnchors,
 } from "./visual-options";
-export type { OptionVisual, GroupEmphasis } from "./visual-options";
+export type {
+  OptionVisual,
+  GroupEmphasis,
+  ProductAnchor,
+  AnchorKind,
+  AnchorType,
+  CollectAnchorsOptions,
+} from "./visual-options";
 
 export { computeReadiness } from "./readiness";
 export type {

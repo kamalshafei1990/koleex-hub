@@ -145,6 +145,129 @@ export const FIELD_VISUAL_DOMAIN: Record<string, OptionVisualType> = {
   material_weight: "weight",
 };
 
+/* ── Product Intelligence Anchors ──────────────────────────────────
+   Collects the fields that deserve hero-level priority into an ordered
+   list, regardless of whether they are numeric. A field is an anchor if:
+     • field.anchor === true, OR
+     • field.importance is "critical" | "high", OR
+     • (back-compat) field.visualRenderType === "metric_block".
+   A field with anchor === false is always excluded. Booleans only anchor
+   when their value is true; everything else needs a non-empty value.
+
+   Each anchor is classified into a render `kind`:
+     • "metric"  — a number (+ unit): big figure treatment
+     • "boolean" — a true flag: glyph + the field label
+     • "badge"   — a selected option: glyph/swatch + the option label
+   Ordering: anchorPriority (if set) else an importance weight; metric
+   back-compat anchors sit mid-pack. Pure function, reusable by any
+   surface (preview, brochure, compare). */
+export type AnchorKind = "metric" | "boolean" | "badge";
+
+/* Semantic category of an anchor — lets surfaces cluster / label anchors
+   (technical, automation, material, …) without hardcoding field keys.
+   Derived from field.anchorGroup, else the group id, else the visual
+   domain. Presentational treatment stays driven by `kind`. */
+export type AnchorType =
+  | "performance"
+  | "technical"
+  | "automation"
+  | "material"
+  | "application"
+  | "intelligence"
+  | "commercial"
+  | "generic";
+
+export interface ProductAnchor {
+  field: SpecField;
+  kind: AnchorKind;
+  type: AnchorType;
+  priority: number;
+}
+
+export interface CollectAnchorsOptions {
+  limit?: number;
+  /** Map a field key to its group id (enables type + quiet-group guard). */
+  groupOf?: (fieldKey: string) => string | undefined;
+  /** True when the field's group is low-emphasis (compliance/fulfillment/…).
+      Quiet-group fields never anchor UNLESS field.anchor === true. */
+  isQuietGroup?: (fieldKey: string) => boolean;
+}
+
+function anchorTypeOf(field: SpecField, groupId: string | undefined): AnchorType {
+  const g = (field.anchorGroup ?? groupId ?? "").toLowerCase();
+  if (g.includes("automation")) return "automation";
+  if (g.includes("material")) return "material";
+  if (g.includes("application")) return "application";
+  if (g.includes("performance")) return "performance";
+  if (g.includes("intelligence") || g.includes("smart") || g.includes("ai")) return "intelligence";
+  if (g.includes("commercial") || g.includes("series")) return "commercial";
+  const dom = domainForField(field);
+  if (dom === "material" || dom === "weight") return "material";
+  if (dom === "application" || dom === "garment") return "application";
+  if (dom === "motor" || dom === "feed" || dom === "hook" || dom === "plug") return "technical";
+  return "generic";
+}
+
+function importanceWeight(field: SpecField): number {
+  switch (field.importance) {
+    case "critical": return 0;
+    case "high": return 10;
+    case "normal": return 50;
+    case "quiet": return 90;
+    default: return field.visualRenderType === "metric_block" ? 40 : 60;
+  }
+}
+
+function isAnchorValueFilled(field: SpecField, raw: unknown): boolean {
+  if (field.fieldType === "boolean") return raw === true;
+  if (raw === null || raw === undefined) return false;
+  if (typeof raw === "string") return raw.trim() !== "";
+  if (Array.isArray(raw)) return raw.length > 0;
+  return true;
+}
+
+function anchorKindOf(field: SpecField): AnchorKind {
+  if (field.fieldType === "boolean") return "boolean";
+  if (
+    field.fieldType === "number" ||
+    field.fieldType === "unit_number" ||
+    field.visualRenderType === "metric_block"
+  )
+    return "metric";
+  return "badge";
+}
+
+export function collectAnchors(
+  fields: SpecField[],
+  values: Record<string, unknown>,
+  opts: CollectAnchorsOptions = {},
+): ProductAnchor[] {
+  const { limit = 8, groupOf, isQuietGroup } = opts;
+  const out: ProductAnchor[] = [];
+  for (const field of fields) {
+    if (field.anchor === false) continue;
+    const explicit = field.anchor === true;
+    const qualifies =
+      explicit ||
+      field.importance === "critical" ||
+      field.importance === "high" ||
+      field.visualRenderType === "metric_block";
+    if (!qualifies) continue;
+    // Quiet groups (compliance / customs / fulfillment / …) never auto-anchor;
+    // only an explicit anchor:true can elevate a field from a quiet group.
+    if (!explicit && isQuietGroup?.(field.key)) continue;
+    if (!isAnchorValueFilled(field, values[field.key])) continue;
+    out.push({
+      field,
+      kind: anchorKindOf(field),
+      type: anchorTypeOf(field, groupOf?.(field.key)),
+      priority: field.anchorPriority ?? importanceWeight(field),
+    });
+  }
+  out.sort((a, b) => a.priority - b.priority || (a.field.order ?? 0) - (b.field.order ?? 0));
+  return out.slice(0, limit);
+}
+
 /* ── Spec-group emphasis ───────────────────────────────────────────
    Not all groups deserve equal visual weight. Selling-relevant groups
    (performance, automation, materials, applications, mechanical) get a
