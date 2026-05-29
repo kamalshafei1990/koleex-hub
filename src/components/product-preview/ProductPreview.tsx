@@ -137,34 +137,34 @@ const Disclosure = ({
 }) => {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <section className="rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+    <section className="border-b border-[var(--border-subtle)] last:border-0">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between gap-3 px-5 py-4 hover:bg-[var(--bg-surface-hover)] transition-colors"
+        className="group w-full flex items-center justify-between gap-3 py-5 text-left"
         aria-expanded={open}
       >
-        <span className="text-left">
+        <span>
           {eyebrow ? (
             <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-faint)]">
               {eyebrow}
             </span>
           ) : null}
-          <span className="block text-[13px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+          <span className="block text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">
             {title}
           </span>
         </span>
         <span
-          className={`text-[var(--text-ghost)] transition-transform ${open ? "rotate-45" : ""}`}
+          className={`shrink-0 text-[var(--text-ghost)] transition-transform duration-300 group-hover:text-[var(--text-secondary)] ${open ? "rotate-180" : ""}`}
           aria-hidden
         >
-          {/* plus → x on open */}
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round">
-            <path d="M12 5v14M5 12h14" />
+          {/* chevron — rotates 180° when open */}
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 9l6 6 6-6" />
           </svg>
         </span>
       </button>
-      {open ? <div className="px-5 pb-5 pt-1">{children}</div> : null}
+      {open ? <div className="pb-7 -mt-1">{children}</div> : null}
     </section>
   );
 };
@@ -291,16 +291,26 @@ export const ProductPreview = (props: ProductPreviewProps) => {
     (f) => !automationFeatures.includes(f) && !complianceFeatures.includes(f),
   );
 
-  /* ── derived: material + application cards ── */
-  const materialEntries = visibleFields
-    .filter((f) => f.visualRenderType === "material_card")
-    .map((field) => ({ field, selected: selectedValuesOf(values[field.key]) }))
-    .filter((e) => e.selected.length > 0);
-
-  const applicationEntries = visibleFields
-    .filter((f) => f.visualRenderType === "application_card")
-    .map((field) => ({ field, selected: selectedValuesOf(values[field.key]) }))
-    .filter((e) => e.selected.length > 0);
+  /* ── derived: material + application cards ──
+     Flattened to a single de-duplicated list of {field, value} so the same
+     option label can't surface twice (e.g. "Shirts" from two fields). */
+  type VisualPick = { field: SpecField; value: string; label: string };
+  const flattenPicks = (renderType: string): VisualPick[] => {
+    const seen = new Set<string>();
+    const out: VisualPick[] = [];
+    for (const field of visibleFields.filter((f) => f.visualRenderType === renderType)) {
+      for (const value of selectedValuesOf(values[field.key])) {
+        const label = labelForOption(field, value);
+        const dedupeKey = label.trim().toLowerCase();
+        if (seen.has(dedupeKey)) continue;
+        seen.add(dedupeKey);
+        out.push({ field, value, label });
+      }
+    }
+    return out;
+  };
+  const materialPicks = flattenPicks("material_card");
+  const applicationPicks = flattenPicks("application_card");
 
   /* ── derived: grouped spec sections (excluding fields rendered in
        dedicated bands above), carrying their emphasis tier ── */
@@ -355,219 +365,91 @@ export const ProductPreview = (props: ProductPreviewProps) => {
     );
   }
 
-  /* ── value renderer for a single non-dedicated field ── */
-  const renderFieldValue = (f: SpecField): React.ReactNode => {
-    const raw = values[f.key];
-    if (isEmptyValue(raw)) return null;
-
-    if (f.visualRenderType === "technical_badge") {
-      const singleVal = typeof raw === "string" ? raw : null;
-      const option = singleVal ? f.options?.find((o) => o.value === singleVal) : undefined;
-      const visual = singleVal ? resolveOptionVisual(f, option, singleVal) : {};
-      const display = option?.label ?? displayScalar(raw);
-      return (
-        <div className="flex items-center gap-2.5">
-          {visual.icon ? (
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] text-[var(--text-secondary)]">
-              <VisualGlyph token={visual.icon} className="h-4 w-4" />
-            </span>
-          ) : null}
-          <div className="min-w-0">
-            <div className="text-[10px] uppercase tracking-wider text-[var(--text-ghost)]">
-              {f.label ?? f.key}
-            </div>
-            <div className="text-sm font-semibold text-[var(--text-primary)] truncate">
-              {display}
-              {f.unit ? <span className="ms-1 text-xs font-normal text-[var(--text-ghost)]">{f.unit}</span> : null}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (f.visualRenderType === "icon_chip" || f.visualRenderType === "image_chip") {
-      const selected = selectedValuesOf(raw);
-      return (
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-[var(--text-ghost)] mb-1.5">
-            {f.label ?? f.key}
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {selected.map((val) => {
-              const option = f.options?.find((o) => o.value === val);
-              const label = option?.label ?? val;
-              const visual = resolveOptionVisual(f, option, val);
-              return (
-                <span
-                  key={`${f.key}-${val}`}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)] ps-1.5 pe-2.5 py-1 text-xs text-[var(--text-primary)]"
-                  title={visual.description ?? label}
-                >
-                  {visual.swatch ? (
-                    <span className="h-3.5 w-3.5 rounded-sm border border-black/10 shrink-0" style={{ backgroundColor: visual.swatch }} />
-                  ) : visual.icon ? (
-                    <VisualGlyph token={visual.icon} className="h-4 w-4 text-[var(--text-secondary)] shrink-0" />
-                  ) : null}
-                  {label}
-                  {visual.badge ? (
-                    <span className="ms-0.5 rounded-sm bg-[var(--bg-surface-subtle)] px-1 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-ghost)]">
-                      {visual.badge}
-                    </span>
-                  ) : null}
-                </span>
-              );
-            })}
-          </div>
-        </div>
-      );
-    }
-
-    // spec_card / plain_text / range / comparison_row / fallback
-    return (
-      <div>
-        <div className="text-[10px] uppercase tracking-wider text-[var(--text-ghost)]">
-          {f.label ?? f.key}
-        </div>
-        <div className="text-sm font-medium text-[var(--text-primary)]">
-          {displayScalar(raw)}
-          {f.unit ? <span className="ms-1 text-xs text-[var(--text-ghost)]">{f.unit}</span> : null}
-        </div>
-      </div>
-    );
-  };
-
   return (
-    <div className="space-y-12 md:space-y-16">
+    <div className="space-y-20 md:space-y-28 pb-28">
       {/* ═══ 1. CINEMATIC HERO ═══
-          The machine is the main character: a dominant render with two
-          floating intelligence cards overlapping it (desktop), an
-          asymmetric identity column, and generous breathing room. */}
-      <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center pt-2 md:pt-4">
+          The machine is the protagonist. Generous negative space, a large
+          unframed render, and a calm identity column. No floating cards —
+          the headline stats live in the dedicated band below so nothing
+          duplicates or collides. */}
+      <section className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center pt-2 md:pt-6">
         {/* LEFT — identity */}
-        <div className="order-2 lg:order-1 lg:col-span-5 space-y-6">
-          <div className="space-y-3">
+        <div className="order-2 lg:order-1 lg:col-span-5 space-y-7">
+          <div className="space-y-4">
             {(machineKindLabel || brand) ? (
-              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-faint)]">
+              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--text-faint)]">
                 {brand ? <span>{brand}</span> : null}
                 {brand && machineKindLabel ? <span className="text-[var(--border-subtle)]">/</span> : null}
                 {machineKindLabel ? <span>{machineKindLabel}</span> : null}
               </div>
             ) : null}
-            <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-[var(--text-primary)] leading-[1.04]">
+            <h1 className="text-[2.75rem] leading-[1.02] md:text-6xl md:leading-[0.98] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
               {productName || "Untitled product"}
             </h1>
             {tagline ? (
-              <p className="text-lg md:text-xl font-light text-[var(--text-secondary)] leading-relaxed">
+              <p className="text-xl md:text-2xl font-light text-[var(--text-secondary)] leading-snug max-w-xl">
                 {tagline}
               </p>
             ) : null}
             {primaryModel ? (
-              <div className="font-mono text-sm text-[var(--text-ghost)] tracking-wide">{primaryModel}</div>
+              <div className="font-mono text-xs text-[var(--text-faint)] tracking-[0.12em] pt-1">{primaryModel}</div>
             ) : null}
           </div>
 
           {heroHighlights.length > 0 ? (
-            <ul className="space-y-2.5">
+            <ul className="space-y-3 pt-1">
               {heroHighlights.map((h, i) => (
-                <li key={i} className="flex items-start gap-2.5 text-[15px] text-[var(--text-primary)]">
-                  <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)]">
-                    <VisualGlyph token="check" className="h-2.5 w-2.5" />
-                  </span>
-                  <span className="leading-snug">{h}</span>
+                <li key={i} className="flex items-start gap-3 text-[15px] leading-snug text-[var(--text-secondary)]">
+                  <VisualGlyph token="check" className="mt-[3px] h-4 w-4 shrink-0 text-[var(--text-primary)]" />
+                  <span>{h}</span>
                 </li>
               ))}
             </ul>
           ) : null}
 
           {(warranty || countryOfOrigin) ? (
-            <div className="flex flex-wrap gap-2 pt-1">
+            <div className="flex flex-wrap gap-x-8 gap-y-3 pt-2">
               {warranty ? (
-                <span className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-2.5 py-1 text-[11px] text-[var(--text-secondary)]">
-                  <span className="uppercase tracking-wider text-[var(--text-ghost)]">Warranty</span>
-                  <span className="font-medium text-[var(--text-primary)]">{warranty}</span>
-                </span>
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-faint)]">Warranty</div>
+                  <div className="mt-0.5 text-sm font-medium text-[var(--text-primary)]">{warranty}</div>
+                </div>
               ) : null}
               {countryOfOrigin ? (
-                <span className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-2.5 py-1 text-[11px] text-[var(--text-secondary)]">
-                  <span className="uppercase tracking-wider text-[var(--text-ghost)]">Origin</span>
-                  <span className="font-medium text-[var(--text-primary)]">{countryOfOrigin}</span>
-                </span>
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-faint)]">Origin</div>
+                  <div className="mt-0.5 text-sm font-medium text-[var(--text-primary)]">{countryOfOrigin}</div>
+                </div>
               ) : null}
             </div>
           ) : null}
         </div>
 
-        {/* RIGHT — dominant render + floating intelligence cards */}
+        {/* RIGHT — dominant unframed render */}
         <div className="order-1 lg:order-2 lg:col-span-7">
-          <div className="relative">
-            <div className="relative w-full aspect-[4/3] md:aspect-[5/4] flex items-center justify-center">
-              {mainImageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={mainImageUrl} alt={productName} className="h-full w-full object-contain" />
-              ) : (
-                <span className="text-sm text-[var(--text-faint)]">No main image</span>
-              )}
-            </div>
-
-            {/* Floating intelligence cards — desktop only; mobile uses the
-                anchor band below. Pulls the top 2 anchors. */}
-            {coreAnchors.length > 0 ? (
-              <div className="hidden lg:flex absolute -bottom-6 left-6 right-6 gap-3">
-                {coreAnchors.slice(0, 2).map(({ field: f, kind }) => {
-                  const raw = values[f.key];
-                  let icon: string | null = null;
-                  let headline: string;
-                  if (kind === "metric") {
-                    headline = `${displayScalar(raw)}${f.unit ? " " + f.unit : ""}`;
-                  } else if (kind === "boolean") {
-                    icon = "automation";
-                    headline = f.label ?? f.key;
-                  } else {
-                    const single = typeof raw === "string" ? raw : selectedValuesOf(raw)[0] ?? "";
-                    const opt = f.options?.find((o) => o.value === single);
-                    const v = resolveOptionVisual(f, opt, single);
-                    icon = v.icon ?? null;
-                    headline = opt?.label ?? displayScalar(raw);
-                  }
-                  return (
-                    <div
-                      key={f.key}
-                      className="flex-1 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]/90 backdrop-blur px-4 py-3 shadow-sm"
-                    >
-                      <div className="flex items-center gap-2">
-                        {icon ? (
-                          <VisualGlyph token={icon} className="h-4 w-4 text-[var(--text-secondary)] shrink-0" />
-                        ) : null}
-                        <span className="text-lg font-bold font-mono text-[var(--text-primary)] leading-none truncate">
-                          {headline}
-                        </span>
-                      </div>
-                      <div className="mt-1 text-[10px] uppercase tracking-[0.14em] text-[var(--text-ghost)]">
-                        {f.label ?? f.key}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : null}
+          <div className="relative w-full aspect-[4/3] md:aspect-[5/4] flex items-center justify-center">
+            {mainImageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={mainImageUrl} alt={productName} className="h-full w-full object-contain drop-shadow-[0_30px_60px_rgba(0,0,0,0.25)]" />
+            ) : (
+              <span className="text-sm text-[var(--text-faint)]">No main image</span>
+            )}
           </div>
         </div>
       </section>
 
       {/* ═══ 2. AT A GLANCE — airy, glyph-forward stat band (no table lines) ═══ */}
       {coreAnchors.length > 0 ? (
-        <section className="border-y border-[var(--border-subtle)] py-8 md:py-10 space-y-7">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-x-6 gap-y-9">
+        <section className="border-y border-[var(--border-subtle)]">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 divide-x divide-y md:divide-y-0 divide-[var(--border-subtle)]">
             {coreAnchors.map(({ field: f, kind }) => {
               const raw = values[f.key];
-              let glyph: string | null = null;
-              let swatch: string | null = null;
-              let big = "";
-              let bigClass = "text-2xl md:text-[28px] font-bold font-mono leading-none";
+              let value = "";
+              let unit = "";
+              let big = true;
               let meterPct: number | null = null;
 
               if (kind === "metric") {
-                glyph = "gauge";
                 {
                   const n = typeof raw === "number" ? raw : Number(raw);
                   const mx = f.validation?.max;
@@ -575,85 +457,66 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                     meterPct = Math.max(4, Math.min(100, Math.round((n / mx) * 100)));
                   }
                 }
-                big = `${displayScalar(raw)}${f.unit ? ` ${f.unit}` : ""}`;
+                value = displayScalar(raw);
+                unit = f.unit ?? "";
               } else if (kind === "boolean") {
-                glyph = "automation";
-                big = f.label ?? f.key;
-                bigClass = "text-[15px] font-semibold leading-snug";
+                value = f.label ?? f.key;
+                big = false;
               } else {
                 const single = typeof raw === "string" ? raw : selectedValuesOf(raw)[0] ?? "";
                 const opt = f.options?.find((o) => o.value === single);
-                const v = resolveOptionVisual(f, opt, single);
-                glyph = v.icon ?? null;
-                swatch = v.swatch ?? null;
-                big = opt?.label ?? displayScalar(raw);
-                bigClass = "text-lg font-semibold leading-snug";
+                value = opt?.label ?? displayScalar(raw);
+                big = false;
               }
 
               return (
-                <div key={f.key} className="flex flex-col items-start gap-3">
-                  <span
-                    className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]"
-                    aria-hidden
-                  >
-                    {swatch ? (
-                      <span
-                        className="h-6 w-6 rounded-lg"
-                        style={{
-                          backgroundColor: swatch,
-                          backgroundImage:
-                            "repeating-linear-gradient(45deg, rgba(0,0,0,0.10) 0 2px, transparent 2px 4px)",
-                        }}
-                      />
-                    ) : glyph ? (
-                      <VisualGlyph token={glyph} className="h-6 w-6" />
-                    ) : null}
-                  </span>
-                  <div className="space-y-1">
-                    <div className={`text-[var(--text-primary)] ${bigClass}`}>{big}</div>
-                    <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-ghost)]">
-                      {f.label ?? f.key}
-                    </div>
+                <div key={f.key} className="flex min-h-[7.5rem] flex-col justify-between gap-3 px-5 py-7 md:py-9">
+                  <div className="flex items-baseline gap-1.5">
+                    <span
+                      className={
+                        big
+                          ? "text-3xl leading-none font-semibold tracking-[-0.02em] text-[var(--text-primary)] md:text-[2.5rem]"
+                          : "text-lg leading-tight font-semibold tracking-tight text-[var(--text-primary)] md:text-xl"
+                      }
+                    >
+                      {value}
+                    </span>
+                    {unit ? <span className="text-sm font-medium text-[var(--text-faint)]">{unit}</span> : null}
+                  </div>
+                  <div className="space-y-2">
                     {meterPct !== null ? (
-                      <div className="mt-1.5 h-1 w-24 rounded-full bg-[var(--bg-surface-subtle)] overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-[var(--text-primary)]"
-                          style={{ width: `${meterPct}%` }}
-                        />
+                      <div className="h-[3px] w-full overflow-hidden rounded-full bg-[var(--bg-surface-subtle)]">
+                        <div className="h-full rounded-full bg-[var(--text-primary)]" style={{ width: `${meterPct}%` }} />
                       </div>
                     ) : null}
+                    <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--text-faint)]">
+                      {f.label ?? f.key}
+                    </div>
                   </div>
                 </div>
               );
             })}
           </div>
 
-          {/* secondary anchors — quiet chip row */}
+          {/* secondary anchors — quiet caption row */}
           {secondaryAnchors.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-x-8 gap-y-2 border-t border-[var(--border-subtle)] px-5 py-4">
               {secondaryAnchors.map(({ field: f, kind }) => {
                 const raw = values[f.key];
                 let label = f.label ?? f.key;
-                let icon: string | null = null;
                 if (kind === "boolean") {
-                  icon = "automation";
+                  label = "Yes";
                 } else if (kind === "badge") {
                   const single = typeof raw === "string" ? raw : selectedValuesOf(raw)[0] ?? "";
                   const option = f.options?.find((o) => o.value === single);
-                  const v = resolveOptionVisual(f, option, single);
-                  icon = v.icon ?? null;
                   label = option?.label ?? displayScalar(raw);
                 } else {
-                  icon = "gauge";
                   label = `${displayScalar(raw)}${f.unit ? " " + f.unit : ""}`;
                 }
                 return (
-                  <span
-                    key={f.key}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-[var(--bg-surface-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)]"
-                  >
-                    {icon ? <VisualGlyph token={icon} className="h-3.5 w-3.5" /> : null}
-                    {label}
+                  <span key={f.key} className="text-[12px]">
+                    <span className="text-[var(--text-faint)]">{f.label ?? f.key}</span>
+                    <span className="ms-2 font-medium text-[var(--text-primary)]">{label}</span>
                   </span>
                 );
               })}
@@ -665,30 +528,28 @@ export const ProductPreview = (props: ProductPreviewProps) => {
       {/* ═══ 3. OVERVIEW ═══ */}
       {firstKb("overview") ? (
         <section className="max-w-3xl">
-          <p className="text-lg md:text-xl font-light leading-relaxed text-[var(--text-secondary)]">
+          <p className="text-xl md:text-[1.75rem] md:leading-[1.4] font-light leading-relaxed text-[var(--text-secondary)]">
             {asKnowledgeList(firstKb("overview")!.content).join(" ")}
           </p>
         </section>
       ) : null}
 
       {/* ═══ 4. MATERIALS ═══ */}
-      {materialEntries.length > 0 ? (
-        <section className="space-y-4">
+      {materialPicks.length > 0 ? (
+        <section className="space-y-6">
           <SectionHead eyebrow="Capability" title="Suitable Materials" />
           {/* Filmstrip — large material swatches, horizontally scrollable. */}
-          <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1 snap-x">
-            {materialEntries.flatMap(({ field, selected }) =>
-              selected.map((val) => {
+          <div className="flex gap-5 overflow-x-auto pb-2 -mx-1 px-1 snap-x">
+            {materialPicks.map(({ field, value: val, label }) => {
                 const option = field.options?.find((o) => o.value === val);
-                const label = labelForOption(field, val);
                 const visual = resolveOptionVisual(field, option, val);
                 return (
                   <div
                     key={`${field.key}-${val}`}
-                    className="snap-start shrink-0 w-36 md:w-40"
+                    className="snap-start shrink-0 w-40 md:w-44"
                     title={visual.description ?? label}
                   >
-                    <div className="aspect-[4/5] w-full overflow-hidden rounded-2xl border border-[var(--border-subtle)]">
+                    <div className="aspect-[4/5] w-full overflow-hidden rounded-2xl">
                       {option?.image ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={option.image} alt={label} className="h-full w-full object-cover" />
@@ -715,29 +576,26 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                     ) : null}
                   </div>
                 );
-              }),
-            )}
+            })}
           </div>
         </section>
       ) : null}
 
       {/* ═══ 5. APPLICATIONS ═══ */}
-      {applicationEntries.length > 0 ? (
-        <section className="space-y-4">
+      {applicationPicks.length > 0 ? (
+        <section className="space-y-6">
           <SectionHead eyebrow="Built for" title="Applications" />
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {applicationEntries.flatMap(({ field, selected }) =>
-              selected.map((val) => {
+            {applicationPicks.map(({ field, value: val, label }) => {
                 const option = field.options?.find((o) => o.value === val);
-                const label = labelForOption(field, val);
                 const visual = resolveOptionVisual(field, option, val);
                 return (
                   <div
                     key={`${field.key}-${val}`}
-                    className="flex items-center gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-3"
+                    className="flex items-center gap-3 rounded-2xl bg-[var(--bg-surface-subtle)] px-4 py-3.5"
                     title={visual.description ?? label}
                   >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-surface)] text-[var(--text-secondary)]">
                       {visual.icon ? (
                         <VisualGlyph token={visual.icon} className="h-5 w-5" />
                       ) : (
@@ -747,8 +605,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                     <span className="text-sm font-medium text-[var(--text-primary)]">{label}</span>
                   </div>
                 );
-              }),
-            )}
+            })}
           </div>
         </section>
       ) : null}
@@ -792,12 +649,10 @@ export const ProductPreview = (props: ProductPreviewProps) => {
             ].map((point, i) => (
               <div
                 key={i}
-                className="flex items-start gap-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5"
+                className="flex items-start gap-4 rounded-2xl bg-[var(--bg-surface-subtle)] p-6"
               >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]">
-                  <VisualGlyph token="spark" className="h-5 w-5" />
-                </span>
-                <p className="text-[15px] leading-relaxed text-[var(--text-primary)]">{point}</p>
+                <VisualGlyph token="spark" className="mt-0.5 h-5 w-5 shrink-0 text-[var(--text-primary)]" />
+                <p className="text-base leading-relaxed text-[var(--text-primary)]">{point}</p>
               </div>
             ))}
           </div>
@@ -813,17 +668,17 @@ export const ProductPreview = (props: ProductPreviewProps) => {
             {intelligence.map((it) => (
               <div
                 key={it.key}
-                className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5"
+                className="rounded-2xl bg-[var(--bg-surface-subtle)] p-6"
               >
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-ghost)]">
+                  <span className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-faint)]">
                     {it.label}
                   </span>
-                  <span className="text-sm font-semibold font-mono text-[var(--text-primary)] shrink-0">
+                  <span className="text-base font-semibold text-[var(--text-primary)] shrink-0">
                     {it.headline}
                   </span>
                 </div>
-                <p className="mt-2 text-[15px] leading-relaxed text-[var(--text-secondary)]">
+                <p className="mt-3 text-base leading-relaxed text-[var(--text-secondary)]">
                   {it.insight}
                 </p>
               </div>
@@ -836,8 +691,9 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           Primary groups open by default; standard/quiet collapsed so the
           page reads simple-first, deep-on-demand. */}
       {specGroups.length > 0 ? (
-        <div className="space-y-3">
+        <div>
           <SectionHead eyebrow="Layer 3" title="Technical Specifications" />
+          <div className="mt-3 border-t border-[var(--border-subtle)]">
           {specGroups.map(({ group, fields, emphasis }) => (
             <Disclosure
               key={group.id}
@@ -884,6 +740,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
               </table>
             </Disclosure>
           ))}
+          </div>
         </div>
       ) : null}
 
@@ -920,12 +777,10 @@ export const ProductPreview = (props: ProductPreviewProps) => {
             <SectionHead eyebrow="Good to know" title="Buyer Questions" />
             <div className="space-y-3">
               {qs.map((q, i) => (
-                <div key={i} className="flex items-start gap-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]">
-                    <VisualGlyph token="question" className="h-5 w-5" />
-                  </span>
+                <div key={i} className="flex items-start gap-4 rounded-2xl bg-[var(--bg-surface-subtle)] p-6">
+                  <VisualGlyph token="question" className="mt-0.5 h-5 w-5 shrink-0 text-[var(--text-primary)]" />
                   <div className="min-w-0">
-                    <div className="text-[15px] font-semibold text-[var(--text-primary)]">{q.question}</div>
+                    <div className="text-base font-semibold text-[var(--text-primary)]">{q.question}</div>
                     <div className="mt-1.5 text-sm leading-relaxed text-[var(--text-secondary)]">{q.answer}</div>
                   </div>
                 </div>
@@ -970,7 +825,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           <SectionHead title="Gallery" />
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {galleryUrls!.map((url, i) => (
-              <div key={`${url}-${i}`} className="aspect-square overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
+              <div key={`${url}-${i}`} className="aspect-square overflow-hidden rounded-2xl bg-[var(--bg-surface-subtle)]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={url} alt={`${productName} ${i + 1}`} className="h-full w-full object-cover" />
               </div>
@@ -986,16 +841,22 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {hasVideos
               ? videoUrls!.map((url, i) => (
-                  <div key={`${url}-${i}`} className="aspect-video overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
+                  <div key={`${url}-${i}`} className="aspect-video overflow-hidden rounded-2xl bg-[var(--bg-surface-subtle)]">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={url} alt={`Video ${i + 1}`} className="h-full w-full object-cover" />
                   </div>
                 ))
               : null}
             {ar3dUrl ? (
-              <div className="aspect-video overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] flex items-center justify-center">
-                <span className="text-xs uppercase tracking-wider text-[var(--text-ghost)]">3D / AR view available</span>
-              </div>
+              <a
+                href={ar3dUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex aspect-video flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl bg-[var(--bg-surface-subtle)] transition-colors hover:bg-[var(--bg-surface-hover)]"
+              >
+                <VisualGlyph token="spark" className="h-6 w-6 text-[var(--text-secondary)]" />
+                <span className="text-xs uppercase tracking-[0.16em] text-[var(--text-ghost)] group-hover:text-[var(--text-secondary)]">View in 3D / AR</span>
+              </a>
             ) : null}
           </div>
         </section>
