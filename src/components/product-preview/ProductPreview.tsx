@@ -14,7 +14,7 @@
    visual language without re-declaring it.
    --------------------------------------------------------------------------- */
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type {
   ProductSchemaDefinition,
   ProductKnowledgeBlock,
@@ -122,6 +122,53 @@ const SectionHead = ({
   </div>
 );
 
+/* Progressive-disclosure section — "simple first, deep later". Layer-3
+   technical groups mount collapsed; the operator expands on demand. */
+const Disclosure = ({
+  title,
+  eyebrow,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  eyebrow?: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) => {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className="rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between gap-3 px-5 py-4 hover:bg-[var(--bg-surface-hover)] transition-colors"
+        aria-expanded={open}
+      >
+        <span className="text-left">
+          {eyebrow ? (
+            <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-faint)]">
+              {eyebrow}
+            </span>
+          ) : null}
+          <span className="block text-[13px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+            {title}
+          </span>
+        </span>
+        <span
+          className={`text-[var(--text-ghost)] transition-transform ${open ? "rotate-45" : ""}`}
+          aria-hidden
+        >
+          {/* plus → x on open */}
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </span>
+      </button>
+      {open ? <div className="px-5 pb-5 pt-1">{children}</div> : null}
+    </section>
+  );
+};
+
 export const ProductPreview = (props: ProductPreviewProps) => {
   const {
     productName,
@@ -200,6 +247,31 @@ export const ProductPreview = (props: ProductPreviewProps) => {
   const coreAnchors = anchors.slice(0, 6);
   const secondaryAnchors = anchors.slice(6);
   const anchorKeys = useMemo(() => new Set(anchors.map((a) => a.field.key)), [anchors]);
+
+  /* ── LAYER 2: Smart Intelligence — interpreted, benefit-oriented
+       summaries (schema-driven via field.insight). Any field carrying an
+       insight surfaces here; ordered by anchor priority when it is also an
+       anchor, else appended. Generic — zero product-specific logic. */
+  const intelligence = useMemo(() => {
+    const seen = new Set<string>();
+    const items: { key: string; label: string; headline: string; insight: string }[] = [];
+    const pushField = (f: SpecField) => {
+      if (!f.insight || seen.has(f.key) || isEmptyValue(values[f.key])) return;
+      seen.add(f.key);
+      const raw = values[f.key];
+      const single = typeof raw === "string" ? raw : selectedValuesOf(raw)[0] ?? "";
+      const opt = f.options?.find((o) => o.value === single);
+      const headline =
+        f.fieldType === "boolean"
+          ? (f.label ?? f.key)
+          : opt?.label ?? `${displayScalar(raw)}${f.unit ? " " + f.unit : ""}`;
+      items.push({ key: f.key, label: f.label ?? f.key, headline, insight: f.insight });
+    };
+    // anchored insights first (priority order), then any other insight fields
+    anchors.forEach((a) => pushField(a.field));
+    visibleFields.forEach(pushField);
+    return items;
+  }, [anchors, visibleFields, values]);
 
   /* ── derived: booleans split by group (anchored ones excluded) ── */
   const trueBooleans = visibleFields.filter(
@@ -648,64 +720,92 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         </section>
       ) : null}
 
-      {/* ═══ 8. SPEC GROUPS (emphasis-tiered) ═══ */}
-      {specGroups.map(({ group, fields, emphasis }) => {
-        if (emphasis === "quiet") {
-          // Quiet: compact key→value rows, recessive.
-          return (
-            <section key={group.id} className="space-y-3">
-              <SectionHead title={group.title} />
-              <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]">
-                {fields.map((f, idx) => {
-                  const raw = values[f.key];
-                  const single = typeof raw === "string" ? raw : null;
-                  const opt = single ? f.options?.find((o) => o.value === single) : undefined;
-                  const display = opt?.label ?? displayScalar(raw);
-                  return (
+      {/* ═══ LAYER 2 — SMART PRODUCT INTELLIGENCE ═══
+          Interpreted, benefit-oriented summaries (schema-driven via insight). */}
+      {intelligence.length > 0 ? (
+        <section className="space-y-4">
+          <SectionHead eyebrow="What it means for you" title="Product Intelligence" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {intelligence.map((it) => (
+              <div
+                key={it.key}
+                className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5"
+              >
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-ghost)]">
+                    {it.label}
+                  </span>
+                  <span className="text-sm font-semibold font-mono text-[var(--text-primary)] shrink-0">
+                    {it.headline}
+                  </span>
+                </div>
+                <p className="mt-2 text-[15px] leading-relaxed text-[var(--text-secondary)]">
+                  {it.insight}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {/* ═══ LAYER 3 — ADVANCED TECHNICAL DATA (progressive disclosure) ═══
+          Primary groups open by default; standard/quiet collapsed so the
+          page reads simple-first, deep-on-demand. */}
+      {specGroups.length > 0 ? (
+        <div className="space-y-3">
+          <SectionHead eyebrow="Layer 3" title="Technical Specifications" />
+          {specGroups.map(({ group, fields, emphasis }) => (
+            <Disclosure
+              key={group.id}
+              title={group.title}
+              eyebrow={emphasis === "primary" ? "Core" : undefined}
+              defaultOpen={emphasis === "primary"}
+            >
+              {emphasis === "quiet" ? (
+                <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]">
+                  {fields.map((f, idx) => {
+                    const raw = values[f.key];
+                    const single = typeof raw === "string" ? raw : null;
+                    const opt = single ? f.options?.find((o) => o.value === single) : undefined;
+                    const display = opt?.label ?? displayScalar(raw);
+                    return (
+                      <div
+                        key={f.key}
+                        className={`flex items-center justify-between gap-4 px-4 py-2.5 ${
+                          idx % 2 === 0 ? "bg-[var(--bg-surface-subtle)]/50" : ""
+                        }`}
+                      >
+                        <span className="text-xs text-[var(--text-ghost)]">{f.label ?? f.key}</span>
+                        <span className="text-sm font-medium text-[var(--text-primary)] text-end">
+                          {display}
+                          {f.unit ? <span className="ms-1 text-xs text-[var(--text-ghost)]">{f.unit}</span> : null}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div
+                  className={`grid gap-3 ${
+                    emphasis === "primary"
+                      ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+                      : "grid-cols-1 sm:grid-cols-2 md:grid-cols-4"
+                  }`}
+                >
+                  {fields.map((f) => (
                     <div
                       key={f.key}
-                      className={`flex items-center justify-between gap-4 px-4 py-2.5 ${
-                        idx % 2 === 0 ? "bg-[var(--bg-surface-subtle)]/50" : ""
-                      }`}
+                      className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4"
                     >
-                      <span className="text-xs text-[var(--text-ghost)]">{f.label ?? f.key}</span>
-                      <span className="text-sm font-medium text-[var(--text-primary)] text-end">
-                        {display}
-                        {f.unit ? <span className="ms-1 text-xs text-[var(--text-ghost)]">{f.unit}</span> : null}
-                      </span>
+                      {renderFieldValue(f)}
                     </div>
-                  );
-                })}
-              </div>
-            </section>
-          );
-        }
-        // primary / standard: card grid
-        return (
-          <section key={group.id} className="space-y-4">
-            <SectionHead
-              eyebrow={emphasis === "primary" ? "Core" : undefined}
-              title={group.title}
-            />
-            <div
-              className={`grid gap-3 ${
-                emphasis === "primary"
-                  ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-                  : "grid-cols-1 sm:grid-cols-2 md:grid-cols-4"
-              }`}
-            >
-              {fields.map((f) => (
-                <div
-                  key={f.key}
-                  className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4"
-                >
-                  {renderFieldValue(f)}
+                  ))}
                 </div>
-              ))}
-            </div>
-          </section>
-        );
-      })}
+              )}
+            </Disclosure>
+          ))}
+        </div>
+      ) : null}
 
       {/* ═══ 9. APPLICATIONS DETAIL / OTHER FEATURES ═══ */}
       {otherFeatures.length > 0 ? (

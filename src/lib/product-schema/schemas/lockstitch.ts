@@ -58,6 +58,8 @@ export const LOCKSTITCH_SCHEMA: ProductSchemaDefinition = {
           key: "max_sewing_speed",
           importance: "critical",
           anchorPriority: 10,
+          insight:
+            "High-speed output engineered for high-volume apparel lines — more garments per shift without sacrificing stitch quality.",
           label: "Max Sewing Speed",
           order: 10,
           fieldType: "unit_number",
@@ -185,6 +187,8 @@ export const LOCKSTITCH_SCHEMA: ProductSchemaDefinition = {
           anchor: true,
           importance: "high",
           anchorPriority: 20,
+          insight:
+            "Direct-drive servo delivers instant stop/start and precise torque at low speed — no belt slip, no clutch lag, less operator fatigue.",
           label: "Motor Type",
           order: 10,
           fieldType: "select",
@@ -241,6 +245,8 @@ export const LOCKSTITCH_SCHEMA: ProductSchemaDefinition = {
           anchor: true,
           importance: "high",
           anchorPriority: 30,
+          insight:
+            "Semi-dry head lubricates only the hook race — keeps whites and pastels stain-free, cutting reject rates on premium fabric.",
           label: "Lubrication System",
           order: 40,
           fieldType: "select",
@@ -273,6 +279,8 @@ export const LOCKSTITCH_SCHEMA: ProductSchemaDefinition = {
           anchor: true,
           importance: "high",
           anchorPriority: 40,
+          insight:
+            "Tuned for medium-weight fabric — the everyday sweet spot for shirts, denim, and general apparel production.",
           label: "Material Weight",
           order: 10,
           fieldType: "select",
@@ -509,6 +517,8 @@ export const LOCKSTITCH_SCHEMA: ProductSchemaDefinition = {
           anchor: true,
           importance: "high",
           anchorPriority: 50,
+          insight:
+            "Automatic thread trimming removes a manual step every seam — faster cycle times and consistent thread tails across operators.",
           label: "Auto Thread Trimmer",
           order: 10,
           fieldType: "boolean",
@@ -622,6 +632,8 @@ export const LOCKSTITCH_SCHEMA: ProductSchemaDefinition = {
           anchor: true,
           anchorGroup: "performance",
           anchorPriority: 25,
+          insight:
+            "Right-sized servo power for continuous duty — strong enough for medium-heavy seams, efficient enough to cut energy cost per shift.",
           label: "Motor Power",
           order: 30,
           fieldType: "unit_number",

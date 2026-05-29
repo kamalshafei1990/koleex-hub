@@ -134,6 +134,12 @@ export interface SpecField extends VisibilityFlags {
   anchor?: boolean;
   anchorGroup?: string;
   anchorPriority?: number;
+  /* Smart-intelligence interpretation — a human, benefit-oriented sentence
+     that explains what this spec MEANS for production (e.g. "550" + "W" →
+     "Energy-efficient servo tuned for long production shifts"). Surfaced in
+     the Layer-2 Product Intelligence band. Schema-driven + generic: any
+     field can carry one; absent → the field simply isn't summarized. */
+  insight?: string;
 }
 
 export interface SpecGroup {
