@@ -556,64 +556,65 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         </div>
       </section>
 
-      {/* ═══ 2. INTELLIGENCE ANCHORS (schema-driven importance, any type) ═══ */}
+      {/* ═══ 2. AT A GLANCE — airy, glyph-forward stat band (no table lines) ═══ */}
       {coreAnchors.length > 0 ? (
-        <section className="space-y-3">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-2xl border border-[var(--border-subtle)] bg-[var(--border-subtle)] overflow-hidden">
-          {coreAnchors.map(({ field: f, kind }) => {
-            const raw = values[f.key];
-            if (kind === "metric") {
+        <section className="border-y border-[var(--border-subtle)] py-8 md:py-10 space-y-7">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-x-6 gap-y-9">
+            {coreAnchors.map(({ field: f, kind }) => {
+              const raw = values[f.key];
+              let glyph: string | null = null;
+              let swatch: string | null = null;
+              let big = "";
+              let bigClass = "text-2xl md:text-[28px] font-bold font-mono leading-none";
+
+              if (kind === "metric") {
+                glyph = "gauge";
+                big = `${displayScalar(raw)}${f.unit ? ` ${f.unit}` : ""}`;
+              } else if (kind === "boolean") {
+                glyph = "automation";
+                big = f.label ?? f.key;
+                bigClass = "text-[15px] font-semibold leading-snug";
+              } else {
+                const single = typeof raw === "string" ? raw : selectedValuesOf(raw)[0] ?? "";
+                const opt = f.options?.find((o) => o.value === single);
+                const v = resolveOptionVisual(f, opt, single);
+                glyph = v.icon ?? null;
+                swatch = v.swatch ?? null;
+                big = opt?.label ?? displayScalar(raw);
+                bigClass = "text-lg font-semibold leading-snug";
+              }
+
               return (
-                <div key={f.key} className="bg-[var(--bg-surface)] p-5 flex flex-col justify-center gap-1">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-2xl md:text-3xl font-bold font-mono text-[var(--text-primary)] leading-none">
-                      {displayScalar(raw)}
-                    </span>
-                    {f.unit ? <span className="text-xs text-[var(--text-ghost)]">{f.unit}</span> : null}
-                  </div>
-                  <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-ghost)]">
-                    {f.label ?? f.key}
+                <div key={f.key} className="flex flex-col items-start gap-3">
+                  <span
+                    className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]"
+                    aria-hidden
+                  >
+                    {swatch ? (
+                      <span
+                        className="h-6 w-6 rounded-lg"
+                        style={{
+                          backgroundColor: swatch,
+                          backgroundImage:
+                            "repeating-linear-gradient(45deg, rgba(0,0,0,0.10) 0 2px, transparent 2px 4px)",
+                        }}
+                      />
+                    ) : glyph ? (
+                      <VisualGlyph token={glyph} className="h-6 w-6" />
+                    ) : null}
+                  </span>
+                  <div className="space-y-1">
+                    <div className={`text-[var(--text-primary)] ${bigClass}`}>{big}</div>
+                    <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-ghost)]">
+                      {f.label ?? f.key}
+                    </div>
                   </div>
                 </div>
               );
-            }
-            if (kind === "boolean") {
-              // a true flag — the field label IS the headline (e.g. "Auto Thread Trimmer")
-              return (
-                <div key={f.key} className="bg-[var(--bg-surface)] p-5 flex flex-col justify-center gap-1.5">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-secondary)]">
-                    <VisualGlyph token="automation" className="h-4 w-4" />
-                  </span>
-                  <div className="text-sm font-semibold text-[var(--text-primary)] leading-snug">
-                    {f.label ?? f.key}
-                  </div>
-                </div>
-              );
-            }
-            // badge — a selected option is the headline (e.g. "Direct Drive")
-            const single = typeof raw === "string" ? raw : selectedValuesOf(raw)[0] ?? "";
-            const option = f.options?.find((o) => o.value === single);
-            const visual = resolveOptionVisual(f, option, single);
-            const headline = option?.label ?? displayScalar(raw);
-            return (
-              <div key={f.key} className="bg-[var(--bg-surface)] p-5 flex flex-col justify-center gap-1.5">
-                {visual.swatch ? (
-                  <span className="h-8 w-8 rounded-lg border border-[var(--border-subtle)]" style={{ backgroundColor: visual.swatch }} />
-                ) : visual.icon ? (
-                  <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-secondary)]">
-                    <VisualGlyph token={visual.icon} className="h-4 w-4" />
-                  </span>
-                ) : null}
-                <div className="text-sm font-semibold text-[var(--text-primary)] leading-snug">{headline}</div>
-                <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-ghost)]">
-                  {f.label ?? f.key}
-                </div>
-              </div>
-            );
-          })}
+            })}
           </div>
 
-          {/* secondary anchors — compact chip row */}
+          {/* secondary anchors — quiet chip row */}
           {secondaryAnchors.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {secondaryAnchors.map(({ field: f, kind }) => {
@@ -629,12 +630,13 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                   icon = v.icon ?? null;
                   label = option?.label ?? displayScalar(raw);
                 } else {
+                  icon = "gauge";
                   label = `${displayScalar(raw)}${f.unit ? " " + f.unit : ""}`;
                 }
                 return (
                   <span
                     key={f.key}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2.5 py-1 text-[12px] font-medium text-[var(--text-secondary)]"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[var(--bg-surface-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)]"
                   >
                     {icon ? <VisualGlyph token={icon} className="h-3.5 w-3.5" /> : null}
                     {label}

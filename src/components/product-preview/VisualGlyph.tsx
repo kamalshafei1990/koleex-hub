@@ -34,6 +34,16 @@ function paths(token: string): React.ReactNode {
     case "dot":
       return <circle cx="12" cy="12" r="3" {...S} />;
 
+    /* ── Generic metric (gauge) — for numeric anchors with no domain glyph ── */
+    case "gauge":
+      return (
+        <>
+          <path d="M4 15a8 8 0 0 1 16 0" {...S} />
+          <path d="M12 15l4-4" {...S} />
+          <circle cx="12" cy="15" r="1.2" {...S} />
+        </>
+      );
+
     /* ── Motors ── */
     case "motor-servo":
     case "motor-direct":
