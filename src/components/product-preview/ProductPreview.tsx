@@ -566,9 +566,17 @@ export const ProductPreview = (props: ProductPreviewProps) => {
               let swatch: string | null = null;
               let big = "";
               let bigClass = "text-2xl md:text-[28px] font-bold font-mono leading-none";
+              let meterPct: number | null = null;
 
               if (kind === "metric") {
                 glyph = "gauge";
+                {
+                  const n = typeof raw === "number" ? raw : Number(raw);
+                  const mx = f.validation?.max;
+                  if (Number.isFinite(n) && typeof mx === "number" && mx > 0) {
+                    meterPct = Math.max(4, Math.min(100, Math.round((n / mx) * 100)));
+                  }
+                }
                 big = `${displayScalar(raw)}${f.unit ? ` ${f.unit}` : ""}`;
               } else if (kind === "boolean") {
                 glyph = "automation";
@@ -608,6 +616,14 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                     <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-ghost)]">
                       {f.label ?? f.key}
                     </div>
+                    {meterPct !== null ? (
+                      <div className="mt-1.5 h-1 w-24 rounded-full bg-[var(--bg-surface-subtle)] overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-[var(--text-primary)]"
+                          style={{ width: `${meterPct}%` }}
+                        />
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               );
@@ -661,15 +677,20 @@ export const ProductPreview = (props: ProductPreviewProps) => {
       {materialEntries.length > 0 ? (
         <section className="space-y-4">
           <SectionHead eyebrow="Capability" title="Suitable Materials" />
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+          {/* Filmstrip — large material swatches, horizontally scrollable. */}
+          <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1 snap-x">
             {materialEntries.flatMap(({ field, selected }) =>
               selected.map((val) => {
                 const option = field.options?.find((o) => o.value === val);
                 const label = labelForOption(field, val);
                 const visual = resolveOptionVisual(field, option, val);
                 return (
-                  <div key={`${field.key}-${val}`} className="group" title={visual.description ?? label}>
-                    <div className="aspect-square w-full overflow-hidden rounded-xl border border-[var(--border-subtle)]">
+                  <div
+                    key={`${field.key}-${val}`}
+                    className="snap-start shrink-0 w-36 md:w-40"
+                    title={visual.description ?? label}
+                  >
+                    <div className="aspect-[4/5] w-full overflow-hidden rounded-2xl border border-[var(--border-subtle)]">
                       {option?.image ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={option.image} alt={label} className="h-full w-full object-cover" />
@@ -679,16 +700,21 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                           style={{
                             backgroundColor: visual.swatch,
                             backgroundImage:
-                              "repeating-linear-gradient(45deg, rgba(0,0,0,0.10) 0 2px, transparent 2px 4px), repeating-linear-gradient(-45deg, rgba(255,255,255,0.06) 0 2px, transparent 2px 4px)",
+                              "repeating-linear-gradient(45deg, rgba(0,0,0,0.12) 0 2px, transparent 2px 5px), repeating-linear-gradient(-45deg, rgba(255,255,255,0.07) 0 2px, transparent 2px 5px)",
                           }}
                         />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-[var(--bg-surface-subtle)] font-mono font-bold text-[var(--text-primary)]">
+                        <div className="flex h-full w-full items-center justify-center bg-[var(--bg-surface-subtle)] font-mono font-bold text-2xl text-[var(--text-primary)]">
                           {getInitials(label)}
                         </div>
                       )}
                     </div>
-                    <div className="mt-1.5 text-[11px] font-medium text-[var(--text-primary)] text-center">{label}</div>
+                    <div className="mt-2 text-sm font-semibold text-[var(--text-primary)]">{label}</div>
+                    {visual.description ? (
+                      <div className="mt-0.5 text-[11px] leading-snug text-[var(--text-ghost)]">
+                        {visual.description}
+                      </div>
+                    ) : null}
                   </div>
                 );
               }),
@@ -729,22 +755,30 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         </section>
       ) : null}
 
-      {/* ═══ 6. AUTOMATION ═══ */}
+      {/* ═══ 6. AUTOMATION — workflow row (connected nodes) ═══ */}
       {automationFeatures.length > 0 ? (
-        <section className="space-y-4">
-          <SectionHead eyebrow="Hands-off" title="Automation" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-            {automationFeatures.map((f) => (
-              <div
-                key={f.key}
-                className="flex items-center gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3.5"
-              >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]">
-                  <VisualGlyph token="automation" className="h-4 w-4" />
-                </span>
-                <span className="text-sm font-medium text-[var(--text-primary)]">{f.label ?? f.key}</span>
+        <section className="space-y-5">
+          <SectionHead eyebrow="Hands-off" title="Automation workflow" />
+          <div className="relative overflow-x-auto pb-1">
+            <div className="relative min-w-[460px]">
+              {/* connector line running through the node centers (h-14 → 28px) */}
+              <div className="absolute left-7 right-7 top-7 h-px bg-[var(--border-subtle)]" />
+              <div className="relative flex justify-between gap-3">
+                {automationFeatures.map((f, i) => (
+                  <div key={f.key} className="flex flex-1 flex-col items-center text-center gap-2.5">
+                    <span className="relative flex h-14 w-14 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-secondary)]">
+                      <VisualGlyph token="automation" className="h-5 w-5" />
+                      <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--text-primary)] text-[9px] font-bold text-[var(--bg-primary)]">
+                        {i + 1}
+                      </span>
+                    </span>
+                    <span className="text-[12px] font-medium leading-snug text-[var(--text-primary)] max-w-[120px]">
+                      {f.label ?? f.key}
+                    </span>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
         </section>
       ) : null}

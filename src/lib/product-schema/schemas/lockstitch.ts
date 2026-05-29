@@ -58,6 +58,7 @@ export const LOCKSTITCH_SCHEMA: ProductSchemaDefinition = {
           key: "max_sewing_speed",
           importance: "critical",
           anchorPriority: 10,
+          validation: { max: 6000 },
           insight:
             "High-speed output engineered for high-volume apparel lines — more garments per shift without sacrificing stitch quality.",
           label: "Max Sewing Speed",
@@ -632,6 +633,7 @@ export const LOCKSTITCH_SCHEMA: ProductSchemaDefinition = {
           anchor: true,
           anchorGroup: "performance",
           anchorPriority: 25,
+          validation: { max: 750 },
           insight:
             "Right-sized servo power for continuous duty — strong enough for medium-heavy seams, efficient enough to cut energy cost per shift.",
           label: "Motor Power",
