@@ -489,9 +489,11 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                         <div className="h-full rounded-full bg-[var(--text-primary)]" style={{ width: `${meterPct}%` }} />
                       </div>
                     ) : null}
-                    <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--text-faint)]">
-                      {f.label ?? f.key}
-                    </div>
+                    {(f.label ?? f.key).trim().toLowerCase() !== value.trim().toLowerCase() ? (
+                      <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--text-faint)]">
+                        {f.label ?? f.key}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               );
