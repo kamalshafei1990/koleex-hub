@@ -95,7 +95,27 @@ export function validatePrimaryModel(
   if (expectedPrefix) {
     const expected = expectedPrefix.trim().toUpperCase();
     const upper = c.toUpperCase();
-    if (!upper.startsWith(`${expected}-`) && upper !== expected) {
+
+    /* Just the prefix on its own is NOT a valid commercial code —
+       it'd collide with every other product in the subcategory. The
+       commercial identity must be "<PREFIX>-<MODEL>", e.g. XCS-7800.
+       Block approve, not just warn. */
+    if (upper === expected) {
+      return {
+        ok: false,
+        reason: `Primary Model needs a model number after the prefix (e.g. ${expected}-7800).`,
+      };
+    }
+
+    /* Starts with PREFIX- but nothing after the dash — same problem. */
+    if (upper === `${expected}-`) {
+      return {
+        ok: false,
+        reason: `Primary Model needs a model number after the prefix (e.g. ${expected}-7800).`,
+      };
+    }
+
+    if (!upper.startsWith(`${expected}-`)) {
       return {
         ok: true,
         warning: `This code does not match the selected subcategory prefix (${expected}).`,
