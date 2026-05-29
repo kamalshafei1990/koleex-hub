@@ -110,6 +110,14 @@ export interface ModelFormState {
   moq: string;
   lead_time: string;
   barcode: string;
+  /* v30 — KOLEEX 3-layer identity. supplier_model / reference_model is
+     the factory identity (already above). primary_model is the
+     commercial KOLEEX code (XCS-7800), code_prefix is the classification
+     prefix it was generated from (XCS), and coding_status tracks the
+     workflow (auto_suggested → edited → approved → locked). */
+  primary_model: string;
+  code_prefix: string;
+  coding_status: string;
 }
 
 export interface MediaFormState {
@@ -243,6 +251,9 @@ export function createEmptyModel(): ModelFormState {
     moq: "",
     lead_time: "",
     barcode: "",
+    primary_model: "",
+    code_prefix: "",
+    coding_status: "",
   };
 }
 

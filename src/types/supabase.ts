@@ -246,6 +246,10 @@ export interface SubcategoryRow {
   description: string | null;
   order: number;
   created_at: string;
+  /** Stable short KOLEEX prefix (e.g. "XCS"). NULL until the division's
+   *  coding grammar lands. Set for every Garment Machinery subcategory
+   *  via migration pd_auto_code_v2_subcategory_code_column. */
+  code: string | null;
 }
 
 export interface ProductRow {
@@ -314,6 +318,15 @@ export interface ProductModelRow {
   tagline: string | null;
   supplier: string | null;
   reference_model: string | null;
+  /** Commercial KOLEEX code (e.g. "XCS-7800"). Unique when set.
+   *  Auto-suggested from subcategory.code + extract(supplier model),
+   *  freely editable, persisted alongside reference_model so the
+   *  supplier identity is never overwritten. */
+  primary_model: string | null;
+  /** Denormalised prefix the primary model was built from. */
+  code_prefix: string | null;
+  /** Workflow: 'auto_suggested' | 'edited' | 'approved' | 'locked'. */
+  coding_status: string | null;
   cost_price: number | null;
   global_price: number | null;
   supports_head_only: boolean | null;

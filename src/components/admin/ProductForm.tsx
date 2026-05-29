@@ -85,6 +85,11 @@ import BarcodeQRDisplay from "./form-sections/BarcodeQRDisplay";
 import { isSewingMachineSubcategory } from "@/lib/sewing-machine-templates";
 import { getKindBySlug } from "@/lib/machine-kinds";
 import { slugify } from "@/types/product-form";
+import {
+  suggestPrimaryModel,
+  validatePrimaryModel,
+  normalizeKoleexCode,
+} from "@/lib/product-coding";
 
 /* ═══════════════════════════════════════════════════════════════════
    SECTION WRAPPER — collapsible card with icon + title
@@ -470,6 +475,9 @@ export default function ProductForm({ productId }: Props) {
           moq: m.moq?.toString() || "",
           lead_time: m.lead_time || "",
           barcode: m.barcode || "",
+          primary_model: m.primary_model || "",
+          code_prefix: m.code_prefix || "",
+          coding_status: m.coding_status || "",
         }));
         setModels(mappedModels);
         setOriginalModelIds(modelIds);
@@ -579,6 +587,17 @@ export default function ProductForm({ productId }: Props) {
     if (!loading && models.length === 0) ensureFirstModel();
   }, [loading, ensureFirstModel]);
 
+  /* ── v30: KOLEEX Primary Model auto-coding ──
+     Resolve the prefix from the currently-selected subcategory's `code`
+     column. When the user types into Supplier Model AND the primary
+     model hasn't been hand-edited (status != "edited"), we re-derive
+     the suggestion. The status flag stops us from clobbering manual
+     overrides. */
+  const selectedSubcategory = subcategories.find(
+    (s) => s.slug === product.subcategory_slug,
+  );
+  const resolvedPrefix = selectedSubcategory?.code ?? "";
+
   /* ── Primary model helpers (shown in Hero) ── */
   const primaryModel = models[0];
   const updatePrimaryModel = useCallback((updates: Partial<ModelFormState>) => {
@@ -591,6 +610,29 @@ export default function ProductForm({ productId }: Props) {
       return next;
     });
   }, []);
+
+  /* Live auto-suggest: whenever the prefix or supplier-model changes,
+     recompute the suggestion. Only push it into `primary_model` when
+     the field has never been hand-edited (coding_status != "edited" /
+     "locked"). The "Reset to auto" button below clears the flag so a
+     user can reclaim the suggestion explicitly. */
+  const suggestedPrimaryModel = suggestPrimaryModel(
+    resolvedPrefix,
+    primaryModel?.reference_model || "",
+  );
+  useEffect(() => {
+    if (!primaryModel) return;
+    if (!resolvedPrefix || !primaryModel.reference_model) return;
+    const status = primaryModel.coding_status;
+    if (status === "edited" || status === "locked") return;
+    if (primaryModel.primary_model === suggestedPrimaryModel) return;
+    updatePrimaryModel({
+      primary_model: suggestedPrimaryModel,
+      code_prefix: resolvedPrefix,
+      coding_status: "auto_suggested",
+    });
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [suggestedPrimaryModel, resolvedPrefix]);
 
   /* Smart save-button label + styling based on the chosen status.
      Shared between the Review step's preview card and the bottom
@@ -794,6 +836,13 @@ export default function ProductForm({ productId }: Props) {
           moq: m.moq ? parseInt(m.moq) : null,
           lead_time: m.lead_time || null,
           barcode: m.barcode || null,
+          /* v30: KOLEEX 3-layer identity. Normalize the primary model to
+             uppercase + strip whitespace before persisting so the
+             partial-unique index does what we expect. Blank values stay
+             null so the index ignores them. */
+          primary_model: m.primary_model ? m.primary_model.trim().toUpperCase().replace(/\s+/g, "") : null,
+          code_prefix: m.code_prefix ? m.code_prefix.trim().toUpperCase() : null,
+          coding_status: m.coding_status || null,
         };
 
         if (m.id) {
@@ -1360,6 +1409,145 @@ export default function ProductForm({ productId }: Props) {
                       />
                     </div>
                   </div>
+                </div>
+
+                {/* ── v30: KOLEEX Product Identity (Primary Model) ── */}
+                <div className="mt-5 pt-5 border-t border-[var(--border-subtle)]">
+                  <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <div className="h-6 w-6 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
+                        <span className="text-[10px] font-bold text-[var(--text-ghost)] font-mono">K</span>
+                      </div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">
+                        KOLEEX Product Identity
+                      </span>
+                    </div>
+                    {(() => {
+                      const s = primaryModel?.coding_status;
+                      const label =
+                        s === "edited" ? "Edited" :
+                        s === "approved" ? "Approved" :
+                        s === "locked" ? "Locked" :
+                        s === "auto_suggested" ? "Auto-suggested" :
+                        "Unset";
+                      const cls =
+                        s === "edited" ? "border-[var(--text-primary)] text-[var(--text-primary)]" :
+                        s === "approved" || s === "locked" ? "border-emerald-500/50 text-emerald-600 dark:text-emerald-300" :
+                        "border-[var(--border-subtle)] text-[var(--text-ghost)]";
+                      return (
+                        <span className={`text-[9.5px] font-bold uppercase tracking-[0.16em] px-1.5 py-0.5 rounded-full border ${cls}`}>
+                          {label}
+                        </span>
+                      );
+                    })()}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-[120px_1fr_auto] gap-3 items-end">
+                    {/* Prefix badge */}
+                    <div>
+                      <label className={lbl}>Classification prefix</label>
+                      {resolvedPrefix ? (
+                        <div className="h-10 px-3 rounded-md border border-[var(--text-primary)] bg-[var(--bg-surface)] flex items-center font-mono text-[15px] font-bold tracking-[0.06em] text-[var(--text-primary)]">
+                          {resolvedPrefix}
+                        </div>
+                      ) : (
+                        <div className="h-10 px-3 rounded-md border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] flex items-center text-[11px] text-[var(--text-faint)]">
+                          Pick subcategory
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Editable primary model code */}
+                    <div>
+                      <label className={lbl}>Primary Model code</label>
+                      <input
+                        type="text"
+                        value={primaryModel?.primary_model || ""}
+                        onChange={(e) => {
+                          const next = e.target.value.toUpperCase().replace(/\s+/g, "");
+                          updatePrimaryModel({
+                            primary_model: next,
+                            code_prefix: resolvedPrefix || primaryModel?.code_prefix || "",
+                            coding_status: next === suggestedPrimaryModel ? "auto_suggested" : "edited",
+                          });
+                        }}
+                        onBlur={(e) => {
+                          const normalized = normalizeKoleexCode(e.target.value);
+                          if (normalized !== e.target.value) {
+                            updatePrimaryModel({ primary_model: normalized });
+                          }
+                        }}
+                        placeholder={suggestedPrimaryModel || `${resolvedPrefix || "PREFIX"}-…`}
+                        className={`${inp} font-mono`}
+                      />
+                      {/* Validation hint */}
+                      {(() => {
+                        const code = primaryModel?.primary_model || "";
+                        if (!code) {
+                          return (
+                            <p className="text-[10px] text-[var(--text-ghost)] mt-1">
+                              Suggested from supplier model. Editable.
+                            </p>
+                          );
+                        }
+                        const v = validatePrimaryModel(code, resolvedPrefix);
+                        if (!v.ok) {
+                          return (
+                            <p className="text-[10px] text-red-500 mt-1">{v.reason}</p>
+                          );
+                        }
+                        if (v.warning) {
+                          return (
+                            <p className="text-[10px] text-amber-500 mt-1">{v.warning}</p>
+                          );
+                        }
+                        return (
+                          <p className="text-[10px] text-[var(--text-ghost)] mt-1">
+                            Saved on the product as the commercial identity. Supplier model stays untouched.
+                          </p>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Reset / approve buttons */}
+                    <div className="flex items-center gap-2 md:flex-col md:items-stretch">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!suggestedPrimaryModel) return;
+                          updatePrimaryModel({
+                            primary_model: suggestedPrimaryModel,
+                            code_prefix: resolvedPrefix,
+                            coding_status: "auto_suggested",
+                          });
+                        }}
+                        disabled={!suggestedPrimaryModel || primaryModel?.primary_model === suggestedPrimaryModel}
+                        className="h-9 px-3 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                        title="Reset to the auto-suggested code"
+                      >
+                        ↺ Reset
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!primaryModel?.primary_model) return;
+                          const v = validatePrimaryModel(primaryModel.primary_model, resolvedPrefix);
+                          if (!v.ok) return;
+                          updatePrimaryModel({ coding_status: "approved" });
+                        }}
+                        disabled={!primaryModel?.primary_model || primaryModel?.coding_status === "approved"}
+                        className="h-9 px-3 rounded-md border border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-primary)] text-[11px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                        title="Mark as approved — locks the auto-resync"
+                      >
+                        ✓ Approve
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Helper strip */}
+                  <p className="text-[10px] text-[var(--text-ghost)] mt-3 leading-relaxed">
+                    Supplier model stays as the original factory reference. KOLEEX Primary Model is the commercial identity used in catalog, quotations, website, and internal product data.
+                  </p>
                 </div>
 
                 {/* Auto-generated codes for the primary model */}
