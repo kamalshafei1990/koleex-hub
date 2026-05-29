@@ -22,6 +22,14 @@ export {
   filterKnowledgeForSurface,
 } from "./visibility";
 
+export {
+  VISUAL_OPTIONS,
+  FIELD_VISUAL_DOMAIN,
+  domainForField,
+  resolveOptionVisual,
+} from "./visual-options";
+export type { OptionVisual } from "./visual-options";
+
 export { computeReadiness } from "./readiness";
 export type {
   ReadinessDimension,
@@ -42,4 +50,6 @@ export type {
   ProductKnowledgeBlock,
   ProductSchemaResolution,
   ProductSchemaSurface,
+  SpecFieldOption,
+  OptionVisualType,
 } from "@/types/product-schema";

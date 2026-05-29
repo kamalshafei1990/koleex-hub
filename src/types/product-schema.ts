@@ -63,11 +63,36 @@ export type VisualRenderType =
   | 'ai_fact'
   | 'brochure_block';
 
+/* Visual classification for an option — drives which renderer the
+   ProductPreview / future surfaces use. Optional; falls back to a plain
+   chip when absent. */
+export type OptionVisualType =
+  | 'material'
+  | 'application'
+  | 'garment'
+  | 'motor'
+  | 'feed'
+  | 'hook'
+  | 'plug'
+  | 'automation'
+  | 'weight'
+  | 'generic';
+
 export interface SpecFieldOption {
   value: string;
   label: string;
-  icon?: string;
-  image?: string;
+  /* ── Visual option metadata (all optional, future-safe) ──
+     A central registry (src/lib/product-schema/visual-options.ts) supplies
+     these for known option values so individual schemas don't re-declare
+     them; a schema MAY override any of them inline here. */
+  icon?: string;          // glyph token resolved by VisualGlyph (e.g. "motor-servo")
+  image?: string;         // optional raster/texture URL
+  swatch?: string;        // muted material tone (CSS color) for material cards
+  description?: string;   // one-line explanation, shown on cards / tooltips / AI
+  visualType?: OptionVisualType;
+  badge?: string;         // short region / class label (e.g. "EU", "UK")
+  illustration?: string;  // optional inline-SVG token for richer diagrams
+  animationKey?: string;  // reserved for future motion (no-op today)
 }
 
 export interface SpecFieldValidation {
@@ -92,6 +117,10 @@ export interface SpecField extends VisibilityFlags {
   validation?: SpecFieldValidation;
   defaultValue?: unknown;
   visualRenderType: VisualRenderType;
+  /* Optional visual domain for this field's options. When set, the visual
+     registry resolves swatches/glyphs/descriptions for each option value
+     from this domain. Falls back to a field-key map in the registry. */
+  optionSet?: OptionVisualType;
 }
 
 export interface SpecGroup {

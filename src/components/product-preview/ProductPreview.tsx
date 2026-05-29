@@ -11,7 +11,9 @@ import type {
 import {
   filterFieldsForSurface,
   filterKnowledgeForSurface,
+  resolveOptionVisual,
 } from "@/lib/product-schema";
+import VisualGlyph from "./VisualGlyph";
 
 interface ProductPreviewProps {
   // --- MUST STAY (Review-step call site, A4) ---
@@ -184,16 +186,29 @@ export const ProductPreview = (props: ProductPreviewProps) => {
       }
 
       case "technical_badge": {
+        // For single-select badges, resolve a glyph + the option's label
+        // from the visual registry so e.g. motor_type shows a motor icon
+        // and the human label ("Direct Drive") rather than the raw value.
+        const singleVal = typeof raw === "string" ? raw : null;
+        const option = singleVal
+          ? f.options?.find((o) => o.value === singleVal)
+          : undefined;
+        const visual = singleVal ? resolveOptionVisual(f, option, singleVal) : {};
+        const display = option?.label ?? displayScalar(raw);
         return (
           <div
             key={f.key}
             className="inline-flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2"
+            title={visual.description ?? undefined}
           >
+            {visual.icon ? (
+              <VisualGlyph token={visual.icon} className="h-4 w-4 text-[var(--text-secondary)] shrink-0" />
+            ) : null}
             <span className="text-[10px] uppercase tracking-wider text-[var(--text-ghost)]">
               {f.label ?? f.key}
             </span>
-            <span className="text-sm font-semibold font-mono text-[var(--text-primary)]">
-              {displayScalar(raw)}
+            <span className="text-sm font-semibold text-[var(--text-primary)]">
+              {display}
               {f.unit ? (
                 <span className="ms-1 text-xs font-normal text-[var(--text-ghost)]">
                   {f.unit}
@@ -216,6 +231,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
               {selected.map((val) => {
                 const option = f.options?.find((o) => o.value === val);
                 const label = option?.label ?? val;
+                const visual = resolveOptionVisual(f, option, val);
                 const image =
                   f.visualRenderType === "image_chip"
                     ? option?.image
@@ -223,17 +239,26 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                 return (
                   <span
                     key={`${f.key}-${val}`}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2.5 py-1 text-xs text-[var(--text-primary)]"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] ps-1.5 pe-2.5 py-1 text-xs text-[var(--text-primary)]"
+                    title={visual.description ?? label}
                   >
                     {image ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={image}
-                        alt=""
-                        className="h-4 w-4 rounded object-cover"
+                      <img src={image} alt="" className="h-4 w-4 rounded object-cover" />
+                    ) : visual.swatch ? (
+                      <span
+                        className="h-3.5 w-3.5 rounded-sm border border-black/10 shrink-0"
+                        style={{ backgroundColor: visual.swatch }}
                       />
+                    ) : visual.icon ? (
+                      <VisualGlyph token={visual.icon} className="h-4 w-4 text-[var(--text-secondary)] shrink-0" />
                     ) : null}
                     {label}
+                    {visual.badge ? (
+                      <span className="ms-0.5 rounded-sm bg-[var(--bg-primary)] px-1 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-ghost)]">
+                        {visual.badge}
+                      </span>
+                    ) : null}
                   </span>
                 );
               })}
@@ -423,13 +448,15 @@ export const ProductPreview = (props: ProductPreviewProps) => {
               selected.map((val) => {
                 const option = field.options?.find((o) => o.value === val);
                 const label = labelForOption(field, val);
+                const visual = resolveOptionVisual(field, option, val);
                 return (
                   <div
                     key={`${field.key}-${val}`}
                     className="flex flex-col items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-2"
+                    title={visual.description ?? label}
                   >
                     <div
-                      className="flex items-center justify-center rounded-lg bg-[var(--bg-primary)] text-[var(--text-primary)] font-mono font-bold overflow-hidden"
+                      className="relative flex items-center justify-center rounded-lg overflow-hidden border border-[var(--border-subtle)]"
                       style={{ width: 80, height: 80 }}
                     >
                       {option?.image ? (
@@ -439,13 +466,30 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                           alt={label}
                           className="h-full w-full object-cover"
                         />
+                      ) : visual.swatch ? (
+                        /* Muted material swatch + subtle woven texture. */
+                        <div
+                          className="h-full w-full"
+                          style={{
+                            backgroundColor: visual.swatch,
+                            backgroundImage:
+                              "repeating-linear-gradient(45deg, rgba(0,0,0,0.10) 0 2px, transparent 2px 4px), repeating-linear-gradient(-45deg, rgba(255,255,255,0.06) 0 2px, transparent 2px 4px)",
+                          }}
+                        />
                       ) : (
-                        <span className="text-lg">{getInitials(label)}</span>
+                        <div className="flex h-full w-full items-center justify-center bg-[var(--bg-primary)] text-[var(--text-primary)] font-mono font-bold">
+                          <span className="text-lg">{getInitials(label)}</span>
+                        </div>
                       )}
                     </div>
-                    <span className="mt-2 text-[11px] text-[var(--text-secondary)] text-center">
+                    <span className="mt-2 text-[11px] font-medium text-[var(--text-primary)] text-center">
                       {label}
                     </span>
+                    {visual.description ? (
+                      <span className="mt-0.5 text-[9.5px] leading-tight text-[var(--text-ghost)] text-center line-clamp-2">
+                        {visual.description}
+                      </span>
+                    ) : null}
                   </div>
                 );
               }),
@@ -463,13 +507,15 @@ export const ProductPreview = (props: ProductPreviewProps) => {
               selected.map((val) => {
                 const option = field.options?.find((o) => o.value === val);
                 const label = labelForOption(field, val);
+                const visual = resolveOptionVisual(field, option, val);
                 return (
                   <div
                     key={`${field.key}-${val}`}
                     className="flex flex-col items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-2"
+                    title={visual.description ?? label}
                   >
                     <div
-                      className="flex items-center justify-center rounded-lg bg-[var(--bg-primary)] text-[var(--text-primary)] font-mono font-bold overflow-hidden"
+                      className="flex items-center justify-center rounded-lg bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden"
                       style={{ width: 80, height: 80 }}
                     >
                       {option?.image ? (
@@ -479,11 +525,13 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                           alt={label}
                           className="h-full w-full object-cover"
                         />
+                      ) : visual.icon ? (
+                        <VisualGlyph token={visual.icon} className="h-9 w-9 text-[var(--text-secondary)]" />
                       ) : (
-                        <span className="text-lg">{getInitials(label)}</span>
+                        <span className="font-mono font-bold text-lg">{getInitials(label)}</span>
                       )}
                     </div>
-                    <span className="mt-2 text-[11px] text-[var(--text-secondary)] text-center">
+                    <span className="mt-2 text-[11px] font-medium text-[var(--text-primary)] text-center">
                       {label}
                     </span>
                   </div>
@@ -541,10 +589,10 @@ export const ProductPreview = (props: ProductPreviewProps) => {
             {remainingBooleanFields.map((f) => (
               <div
                 key={f.key}
-                className="flex items-center gap-2 text-sm text-[var(--text-primary)]"
+                className="flex items-center gap-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-sm text-[var(--text-primary)]"
               >
-                <span className="text-emerald-600 dark:text-emerald-300">
-                  ✓
+                <span className="flex h-5 w-5 items-center justify-center rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)] shrink-0">
+                  <VisualGlyph token="check" className="h-3 w-3" />
                 </span>
                 <span>{f.label ?? f.key}</span>
               </div>
