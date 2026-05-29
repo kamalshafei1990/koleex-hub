@@ -1,124 +1,19 @@
 /**
  * Public product page — /products/preview/[slug]
  * ---------------------------------------------------------------------------
- * Server Component (RSC). Architecture-validation layer for the schema-driven
- * product system: it fetches public-safe product data on the server and hands
- * it to the SHARED <ProductPreview> with surface="website". ProductPreview owns
- * ALL spec/knowledge rendering — this page does zero presentation of specs.
- *
- * Security model:
- *   • getSupabaseServer() is service-role and bypasses RLS, so the leak surface
- *     is controlled entirely by (a) selecting only public-safe product columns
- *     and (b) passing surface="website" so filterFieldsForSurface /
- *     filterKnowledgeForSurface strip internal fields (cost, supplier, HS code,
- *     MOQ). Cost/supplier live on product_models and are NEVER read into the
- *     props passed to ProductPreview.
+ * Thin server route over the shared loader. Renders the schema-driven
+ * <ProductPreview>; 404s when the product is missing / non-public / has no
+ * resolved schema. All fetch + surface-filtering lives in
+ * src/lib/server/product-detail.ts (shared with /products/[id]).
  */
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
-import { getSupabaseServer } from "@/lib/server/supabase-server";
-import {
-  resolveSchema,
-  filterFieldsForSurface,
-  filterKnowledgeForSurface,
-} from "@/lib/product-schema";
-import type { ProductKnowledgeBlock } from "@/types/product-schema";
+import { loadPublicSchemaProduct } from "@/lib/server/product-detail";
 import { ProductPreview } from "@/components/product-preview/ProductPreview";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
-
-/* Public-safe product columns only. No cost_price / supplier / margin. */
-const PRODUCT_PUBLIC_COLUMNS =
-  "id, product_name, slug, brand, division_slug, category_slug, subcategory_slug, " +
-  "schema_id, schema_version, schema_specs, schema_knowledge, schema_visibility, " +
-  "warranty, country_of_origin, status, visible, featured";
-
-interface PublicProductRow {
-  id: string;
-  product_name: string;
-  slug: string;
-  brand: string | null;
-  division_slug: string | null;
-  category_slug: string | null;
-  subcategory_slug: string | null;
-  schema_id: string | null;
-  schema_version: string | null;
-  schema_specs: Record<string, unknown> | null;
-  schema_knowledge: unknown[] | null;
-  schema_visibility: Record<string, unknown> | null;
-  warranty: string | null;
-  country_of_origin: string | null;
-  status: string | null;
-  visible: boolean | null;
-  featured: boolean | null;
-}
-
-interface MediaRow {
-  url: string;
-  alt_text: string | null;
-  order: number | null;
-  type: string;
-  role: string | null;
-}
-
-interface ModelRow {
-  primary_model: string | null;
-  tagline: string | null;
-  order: number | null;
-}
-
-/* A product is publicly viewable only when published + visible. */
-const isPublic = (row: PublicProductRow): boolean =>
-  row.visible === true && row.status === "active";
-
-async function fetchProduct(slug: string): Promise<PublicProductRow | null> {
-  const supabase = getSupabaseServer();
-  const { data, error } = await supabase
-    .from("products")
-    .select(PRODUCT_PUBLIC_COLUMNS)
-    .eq("slug", slug)
-    .maybeSingle();
-
-  if (error || !data) return null;
-  return data as unknown as PublicProductRow;
-}
-
-async function fetchSubcategoryCode(slug: string | null): Promise<string> {
-  if (!slug) return "";
-  const supabase = getSupabaseServer();
-  const { data } = await supabase
-    .from("subcategories")
-    .select("code")
-    .eq("slug", slug)
-    .maybeSingle();
-  return (data?.code as string | null) ?? "";
-}
-
-async function fetchMedia(productId: string): Promise<MediaRow[]> {
-  const supabase = getSupabaseServer();
-  const { data } = await supabase
-    .from("product_media")
-    .select('url, alt_text, "order", type, role')
-    .eq("product_id", productId)
-    .order("order", { ascending: true });
-  return (data as MediaRow[] | null) ?? [];
-}
-
-async function fetchPrimaryModel(productId: string): Promise<ModelRow | null> {
-  const supabase = getSupabaseServer();
-  // Only public-safe columns. Never read cost_price / global_price / supplier.
-  const { data } = await supabase
-    .from("product_models")
-    .select('primary_model, tagline, "order"')
-    .eq("product_id", productId)
-    .order("order", { ascending: true });
-  const rows = (data as ModelRow[] | null) ?? [];
-  if (rows.length === 0) return null;
-  // Derive the primary model: first row carrying a primary_model, else first row.
-  return rows.find((r) => !!r.primary_model) ?? rows[0];
-}
 
 export async function generateMetadata({
   params,
@@ -126,15 +21,11 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const product = await fetchProduct(slug);
-  if (!product || !isPublic(product)) {
-    return { title: "Product not found — KOLEEX" };
-  }
-  const model = await fetchPrimaryModel(product.id);
-  const description = model?.tagline ?? undefined;
+  const loaded = await loadPublicSchemaProduct(slug);
+  if (!loaded) return { title: "Product not found — KOLEEX" };
   return {
-    title: `${product.product_name} — KOLEEX`,
-    description,
+    title: `${loaded.productName} — KOLEEX`,
+    description: loaded.tagline ?? undefined,
   };
 }
 
@@ -144,92 +35,11 @@ export default async function PublicProductPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-
-  const product = await fetchProduct(slug);
-  if (!product || !isPublic(product)) {
-    notFound();
-  }
-
-  // Parallel: subcategory code (for schema resolution), media, primary model.
-  const [subcategoryCode, media, model] = await Promise.all([
-    fetchSubcategoryCode(product.subcategory_slug),
-    fetchMedia(product.id),
-    fetchPrimaryModel(product.id),
-  ]);
-
-  // ── Schema resolution (real exported resolver) ──
-  const { schema } = resolveSchema({
-    divisionCode: product.division_slug || "",
-    categoryCode: product.category_slug || "",
-    subcategoryCode: subcategoryCode || "",
-  });
-
-  /* ── Server-side surface filtering (DATA BOUNDARY) ────────────────
-     ProductPreview filters by surface at DISPLAY time, but it is a client
-     component — anything we pass as props is serialized into the HTML
-     payload and reaches the browser even if not visually rendered. So we
-     strip internal-only data HERE, on the server, before it crosses the
-     boundary. Only website-visible spec keys + knowledge blocks leave the
-     server. (hs_code, moq, lead_time, head-only flags, the limitations
-     block, etc. never reach the client.) */
-  const rawSpecs = (product.schema_specs ?? {}) as Record<string, unknown>;
-  const rawKnowledge = (product.schema_knowledge ?? []) as ProductKnowledgeBlock[];
-
-  const websiteFieldKeys = schema
-    ? new Set(
-        filterFieldsForSurface(
-          schema.groups.flatMap((g) => g.fields),
-          "website",
-        ).map((f) => f.key),
-      )
-    : new Set<string>();
-
-  const publicSpecs: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(rawSpecs)) {
-    if (websiteFieldKeys.has(k)) publicSpecs[k] = v;
-  }
-  const publicKnowledge = filterKnowledgeForSurface(rawKnowledge, "website");
-
-  /* Also strip internal field DEFINITIONS from the schema we hand to the
-     client — otherwise internal field keys/labels (hs_code, lead_time,
-     head-only flags) serialize into the payload even with no values.
-     Groups left with zero website-visible fields drop out entirely. */
-  const publicSchema = schema
-    ? {
-        ...schema,
-        groups: schema.groups
-          .map((g) => ({
-            ...g,
-            fields: filterFieldsForSurface(g.fields, "website"),
-          }))
-          .filter((g) => g.fields.length > 0),
-      }
-    : null;
-
-  // ── Media derivation using the real ProductMediaType union values ──
-  const byType = (t: string) => media.filter((m) => m.type === t);
-  const gallery = byType("gallery");
-  const videos = byType("video");
-  const manualsMedia = byType("manual");
-  const mainImageRow = byType("main_image")[0];
-
-  const galleryUrls = gallery.map((m) => m.url).filter(Boolean);
-  const mainImageUrl = mainImageRow?.url ?? galleryUrls[0] ?? null;
-  const videoUrls = videos.map((m) => m.url).filter(Boolean);
-  const manuals = manualsMedia
-    .map((m) => ({ url: m.url, label: m.alt_text }))
-    .filter((m) => !!m.url);
-  const ar3dUrl = byType("ar_3d")[0]?.url ?? null;
-
-  const mediaCounts = {
-    photos: gallery.length,
-    videos: videos.length,
-    manuals: manualsMedia.length,
-  };
+  const loaded = await loadPublicSchemaProduct(slug);
+  if (!loaded) notFound();
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
-      {/* Minimal chrome — architecture validation layer, not the final site. */}
       <header className="border-b border-[var(--border-subtle)]">
         <div className="mx-auto w-full max-w-6xl px-4 md:px-8 py-4">
           <Link
@@ -241,26 +51,8 @@ export default async function PublicProductPage({
           </Link>
         </div>
       </header>
-
       <main className="mx-auto w-full max-w-6xl px-4 md:px-8 py-6 md:py-10">
-        <ProductPreview
-          productName={product.product_name}
-          primaryModel={model?.primary_model ?? null}
-          tagline={model?.tagline ?? null}
-          brand={product.brand}
-          schema={publicSchema}
-          values={publicSpecs}
-          knowledge={publicKnowledge}
-          mainImageUrl={mainImageUrl}
-          galleryUrls={galleryUrls}
-          videoUrls={videoUrls}
-          manuals={manuals}
-          ar3dUrl={ar3dUrl}
-          mediaCounts={mediaCounts}
-          countryOfOrigin={product.country_of_origin}
-          warranty={product.warranty}
-          surface="website"
-        />
+        <ProductPreview {...loaded.preview} />
       </main>
     </div>
   );
