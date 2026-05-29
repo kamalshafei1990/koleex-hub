@@ -500,15 +500,13 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         {/* RIGHT — dominant render + floating intelligence cards */}
         <div className="order-1 lg:order-2 lg:col-span-7">
           <div className="relative">
-            <div className="relative w-full aspect-[4/3] md:aspect-[5/4] overflow-hidden rounded-3xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] flex items-center justify-center">
+            <div className="relative w-full aspect-[4/3] md:aspect-[5/4] flex items-center justify-center">
               {mainImageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={mainImageUrl} alt={productName} className="h-full w-full object-cover" />
+                <img src={mainImageUrl} alt={productName} className="h-full w-full object-contain" />
               ) : (
                 <span className="text-sm text-[var(--text-faint)]">No main image</span>
               )}
-              {/* subtle inner edge for depth (monochrome, no gradient fill) */}
-              <div className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-inset ring-black/5" />
             </div>
 
             {/* Floating intelligence cards — desktop only; mobile uses the
