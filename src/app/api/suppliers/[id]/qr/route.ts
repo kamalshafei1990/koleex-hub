@@ -13,6 +13,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { logSupplierEvent, actorName } from "@/lib/suppliers/timeline";
 
 const QR_CATEGORIES = new Set([
   "sales", "support", "finance", "boss", "logistics", "group", "showroom", "factory",
@@ -98,6 +99,17 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     .select("id")
     .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await logSupplierEvent({
+    tenant_id: tid, supplier_id: id,
+    event_type: "qr_added", event_category: "communication",
+    title: `QR code added: ${category}`,
+    description: typeof body.title === "string" ? body.title : null,
+    actor_id: auth.account_id ?? null, actor_name: actorName(auth),
+    source_module: "suppliers", visibility_tier: visibility,
+    related_entity_id: data?.id ?? null, related_entity_type: "supplier_media",
+    metadata: { category },
+  });
 
   return NextResponse.json({ ok: true, id: data?.id ?? null });
 }

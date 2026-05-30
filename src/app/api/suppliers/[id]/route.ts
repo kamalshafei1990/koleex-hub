@@ -18,8 +18,9 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
-import { computeReadiness, resolveCallerTier, visibleTiers, certIsTrusted } from "@/lib/suppliers/intelligence";
+import { computeReadiness, resolveCallerTier, visibleTiers, certIsTrusted, STRATEGIC_STATUS_LABELS } from "@/lib/suppliers/intelligence";
 import { PRIVATE_BUCKETS } from "@/lib/server/storage-tenant";
+import { logSupplierEvent, actorName } from "@/lib/suppliers/timeline";
 
 type Row = Record<string, unknown>;
 
@@ -68,7 +69,7 @@ export async function GET(
     return NextResponse.json({ error: "Supplier not found" }, { status: 404 });
   }
 
-  const [purchaseOrders, bills, payments, products, receipts, returns, classifications, contactPersons, media, qrCodes, statusHistory, factoryRows] = await Promise.all([
+  const [purchaseOrders, bills, payments, products, receipts, returns, classifications, contactPersons, media, qrCodes, statusHistory, factoryRows, timeline] = await Promise.all([
     safe(() =>
       supabaseServer
         .from("purchase_orders")
@@ -193,6 +194,17 @@ export async function GET(
         .eq("supplier_id", id)
         .limit(1),
     ),
+    // Unified operational timeline — tier-aware, newest first.
+    safe(() =>
+      supabaseServer
+        .from("supplier_timeline_events")
+        .select("id, event_type, event_category, title, description, actor_id, actor_name, source_module, visibility_tier, importance, is_manual, related_entity_id, related_entity_type, metadata, created_at")
+        .eq("tenant_id", tid)
+        .eq("supplier_id", id)
+        .in("visibility_tier", tiers)
+        .order("created_at", { ascending: false })
+        .limit(200),
+    ),
   ]);
 
   const factory = factoryRows[0] ?? null;
@@ -270,6 +282,25 @@ export async function GET(
     docsVerified,
   });
 
+  // ── Readiness-milestone timeline event ── fires at most once per 25-point
+  //    threshold crossed upward (guarded by the persisted readiness_milestone
+  //    marker, so a GET never re-emits). Idempotent + non-spammy.
+  const milestone = Math.floor(readiness.score / 25) * 25;
+  const prevMilestone = Number((supplier as Row).readiness_milestone ?? 0);
+  if (milestone > prevMilestone && milestone >= 25) {
+    try {
+      await supabaseServer.from("contacts").update({ readiness_milestone: milestone }).eq("id", id).eq("tenant_id", tid);
+      await logSupplierEvent({
+        tenant_id: tid, supplier_id: id,
+        event_type: "readiness_milestone", event_category: "system",
+        title: `Supplier readiness reached ${milestone}%`,
+        actor_id: null, actor_name: "System", source_module: "readiness",
+        visibility_tier: "internal", importance: milestone >= 75 ? "high" : "normal",
+        metadata: { milestone, score: readiness.score },
+      });
+    } catch { /* best-effort */ }
+  }
+
   return NextResponse.json(
     {
       supplier,
@@ -285,6 +316,7 @@ export async function GET(
       qrCodes,
       statusHistory,
       factory,
+      timeline,
       callerTier,
       readiness,
     },
@@ -394,6 +426,18 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     } catch {
       /* history is best-effort; the status update already succeeded */
     }
+    const toLabel = STRATEGIC_STATUS_LABELS[patch.strategic_status as keyof typeof STRATEGIC_STATUS_LABELS] ?? patch.strategic_status;
+    await logSupplierEvent({
+      tenant_id: tid, supplier_id: id,
+      event_type: "status_changed", event_category: "relationship",
+      title: `Strategic status set to ${toLabel}`,
+      description: typeof patch.strategic_status_reason === "string" ? patch.strategic_status_reason : null,
+      actor_id: auth.account_id ?? null, actor_name: actorName(auth),
+      source_module: "suppliers",
+      visibility_tier: "internal",
+      importance: patch.strategic_status === "blacklisted" || patch.strategic_status === "blocked" ? "high" : "normal",
+      metadata: { from: (current as Row).strategic_status ?? null, to: patch.strategic_status },
+    });
   }
 
   return NextResponse.json({ ok: true });

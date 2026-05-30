@@ -16,6 +16,8 @@ import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import {
   buildMediaPatch, validateMediaPatch, MEDIA_CATEGORIES,
 } from "@/lib/suppliers/media-fields";
+import { logSupplierEvent, actorName } from "@/lib/suppliers/timeline";
+import { docCategoryLabel } from "@/lib/suppliers/intelligence";
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth(req);
@@ -105,6 +107,21 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     .select("id")
     .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  const isCert = category === "certification";
+  const visibility = typeof body.visibility === "string" && body.visibility ? body.visibility : "internal";
+  await logSupplierEvent({
+    tenant_id: tid, supplier_id: id,
+    event_type: isCert ? "certification_uploaded" : "media_uploaded",
+    event_category: "documents",
+    title: isCert
+      ? `Certification uploaded: ${meta.title ?? (meta.cert_type ? String(meta.cert_type).toUpperCase() : "Certificate")}`
+      : `Document uploaded: ${meta.title ?? docCategoryLabel(category)}`,
+    actor_id: auth.account_id ?? null, actor_name: actorName(auth),
+    source_module: "suppliers", visibility_tier: visibility,
+    related_entity_id: data?.id ?? null, related_entity_type: "supplier_media",
+    metadata: { category, cert_type: meta.cert_type ?? null },
+  });
 
   return NextResponse.json({ ok: true, id: data?.id ?? null });
 }

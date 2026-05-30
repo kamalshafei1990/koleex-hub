@@ -15,6 +15,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { buildMediaPatch, validateMediaPatch } from "@/lib/suppliers/media-fields";
+import { logSupplierEvent, actorName } from "@/lib/suppliers/timeline";
 
 type Params = { params: Promise<{ id: string; mediaId: string }> };
 
@@ -64,6 +65,26 @@ export async function PATCH(req: Request, ctx: Params) {
     .eq("id", mediaId).eq("tenant_id", tid).eq("supplier_id", id)
     .neq("media_class", "qr_code");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  if (body.verify === true) {
+    const { data: row } = await supabaseServer
+      .from("supplier_media")
+      .select("category, title, visibility").eq("id", mediaId).eq("tenant_id", tid).maybeSingle();
+    const isCert = row?.category === "certification";
+    await logSupplierEvent({
+      tenant_id: tid, supplier_id: id,
+      event_type: isCert ? "certification_verified" : "media_verified",
+      event_category: "documents",
+      title: isCert
+        ? `Certification verified: ${row?.title ?? "Certificate"}`
+        : `Document verified: ${row?.title ?? "Document"}`,
+      actor_id: auth.account_id ?? null, actor_name: actorName(auth),
+      source_module: "suppliers",
+      visibility_tier: typeof row?.visibility === "string" ? row.visibility : "internal",
+      importance: "high",
+      related_entity_id: mediaId, related_entity_type: "supplier_media",
+    });
+  }
 
   return NextResponse.json({ ok: true });
 }

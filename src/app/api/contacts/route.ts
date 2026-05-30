@@ -115,5 +115,22 @@ export async function POST(req: Request) {
       { status: 500 },
     );
   }
+
+  // Seed the supplier operational timeline at birth (unified history layer).
+  if (data && (data as { contact_type?: string }).contact_type === "supplier") {
+    try {
+      const { logSupplierEvent } = await import("@/lib/suppliers/timeline");
+      await logSupplierEvent({
+        tenant_id: auth.tenant_id,
+        supplier_id: (data as { id: string }).id,
+        event_type: "supplier_created", event_category: "relationship",
+        title: "Supplier created",
+        actor_id: auth.account_id ?? null,
+        actor_name: auth.username || auth.login_email || "System",
+        source_module: "suppliers", visibility_tier: "internal",
+      });
+    } catch { /* best-effort */ }
+  }
+
   return NextResponse.json({ contact: data });
 }

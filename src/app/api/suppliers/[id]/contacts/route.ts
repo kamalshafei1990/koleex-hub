@@ -15,6 +15,7 @@ import {
   buildContactPatch,
   validateContactPatch,
 } from "@/lib/suppliers/contact-fields";
+import { logSupplierEvent, actorName } from "@/lib/suppliers/timeline";
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth(req);
@@ -60,6 +61,17 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     .select("id")
     .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await logSupplierEvent({
+    tenant_id: tid, supplier_id: id,
+    event_type: "contact_added", event_category: "communication",
+    title: `Contact added: ${String(row.full_name)}`,
+    description: [row.position, row.role_category].filter(Boolean).map(String).join(" · ") || null,
+    actor_id: auth.account_id ?? null, actor_name: actorName(auth),
+    source_module: "suppliers",
+    visibility_tier: typeof row.visibility_tier === "string" ? row.visibility_tier : "internal",
+    related_entity_id: data?.id ?? null, related_entity_type: "supplier_contact_persons",
+  });
 
   return NextResponse.json({ ok: true, id: data?.id ?? null });
 }

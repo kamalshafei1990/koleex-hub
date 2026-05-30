@@ -11,6 +11,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { logSupplierEvent, actorName } from "@/lib/suppliers/timeline";
 
 const NUM_FIELDS = new Set([
   "employee_count", "qc_staff_count", "rd_staff_count", "production_lines",
@@ -100,6 +101,15 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
       { onConflict: "tenant_id,supplier_id" },
     );
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await logSupplierEvent({
+    tenant_id: tid, supplier_id: id,
+    event_type: "factory_updated", event_category: "factory",
+    title: "Factory profile updated",
+    actor_id: auth.account_id ?? null, actor_name: actorName(auth),
+    source_module: "suppliers", visibility_tier: "internal",
+    related_entity_type: "supplier_factory_profile",
+  });
 
   return NextResponse.json({ ok: true });
 }

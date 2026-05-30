@@ -1,0 +1,322 @@
+"use client";
+
+/* ---------------------------------------------------------------------------
+   TimelineSection — the unified Supplier Operational Timeline.
+
+   The living operational history / memory layer for the Supplier 360: a single
+   visibility-aware chronology of automatic events (status, classification,
+   contacts, QR, factory, documents, certification verification, readiness
+   milestones) plus manually logged operational events (meetings, visits,
+   calls, negotiation notes, issues, milestones).
+
+   Monochrome, intelligence-oriented vertical rhythm — not a social feed.
+   Category + search + visibility filtering. Manual composer with inline add /
+   remove and optimistic refresh.
+   --------------------------------------------------------------------------- */
+
+import { useMemo, useState } from "react";
+import { humanizeError } from "@/lib/ui/humanize-error";
+import {
+  TIMELINE_CATEGORY_LABELS, TIMELINE_CATEGORY_ORDER, timelineCategoryLabel,
+  eventTypeLabel, MANUAL_EVENT_TYPES, IMPORTANCE_LABELS,
+} from "@/lib/suppliers/intelligence";
+import HandshakeIcon from "@/components/icons/ui/HandshakeIcon";
+import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
+import FactoryIcon from "@/components/icons/ui/FactoryIcon";
+import FileBadge2Icon from "@/components/icons/ui/FileBadge2Icon";
+import ShoppingCartIcon from "@/components/icons/ui/ShoppingCartIcon";
+import GaugeIcon from "@/components/icons/ui/GaugeIcon";
+import HistoryIcon from "@/components/icons/ui/HistoryIcon";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
+
+type Row = Record<string, unknown>;
+const str = (r: Row, k: string): string => {
+  const v = r[k];
+  if (typeof v === "string") return v;
+  if (typeof v === "number") return String(v);
+  return "";
+};
+
+const VISIBILITY_TIERS = ["public", "internal", "procurement", "finance", "management"] as const;
+const VISIBILITY_LABELS: Record<string, string> = {
+  public: "Public", internal: "Internal", procurement: "Procurement",
+  finance: "Finance only", management: "Management only",
+};
+
+const CATEGORY_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
+  relationship: HandshakeIcon,
+  communication: MessageSquareIcon,
+  factory: FactoryIcon,
+  documents: FileBadge2Icon,
+  procurement: ShoppingCartIcon,
+  system: GaugeIcon,
+};
+
+function relativeTime(iso: string): string {
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return "";
+  const s = Math.round((Date.now() - t) / 1000);
+  if (s < 60) return "just now";
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.round(h / 24);
+  if (d < 30) return `${d}d ago`;
+  const mo = Math.round(d / 30);
+  if (mo < 12) return `${mo}mo ago`;
+  return `${Math.round(mo / 12)}y ago`;
+}
+function dayBucket(iso: string): string {
+  const d = new Date(iso); const now = new Date();
+  const dd = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const nn = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diff = Math.round((nn.getTime() - dd.getTime()) / 86400000);
+  if (diff === 0) return "Today";
+  if (diff === 1) return "Yesterday";
+  if (diff < 7) return `${diff} days ago`;
+  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <label className="block">
+    <span className="mb-1 block text-[11px] font-medium text-[var(--text-secondary)]">{label}</span>
+    {children}
+  </label>
+);
+const inputCls =
+  "w-full rounded-lg bg-[var(--bg-surface)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-faint)] outline-none focus:ring-1 focus:ring-[var(--border-subtle)]";
+
+const importanceDot: Record<string, string> = {
+  low: "bg-[var(--text-faint)]", normal: "bg-[var(--text-secondary)]",
+  high: "bg-amber-400", critical: "bg-rose-400",
+};
+
+export default function TimelineSection({
+  supplierId,
+  timeline,
+  onSaved,
+}: {
+  supplierId: string;
+  timeline: Row[];
+  onSaved: () => void | Promise<void>;
+}) {
+  const [cat, setCat] = useState<string>("all");
+  const [q, setQ] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  // composer
+  const [open, setOpen] = useState(false);
+  const [evType, setEvType] = useState(MANUAL_EVENT_TYPES[0].type);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [visibility, setVisibility] = useState("internal");
+  const [importance, setImportance] = useState("normal");
+  const [busy, setBusy] = useState(false);
+  const [cErr, setCErr] = useState<string | null>(null);
+
+  const filtered = useMemo(() => {
+    const ql = q.trim().toLowerCase();
+    return timeline.filter((e) => {
+      if (cat !== "all" && str(e, "event_category") !== cat) return false;
+      if (ql) {
+        const hay = `${str(e, "title")} ${str(e, "description")} ${str(e, "actor_name")} ${eventTypeLabel(str(e, "event_type"))}`.toLowerCase();
+        if (!hay.includes(ql)) return false;
+      }
+      return true;
+    });
+  }, [timeline, cat, q]);
+
+  const groups = useMemo(() => {
+    const by: { bucket: string; items: Row[] }[] = [];
+    for (const e of filtered) {
+      const b = dayBucket(str(e, "created_at"));
+      const last = by[by.length - 1];
+      if (last && last.bucket === b) last.items.push(e);
+      else by.push({ bucket: b, items: [e] });
+    }
+    return by;
+  }, [filtered]);
+
+  const counts = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const e of timeline) m[str(e, "event_category")] = (m[str(e, "event_category")] ?? 0) + 1;
+    return m;
+  }, [timeline]);
+
+  const save = async () => {
+    if (!title.trim()) { setCErr("Title is required"); return; }
+    setBusy(true); setCErr(null);
+    try {
+      const r = await fetch(`/api/suppliers/${supplierId}/timeline`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ event_type: evType, title, description, visibility_tier: visibility, importance }),
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
+      }
+      setOpen(false); setTitle(""); setDescription("");
+      await onSaved();
+    } catch (e) {
+      setCErr(e instanceof Error ? e.message : String(e));
+    } finally { setBusy(false); }
+  };
+
+  const remove = async (e: Row) => {
+    const id = str(e, "id");
+    if (!confirm("Remove this logged event?")) return;
+    setBusyId(id); setErr(null);
+    try {
+      const r = await fetch(`/api/suppliers/${supplierId}/timeline/${id}`, { method: "DELETE", credentials: "include" });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
+      }
+      await onSaved();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally { setBusyId(null); }
+  };
+
+  const openComposer = () => {
+    setEvType(MANUAL_EVENT_TYPES[0].type); setTitle(""); setDescription("");
+    setVisibility("internal"); setImportance("normal"); setCErr(null); setOpen(true);
+  };
+
+  return (
+    <section className="space-y-5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <HistoryIcon className="h-4 w-4 text-[var(--text-secondary)]" />
+          <h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">Operational Timeline</h3>
+        </div>
+        <button type="button" onClick={openComposer}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90">
+          <PlusIcon className="h-3.5 w-3.5" /> Log event
+        </button>
+      </div>
+
+      {/* filters */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap gap-1.5">
+          <button type="button" onClick={() => setCat("all")}
+            className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${cat === "all" ? "bg-[var(--text-primary)] text-[var(--bg-primary)]" : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>
+            All {timeline.length ? <span className="opacity-60">{timeline.length}</span> : null}
+          </button>
+          {TIMELINE_CATEGORY_ORDER.filter((c) => counts[c]).map((c) => (
+            <button key={c} type="button" onClick={() => setCat(c)}
+              className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${cat === c ? "bg-[var(--text-primary)] text-[var(--bg-primary)]" : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>
+              {TIMELINE_CATEGORY_LABELS[c]} <span className="opacity-60">{counts[c]}</span>
+            </button>
+          ))}
+        </div>
+        <div className="relative ml-auto">
+          <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-faint)]" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search timeline…"
+            className="w-48 rounded-lg bg-[var(--bg-surface-subtle)] py-1.5 pl-8 pr-3 text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-faint)] outline-none" />
+        </div>
+      </div>
+
+      {err ? <div className="text-[12px] text-rose-400">{err}</div> : null}
+
+      {timeline.length === 0 ? (
+        <div className="rounded-2xl bg-[var(--bg-surface-subtle)]/50 px-6 py-12 text-center text-sm text-[var(--text-faint)]">
+          No activity yet — operational events (status, contacts, documents, factory) appear here automatically, and you can log meetings, visits, and calls.
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-2xl bg-[var(--bg-surface-subtle)]/50 px-6 py-10 text-center text-sm text-[var(--text-faint)]">No events match this filter.</div>
+      ) : (
+        <div className="space-y-6">
+          {groups.map((g) => (
+            <div key={g.bucket} className="space-y-3">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-faint)]">{g.bucket}</div>
+              <ol className="relative space-y-3 border-l border-[var(--border-subtle)] pl-5">
+                {g.items.map((e) => {
+                  const id = str(e, "id");
+                  const Icon = CATEGORY_ICON[str(e, "event_category")] ?? GaugeIcon;
+                  const imp = str(e, "importance") || "normal";
+                  return (
+                    <li key={id} className="relative">
+                      {/* node */}
+                      <span className="absolute -left-[27px] top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--bg-surface)] ring-1 ring-[var(--border-subtle)]">
+                        <Icon className="h-3 w-3 text-[var(--text-secondary)]" />
+                      </span>
+                      <div className="rounded-xl bg-[var(--bg-surface-subtle)] p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {imp !== "normal" ? <span className={`h-1.5 w-1.5 rounded-full ${importanceDot[imp]}`} title={IMPORTANCE_LABELS[imp]} /> : null}
+                              <span className="text-[13px] font-semibold text-[var(--text-primary)]">{str(e, "title")}</span>
+                            </div>
+                            {str(e, "description") ? <div className="mt-0.5 text-[11px] leading-relaxed text-[var(--text-secondary)]">{str(e, "description")}</div> : null}
+                            <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[10px] text-[var(--text-faint)]">
+                              <span className="uppercase tracking-wide">{timelineCategoryLabel(str(e, "event_category"))}</span>
+                              <span>· {eventTypeLabel(str(e, "event_type"))}</span>
+                              {str(e, "actor_name") ? <span>· {str(e, "actor_name")}</span> : null}
+                              <span title={new Date(str(e, "created_at")).toLocaleString()}>· {relativeTime(str(e, "created_at"))}</span>
+                              {e.is_manual ? <span className="rounded bg-[var(--bg-surface)] px-1 py-0.5">Manual</span> : null}
+                              <span className="inline-flex items-center gap-0.5"><ShieldCheckIcon className="h-2.5 w-2.5" />{VISIBILITY_LABELS[str(e, "visibility_tier")] ?? "Internal"}</span>
+                            </div>
+                          </div>
+                          {e.is_manual ? (
+                            <button type="button" disabled={busyId === id} onClick={() => remove(e)}
+                              className="shrink-0 rounded-md p-1 text-[var(--text-faint)] hover:bg-[var(--bg-surface)] hover:text-rose-400 disabled:opacity-40" title="Remove"><TrashIcon className="h-3.5 w-3.5" /></button>
+                          ) : null}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* composer modal */}
+      {open ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !busy && setOpen(false)}>
+          <div className="w-full max-w-md space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(ev) => ev.stopPropagation()}>
+            <div className="flex items-center gap-2">
+              <HistoryIcon className="h-4 w-4 text-[var(--text-secondary)]" />
+              <span className="text-[14px] font-semibold text-[var(--text-primary)]">Log operational event</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Type">
+                <select className={inputCls} value={evType} onChange={(e) => setEvType(e.target.value)}>
+                  {MANUAL_EVENT_TYPES.map((t) => <option key={t.type} value={t.type}>{t.label}</option>)}
+                </select>
+              </Field>
+              <Field label="Importance">
+                <select className={inputCls} value={importance} onChange={(e) => setImportance(e.target.value)}>
+                  {Object.keys(IMPORTANCE_LABELS).map((k) => <option key={k} value={k}>{IMPORTANCE_LABELS[k]}</option>)}
+                </select>
+              </Field>
+            </div>
+            <Field label="Title"><input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Factory visit — Taizhou plant" /></Field>
+            <Field label="Details"><textarea className={`${inputCls} min-h-[72px]`} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What happened, outcomes, follow-ups…" /></Field>
+            <Field label="Visibility">
+              <select className={inputCls} value={visibility} onChange={(e) => setVisibility(e.target.value)}>
+                {VISIBILITY_TIERS.map((t) => <option key={t} value={t}>{VISIBILITY_LABELS[t]}</option>)}
+              </select>
+            </Field>
+            {cErr ? <div className="text-[12px] text-rose-400">{cErr}</div> : null}
+            <div className="flex items-center gap-3">
+              <button type="button" disabled={busy} onClick={save}
+                className="rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
+                {busy ? "Saving…" : "Log event"}
+              </button>
+              <button type="button" onClick={() => setOpen(false)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">Cancel</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}

@@ -162,6 +162,79 @@ export const LIFECYCLE_LABELS: Record<string, string> = {
 };
 export const lifecycleLabel = (v: string): string => LIFECYCLE_LABELS[v] ?? v;
 
+/* ── Timeline / Activity Intelligence ──
+   Unified operational history. event_category mirrors the
+   supplier_timeline_events CHECK; event_type is open but labelled here. */
+export const TIMELINE_CATEGORY_LABELS: Record<string, string> = {
+  relationship: "Relationship",
+  communication: "Communication",
+  factory: "Factory",
+  documents: "Documents",
+  procurement: "Procurement",
+  system: "System",
+};
+export const TIMELINE_CATEGORY_ORDER = [
+  "relationship", "communication", "factory", "documents", "procurement", "system",
+];
+export const timelineCategoryLabel = (v: string): string => TIMELINE_CATEGORY_LABELS[v] ?? v;
+
+export const EVENT_TYPE_LABELS: Record<string, string> = {
+  // relationship
+  supplier_created: "Supplier created",
+  status_changed: "Strategic status changed",
+  classification_added: "Classification added",
+  classification_removed: "Classification removed",
+  supplier_archived: "Supplier archived",
+  // communication
+  contact_added: "Contact added",
+  qr_added: "QR code added",
+  meeting: "Meeting logged",
+  call: "Call logged",
+  message: "Message logged",
+  supplier_visit: "Supplier visit",
+  // factory
+  factory_updated: "Factory profile updated",
+  factory_visit: "Factory visit",
+  audit_performed: "Audit performed",
+  // documents
+  media_uploaded: "Document uploaded",
+  certification_uploaded: "Certification uploaded",
+  media_verified: "Document verified",
+  certification_verified: "Certification verified",
+  document_expired: "Document expired",
+  // procurement
+  negotiation_note: "Negotiation note",
+  sample_requested: "Sample requested",
+  sample_approved: "Sample approved",
+  issue: "Issue logged",
+  quality_issue: "Quality issue",
+  // system
+  visibility_changed: "Visibility changed",
+  readiness_milestone: "Readiness milestone",
+  risk_changed: "Risk level changed",
+  milestone: "Milestone",
+};
+export const eventTypeLabel = (v: string): string => EVENT_TYPE_LABELS[v] ?? v;
+
+/* Manual operational event types the composer offers (category is derived). */
+export const MANUAL_EVENT_TYPES: { type: string; category: string; label: string }[] = [
+  { type: "meeting", category: "communication", label: "Meeting" },
+  { type: "call", category: "communication", label: "Call" },
+  { type: "message", category: "communication", label: "Message" },
+  { type: "supplier_visit", category: "communication", label: "Supplier visit" },
+  { type: "factory_visit", category: "factory", label: "Factory visit" },
+  { type: "audit_performed", category: "factory", label: "Audit performed" },
+  { type: "negotiation_note", category: "procurement", label: "Negotiation note" },
+  { type: "sample_requested", category: "procurement", label: "Sample requested" },
+  { type: "issue", category: "procurement", label: "Issue" },
+  { type: "milestone", category: "relationship", label: "Milestone" },
+];
+
+export const IMPORTANCE_LABELS: Record<string, string> = {
+  low: "Low", normal: "Normal", high: "High", critical: "Critical",
+};
+export const IMPORTANCE_ORDER = ["low", "normal", "high", "critical"];
+
 /* Categories whose assets are sensitive by nature → stored privately and
    served via signed URLs (never a public bucket). Visibility finance/management
    is also treated as sensitive regardless of category. */

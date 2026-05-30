@@ -11,7 +11,8 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
-import { CLASSIFICATION_LABELS } from "@/lib/suppliers/intelligence";
+import { CLASSIFICATION_LABELS, classificationLabel } from "@/lib/suppliers/intelligence";
+import { logSupplierEvent, actorName } from "@/lib/suppliers/timeline";
 
 const VALID = new Set(Object.keys(CLASSIFICATION_LABELS));
 
@@ -83,6 +84,15 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       .eq("tenant_id", auth.tenant_id);
   }
 
+  await logSupplierEvent({
+    tenant_id: auth.tenant_id, supplier_id: id,
+    event_type: "classification_added", event_category: "relationship",
+    title: `Classification added: ${classificationLabel(classification)}`,
+    actor_id: auth.account_id ?? null, actor_name: actorName(auth),
+    source_module: "suppliers", visibility_tier: "internal",
+    metadata: { classification, is_primary: !!body.is_primary },
+  });
+
   return NextResponse.json({ ok: true });
 }
 
@@ -102,5 +112,15 @@ export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }
     .eq("supplier_id", id)
     .eq("classification", classification);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await logSupplierEvent({
+    tenant_id: auth.tenant_id, supplier_id: id,
+    event_type: "classification_removed", event_category: "relationship",
+    title: `Classification removed: ${classificationLabel(classification)}`,
+    actor_id: auth.account_id ?? null, actor_name: actorName(auth),
+    source_module: "suppliers", visibility_tier: "internal",
+    importance: "low", metadata: { classification },
+  });
+
   return NextResponse.json({ ok: true });
 }
