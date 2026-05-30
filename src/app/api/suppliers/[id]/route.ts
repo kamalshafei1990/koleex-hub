@@ -61,7 +61,7 @@ export async function GET(
     return NextResponse.json({ error: "Supplier not found" }, { status: 404 });
   }
 
-  const [purchaseOrders, bills, payments, products, receipts, returns, classifications, contactPersons, media, statusHistory] = await Promise.all([
+  const [purchaseOrders, bills, payments, products, receipts, returns, classifications, contactPersons, media, statusHistory, factoryRows] = await Promise.all([
     safe(() =>
       supabaseServer
         .from("purchase_orders")
@@ -149,7 +149,17 @@ export async function GET(
         .order("changed_at", { ascending: false })
         .limit(20),
     ),
+    safe(() =>
+      supabaseServer
+        .from("supplier_factory_profile")
+        .select("*")
+        .eq("tenant_id", tid)
+        .eq("supplier_id", id)
+        .limit(1),
+    ),
   ]);
+
+  const factory = factoryRows[0] ?? null;
 
   const readiness = computeReadiness({
     supplier: supplier as Record<string, unknown>,
@@ -159,6 +169,7 @@ export async function GET(
     purchaseOrders: purchaseOrders.length,
     bills: bills.length,
     receipts: receipts.length,
+    factory,
   });
 
   return NextResponse.json(
@@ -174,6 +185,7 @@ export async function GET(
       contactPersons,
       media,
       statusHistory,
+      factory,
       readiness,
     },
     { headers: { "Cache-Control": "private, max-age=20, stale-while-revalidate=120" } },

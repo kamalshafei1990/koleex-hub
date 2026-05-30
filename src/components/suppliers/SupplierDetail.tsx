@@ -37,6 +37,7 @@ import {
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import Edit3Icon from "@/components/icons/ui/Edit3Icon";
+import FactorySection from "./FactorySection";
 
 type Row = Record<string, unknown>;
 interface Payload {
@@ -51,6 +52,7 @@ interface Payload {
   contactPersons: Row[];
   media: Row[];
   statusHistory: Row[];
+  factory: Row | null;
   readiness: { score: number; dimensions: { key: string; label: string; weight: number; met: number; total: number; fraction: number }[] };
 }
 
@@ -124,7 +126,7 @@ const StatusPill = ({ value }: { value: string }) =>
     <span className="text-[var(--text-faint)]">—</span>
   );
 
-type Tab = "overview" | "orders" | "bills" | "products" | "quality";
+type Tab = "overview" | "factory" | "orders" | "bills" | "products" | "quality";
 
 export default function SupplierDetail({ id }: { id: string }) {
   const router = useRouter();
@@ -339,6 +341,7 @@ export default function SupplierDetail({ id }: { id: string }) {
 
   const tabs: { key: Tab; label: string; count?: number }[] = [
     { key: "overview", label: "Overview" },
+    { key: "factory", label: "Factory" },
     { key: "orders", label: "Purchase Orders", count: data.purchaseOrders.length },
     { key: "bills", label: "Bills & Payments", count: data.bills.length + data.payments.length },
     { key: "products", label: "Products", count: data.products.length },
@@ -661,6 +664,15 @@ export default function SupplierDetail({ id }: { id: string }) {
               </div>
             ) : null}
           </section>
+        ) : null}
+
+        {tab === "factory" ? (
+          <FactorySection
+            supplierId={id}
+            supplier={s}
+            factory={data.factory}
+            onSaved={() => load({ silent: true })}
+          />
         ) : null}
 
         {tab === "orders" ? (

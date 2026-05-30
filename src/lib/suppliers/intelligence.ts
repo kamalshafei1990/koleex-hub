@@ -102,6 +102,16 @@ export const CLASSIFICATION_LABELS: Record<SupplierClassification, string> = {
 export const classificationLabel = (v: string): string =>
   CLASSIFICATION_LABELS[v as SupplierClassification] ?? v;
 
+/* ── Factory type vocabulary (mirrors supplier_factory_profile CHECK) ── */
+export const FACTORY_TYPE_LABELS: Record<string, string> = {
+  own_factory: "Own factory",
+  partner_factory: "Partner factory",
+  contract_manufacturer: "Contract manufacturer",
+  trading_only: "Trading (no factory)",
+  multiple: "Multiple factories",
+};
+export const factoryTypeLabel = (v: string): string => FACTORY_TYPE_LABELS[v] ?? v;
+
 /* ── Readiness / completeness score (computed, never stored stale) ──
    Eight weighted dimensions summing to 100. Each scores the share of its
    checks met × weight; per-dimension fraction is returned so the UI can
@@ -116,6 +126,8 @@ export interface ReadinessContext {
   purchaseOrders: number;
   bills: number;
   receipts: number;
+  /** 1:1 supplier_factory_profile row (raw), if present */
+  factory?: Record<string, unknown> | null;
 }
 
 export interface ReadinessDimension {
@@ -142,6 +154,8 @@ const filled = (v: unknown): boolean => {
 export function computeReadiness(ctx: ReadinessContext): Readiness {
   const s = ctx.supplier;
   const g = (...keys: string[]) => keys.some((k) => filled(s[k]));
+  const f = ctx.factory ?? {};
+  const fg = (...keys: string[]) => keys.some((k) => filled(f[k]));
 
   const dims: Array<Omit<ReadinessDimension, "fraction">> = [
     {
@@ -172,11 +186,14 @@ export function computeReadiness(ctx: ReadinessContext): Readiness {
       key: "factory",
       label: "Factory",
       weight: 12,
-      total: 3,
+      total: 6,
       met:
-        Number(g("employee_count_range")) +
-        Number(g("annual_revenue_range")) +
-        Number(g("factory_visit_date")),
+        Number(g("employee_count_range") || fg("employee_count")) +
+        Number(g("annual_revenue_range") || fg("annual_output")) +
+        Number(g("factory_visit_date")) +
+        Number(fg("factory_type")) +
+        Number(fg("production_lines") || fg("monthly_capacity")) +
+        Number(fg("factory_size_sqm") || fg("main_export_markets") || fg("production_categories")),
     },
     {
       key: "certifications",
