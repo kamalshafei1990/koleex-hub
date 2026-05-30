@@ -27,6 +27,12 @@ import ReceiptIcon from "@/components/icons/ui/ReceiptIcon";
 import WalletIcon from "@/components/icons/ui/WalletIcon";
 import FileCheckIcon from "@/components/icons/ui/FileCheckIcon";
 import ShipIcon from "@/components/icons/ui/ShipIcon";
+import {
+  STRATEGIC_STATUS_LABELS,
+  strategicStatusTone,
+  classificationLabel,
+  type StrategicStatus,
+} from "@/lib/suppliers/intelligence";
 
 type Row = Record<string, unknown>;
 interface Payload {
@@ -37,6 +43,11 @@ interface Payload {
   products: Row[];
   receipts: Row[];
   returns: Row[];
+  classifications: Row[];
+  contactPersons: Row[];
+  media: Row[];
+  statusHistory: Row[];
+  readiness: { score: number; dimensions: { key: string; label: string; weight: number; met: number; total: number; fraction: number }[] };
 }
 
 /* ── defensive getters (the API returns raw rows of unknown shape) ── */
@@ -303,6 +314,21 @@ export default function SupplierDetail({ id }: { id: string }) {
                   {str(s, "country")}
                 </span>
               ) : null}
+              {str(s, "strategic_status") ? (() => {
+                const ss = str(s, "strategic_status");
+                const tone = strategicStatusTone(ss);
+                const cls =
+                  tone === "positive"
+                    ? "bg-[var(--text-primary)] text-[var(--bg-primary)]"
+                    : tone === "danger"
+                      ? "bg-rose-500/10 text-rose-300"
+                      : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]";
+                return (
+                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${cls}`}>
+                    {STRATEGIC_STATUS_LABELS[ss as StrategicStatus] ?? ss}
+                  </span>
+                );
+              })() : null}
               <span
                 className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
                   isActive ? "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]" : "bg-rose-500/10 text-rose-300"
@@ -311,6 +337,25 @@ export default function SupplierDetail({ id }: { id: string }) {
                 {isActive ? "Active" : "Archived"}
               </span>
             </div>
+            {data.classifications.length > 0 ? (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {data.classifications
+                  .slice()
+                  .sort((a, b) => Number(b.is_primary) - Number(a.is_primary))
+                  .map((c, i) => (
+                    <span
+                      key={`${str(c, "classification")}-${i}`}
+                      className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                        c.is_primary
+                          ? "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)]"
+                          : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]"
+                      }`}
+                    >
+                      {classificationLabel(str(c, "classification"))}
+                    </span>
+                  ))}
+              </div>
+            ) : null}
           </div>
         </section>
 
@@ -341,6 +386,35 @@ export default function SupplierDetail({ id }: { id: string }) {
             </div>
           ))}
         </section>
+
+        {/* ── Readiness score (computed completeness) ── */}
+        {data.readiness ? (
+          <section className="rounded-2xl bg-[var(--bg-surface-subtle)] p-6">
+            <div className="flex items-center justify-between gap-4">
+              <SectionHead eyebrow="Onboarding" title="Supplier readiness" />
+              <div className="flex items-baseline gap-1">
+                <span className="text-3xl font-semibold tracking-[-0.02em] text-[var(--text-primary)]">{data.readiness.score}</span>
+                <span className="text-sm font-medium text-[var(--text-faint)]">%</span>
+              </div>
+            </div>
+            <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
+              <div className="h-full rounded-full bg-[var(--text-primary)]" style={{ width: `${Math.max(2, data.readiness.score)}%` }} />
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
+              {data.readiness.dimensions.map((d) => (
+                <div key={d.key}>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-[11px] font-medium text-[var(--text-secondary)]">{d.label}</span>
+                    <span className="text-[11px] tabular-nums text-[var(--text-faint)]">{d.met}/{d.total}</span>
+                  </div>
+                  <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
+                    <div className="h-full rounded-full bg-[var(--text-secondary)]" style={{ width: `${Math.round(d.fraction * 100)}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         {/* ── Performance scorecard ── */}
         <section className="space-y-4">

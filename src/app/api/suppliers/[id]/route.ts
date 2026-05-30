@@ -18,6 +18,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { computeReadiness } from "@/lib/suppliers/intelligence";
 
 type Row = Record<string, unknown>;
 
@@ -60,7 +61,7 @@ export async function GET(
     return NextResponse.json({ error: "Supplier not found" }, { status: 404 });
   }
 
-  const [purchaseOrders, bills, payments, products, receipts, returns] = await Promise.all([
+  const [purchaseOrders, bills, payments, products, receipts, returns, classifications, contactPersons, media, statusHistory] = await Promise.all([
     safe(() =>
       supabaseServer
         .from("purchase_orders")
@@ -110,10 +111,71 @@ export async function GET(
         .eq("supplier_id", id)
         .limit(200),
     ),
+    // ── Supplier Intelligence (contacts-keyed) ──
+    safe(() =>
+      supabaseServer
+        .from("supplier_classifications")
+        .select("classification, is_primary")
+        .eq("tenant_id", tid)
+        .eq("supplier_id", id)
+        .limit(50),
+    ),
+    safe(() =>
+      supabaseServer
+        .from("supplier_contact_persons")
+        .select("id, full_name, role, role_category, is_primary, is_decision_maker, email, mobile, wechat_id, whatsapp")
+        .eq("tenant_id", tid)
+        .eq("supplier_id", id)
+        .eq("is_active", true)
+        .limit(100),
+    ),
+    // Governed media — public/internal/procurement only (never finance/management here)
+    safe(() =>
+      supabaseServer
+        .from("supplier_media")
+        .select("id, media_class, category, title, file_url, preview_url, visibility, expiry_date, lifecycle_status, is_primary")
+        .eq("tenant_id", tid)
+        .eq("supplier_id", id)
+        .is("deleted_at", null)
+        .in("visibility", ["public", "internal", "procurement"])
+        .limit(200),
+    ),
+    safe(() =>
+      supabaseServer
+        .from("supplier_status_history")
+        .select("from_status, to_status, changed_at")
+        .eq("tenant_id", tid)
+        .eq("supplier_id", id)
+        .order("changed_at", { ascending: false })
+        .limit(20),
+    ),
   ]);
 
+  const readiness = computeReadiness({
+    supplier: supplier as Record<string, unknown>,
+    classifications: classifications.length,
+    contactPersons: contactPersons.length,
+    media: media.length,
+    purchaseOrders: purchaseOrders.length,
+    bills: bills.length,
+    receipts: receipts.length,
+  });
+
   return NextResponse.json(
-    { supplier, purchaseOrders, bills, payments, products, receipts, returns },
+    {
+      supplier,
+      purchaseOrders,
+      bills,
+      payments,
+      products,
+      receipts,
+      returns,
+      classifications,
+      contactPersons,
+      media,
+      statusHistory,
+      readiness,
+    },
     { headers: { "Cache-Control": "private, max-age=20, stale-while-revalidate=120" } },
   );
 }
