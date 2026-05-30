@@ -60,7 +60,7 @@ export async function GET(
     return NextResponse.json({ error: "Supplier not found" }, { status: 404 });
   }
 
-  const [purchaseOrders, bills, payments, products] = await Promise.all([
+  const [purchaseOrders, bills, payments, products, receipts, returns] = await Promise.all([
     safe(() =>
       supabaseServer
         .from("purchase_orders")
@@ -94,10 +94,26 @@ export async function GET(
         .eq("supplier_id", id)
         .limit(200),
     ),
+    safe(() =>
+      supabaseServer
+        .from("purchase_receipts")
+        .select("*")
+        .eq("tenant_id", tid)
+        .eq("supplier_id", id)
+        .limit(200),
+    ),
+    safe(() =>
+      supabaseServer
+        .from("returns")
+        .select("*")
+        .eq("tenant_id", tid)
+        .eq("supplier_id", id)
+        .limit(200),
+    ),
   ]);
 
   return NextResponse.json(
-    { supplier, purchaseOrders, bills, payments, products },
+    { supplier, purchaseOrders, bills, payments, products, receipts, returns },
     { headers: { "Cache-Control": "private, max-age=20, stale-while-revalidate=120" } },
   );
 }

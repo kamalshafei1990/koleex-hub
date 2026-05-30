@@ -35,6 +35,8 @@ interface Payload {
   bills: Row[];
   payments: Row[];
   products: Row[];
+  receipts: Row[];
+  returns: Row[];
 }
 
 /* ── defensive getters (the API returns raw rows of unknown shape) ── */
@@ -163,6 +165,59 @@ export default function SupplierDetail({ id }: { id: string }) {
     };
   }, [data]);
 
+  /* ── Performance scorecard ──
+     On-time % (receipt date vs PO promised date), average lead time
+     (receipt vs order date), and return/defect rate. Computed from the
+     fault-tolerant receipts/returns datasets; any metric without a basis
+     shows "—". */
+  const scorecard = useMemo(() => {
+    const pos = data?.purchaseOrders ?? [];
+    const receipts = data?.receipts ?? [];
+    const rets = data?.returns ?? [];
+    const poById = new Map<string, Row>();
+    for (const p of pos) {
+      const pid = str(p, "id");
+      if (pid) poById.set(pid, p);
+    }
+    const dayDiff = (later: string, earlier: string): number | null => {
+      const a = new Date(later).getTime();
+      const b = new Date(earlier).getTime();
+      if (Number.isNaN(a) || Number.isNaN(b)) return null;
+      return Math.round((a - b) / 86_400_000);
+    };
+    let onTime = 0;
+    let withPromise = 0;
+    const leads: number[] = [];
+    for (const r of receipts) {
+      const rec = str(r, "received_at", "receipt_date", "created_at");
+      const po = poById.get(str(r, "po_id"));
+      if (!rec || !po) continue;
+      const promised = str(po, "delivery_date", "eta", "expected_date");
+      if (promised) {
+        withPromise++;
+        const slack = dayDiff(promised, rec);
+        if (slack !== null && slack >= 0) onTime++;
+      }
+      const ordered = str(po, "order_date", "created_at");
+      if (ordered) {
+        const l = dayDiff(rec, ordered);
+        if (l !== null && l >= 0) leads.push(l);
+      }
+    }
+    const basis = receipts.length || pos.length;
+    const defects = rets.filter((r) =>
+      /(defect|quality|damage|faulty|broken|wrong)/i.test(str(r, "reason_code", "reason", "reason_notes")),
+    ).length;
+    return {
+      onTimePct: withPromise ? Math.round((onTime / withPromise) * 100) : null,
+      avgLeadDays: leads.length ? Math.round(leads.reduce((a, b) => a + b, 0) / leads.length) : null,
+      returns: rets.length,
+      returnRate: basis ? Math.round((rets.length / basis) * 100) : null,
+      defects,
+      hasHistory: basis > 0 || rets.length > 0,
+    };
+  }, [data]);
+
   if (loading) {
     return (
       <div className="mx-auto w-full max-w-6xl px-4 md:px-8 py-10">
@@ -285,6 +340,37 @@ export default function SupplierDetail({ id }: { id: string }) {
               <div className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--text-faint)]">{k.label}</div>
             </div>
           ))}
+        </section>
+
+        {/* ── Performance scorecard ── */}
+        <section className="space-y-4">
+          <SectionHead eyebrow="Track record" title="Performance scorecard" />
+          {!scorecard.hasHistory ? (
+            <EmptyTab label="No purchasing history yet — on-time, lead-time, and return metrics appear once POs and receipts are recorded." />
+          ) : (
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              {[
+                { label: "On-time delivery", value: scorecard.onTimePct === null ? "—" : `${scorecard.onTimePct}%`, meter: scorecard.onTimePct },
+                { label: "Avg lead time", value: scorecard.avgLeadDays === null ? "—" : `${scorecard.avgLeadDays}`, unit: "days" },
+                { label: "Returns", value: String(scorecard.returns), sub: scorecard.defects ? `${scorecard.defects} quality` : undefined },
+                { label: "Return rate", value: scorecard.returnRate === null ? "—" : `${scorecard.returnRate}%` },
+              ].map((k) => (
+                <div key={k.label} className="rounded-2xl bg-[var(--bg-surface-subtle)] p-5">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-xl md:text-2xl font-semibold tracking-tight text-[var(--text-primary)]">{k.value}</span>
+                    {"unit" in k && k.unit ? <span className="text-xs font-medium text-[var(--text-faint)]">{k.unit}</span> : null}
+                  </div>
+                  {"meter" in k && typeof k.meter === "number" ? (
+                    <div className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
+                      <div className="h-full rounded-full bg-[var(--text-primary)]" style={{ width: `${Math.max(4, Math.min(100, k.meter))}%` }} />
+                    </div>
+                  ) : null}
+                  <div className="mt-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--text-faint)]">{k.label}</div>
+                  {"sub" in k && k.sub ? <div className="mt-0.5 text-[11px] text-[var(--text-faint)]">{k.sub}</div> : null}
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* ── Tabs ── */}
