@@ -16,7 +16,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 type Supplier = {
   id: string;
-  display_name: string | null; full_name: string | null; company_name: string | null;
+  display_name: string | null; full_name: string | null; company_name: string | null; company_name_en: string | null;
   country: string | null; supplier_type: string | null;
   preferred_payment_method: string | null;
   rating: number | null;
@@ -35,7 +35,7 @@ export default function SuppliersModule({ t }: PurchaseModuleProps) {
       const [c, p] = await Promise.all([
         supabase
           .from("contacts")
-          .select("id,display_name,full_name,company_name,country,supplier_type,preferred_payment_method,rating,is_active,certifications")
+          .select("id,display_name,full_name,company_name,company_name_en,country,supplier_type,preferred_payment_method,rating,is_active,certifications")
           .not("supplier_type", "is", null)
           .order("updated_at", { ascending: false, nullsFirst: false })
           .limit(50),
@@ -61,7 +61,7 @@ export default function SuppliersModule({ t }: PurchaseModuleProps) {
     const sa = spendBySupplier[a.id] || 0;
     const sb = spendBySupplier[b.id] || 0;
     if (sb !== sa) return sb - sa;
-    return (a.company_name || a.full_name || a.display_name || "").localeCompare(b.company_name || b.full_name || b.display_name || "");
+    return (a.company_name || a.company_name_en || a.full_name || a.display_name || "").localeCompare(b.company_name || b.company_name_en || b.full_name || b.display_name || "");
   });
 
   return (
@@ -80,7 +80,7 @@ export default function SuppliersModule({ t }: PurchaseModuleProps) {
         <div className={`${cardCls} divide-y divide-[var(--border-subtle)] overflow-hidden`}>
           {sorted.map((s, i) => {
             const spend = spendBySupplier[s.id] || 0;
-            const display = s.company_name || s.full_name || s.display_name || "—";
+            const display = s.company_name || s.company_name_en || s.full_name || s.display_name || "—";
             const subtitle = [s.country, s.supplier_type, s.preferred_payment_method].filter(Boolean).join(" · ") || "—";
             const rating = Number(s.rating) || 0;
             return (

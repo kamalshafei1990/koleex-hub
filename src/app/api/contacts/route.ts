@@ -81,7 +81,26 @@ export async function POST(req: Request) {
   const deny = await requireModuleAccess(auth, moduleForType(submittedType));
   if (deny) return deny;
 
-  const row = { ...body, tenant_id: auth.tenant_id };
+  /* ── Canonical name derivation (data boundary) ──
+     Create surfaces disagree on which name field they send: the simple
+     /create/supplier form sends company_name + display_name, while the
+     admin modal sends only company_name_en / company_name_cn. Downstream
+     views resolve display_name > full_name > company_name, so a
+     modal-created supplier rendered BLANK. Guarantee every row carries a
+     usable display_name (and backfill company_name from the _en/_cn
+     variant) so no contact/supplier can render nameless regardless of the
+     form that created it. Never overwrites a value the caller provided. */
+  const pick = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+  const companyName =
+    pick(body.company_name) ?? pick(body.company_name_en) ?? pick(body.company_name_cn);
+  const personName =
+    [pick(body.first_name), pick(body.last_name)].filter(Boolean).join(" ") || null;
+  const displayName =
+    pick(body.display_name) ?? companyName ?? pick(body.full_name) ?? personName;
+
+  const row: Record<string, unknown> = { ...body, tenant_id: auth.tenant_id };
+  if (displayName) row.display_name = displayName;
+  if (companyName && !pick(body.company_name)) row.company_name = companyName;
 
   const { data, error } = await supabaseServer
     .from("contacts")
