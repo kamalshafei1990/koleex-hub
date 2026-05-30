@@ -179,3 +179,110 @@ export async function GET(
     { headers: { "Cache-Control": "private, max-age=20, stale-while-revalidate=120" } },
   );
 }
+
+/* ---------------------------------------------------------------------------
+   PATCH /api/suppliers/[id] — edit supplier intelligence (scalar fields).
+
+   Whitelisted, tenant-scoped, Suppliers-module gated. Writes only the
+   intelligence/commercial scalars that live on the contacts row. Changing
+   strategic_status stamps strategic_status_since and appends an immutable
+   supplier_status_history row (operational audit trail). Sensitive
+   management-tier reasons are accepted but never returned to public surfaces.
+   --------------------------------------------------------------------------- */
+
+const PATCHABLE_FIELDS = new Set<string>([
+  "strategic_status",
+  "strategic_status_reason",
+  "blacklist_reason",
+  "supports_oem_branding",
+  "supports_packaging_customization",
+  "supports_spare_parts",
+  "supports_samples",
+  "sample_turnaround_days",
+  "wecom_support_available",
+  "wechat_sales_group_available",
+  "wechat_official_account",
+  // commercial scalars (reused existing contacts columns)
+  "payment_terms",
+  "currency",
+  "moq",
+  "lead_time",
+  "incoterms",
+]);
+
+const STRATEGIC_STATUSES = new Set([
+  "strategic", "preferred", "approved", "trial", "inactive", "blocked", "blacklisted",
+]);
+
+export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const deny = await requireModuleAccess(auth, "Suppliers");
+  if (deny) return deny;
+
+  const { id } = await ctx.params;
+  const tid = auth.tenant_id;
+
+  let body: Record<string, unknown>;
+  try {
+    body = (await req.json()) as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+  }
+
+  // Build a whitelisted patch.
+  const patch: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(body)) {
+    if (PATCHABLE_FIELDS.has(k)) patch[k] = v === "" ? null : v;
+  }
+  if (Object.keys(patch).length === 0) {
+    return NextResponse.json({ error: "No editable fields supplied" }, { status: 400 });
+  }
+  if (
+    typeof patch.strategic_status === "string" &&
+    patch.strategic_status &&
+    !STRATEGIC_STATUSES.has(patch.strategic_status)
+  ) {
+    return NextResponse.json({ error: "Invalid strategic_status" }, { status: 400 });
+  }
+
+  // Load current supplier (tenant + supplier scoped) for status-change detection.
+  const { data: current, error: curErr } = await supabaseServer
+    .from("contacts")
+    .select("id, strategic_status")
+    .eq("id", id)
+    .eq("tenant_id", tid)
+    .eq("contact_type", "supplier")
+    .maybeSingle();
+  if (curErr) return NextResponse.json({ error: "Failed to load supplier" }, { status: 500 });
+  if (!current) return NextResponse.json({ error: "Supplier not found" }, { status: 404 });
+
+  const statusChanged =
+    "strategic_status" in patch && patch.strategic_status !== (current as Row).strategic_status;
+  if (statusChanged) patch.strategic_status_since = new Date().toISOString();
+
+  const { error: updErr } = await supabaseServer
+    .from("contacts")
+    .update(patch)
+    .eq("id", id)
+    .eq("tenant_id", tid);
+  if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
+
+  // Append an immutable status-history event on transition.
+  if (statusChanged && typeof patch.strategic_status === "string" && patch.strategic_status) {
+    try {
+      await supabaseServer.from("supplier_status_history").insert({
+        tenant_id: tid,
+        supplier_id: id,
+        from_status: (current as Row).strategic_status ?? null,
+        to_status: patch.strategic_status,
+        reason: typeof patch.strategic_status_reason === "string" ? patch.strategic_status_reason : null,
+        changed_by: auth.account_id ?? null,
+      });
+    } catch {
+      /* history is best-effort; the status update already succeeded */
+    }
+  }
+
+  return NextResponse.json({ ok: true });
+}

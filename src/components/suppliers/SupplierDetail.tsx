@@ -11,7 +11,7 @@
    desktop + mobile parity.
    --------------------------------------------------------------------------- */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { humanizeError } from "@/lib/ui/humanize-error";
@@ -31,8 +31,12 @@ import {
   STRATEGIC_STATUS_LABELS,
   strategicStatusTone,
   classificationLabel,
+  CLASSIFICATION_LABELS,
   type StrategicStatus,
 } from "@/lib/suppliers/intelligence";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
+import Edit3Icon from "@/components/icons/ui/Edit3Icon";
 
 type Row = Record<string, unknown>;
 interface Payload {
@@ -129,26 +133,98 @@ export default function SupplierDetail({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("overview");
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
+  const load = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!opts?.silent) setLoading(true);
       setError(null);
       try {
         const r = await fetch(`/api/suppliers/${id}`, { credentials: "include" });
         const j = await r.json();
         if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
-        if (!cancelled) setData(j as Payload);
+        setData(j as Payload);
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+        if (!opts?.silent) setError(e instanceof Error ? e.message : String(e));
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!opts?.silent) setLoading(false);
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
+    },
+    [id],
+  );
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  /* ── inline edit state (Phase 2 operational layer) ── */
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [statusDraft, setStatusDraft] = useState("");
+  const [statusReason, setStatusReason] = useState("");
+  const [savingStatus, setSavingStatus] = useState(false);
+  const [classOpen, setClassOpen] = useState(false);
+  const [busyClass, setBusyClass] = useState<string | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  const patchSupplier = useCallback(
+    async (body: Record<string, unknown>) => {
+      setEditError(null);
+      const r = await fetch(`/api/suppliers/${id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
+      }
+    },
+    [id],
+  );
+
+  const saveStatus = useCallback(async () => {
+    setSavingStatus(true);
+    try {
+      await patchSupplier({
+        strategic_status: statusDraft || null,
+        strategic_status_reason: statusReason || null,
+      });
+      setStatusOpen(false);
+      setStatusReason("");
+      await load({ silent: true });
+    } catch (e) {
+      setEditError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSavingStatus(false);
+    }
+  }, [patchSupplier, statusDraft, statusReason, load]);
+
+  const mutateClassification = useCallback(
+    async (classification: string, action: "add" | "remove") => {
+      setBusyClass(classification);
+      setEditError(null);
+      try {
+        const r = await fetch(
+          `/api/suppliers/${id}/classifications${action === "remove" ? `?classification=${encodeURIComponent(classification)}` : ""}`,
+          {
+            method: action === "remove" ? "DELETE" : "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: action === "add" ? JSON.stringify({ classification }) : undefined,
+          },
+        );
+        if (!r.ok) {
+          const j = await r.json().catch(() => ({}));
+          throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
+        }
+        await load({ silent: true });
+      } catch (e) {
+        setEditError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setBusyClass(null);
+      }
+    },
+    [id, load],
+  );
 
   const s = data?.supplier ?? {};
   const name = str(s, "company_name_en", "company_name", "display_name", "full_name") || "Supplier";
@@ -314,21 +390,28 @@ export default function SupplierDetail({ id }: { id: string }) {
                   {str(s, "country")}
                 </span>
               ) : null}
-              {str(s, "strategic_status") ? (() => {
+              {/* Strategic status — editable pill */}
+              {(() => {
                 const ss = str(s, "strategic_status");
                 const tone = strategicStatusTone(ss);
-                const cls =
-                  tone === "positive"
+                const cls = ss
+                  ? tone === "positive"
                     ? "bg-[var(--text-primary)] text-[var(--bg-primary)]"
                     : tone === "danger"
                       ? "bg-rose-500/10 text-rose-300"
-                      : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]";
+                      : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]"
+                  : "bg-[var(--bg-surface-subtle)] text-[var(--text-faint)] hover:text-[var(--text-secondary)]";
                 return (
-                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${cls}`}>
-                    {STRATEGIC_STATUS_LABELS[ss as StrategicStatus] ?? ss}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => { setStatusDraft(ss); setStatusReason(""); setStatusOpen((o) => !o); }}
+                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold transition-colors ${cls}`}
+                  >
+                    {ss ? (STRATEGIC_STATUS_LABELS[ss as StrategicStatus] ?? ss) : "Set status"}
+                    <Edit3Icon className="h-3 w-3 opacity-70" />
+                  </button>
                 );
-              })() : null}
+              })()}
               <span
                 className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
                   isActive ? "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]" : "bg-rose-500/10 text-rose-300"
@@ -337,25 +420,110 @@ export default function SupplierDetail({ id }: { id: string }) {
                 {isActive ? "Active" : "Archived"}
               </span>
             </div>
-            {data.classifications.length > 0 ? (
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {data.classifications
-                  .slice()
-                  .sort((a, b) => Number(b.is_primary) - Number(a.is_primary))
-                  .map((c, i) => (
+
+            {/* Strategic status editor */}
+            {statusOpen ? (
+              <div className="mt-3 max-w-md space-y-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
+                <div className="flex flex-wrap gap-1.5">
+                  {(Object.keys(STRATEGIC_STATUS_LABELS) as StrategicStatus[]).map((k) => (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => setStatusDraft(k)}
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                        statusDraft === k
+                          ? "bg-[var(--text-primary)] text-[var(--bg-primary)]"
+                          : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                      }`}
+                    >
+                      {STRATEGIC_STATUS_LABELS[k]}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  value={statusReason}
+                  onChange={(e) => setStatusReason(e.target.value)}
+                  placeholder="Reason / internal note (optional)"
+                  className="w-full rounded-lg bg-[var(--bg-surface-subtle)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-faint)] outline-none"
+                />
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    disabled={savingStatus}
+                    onClick={saveStatus}
+                    className="rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50"
+                  >
+                    {savingStatus ? "Saving…" : "Save status"}
+                  </button>
+                  <button type="button" onClick={() => setStatusOpen(false)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Classifications — editable chips */}
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              {data.classifications
+                .slice()
+                .sort((a, b) => Number(b.is_primary) - Number(a.is_primary))
+                .map((c, i) => {
+                  const val = str(c, "classification");
+                  return (
                     <span
-                      key={`${str(c, "classification")}-${i}`}
-                      className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                      key={`${val}-${i}`}
+                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${
                         c.is_primary
                           ? "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)]"
                           : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]"
                       }`}
                     >
-                      {classificationLabel(str(c, "classification"))}
+                      {classificationLabel(val)}
+                      <button
+                        type="button"
+                        disabled={busyClass === val}
+                        onClick={() => mutateClassification(val, "remove")}
+                        className="text-[var(--text-faint)] hover:text-rose-400 disabled:opacity-40"
+                        aria-label="Remove classification"
+                      >
+                        <CrossIcon className="h-3 w-3" />
+                      </button>
                     </span>
-                  ))}
+                  );
+                })}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setClassOpen((o) => !o)}
+                  className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-surface-subtle)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-faint)] hover:text-[var(--text-primary)]"
+                >
+                  <PlusIcon className="h-3 w-3" /> Classification
+                </button>
+                {classOpen ? (
+                  <div className="absolute z-10 mt-1 max-h-64 w-56 overflow-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-1.5 shadow-lg">
+                    {(Object.keys(CLASSIFICATION_LABELS) as (keyof typeof CLASSIFICATION_LABELS)[])
+                      .filter((k) => !data.classifications.some((c) => str(c, "classification") === k))
+                      .map((k) => (
+                        <button
+                          key={k}
+                          type="button"
+                          disabled={busyClass === k}
+                          onClick={async () => { await mutateClassification(k, "add"); setClassOpen(false); }}
+                          className="block w-full rounded-lg px-2.5 py-1.5 text-left text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] disabled:opacity-50"
+                        >
+                          {CLASSIFICATION_LABELS[k]}
+                        </button>
+                      ))}
+                    {(Object.keys(CLASSIFICATION_LABELS) as string[]).filter(
+                      (k) => !data.classifications.some((c) => str(c, "classification") === k),
+                    ).length === 0 ? (
+                      <div className="px-2.5 py-2 text-[11px] text-[var(--text-faint)]">All classifications added</div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
-            ) : null}
+            </div>
+            {editError ? <div className="mt-2 text-[11px] text-rose-400">{editError}</div> : null}
           </div>
         </section>
 
