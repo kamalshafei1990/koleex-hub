@@ -86,7 +86,7 @@ export default function SuppliersModule({ t }: PurchaseModuleProps) {
             return (
               <Link
                 key={s.id}
-                href={`/contacts?selected=${s.id}`}
+                href={`/suppliers/${s.id}`}
                 className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-[var(--bg-surface)] transition-colors"
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
