@@ -41,7 +41,9 @@ export default function CreateSupplier() {
       const r = await fetch("/api/contacts", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          company_name: name.trim(), display_name: name.trim(),
+          // entity_type is NOT NULL on contacts; a supplier is a company.
+          entity_type: "company",
+          company_name: name.trim(), company_name_en: name.trim(), display_name: name.trim(),
           email: email || null, phone: phone || null,
           country: country || null, notes: notes || null,
           contact_type: "supplier", is_active: true,
@@ -50,7 +52,11 @@ export default function CreateSupplier() {
       const j = await r.json();
       if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
       const id = j.contact?.id ?? j.id;
-      router.push(id ? `/contacts/${id}` : "/suppliers");
+      // Land on the Supplier 360 (Supplier Intelligence Platform) so the
+      // operator can immediately enrich Factory, Contacts, QR, Strategic
+      // Status, Classification, and watch Readiness build — not the legacy
+      // contact card.
+      router.push(id ? `/suppliers/${id}` : "/suppliers");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally { setBusy(false); }
@@ -69,9 +75,9 @@ export default function CreateSupplier() {
       side={
         <SmartHelpCard
           title="What is this?"
-          meaning="A unique vendor you buy goods or services from. Used in POs, bills, payments, and AP."
+          meaning="A unique vendor you buy goods or services from. Used in POs, bills, payments, and AP — and the hub of its Supplier Intelligence 360."
           required={["Company name"]}
-          nextStep="Create a purchase order or attach a bill."
+          nextStep="Save, then enrich Factory, Contacts & WeChat QR on the supplier 360 — Readiness builds as you go."
         />
       }
     >
