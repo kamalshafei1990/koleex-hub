@@ -2125,6 +2125,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const [view, setView] = useState<ViewMode>("list");
   const [typeTab, setTypeTab] = useState<ContactType | "all">(filterType || "all");
   const [search, setSearch] = useState("");
+  /* Active/Archived status filter — surfaced only in the supplier view. */
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "archived">("all");
   const [form, setForm] = useState<ContactForm>({ ...EMPTY_FORM });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -2196,6 +2198,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     let list = contacts;
     const tab = filterType || typeTab;
     if (tab !== "all") list = list.filter(c => c.contact_type === tab);
+    if (statusFilter !== "all") {
+      const wantActive = statusFilter === "active";
+      list = list.filter(c => ((c.is_active ?? true) !== false) === wantActive);
+    }
     if (debouncedSearch.trim()) {
       const q = debouncedSearch.toLowerCase();
       const isShort = q.length <= 2;
@@ -2237,7 +2243,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       });
     }
     return list.sort((a, b) => contactSortKey(a).localeCompare(contactSortKey(b)));
-  }, [contacts, typeTab, filterType, debouncedSearch]);
+  }, [contacts, typeTab, filterType, debouncedSearch, statusFilter]);
 
   const grouped = useMemo(() => {
     const map: Record<string, ContactRow[]> = {};
@@ -2678,6 +2684,29 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </button>
           )}
         </div>
+
+        {/* Active / Archived filter — suppliers only */}
+        {filterType === "supplier" && (
+          <div className="flex gap-1 mt-3">
+            {([
+              { k: "all", label: "All" },
+              { k: "active", label: "Active" },
+              { k: "archived", label: "Archived" },
+            ] as const).map(opt => (
+              <button
+                key={opt.k}
+                onClick={() => setStatusFilter(opt.k)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  statusFilter === opt.k
+                    ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]"
+                    : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Type tabs */}
         {!filterType && (
