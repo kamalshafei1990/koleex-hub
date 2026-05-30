@@ -18,7 +18,8 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
-import { computeReadiness, resolveCallerTier, visibleTiers } from "@/lib/suppliers/intelligence";
+import { computeReadiness, resolveCallerTier, visibleTiers, certIsTrusted } from "@/lib/suppliers/intelligence";
+import { PRIVATE_BUCKETS } from "@/lib/server/storage-tenant";
 
 type Row = Record<string, unknown>;
 
@@ -143,17 +144,24 @@ export async function GET(
         .order("is_primary", { ascending: false })
         .limit(100),
     ),
-    // Governed media (documents/photos) — tier-aware; QR codes excluded here.
+    // Governed media (documents/photos/certifications) — tier-aware; QR excluded.
     safe(() =>
       supabaseServer
         .from("supplier_media")
-        .select("id, media_class, category, title, file_url, preview_url, visibility, expiry_date, lifecycle_status, is_primary")
+        .select(
+          "id, media_class, category, title, description, file_url, preview_url, " +
+          "storage_bucket, storage_path, file_name, mime_type, file_size, file_ext, " +
+          "visibility, lifecycle_status, is_primary, is_downloadable, language, doc_number, " +
+          "issuer, issued_date, expiry_date, cert_type, markets_covered, " +
+          "verified_at, verified_by, contact_id, product_id, tags, created_at, uploaded_by",
+        )
         .eq("tenant_id", tid)
         .eq("supplier_id", id)
         .is("deleted_at", null)
         .neq("media_class", "qr_code")
         .in("visibility", tiers)
-        .limit(200),
+        .order("created_at", { ascending: false })
+        .limit(300),
     ),
     // Communication QR codes — governed media, tier-aware, may link a contact.
     safe(() =>
@@ -196,6 +204,54 @@ export async function GET(
   const contactsWithChannel = contactPersons.filter(hasChannel).length;
   const contactsWithPreferences = contactPersons.filter(hasPrefs).length;
 
+  // ── Sensitive assets in private buckets get short-lived signed URLs so
+  //    governance never depends on frontend filtering alone. Public-bucket
+  //    assets keep their direct file_url. (Best-effort: a failed mint leaves
+  //    the row without a usable URL rather than leaking it.)
+  const privateRows = media.filter(
+    (m) => typeof m.storage_bucket === "string" && PRIVATE_BUCKETS.has(m.storage_bucket) && typeof m.storage_path === "string",
+  );
+  if (privateRows.length) {
+    const byBucket = new Map<string, Row[]>();
+    for (const m of privateRows) {
+      const b = m.storage_bucket as string;
+      (byBucket.get(b) ?? byBucket.set(b, []).get(b)!).push(m);
+    }
+    await Promise.all(
+      [...byBucket.entries()].map(async ([bucket, rows]) => {
+        try {
+          const paths = rows.map((r) => r.storage_path as string);
+          const { data } = await supabaseServer.storage.from(bucket).createSignedUrls(paths, 3600);
+          const signed = new Map((data ?? []).map((d) => [d.path, d.signedUrl]));
+          for (const r of rows) {
+            const u = signed.get(r.storage_path as string) ?? null;
+            r.file_url = u;
+            r.preview_url = u;
+          }
+        } catch {
+          for (const r of rows) { r.file_url = null; r.preview_url = null; }
+        }
+      }),
+    );
+  }
+
+  // ── Evidence-asset readiness signals ──
+  const today = new Date().toISOString().slice(0, 10);
+  const FACTORY_CATS = new Set([
+    "factory_photo", "factory_video", "production_line", "qc_photo",
+    "warehouse_photo", "showroom_photo", "production_video",
+  ]);
+  const PROC_DOC_CATS = new Set(["audit_report", "inspection_report", "sample_report"]);
+  const certRows = media.filter((m) => m.category === "certification");
+  const certsActive = certRows.filter((m) => certIsTrusted(m, today)).length;
+  const certsExpired = certRows.filter(
+    (m) => typeof m.expiry_date === "string" && (m.expiry_date as string) < today,
+  ).length;
+  const factoryMediaCount = media.filter((m) => FACTORY_CATS.has(String(m.category))).length;
+  const docsVerified = media.filter(
+    (m) => PROC_DOC_CATS.has(String(m.category)) && !!m.verified_at,
+  ).length;
+
   const readiness = computeReadiness({
     supplier: supplier as Record<string, unknown>,
     classifications: classifications.length,
@@ -208,6 +264,10 @@ export async function GET(
     contactsWithChannel,
     contactsWithPreferences,
     qrCodes: qrCodes.length,
+    certsActive,
+    certsExpired,
+    factoryMediaCount,
+    docsVerified,
   });
 
   return NextResponse.json(

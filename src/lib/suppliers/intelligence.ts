@@ -109,6 +109,85 @@ export const QR_CATEGORY_ORDER: string[] = [
 ];
 export const qrCategoryLabel = (v: string): string => QR_CATEGORY_LABELS[v] ?? v;
 
+/* ── Media & Documents evidence taxonomy (mirrors supplier_media.category) ──
+   Grouped for the Media tab. QR categories live with the Contacts tranche;
+   here we cover certifications, commercial, factory, legal, procurement. */
+export const DOC_CATEGORY_LABELS: Record<string, string> = {
+  // certifications
+  certification: "Certification",
+  // commercial
+  product_catalog: "Catalog", quotation: "Quotation", price_list: "Price list",
+  brochure: "Brochure", presentation: "Presentation",
+  // factory
+  factory_photo: "Factory photo", factory_video: "Factory video",
+  production_line: "Production line", qc_photo: "QC photo",
+  warehouse_photo: "Warehouse photo", showroom_photo: "Showroom photo",
+  production_video: "Production video",
+  // legal
+  nda: "NDA", contract: "Contract", license: "License",
+  business_license: "Business license", registration: "Registration",
+  compliance_doc: "Compliance document",
+  // procurement
+  sample_report: "Sample report", audit_report: "Audit report",
+  inspection_report: "Inspection report", packing_standard: "Packing standard",
+  // misc
+  product_photo: "Product photo", product_video: "Product video",
+  team_photo: "Team photo", company_logo: "Company logo",
+  business_card: "Business card", other: "Other",
+};
+export const docCategoryLabel = (v: string): string => DOC_CATEGORY_LABELS[v] ?? v;
+
+/* Ordered groups for the Media tab (certifications shown first as evidence). */
+export const DOC_CATEGORY_GROUPS: { key: string; label: string; categories: string[] }[] = [
+  { key: "certifications", label: "Certifications", categories: ["certification"] },
+  { key: "commercial", label: "Commercial", categories: ["product_catalog", "quotation", "price_list", "brochure", "presentation"] },
+  { key: "factory", label: "Factory", categories: ["factory_photo", "factory_video", "production_line", "qc_photo", "warehouse_photo", "showroom_photo", "production_video"] },
+  { key: "legal", label: "Legal", categories: ["nda", "contract", "license", "business_license", "registration", "compliance_doc"] },
+  { key: "procurement", label: "Procurement", categories: ["sample_report", "audit_report", "inspection_report", "packing_standard"] },
+  { key: "other", label: "Other", categories: ["product_photo", "product_video", "team_photo", "company_logo", "business_card", "other"] },
+];
+
+/* Certification types (stored in supplier_media.cert_type). */
+export const CERT_TYPE_LABELS: Record<string, string> = {
+  iso: "ISO", ce: "CE", rohs: "RoHS", bsci: "BSCI", sedex: "SEDEX",
+  fda: "FDA", gots: "GOTS", reach: "REACH", other: "Other",
+};
+export const CERT_TYPE_ORDER = ["iso", "ce", "rohs", "bsci", "sedex", "fda", "gots", "reach", "other"];
+export const certTypeLabel = (v: string): string => CERT_TYPE_LABELS[v] ?? v;
+
+/* Lifecycle status labels (mirrors supplier_media.lifecycle_status CHECK). */
+export const LIFECYCLE_LABELS: Record<string, string> = {
+  active: "Active", expired: "Expired", superseded: "Superseded",
+  revoked: "Revoked", archived: "Archived", pending_review: "Pending review",
+};
+export const lifecycleLabel = (v: string): string => LIFECYCLE_LABELS[v] ?? v;
+
+/* Categories whose assets are sensitive by nature → stored privately and
+   served via signed URLs (never a public bucket). Visibility finance/management
+   is also treated as sensitive regardless of category. */
+export const SENSITIVE_CATEGORIES = new Set<string>([
+  "contract", "nda", "audit_report", "inspection_report",
+  "business_license", "license", "registration", "compliance_doc",
+]);
+
+/** True when a media asset must use the private (signed-URL) storage path. */
+export function isSensitiveAsset(category: string, visibility: string): boolean {
+  if (visibility === "finance" || visibility === "management") return true;
+  return SENSITIVE_CATEGORIES.has(category);
+}
+
+/** A certification is "trusted" when it's verified, active, and not past expiry. */
+export function certIsTrusted(row: {
+  lifecycle_status?: string | null;
+  verified_at?: string | null;
+  expiry_date?: string | null;
+}, today: string): boolean {
+  if (row.lifecycle_status && row.lifecycle_status !== "active") return false;
+  if (!row.verified_at) return false;
+  if (row.expiry_date && row.expiry_date < today) return false;
+  return true;
+}
+
 /* ── Strategic lifecycle ── */
 export type StrategicStatus =
   | "strategic"
@@ -213,6 +292,15 @@ export interface ReadinessContext {
   contactsWithPreferences?: number;
   /** governed QR codes registered for this supplier (any visibility). */
   qrCodes?: number;
+  /* ── Evidence assets (Media + Documents tranche) ── */
+  /** verified, active, non-expired certification documents. */
+  certsActive?: number;
+  /** certification documents past their expiry date (downgrades trust). */
+  certsExpired?: number;
+  /** factory-evidence media (photos/videos of plant, lines, QC, warehouse). */
+  factoryMediaCount?: number;
+  /** verified procurement evidence (audit / inspection / sample reports). */
+  docsVerified?: number;
 }
 
 export interface ReadinessDimension {
@@ -284,8 +372,12 @@ export function computeReadiness(ctx: ReadinessContext): Readiness {
       key: "certifications",
       label: "Certifications",
       weight: 13,
-      total: 2,
-      met: Number(g("certifications")) + Number(g("sample_status")),
+      total: 3,
+      met:
+        Number(g("certifications") || (ctx.certsActive ?? 0) > 0) +
+        Number(g("sample_status")) +
+        // verified, non-expired certification evidence (not just a claim)
+        Number((ctx.certsActive ?? 0) > 0),
     },
     {
       key: "contacts",
@@ -306,8 +398,11 @@ export function computeReadiness(ctx: ReadinessContext): Readiness {
       key: "media",
       label: "Media",
       weight: 10,
-      total: 2,
-      met: Number(g("photo_url")) + Number(ctx.media > 0),
+      total: 3,
+      met:
+        Number(g("photo_url")) +
+        Number(ctx.media > 0) +
+        Number((ctx.factoryMediaCount ?? 0) > 0),
     },
     {
       key: "legal",
@@ -323,11 +418,13 @@ export function computeReadiness(ctx: ReadinessContext): Readiness {
       key: "operational",
       label: "Operational",
       weight: 10,
-      total: 3,
+      total: 4,
       met:
         Number(ctx.purchaseOrders > 0) +
         Number(ctx.receipts > 0) +
-        Number(ctx.bills > 0),
+        Number(ctx.bills > 0) +
+        // verified operational evidence (audit / inspection / sample report)
+        Number((ctx.docsVerified ?? 0) > 0),
     },
   ];
 
