@@ -83,6 +83,8 @@ export default function SuppliersModule({ t }: PurchaseModuleProps) {
             const display = s.company_name || s.company_name_en || s.full_name || s.display_name || "—";
             const subtitle = [s.country, s.supplier_type, s.preferred_payment_method].filter(Boolean).join(" · ") || "—";
             const rating = Number(s.rating) || 0;
+            const certCount = Array.isArray(s.certifications) ? s.certifications.length : 0;
+            const inactive = s.is_active === false;
             return (
               <Link
                 key={s.id}
@@ -101,8 +103,16 @@ export default function SuppliersModule({ t }: PurchaseModuleProps) {
                           ★ {rating}
                         </span>
                       )}
+                      {inactive && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-300 shrink-0">
+                          Inactive
+                        </span>
+                      )}
                     </div>
-                    <p className="text-[11px] text-[var(--text-dim)] truncate">{subtitle}</p>
+                    <p className="text-[11px] text-[var(--text-dim)] truncate">
+                      {subtitle}
+                      {certCount > 0 ? ` · ${certCount} cert${certCount > 1 ? "s" : ""}` : ""}
+                    </p>
                   </div>
                 </div>
                 <span className="text-[13px] tabular-nums font-semibold text-[var(--text-primary)] shrink-0">
