@@ -32,6 +32,83 @@ export function canSee(callerTier: VisibilityTier, fieldTier: VisibilityTier): b
   return VISIBILITY_ORDER.indexOf(callerTier) >= VISIBILITY_ORDER.indexOf(fieldTier);
 }
 
+/** Resolve the visibility tier a server caller is entitled to, from their
+ *  auth flags. Super admins (and break-glass `can_view_private` roles) get
+ *  full management-tier visibility; everyone else with Suppliers access is
+ *  treated as procurement. This is the gate used to project communication
+ *  intelligence (contacts + QR) so finance/management-tier records never
+ *  reach lower tiers. Conservative by design. */
+export function resolveCallerTier(auth: {
+  is_super_admin?: boolean;
+  can_view_private?: boolean;
+}): VisibilityTier {
+  if (auth.is_super_admin) return "management";
+  if (auth.can_view_private) return "finance";
+  return "procurement";
+}
+
+/** Tiers at or below `callerTier` — the set safe to query/return. */
+export function visibleTiers(callerTier: VisibilityTier): VisibilityTier[] {
+  const max = VISIBILITY_ORDER.indexOf(callerTier);
+  return VISIBILITY_ORDER.filter((_, i) => i <= max);
+}
+
+/* ── Contact-person role hierarchy (mirrors the supplier_contact_persons
+   .role_category CHECK exactly — do not add values without a migration).
+   Finer titles (e.g. "Sales Manager" vs "Sales Representative", "Export
+   Manager") live in the free-text role/position fields. */
+export const ROLE_CATEGORY_LABELS: Record<string, string> = {
+  boss: "Boss",
+  owner: "Owner",
+  management: "Management",
+  sales: "Sales",
+  support: "Technical Support",
+  qc: "QC",
+  engineering: "Engineering",
+  logistics: "Logistics",
+  finance: "Finance",
+  other: "Other",
+};
+export const ROLE_CATEGORY_ORDER: string[] = [
+  "boss", "owner", "management", "sales", "support",
+  "engineering", "qc", "logistics", "finance", "other",
+];
+export const roleCategoryLabel = (v: string): string => ROLE_CATEGORY_LABELS[v] ?? v;
+
+/* contact reliability rating (mirrors supplier_contact_persons.reliability CHECK) */
+export const RELIABILITY_LABELS: Record<string, string> = {
+  high: "High", medium: "Medium", low: "Low", unknown: "Unknown",
+};
+
+/* ── Preferred communication channels ── */
+export const CHANNEL_LABELS: Record<string, string> = {
+  wechat: "WeChat",
+  wecom: "WeCom",
+  whatsapp: "WhatsApp",
+  telegram: "Telegram",
+  email: "Email",
+  mobile: "Phone / Mobile",
+  line: "LINE",
+  skype: "Skype",
+};
+export const channelLabel = (v: string): string => CHANNEL_LABELS[v] ?? v;
+
+/* ── QR / communication-media categories (supplier_media.category for QR) ── */
+export const QR_CATEGORY_LABELS: Record<string, string> = {
+  sales: "Sales",
+  support: "Technical Support",
+  finance: "Finance",
+  boss: "Boss",
+  logistics: "Logistics",
+  group: "Group",
+  showroom: "Showroom",
+  factory: "Factory",
+};
+export const QR_CATEGORY_ORDER: string[] = [
+  "sales", "support", "boss", "finance", "logistics", "group", "showroom", "factory",
+];
+export const qrCategoryLabel = (v: string): string => QR_CATEGORY_LABELS[v] ?? v;
+
 /* ── Strategic lifecycle ── */
 export type StrategicStatus =
   | "strategic"
@@ -128,6 +205,14 @@ export interface ReadinessContext {
   receipts: number;
   /** 1:1 supplier_factory_profile row (raw), if present */
   factory?: Record<string, unknown> | null;
+  /* ── Communication intelligence (Contacts + QR tranche) ── */
+  /** contact persons that carry at least one messaging channel
+   *  (wechat / wecom / whatsapp / telegram / mobile). */
+  contactsWithChannel?: number;
+  /** contact persons with preferred channel and/or language filled. */
+  contactsWithPreferences?: number;
+  /** governed QR codes registered for this supplier (any visibility). */
+  qrCodes?: number;
 }
 
 export interface ReadinessDimension {
@@ -206,11 +291,16 @@ export function computeReadiness(ctx: ReadinessContext): Readiness {
       key: "contacts",
       label: "Contacts",
       weight: 10,
-      total: 3,
+      total: 5,
       met:
         Number(g("supplier_email", "email")) +
         Number(g("supplier_tel", "supplier_mobile", "phone")) +
-        Number(g("contact_persons") || ctx.contactPersons > 0),
+        Number(g("contact_persons") || ctx.contactPersons > 0) +
+        Number((ctx.contactsWithChannel ?? 0) > 0) +
+        Number(
+          (ctx.qrCodes ?? 0) > 0 ||
+          (ctx.contactsWithPreferences ?? 0) > 0,
+        ),
     },
     {
       key: "media",

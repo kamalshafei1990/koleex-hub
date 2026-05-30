@@ -18,7 +18,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
-import { computeReadiness } from "@/lib/suppliers/intelligence";
+import { computeReadiness, resolveCallerTier, visibleTiers } from "@/lib/suppliers/intelligence";
 
 type Row = Record<string, unknown>;
 
@@ -46,6 +46,12 @@ export async function GET(
   const { id } = await ctx.params;
   const tid = auth.tenant_id;
 
+  // Communication intelligence (contacts + QR) is visibility-gated by the
+  // caller's resolved tier. Finance/management-tier records never reach
+  // lower-tier callers.
+  const callerTier = resolveCallerTier(auth);
+  const tiers = visibleTiers(callerTier);
+
   const { data: supplier, error: supErr } = await supabaseServer
     .from("contacts")
     .select("*")
@@ -61,7 +67,7 @@ export async function GET(
     return NextResponse.json({ error: "Supplier not found" }, { status: 404 });
   }
 
-  const [purchaseOrders, bills, payments, products, receipts, returns, classifications, contactPersons, media, statusHistory, factoryRows] = await Promise.all([
+  const [purchaseOrders, bills, payments, products, receipts, returns, classifications, contactPersons, media, qrCodes, statusHistory, factoryRows] = await Promise.all([
     safe(() =>
       supabaseServer
         .from("purchase_orders")
@@ -123,13 +129,21 @@ export async function GET(
     safe(() =>
       supabaseServer
         .from("supplier_contact_persons")
-        .select("id, full_name, role, role_category, is_primary, is_decision_maker, email, mobile, wechat_id, whatsapp")
+        .select(
+          "id, full_name, name_cn, role, role_category, department, position, is_primary, is_decision_maker, " +
+          "email, mobile, whatsapp, telegram, wechat_id, wecom_id, line_id, skype_id, " +
+          "preferred_channel, preferred_language, timezone, available_hours, " +
+          "reliability, reliability_score, response_speed, avg_response_hours, " +
+          "last_interaction_at, notes, visibility_tier",
+        )
         .eq("tenant_id", tid)
         .eq("supplier_id", id)
         .eq("is_active", true)
+        .in("visibility_tier", tiers)
+        .order("is_primary", { ascending: false })
         .limit(100),
     ),
-    // Governed media — public/internal/procurement only (never finance/management here)
+    // Governed media (documents/photos) — tier-aware; QR codes excluded here.
     safe(() =>
       supabaseServer
         .from("supplier_media")
@@ -137,8 +151,22 @@ export async function GET(
         .eq("tenant_id", tid)
         .eq("supplier_id", id)
         .is("deleted_at", null)
-        .in("visibility", ["public", "internal", "procurement"])
+        .neq("media_class", "qr_code")
+        .in("visibility", tiers)
         .limit(200),
+    ),
+    // Communication QR codes — governed media, tier-aware, may link a contact.
+    safe(() =>
+      supabaseServer
+        .from("supplier_media")
+        .select("id, category, title, description, file_url, preview_url, visibility, contact_id, is_downloadable, created_at, uploaded_by")
+        .eq("tenant_id", tid)
+        .eq("supplier_id", id)
+        .eq("media_class", "qr_code")
+        .is("deleted_at", null)
+        .in("visibility", tiers)
+        .order("created_at", { ascending: false })
+        .limit(100),
     ),
     safe(() =>
       supabaseServer
@@ -161,6 +189,13 @@ export async function GET(
 
   const factory = factoryRows[0] ?? null;
 
+  // Communication-intelligence completeness signals (drive the Contacts dim).
+  const hasChannel = (c: Row) =>
+    !!(c.wechat_id || c.wecom_id || c.whatsapp || c.telegram || c.mobile);
+  const hasPrefs = (c: Row) => !!(c.preferred_channel || c.preferred_language);
+  const contactsWithChannel = contactPersons.filter(hasChannel).length;
+  const contactsWithPreferences = contactPersons.filter(hasPrefs).length;
+
   const readiness = computeReadiness({
     supplier: supplier as Record<string, unknown>,
     classifications: classifications.length,
@@ -170,6 +205,9 @@ export async function GET(
     bills: bills.length,
     receipts: receipts.length,
     factory,
+    contactsWithChannel,
+    contactsWithPreferences,
+    qrCodes: qrCodes.length,
   });
 
   return NextResponse.json(
@@ -184,8 +222,10 @@ export async function GET(
       classifications,
       contactPersons,
       media,
+      qrCodes,
       statusHistory,
       factory,
+      callerTier,
       readiness,
     },
     { headers: { "Cache-Control": "private, max-age=20, stale-while-revalidate=120" } },
