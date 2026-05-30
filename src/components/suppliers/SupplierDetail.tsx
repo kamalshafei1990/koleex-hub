@@ -41,6 +41,8 @@ import FactorySection from "./FactorySection";
 import ContactsSection from "./ContactsSection";
 import MediaSection from "./MediaSection";
 import TimelineSection from "./TimelineSection";
+import RiskSection from "./RiskSection";
+import NegotiationSection from "./NegotiationSection";
 
 type Row = Record<string, unknown>;
 interface Payload {
@@ -58,6 +60,11 @@ interface Payload {
   statusHistory: Row[];
   timeline: Row[];
   factory: Row | null;
+  riskProfile: Row | null;
+  riskItems: Row[];
+  negotiations: Row[];
+  negotiationIntel: Row | null;
+  risk: { level: string | null; score: number | null; trustLevel: string | null; openItems: number; openHighRisks: number } | null;
   readiness: { score: number; dimensions: { key: string; label: string; weight: number; met: number; total: number; fraction: number }[] };
 }
 
@@ -131,7 +138,7 @@ const StatusPill = ({ value }: { value: string }) =>
     <span className="text-[var(--text-faint)]">—</span>
   );
 
-type Tab = "overview" | "factory" | "contacts" | "media" | "timeline" | "orders" | "bills" | "products" | "quality";
+type Tab = "overview" | "factory" | "contacts" | "media" | "timeline" | "risk" | "negotiation" | "orders" | "bills" | "products" | "quality";
 
 export default function SupplierDetail({ id }: { id: string }) {
   const router = useRouter();
@@ -350,6 +357,8 @@ export default function SupplierDetail({ id }: { id: string }) {
     { key: "contacts", label: "Contacts", count: data.contactPersons.length },
     { key: "media", label: "Documents", count: data.media.length },
     { key: "timeline", label: "Timeline", count: (data.timeline ?? []).length },
+    { key: "risk", label: "Risk", count: (data.riskItems ?? []).filter((r) => r.status !== "resolved").length },
+    { key: "negotiation", label: "Negotiation", count: (data.negotiations ?? []).length },
     { key: "orders", label: "Purchase Orders", count: data.purchaseOrders.length },
     { key: "bills", label: "Bills & Payments", count: data.bills.length + data.payments.length },
     { key: "products", label: "Products", count: data.products.length },
@@ -704,6 +713,25 @@ export default function SupplierDetail({ id }: { id: string }) {
           <TimelineSection
             supplierId={id}
             timeline={data.timeline ?? []}
+            onSaved={() => load({ silent: true })}
+          />
+        ) : null}
+
+        {tab === "risk" ? (
+          <RiskSection
+            supplierId={id}
+            riskProfile={data.riskProfile ?? null}
+            riskItems={data.riskItems ?? []}
+            risk={data.risk ?? null}
+            onSaved={() => load({ silent: true })}
+          />
+        ) : null}
+
+        {tab === "negotiation" ? (
+          <NegotiationSection
+            supplierId={id}
+            negotiations={data.negotiations ?? []}
+            negotiationIntel={data.negotiationIntel ?? null}
             onSaved={() => load({ silent: true })}
           />
         ) : null}

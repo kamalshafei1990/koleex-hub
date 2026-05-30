@@ -69,7 +69,8 @@ export async function GET(
     return NextResponse.json({ error: "Supplier not found" }, { status: 404 });
   }
 
-  const [purchaseOrders, bills, payments, products, receipts, returns, classifications, contactPersons, media, qrCodes, statusHistory, factoryRows, timeline] = await Promise.all([
+  const profileGated = callerTier === "public" || callerTier === "internal";
+  const [purchaseOrders, bills, payments, products, receipts, returns, classifications, contactPersons, media, qrCodes, statusHistory, factoryRows, timeline, riskProfileRows, riskItems, negotiations, negotiationIntelRows] = await Promise.all([
     safe(() =>
       supabaseServer
         .from("purchase_orders")
@@ -205,9 +206,41 @@ export async function GET(
         .order("created_at", { ascending: false })
         .limit(200),
     ),
+    // ── Risk / Negotiation Intelligence (most sensitive; RLS + tier-gated) ──
+    // The 1:1 scorecards (Foundation tables) are procurement+ only.
+    profileGated ? Promise.resolve([] as Row[]) : safe(() =>
+      supabaseServer.from("supplier_risk_profile").select("*")
+        .eq("tenant_id", tid).eq("supplier_id", id).limit(1)),
+    safe(() =>
+      supabaseServer.from("supplier_risk_items")
+        .select("id, dimension, severity, status, title, description, mitigation, visibility_tier, raised_by, resolved_at, created_at")
+        .eq("tenant_id", tid).eq("supplier_id", id)
+        .in("visibility_tier", tiers)
+        .order("created_at", { ascending: false }).limit(200)),
+    safe(() =>
+      supabaseServer.from("supplier_negotiation_rounds")
+        .select("id, round_no, topic, outcome, price_concession, moq_concession, payment_terms_concession, discount_pct, exclusivity_discussed, territory_discussed, leverage_notes, red_flags, behavior_notes, visibility_tier, occurred_on, created_by, created_at")
+        .eq("tenant_id", tid).eq("supplier_id", id)
+        .in("visibility_tier", tiers)
+        .order("created_at", { ascending: false }).limit(100)),
+    profileGated ? Promise.resolve([] as Row[]) : safe(() =>
+      supabaseServer.from("supplier_negotiation_intel").select("*")
+        .eq("tenant_id", tid).eq("supplier_id", id).limit(1)),
   ]);
 
   const factory = factoryRows[0] ?? null;
+  const riskProfile = riskProfileRows[0] ?? null;
+  const negotiationIntel = negotiationIntelRows[0] ?? null;
+  const openHighRisks = riskItems.filter(
+    (r) => r.resolved_at == null && r.status !== "resolved" && (r.severity === "high" || r.severity === "critical"),
+  ).length;
+  const risk = {
+    level: riskProfile && typeof riskProfile.risk_level === "string" ? riskProfile.risk_level : null,
+    score: riskProfile && typeof riskProfile.internal_evaluation_score === "number" ? riskProfile.internal_evaluation_score : null,
+    trustLevel: riskProfile && typeof riskProfile.trust_level === "string" ? riskProfile.trust_level : null,
+    openItems: riskItems.filter((r) => r.status !== "resolved").length,
+    openHighRisks,
+  };
 
   // Communication-intelligence completeness signals (drive the Contacts dim).
   const hasChannel = (c: Row) =>
@@ -317,6 +350,11 @@ export async function GET(
       statusHistory,
       factory,
       timeline,
+      riskProfile,
+      riskItems,
+      negotiations,
+      negotiationIntel,
+      risk,
       callerTier,
       readiness,
     },

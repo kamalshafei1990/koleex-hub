@@ -235,6 +235,73 @@ export const IMPORTANCE_LABELS: Record<string, string> = {
 };
 export const IMPORTANCE_ORDER = ["low", "normal", "high", "critical"];
 
+/* ── Risk / Negotiation Intelligence ──
+   Built on the Phase-1 Foundation scorecards: supplier_risk_profile (level-
+   based qualitative scoring + internal_evaluation_score) and
+   supplier_negotiation_intel (flexibility levels + negotiation_score + AI
+   summary). Risk *items* (supplier_risk_items) are an additive active-risk
+   register keyed by dimension. */
+
+/* risk_level / dependency_level CHECK on supplier_risk_profile */
+export const RISK_LEVEL_LABELS: Record<string, string> = {
+  low: "Low", medium: "Medium", high: "High", critical: "Critical",
+};
+export const RISK_LEVEL_ORDER = ["low", "medium", "high", "critical"];
+export function riskLevelTone(v: string | null | undefined): "low" | "moderate" | "elevated" | "high" | "none" {
+  switch (v) { case "low": return "low"; case "medium": return "moderate"; case "high": return "elevated"; case "critical": return "high"; default: return "none"; }
+}
+
+/* Qualitative level for stability / quality / flexibility fields (higher = better). */
+export const QUALITY_LEVELS = ["low", "medium", "high"] as const;
+export const QUALITY_LEVEL_LABELS: Record<string, string> = { low: "Low", medium: "Medium", high: "High" };
+
+/* supplier_risk_profile level-scored fields (higher = healthier). */
+export const RISK_PROFILE_FIELDS: { col: string; label: string }[] = [
+  { col: "financial_stability", label: "Financial stability" },
+  { col: "delivery_stability", label: "Delivery stability" },
+  { col: "quality_stability", label: "Quality stability" },
+  { col: "communication_quality", label: "Communication quality" },
+  { col: "response_speed", label: "Response speed" },
+  { col: "negotiation_flexibility", label: "Negotiation flexibility" },
+];
+
+/* supplier_negotiation_intel level-scored fields. */
+export const NEGOTIATION_INTEL_FIELDS: { col: string; label: string }[] = [
+  { col: "price_flexibility", label: "Price flexibility" },
+  { col: "moq_flexibility", label: "MOQ flexibility" },
+  { col: "payment_flexibility", label: "Payment flexibility" },
+  { col: "communication_flexibility", label: "Communication" },
+  { col: "customization_openness", label: "Customization" },
+  { col: "exclusivity_openness", label: "Exclusivity openness" },
+  { col: "negotiation_difficulty", label: "Negotiation difficulty" },
+  { col: "sample_turnaround_speed", label: "Sample turnaround" },
+];
+
+/* ── Active risk register (supplier_risk_items) vocab ── */
+export const RISK_DIMENSIONS = ["financial", "operational", "strategic", "geographic", "relationship"] as const;
+export const RISK_DIMENSION_LABELS: Record<string, string> = {
+  financial: "Financial", operational: "Operational", strategic: "Strategic",
+  geographic: "Geographic", relationship: "Relationship",
+};
+export const riskDimensionLabel = (v: string): string => RISK_DIMENSION_LABELS[v] ?? v;
+export const SEVERITY_LABELS: Record<string, string> = { low: "Low", medium: "Medium", high: "High", critical: "Critical" };
+export const SEVERITY_ORDER = ["low", "medium", "high", "critical"];
+export const RISK_STATUS_LABELS: Record<string, string> = { open: "Open", mitigating: "Mitigating", resolved: "Resolved" };
+export const TRUST_LABELS: Record<string, string> = { low: "Low", medium: "Medium", high: "High" };
+export const DEPENDENCY_LABELS: Record<string, string> = { low: "Low", medium: "Medium", high: "High", critical: "Critical" };
+
+/* Extra timeline event types emitted by the risk/negotiation layer. */
+export const RISK_EVENT_TYPE_LABELS: Record<string, string> = {
+  risk_raised: "Risk raised",
+  risk_resolved: "Risk resolved",
+  risk_downgraded: "Risk downgraded",
+  dispute_opened: "Dispute opened",
+  negotiation_round: "Negotiation round",
+  agreement_reached: "Agreement reached",
+  escalation: "Escalation",
+  payment_issue: "Payment issue",
+};
+
 /* Categories whose assets are sensitive by nature → stored privately and
    served via signed URLs (never a public bucket). Visibility finance/management
    is also treated as sensitive regardless of category. */
