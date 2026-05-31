@@ -2624,6 +2624,18 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           <h1 className="text-[16px] font-bold text-[var(--text-primary)] truncate flex-1">
             {filterType ? (filterType === "company" ? t("tab.companies") : filterType === "people" ? t("tab.people") : filterType === "supplier" ? t("tab.suppliers") : t("tab.customers")) : t("title")}
           </h1>
+          {/* Suppliers app → quick access to the tenant-wide Sourcing
+              Command Center (procurement intelligence overview). */}
+          {filterType === "supplier" && (
+            <Link
+              href="/suppliers/sourcing"
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-2.5 text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
+              title="Sourcing Command Center"
+            >
+              <TargetIcon size={14} />
+              <span className="hidden sm:inline">Command Center</span>
+            </Link>
+          )}
           {/* CSV export — customer directory only. Dumps whatever the
               current filters produce (search, tier filter, active
               filter) so the download matches what the user sees. */}
