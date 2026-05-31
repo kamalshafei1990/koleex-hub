@@ -2670,13 +2670,34 @@ const ScoreSlider = React.memo(function ScoreSlider({ label, value, onChange, ma
 
 /* ── Segmented control — one-tap pick for short option sets (Low/Med/High) ──
    All choices visible at once, no dropdown to open. Click the active one again
-   to clear. Stores the option string unchanged. */
-const SegmentedField = React.memo(function SegmentedField({ label, value, onChange, options, renderLabel }: {
+   to clear. Colour-coded by meaning: green = good, amber = caution, red = bad.
+   `polarity` flips which end is "good": "goodHigh" (stability/quality/trust →
+   High is good) vs "goodLow" (risk/dependency/difficulty → Low is good). */
+type SegTone = "emerald" | "amber" | "rose" | "neutral";
+const SEG_TONE_TEXT: Record<SegTone, string> = {
+  emerald: "text-emerald-400", amber: "text-amber-400", rose: "text-rose-400", neutral: "text-[var(--text-secondary)]",
+};
+const SEG_TONE_SEL: Record<SegTone, string> = {
+  emerald: "bg-emerald-500/15 text-emerald-300 ring-1 ring-inset ring-emerald-500/40",
+  amber: "bg-amber-500/15 text-amber-300 ring-1 ring-inset ring-amber-500/40",
+  rose: "bg-rose-500/15 text-rose-300 ring-1 ring-inset ring-rose-500/40",
+  neutral: "bg-[var(--bg-inverted)] text-[var(--text-inverted)]",
+};
+function segTone(option: string, polarity: "goodHigh" | "goodLow"): SegTone {
+  const o = option.toLowerCase();
+  if (o === "medium") return "amber";
+  if (o === "critical") return "rose";
+  if (o === "low") return polarity === "goodLow" ? "emerald" : "rose";
+  if (o === "high") return polarity === "goodLow" ? "rose" : "emerald";
+  return "neutral";
+}
+const SegmentedField = React.memo(function SegmentedField({ label, value, onChange, options, renderLabel, polarity = "goodHigh" }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: string[];
   renderLabel?: (o: string) => string;
+  polarity?: "goodHigh" | "goodLow";
 }) {
   return (
     <div>
@@ -2684,12 +2705,13 @@ const SegmentedField = React.memo(function SegmentedField({ label, value, onChan
       <div className="flex w-full gap-0.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] p-0.5">
         {options.map((o) => {
           const sel = value === o;
+          const tone = segTone(o, polarity);
           return (
             <button
               key={o}
               type="button"
               onClick={() => onChange(sel ? "" : o)}
-              className={`min-w-0 flex-1 h-8 rounded-md text-[11px] font-medium truncate transition-colors ${sel ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]"}`}
+              className={`min-w-0 flex-1 h-8 rounded-md text-[11px] font-semibold truncate transition-colors ${sel ? SEG_TONE_SEL[tone] : `${SEG_TONE_TEXT[tone]} hover:bg-[var(--bg-surface-hover)]`}`}
             >
               {renderLabel ? renderLabel(o) : o}
             </button>
@@ -7462,13 +7484,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <FormSection title={t("section.risk", "Risk")} icon={<TriangleWarningIcon size={14} />}>
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="col-span-2"><SegmentedField label={t("field.riskLevel", "Risk level")} value={String(sIntel.risk.risk_level)} onChange={(v) => setIntelRisk("risk_level", v)} options={LEVEL4_OPTS} renderLabel={capWord} /></div>
-                  <div className="col-span-2"><SegmentedField label={t("field.dependencyLevel", "Dependency level")} value={String(sIntel.risk.dependency_level)} onChange={(v) => setIntelRisk("dependency_level", v)} options={LEVEL4_OPTS} renderLabel={capWord} /></div>
+                  <div className="col-span-2"><SegmentedField label={t("field.riskLevel", "Risk level")} value={String(sIntel.risk.risk_level)} onChange={(v) => setIntelRisk("risk_level", v)} options={LEVEL4_OPTS} renderLabel={capWord} polarity="goodLow" /></div>
+                  <div className="col-span-2"><SegmentedField label={t("field.dependencyLevel", "Dependency level")} value={String(sIntel.risk.dependency_level)} onChange={(v) => setIntelRisk("dependency_level", v)} options={LEVEL4_OPTS} renderLabel={capWord} polarity="goodLow" /></div>
                   <SegmentedField label={t("field.financialStability", "Financial stability")} value={String(sIntel.risk.financial_stability)} onChange={(v) => setIntelRisk("financial_stability", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
                   <SegmentedField label={t("field.deliveryStability", "Delivery stability")} value={String(sIntel.risk.delivery_stability)} onChange={(v) => setIntelRisk("delivery_stability", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
                   <SegmentedField label={t("field.qualityStability", "Quality stability")} value={String(sIntel.risk.quality_stability)} onChange={(v) => setIntelRisk("quality_stability", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
                   <SegmentedField label={t("field.communicationQuality", "Communication quality")} value={String(sIntel.risk.communication_quality)} onChange={(v) => setIntelRisk("communication_quality", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
                   <SegmentedField label={t("field.trustLevel", "Trust level")} value={String(sIntel.risk.trust_level)} onChange={(v) => setIntelRisk("trust_level", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
+                </div>
+                <div className="border-t border-[var(--border-color)] pt-3">
                   <ScoreSlider label={t("field.internalScore", "Internal score (0–100)")} value={String(sIntel.risk.internal_evaluation_score)} onChange={(v) => setIntelRisk("internal_evaluation_score", v)} max={100} />
                 </div>
                 <label className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)]"><input type="checkbox" checked={!!sIntel.risk.backup_supplier_exists} onChange={(e) => setIntelRisk("backup_supplier_exists", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.backupExists", "Backup supplier exists")}</label>
@@ -7478,12 +7502,12 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
             {/* Negotiation */}
             <FormSection title={t("section.negotiation", "Negotiation")} icon={<HandCoinsIcon size={14} />}>
-              <div className="grid grid-cols-2 gap-3">
-                <ScoreSlider label={t("field.negotiationScore", "Negotiation score (0–100)")} value={sIntel.neg.negotiation_score} onChange={(v) => setIntelNeg("negotiation_score", v)} max={100} />
+              <div className="pb-3"><ScoreSlider label={t("field.negotiationScore", "Negotiation score (0–100)")} value={sIntel.neg.negotiation_score} onChange={(v) => setIntelNeg("negotiation_score", v)} max={100} /></div>
+              <div className="grid grid-cols-2 gap-3 border-t border-[var(--border-color)] pt-3">
                 <SegmentedField label={t("field.priceFlexibility", "Price flexibility")} value={sIntel.neg.price_flexibility} onChange={(v) => setIntelNeg("price_flexibility", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
                 <SegmentedField label={t("field.moqFlexibility", "MOQ flexibility")} value={sIntel.neg.moq_flexibility} onChange={(v) => setIntelNeg("moq_flexibility", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
                 <SegmentedField label={t("field.paymentFlexibility", "Payment flexibility")} value={sIntel.neg.payment_flexibility} onChange={(v) => setIntelNeg("payment_flexibility", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
-                <SegmentedField label={t("field.negotiationDifficulty", "Negotiation difficulty")} value={sIntel.neg.negotiation_difficulty} onChange={(v) => setIntelNeg("negotiation_difficulty", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
+                <SegmentedField label={t("field.negotiationDifficulty", "Negotiation difficulty")} value={sIntel.neg.negotiation_difficulty} onChange={(v) => setIntelNeg("negotiation_difficulty", v)} options={LEVEL3_OPTS} renderLabel={capWord} polarity="goodLow" />
                 <SegmentedField label={t("field.sampleSpeed", "Sample turnaround speed")} value={sIntel.neg.sample_turnaround_speed} onChange={(v) => setIntelNeg("sample_turnaround_speed", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
               </div>
               <div className="mt-3"><Input label={t("field.internalNotes", "Internal notes")} value={sIntel.neg.internal_notes} onChange={(v) => setIntelNeg("internal_notes", v)} /></div>
