@@ -30,8 +30,7 @@ type SI = { path: string; hex: string };
 const STORAGE_BASE =
   (process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "") ?? "") + "/storage/v1/object/public/media/brand-icons/";
 const STORAGE_SLUGS = new Set([
-  "qq", "bilibili", "dingtalk", "douyin", "1688", "made-in-china",
-  "global-sources", "alibaba", "xiaohongshu", "weibo", "wechat",
+  "qq", "bilibili", "dingtalk", "douyin", "1688", "made-in-china", "global-sources",
 ]);
 
 function slugFor(name: string): string {
