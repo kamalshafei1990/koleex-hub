@@ -49,6 +49,7 @@ import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
 import BrandGlyph from "@/components/icons/brands/BrandGlyph";
 import { DIVISIONS, CATEGORIES } from "@/components/knowledge/product-coding/data";
 import { taxonomyLogoUrl } from "@/components/knowledge/product-coding/taxonomy-logo";
+import { fetchDivisionLogos, fetchCategoryLogos } from "@/lib/products-admin";
 import LanguagesIcon from "@/components/icons/ui/LanguagesIcon";
 import ShipIcon from "@/components/icons/ui/ShipIcon";
 import FileCheckIcon from "@/components/icons/ui/FileCheckIcon";
@@ -1581,9 +1582,15 @@ const PlatformSelect = React.memo(function PlatformSelect({ value, onChange, opt
   );
 });
 
-/* ── Taxonomy options (saved KOLEEX divisions + categories, with icons) ──── */
-const DIVISION_OPTIONS = DIVISIONS.map((d) => ({ value: d.name, label: d.name, iconUrl: taxonomyLogoUrl("divisions", d.id) }));
-const CATEGORY_OPTIONS = CATEGORIES.map((c) => ({ value: c.label, label: c.label, iconUrl: taxonomyLogoUrl("categories", c.slug) }));
+/* ── Taxonomy helpers (saved KOLEEX divisions + categories) ───────────────── */
+type TaxoOption = { value: string; label: string; iconUrl: string | null };
+/* Which division a category belongs to — by longest matching code prefix
+   (e.g. "XPR" / "XS" → division prefix "X"; "Md…" → "Md" before "M"). */
+function divisionOfCategory(code: string) {
+  return DIVISIONS
+    .filter((d) => code.startsWith(d.prefix))
+    .sort((a, b) => b.prefix.length - a.prefix.length)[0];
+}
 
 /* ── Searchable taxonomy dropdown (icon + label) with "create new" ──────────
    Lists the saved divisions / categories and lets the user add a custom one. */
@@ -2553,6 +2560,30 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const [showTypeChooser, setShowTypeChooser] = useState(false);
   const [typeChooserStep, setTypeChooserStep] = useState<1 | 2>(1);
   const [expandedFamily, setExpandedFamily] = useState<number | null>(null);
+
+  /* Division / category icons — loaded live from the same storage the Product
+     Data app manages, so an icon swapped there shows here too. */
+  const [divisionLogos, setDivisionLogos] = useState<Record<string, string>>({});
+  const [categoryLogos, setCategoryLogos] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let alive = true;
+    fetchDivisionLogos().then((m) => { if (alive) setDivisionLogos(m); }).catch(() => {});
+    fetchCategoryLogos().then((m) => { if (alive) setCategoryLogos(m); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  const divisionOptions: TaxoOption[] = useMemo(
+    () => DIVISIONS.map((d) => ({ value: d.name, label: d.name, iconUrl: divisionLogos[d.id] ?? taxonomyLogoUrl("divisions", d.id) })),
+    [divisionLogos],
+  );
+  /* Category list is scoped to the chosen division (falls back to all when none picked). */
+  const categoryOptions: TaxoOption[] = useMemo(() => {
+    const div = DIVISIONS.find((d) => d.name === form.division);
+    if (!div) return []; // category depends on the chosen division
+    return CATEGORIES
+      .filter((c) => divisionOfCategory(c.code)?.id === div.id)
+      .map((c) => ({ value: c.label, label: c.label, iconUrl: categoryLogos[c.slug] ?? taxonomyLogoUrl("categories", c.slug) }));
+  }, [categoryLogos, form.division]);
   const [expandedResumeLine, setExpandedResumeLine] = useState<number | null>(null);
   const [mobileShowDetail, setMobileShowDetail] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -6604,11 +6635,23 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.division")}</label>
-                    <TaxonomySelect value={form.division} onChange={v => setField("division", v)} options={DIVISION_OPTIONS} placeholder={t("field.division")} createLabel={t("create.newDivision", "Create new division")} />
+                    <TaxonomySelect
+                      value={form.division}
+                      onChange={v => {
+                        setField("division", v);
+                        // Clear a known category that no longer belongs to the new division.
+                        const div = DIVISIONS.find(d => d.name === v);
+                        const cat = CATEGORIES.find(c => c.label === form.category);
+                        if (cat && div && divisionOfCategory(cat.code)?.id !== div.id) setField("category", "");
+                      }}
+                      options={divisionOptions}
+                      placeholder={t("field.division")}
+                      createLabel={t("create.newDivision", "Create new division")}
+                    />
                   </div>
                   <div>
                     <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.category")}</label>
-                    <TaxonomySelect value={form.category} onChange={v => setField("category", v)} options={CATEGORY_OPTIONS} placeholder={t("field.category")} createLabel={t("create.newCategory", "Create new category")} />
+                    <TaxonomySelect value={form.category} onChange={v => setField("category", v)} options={categoryOptions} placeholder={form.division ? t("field.category") : t("placeholder.pickDivisionFirst", "Pick a division first")} createLabel={t("create.newCategory", "Create new category")} />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
