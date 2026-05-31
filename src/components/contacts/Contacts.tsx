@@ -1668,14 +1668,15 @@ const TaxonomySelect = React.memo(function TaxonomySelect({ value, onChange, opt
                 <span className="truncate">{o.label}</span>
               </button>
             ))}
+            {/* "Create new" scrolls with the list (not pinned). */}
+            <button
+              type="button"
+              onClick={() => { onChange(query.trim()); setQuery(""); setOpen(false); setCreating(true); }}
+              className="w-full flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-[var(--text-primary)] border-t border-[var(--border-faint)] hover:bg-[var(--bg-surface)]"
+            >
+              <PlusIcon size={14} /> {createLabel || "Create new"}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => { onChange(query.trim()); setQuery(""); setOpen(false); setCreating(true); }}
-            className="w-full flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-[var(--text-primary)] border-t border-[var(--border-faint)] hover:bg-[var(--bg-surface)]"
-          >
-            <PlusIcon size={14} /> {createLabel || "Create new"}
-          </button>
         </div>
       )}
     </div>
