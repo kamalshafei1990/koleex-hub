@@ -214,6 +214,7 @@ export interface ContactRow {
   private_phone: string | null;
   employee_bank_account: string | null;
   legal_name: string | null;
+  business_license_image: string | null;
   place_of_birth: string | null;
   gender: string | null;
   emergency_contacts: { contact: string; phone: string }[];

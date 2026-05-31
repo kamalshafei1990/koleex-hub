@@ -350,6 +350,7 @@ interface ContactForm {
   private_phone: string;
   employee_bank_account: string;
   legal_name: string;
+  business_license_image: string;
   place_of_birth: string;
   gender: string;
   emergency_contacts: EmergencyContactEntry[];
@@ -695,6 +696,7 @@ const EMPTY_FORM: ContactForm = {
   private_phone: "",
   employee_bank_account: "",
   legal_name: "",
+  business_license_image: "",
   place_of_birth: "",
   gender: "",
   emergency_contacts: [],
@@ -1168,6 +1170,7 @@ function contactToForm(c: ContactRow): ContactForm {
     private_phone: c.private_phone || "",
     employee_bank_account: c.employee_bank_account || "",
     legal_name: c.legal_name || "",
+    business_license_image: c.business_license_image || "",
     place_of_birth: c.place_of_birth || "",
     gender: c.gender || "",
     emergency_contacts: Array.isArray(c.emergency_contacts) ? c.emergency_contacts : [],
@@ -1401,6 +1404,7 @@ function formToRow(f: ContactForm): Record<string, unknown> {
     private_phone: f.private_phone || null,
     employee_bank_account: f.employee_bank_account || null,
     legal_name: f.legal_name || null,
+    business_license_image: f.business_license_image || null,
     place_of_birth: f.place_of_birth || null,
     gender: f.gender || null,
     emergency_contacts: f.emergency_contacts.length > 0 ? f.emergency_contacts : null,
@@ -2279,6 +2283,52 @@ const MessagingIdField = React.memo(function MessagingIdField({
         </div>
         {qrBox}
       </div>
+    </div>
+  );
+});
+
+/* ── Document / photo uploader (landscape, drag-drop PNG/JPG) ─────────────── */
+const ImageDropField = React.memo(function ImageDropField({
+  label, value, onChange, hint, icon,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  hint?: string;
+  icon?: React.ReactNode;
+}) {
+  const [drag, setDrag] = useState(false);
+  const accept = (file?: File | null) => {
+    if (!file) return;
+    if (!/^image\/(png|jpe?g)$/i.test(file.type)) return; // PNG / JPG only
+    compressImage(file, 1600, 0.85).then(onChange);
+  };
+  return (
+    <div>
+      <label className="mb-1.5 flex items-center gap-2 text-xs font-medium text-[var(--text-secondary)]">
+        <span className="text-[var(--text-muted)]">{icon ?? <ImageRawIcon size={14} />}</span>
+        {label}
+      </label>
+      {value ? (
+        <div className="relative inline-block">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={value} alt={label} className="max-h-56 w-auto max-w-full rounded-lg border border-[var(--border-color)] object-contain bg-white" />
+          <button type="button" onClick={() => onChange("")} aria-label="Remove" className="absolute -top-2 -end-2 h-6 w-6 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center shadow">
+            <CrossIcon size={12} />
+          </button>
+        </div>
+      ) : (
+        <label
+          onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+          onDragLeave={() => setDrag(false)}
+          onDrop={(e) => { e.preventDefault(); setDrag(false); accept(e.dataTransfer.files?.[0]); }}
+          className={`flex h-32 w-full cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed text-center transition-colors ${drag ? "border-[var(--border-focus)] bg-[var(--bg-surface)]" : "border-[var(--border-color)] hover:border-[var(--border-focus)]"}`}
+        >
+          <ImageRawIcon size={20} className="text-[var(--text-dim)]" />
+          <span className="px-2 text-[11px] leading-tight text-[var(--text-dim)]">{hint ?? "Drop image — PNG / JPG"}</span>
+          <input type="file" accept="image/png,image/jpeg" className="hidden" onChange={(e) => accept(e.target.files?.[0])} />
+        </label>
+      )}
     </div>
   );
 });
@@ -4954,7 +5004,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* ── Legal Identity (Compliance tab) ── */}
-        {isCustomerDetail && detailTab("compliance") && (c.trading_name || c.company_type || c.business_registration_number || c.registration_country || c.year_established || c.employee_count_range || c.annual_revenue_range) && (
+        {isCustomerDetail && detailTab("compliance") && (c.trading_name || c.company_type || c.business_registration_number || c.registration_country || c.year_established || c.employee_count_range || c.annual_revenue_range || c.business_license_image) && (
           <Section title={t("section.legalIdentity", "Legal Identity")} icon={<Building2Icon size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.trading_name && <div className="col-span-2"><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.tradingName", "Trading Name")}</span><p className="text-sm text-[var(--text-primary)]">{c.trading_name}</p></div>}
@@ -4965,6 +5015,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               {c.year_established && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.yearEstablished", "Established")}</span><p className="text-sm text-[var(--text-primary)]">{c.year_established}</p></div>}
               {c.employee_count_range && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.employeeCountRange", "Employees")}</span><p className="text-sm text-[var(--text-primary)]">{c.employee_count_range}</p></div>}
               {c.annual_revenue_range && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.annualRevenueRange", "Annual Revenue")}</span><p className="text-sm text-[var(--text-primary)]">{c.annual_revenue_range}</p></div>}
+              {c.business_license_image && (
+                <div className="col-span-2">
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.businessLicense", "Business License")}</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <a href={c.business_license_image} target="_blank" rel="noopener noreferrer" className="mt-1 block w-fit">
+                    <img src={c.business_license_image} alt={t("field.businessLicense", "Business License")} className="max-h-56 w-auto max-w-full rounded-lg border border-[var(--border-color)] object-contain bg-white" />
+                  </a>
+                </div>
+              )}
             </div>
           </Section>
         )}
@@ -6689,6 +6748,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <SelectInput label={t("field.employeeCountRange", "Employee Count")} value={form.employee_count_range} onChange={v => setField("employee_count_range", v)} options={EMPLOYEE_COUNT_RANGES} icon={<UsersIcon size={14} />} selectLabel={t("detail.select")} />
                   <SelectInput label={t("field.annualRevenueRange", "Annual Revenue")} value={form.annual_revenue_range} onChange={v => setField("annual_revenue_range", v)} options={ANNUAL_REVENUE_RANGES} icon={<TrendingUpIcon size={14} />} selectLabel={t("detail.select")} />
                 </div>
+                <ImageDropField
+                  label={t("field.businessLicense", "Business License")}
+                  value={form.business_license_image}
+                  onChange={v => setField("business_license_image", v)}
+                  hint={t("hint.businessLicense", "Drop the company license photo — PNG / JPG")}
+                  icon={<FileCheckIcon size={14} />}
+                />
               </div>
             </FormSection>
 
