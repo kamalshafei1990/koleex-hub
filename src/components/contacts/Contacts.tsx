@@ -5731,20 +5731,20 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       "contact_persons", "brand_names", "certifications", "tags",
     ]);
     const supplierFields: (keyof ContactForm)[] = [
-      "photo_url", "company_name_en", "company_name_cn", "supplier_type",
+      "photo_url", "company_name_en", "company_name_cn",
       "industry", "source", "year_established",
       "supplier_tel", "supplier_mobile", "supplier_email", "supplier_website", "supplier_address",
       "country", "province", "city", "division", "category", "brand_names",
       // Legal & Trade IDs
-      "trading_name", "business_registration_number", "registration_country",
+      "trading_name", "business_registration_number", "registration_country", "business_license_image",
       "gst_number", "cr_number", "duns_number", "importer_exporter_code", "customs_code",
       // Commercial
       "payment_terms", "currency", "payment_info", "moq", "lead_time", "incoterms",
       "annual_revenue_range", "employee_count_range",
       // Logistics
       "port_of_entry", "container_preference", "customs_broker", "freight_forwarder",
-      // Messaging
-      "whatsapp_business", "wechat_id", "telegram_id", "line_id", "skype_id",
+      // Messaging (current channels — Line/Skype were removed)
+      "whatsapp_business", "wechat_id", "telegram_id", "qq_id", "dingtalk_id", "messenger_id",
       // Quality
       "certifications", "sample_status", "rating",
       "contact_persons", "notes",
