@@ -55,10 +55,10 @@ function GroupLabel({ children }: { children: React.ReactNode }) {
 }
 function StatCard({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
   return (
-    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-faint)]">{label}</div>
-      <div className="mt-1 text-2xl font-semibold tracking-tight text-[var(--text-primary)]">{value}</div>
-      {hint ? <div className="mt-0.5 text-[11px] text-[var(--text-secondary)]">{hint}</div> : null}
+    <div className="flex min-h-[96px] flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
+      <div className="text-[10px] font-semibold uppercase leading-tight tracking-[0.14em] text-[var(--text-faint)]">{label}</div>
+      <div className="mt-auto text-2xl font-semibold tracking-tight text-[var(--text-primary)]">{value}</div>
+      <div className="min-h-[14px] text-[11px] leading-tight text-[var(--text-secondary)]">{hint ?? ""}</div>
     </div>
   );
 }
@@ -179,32 +179,20 @@ export default function SourcingCommandCenter() {
         <p className="text-[12px] text-[var(--text-secondary)]">{o.activeSuppliers} active suppliers · {data.categories.length} categories · viewing as <span className="font-medium text-[var(--text-primary)]">{titleCase(data.callerTier)}</span></p>
       </div>
 
-      {/* A. Global procurement overview — grouped for scannability */}
-      <section className="mb-8 grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <div>
-          <GroupLabel>Portfolio</GroupLabel>
-          <div className="grid grid-cols-3 gap-3">
-            <StatCard label="Active" value={o.activeSuppliers} hint={`${o.totalSuppliers} total`} />
-            <StatCard label="Preferred" value={o.preferredSuppliers} />
-            <StatCard label="Blocked" value={o.blockedSuppliers} />
-          </div>
-        </div>
-        <div>
-          <GroupLabel>Risk exposure</GroupLabel>
-          <div className="grid grid-cols-3 gap-3">
-            <StatCard label="High risk" value={o.highRiskSuppliers} />
-            <StatCard label="Sole-source" value={o.soleSourceSuppliers} hint="no backup" />
-            <StatCard label="Missing certs" value={o.missingCerts} />
-          </div>
-        </div>
-        <div>
-          <GroupLabel>Average scores</GroupLabel>
-          <div className="grid grid-cols-3 gap-3">
-            <StatCard label="Sourcing" value={num(o.avgSourcingScore)} />
-            <StatCard label="Negotiation" value={num(o.avgNegotiationScore)} />
-            <StatCard label="Readiness" value={num(o.avgReadiness)} />
-          </div>
-        </div>
+      {/* A. Global procurement overview — one aligned grid, grouped by label */}
+      <section className="mb-8 grid grid-cols-3 gap-3">
+        <div className="col-span-3"><GroupLabel>Portfolio</GroupLabel></div>
+        <StatCard label="Active" value={o.activeSuppliers} hint={`${o.totalSuppliers} total`} />
+        <StatCard label="Preferred" value={o.preferredSuppliers} />
+        <StatCard label="Blocked" value={o.blockedSuppliers} />
+        <div className="col-span-3 mt-2"><GroupLabel>Risk exposure</GroupLabel></div>
+        <StatCard label="High risk" value={o.highRiskSuppliers} />
+        <StatCard label="Sole-source" value={o.soleSourceSuppliers} hint="no backup" />
+        <StatCard label="Missing certs" value={o.missingCerts} />
+        <div className="col-span-3 mt-2"><GroupLabel>Average scores</GroupLabel></div>
+        <StatCard label="Sourcing" value={num(o.avgSourcingScore)} />
+        <StatCard label="Negotiation" value={num(o.avgNegotiationScore)} />
+        <StatCard label="Readiness" value={num(o.avgReadiness)} />
       </section>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
@@ -213,14 +201,14 @@ export default function SourcingCommandCenter() {
           <SectionHeader icon={<LayersIcon className="h-4 w-4" />} title="Category sourcing matrix" sub="Coverage, roles, and backup posture per category" />
           <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[560px] text-sm">
+              <table className="w-full min-w-0 text-sm sm:min-w-[480px]">
                 <thead>
                   <tr className="border-b border-[var(--border-subtle)] text-left text-[10px] uppercase tracking-[0.14em] text-[var(--text-faint)]">
                     <th className="px-4 py-2 font-semibold">Category</th>
                     <th className="px-3 py-2 text-center font-semibold">Suppliers</th>
-                    <th className="px-3 py-2 text-center font-semibold">Pref</th>
-                    <th className="px-3 py-2 text-center font-semibold">Block</th>
-                    <th className="px-3 py-2 text-center font-semibold">Lead</th>
+                    <th className="hidden px-3 py-2 text-center font-semibold sm:table-cell">Pref</th>
+                    <th className="hidden px-3 py-2 text-center font-semibold sm:table-cell">Block</th>
+                    <th className="hidden px-3 py-2 text-center font-semibold sm:table-cell">Lead</th>
                     <th className="px-3 py-2 text-center font-semibold">Score</th>
                   </tr>
                 </thead>
@@ -234,9 +222,9 @@ export default function SourcingCommandCenter() {
                         {c.backupMissing ? <span className="ml-2 inline-flex items-center gap-1 text-[10px] text-[var(--text-secondary)]"><TriangleWarningIcon className="h-3 w-3" />no backup</span> : null}
                       </td>
                       <td className="px-3 py-2.5 text-center text-[var(--text-secondary)]">{c.supplierCount}</td>
-                      <td className="px-3 py-2.5 text-center text-[var(--text-secondary)]">{c.preferred}</td>
-                      <td className="px-3 py-2.5 text-center text-[var(--text-secondary)]">{c.blocked}</td>
-                      <td className="px-3 py-2.5 text-center text-[var(--text-secondary)]">{c.avgLeadTime == null ? "—" : `${c.avgLeadTime}d`}</td>
+                      <td className="hidden px-3 py-2.5 text-center text-[var(--text-secondary)] sm:table-cell">{c.preferred}</td>
+                      <td className="hidden px-3 py-2.5 text-center text-[var(--text-secondary)] sm:table-cell">{c.blocked}</td>
+                      <td className="hidden px-3 py-2.5 text-center text-[var(--text-secondary)] sm:table-cell">{c.avgLeadTime == null ? "—" : `${c.avgLeadTime}d`}</td>
                       <td className="px-3 py-2.5 text-center font-medium text-[var(--text-primary)]">{num(c.avgSourcingScore)}</td>
                     </tr>
                   ))}
@@ -317,17 +305,17 @@ export default function SourcingCommandCenter() {
 
         <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="w-full min-w-0 text-sm sm:min-w-[640px]">
               <thead>
                 <tr className="border-b border-[var(--border-subtle)] text-left text-[10px] uppercase tracking-[0.14em] text-[var(--text-faint)]">
                   {compareMode ? <th className="w-8 px-3 py-2" /> : null}
                   <th className="px-4 py-2 font-semibold">Supplier</th>
                   <th className="px-3 py-2 text-center font-semibold">Sourcing</th>
                   <th className="px-3 py-2 text-center font-semibold">Readiness</th>
-                  <th className="px-3 py-2 text-center font-semibold">Nego</th>
+                  <th className="hidden px-3 py-2 text-center font-semibold sm:table-cell">Nego</th>
                   <th className="px-3 py-2 text-center font-semibold">Risk</th>
-                  <th className="px-3 py-2 text-center font-semibold">Certs</th>
-                  <th className="px-3 py-2 text-center font-semibold">Pref</th>
+                  <th className="hidden px-3 py-2 text-center font-semibold sm:table-cell">Certs</th>
+                  <th className="hidden px-3 py-2 text-center font-semibold sm:table-cell">Pref</th>
                 </tr>
               </thead>
               <tbody>
@@ -342,10 +330,10 @@ export default function SourcingCommandCenter() {
                     </td>
                     <td className="px-3 py-2.5 text-center font-semibold text-[var(--text-primary)]">{num(r.sourcingScore)}</td>
                     <td className="px-3 py-2.5 text-center text-[var(--text-secondary)]">{num(r.readiness)}</td>
-                    <td className="px-3 py-2.5 text-center text-[var(--text-secondary)]">{num(r.negotiationScore)}</td>
+                    <td className="hidden px-3 py-2.5 text-center text-[var(--text-secondary)] sm:table-cell">{num(r.negotiationScore)}</td>
                     <td className="px-3 py-2.5 text-center text-[var(--text-secondary)]">{r.riskLevel ? titleCase(r.riskLevel) : "—"}</td>
-                    <td className="px-3 py-2.5 text-center text-[var(--text-secondary)]">{r.certsActive}</td>
-                    <td className="px-3 py-2.5 text-center text-[var(--text-secondary)]">{r.preferred}</td>
+                    <td className="hidden px-3 py-2.5 text-center text-[var(--text-secondary)] sm:table-cell">{r.certsActive}</td>
+                    <td className="hidden px-3 py-2.5 text-center text-[var(--text-secondary)] sm:table-cell">{r.preferred}</td>
                   </tr>
                 ))}
               </tbody>
