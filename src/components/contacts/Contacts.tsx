@@ -1515,6 +1515,46 @@ const LabelSelect = React.memo(function LabelSelect({ value, onChange, options, 
   );
 });
 
+/* ── Platform select with brand glyphs (custom dropdown — native <select>
+      can't render SVG icons in its option list). ── */
+const PlatformSelect = React.memo(function PlatformSelect({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    function h(e: MouseEvent) { if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false); }
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+  return (
+    <div ref={wrapRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="h-10 w-full px-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-secondary)] flex items-center gap-1.5 outline-none hover:border-[var(--border-color)] focus:border-[var(--border-focus)] transition-colors"
+      >
+        <BrandGlyph name={value} size={16} />
+        <span className="truncate flex-1 text-start">{value}</span>
+        <AngleDownIcon size={12} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-56 max-h-60 overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+          {options.map((o) => (
+            <button
+              key={o}
+              type="button"
+              onClick={() => { onChange(o); setOpen(false); }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-start hover:bg-[var(--bg-surface)] transition-colors ${o === value ? "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}
+            >
+              <BrandGlyph name={o} size={18} />
+              <span className="truncate">{o}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+});
+
 /* ── Form section wrapper ── */
 const FormSection = React.memo(function FormSection({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -6348,9 +6388,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 {form.social_profiles.map((s, i) => (
                   <div key={i} className="flex items-center gap-2">
                     <RemoveBtn onClick={() => removeSocial(i)} />
-                    <span className="shrink-0 text-[var(--text-secondary)]"><BrandGlyph name={s.platform} size={18} /></span>
-                    <div className="w-32 shrink-0 sm:w-40">
-                      <LabelSelect value={s.platform} onChange={v => updateSocial(i, "platform", v)} options={SOCIAL_MEDIA_PLATFORMS} renderLabel={tOpt} />
+                    <div className="w-36 shrink-0 sm:w-44">
+                      <PlatformSelect value={s.platform} onChange={v => updateSocial(i, "platform", v)} options={SOCIAL_MEDIA_PLATFORMS} />
                     </div>
                     <input
                       value={s.url}
