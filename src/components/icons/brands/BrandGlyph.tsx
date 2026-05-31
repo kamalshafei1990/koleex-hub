@@ -1,4 +1,6 @@
-import React from "react";
+"use client";
+
+import React, { useState } from "react";
 import {
   siWhatsapp, siWechat, siTelegram, siLine, siQq, siMessenger,
   siFacebook, siInstagram, siX, siYoutube, siTiktok, siPinterest, siReddit,
@@ -18,6 +20,35 @@ import {
 
 type Props = { name: string; size?: number; className?: string };
 type SI = { path: string; hex: string };
+
+/* ── Uploaded official icons (Supabase Storage) ───────────────────────────────
+   Drop a file at:  media/brand-icons/<slug>.svg  (public bucket)
+   and BrandGlyph uses it for that platform, falling back to the built-in glyph
+   if the file is missing. Only slugs listed here are fetched (avoids 404 spam
+   for the platforms already covered by accurate Simple Icons). Add a slug here
+   when you upload a new override. */
+const STORAGE_BASE =
+  (process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "") ?? "") + "/storage/v1/object/public/media/brand-icons/";
+const STORAGE_SLUGS = new Set([
+  "qq", "bilibili", "dingtalk", "douyin", "1688", "made-in-china",
+  "global-sources", "alibaba", "xiaohongshu", "weibo", "wechat",
+]);
+
+function slugFor(name: string): string {
+  const n = (name || "").toLowerCase().trim();
+  if (n.includes("xiaohongshu") || n === "red" || n.includes("(red)")) return "xiaohongshu";
+  if (n.includes("made-in-china") || n.includes("made in china")) return "made-in-china";
+  if (n.includes("global sources")) return "global-sources";
+  if (n.includes("dingtalk")) return "dingtalk";
+  if (n.includes("douyin")) return "douyin";
+  if (n.includes("bilibili")) return "bilibili";
+  if (n.includes("1688")) return "1688";
+  if (n.includes("alibaba")) return "alibaba";
+  if (n.includes("weibo")) return "weibo";
+  if (n.includes("wechat")) return "wechat";
+  if (n === "qq" || n.includes("qq")) return "qq";
+  return n.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
 
 const ICONS: Record<string, SI> = {
   whatsapp: siWhatsapp,
@@ -84,6 +115,26 @@ function keyFor(name: string): string {
 }
 
 export default function BrandGlyph({ name, size = 16, className }: Props) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const slug = slugFor(name);
+
+  // Prefer an uploaded official icon when one exists for this platform.
+  if (!imgFailed && STORAGE_BASE.length > 45 && STORAGE_SLUGS.has(slug)) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={`${STORAGE_BASE}${slug}.svg`}
+        alt=""
+        width={size}
+        height={size}
+        className={className}
+        style={{ display: "inline-block", objectFit: "contain" }}
+        onError={() => setImgFailed(true)}
+        aria-hidden
+      />
+    );
+  }
+
   const key = keyFor(name);
   const icon: SI | undefined = ICONS[key] ?? EXTRA[key];
 
