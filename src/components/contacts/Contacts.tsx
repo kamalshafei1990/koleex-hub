@@ -2686,18 +2686,6 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           <h1 className="text-[16px] font-bold text-[var(--text-primary)] truncate flex-1">
             {filterType ? (filterType === "company" ? t("tab.companies") : filterType === "people" ? t("tab.people") : filterType === "supplier" ? t("tab.suppliers") : t("tab.customers")) : t("title")}
           </h1>
-          {/* Suppliers app → quick access to the tenant-wide Sourcing
-              Command Center (procurement intelligence overview). */}
-          {filterType === "supplier" && (
-            <Link
-              href="/suppliers/sourcing"
-              className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
-              title="Sourcing Command Center"
-              aria-label="Sourcing Command Center"
-            >
-              <TargetIcon size={14} />
-            </Link>
-          )}
           {/* CSV export — customer directory only. Dumps whatever the
               current filters produce (search, tier filter, active
               filter) so the download matches what the user sees. */}
@@ -2975,6 +2963,27 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <h2 className="text-2xl font-bold text-[var(--text-primary)]">{t("type.supplier")} {t("kpi.overview")}</h2>
                 <p className="text-sm text-[var(--text-faint)] mt-1">{t("kpi.keyMetrics")}</p>
               </div>
+
+              {/* Sourcing Command Center — prominent entry to the tenant-wide
+                  procurement intelligence workspace. */}
+              <Link
+                href="/suppliers/sourcing"
+                className="group flex items-center justify-between gap-4 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-4 md:p-5 transition-colors hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)]"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)]">
+                    <TargetIcon size={20} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[15px] font-semibold text-[var(--text-primary)]">{t("supplier.commandCenter", "Sourcing Command Center")}</p>
+                    <p className="text-xs text-[var(--text-faint)] mt-0.5">{t("supplier.commandCenterDesc", "Tenant-wide procurement intelligence — ranking, dependencies & recommendations")}</p>
+                  </div>
+                </div>
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] group-hover:border-[var(--border-focus)] transition-colors">
+                  {t("btn.open", "Open")}
+                  <AngleRightIcon size={13} className="rtl:rotate-180" />
+                </span>
+              </Link>
 
               {/* Main KPI Row - 4 cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
