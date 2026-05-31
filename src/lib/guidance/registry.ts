@@ -1045,6 +1045,214 @@ const REGISTRY: Record<string, GuidanceEntry> = {
       zh: "本期的流入(营收)、流出(成本与费用)及净利润走势。斜率比绝对值更重要。",
     },
   },
+
+  /* ── Supplier · Trade & Tax IDs ─────────────────────────────────
+     Consumed by Contacts.tsx supplier add/edit form. Bilingual field
+     help for international-trade identifiers. ── */
+  "supplier.gst_number": {
+    id: "supplier.gst_number",
+    title: { en: "VAT / GST number", zh: "增值税 / GST 税号" },
+    default: {
+      en: "The supplier's value-added / goods-and-services tax registration number — used to validate tax-compliant invoices and reclaim input tax.",
+      zh: "供应商的增值税 / 商品服务税登记号 — 用于核验合规发票并抵扣进项税。",
+    },
+  },
+  "supplier.cr_number": {
+    id: "supplier.cr_number",
+    title: { en: "Commercial registration (CR)", zh: "商业登记号 (CR)" },
+    default: {
+      en: "The supplier's official company registration number from its national business registry — proves the entity is legally incorporated.",
+      zh: "供应商在所在国工商登记机构的正式注册号 — 证明该主体已合法注册成立。",
+    },
+  },
+  "supplier.duns_number": {
+    id: "supplier.duns_number",
+    title: { en: "D-U-N-S number", zh: "邓白氏编码 (D-U-N-S)" },
+    default: {
+      en: "A unique nine-digit Dun & Bradstreet identifier used worldwide to verify a business and pull its credit profile.",
+      zh: "由邓白氏分配的九位唯一企业识别码,全球通用,用于核实企业身份并查询其信用档案。",
+    },
+  },
+  "supplier.iec": {
+    id: "supplier.iec",
+    title: { en: "Importer / Exporter Code (IEC)", zh: "进出口企业代码 (IEC)" },
+    default: {
+      en: "The license code that authorizes the supplier to clear goods through customs for international trade — required for cross-border shipments.",
+      zh: "授权供应商办理跨境货物通关的进出口许可代码 — 跨境发货所必需。",
+    },
+  },
+  "supplier.customs_code": {
+    id: "supplier.customs_code",
+    title: { en: "Customs code", zh: "海关编码" },
+    default: {
+      en: "The supplier's registered customs / trader code used by the customs authority to identify it on import-export declarations.",
+      zh: "供应商在海关登记的报关 / 贸易代码,海关凭此在进出口申报中识别该企业。",
+    },
+  },
+
+  /* ── Supplier · Logistics & Trade ──────────────────────────────── */
+  "supplier.incoterms": {
+    id: "supplier.incoterms",
+    title: { en: "Incoterms", zh: "国际贸易术语 (Incoterms)" },
+    default: {
+      en: "The agreed delivery term (e.g. FOB, CIF, EXW) that defines where the supplier's responsibility and cost end and yours begin.",
+      zh: "约定的交货条款(如 FOB、CIF、EXW),界定供应商的责任与成本在何处结束、由您接手的起点。",
+    },
+  },
+  "supplier.lead_time": {
+    id: "supplier.lead_time",
+    title: { en: "Lead time", zh: "交货周期" },
+    default: {
+      en: "How long the supplier needs from confirmed order to ready-to-ship — the basis for your reorder and planning timelines.",
+      zh: "供应商从确认订单到可发货所需的时间 — 是您补货与计划排期的依据。",
+    },
+  },
+  "supplier.moq": {
+    id: "supplier.moq",
+    title: { en: "Minimum order quantity (MOQ)", zh: "最小起订量 (MOQ)" },
+    default: {
+      en: "The smallest quantity the supplier will accept per order — drives whether their pricing fits your purchase volumes.",
+      zh: "供应商每单可接受的最小数量 — 决定其报价是否匹配您的采购量。",
+    },
+  },
+  "supplier.container_preference": {
+    id: "supplier.container_preference",
+    title: { en: "Container preference", zh: "集装箱偏好" },
+    default: {
+      en: "The supplier's preferred shipping container type (e.g. 20ft, 40ft, LCL) — affects consolidation and freight cost per unit.",
+      zh: "供应商偏好的运输集装箱类型(如 20 尺、40 尺、拼箱)— 影响拼柜方式与单位运费。",
+    },
+  },
+  "supplier.port_of_entry": {
+    id: "supplier.port_of_entry",
+    title: { en: "Port of loading / entry", zh: "装运港 / 入境港" },
+    default: {
+      en: "The port the supplier ships from (or your goods enter through) — used to estimate transit time and routing.",
+      zh: "供应商发货的装运港(或货物入境的口岸)— 用于估算运输时间与路线安排。",
+    },
+  },
+
+  /* ── Supplier · Factory ────────────────────────────────────────── */
+  "supplier.factory_name": {
+    id: "supplier.factory_name",
+    title: { en: "Factory name", zh: "工厂名称" },
+    default: {
+      en: "The name of the production facility — may differ from the trading company you contract with; identifies where goods are actually made.",
+      zh: "生产工厂的名称 — 可能与您签约的贸易公司不同;用于标明货物的实际生产地。",
+    },
+  },
+  "supplier.factory_type": {
+    id: "supplier.factory_type",
+    title: { en: "Factory type", zh: "工厂类型" },
+    default: {
+      en: "Whether the supplier is a manufacturer, trading company, or both — tells you if you are buying direct from the source or through a middleman.",
+      zh: "供应商是制造商、贸易公司还是两者兼具 — 表明您是直接向源头采购还是经由中间商。",
+    },
+  },
+  "supplier.production_lines": {
+    id: "supplier.production_lines",
+    title: { en: "Production lines", zh: "生产线数量" },
+    default: {
+      en: "The number of active production lines — a rough indicator of how much the factory can run in parallel.",
+      zh: "在用生产线的数量 — 大致反映工厂可同时并行生产的能力。",
+    },
+  },
+  "supplier.monthly_capacity": {
+    id: "supplier.monthly_capacity",
+    title: { en: "Monthly capacity", zh: "月产能" },
+    default: {
+      en: "The maximum output the factory can produce in a month — check it comfortably covers your peak order volumes.",
+      zh: "工厂每月可生产的最大产量 — 请确认其能从容覆盖您的高峰订单量。",
+    },
+  },
+  "supplier.annual_output": {
+    id: "supplier.annual_output",
+    title: { en: "Annual output", zh: "年产量" },
+    default: {
+      en: "Total units the factory produces per year — a scale indicator for assessing whether the supplier fits long-term demand.",
+      zh: "工厂每年的总产量 — 衡量其规模、判断是否匹配长期需求的指标。",
+    },
+  },
+  "supplier.factory_size": {
+    id: "supplier.factory_size",
+    title: { en: "Factory size (sqm)", zh: "工厂面积(平方米)" },
+    default: {
+      en: "The factory's floor area in square metres — a proxy for production scale and how much capacity could expand.",
+      zh: "工厂的建筑面积(平方米)— 反映生产规模及未来产能扩张空间的参考。",
+    },
+  },
+  "supplier.employees": {
+    id: "supplier.employees",
+    title: { en: "Employees", zh: "员工人数" },
+    default: {
+      en: "Total headcount at the factory — indicates labour scale and how it might handle large or rush orders.",
+      zh: "工厂的员工总数 — 反映用工规模及应对大单或加急订单的能力。",
+    },
+  },
+  "supplier.qc_staff": {
+    id: "supplier.qc_staff",
+    title: { en: "QC staff", zh: "质检人员" },
+    default: {
+      en: "The number of dedicated quality-control inspectors — a higher count signals more disciplined in-house quality checks.",
+      zh: "专职质检人员的数量 — 数量越多,通常意味着厂内质量管控越严格。",
+    },
+  },
+  "supplier.rd_staff": {
+    id: "supplier.rd_staff",
+    title: { en: "R&D staff", zh: "研发人员" },
+    default: {
+      en: "The number of research & development staff — indicates the factory's ability to customise products or develop new designs.",
+      zh: "研发人员的数量 — 反映工厂定制产品或开发新款式的能力。",
+    },
+  },
+  "supplier.export_pct": {
+    id: "supplier.export_pct",
+    title: { en: "Export percentage", zh: "出口占比" },
+    default: {
+      en: "The share of output that is exported (0–100) — a high figure means the factory is experienced with international shipping and compliance.",
+      zh: "出口产量所占的比例(0–100)— 比例越高,说明工厂在国际运输与合规方面经验越丰富。",
+    },
+  },
+  "supplier.export_markets": {
+    id: "supplier.export_markets",
+    title: { en: "Export markets", zh: "出口市场" },
+    default: {
+      en: "The regions the factory already ships to (comma-separated) — confirms experience with your target markets' standards and paperwork.",
+      zh: "工厂目前已出口的地区(用逗号分隔)— 用于确认其熟悉您目标市场的标准与单证要求。",
+    },
+  },
+  "supplier.production_categories": {
+    id: "supplier.production_categories",
+    title: { en: "Production categories", zh: "生产品类" },
+    default: {
+      en: "The product categories the factory specialises in (comma-separated) — verifies it actually makes what you need to source.",
+      zh: "工厂擅长生产的产品品类(用逗号分隔)— 用于核实其确实生产您需要采购的品类。",
+    },
+  },
+  "supplier.odm": {
+    id: "supplier.odm",
+    title: { en: "ODM support", zh: "ODM 支持" },
+    default: {
+      en: "Whether the factory can design and develop a product for you to sell under your brand (Original Design Manufacturing).",
+      zh: "工厂是否能为您设计并开发产品、由您贴牌销售(原始设计制造,ODM)。",
+    },
+  },
+  "supplier.private_label": {
+    id: "supplier.private_label",
+    title: { en: "Private label", zh: "贴牌 / 自有品牌" },
+    default: {
+      en: "Whether the factory will produce existing products under your own brand name and packaging.",
+      zh: "工厂是否愿意以您的品牌名称与包装生产现有产品。",
+    },
+  },
+  "supplier.low_moq": {
+    id: "supplier.low_moq",
+    title: { en: "Low MOQ", zh: "低起订量" },
+    default: {
+      en: "Whether the factory accepts small minimum order quantities — useful for trial orders or low-volume product lines.",
+      zh: "工厂是否接受较小的最小起订量 — 适用于试单或小批量产品线。",
+    },
+  },
 };
 
 /* ---------------------------------------------------------------------------

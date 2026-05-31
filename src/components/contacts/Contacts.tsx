@@ -102,6 +102,7 @@ import EntityPlanningStrip from "@/components/planning/EntityPlanningStrip";
 import EntityTasksStrip from "@/components/projects/EntityTasksStrip";
 import EntityInvoicesStrip from "@/components/invoices/EntityInvoicesStrip";
 import ProfileCompletenessBar from "@/components/ui/ProfileCompletenessBar";
+import GuidanceTip from "@/components/ui/GuidanceTip";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TYPES
@@ -1537,9 +1538,9 @@ const FieldMark = ({ tier }: { tier?: FieldTier }) =>
     : tier === "optional" ? <span className="ms-1.5 align-middle text-[9px] font-medium uppercase tracking-wide text-[var(--text-ghost)]">optional</span>
     : null;
 
-const Input = React.memo(function Input({ label, value, onChange, type = "text", placeholder, icon, inputMode, autoComplete, list, tier }: {
+const Input = React.memo(function Input({ label, value, onChange, type = "text", placeholder, icon, inputMode, autoComplete, list, tier, help }: {
   label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string; icon?: React.ReactNode;
-  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"]; autoComplete?: string; list?: string; tier?: FieldTier;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"]; autoComplete?: string; list?: string; tier?: FieldTier; help?: string;
 }) {
   /* Sensible defaults so each field gets the right mobile keyboard + browser
      autofill even when the caller only passes `type`. */
@@ -1547,7 +1548,7 @@ const Input = React.memo(function Input({ label, value, onChange, type = "text",
   const resolvedAutoComplete = autoComplete ?? (type === "email" ? "email" : type === "tel" ? "tel" : type === "url" ? "url" : undefined);
   return (
     <div>
-      <label className="text-xs text-[var(--text-faint)] mb-1 block">{label}<FieldMark tier={tier} /></label>
+      <label className="text-xs text-[var(--text-faint)] mb-1 flex items-center gap-1">{label}<FieldMark tier={tier} />{help && <GuidanceTip guidanceId={help} size="xs" />}</label>
       <div className="relative">
         {icon && <span className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)]">{icon}</span>}
         <input
@@ -1566,13 +1567,13 @@ const Input = React.memo(function Input({ label, value, onChange, type = "text",
 });
 
 /* ── Form select input ── */
-const SelectInput = React.memo(function SelectInput({ label, value, onChange, options, icon, renderLabel, selectLabel, tier }: {
+const SelectInput = React.memo(function SelectInput({ label, value, onChange, options, icon, renderLabel, selectLabel, tier, help }: {
   label: string; value: string; onChange: (v: string) => void; options: string[]; icon?: React.ReactNode;
-  renderLabel?: (o: string) => string; selectLabel?: string; tier?: FieldTier;
+  renderLabel?: (o: string) => string; selectLabel?: string; tier?: FieldTier; help?: string;
 }) {
   return (
     <div>
-      <label className="text-xs text-[var(--text-faint)] mb-1 block">{label}<FieldMark tier={tier} /></label>
+      <label className="text-xs text-[var(--text-faint)] mb-1 flex items-center gap-1">{label}<FieldMark tier={tier} />{help && <GuidanceTip guidanceId={help} size="xs" />}</label>
       <div className="relative">
         {icon && <span className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] pointer-events-none">{icon}</span>}
         <select
@@ -7290,14 +7291,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <FormSection title={t("section.tradeIdentifiers", "Trade & Tax IDs")} icon={<FileCheckIcon size={14} />}>
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <Input label={t("field.gstNumber", "VAT / GST")} tier="optional" value={form.gst_number} onChange={v => setField("gst_number", v)} placeholder="VAT / GST number" icon={<HashtagIcon size={14} />} />
-                  <Input label={t("field.crNumber", "CR Number")} tier="optional" value={form.cr_number} onChange={v => setField("cr_number", v)} placeholder="Commercial registration" icon={<HashtagIcon size={14} />} />
+                  <Input label={t("field.gstNumber", "VAT / GST")} help="supplier.gst_number" tier="optional" value={form.gst_number} onChange={v => setField("gst_number", v)} placeholder="VAT / GST number" icon={<HashtagIcon size={14} />} />
+                  <Input label={t("field.crNumber", "CR Number")} help="supplier.cr_number" tier="optional" value={form.cr_number} onChange={v => setField("cr_number", v)} placeholder="Commercial registration" icon={<HashtagIcon size={14} />} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <Input label={t("field.dunsNumber", "D-U-N-S")} tier="optional" value={form.duns_number} onChange={v => setField("duns_number", v)} placeholder="123456789" icon={<HashtagIcon size={14} />} />
-                  <Input label={t("field.iec", "Importer / Exporter Code")} tier="optional" value={form.importer_exporter_code} onChange={v => setField("importer_exporter_code", v)} placeholder="IEC code" icon={<HashtagIcon size={14} />} />
+                  <Input label={t("field.dunsNumber", "D-U-N-S")} help="supplier.duns_number" tier="optional" value={form.duns_number} onChange={v => setField("duns_number", v)} placeholder="123456789" icon={<HashtagIcon size={14} />} />
+                  <Input label={t("field.iec", "Importer / Exporter Code")} help="supplier.iec" tier="optional" value={form.importer_exporter_code} onChange={v => setField("importer_exporter_code", v)} placeholder="IEC code" icon={<HashtagIcon size={14} />} />
                 </div>
-                <Input label={t("field.customsCode", "Customs Code")} tier="optional" value={form.customs_code} onChange={v => setField("customs_code", v)} placeholder="Customs code" icon={<HashtagIcon size={14} />} />
+                <Input label={t("field.customsCode", "Customs Code")} help="supplier.customs_code" tier="optional" value={form.customs_code} onChange={v => setField("customs_code", v)} placeholder="Customs code" icon={<HashtagIcon size={14} />} />
               </div>
             </FormSection>
 
@@ -7376,14 +7377,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <FormSection title={t("section.logisticsTrade", "Logistics & Trade")} icon={<TruckIcon size={14} />}>
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <SelectInput label={t("field.incoterms", "Incoterms")} tier="preferred" value={form.incoterms} onChange={v => setField("incoterms", v)} options={INCOTERMS} icon={<ShipIcon size={14} />} selectLabel={t("detail.select")} />
-                  <Input label={t("field.leadTime", "Lead Time")} tier="preferred" value={form.lead_time} onChange={v => setField("lead_time", v)} placeholder="e.g. 30 days" icon={<TimerIcon size={14} />} />
+                  <SelectInput label={t("field.incoterms", "Incoterms")} help="supplier.incoterms" tier="preferred" value={form.incoterms} onChange={v => setField("incoterms", v)} options={INCOTERMS} icon={<ShipIcon size={14} />} selectLabel={t("detail.select")} />
+                  <Input label={t("field.leadTime", "Lead Time")} help="supplier.lead_time" tier="preferred" value={form.lead_time} onChange={v => setField("lead_time", v)} placeholder="e.g. 30 days" icon={<TimerIcon size={14} />} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <Input label={t("field.moq", "MOQ")} tier="preferred" value={form.moq} onChange={v => setField("moq", v)} placeholder="Minimum order qty" icon={<PackageIcon size={14} />} />
-                  <SelectInput label={t("field.containerPreference", "Container Preference")} tier="optional" value={form.container_preference} onChange={v => setField("container_preference", v)} options={CONTAINER_PREFERENCES} icon={<BoxesIcon size={14} />} selectLabel={t("detail.select")} />
+                  <Input label={t("field.moq", "MOQ")} help="supplier.moq" tier="preferred" value={form.moq} onChange={v => setField("moq", v)} placeholder="Minimum order qty" icon={<PackageIcon size={14} />} />
+                  <SelectInput label={t("field.containerPreference", "Container Preference")} help="supplier.container_preference" tier="optional" value={form.container_preference} onChange={v => setField("container_preference", v)} options={CONTAINER_PREFERENCES} icon={<BoxesIcon size={14} />} selectLabel={t("detail.select")} />
                 </div>
-                <Input label={t("field.portOfEntry", "Port of Loading / Entry")} tier="optional" value={form.port_of_entry} onChange={v => setField("port_of_entry", v)} placeholder="Shanghai / Ningbo / Jebel Ali" icon={<ShipIcon size={14} />} />
+                <Input label={t("field.portOfEntry", "Port of Loading / Entry")} help="supplier.port_of_entry" tier="optional" value={form.port_of_entry} onChange={v => setField("port_of_entry", v)} placeholder="Shanghai / Ningbo / Jebel Ali" icon={<ShipIcon size={14} />} />
               </div>
             </FormSection>
 
@@ -7391,23 +7392,23 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <FormSection title={t("section.factory", "Factory")} icon={<FactoryIcon size={14} />}>
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <Input label={t("field.factoryName", "Factory name")} value={String(sIntel.factory.factory_name)} onChange={(v) => setIntelFactory("factory_name", v)} icon={<FactoryIcon size={14} />} />
-                  <SelectInput label={t("field.factoryType", "Factory type")} value={String(sIntel.factory.factory_type)} onChange={(v) => setIntelFactory("factory_type", v)} options={Object.keys(FACTORY_TYPE_LABELS)} renderLabel={(o) => FACTORY_TYPE_LABELS[o] ?? o} selectLabel={t("detail.select")} />
-                  <Input label={t("field.productionLines", "Production lines")} value={String(sIntel.factory.production_lines)} onChange={(v) => setIntelFactory("production_lines", v)} inputMode="numeric" placeholder="e.g. 12" />
-                  <Input label={t("field.monthlyCapacity", "Monthly capacity")} value={String(sIntel.factory.monthly_capacity)} onChange={(v) => setIntelFactory("monthly_capacity", v)} placeholder="e.g. 50,000 units" />
-                  <Input label={t("field.annualOutput", "Annual output")} value={String(sIntel.factory.annual_output)} onChange={(v) => setIntelFactory("annual_output", v)} placeholder="e.g. 600,000 units" />
-                  <Input label={t("field.factorySize", "Factory size (sqm)")} value={String(sIntel.factory.factory_size_sqm)} onChange={(v) => setIntelFactory("factory_size_sqm", v)} inputMode="numeric" placeholder="e.g. 8000" />
-                  <Input label={t("field.employees", "Employees")} value={String(sIntel.factory.employee_count)} onChange={(v) => setIntelFactory("employee_count", v)} inputMode="numeric" placeholder="e.g. 250" />
-                  <Input label={t("field.qcStaff", "QC staff")} value={String(sIntel.factory.qc_staff_count)} onChange={(v) => setIntelFactory("qc_staff_count", v)} inputMode="numeric" placeholder="e.g. 15" />
-                  <Input label={t("field.rdStaff", "R&D staff")} value={String(sIntel.factory.rd_staff_count)} onChange={(v) => setIntelFactory("rd_staff_count", v)} inputMode="numeric" placeholder="e.g. 8" />
-                  <Input label={t("field.exportPct", "Export %")} value={String(sIntel.factory.export_percentage)} onChange={(v) => setIntelFactory("export_percentage", v)} inputMode="numeric" placeholder="0–100" />
-                  <Input label={t("field.exportMarkets", "Export markets (comma)")} value={String(sIntel.factory.main_export_markets)} onChange={(v) => setIntelFactory("main_export_markets", v)} placeholder="US, EU, UAE" />
-                  <Input label={t("field.prodCategories", "Production categories (comma)")} value={String(sIntel.factory.production_categories)} onChange={(v) => setIntelFactory("production_categories", v)} />
+                  <Input label={t("field.factoryName", "Factory name")} help="supplier.factory_name" value={String(sIntel.factory.factory_name)} onChange={(v) => setIntelFactory("factory_name", v)} icon={<FactoryIcon size={14} />} />
+                  <SelectInput label={t("field.factoryType", "Factory type")} help="supplier.factory_type" value={String(sIntel.factory.factory_type)} onChange={(v) => setIntelFactory("factory_type", v)} options={Object.keys(FACTORY_TYPE_LABELS)} renderLabel={(o) => FACTORY_TYPE_LABELS[o] ?? o} selectLabel={t("detail.select")} />
+                  <Input label={t("field.productionLines", "Production lines")} help="supplier.production_lines" value={String(sIntel.factory.production_lines)} onChange={(v) => setIntelFactory("production_lines", v)} inputMode="numeric" placeholder="e.g. 12" />
+                  <Input label={t("field.monthlyCapacity", "Monthly capacity")} help="supplier.monthly_capacity" value={String(sIntel.factory.monthly_capacity)} onChange={(v) => setIntelFactory("monthly_capacity", v)} placeholder="e.g. 50,000 units" />
+                  <Input label={t("field.annualOutput", "Annual output")} help="supplier.annual_output" value={String(sIntel.factory.annual_output)} onChange={(v) => setIntelFactory("annual_output", v)} placeholder="e.g. 600,000 units" />
+                  <Input label={t("field.factorySize", "Factory size (sqm)")} help="supplier.factory_size" value={String(sIntel.factory.factory_size_sqm)} onChange={(v) => setIntelFactory("factory_size_sqm", v)} inputMode="numeric" placeholder="e.g. 8000" />
+                  <Input label={t("field.employees", "Employees")} help="supplier.employees" value={String(sIntel.factory.employee_count)} onChange={(v) => setIntelFactory("employee_count", v)} inputMode="numeric" placeholder="e.g. 250" />
+                  <Input label={t("field.qcStaff", "QC staff")} help="supplier.qc_staff" value={String(sIntel.factory.qc_staff_count)} onChange={(v) => setIntelFactory("qc_staff_count", v)} inputMode="numeric" placeholder="e.g. 15" />
+                  <Input label={t("field.rdStaff", "R&D staff")} help="supplier.rd_staff" value={String(sIntel.factory.rd_staff_count)} onChange={(v) => setIntelFactory("rd_staff_count", v)} inputMode="numeric" placeholder="e.g. 8" />
+                  <Input label={t("field.exportPct", "Export %")} help="supplier.export_pct" value={String(sIntel.factory.export_percentage)} onChange={(v) => setIntelFactory("export_percentage", v)} inputMode="numeric" placeholder="0–100" />
+                  <Input label={t("field.exportMarkets", "Export markets (comma)")} help="supplier.export_markets" value={String(sIntel.factory.main_export_markets)} onChange={(v) => setIntelFactory("main_export_markets", v)} placeholder="US, EU, UAE" />
+                  <Input label={t("field.prodCategories", "Production categories (comma)")} help="supplier.production_categories" value={String(sIntel.factory.production_categories)} onChange={(v) => setIntelFactory("production_categories", v)} />
                 </div>
                 <div className="flex flex-wrap gap-4 text-sm text-[var(--text-muted)]">
-                  <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!sIntel.factory.odm_supported} onChange={(e) => setIntelFactory("odm_supported", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.odm", "ODM support")}</label>
-                  <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!sIntel.factory.private_label_supported} onChange={(e) => setIntelFactory("private_label_supported", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.privateLabel", "Private label")}</label>
-                  <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!sIntel.factory.low_moq_supported} onChange={(e) => setIntelFactory("low_moq_supported", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.lowMoq", "Low MOQ")}</label>
+                  <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!sIntel.factory.odm_supported} onChange={(e) => setIntelFactory("odm_supported", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.odm", "ODM support")}<GuidanceTip guidanceId="supplier.odm" size="xs" /></label>
+                  <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!sIntel.factory.private_label_supported} onChange={(e) => setIntelFactory("private_label_supported", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.privateLabel", "Private label")}<GuidanceTip guidanceId="supplier.private_label" size="xs" /></label>
+                  <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!sIntel.factory.low_moq_supported} onChange={(e) => setIntelFactory("low_moq_supported", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.lowMoq", "Low MOQ")}<GuidanceTip guidanceId="supplier.low_moq" size="xs" /></label>
                 </div>
               </div>
             </FormSection>
