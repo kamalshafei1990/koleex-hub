@@ -2682,6 +2682,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               if (filterType === "customer") {
                 setTypeChooserStep(2);
                 setShowTypeChooser(true);
+              } else if (filterType === "supplier") {
+                /* Suppliers get the premium guided onboarding wizard. */
+                router.push("/suppliers/new");
               } else if (filterType) {
                 handleAdd(filterType);
               } else {
