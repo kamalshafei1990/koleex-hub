@@ -13,6 +13,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { recordSectionEdits } from "@/lib/suppliers/section-audit";
 
 const LEVEL3 = new Set(["low", "medium", "high"]);
 const LEVEL_FIELDS = new Set([
@@ -64,6 +65,12 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
       { onConflict: "tenant_id,supplier_id" },
     );
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await recordSectionEdits({
+    tenantId: tid, supplierId: id, depts: ["commercial"],
+    accountId: auth.account_id ?? null,
+    accountName: auth.username || auth.login_email || "System",
+  });
 
   return NextResponse.json({ ok: true });
 }

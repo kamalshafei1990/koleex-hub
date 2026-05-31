@@ -11,6 +11,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { recordSectionEdits } from "@/lib/suppliers/section-audit";
 import { logSupplierEvent, actorName } from "@/lib/suppliers/timeline";
 
 const NUM_FIELDS = new Set([
@@ -109,6 +110,11 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
     actor_id: auth.account_id ?? null, actor_name: actorName(auth),
     source_module: "suppliers", visibility_tier: "internal",
     related_entity_type: "supplier_factory_profile",
+  });
+
+  await recordSectionEdits({
+    tenantId: tid, supplierId: id, depts: ["quality"],
+    accountId: auth.account_id ?? null, accountName: actorName(auth),
   });
 
   return NextResponse.json({ ok: true });

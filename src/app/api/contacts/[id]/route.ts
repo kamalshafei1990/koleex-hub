@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { deptsFromFields, recordSectionEdits } from "@/lib/suppliers/section-audit";
 
 /* PATCH /api/contacts/[id] — update a contact. Tenant-enforced.
    DELETE /api/contacts/[id] — remove a contact. Tenant-enforced.
@@ -66,6 +67,22 @@ export async function PATCH(
     console.error("[api/contacts/[id] PATCH]", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  /* Section-level attribution: stamp which department(s) this edit touched
+     so the supplier form can show "Updated by <name> · <date>". */
+  if (existing.contact_type === "supplier") {
+    const depts = deptsFromFields(Object.keys(patch));
+    if (depts.length) {
+      await recordSectionEdits({
+        tenantId: auth.tenant_id,
+        supplierId: id,
+        depts,
+        accountId: auth.account_id ?? null,
+        accountName: auth.username || auth.login_email || "System",
+      });
+    }
+  }
+
   return NextResponse.json({ ok: true });
 }
 

@@ -396,6 +396,7 @@ export const contactsT: Translations = {
      section of the supplier record. Shown as a badge on each section header.
      ═══════════════════════════════════════════════════════════════════════════ */
   "owner.label":                { en: "Filled by",                 zh: "填写人",                ar: "يُعبّأ بواسطة" },
+  "owner.updatedBy":            { en: "Updated by",                zh: "更新人",                ar: "حُدّث بواسطة" },
   "owner.procurement":          { en: "Procurement",               zh: "采购部",                ar: "المشتريات" },
   "owner.sourcing":             { en: "Sourcing",                  zh: "寻源部",                ar: "التوريد" },
   "owner.compliance":           { en: "Compliance / Legal",        zh: "合规 / 法务",            ar: "الامتثال / القانونية" },

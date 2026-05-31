@@ -130,6 +130,21 @@ export async function POST(req: Request) {
         source_module: "suppliers", visibility_tier: "internal",
       });
     } catch { /* best-effort */ }
+
+    /* Section-level attribution for the fields supplied at creation. */
+    try {
+      const { deptsFromFields, recordSectionEdits } = await import("@/lib/suppliers/section-audit");
+      const depts = deptsFromFields(Object.keys(body));
+      if (depts.length) {
+        await recordSectionEdits({
+          tenantId: auth.tenant_id,
+          supplierId: (data as { id: string }).id,
+          depts,
+          accountId: auth.account_id ?? null,
+          accountName: auth.username || auth.login_email || "System",
+        });
+      }
+    } catch { /* best-effort */ }
   }
 
   return NextResponse.json({ contact: data });
