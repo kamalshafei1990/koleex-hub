@@ -1547,7 +1547,7 @@ const EMPTY_SINTEL: SupplierIntel = {
   strategic_status: "", strategic_status_reason: "", classifications: [], primary_class: "",
   factory: { factory_name: "", factory_type: "", production_lines: "", monthly_capacity: "", annual_output: "", factory_size_sqm: "", employee_count: "", qc_staff_count: "", rd_staff_count: "", export_percentage: "", odm_supported: false, private_label_supported: false, low_moq_supported: false, main_export_markets: "", production_categories: "", supported_materials: "", capacity_unit: "", output_unit: "", lead_time_days: "", peak_season_months: "" },
   risk: { risk_level: "", dependency_level: "", geographic_risk: "", compliance_level: "", capacity_level: "", financial_stability: "", delivery_stability: "", quality_stability: "", communication_quality: "", trust_level: "", internal_evaluation_score: "", backup_supplier_exists: false, assessment_notes: "" },
-  neg: { negotiation_score: "", price_flexibility: "", moq_flexibility: "", payment_flexibility: "", leadtime_flexibility: "", volume_discount: "", contract_willingness: "", negotiation_difficulty: "", sample_turnaround_speed: "", internal_notes: "" },
+  neg: { negotiation_score: "", price_flexibility: "", moq_flexibility: "", payment_flexibility: "", leadtime_flexibility: "", volume_discount: "", contract_willingness: "", negotiation_difficulty: "", sample_turnaround_speed: "", communication_flexibility: "", customization_openness: "", exclusivity_openness: "", preferred_tactics: "", leverage_points: "", internal_notes: "" },
 };
 
 /* Importance marker shown after a field label: red * for required,
@@ -3442,6 +3442,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       const rb = num(ne(sIntel.risk), ["internal_evaluation_score"]);
       if (Object.keys(rb).length) await j(`/api/suppliers/${id}/risk`, "PUT", rb);
       const nb = num(ne(sIntel.neg), ["negotiation_score"]);
+      const npt = sIntel.neg.preferred_tactics; nb.preferred_tactics = typeof npt === "string" && npt.trim() ? npt.split(",").map((s) => s.trim()).filter(Boolean) : [];
+      const nlp = sIntel.neg.leverage_points; nb.leverage_points = typeof nlp === "string" && nlp.trim() ? nlp.split(",").map((s) => s.trim()).filter(Boolean) : [];
       if (Object.keys(nb).length) await j(`/api/suppliers/${id}/negotiations/intel`, "PUT", nb);
     } catch { /* best-effort */ }
   };
@@ -7714,7 +7716,16 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     <SegmentedField layout="row" label={t("field.contractWillingness", "Contract willingness")} value={sIntel.neg.contract_willingness} onChange={(v) => setIntelNeg("contract_willingness", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
                     <SegmentedField layout="row" label={t("field.negotiationDifficulty", "Negotiation difficulty")} value={sIntel.neg.negotiation_difficulty} onChange={(v) => setIntelNeg("negotiation_difficulty", v)} options={LEVEL3_OPTS} renderLabel={capWord} polarity="goodLow" />
                     <SegmentedField layout="row" label={t("field.sampleSpeed", "Sample turnaround speed")} value={sIntel.neg.sample_turnaround_speed} onChange={(v) => setIntelNeg("sample_turnaround_speed", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
+                    <SegmentedField layout="row" label={t("field.communicationFlexibility", "Communication flexibility")} value={sIntel.neg.communication_flexibility} onChange={(v) => setIntelNeg("communication_flexibility", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
+                    <SegmentedField layout="row" label={t("field.customizationOpenness", "Customization openness")} value={sIntel.neg.customization_openness} onChange={(v) => setIntelNeg("customization_openness", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
+                    <SegmentedField layout="row" label={t("field.exclusivityOpenness", "Exclusivity openness")} value={sIntel.neg.exclusivity_openness} onChange={(v) => setIntelNeg("exclusivity_openness", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
                   </div>
+                </div>
+                {/* Tactics & leverage (comma-separated lists) */}
+                <div className="space-y-3 border-t border-[var(--border-color)] pt-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.tacticsLeverage", "Tactics & Leverage")}</p>
+                  <Input label={t("field.preferredTactics", "Preferred tactics (comma)")} value={sIntel.neg.preferred_tactics} onChange={(v) => setIntelNeg("preferred_tactics", v)} placeholder="Bundle pricing, Annual commitment" />
+                  <Input label={t("field.leveragePoints", "Leverage points (comma)")} value={sIntel.neg.leverage_points} onChange={(v) => setIntelNeg("leverage_points", v)} placeholder="High volume, Repeat buyer, Multiple suppliers" />
                 </div>
                 {/* Overall — score + notes (last, mirrors Risk) */}
                 <div className="space-y-3 border-t border-[var(--border-color)] pt-3">
