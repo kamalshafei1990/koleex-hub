@@ -2380,6 +2380,30 @@ function parseISODate(v: string): { y: number; m: number; d: number } | null {
 }
 function pad2(n: number) { return n < 10 ? `0${n}` : `${n}`; }
 
+/* ISO yyyy-mm-dd → easy-to-edit dd/mm/yyyy display. */
+function isoToDisplay(v: string): string {
+  const p = parseISODate(v);
+  return p ? `${pad2(p.d)}/${pad2(p.m + 1)}/${p.y}` : "";
+}
+/* Build a validated ISO date, or null if the day/month/year don't form a real date. */
+function makeISO(y: number, mo: number, d: number): string | null {
+  if (y < 1000 || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  const dt = new Date(y, mo - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+  return `${y}-${pad2(mo)}-${pad2(d)}`;
+}
+/* Accept what a person naturally types: dd/mm/yyyy, dd-mm-yyyy, dd.mm.yyyy,
+   2-digit years, or ISO yyyy-mm-dd. Returns ISO or null. */
+function parseTypedDate(s: string): string | null {
+  const t = (s || "").trim();
+  if (!t) return null;
+  let m: RegExpExecArray | null;
+  if ((m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(t))) return makeISO(+m[1], +m[2], +m[3]);
+  if ((m = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/.exec(t))) return makeISO(+m[3], +m[2], +m[1]);
+  if ((m = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2})$/.exec(t))) return makeISO(2000 + +m[3], +m[2], +m[1]);
+  return null;
+}
+
 const DateField = React.memo(function DateField({ value, onChange, disabled, className }: {
   value: string;
   onChange: (v: string) => void;
@@ -2389,8 +2413,25 @@ const DateField = React.memo(function DateField({ value, onChange, disabled, cla
   const [open, setOpen] = useState(false);
   const [openUp, setOpenUp] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const focusedRef = useRef(false);
   const parsed = parseISODate(value);
   const today = new Date();
+
+  // The text the user is typing. Stays in sync with the stored value when not editing.
+  const [text, setText] = useState(() => isoToDisplay(value));
+  useEffect(() => { if (!focusedRef.current) setText(isoToDisplay(value)); }, [value]);
+
+  const commitText = (raw: string) => {
+    setText(raw);
+    if (raw.trim() === "") { onChange(""); return; }
+    const iso = parseTypedDate(raw);
+    if (iso) onChange(iso);
+  };
+  const onBlurText = () => {
+    focusedRef.current = false;
+    const iso = parseTypedDate(text);
+    setText(iso ? isoToDisplay(iso) : (text.trim() === "" ? "" : isoToDisplay(value)));
+  };
   // Month currently shown in the calendar grid.
   const [view, setView] = useState(() => parsed ? { y: parsed.y, m: parsed.m } : { y: today.getFullYear(), m: today.getMonth() });
 
@@ -2421,10 +2462,6 @@ const DateField = React.memo(function DateField({ value, onChange, disabled, cla
     setOpen(o => !o);
   };
 
-  const display = parsed
-    ? `${pad2(parsed.d)} ${DATE_MONTHS[parsed.m].slice(0, 3)} ${parsed.y}`
-    : "";
-
   const firstWeekday = new Date(view.y, view.m, 1).getDay();
   const daysInMonth = new Date(view.y, view.m + 1, 0).getDate();
   const cells: (number | null)[] = [];
@@ -2435,7 +2472,7 @@ const DateField = React.memo(function DateField({ value, onChange, disabled, cla
     const m = v.m + delta;
     return { y: v.y + Math.floor(m / 12), m: ((m % 12) + 12) % 12 };
   });
-  const pick = (d: number) => { onChange(`${view.y}-${pad2(view.m + 1)}-${pad2(d)}`); setOpen(false); };
+  const pick = (d: number) => { const iso = `${view.y}-${pad2(view.m + 1)}-${pad2(d)}`; onChange(iso); setText(isoToDisplay(iso)); setOpen(false); };
 
   const isSel = (d: number) => parsed && parsed.y === view.y && parsed.m === view.m && parsed.d === d;
   const isToday = (d: number) => today.getFullYear() === view.y && today.getMonth() === view.m && today.getDate() === d;
@@ -2448,14 +2485,29 @@ const DateField = React.memo(function DateField({ value, onChange, disabled, cla
 
   return (
     <div ref={wrapRef} className={`relative ${className ?? ""}`}>
+      <CalendarRawIcon size={14} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
+      {/* Type the date directly (dd/mm/yyyy) — fastest path */}
+      <input
+        type="text"
+        inputMode="numeric"
+        value={text}
+        disabled={disabled}
+        placeholder="dd/mm/yyyy"
+        onFocus={() => { focusedRef.current = true; }}
+        onBlur={onBlurText}
+        onChange={e => commitText(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter") { (e.target as HTMLInputElement).blur(); setOpen(false); } }}
+        className={`w-full h-10 ps-9 pe-10 rounded-lg bg-[var(--bg-surface)] border text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none transition-colors disabled:opacity-30 ${open ? "border-[var(--border-focus)]" : "border-[var(--border-color)] hover:border-[var(--border-focus)] focus:border-[var(--border-focus)]"}`}
+      />
+      {/* Calendar toggle */}
       <button
         type="button"
         disabled={disabled}
         onClick={toggle}
-        className={`w-full h-10 ps-9 pe-3 flex items-center rounded-lg bg-[var(--bg-surface)] border text-sm text-start outline-none transition-colors disabled:opacity-30 ${open ? "border-[var(--border-focus)]" : "border-[var(--border-color)] hover:border-[var(--border-focus)]"} ${display ? "text-[var(--text-primary)]" : "text-[var(--text-ghost)]"}`}
+        aria-label="Open calendar"
+        className="absolute end-1.5 top-1/2 -translate-y-1/2 h-7 w-7 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] disabled:opacity-30"
       >
-        <CalendarRawIcon size={14} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
-        {display || "Select date"}
+        <CalendarRawIcon size={15} />
       </button>
 
       {open && (
@@ -2493,8 +2545,8 @@ const DateField = React.memo(function DateField({ value, onChange, disabled, cla
           </div>
           {/* Actions */}
           <div className="mt-2 flex items-center justify-between border-t border-[var(--border-color)] pt-2">
-            <button type="button" onClick={() => { onChange(""); setOpen(false); }} className="text-xs text-[var(--text-dim)] hover:text-[var(--text-primary)]">Clear</button>
-            <button type="button" onClick={() => { const t = new Date(); onChange(`${t.getFullYear()}-${pad2(t.getMonth() + 1)}-${pad2(t.getDate())}`); setOpen(false); }} className="text-xs font-medium text-[var(--accent,#0066FF)] hover:opacity-80">Today</button>
+            <button type="button" onClick={() => { onChange(""); setText(""); setOpen(false); }} className="text-xs text-[var(--text-dim)] hover:text-[var(--text-primary)]">Clear</button>
+            <button type="button" onClick={() => { const t = new Date(); const iso = `${t.getFullYear()}-${pad2(t.getMonth() + 1)}-${pad2(t.getDate())}`; onChange(iso); setText(isoToDisplay(iso)); setOpen(false); }} className="text-xs font-medium text-[var(--accent,#0066FF)] hover:opacity-80">Today</button>
           </div>
         </div>
       )}
