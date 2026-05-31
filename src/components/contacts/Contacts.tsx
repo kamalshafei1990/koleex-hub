@@ -87,6 +87,7 @@ import {
   type ContactRow,
 } from "@/lib/contacts-admin";
 import { fetchOpportunities } from "@/lib/crm";
+import { STRATEGIC_STATUS_LABELS, CLASSIFICATION_LABELS, FACTORY_TYPE_LABELS } from "@/lib/suppliers/intelligence";
 import { useScopeContext } from "@/lib/use-scope";
 import type { CrmOpportunityWithRelations } from "@/types/supabase";
 import { Country, State, City } from "country-state-city";
@@ -1378,6 +1379,24 @@ const Section = React.memo(function Section({ title, icon, children }: { title: 
 });
 
 /* ── Form text input ── */
+/* ── Supplier intelligence (canonical tables, written after create) ── */
+const LEVEL3_OPTS = ["low", "medium", "high"];
+const LEVEL4_OPTS = ["low", "medium", "high", "critical"];
+const capWord = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
+interface SupplierIntel {
+  strategic_status: string; strategic_status_reason: string;
+  classifications: string[]; primary_class: string;
+  factory: Record<string, string | boolean>;
+  risk: Record<string, string | boolean>;
+  neg: Record<string, string>;
+}
+const EMPTY_SINTEL: SupplierIntel = {
+  strategic_status: "", strategic_status_reason: "", classifications: [], primary_class: "",
+  factory: { factory_name: "", factory_type: "", production_lines: "", monthly_capacity: "", annual_output: "", factory_size_sqm: "", employee_count: "", qc_staff_count: "", rd_staff_count: "", export_percentage: "", odm_supported: false, private_label_supported: false, low_moq_supported: false, main_export_markets: "", production_categories: "" },
+  risk: { risk_level: "", dependency_level: "", financial_stability: "", delivery_stability: "", quality_stability: "", communication_quality: "", trust_level: "", internal_evaluation_score: "", backup_supplier_exists: false, assessment_notes: "" },
+  neg: { negotiation_score: "", price_flexibility: "", moq_flexibility: "", payment_flexibility: "", negotiation_difficulty: "", sample_turnaround_speed: "", internal_notes: "" },
+};
+
 const Input = React.memo(function Input({ label, value, onChange, type = "text", placeholder, icon }: {
   label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string; icon?: React.ReactNode;
 }) {
@@ -2128,6 +2147,18 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   /* Active/Archived status filter — surfaced only in the supplier view. */
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "archived">("all");
   const [form, setForm] = useState<ContactForm>({ ...EMPTY_FORM });
+  /* Supplier-only intelligence captured in the same form, written to the
+     canonical tables after the base contact is created. */
+  const [sIntel, setSIntel] = useState<SupplierIntel>(EMPTY_SINTEL);
+  const setIntelFactory = (k: string, v: string | boolean) => setSIntel((p) => ({ ...p, factory: { ...p.factory, [k]: v } }));
+  const setIntelRisk = (k: string, v: string | boolean) => setSIntel((p) => ({ ...p, risk: { ...p.risk, [k]: v } }));
+  const setIntelNeg = (k: string, v: string) => setSIntel((p) => ({ ...p, neg: { ...p.neg, [k]: v } }));
+  const toggleIntelClass = (key: string) => setSIntel((p) => {
+    const has = p.classifications.includes(key);
+    const classifications = has ? p.classifications.filter((c) => c !== key) : [...p.classifications, key];
+    const primary_class = has && p.primary_class === key ? (classifications[0] ?? "") : (!has && !p.primary_class ? key : p.primary_class);
+    return { ...p, classifications, primary_class };
+  });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -2331,6 +2362,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
   const handleAdd = useCallback((type: ContactType, entityType?: "person" | "company") => {
     setForm({ ...EMPTY_FORM, contact_type: type, entity_type: entityType || "" });
+    setSIntel(EMPTY_SINTEL);
     setEditingId(null);
     setView("form");
     setShowTypeChooser(false);
@@ -2346,6 +2378,28 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     setView("form");
     setExpandedFamily(null);
   }, [selectedContact]);
+
+  /* After a supplier's base contact row is created, push the intelligence
+     captured in the form into the canonical tables via the existing APIs.
+     Best-effort: a hiccup here never undoes the created supplier. */
+  const enrichSupplier = async (id: string) => {
+    const j = (u: string, m: string, b: unknown) => fetch(u, { method: m, credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }).catch(() => null);
+    const ne = (o: Record<string, unknown>) => { const r: Record<string, unknown> = {}; for (const [k, v] of Object.entries(o)) { if (typeof v === "string") { if (v.trim()) r[k] = v.trim(); } else if (typeof v === "boolean") { if (v) r[k] = true; } else if (v != null) r[k] = v; } return r; };
+    const num = (o: Record<string, unknown>, keys: string[]) => { for (const k of keys) if (typeof o[k] === "string") o[k] = Number(o[k]); return o; };
+    try {
+      if (sIntel.strategic_status) await j(`/api/suppliers/${id}`, "PATCH", { strategic_status: sIntel.strategic_status, strategic_status_reason: sIntel.strategic_status_reason || null });
+      for (const c of sIntel.classifications) await j(`/api/suppliers/${id}/classifications`, "POST", { classification: c, is_primary: c === sIntel.primary_class });
+      for (const p of form.contact_persons) { if ((p.name || "").trim()) await j(`/api/suppliers/${id}/contacts`, "POST", ne({ full_name: p.name, position: p.position, department: p.department, mobile: p.mobile || p.phone, email: p.email, notes: p.notes })); }
+      const fb = num(ne(sIntel.factory), ["production_lines", "monthly_capacity", "annual_output", "factory_size_sqm", "employee_count", "qc_staff_count", "rd_staff_count", "export_percentage"]);
+      const fem = sIntel.factory.main_export_markets; if (typeof fem === "string" && fem.trim()) fb.main_export_markets = fem.split(",").map((s) => s.trim()).filter(Boolean);
+      const fpc = sIntel.factory.production_categories; if (typeof fpc === "string" && fpc.trim()) fb.production_categories = fpc.split(",").map((s) => s.trim()).filter(Boolean);
+      if (Object.keys(fb).length) await j(`/api/suppliers/${id}/factory`, "PUT", fb);
+      const rb = num(ne(sIntel.risk), ["internal_evaluation_score"]);
+      if (Object.keys(rb).length) await j(`/api/suppliers/${id}/risk`, "PUT", rb);
+      const nb = num(ne(sIntel.neg), ["negotiation_score"]);
+      if (Object.keys(nb).length) await j(`/api/suppliers/${id}/negotiations/intel`, "PUT", nb);
+    } catch { /* best-effort */ }
+  };
 
   const handleSave = async () => {
     if (!form.first_name && !form.last_name && !form.company && !form.company_name_en) return;
@@ -2368,6 +2422,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
              page so the operator immediately sees Factory / Contacts / Media /
              Risk / Negotiation / Sourcing rather than the legacy panel. */
           if (filterType === "supplier" || row.contact_type === "supplier") {
+            await enrichSupplier(created.id);
             router.push(`/suppliers/${created.id}`);
             return;
           }
@@ -2682,9 +2737,6 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               if (filterType === "customer") {
                 setTypeChooserStep(2);
                 setShowTypeChooser(true);
-              } else if (filterType === "supplier") {
-                /* Suppliers use the all-in-one onboarding form. */
-                router.push("/suppliers/new");
               } else if (filterType) {
                 handleAdd(filterType);
               } else {
@@ -6288,6 +6340,86 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <textarea value={form.quality_notes} onChange={e => setField("quality_notes", e.target.value)} placeholder={t("placeholder.qualityObs")} rows={3} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none resize-none focus:border-[var(--border-focus)]" />
                 </div>
               </div>
+            </FormSection>
+
+            {/* Strategic status */}
+            <FormSection title={t("section.strategicStatus", "Strategic Status")} icon={<TargetIcon size={14} />}>
+              <div className="grid grid-cols-2 gap-3">
+                <SelectInput label={t("field.strategicStatus", "Strategic status")} value={sIntel.strategic_status} onChange={(v) => setSIntel((p) => ({ ...p, strategic_status: v }))} options={Object.keys(STRATEGIC_STATUS_LABELS)} renderLabel={(o) => STRATEGIC_STATUS_LABELS[o as keyof typeof STRATEGIC_STATUS_LABELS] ?? o} icon={<TargetIcon size={14} />} selectLabel={t("detail.select")} />
+                <Input label={t("field.statusReason", "Status reason")} value={sIntel.strategic_status_reason} onChange={(v) => setSIntel((p) => ({ ...p, strategic_status_reason: v }))} />
+              </div>
+            </FormSection>
+
+            {/* Classifications */}
+            <FormSection title={t("section.classifications", "Classifications")} icon={<TagsIcon size={14} />}>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(CLASSIFICATION_LABELS).map(([k, v]) => {
+                  const on = sIntel.classifications.includes(k);
+                  return <button type="button" key={k} onClick={() => toggleIntelClass(k)} className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${on ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent" : "bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--border-focus)]"}`}>{v}</button>;
+                })}
+              </div>
+              {sIntel.classifications.length > 1 && (
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="text-xs text-[var(--text-faint)]">{t("field.primary", "Primary")}:</span>
+                  <LabelSelect value={sIntel.primary_class} onChange={(v) => setSIntel((p) => ({ ...p, primary_class: v }))} options={sIntel.classifications} renderLabel={(o) => CLASSIFICATION_LABELS[o as keyof typeof CLASSIFICATION_LABELS] ?? o} />
+                </div>
+              )}
+            </FormSection>
+
+            {/* Factory */}
+            <FormSection title={t("section.factory", "Factory")} icon={<FactoryIcon size={14} />}>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <Input label={t("field.factoryName", "Factory name")} value={String(sIntel.factory.factory_name)} onChange={(v) => setIntelFactory("factory_name", v)} icon={<FactoryIcon size={14} />} />
+                  <SelectInput label={t("field.factoryType", "Factory type")} value={String(sIntel.factory.factory_type)} onChange={(v) => setIntelFactory("factory_type", v)} options={Object.keys(FACTORY_TYPE_LABELS)} renderLabel={(o) => FACTORY_TYPE_LABELS[o] ?? o} selectLabel={t("detail.select")} />
+                  <Input label={t("field.productionLines", "Production lines")} value={String(sIntel.factory.production_lines)} onChange={(v) => setIntelFactory("production_lines", v)} />
+                  <Input label={t("field.monthlyCapacity", "Monthly capacity")} value={String(sIntel.factory.monthly_capacity)} onChange={(v) => setIntelFactory("monthly_capacity", v)} />
+                  <Input label={t("field.annualOutput", "Annual output")} value={String(sIntel.factory.annual_output)} onChange={(v) => setIntelFactory("annual_output", v)} />
+                  <Input label={t("field.factorySize", "Factory size (sqm)")} value={String(sIntel.factory.factory_size_sqm)} onChange={(v) => setIntelFactory("factory_size_sqm", v)} />
+                  <Input label={t("field.employees", "Employees")} value={String(sIntel.factory.employee_count)} onChange={(v) => setIntelFactory("employee_count", v)} />
+                  <Input label={t("field.qcStaff", "QC staff")} value={String(sIntel.factory.qc_staff_count)} onChange={(v) => setIntelFactory("qc_staff_count", v)} />
+                  <Input label={t("field.rdStaff", "R&D staff")} value={String(sIntel.factory.rd_staff_count)} onChange={(v) => setIntelFactory("rd_staff_count", v)} />
+                  <Input label={t("field.exportPct", "Export %")} value={String(sIntel.factory.export_percentage)} onChange={(v) => setIntelFactory("export_percentage", v)} placeholder="0–100" />
+                  <Input label={t("field.exportMarkets", "Export markets (comma)")} value={String(sIntel.factory.main_export_markets)} onChange={(v) => setIntelFactory("main_export_markets", v)} placeholder="US, EU, UAE" />
+                  <Input label={t("field.prodCategories", "Production categories (comma)")} value={String(sIntel.factory.production_categories)} onChange={(v) => setIntelFactory("production_categories", v)} />
+                </div>
+                <div className="flex flex-wrap gap-4 text-sm text-[var(--text-muted)]">
+                  <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!sIntel.factory.odm_supported} onChange={(e) => setIntelFactory("odm_supported", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.odm", "ODM support")}</label>
+                  <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!sIntel.factory.private_label_supported} onChange={(e) => setIntelFactory("private_label_supported", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.privateLabel", "Private label")}</label>
+                  <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!sIntel.factory.low_moq_supported} onChange={(e) => setIntelFactory("low_moq_supported", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.lowMoq", "Low MOQ")}</label>
+                </div>
+              </div>
+            </FormSection>
+
+            {/* Risk */}
+            <FormSection title={t("section.risk", "Risk")} icon={<TriangleWarningIcon size={14} />}>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <SelectInput label={t("field.riskLevel", "Risk level")} value={String(sIntel.risk.risk_level)} onChange={(v) => setIntelRisk("risk_level", v)} options={LEVEL4_OPTS} renderLabel={capWord} selectLabel={t("detail.select")} />
+                  <SelectInput label={t("field.dependencyLevel", "Dependency level")} value={String(sIntel.risk.dependency_level)} onChange={(v) => setIntelRisk("dependency_level", v)} options={LEVEL4_OPTS} renderLabel={capWord} selectLabel={t("detail.select")} />
+                  <SelectInput label={t("field.financialStability", "Financial stability")} value={String(sIntel.risk.financial_stability)} onChange={(v) => setIntelRisk("financial_stability", v)} options={LEVEL3_OPTS} renderLabel={capWord} selectLabel={t("detail.select")} />
+                  <SelectInput label={t("field.deliveryStability", "Delivery stability")} value={String(sIntel.risk.delivery_stability)} onChange={(v) => setIntelRisk("delivery_stability", v)} options={LEVEL3_OPTS} renderLabel={capWord} selectLabel={t("detail.select")} />
+                  <SelectInput label={t("field.qualityStability", "Quality stability")} value={String(sIntel.risk.quality_stability)} onChange={(v) => setIntelRisk("quality_stability", v)} options={LEVEL3_OPTS} renderLabel={capWord} selectLabel={t("detail.select")} />
+                  <SelectInput label={t("field.communicationQuality", "Communication quality")} value={String(sIntel.risk.communication_quality)} onChange={(v) => setIntelRisk("communication_quality", v)} options={LEVEL3_OPTS} renderLabel={capWord} selectLabel={t("detail.select")} />
+                  <SelectInput label={t("field.trustLevel", "Trust level")} value={String(sIntel.risk.trust_level)} onChange={(v) => setIntelRisk("trust_level", v)} options={LEVEL3_OPTS} renderLabel={capWord} selectLabel={t("detail.select")} />
+                  <Input label={t("field.internalScore", "Internal score (0–100)")} value={String(sIntel.risk.internal_evaluation_score)} onChange={(v) => setIntelRisk("internal_evaluation_score", v)} />
+                </div>
+                <label className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)]"><input type="checkbox" checked={!!sIntel.risk.backup_supplier_exists} onChange={(e) => setIntelRisk("backup_supplier_exists", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.backupExists", "Backup supplier exists")}</label>
+                <Input label={t("field.assessmentNotes", "Assessment notes")} value={String(sIntel.risk.assessment_notes)} onChange={(v) => setIntelRisk("assessment_notes", v)} />
+              </div>
+            </FormSection>
+
+            {/* Negotiation */}
+            <FormSection title={t("section.negotiation", "Negotiation")} icon={<HandCoinsIcon size={14} />}>
+              <div className="grid grid-cols-2 gap-3">
+                <Input label={t("field.negotiationScore", "Negotiation score (0–100)")} value={sIntel.neg.negotiation_score} onChange={(v) => setIntelNeg("negotiation_score", v)} />
+                <SelectInput label={t("field.priceFlexibility", "Price flexibility")} value={sIntel.neg.price_flexibility} onChange={(v) => setIntelNeg("price_flexibility", v)} options={LEVEL3_OPTS} renderLabel={capWord} selectLabel={t("detail.select")} />
+                <SelectInput label={t("field.moqFlexibility", "MOQ flexibility")} value={sIntel.neg.moq_flexibility} onChange={(v) => setIntelNeg("moq_flexibility", v)} options={LEVEL3_OPTS} renderLabel={capWord} selectLabel={t("detail.select")} />
+                <SelectInput label={t("field.paymentFlexibility", "Payment flexibility")} value={sIntel.neg.payment_flexibility} onChange={(v) => setIntelNeg("payment_flexibility", v)} options={LEVEL3_OPTS} renderLabel={capWord} selectLabel={t("detail.select")} />
+                <SelectInput label={t("field.negotiationDifficulty", "Negotiation difficulty")} value={sIntel.neg.negotiation_difficulty} onChange={(v) => setIntelNeg("negotiation_difficulty", v)} options={LEVEL3_OPTS} renderLabel={capWord} selectLabel={t("detail.select")} />
+                <SelectInput label={t("field.sampleSpeed", "Sample turnaround speed")} value={sIntel.neg.sample_turnaround_speed} onChange={(v) => setIntelNeg("sample_turnaround_speed", v)} options={LEVEL3_OPTS} renderLabel={capWord} selectLabel={t("detail.select")} />
+              </div>
+              <div className="mt-3"><Input label={t("field.internalNotes", "Internal notes")} value={sIntel.neg.internal_notes} onChange={(v) => setIntelNeg("internal_notes", v)} /></div>
             </FormSection>
 
             {/* 10. Products (placeholder) */}
