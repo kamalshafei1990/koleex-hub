@@ -50,6 +50,9 @@ const num = (v: number | null) => (v == null ? "—" : String(v));
 const titleCase = (s: string) => s.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
 /* ── small presentational primitives (monochrome) ── */
+function GroupLabel({ children }: { children: React.ReactNode }) {
+  return <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-faint)]">{children}</div>;
+}
 function StatCard({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
   return (
     <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
@@ -176,18 +179,31 @@ export default function SourcingCommandCenter() {
         <p className="text-[12px] text-[var(--text-secondary)]">{o.activeSuppliers} active suppliers · {data.categories.length} categories · viewing as <span className="font-medium text-[var(--text-primary)]">{titleCase(data.callerTier)}</span></p>
       </div>
 
-      {/* A. Global procurement overview */}
-      <section className="mb-8">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <StatCard label="Active" value={o.activeSuppliers} hint={`${o.totalSuppliers} total`} />
-          <StatCard label="Preferred" value={o.preferredSuppliers} />
-          <StatCard label="Blocked" value={o.blockedSuppliers} />
-          <StatCard label="High risk" value={o.highRiskSuppliers} />
-          <StatCard label="Sole-source" value={o.soleSourceSuppliers} hint="no backup" />
-          <StatCard label="Missing certs" value={o.missingCerts} />
-          <StatCard label="Avg sourcing" value={num(o.avgSourcingScore)} />
-          <StatCard label="Avg negotiation" value={num(o.avgNegotiationScore)} />
-          <StatCard label="Avg readiness" value={num(o.avgReadiness)} />
+      {/* A. Global procurement overview — grouped for scannability */}
+      <section className="mb-8 grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <div>
+          <GroupLabel>Portfolio</GroupLabel>
+          <div className="grid grid-cols-3 gap-3">
+            <StatCard label="Active" value={o.activeSuppliers} hint={`${o.totalSuppliers} total`} />
+            <StatCard label="Preferred" value={o.preferredSuppliers} />
+            <StatCard label="Blocked" value={o.blockedSuppliers} />
+          </div>
+        </div>
+        <div>
+          <GroupLabel>Risk exposure</GroupLabel>
+          <div className="grid grid-cols-3 gap-3">
+            <StatCard label="High risk" value={o.highRiskSuppliers} />
+            <StatCard label="Sole-source" value={o.soleSourceSuppliers} hint="no backup" />
+            <StatCard label="Missing certs" value={o.missingCerts} />
+          </div>
+        </div>
+        <div>
+          <GroupLabel>Average scores</GroupLabel>
+          <div className="grid grid-cols-3 gap-3">
+            <StatCard label="Sourcing" value={num(o.avgSourcingScore)} />
+            <StatCard label="Negotiation" value={num(o.avgNegotiationScore)} />
+            <StatCard label="Readiness" value={num(o.avgReadiness)} />
+          </div>
         </div>
       </section>
 
