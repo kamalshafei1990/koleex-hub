@@ -7042,6 +7042,72 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
+            {/* 4. Company Profile — Brand, classification, and business identity */}
+            <FormSection title={t("section.companyProfile")} icon={<BriefcaseIcon size={14} />}>
+              <div className="space-y-3">
+                {/* Brand Names */}
+                <div>
+                  <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.brand")}</label>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {form.brand_names.map((b, i) => (
+                      <span key={i} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-secondary)]">
+                        {b}
+                        <button onClick={() => setField("brand_names", form.brand_names.filter((_, idx) => idx !== i))} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]"><CrossIcon size={10} /></button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input id="brand-input" placeholder={t("add.brand")} className="flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
+                      onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); const val = (e.target as HTMLInputElement).value.trim(); if (val && !form.brand_names.includes(val)) { setField("brand_names", [...form.brand_names, val]); (e.target as HTMLInputElement).value = ""; } } }} />
+                    <button onClick={() => { const input = document.getElementById("brand-input") as HTMLInputElement; const val = input?.value.trim(); if (val && !form.brand_names.includes(val)) { setField("brand_names", [...form.brand_names, val]); input.value = ""; } }} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors">{t("btn.add")}</button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.division")}</label>
+                    <TaxonomySelect
+                      value={form.division}
+                      onChange={v => {
+                        setField("division", v);
+                        // Clear a known category that no longer belongs to the new division.
+                        const div = DIVISIONS.find(d => d.name === v);
+                        const cat = CATEGORIES.find(c => c.label === form.category);
+                        if (cat && div && divisionOfCategory(cat.code)?.id !== div.id) setField("category", "");
+                      }}
+                      options={divisionOptions}
+                      placeholder={t("field.division")}
+                      createLabel={t("create.newDivision", "Create new division")}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.category")}</label>
+                    <TaxonomySelect value={form.category} onChange={v => setField("category", v)} options={categoryOptions} placeholder={form.division ? t("field.category") : t("placeholder.pickDivisionFirst", "Pick a division first")} createLabel={t("create.newCategory", "Create new category")} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <SelectInput label={t("field.industry")} value={form.industry} onChange={v => setField("industry", v)} options={INDUSTRIES} icon={<FactoryIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
+                  <SelectInput label={t("field.source")} value={form.source} onChange={v => setField("source", v)} options={SUPPLIER_SOURCES} icon={<TargetIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
+                </div>
+                {/* Supplier kind is captured once in the "Classifications" section below. */}
+              </div>
+            </FormSection>
+
+            {/* Classifications */}
+            <FormSection title={t("section.classifications", "Classifications")} icon={<TagsIcon size={14} />}>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(CLASSIFICATION_LABELS).map(([k, v]) => {
+                  const on = sIntel.classifications.includes(k);
+                  return <button type="button" key={k} onClick={() => toggleIntelClass(k)} className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${on ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent" : "bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--border-focus)]"}`}>{v}</button>;
+                })}
+              </div>
+              {sIntel.classifications.length > 1 && (
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="text-xs text-[var(--text-faint)]">{t("field.primary", "Primary")}:</span>
+                  <LabelSelect value={sIntel.primary_class} onChange={(v) => setSIntel((p) => ({ ...p, primary_class: v }))} options={sIntel.classifications} renderLabel={(o) => CLASSIFICATION_LABELS[o as keyof typeof CLASSIFICATION_LABELS] ?? o} />
+                </div>
+              )}
+            </FormSection>
+
             {/* 2. Contact Details — How to reach the supplier */}
             <FormSection title={t("section.contactDetails")} icon={<PhoneIcon size={14} />}>
               <div className="space-y-3">
@@ -7068,62 +7134,6 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     <Input label={t("field.postalCode", "Postal / ZIP code")} value={form.supplier_postal_code} onChange={v => setField("supplier_postal_code", v)} placeholder={t("placeholder.zipCode", "Postal / ZIP code")} autoComplete="postal-code" />
                   </div>
                 </div>
-              </div>
-            </FormSection>
-
-            {/* Messaging IDs — how the team reaches an overseas factory.
-                Each channel takes an ID/handle and/or a QR image (drag-drop,
-                PNG/JPG). WeChat is the primary channel for China sourcing. */}
-            <FormSection title={t("section.messagingIds", "Messaging IDs")} icon={<MessageSquareIcon size={14} />}>
-              <div className="space-y-3">
-                <MessagingIdField
-                  hero
-                  label={t("field.wechat", "WeChat")}
-                  icon={<BrandGlyph name="WeChat" size={15} />}
-                  idValue={form.wechat_id}
-                  onIdChange={v => setField("wechat_id", v)}
-                  placeholder={t("placeholder.wechatId", "WeChat ID / handle")}
-                  qrValue={form.wechat_qr}
-                  onQrChange={v => setField("wechat_qr", v)}
-                />
-                <MessagingIdField
-                  label={t("field.whatsappBusiness", "WhatsApp Business")}
-                  icon={<BrandGlyph name="WhatsApp" size={15} />}
-                  idNode={<PhoneField value={form.whatsapp_business} onChange={v => setField("whatsapp_business", v)} placeholder={t("field.whatsappBusiness", "WhatsApp Business")} defaultIso={form.country_code || "CN"} />}
-                  qrValue={form.whatsapp_qr}
-                  onQrChange={v => setField("whatsapp_qr", v)}
-                />
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <MessagingIdField label={t("field.telegram", "Telegram")} icon={<BrandGlyph name="Telegram" size={15} />} idValue={form.telegram_id} onIdChange={v => setField("telegram_id", v)} placeholder="@handle" qrValue={form.telegram_qr} onQrChange={v => setField("telegram_qr", v)} />
-                  <MessagingIdField label={t("field.qq", "QQ")} icon={<BrandGlyph name="QQ" size={15} />} idValue={form.qq_id} onIdChange={v => setField("qq_id", v)} placeholder={t("placeholder.qqId", "QQ number")} qrValue={form.qq_qr} onQrChange={v => setField("qq_qr", v)} />
-                  <MessagingIdField label={t("field.dingtalk", "DingTalk")} icon={<BrandGlyph name="DingTalk" size={15} />} idValue={form.dingtalk_id} onIdChange={v => setField("dingtalk_id", v)} placeholder={t("placeholder.dingtalkId", "DingTalk ID")} qrValue={form.dingtalk_qr} onQrChange={v => setField("dingtalk_qr", v)} />
-                  <MessagingIdField label={t("field.messenger", "Messenger")} icon={<BrandGlyph name="Messenger" size={15} />} idValue={form.messenger_id} onIdChange={v => setField("messenger_id", v)} placeholder={t("placeholder.messenger", "m.me/username")} qrValue={form.messenger_qr} onQrChange={v => setField("messenger_qr", v)} />
-                </div>
-              </div>
-            </FormSection>
-
-            {/* Social Media — add as many accounts as needed; each is a
-                platform + a link, page, or @account name. */}
-            <FormSection title={t("section.socialMedia", "Social Media")} icon={<Share2Icon size={14} />}>
-              <div className="space-y-2.5">
-                {form.social_profiles.length === 0 && (
-                  <p className="text-[11px] text-[var(--text-faint)]">{t("hint.socialMedia", "Add the factory's social pages — paste a link, page, or @account.")}</p>
-                )}
-                {form.social_profiles.map((s, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <RemoveBtn onClick={() => removeSocial(i)} />
-                    <div className="w-36 shrink-0 sm:w-44">
-                      <PlatformSelect value={s.platform} onChange={v => updateSocial(i, "platform", v)} options={SOCIAL_MEDIA_PLATFORMS} />
-                    </div>
-                    <input
-                      value={s.url}
-                      onChange={e => updateSocial(i, "url", e.target.value)}
-                      placeholder={t("placeholder.socialLink", "Link, page, or @account")}
-                      className="min-w-0 flex-1 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
-                    />
-                  </div>
-                ))}
-                <AddButton label={t("add.socialAccount", "Add social account")} onClick={() => setField("social_profiles", [...form.social_profiles, { platform: "LinkedIn", username: "", url: "", qr_code_url: "" }])} />
               </div>
             </FormSection>
 
@@ -7183,53 +7193,59 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
-            {/* 4. Company Profile — Brand, classification, and business identity */}
-            <FormSection title={t("section.companyProfile")} icon={<BriefcaseIcon size={14} />}>
+            {/* Messaging IDs — how the team reaches an overseas factory.
+                Each channel takes an ID/handle and/or a QR image (drag-drop,
+                PNG/JPG). WeChat is the primary channel for China sourcing. */}
+            <FormSection title={t("section.messagingIds", "Messaging IDs")} icon={<MessageSquareIcon size={14} />}>
               <div className="space-y-3">
-                {/* Brand Names */}
-                <div>
-                  <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.brand")}</label>
-                  <div className="flex flex-wrap gap-1.5 mb-2">
-                    {form.brand_names.map((b, i) => (
-                      <span key={i} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-secondary)]">
-                        {b}
-                        <button onClick={() => setField("brand_names", form.brand_names.filter((_, idx) => idx !== i))} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]"><CrossIcon size={10} /></button>
-                      </span>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <input id="brand-input" placeholder={t("add.brand")} className="flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
-                      onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); const val = (e.target as HTMLInputElement).value.trim(); if (val && !form.brand_names.includes(val)) { setField("brand_names", [...form.brand_names, val]); (e.target as HTMLInputElement).value = ""; } } }} />
-                    <button onClick={() => { const input = document.getElementById("brand-input") as HTMLInputElement; const val = input?.value.trim(); if (val && !form.brand_names.includes(val)) { setField("brand_names", [...form.brand_names, val]); input.value = ""; } }} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors">{t("btn.add")}</button>
-                  </div>
+                <MessagingIdField
+                  hero
+                  label={t("field.wechat", "WeChat")}
+                  icon={<BrandGlyph name="WeChat" size={15} />}
+                  idValue={form.wechat_id}
+                  onIdChange={v => setField("wechat_id", v)}
+                  placeholder={t("placeholder.wechatId", "WeChat ID / handle")}
+                  qrValue={form.wechat_qr}
+                  onQrChange={v => setField("wechat_qr", v)}
+                />
+                <MessagingIdField
+                  label={t("field.whatsappBusiness", "WhatsApp Business")}
+                  icon={<BrandGlyph name="WhatsApp" size={15} />}
+                  idNode={<PhoneField value={form.whatsapp_business} onChange={v => setField("whatsapp_business", v)} placeholder={t("field.whatsappBusiness", "WhatsApp Business")} defaultIso={form.country_code || "CN"} />}
+                  qrValue={form.whatsapp_qr}
+                  onQrChange={v => setField("whatsapp_qr", v)}
+                />
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <MessagingIdField label={t("field.telegram", "Telegram")} icon={<BrandGlyph name="Telegram" size={15} />} idValue={form.telegram_id} onIdChange={v => setField("telegram_id", v)} placeholder="@handle" qrValue={form.telegram_qr} onQrChange={v => setField("telegram_qr", v)} />
+                  <MessagingIdField label={t("field.qq", "QQ")} icon={<BrandGlyph name="QQ" size={15} />} idValue={form.qq_id} onIdChange={v => setField("qq_id", v)} placeholder={t("placeholder.qqId", "QQ number")} qrValue={form.qq_qr} onQrChange={v => setField("qq_qr", v)} />
+                  <MessagingIdField label={t("field.dingtalk", "DingTalk")} icon={<BrandGlyph name="DingTalk" size={15} />} idValue={form.dingtalk_id} onIdChange={v => setField("dingtalk_id", v)} placeholder={t("placeholder.dingtalkId", "DingTalk ID")} qrValue={form.dingtalk_qr} onQrChange={v => setField("dingtalk_qr", v)} />
+                  <MessagingIdField label={t("field.messenger", "Messenger")} icon={<BrandGlyph name="Messenger" size={15} />} idValue={form.messenger_id} onIdChange={v => setField("messenger_id", v)} placeholder={t("placeholder.messenger", "m.me/username")} qrValue={form.messenger_qr} onQrChange={v => setField("messenger_qr", v)} />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.division")}</label>
-                    <TaxonomySelect
-                      value={form.division}
-                      onChange={v => {
-                        setField("division", v);
-                        // Clear a known category that no longer belongs to the new division.
-                        const div = DIVISIONS.find(d => d.name === v);
-                        const cat = CATEGORIES.find(c => c.label === form.category);
-                        if (cat && div && divisionOfCategory(cat.code)?.id !== div.id) setField("category", "");
-                      }}
-                      options={divisionOptions}
-                      placeholder={t("field.division")}
-                      createLabel={t("create.newDivision", "Create new division")}
+              </div>
+            </FormSection>
+
+            {/* Social Media — add as many accounts as needed; each is a
+                platform + a link, page, or @account name. */}
+            <FormSection title={t("section.socialMedia", "Social Media")} icon={<Share2Icon size={14} />}>
+              <div className="space-y-2.5">
+                {form.social_profiles.length === 0 && (
+                  <p className="text-[11px] text-[var(--text-faint)]">{t("hint.socialMedia", "Add the factory's social pages — paste a link, page, or @account.")}</p>
+                )}
+                {form.social_profiles.map((s, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <RemoveBtn onClick={() => removeSocial(i)} />
+                    <div className="w-36 shrink-0 sm:w-44">
+                      <PlatformSelect value={s.platform} onChange={v => updateSocial(i, "platform", v)} options={SOCIAL_MEDIA_PLATFORMS} />
+                    </div>
+                    <input
+                      value={s.url}
+                      onChange={e => updateSocial(i, "url", e.target.value)}
+                      placeholder={t("placeholder.socialLink", "Link, page, or @account")}
+                      className="min-w-0 flex-1 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
                     />
                   </div>
-                  <div>
-                    <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.category")}</label>
-                    <TaxonomySelect value={form.category} onChange={v => setField("category", v)} options={categoryOptions} placeholder={form.division ? t("field.category") : t("placeholder.pickDivisionFirst", "Pick a division first")} createLabel={t("create.newCategory", "Create new category")} />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <SelectInput label={t("field.supplierType")} value={form.supplier_type} onChange={v => setField("supplier_type", v)} options={SUPPLIER_TYPES} icon={<Building2Icon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
-                  <SelectInput label={t("field.industry")} value={form.industry} onChange={v => setField("industry", v)} options={INDUSTRIES} icon={<FactoryIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
-                </div>
-                <SelectInput label={t("field.source")} value={form.source} onChange={v => setField("source", v)} options={SUPPLIER_SOURCES} icon={<TargetIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
+                ))}
+                <AddButton label={t("add.socialAccount", "Add social account")} onClick={() => setField("social_profiles", [...form.social_profiles, { platform: "LinkedIn", username: "", url: "", qr_code_url: "" }])} />
               </div>
             </FormSection>
 
@@ -7274,39 +7290,19 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
-            {/* 5. Payment & Currency */}
-            <FormSection title={t("section.paymentCurrency")} icon={<DollarSignIcon size={14} />}>
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <SelectInput label={t("field.paymentTerms")} value={form.payment_terms} onChange={v => setField("payment_terms", v)} options={PAYMENT_TERMS_OPTIONS} icon={<ReceiptIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
-                  <SelectInput label={t("field.currency")} value={form.currency} onChange={v => setField("currency", v)} options={CURRENCIES} icon={<DollarSignIcon size={14} />} selectLabel={t("detail.select")} />
-                </div>
-                <div>
-                  <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.paymentInfo")}</label>
-                  <textarea value={form.payment_info} onChange={e => setField("payment_info", e.target.value)} placeholder={t("placeholder.bankTransfer")} rows={3} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none resize-none focus:border-[var(--border-focus)]" />
-                </div>
-              </div>
-            </FormSection>
-
-            {/* Logistics & Trade — shipping terms a buyer needs at a glance */}
-            <FormSection title={t("section.logisticsTrade", "Logistics & Trade")} icon={<TruckIcon size={14} />}>
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <SelectInput label={t("field.incoterms", "Incoterms")} value={form.incoterms} onChange={v => setField("incoterms", v)} options={INCOTERMS} icon={<ShipIcon size={14} />} selectLabel={t("detail.select")} />
-                  <Input label={t("field.leadTime", "Lead Time")} value={form.lead_time} onChange={v => setField("lead_time", v)} placeholder="e.g. 30 days" icon={<TimerIcon size={14} />} />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <Input label={t("field.moq", "MOQ")} value={form.moq} onChange={v => setField("moq", v)} placeholder="Minimum order qty" icon={<PackageIcon size={14} />} />
-                  <SelectInput label={t("field.containerPreference", "Container Preference")} value={form.container_preference} onChange={v => setField("container_preference", v)} options={CONTAINER_PREFERENCES} icon={<BoxesIcon size={14} />} selectLabel={t("detail.select")} />
-                </div>
-                <Input label={t("field.portOfEntry", "Port of Loading / Entry")} value={form.port_of_entry} onChange={v => setField("port_of_entry", v)} placeholder="Shanghai / Ningbo / Jebel Ali" icon={<ShipIcon size={14} />} />
-              </div>
-            </FormSection>
-
-            {/* 6. Payment Information — bank accounts + mobile payment (WeChat Pay / Alipay) */}
+            {/* Payment — terms + currency + bank accounts + mobile payment (WeChat Pay / Alipay) */}
             <FormSection title={t("section.paymentInfo", "Payment Information")} icon={<LandmarkIcon size={14} />}>
               <div className="space-y-4">
+                {/* Terms & currency (merged from the old Payment & Currency section) */}
                 <div className="space-y-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.termsCurrency", "Terms & Currency")}</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <SelectInput label={t("field.paymentTerms")} value={form.payment_terms} onChange={v => setField("payment_terms", v)} options={PAYMENT_TERMS_OPTIONS} icon={<ReceiptIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
+                    <SelectInput label={t("field.currency")} value={form.currency} onChange={v => setField("currency", v)} options={CURRENCIES} icon={<DollarSignIcon size={14} />} selectLabel={t("detail.select")} />
+                  </div>
+                  <textarea value={form.payment_info} onChange={e => setField("payment_info", e.target.value)} placeholder={t("placeholder.bankTransfer")} rows={2} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none resize-none focus:border-[var(--border-focus)]" />
+                </div>
+                <div className="space-y-3 border-t border-[var(--border-color)] pt-3">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.bankAccounts", "Bank Accounts")}</p>
                   {form.bank_accounts.map((bank, i) => (
                     <div key={i} className="p-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] space-y-2">
@@ -7365,6 +7361,46 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
+            {/* Logistics & Trade — shipping terms a buyer needs at a glance */}
+            <FormSection title={t("section.logisticsTrade", "Logistics & Trade")} icon={<TruckIcon size={14} />}>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <SelectInput label={t("field.incoterms", "Incoterms")} value={form.incoterms} onChange={v => setField("incoterms", v)} options={INCOTERMS} icon={<ShipIcon size={14} />} selectLabel={t("detail.select")} />
+                  <Input label={t("field.leadTime", "Lead Time")} value={form.lead_time} onChange={v => setField("lead_time", v)} placeholder="e.g. 30 days" icon={<TimerIcon size={14} />} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input label={t("field.moq", "MOQ")} value={form.moq} onChange={v => setField("moq", v)} placeholder="Minimum order qty" icon={<PackageIcon size={14} />} />
+                  <SelectInput label={t("field.containerPreference", "Container Preference")} value={form.container_preference} onChange={v => setField("container_preference", v)} options={CONTAINER_PREFERENCES} icon={<BoxesIcon size={14} />} selectLabel={t("detail.select")} />
+                </div>
+                <Input label={t("field.portOfEntry", "Port of Loading / Entry")} value={form.port_of_entry} onChange={v => setField("port_of_entry", v)} placeholder="Shanghai / Ningbo / Jebel Ali" icon={<ShipIcon size={14} />} />
+              </div>
+            </FormSection>
+
+            {/* Factory */}
+            <FormSection title={t("section.factory", "Factory")} icon={<FactoryIcon size={14} />}>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <Input label={t("field.factoryName", "Factory name")} value={String(sIntel.factory.factory_name)} onChange={(v) => setIntelFactory("factory_name", v)} icon={<FactoryIcon size={14} />} />
+                  <SelectInput label={t("field.factoryType", "Factory type")} value={String(sIntel.factory.factory_type)} onChange={(v) => setIntelFactory("factory_type", v)} options={Object.keys(FACTORY_TYPE_LABELS)} renderLabel={(o) => FACTORY_TYPE_LABELS[o] ?? o} selectLabel={t("detail.select")} />
+                  <Input label={t("field.productionLines", "Production lines")} value={String(sIntel.factory.production_lines)} onChange={(v) => setIntelFactory("production_lines", v)} inputMode="numeric" placeholder="e.g. 12" />
+                  <Input label={t("field.monthlyCapacity", "Monthly capacity")} value={String(sIntel.factory.monthly_capacity)} onChange={(v) => setIntelFactory("monthly_capacity", v)} placeholder="e.g. 50,000 units" />
+                  <Input label={t("field.annualOutput", "Annual output")} value={String(sIntel.factory.annual_output)} onChange={(v) => setIntelFactory("annual_output", v)} placeholder="e.g. 600,000 units" />
+                  <Input label={t("field.factorySize", "Factory size (sqm)")} value={String(sIntel.factory.factory_size_sqm)} onChange={(v) => setIntelFactory("factory_size_sqm", v)} inputMode="numeric" placeholder="e.g. 8000" />
+                  <Input label={t("field.employees", "Employees")} value={String(sIntel.factory.employee_count)} onChange={(v) => setIntelFactory("employee_count", v)} inputMode="numeric" placeholder="e.g. 250" />
+                  <Input label={t("field.qcStaff", "QC staff")} value={String(sIntel.factory.qc_staff_count)} onChange={(v) => setIntelFactory("qc_staff_count", v)} inputMode="numeric" placeholder="e.g. 15" />
+                  <Input label={t("field.rdStaff", "R&D staff")} value={String(sIntel.factory.rd_staff_count)} onChange={(v) => setIntelFactory("rd_staff_count", v)} inputMode="numeric" placeholder="e.g. 8" />
+                  <Input label={t("field.exportPct", "Export %")} value={String(sIntel.factory.export_percentage)} onChange={(v) => setIntelFactory("export_percentage", v)} inputMode="numeric" placeholder="0–100" />
+                  <Input label={t("field.exportMarkets", "Export markets (comma)")} value={String(sIntel.factory.main_export_markets)} onChange={(v) => setIntelFactory("main_export_markets", v)} placeholder="US, EU, UAE" />
+                  <Input label={t("field.prodCategories", "Production categories (comma)")} value={String(sIntel.factory.production_categories)} onChange={(v) => setIntelFactory("production_categories", v)} />
+                </div>
+                <div className="flex flex-wrap gap-4 text-sm text-[var(--text-muted)]">
+                  <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!sIntel.factory.odm_supported} onChange={(e) => setIntelFactory("odm_supported", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.odm", "ODM support")}</label>
+                  <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!sIntel.factory.private_label_supported} onChange={(e) => setIntelFactory("private_label_supported", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.privateLabel", "Private label")}</label>
+                  <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!sIntel.factory.low_moq_supported} onChange={(e) => setIntelFactory("low_moq_supported", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.lowMoq", "Low MOQ")}</label>
+                </div>
+              </div>
+            </FormSection>
+
             {/* 7. Catalogue */}
             <FormSection title={t("section.catalogue")} icon={<BookOpenIcon size={14} />}>
               <div className="space-y-2">
@@ -7403,54 +7439,28 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
-            {/* 8. Documents */}
-            <FormSection title={t("section.documents")} icon={<PaperclipIcon size={14} />}>
-              <div className="space-y-2">
-                {form.documents.map((doc, i) => (
-                  <div key={i} className="p-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] space-y-2">
-                    <div className="flex items-center gap-2">
-                      <RemoveBtn onClick={() => setField("documents", form.documents.filter((_, idx) => idx !== i))} />
-                      {doc.url ? (
-                        <>
-                          <FileCheckIcon size={14} className="text-blue-400 shrink-0" />
-                          <span className="text-xs text-[var(--text-muted)] font-medium truncate">{doc.doc_name || t("misc.untitled")}</span>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-faint)] font-medium ms-auto">{doc.type}</span>
-                          <button onClick={() => openFilePreview(doc.url)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[10px] text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors">
-                            {doc.type === "PDF" ? <ExternalLinkIcon size={10} /> : <EyeIcon size={10} />} {doc.type === "PDF" ? t("btn.open") : t("btn.preview")}
-                          </button>
-                          <button onClick={() => downloadFile(doc.url, doc.name)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[10px] text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors">
-                            <DownloadIcon size={10} /> {t("btn.download")}
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <input
-                            value={doc.doc_name}
-                            onChange={e => { const arr = [...form.documents]; arr[i] = { ...arr[i], doc_name: e.target.value }; setField("documents", arr); }}
-                            placeholder={t("placeholder.docName")}
-                            className="flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
-                          />
-                          <label className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-subtle)] hover:text-[var(--text-primary)] cursor-pointer transition-colors shrink-0">
-                            <PaperclipIcon size={12} /> {t("btn.upload")}
-                            <input type="file" accept=".pdf,image/*" className="hidden" onChange={e => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                const isPdf = file.type === "application/pdf";
-                                const handler = isPdf ? readFileAsDataURL(file) : compressImage(file, 1200, 0.8);
-                                handler.then(url => {
-                                  const arr = [...form.documents];
-                                  arr[i] = { ...arr[i], name: file.name, url, type: isPdf ? "PDF" : file.type.split("/").pop()?.toUpperCase() || "FILE", uploaded_at: new Date().toISOString() };
-                                  setField("documents", arr);
-                                });
-                              }
-                            }} />
-                          </label>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                <AddButton label={t("add.document")} onClick={() => setField("documents", [...form.documents, { doc_name: "", name: "", url: "", type: "", uploaded_at: "" }])} />
+            {/* 10. Products (placeholder) */}
+            <FormSection title={t("section.products")} icon={<PackageIcon size={14} />}>
+              <div className="flex items-center gap-3 py-4">
+                <div className="w-10 h-10 rounded-full bg-[var(--bg-surface)] flex items-center justify-center">
+                  <PackageIcon size={18} className="text-[var(--text-ghost)]" />
+                </div>
+                <p className="text-sm text-[var(--text-dim)]">{t("detail.productsPlaceholder")}</p>
+              </div>
+            </FormSection>
+
+            {/* Strategic status */}
+            <FormSection title={t("section.strategicStatus", "Strategic Status")} icon={<TargetIcon size={14} />}>
+              <div className="grid grid-cols-2 gap-3">
+                <SelectInput label={t("field.strategicStatus", "Strategic status")} value={sIntel.strategic_status} onChange={(v) => setSIntel((p) => ({ ...p, strategic_status: v }))} options={Object.keys(STRATEGIC_STATUS_LABELS)} renderLabel={(o) => STRATEGIC_STATUS_LABELS[o as keyof typeof STRATEGIC_STATUS_LABELS] ?? o} icon={<TargetIcon size={14} />} selectLabel={t("detail.select")} />
+                <SuggestInput
+                  label={t("field.statusReason", "Status reason")}
+                  value={sIntel.strategic_status_reason}
+                  onChange={(v) => setSIntel((p) => ({ ...p, strategic_status_reason: v }))}
+                  placeholder={t("placeholder.statusReason", "Pick a common reason or type your own")}
+                  options={STATUS_REASON_SUGGESTIONS}
+                  icon={<TargetIcon size={14} />}
+                />
               </div>
             </FormSection>
 
@@ -7468,10 +7478,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     {form.rating > 0 && <span className="text-xs text-[var(--text-dim)] ms-2">{form.rating}/5</span>}
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <Input label={t("field.reliabilityScore")} value={form.reliability_score} onChange={v => setField("reliability_score", v)} placeholder={t("placeholder.reliabilityScore")} icon={<TrendingUpIcon size={14} />} />
-                  <SelectInput label={t("field.sampleStatus")} value={form.sample_status} onChange={v => setField("sample_status", v)} options={SAMPLE_STATUSES} icon={<PackageIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
-                </div>
+                {/* Reliability is captured as the Risk → Internal score (auto-calculated). */}
+                <SelectInput label={t("field.sampleStatus")} value={form.sample_status} onChange={v => setField("sample_status", v)} options={SAMPLE_STATUSES} icon={<PackageIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
                 {/* Certifications */}
                 <div>
                   <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.certifications")}</label>
@@ -7497,62 +7505,6 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <div>
                   <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.qualityObs")}</label>
                   <textarea value={form.quality_notes} onChange={e => setField("quality_notes", e.target.value)} placeholder={t("placeholder.qualityObs")} rows={3} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none resize-none focus:border-[var(--border-focus)]" />
-                </div>
-              </div>
-            </FormSection>
-
-            {/* Strategic status */}
-            <FormSection title={t("section.strategicStatus", "Strategic Status")} icon={<TargetIcon size={14} />}>
-              <div className="grid grid-cols-2 gap-3">
-                <SelectInput label={t("field.strategicStatus", "Strategic status")} value={sIntel.strategic_status} onChange={(v) => setSIntel((p) => ({ ...p, strategic_status: v }))} options={Object.keys(STRATEGIC_STATUS_LABELS)} renderLabel={(o) => STRATEGIC_STATUS_LABELS[o as keyof typeof STRATEGIC_STATUS_LABELS] ?? o} icon={<TargetIcon size={14} />} selectLabel={t("detail.select")} />
-                <SuggestInput
-                  label={t("field.statusReason", "Status reason")}
-                  value={sIntel.strategic_status_reason}
-                  onChange={(v) => setSIntel((p) => ({ ...p, strategic_status_reason: v }))}
-                  placeholder={t("placeholder.statusReason", "Pick a common reason or type your own")}
-                  options={STATUS_REASON_SUGGESTIONS}
-                  icon={<TargetIcon size={14} />}
-                />
-              </div>
-            </FormSection>
-
-            {/* Classifications */}
-            <FormSection title={t("section.classifications", "Classifications")} icon={<TagsIcon size={14} />}>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(CLASSIFICATION_LABELS).map(([k, v]) => {
-                  const on = sIntel.classifications.includes(k);
-                  return <button type="button" key={k} onClick={() => toggleIntelClass(k)} className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${on ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent" : "bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--border-focus)]"}`}>{v}</button>;
-                })}
-              </div>
-              {sIntel.classifications.length > 1 && (
-                <div className="mt-3 flex items-center gap-2">
-                  <span className="text-xs text-[var(--text-faint)]">{t("field.primary", "Primary")}:</span>
-                  <LabelSelect value={sIntel.primary_class} onChange={(v) => setSIntel((p) => ({ ...p, primary_class: v }))} options={sIntel.classifications} renderLabel={(o) => CLASSIFICATION_LABELS[o as keyof typeof CLASSIFICATION_LABELS] ?? o} />
-                </div>
-              )}
-            </FormSection>
-
-            {/* Factory */}
-            <FormSection title={t("section.factory", "Factory")} icon={<FactoryIcon size={14} />}>
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <Input label={t("field.factoryName", "Factory name")} value={String(sIntel.factory.factory_name)} onChange={(v) => setIntelFactory("factory_name", v)} icon={<FactoryIcon size={14} />} />
-                  <SelectInput label={t("field.factoryType", "Factory type")} value={String(sIntel.factory.factory_type)} onChange={(v) => setIntelFactory("factory_type", v)} options={Object.keys(FACTORY_TYPE_LABELS)} renderLabel={(o) => FACTORY_TYPE_LABELS[o] ?? o} selectLabel={t("detail.select")} />
-                  <Input label={t("field.productionLines", "Production lines")} value={String(sIntel.factory.production_lines)} onChange={(v) => setIntelFactory("production_lines", v)} inputMode="numeric" placeholder="e.g. 12" />
-                  <Input label={t("field.monthlyCapacity", "Monthly capacity")} value={String(sIntel.factory.monthly_capacity)} onChange={(v) => setIntelFactory("monthly_capacity", v)} placeholder="e.g. 50,000 units" />
-                  <Input label={t("field.annualOutput", "Annual output")} value={String(sIntel.factory.annual_output)} onChange={(v) => setIntelFactory("annual_output", v)} placeholder="e.g. 600,000 units" />
-                  <Input label={t("field.factorySize", "Factory size (sqm)")} value={String(sIntel.factory.factory_size_sqm)} onChange={(v) => setIntelFactory("factory_size_sqm", v)} inputMode="numeric" placeholder="e.g. 8000" />
-                  <Input label={t("field.employees", "Employees")} value={String(sIntel.factory.employee_count)} onChange={(v) => setIntelFactory("employee_count", v)} inputMode="numeric" placeholder="e.g. 250" />
-                  <Input label={t("field.qcStaff", "QC staff")} value={String(sIntel.factory.qc_staff_count)} onChange={(v) => setIntelFactory("qc_staff_count", v)} inputMode="numeric" placeholder="e.g. 15" />
-                  <Input label={t("field.rdStaff", "R&D staff")} value={String(sIntel.factory.rd_staff_count)} onChange={(v) => setIntelFactory("rd_staff_count", v)} inputMode="numeric" placeholder="e.g. 8" />
-                  <Input label={t("field.exportPct", "Export %")} value={String(sIntel.factory.export_percentage)} onChange={(v) => setIntelFactory("export_percentage", v)} inputMode="numeric" placeholder="0–100" />
-                  <Input label={t("field.exportMarkets", "Export markets (comma)")} value={String(sIntel.factory.main_export_markets)} onChange={(v) => setIntelFactory("main_export_markets", v)} placeholder="US, EU, UAE" />
-                  <Input label={t("field.prodCategories", "Production categories (comma)")} value={String(sIntel.factory.production_categories)} onChange={(v) => setIntelFactory("production_categories", v)} />
-                </div>
-                <div className="flex flex-wrap gap-4 text-sm text-[var(--text-muted)]">
-                  <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!sIntel.factory.odm_supported} onChange={(e) => setIntelFactory("odm_supported", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.odm", "ODM support")}</label>
-                  <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!sIntel.factory.private_label_supported} onChange={(e) => setIntelFactory("private_label_supported", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.privateLabel", "Private label")}</label>
-                  <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!sIntel.factory.low_moq_supported} onChange={(e) => setIntelFactory("low_moq_supported", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.lowMoq", "Low MOQ")}</label>
                 </div>
               </div>
             </FormSection>
@@ -7618,13 +7570,54 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
-            {/* 10. Products (placeholder) */}
-            <FormSection title={t("section.products")} icon={<PackageIcon size={14} />}>
-              <div className="flex items-center gap-3 py-4">
-                <div className="w-10 h-10 rounded-full bg-[var(--bg-surface)] flex items-center justify-center">
-                  <PackageIcon size={18} className="text-[var(--text-ghost)]" />
-                </div>
-                <p className="text-sm text-[var(--text-dim)]">{t("detail.productsPlaceholder")}</p>
+            {/* 8. Documents */}
+            <FormSection title={t("section.documents")} icon={<PaperclipIcon size={14} />}>
+              <div className="space-y-2">
+                {form.documents.map((doc, i) => (
+                  <div key={i} className="p-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] space-y-2">
+                    <div className="flex items-center gap-2">
+                      <RemoveBtn onClick={() => setField("documents", form.documents.filter((_, idx) => idx !== i))} />
+                      {doc.url ? (
+                        <>
+                          <FileCheckIcon size={14} className="text-blue-400 shrink-0" />
+                          <span className="text-xs text-[var(--text-muted)] font-medium truncate">{doc.doc_name || t("misc.untitled")}</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-faint)] font-medium ms-auto">{doc.type}</span>
+                          <button onClick={() => openFilePreview(doc.url)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[10px] text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors">
+                            {doc.type === "PDF" ? <ExternalLinkIcon size={10} /> : <EyeIcon size={10} />} {doc.type === "PDF" ? t("btn.open") : t("btn.preview")}
+                          </button>
+                          <button onClick={() => downloadFile(doc.url, doc.name)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[10px] text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors">
+                            <DownloadIcon size={10} /> {t("btn.download")}
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <input
+                            value={doc.doc_name}
+                            onChange={e => { const arr = [...form.documents]; arr[i] = { ...arr[i], doc_name: e.target.value }; setField("documents", arr); }}
+                            placeholder={t("placeholder.docName")}
+                            className="flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
+                          />
+                          <label className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-subtle)] hover:text-[var(--text-primary)] cursor-pointer transition-colors shrink-0">
+                            <PaperclipIcon size={12} /> {t("btn.upload")}
+                            <input type="file" accept=".pdf,image/*" className="hidden" onChange={e => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const isPdf = file.type === "application/pdf";
+                                const handler = isPdf ? readFileAsDataURL(file) : compressImage(file, 1200, 0.8);
+                                handler.then(url => {
+                                  const arr = [...form.documents];
+                                  arr[i] = { ...arr[i], name: file.name, url, type: isPdf ? "PDF" : file.type.split("/").pop()?.toUpperCase() || "FILE", uploaded_at: new Date().toISOString() };
+                                  setField("documents", arr);
+                                });
+                              }
+                            }} />
+                          </label>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                <AddButton label={t("add.document")} onClick={() => setField("documents", [...form.documents, { doc_name: "", name: "", url: "", type: "", uploaded_at: "" }])} />
               </div>
             </FormSection>
 
