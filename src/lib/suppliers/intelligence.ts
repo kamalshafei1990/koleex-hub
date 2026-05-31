@@ -390,20 +390,29 @@ export function certIsTrusted(row: {
 
 /* ── Strategic lifecycle ── */
 export type StrategicStatus =
-  | "strategic"
-  | "preferred"
-  | "approved"
+  | "prospect"
   | "trial"
+  | "approved"
+  | "preferred"
+  | "strategic"
+  | "under_review"
+  | "suspended"
   | "inactive"
+  | "phasing_out"
   | "blocked"
   | "blacklisted";
 
+/* Ordered as a supplier lifecycle: onboarding → active tiers → caution → exit. */
 export const STRATEGIC_STATUS_LABELS: Record<StrategicStatus, string> = {
-  strategic: "Strategic",
-  preferred: "Preferred",
-  approved: "Approved",
+  prospect: "Prospect",
   trial: "Trial",
+  approved: "Approved",
+  preferred: "Preferred",
+  strategic: "Strategic",
+  under_review: "Under Review",
+  suspended: "Suspended",
   inactive: "Inactive",
+  phasing_out: "Phasing Out",
   blocked: "Blocked",
   blacklisted: "Blacklisted",
 };

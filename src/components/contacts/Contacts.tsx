@@ -1493,9 +1493,9 @@ const EMPTY_SINTEL: SupplierIntel = {
   neg: { negotiation_score: "", price_flexibility: "", moq_flexibility: "", payment_flexibility: "", negotiation_difficulty: "", sample_turnaround_speed: "", internal_notes: "" },
 };
 
-const Input = React.memo(function Input({ label, value, onChange, type = "text", placeholder, icon, inputMode, autoComplete }: {
+const Input = React.memo(function Input({ label, value, onChange, type = "text", placeholder, icon, inputMode, autoComplete, list }: {
   label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string; icon?: React.ReactNode;
-  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"]; autoComplete?: string;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"]; autoComplete?: string; list?: string;
 }) {
   /* Sensible defaults so each field gets the right mobile keyboard + browser
      autofill even when the caller only passes `type`. */
@@ -1510,6 +1510,7 @@ const Input = React.memo(function Input({ label, value, onChange, type = "text",
           type={type}
           inputMode={resolvedInputMode}
           autoComplete={resolvedAutoComplete}
+          list={list}
           value={value}
           onChange={e => onChange(e.target.value)}
           placeholder={placeholder || label}
@@ -7260,7 +7261,23 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <FormSection title={t("section.strategicStatus", "Strategic Status")} icon={<TargetIcon size={14} />}>
               <div className="grid grid-cols-2 gap-3">
                 <SelectInput label={t("field.strategicStatus", "Strategic status")} value={sIntel.strategic_status} onChange={(v) => setSIntel((p) => ({ ...p, strategic_status: v }))} options={Object.keys(STRATEGIC_STATUS_LABELS)} renderLabel={(o) => STRATEGIC_STATUS_LABELS[o as keyof typeof STRATEGIC_STATUS_LABELS] ?? o} icon={<TargetIcon size={14} />} selectLabel={t("detail.select")} />
-                <Input label={t("field.statusReason", "Status reason")} value={sIntel.strategic_status_reason} onChange={(v) => setSIntel((p) => ({ ...p, strategic_status_reason: v }))} />
+                <Input label={t("field.statusReason", "Status reason")} value={sIntel.strategic_status_reason} onChange={(v) => setSIntel((p) => ({ ...p, strategic_status_reason: v }))} list="supplier-status-reasons" placeholder={t("placeholder.statusReason", "Pick a common reason or type your own")} />
+                <datalist id="supplier-status-reasons">
+                  <option value="Consistent quality & on-time delivery" />
+                  <option value="Sole source for a critical component" />
+                  <option value="Long-term strategic partnership" />
+                  <option value="Most competitive pricing" />
+                  <option value="Currently in trial / evaluation" />
+                  <option value="Newly identified — not yet engaged" />
+                  <option value="Pending audit / approval" />
+                  <option value="Repeated quality issues" />
+                  <option value="Late / unreliable deliveries" />
+                  <option value="Failed audit or certification lapse" />
+                  <option value="Compliance / sanctions concern" />
+                  <option value="Pricing no longer competitive" />
+                  <option value="No recent orders / dormant" />
+                  <option value="Being replaced by an alternative supplier" />
+                </datalist>
               </div>
             </FormSection>
 
