@@ -6162,8 +6162,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <FormSection title={t("section.contactDetails")} icon={<PhoneIcon size={14} />}>
               <div className="space-y-3">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <PhoneField label={t("field.contactTel")} value={form.supplier_tel} onChange={v => setField("supplier_tel", v)} placeholder={t("field.contactTel")} defaultIso={form.country_code} />
-                  <PhoneField label={t("field.contactMobile")} value={form.supplier_mobile} onChange={v => setField("supplier_mobile", v)} placeholder={t("field.contactMobile")} defaultIso={form.country_code} />
+                  <PhoneField label={t("field.contactTel")} value={form.supplier_tel} onChange={v => setField("supplier_tel", v)} placeholder={t("field.contactTel")} defaultIso={form.country_code || "CN"} />
+                  <PhoneField label={t("field.contactMobile")} value={form.supplier_mobile} onChange={v => setField("supplier_mobile", v)} placeholder={t("field.contactMobile")} defaultIso={form.country_code || "CN"} />
                 </div>
                 <Input label={t("field.contactEmail")} type="email" value={form.supplier_email} onChange={v => setField("supplier_email", v)} placeholder="company@example.com" icon={<EnvelopeIcon size={14} />} />
                 <Input label={t("field.website")} type="url" value={form.supplier_website} onChange={v => setField("supplier_website", v)} placeholder="https://www.example.com" icon={<GlobeIcon size={14} />} />
@@ -6186,7 +6186,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             {/* Messaging IDs — how the team reaches an overseas factory */}
             <FormSection title={t("section.messagingIds", "Messaging IDs")} icon={<MessageSquareIcon size={14} />}>
               <div className="space-y-3">
-                <PhoneField label={t("field.whatsappBusiness", "WhatsApp Business")} value={form.whatsapp_business} onChange={v => setField("whatsapp_business", v)} placeholder={t("field.whatsappBusiness", "WhatsApp Business")} defaultIso={form.country_code} />
+                <PhoneField label={t("field.whatsappBusiness", "WhatsApp Business")} value={form.whatsapp_business} onChange={v => setField("whatsapp_business", v)} placeholder={t("field.whatsappBusiness", "WhatsApp Business")} defaultIso={form.country_code || "CN"} />
                 <div className="grid grid-cols-2 gap-3">
                   <Input label={t("field.wechatId", "WeChat ID")} value={form.wechat_id} onChange={v => setField("wechat_id", v)} placeholder="@handle" icon={<MessageSquareIcon size={14} />} />
                   <Input label={t("field.telegramId", "Telegram ID")} value={form.telegram_id} onChange={v => setField("telegram_id", v)} placeholder="@handle" icon={<MessageSquareIcon size={14} />} />
