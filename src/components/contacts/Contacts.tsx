@@ -1397,9 +1397,14 @@ const EMPTY_SINTEL: SupplierIntel = {
   neg: { negotiation_score: "", price_flexibility: "", moq_flexibility: "", payment_flexibility: "", negotiation_difficulty: "", sample_turnaround_speed: "", internal_notes: "" },
 };
 
-const Input = React.memo(function Input({ label, value, onChange, type = "text", placeholder, icon }: {
+const Input = React.memo(function Input({ label, value, onChange, type = "text", placeholder, icon, inputMode, autoComplete }: {
   label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string; icon?: React.ReactNode;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"]; autoComplete?: string;
 }) {
+  /* Sensible defaults so each field gets the right mobile keyboard + browser
+     autofill even when the caller only passes `type`. */
+  const resolvedInputMode = inputMode ?? (type === "email" ? "email" : type === "url" ? "url" : type === "tel" ? "tel" : type === "number" ? "decimal" : undefined);
+  const resolvedAutoComplete = autoComplete ?? (type === "email" ? "email" : type === "tel" ? "tel" : type === "url" ? "url" : undefined);
   return (
     <div>
       <label className="text-xs text-[var(--text-faint)] mb-1 block">{label}</label>
@@ -1407,6 +1412,8 @@ const Input = React.memo(function Input({ label, value, onChange, type = "text",
         {icon && <span className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)]">{icon}</span>}
         <input
           type={type}
+          inputMode={resolvedInputMode}
+          autoComplete={resolvedAutoComplete}
           value={value}
           onChange={e => onChange(e.target.value)}
           placeholder={placeholder || label}
@@ -1881,6 +1888,126 @@ const ALL_COUNTRIES: CountryOption[] = Country.getAllCountries().map(c => ({
   isoCode: c.isoCode,
   flag: countryCodeToFlag(c.isoCode),
 }));
+
+/* ── Phone dial codes (built from the same country dataset) ───────────────── */
+interface DialCode { iso: string; name: string; code: string; flag: string; }
+const DIAL_CODES: DialCode[] = Country.getAllCountries()
+  .map(c => ({ iso: c.isoCode, name: c.name, code: String(c.phonecode || "").replace(/^\+/, "").trim(), flag: countryCodeToFlag(c.isoCode) }))
+  .filter(c => c.code)
+  .sort((a, b) => a.name.localeCompare(b.name));
+/* Longest dial code first — so "+1" doesn't shadow "+1-xxx" style codes when parsing. */
+const DIAL_BY_LEN = [...DIAL_CODES].sort((a, b) => b.code.length - a.code.length);
+
+/** Split a stored phone string ("+86 138…") into { code, number }. */
+function splitPhone(value: string): { code: string; number: string } {
+  const v = (value || "").trim();
+  if (v.startsWith("+")) {
+    const digits = v.slice(1).replace(/^\s+/, "");
+    const match = DIAL_BY_LEN.find(d => digits.replace(/[\s-]/g, "").startsWith(d.code));
+    if (match) {
+      // Strip the matched code from the (space/dash-normalised) remainder.
+      const compact = digits.replace(/[\s-]/g, "");
+      const rest = compact.slice(match.code.length);
+      return { code: match.code, number: rest };
+    }
+  }
+  return { code: "", number: v };
+}
+
+/* ── Phone input with searchable country-code selector ────────────────────── */
+const PhoneField = React.memo(function PhoneField({ label, value, onChange, placeholder, defaultIso }: {
+  label?: string; value: string; onChange: (v: string) => void; placeholder?: string; defaultIso?: string;
+}) {
+  const parsed = splitPhone(value);
+  const defaultCode = defaultIso ? (DIAL_CODES.find(d => d.iso === defaultIso)?.code ?? "") : "";
+  const [selCode, setSelCode] = useState<string>(() => parsed.code || defaultCode);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  // If the stored value already carries a dial code (e.g. editing), adopt it.
+  useEffect(() => {
+    const p = splitPhone(value).code;
+    if (p && p !== selCode) setSelCode(p);
+  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    function h(e: MouseEvent) { if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) { setOpen(false); setQuery(""); } }
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  const number = parsed.number;
+  const emit = (code: string, num: string) => {
+    const n = num.trim();
+    if (!n) { onChange(""); return; }
+    onChange(code ? `+${code} ${n}` : n);
+  };
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase().replace(/^\+/, "");
+    if (!q) return DIAL_CODES;
+    return DIAL_CODES.filter(d => d.name.toLowerCase().includes(q) || d.code.startsWith(q) || d.iso.toLowerCase().includes(q));
+  }, [query]);
+
+  const sel = DIAL_CODES.find(d => d.code === selCode);
+
+  return (
+    <div>
+      {label && <label className="text-xs text-[var(--text-faint)] mb-1 block">{label}</label>}
+      <div ref={wrapRef} className="relative flex gap-2">
+        <button
+          type="button"
+          onClick={() => setOpen(o => !o)}
+          className="h-10 shrink-0 px-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm flex items-center gap-1.5 hover:border-[var(--border-focus)] transition-colors"
+          aria-label="Select country code"
+        >
+          <span className="text-base">{sel?.flag ?? "🌐"}</span>
+          <span className="text-[var(--text-secondary)] tabular-nums">{selCode ? `+${selCode}` : "+—"}</span>
+          <AngleDownIcon size={12} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
+        <input
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
+          value={number}
+          onChange={e => emit(selCode, e.target.value)}
+          placeholder={placeholder || label || "Phone number"}
+          className="flex-1 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors"
+        />
+        {open && (
+          <div className="absolute z-50 top-11 start-0 w-64 max-h-60 overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+            <div className="p-2 border-b border-[var(--border-faint)]">
+              <input
+                autoFocus
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Search country or code…"
+                className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
+              />
+            </div>
+            <div className="max-h-48 overflow-y-auto">
+              {filtered.length === 0 ? (
+                <div className="px-3 py-2 text-xs text-[var(--text-dim)]">No matches</div>
+              ) : filtered.map(d => (
+                <button
+                  key={d.iso}
+                  type="button"
+                  onClick={() => { setSelCode(d.code); emit(d.code, number); setOpen(false); setQuery(""); }}
+                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-start hover:bg-[var(--bg-surface)] transition-colors ${d.code === selCode ? "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}
+                >
+                  <span className="text-base">{d.flag}</span>
+                  <span className="truncate flex-1">{d.name}</span>
+                  <span className="text-[11px] text-[var(--text-ghost)] tabular-nums">+{d.code}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
 
 /* ── Searchable Country Dropdown ── */
 function CountryDropdown({ value, displayValue, onChange, label, placeholder, noResults }: {
@@ -5010,10 +5137,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <div className="px-3 pb-3 pt-1 ms-8 space-y-2 border-t border-[var(--border-faint)]">
                     <input value={cp.department} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], department: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.department")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none mt-2" />
                     <div className="grid grid-cols-2 gap-2">
-                      <input value={cp.phone} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], phone: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.phone")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
-                      <input value={cp.mobile} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], mobile: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.contactMobile")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                      <input type="tel" inputMode="tel" autoComplete="tel" value={cp.phone} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], phone: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.phone")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                      <input type="tel" inputMode="tel" autoComplete="tel" value={cp.mobile} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], mobile: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.contactMobile")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
                     </div>
-                    <input value={cp.email} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], email: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.email")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                    <input type="email" inputMode="email" autoComplete="email" value={cp.email} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], email: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.email")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
                     <textarea value={cp.notes} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], notes: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.notes")} rows={2} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none resize-none" />
                   </div>
                 )}
@@ -5114,10 +5241,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <div className="px-3 pb-3 pt-1 ms-8 space-y-2 border-t border-[var(--border-faint)]">
                     <input value={cp.department} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], department: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.department")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none mt-2" />
                     <div className="grid grid-cols-2 gap-2">
-                      <input value={cp.phone} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], phone: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.phone")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
-                      <input value={cp.mobile} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], mobile: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.contactMobile")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                      <input type="tel" inputMode="tel" autoComplete="tel" value={cp.phone} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], phone: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.phone")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                      <input type="tel" inputMode="tel" autoComplete="tel" value={cp.mobile} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], mobile: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.contactMobile")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
                     </div>
-                    <input value={cp.email} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], email: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.email")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                    <input type="email" inputMode="email" autoComplete="email" value={cp.email} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], email: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.email")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
                     <textarea value={cp.notes} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], notes: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.notes")} rows={2} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none resize-none" />
                   </div>
                 )}
@@ -5152,13 +5279,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <div key={i} className="flex items-center gap-2 mb-3">
               <RemoveBtn onClick={() => removePhone(i)} />
               <LabelSelect value={p.label} onChange={v => updatePhone(i, "label", v)} options={PHONE_LABELS} renderLabel={tOpt} />
-              <input
-                type="tel"
-                value={p.number}
-                onChange={e => updatePhone(i, "number", e.target.value)}
-                placeholder={t("placeholder.phoneNumber")}
-                className="flex-1 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
-              />
+              <div className="flex-1">
+                <PhoneField
+                  value={p.number}
+                  onChange={v => updatePhone(i, "number", v)}
+                  placeholder={t("placeholder.phoneNumber")}
+                  defaultIso={form.country_code}
+                />
+              </div>
             </div>
           ))}
           <AddButton label={t("add.phone")} onClick={addPhone} />
@@ -5339,9 +5467,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <div className="px-3 pb-3 pt-1 ms-8 space-y-2 border-t border-[var(--border-faint)]">
                   <div className="grid grid-cols-2 gap-2 mt-2">
                     <input value={f.last_name} onChange={e => updateFamily(i, "last_name", e.target.value)} placeholder={t("field.lastNameField")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
-                    <input value={f.phone} onChange={e => updateFamily(i, "phone", e.target.value)} placeholder={t("field.phone")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                    <input type="tel" inputMode="tel" autoComplete="tel" value={f.phone} onChange={e => updateFamily(i, "phone", e.target.value)} placeholder={t("field.phone")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
                   </div>
-                  <input value={f.email} onChange={e => updateFamily(i, "email", e.target.value)} placeholder={t("field.email")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                  <input type="email" inputMode="email" autoComplete="email" value={f.email} onChange={e => updateFamily(i, "email", e.target.value)} placeholder={t("field.email")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
                   <textarea value={f.notes} onChange={e => updateFamily(i, "notes", e.target.value)} placeholder={t("field.notes")} rows={2} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none resize-none" />
                 </div>
               )}
@@ -5445,10 +5573,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <SelectInput label={t("field.paymentTerms")} value={form.payment_terms} onChange={v => setField("payment_terms", v)} options={PAYMENT_TERMS_OPTIONS} icon={<ReceiptIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <Input label={t("field.totalRevenue")} value={form.total_revenue} onChange={v => setField("total_revenue", v)} placeholder="0.00" icon={<TrendingUpIcon size={14} />} />
-                <Input label={t("field.outstandingBalance")} value={form.outstanding_balance} onChange={v => setField("outstanding_balance", v)} placeholder="0.00" icon={<ReceiptIcon size={14} />} />
+                <Input label={t("field.totalRevenue")} value={form.total_revenue} onChange={v => setField("total_revenue", v)} placeholder="0.00" inputMode="decimal" icon={<TrendingUpIcon size={14} />} />
+                <Input label={t("field.outstandingBalance")} value={form.outstanding_balance} onChange={v => setField("outstanding_balance", v)} placeholder="0.00" inputMode="decimal" icon={<ReceiptIcon size={14} />} />
               </div>
-              <Input label={t("field.creditLimit")} value={form.credit_limit} onChange={v => setField("credit_limit", v)} placeholder="0.00" icon={<WalletIcon size={14} />} />
+              <Input label={t("field.creditLimit")} value={form.credit_limit} onChange={v => setField("credit_limit", v)} placeholder="0.00" inputMode="decimal" icon={<WalletIcon size={14} />} />
               <div>
                 <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.lastOrderDate")}</label>
                 <input
@@ -5666,10 +5794,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <SelectInput label={t("field.priceListTier", "Price List Tier")} value={form.price_list_tier} onChange={v => setField("price_list_tier", v)} options={PRICE_LIST_TIERS} icon={<TagsIcon size={14} />} selectLabel={t("detail.select")} />
-                <Input label={t("field.maxDiscount", "Max Discount (%)")} value={form.max_discount_allowed} onChange={v => setField("max_discount_allowed", v)} placeholder="0.00" icon={<ReceiptIcon size={14} />} />
+                <Input label={t("field.maxDiscount", "Max Discount (%)")} value={form.max_discount_allowed} onChange={v => setField("max_discount_allowed", v)} placeholder="0.00" inputMode="decimal" icon={<ReceiptIcon size={14} />} />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <Input label={t("field.commissionRate", "Commission Rate (%)")} value={form.commission_rate} onChange={v => setField("commission_rate", v)} placeholder="0.00" icon={<DollarSignIcon size={14} />} />
+                <Input label={t("field.commissionRate", "Commission Rate (%)")} value={form.commission_rate} onChange={v => setField("commission_rate", v)} placeholder="0.00" inputMode="decimal" icon={<DollarSignIcon size={14} />} />
                 <div>
                   <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.contractPricingExpiry", "Contract Pricing Expiry")}</label>
                   <input type="date" value={form.contract_pricing_expiry} onChange={e => setField("contract_pricing_expiry", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]" />
@@ -5740,7 +5868,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <Input label={t("field.overdueBalance", "Overdue Balance")} value={form.overdue_balance} onChange={v => setField("overdue_balance", v)} placeholder="0.00" icon={<TriangleWarningIcon size={14} />} />
+                <Input label={t("field.overdueBalance", "Overdue Balance")} value={form.overdue_balance} onChange={v => setField("overdue_balance", v)} placeholder="0.00" inputMode="decimal" icon={<TriangleWarningIcon size={14} />} />
                 <Input label={t("field.dso", "Days Sales Outstanding")} value={form.days_sales_outstanding} onChange={v => setField("days_sales_outstanding", v)} placeholder="0" icon={<TimerIcon size={14} />} />
               </div>
               <SelectInput label={t("field.preferredPaymentMethod", "Preferred Payment Method")} value={form.preferred_payment_method} onChange={v => setField("preferred_payment_method", v)} options={PREFERRED_PAYMENT_METHODS} icon={<CreditCardIcon size={14} />} selectLabel={t("detail.select")} />
@@ -5761,7 +5889,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               {form.credit_insurance_covered && (
                 <div className="grid grid-cols-2 gap-3">
                   <Input label={t("field.insuranceProvider", "Provider")} value={form.credit_insurance_provider} onChange={v => setField("credit_insurance_provider", v)} placeholder="Euler Hermes / Coface" icon={<ShieldCheckIcon size={14} />} />
-                  <Input label={t("field.insuranceCoverage", "Coverage Amount")} value={form.credit_insurance_coverage} onChange={v => setField("credit_insurance_coverage", v)} placeholder="0.00" icon={<WalletIcon size={14} />} />
+                  <Input label={t("field.insuranceCoverage", "Coverage Amount")} value={form.credit_insurance_coverage} onChange={v => setField("credit_insurance_coverage", v)} placeholder="0.00" inputMode="decimal" icon={<WalletIcon size={14} />} />
                 </div>
               )}
             </div>
@@ -6033,12 +6161,12 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             {/* 2. Contact Details — How to reach the supplier */}
             <FormSection title={t("section.contactDetails")} icon={<PhoneIcon size={14} />}>
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <Input label={t("field.contactTel")} value={form.supplier_tel} onChange={v => setField("supplier_tel", v)} placeholder={t("field.contactTel")} icon={<PhoneIcon size={14} />} />
-                  <Input label={t("field.contactMobile")} value={form.supplier_mobile} onChange={v => setField("supplier_mobile", v)} placeholder={t("field.contactMobile")} icon={<PhoneIcon size={14} />} />
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <PhoneField label={t("field.contactTel")} value={form.supplier_tel} onChange={v => setField("supplier_tel", v)} placeholder={t("field.contactTel")} defaultIso={form.country_code} />
+                  <PhoneField label={t("field.contactMobile")} value={form.supplier_mobile} onChange={v => setField("supplier_mobile", v)} placeholder={t("field.contactMobile")} defaultIso={form.country_code} />
                 </div>
-                <Input label={t("field.contactEmail")} value={form.supplier_email} onChange={v => setField("supplier_email", v)} placeholder="company@example.com" icon={<EnvelopeIcon size={14} />} />
-                <Input label={t("field.website")} value={form.supplier_website} onChange={v => setField("supplier_website", v)} placeholder="https://www.example.com" icon={<GlobeIcon size={14} />} />
+                <Input label={t("field.contactEmail")} type="email" value={form.supplier_email} onChange={v => setField("supplier_email", v)} placeholder="company@example.com" icon={<EnvelopeIcon size={14} />} />
+                <Input label={t("field.website")} type="url" value={form.supplier_website} onChange={v => setField("supplier_website", v)} placeholder="https://www.example.com" icon={<GlobeIcon size={14} />} />
                 <Input label={t("field.supplierAddress")} value={form.supplier_address} onChange={v => setField("supplier_address", v)} placeholder={t("field.supplierAddress")} icon={<MapPinIcon size={14} />} />
                 <div>
                   <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("placeholder.countryProvCity")}</label>
@@ -6058,7 +6186,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             {/* Messaging IDs — how the team reaches an overseas factory */}
             <FormSection title={t("section.messagingIds", "Messaging IDs")} icon={<MessageSquareIcon size={14} />}>
               <div className="space-y-3">
-                <Input label={t("field.whatsappBusiness", "WhatsApp Business")} value={form.whatsapp_business} onChange={v => setField("whatsapp_business", v)} placeholder="+86 …" icon={<PhoneIcon size={14} />} />
+                <PhoneField label={t("field.whatsappBusiness", "WhatsApp Business")} value={form.whatsapp_business} onChange={v => setField("whatsapp_business", v)} placeholder={t("field.whatsappBusiness", "WhatsApp Business")} defaultIso={form.country_code} />
                 <div className="grid grid-cols-2 gap-3">
                   <Input label={t("field.wechatId", "WeChat ID")} value={form.wechat_id} onChange={v => setField("wechat_id", v)} placeholder="@handle" icon={<MessageSquareIcon size={14} />} />
                   <Input label={t("field.telegramId", "Telegram ID")} value={form.telegram_id} onChange={v => setField("telegram_id", v)} placeholder="@handle" icon={<MessageSquareIcon size={14} />} />
@@ -6100,10 +6228,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                       <div className="px-3 pb-3 pt-1 ms-8 space-y-2 border-t border-[var(--border-faint)]">
                         <input value={cp.department} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], department: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.department")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none mt-2" />
                         <div className="grid grid-cols-2 gap-2">
-                          <input value={cp.phone} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], phone: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.phone")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
-                          <input value={cp.mobile} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], mobile: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.contactMobile")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                          <input type="tel" inputMode="tel" autoComplete="tel" value={cp.phone} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], phone: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.phone")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                          <input type="tel" inputMode="tel" autoComplete="tel" value={cp.mobile} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], mobile: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.contactMobile")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
                         </div>
-                        <input value={cp.email} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], email: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.email")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                        <input type="email" inputMode="email" autoComplete="email" value={cp.email} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], email: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.email")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
                         <textarea value={cp.notes} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], notes: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.notes")} rows={2} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none resize-none" />
                       </div>
                     )}
