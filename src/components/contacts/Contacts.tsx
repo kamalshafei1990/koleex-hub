@@ -2310,9 +2310,9 @@ const ImageDropField = React.memo(function ImageDropField({
         {label}
       </label>
       {value ? (
-        <div className="relative inline-block">
+        <div className="relative w-full">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={value} alt={label} className="max-h-56 w-auto max-w-full rounded-lg border border-[var(--border-color)] object-contain bg-white" />
+          <img src={value} alt={label} className="h-48 w-full rounded-lg border border-[var(--border-color)] object-contain bg-white" />
           <button type="button" onClick={() => onChange("")} aria-label="Remove" className="absolute -top-2 -end-2 h-6 w-6 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center shadow">
             <CrossIcon size={12} />
           </button>
@@ -5019,8 +5019,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <div className="col-span-2">
                   <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.businessLicense", "Business License")}</span>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <a href={c.business_license_image} target="_blank" rel="noopener noreferrer" className="mt-1 block w-fit">
-                    <img src={c.business_license_image} alt={t("field.businessLicense", "Business License")} className="max-h-56 w-auto max-w-full rounded-lg border border-[var(--border-color)] object-contain bg-white" />
+                  <a href={c.business_license_image} target="_blank" rel="noopener noreferrer" className="mt-1 block w-full">
+                    <img src={c.business_license_image} alt={t("field.businessLicense", "Business License")} className="h-48 w-full rounded-lg border border-[var(--border-color)] object-contain bg-white" />
                   </a>
                 </div>
               )}
