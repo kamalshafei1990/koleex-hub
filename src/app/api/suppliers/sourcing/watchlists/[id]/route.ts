@@ -9,8 +9,8 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { resolveCallerTier } from "@/lib/suppliers/intelligence";
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireAuth();
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
   const deny = await requireModuleAccess(auth, "Suppliers");
   if (deny) return deny;

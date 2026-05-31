@@ -857,19 +857,12 @@ export default function SupplierDetail({ id }: { id: string }) {
                 const pid = str(p, "slug", "id");
                 const card = (
                   <div className="rounded-2xl bg-[var(--bg-surface-subtle)] p-3 transition-colors hover:bg-[var(--bg-surface-hover)]">
-                    <div className="aspect-square w-full overflow-hidden rounded-xl bg-[var(--bg-surface)]">
-                      {str(p, "photo_url") ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={str(p, "photo_url")} alt={str(p, "name")} className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-[var(--text-faint)]">
-                          <PackageIcon className="h-7 w-7" />
-                        </div>
-                      )}
+                    <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl bg-[var(--bg-surface)] text-[var(--text-faint)]">
+                      <PackageIcon className="h-7 w-7" />
                     </div>
-                    <div className="mt-2 truncate text-sm font-medium text-[var(--text-primary)]">{str(p, "name") || "Untitled"}</div>
-                    {str(p, "primary_model") ? (
-                      <div className="truncate font-mono text-[11px] text-[var(--text-faint)]">{str(p, "primary_model")}</div>
+                    <div className="mt-2 truncate text-sm font-medium text-[var(--text-primary)]">{str(p, "product_name") || "Untitled"}</div>
+                    {str(p, "category_slug") ? (
+                      <div className="truncate text-[11px] text-[var(--text-faint)]">{str(p, "category_slug")}</div>
                     ) : null}
                   </div>
                 );

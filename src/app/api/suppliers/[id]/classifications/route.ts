@@ -16,8 +16,8 @@ import { logSupplierEvent, actorName } from "@/lib/suppliers/timeline";
 
 const VALID = new Set(Object.keys(CLASSIFICATION_LABELS));
 
-async function guard(ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAuth();
+async function guard(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return { error: auth as NextResponse };
   const deny = await requireModuleAccess(auth, "Suppliers");
   if (deny) return { error: deny };
@@ -26,7 +26,7 @@ async function guard(ctx: { params: Promise<{ id: string }> }) {
 }
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const g = await guard(ctx);
+  const g = await guard(req, ctx);
   if ("error" in g) return g.error;
   const { auth, id } = g;
 
@@ -97,7 +97,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 }
 
 export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const g = await guard(ctx);
+  const g = await guard(req, ctx);
   if ("error" in g) return g.error;
   const { auth, id } = g;
 

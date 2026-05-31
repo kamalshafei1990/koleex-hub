@@ -70,7 +70,7 @@ export async function GET(
   }
 
   const profileGated = callerTier === "public" || callerTier === "internal";
-  const [purchaseOrders, bills, payments, products, receipts, returns, classifications, contactPersons, media, qrCodes, statusHistory, factoryRows, timeline, riskProfileRows, riskItems, negotiations, negotiationIntelRows, sourcingProfileRows, sourcingLinks, specializations] = await Promise.all([
+  const [purchaseOrders, bills, payments, productLinkRows, receipts, returns, classifications, contactPersons, media, qrCodes, statusHistory, factoryRows, timeline, riskProfileRows, riskItems, negotiations, negotiationIntelRows, sourcingProfileRows, sourcingLinks, specializations] = await Promise.all([
     safe(() =>
       supabaseServer
         .from("purchase_orders")
@@ -96,10 +96,12 @@ export async function GET(
         .eq("party_id", id)
         .limit(200),
     ),
+    // Products supplied — products link to suppliers via supplier_product_links
+    // (there is no products.supplier_id). Join through and dedupe below.
     safe(() =>
       supabaseServer
-        .from("products")
-        .select("id, name, primary_model, photo_url, slug, supplier_id")
+        .from("supplier_product_links")
+        .select("product_id, products(id, product_name, slug, category_slug)")
         .eq("tenant_id", tid)
         .eq("supplier_id", id)
         .limit(200),
@@ -241,6 +243,16 @@ export async function GET(
         .eq("tenant_id", tid).eq("supplier_id", id)
         .order("specialization_rank", { ascending: true, nullsFirst: false }).limit(100)),
   ]);
+
+  // Dedupe products supplied (a supplier may link the same product more than
+  // once via distinct component rows). Shape matches the UI: product_name/slug/category.
+  const seenProducts = new Set<string>();
+  const products: Row[] = [];
+  for (const r of productLinkRows) {
+    const p = (r.products as Row | null) ?? null;
+    const pid = p && typeof p.id === "string" ? p.id : null;
+    if (p && pid && !seenProducts.has(pid)) { seenProducts.add(pid); products.push(p); }
+  }
 
   const factory = factoryRows[0] ?? null;
   const riskProfile = riskProfileRows[0] ?? null;
@@ -433,7 +445,7 @@ const STRATEGIC_STATUSES = new Set([
 ]);
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAuth();
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
   const deny = await requireModuleAccess(auth, "Suppliers");
   if (deny) return deny;

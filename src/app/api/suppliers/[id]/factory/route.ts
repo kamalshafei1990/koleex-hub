@@ -32,7 +32,7 @@ const FACTORY_TYPES = new Set([
 ]);
 
 export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAuth();
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
   const deny = await requireModuleAccess(auth, "Suppliers");
   if (deny) return deny;
