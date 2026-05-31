@@ -384,7 +384,13 @@ const PHONE_LABELS = ["mobile", "home", "work", "main", "work fax", "home fax", 
 const EMAIL_LABELS = ["home", "work", "iCloud", "other"];
 const ADDRESS_LABELS = ["home", "work", "other"];
 const WEBSITE_LABELS = ["homepage", "work", "blog", "other"];
-const SOCIAL_PLATFORMS = ["WhatsApp", "WeChat", "LinkedIn", "Instagram", "Facebook", "Twitter/X", "Telegram", "Snapchat", "TikTok", "Skype", "Other"];
+const SOCIAL_PLATFORMS = ["WhatsApp", "WeChat", "LinkedIn", "Instagram", "Facebook", "Twitter/X", "Telegram", "Snapchat", "TikTok", "Other"];
+/* Comprehensive social-media + B2B-marketplace list for the supplier Social Media section. */
+const SOCIAL_MEDIA_PLATFORMS = [
+  "LinkedIn", "Facebook", "Instagram", "Twitter/X", "YouTube", "TikTok", "Pinterest",
+  "Threads", "Reddit", "Snapchat", "Weibo", "Douyin", "Xiaohongshu (RED)", "Bilibili",
+  "Alibaba", "Made-in-China", "Global Sources", "1688", "Website / Blog", "Other",
+];
 const RELATED_PEOPLE_LABELS = ["Parent", "Father", "Mother", "Brother", "Sister", "Child", "Son", "Daughter", "Spouse", "Friend", "Assistant", "Manager", "Other"];
 
 const INDUSTRIES = [
@@ -6303,8 +6309,32 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <MessagingIdField label={t("field.telegram", "Telegram")} idValue={form.telegram_id} onIdChange={v => setField("telegram_id", v)} placeholder="@handle" qrValue={form.telegram_qr} onQrChange={v => setField("telegram_qr", v)} />
                   <MessagingIdField label={t("field.line", "Line")} idValue={form.line_id} onIdChange={v => setField("line_id", v)} placeholder={t("placeholder.lineId", "Line ID")} qrValue={form.line_qr} onQrChange={v => setField("line_qr", v)} />
-                  <MessagingIdField label={t("field.skype", "Skype")} idValue={form.skype_id} onIdChange={v => setField("skype_id", v)} placeholder="live:…" qrValue={form.skype_qr} onQrChange={v => setField("skype_qr", v)} />
                 </div>
+              </div>
+            </FormSection>
+
+            {/* Social Media — add as many accounts as needed; each is a
+                platform + a link, page, or @account name. */}
+            <FormSection title={t("section.socialMedia", "Social Media")} icon={<Share2Icon size={14} />}>
+              <div className="space-y-2.5">
+                {form.social_profiles.length === 0 && (
+                  <p className="text-[11px] text-[var(--text-faint)]">{t("hint.socialMedia", "Add the factory's social pages — paste a link, page, or @account.")}</p>
+                )}
+                {form.social_profiles.map((s, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <RemoveBtn onClick={() => removeSocial(i)} />
+                    <div className="w-32 shrink-0 sm:w-40">
+                      <LabelSelect value={s.platform} onChange={v => updateSocial(i, "platform", v)} options={SOCIAL_MEDIA_PLATFORMS} renderLabel={tOpt} />
+                    </div>
+                    <input
+                      value={s.url}
+                      onChange={e => updateSocial(i, "url", e.target.value)}
+                      placeholder={t("placeholder.socialLink", "Link, page, or @account")}
+                      className="min-w-0 flex-1 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
+                    />
+                  </div>
+                ))}
+                <AddButton label={t("add.socialAccount", "Add social account")} onClick={() => setField("social_profiles", [...form.social_profiles, { platform: "LinkedIn", username: "", url: "", qr_code_url: "" }])} />
               </div>
             </FormSection>
 
