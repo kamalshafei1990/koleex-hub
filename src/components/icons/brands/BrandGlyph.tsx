@@ -34,6 +34,8 @@ const STORAGE_SLUGS = new Set([
 ]);
 /* File extension per uploaded slug (default svg). */
 const STORAGE_EXT: Record<string, string> = { "made-in-china": "png" };
+/* Bump when a file is re-uploaded, to bust the CDN cache. */
+const STORAGE_VER: Record<string, number> = { qq: 2 };
 
 function slugFor(name: string): string {
   const n = (name || "").toLowerCase().trim();
@@ -124,7 +126,7 @@ export default function BrandGlyph({ name, size = 16, className }: Props) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={`${STORAGE_BASE}${slug}.${STORAGE_EXT[slug] ?? "svg"}`}
+        src={`${STORAGE_BASE}${slug}.${STORAGE_EXT[slug] ?? "svg"}${STORAGE_VER[slug] ? `?v=${STORAGE_VER[slug]}` : ""}`}
         alt=""
         className={className}
         // Normalize by height so every uploaded logo matches the glyph height;
