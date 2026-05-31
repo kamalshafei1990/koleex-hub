@@ -1528,9 +1528,16 @@ const EMPTY_SINTEL: SupplierIntel = {
   neg: { negotiation_score: "", price_flexibility: "", moq_flexibility: "", payment_flexibility: "", leadtime_flexibility: "", volume_discount: "", contract_willingness: "", negotiation_difficulty: "", sample_turnaround_speed: "", internal_notes: "" },
 };
 
-const Input = React.memo(function Input({ label, value, onChange, type = "text", placeholder, icon, inputMode, autoComplete, list }: {
+/* Importance marker shown after a field label: red * for required,
+   a subtle "preferred" tag for recommended. */
+const FieldMark = ({ tier }: { tier?: "required" | "preferred" }) =>
+  tier === "required" ? <span className="ms-0.5 text-rose-400" title="Required">*</span>
+    : tier === "preferred" ? <span className="ms-1.5 align-middle text-[9px] font-medium uppercase tracking-wide text-[var(--text-dim)]">preferred</span>
+    : null;
+
+const Input = React.memo(function Input({ label, value, onChange, type = "text", placeholder, icon, inputMode, autoComplete, list, tier }: {
   label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string; icon?: React.ReactNode;
-  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"]; autoComplete?: string; list?: string;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"]; autoComplete?: string; list?: string; tier?: "required" | "preferred";
 }) {
   /* Sensible defaults so each field gets the right mobile keyboard + browser
      autofill even when the caller only passes `type`. */
@@ -1538,7 +1545,7 @@ const Input = React.memo(function Input({ label, value, onChange, type = "text",
   const resolvedAutoComplete = autoComplete ?? (type === "email" ? "email" : type === "tel" ? "tel" : type === "url" ? "url" : undefined);
   return (
     <div>
-      <label className="text-xs text-[var(--text-faint)] mb-1 block">{label}</label>
+      <label className="text-xs text-[var(--text-faint)] mb-1 block">{label}<FieldMark tier={tier} /></label>
       <div className="relative">
         {icon && <span className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)]">{icon}</span>}
         <input
@@ -5745,30 +5752,63 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     ];
     let filledCount = 0;
     let totalCount = 0;
+    /* Supplier completeness is tiered: Required (gates "Ready"), Preferred
+       (recommended), Optional (counted, never penalised). "Any-of" groups
+       count as ONE slot — having WeChat is enough; a missing DingTalk never
+       reads as incomplete. */
+    let supplierTiers: { required: { filled: number; total: number }; preferred: { filled: number; total: number }; optionalAdded: number } | undefined;
 
     if (isSupplier) {
-      /* Importance-weighted completeness. Only the fields that make a profile
-         genuinely usable count toward the %, and "any-of" groups count as ONE
-         slot — so having WeChat is enough and a missing DingTalk never reads as
-         incomplete. Optional data (extra channels, social media, secondary
-         trade IDs, logistics extras, bank/mobile-pay detail, and the
-         assessment sections) is intentionally excluded so a clean core profile
-         can reach 100%. */
       const filled = completenessIsFilledScalar;
-      const essentials: (keyof ContactForm)[] = [
-        "company_name_en", "country", "division", "category",
-        "supplier_address", "payment_terms", "incoterms",
+      const groupHasValue = (o: Record<string, unknown>) =>
+        Object.values(o).some((v) => v === true || (typeof v === "string" && v.trim().length > 0) || (typeof v === "number" && v > 0));
+      let rF = 0, rT = 0, pF = 0, pT = 0, optAdded = 0;
+      const req = (ok: boolean) => { rT += 1; if (ok) rF += 1; };
+      const pref = (ok: boolean) => { pT += 1; if (ok) pF += 1; };
+
+      // ── Required ──
+      req(filled(form.company_name_en));
+      req(filled(form.country));
+      req(filled(form.division));
+      req(filled(form.category));
+      req([form.supplier_tel, form.supplier_mobile, form.supplier_email].some((v) => filled(v)));            // a contact
+      req([form.wechat_id, form.whatsapp_business, form.telegram_id, form.qq_id, form.dingtalk_id, form.messenger_id].some((v) => filled(v))); // a messaging channel
+      req(form.contact_persons.some((p) => (p.name || "").trim().length > 0));                                 // a contact person
+
+      // ── Preferred ──
+      pref(filled(form.supplier_address));
+      pref(filled(form.payment_terms));
+      pref(filled(form.currency));
+      pref(filled(form.incoterms));
+      pref(filled(form.business_registration_number));
+      pref(filled(form.year_established));
+      pref(filled(form.lead_time));
+      pref(filled(form.moq));
+      pref(filled(form.business_license_image));
+      pref(form.certifications.length > 0);
+      pref(sIntel.classifications.length > 0);
+      pref(!!sIntel.strategic_status);
+
+      // ── Optional (counted, no pressure) ──
+      const optScalars: (keyof ContactForm)[] = [
+        "photo_url", "company_name_cn", "supplier_website", "industry", "source", "trading_name",
+        "gst_number", "cr_number", "duns_number", "importer_exporter_code", "customs_code",
+        "port_of_entry", "container_preference", "customs_broker", "freight_forwarder",
+        "sample_status", "rating", "payment_info", "notes",
       ];
-      for (const k of essentials) { totalCount += 1; if (filled(form[k])) filledCount += 1; }
-      // "Any of" — one slot each, complete if at least one member is set.
-      const anyOf: (keyof ContactForm)[][] = [
-        ["supplier_tel", "supplier_mobile", "supplier_email"],                                   // reachable
-        ["wechat_id", "whatsapp_business", "telegram_id", "qq_id", "dingtalk_id", "messenger_id"], // a messaging channel
-      ];
-      for (const grp of anyOf) { totalCount += 1; if (grp.some((k) => filled(form[k]))) filledCount += 1; }
-      // At least one contact person, and at least one classification (supplier kind).
-      totalCount += 1; if (form.contact_persons.some((p) => (p.name || "").trim().length > 0)) filledCount += 1;
-      totalCount += 1; if (sIntel.classifications.length > 0) filledCount += 1;
+      for (const k of optScalars) if (filled(form[k])) optAdded += 1;
+      if (form.brand_names.length > 0) optAdded += 1;
+      if (form.social_profiles.length > 0) optAdded += 1;
+      if (Array.isArray(form.bank_accounts) && form.bank_accounts.length > 0) optAdded += 1;
+      if (filled(form.wechat_pay_qr) || filled(form.wechat_pay_id) || filled(form.alipay_qr) || filled(form.alipay_id)) optAdded += 1;
+      if (groupHasValue(sIntel.factory)) optAdded += 1;
+      if (groupHasValue(sIntel.risk)) optAdded += 1;
+      if (groupHasValue(sIntel.neg)) optAdded += 1;
+
+      supplierTiers = { required: { filled: rF, total: rT }, preferred: { filled: pF, total: pT }, optionalAdded: optAdded };
+      // Keep the legacy overall numbers in sync (used elsewhere / fallback).
+      filledCount = rF + pF;
+      totalCount = rT + pT;
     } else {
       const completenessFields = isCustomer ? customerFields : genericFields;
       for (const key of completenessFields) {
@@ -5852,7 +5892,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Profile completeness */}
         <div className="px-4 md:px-6 pt-4">
-          <ProfileCompletenessBar filled={filledCount} total={totalCount} />
+          <ProfileCompletenessBar filled={filledCount} total={totalCount} tiers={supplierTiers} />
         </div>
 
         {/* Photo / Logo + Type */}
@@ -6997,7 +7037,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             {/* 1. Company Name — Most important, identity of the supplier */}
             <FormSection title={t("section.companyName")} icon={<Building2Icon size={14} />}>
               <div className="space-y-3">
-                <Input label={t("field.companyNameEn")} value={form.company_name_en} onChange={v => setField("company_name_en", v)} placeholder={t("placeholder.companyNameEn")} icon={<Building2Icon size={14} />} />
+                <Input label={t("field.companyNameEn")} value={form.company_name_en} onChange={v => setField("company_name_en", v)} placeholder={t("placeholder.companyNameEn")} icon={<Building2Icon size={14} />} tier="required" />
                 <Input label={t("field.companyNameCn")} value={form.company_name_cn} onChange={v => setField("company_name_cn", v)} placeholder={t("placeholder.companyNameCn")} icon={<LanguagesIcon size={14} />} />
                 {/* Additional Company Names */}
                 <div>
@@ -7047,7 +7087,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.division")}</label>
+                    <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.division")}<FieldMark tier="required" /></label>
                     <TaxonomySelect
                       value={form.division}
                       onChange={v => {
@@ -7063,7 +7103,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.category")}</label>
+                    <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.category")}<FieldMark tier="required" /></label>
                     <TaxonomySelect value={form.category} onChange={v => setField("category", v)} options={categoryOptions} placeholder={form.division ? t("field.category") : t("placeholder.pickDivisionFirst", "Pick a division first")} createLabel={t("create.newCategory", "Create new category")} />
                   </div>
                 </div>
@@ -7094,6 +7134,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             {/* 2. Contact Details — How to reach the supplier */}
             <FormSection title={t("section.contactDetails")} icon={<PhoneIcon size={14} />}>
               <div className="space-y-3">
+                <p className="text-[11px] text-[var(--text-dim)]">{t("hint.atLeastOneContact", "At least one of phone / mobile / email is required")} <span className="text-rose-400">*</span></p>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <PhoneField label={t("field.contactTel")} value={form.supplier_tel} onChange={v => setField("supplier_tel", v)} placeholder={t("field.contactTel")} defaultIso={form.country_code || "CN"} />
                   <PhoneField label={t("field.contactMobile")} value={form.supplier_mobile} onChange={v => setField("supplier_mobile", v)} placeholder={t("field.contactMobile")} defaultIso={form.country_code || "CN"} />
@@ -7123,6 +7164,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             {/* 3. Contact Persons — Key people to communicate with */}
             <FormSection title={t("section.contactPersons")} icon={<UsersIcon size={14} />}>
               <div className="space-y-3">
+                <p className="text-[11px] text-[var(--text-dim)]">{t("hint.atLeastOnePerson", "At least one contact person is required")} <span className="text-rose-400">*</span></p>
                 {form.contact_persons.map((cp, i) => (
                   <div key={i} className="rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] overflow-hidden">
                     <div className="flex items-center gap-2 p-3">
@@ -7181,6 +7223,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 PNG/JPG). WeChat is the primary channel for China sourcing. */}
             <FormSection title={t("section.messagingIds", "Messaging IDs")} icon={<MessageSquareIcon size={14} />}>
               <div className="space-y-3">
+                <p className="text-[11px] text-[var(--text-dim)]">{t("hint.atLeastOneMessaging", "At least one messaging channel is required")} <span className="text-rose-400">*</span></p>
                 <MessagingIdField
                   hero
                   label={t("field.wechat", "WeChat")}
