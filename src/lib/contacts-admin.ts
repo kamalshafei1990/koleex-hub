@@ -129,6 +129,11 @@ export interface ContactRow {
   telegram_id: string | null;
   line_id: string | null;
   skype_id: string | null;
+  wechat_qr: string | null;
+  whatsapp_qr: string | null;
+  telegram_qr: string | null;
+  line_qr: string | null;
+  skype_qr: string | null;
   /* ── Segmentation extras ── */
   sub_industry: string | null;
   buying_behavior: string | null;

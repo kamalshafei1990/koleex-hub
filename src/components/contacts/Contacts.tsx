@@ -44,6 +44,7 @@ import MapPinnedIcon from "@/components/icons/ui/MapPinnedIcon";
 import DollarSignIcon from "@/components/icons/ui/DollarSignIcon";
 import TagsIcon from "@/components/icons/ui/TagsIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
+import ScanLineIcon from "@/components/icons/ui/ScanLineIcon";
 import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
 import LanguagesIcon from "@/components/icons/ui/LanguagesIcon";
 import ShipIcon from "@/components/icons/ui/ShipIcon";
@@ -260,6 +261,11 @@ interface ContactForm {
   telegram_id: string;
   line_id: string;
   skype_id: string;
+  wechat_qr: string;
+  whatsapp_qr: string;
+  telegram_qr: string;
+  line_qr: string;
+  skype_qr: string;
   /* ── Segmentation extras ── */
   sub_industry: string;
   buying_behavior: string;
@@ -588,6 +594,11 @@ const EMPTY_FORM: ContactForm = {
   telegram_id: "",
   line_id: "",
   skype_id: "",
+  wechat_qr: "",
+  whatsapp_qr: "",
+  telegram_qr: "",
+  line_qr: "",
+  skype_qr: "",
   /* Segmentation extras */
   sub_industry: "",
   buying_behavior: "",
@@ -1050,6 +1061,11 @@ function contactToForm(c: ContactRow): ContactForm {
     telegram_id: c.telegram_id || "",
     line_id: c.line_id || "",
     skype_id: c.skype_id || "",
+    wechat_qr: c.wechat_qr || "",
+    whatsapp_qr: c.whatsapp_qr || "",
+    telegram_qr: c.telegram_qr || "",
+    line_qr: c.line_qr || "",
+    skype_qr: c.skype_qr || "",
     /* Segmentation extras */
     sub_industry: c.sub_industry || "",
     buying_behavior: c.buying_behavior || "",
@@ -1272,6 +1288,11 @@ function formToRow(f: ContactForm): Record<string, unknown> {
     telegram_id: f.telegram_id || null,
     line_id: f.line_id || null,
     skype_id: f.skype_id || null,
+    wechat_qr: f.wechat_qr || null,
+    whatsapp_qr: f.whatsapp_qr || null,
+    telegram_qr: f.telegram_qr || null,
+    line_qr: f.line_qr || null,
+    skype_qr: f.skype_qr || null,
     /* Segmentation extras */
     sub_industry: f.sub_industry || null,
     buying_behavior: f.buying_behavior || null,
@@ -2009,6 +2030,71 @@ const PhoneField = React.memo(function PhoneField({ label, value, onChange, plac
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+});
+
+/* ── Messaging ID + QR uploader (text handle and/or QR image, drag-drop) ──── */
+const MessagingIdField = React.memo(function MessagingIdField({
+  label, icon, idValue, onIdChange, placeholder, idNode, qrValue, onQrChange, hero,
+}: {
+  label: string;
+  icon?: React.ReactNode;
+  idValue?: string;
+  onIdChange?: (v: string) => void;
+  placeholder?: string;
+  idNode?: React.ReactNode;
+  qrValue: string;
+  onQrChange: (v: string) => void;
+  hero?: boolean;
+}) {
+  const [drag, setDrag] = useState(false);
+  const accept = (file?: File | null) => {
+    if (!file) return;
+    if (!/^image\/(png|jpe?g)$/i.test(file.type)) return; // PNG / JPG only
+    compressImage(file, 600, 0.85).then(onQrChange);
+  };
+  const qrBox = qrValue ? (
+    <div className="relative shrink-0">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={qrValue} alt={`${label} QR`} className="h-24 w-24 rounded-lg border border-[var(--border-color)] object-cover bg-white" />
+      <button type="button" onClick={() => onQrChange("")} aria-label="Remove QR" className="absolute -top-2 -end-2 h-6 w-6 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center shadow">
+        <CrossIcon size={12} />
+      </button>
+    </div>
+  ) : (
+    <label
+      onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+      onDragLeave={() => setDrag(false)}
+      onDrop={(e) => { e.preventDefault(); setDrag(false); accept(e.dataTransfer.files?.[0]); }}
+      className={`flex h-24 w-24 shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed text-center transition-colors ${drag ? "border-[var(--border-focus)] bg-[var(--bg-surface)]" : "border-[var(--border-color)] hover:border-[var(--border-focus)]"}`}
+    >
+      <ScanLineIcon size={16} className="text-[var(--text-dim)]" />
+      <span className="px-1 text-[9px] leading-tight text-[var(--text-dim)]">Drop QR<br />PNG / JPG</span>
+      <input type="file" accept="image/png,image/jpeg" className="hidden" onChange={(e) => accept(e.target.files?.[0])} />
+    </label>
+  );
+  return (
+    <div className={`rounded-xl border bg-[var(--bg-surface-subtle)] p-3 ${hero ? "border-[var(--border-focus)]" : "border-[var(--border-color)]"}`}>
+      <div className="mb-2 flex items-center gap-2">
+        <span className="text-[var(--text-muted)]">{icon ?? <MessageSquareIcon size={14} />}</span>
+        <span className="text-xs font-semibold text-[var(--text-secondary)]">{label}</span>
+        {hero && <span className="ms-auto rounded-full bg-[var(--bg-inverted)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-inverted)]">Primary</span>}
+      </div>
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          {idNode ?? (
+            <input
+              value={idValue ?? ""}
+              onChange={(e) => onIdChange?.(e.target.value)}
+              placeholder={placeholder}
+              className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors"
+            />
+          )}
+          <p className="mt-1.5 text-[10px] text-[var(--text-faint)]">Add the ID/handle, the QR image, or both.</p>
+        </div>
+        {qrBox}
       </div>
     </div>
   );
@@ -6192,17 +6278,32 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
-            {/* Messaging IDs — how the team reaches an overseas factory */}
+            {/* Messaging IDs — how the team reaches an overseas factory.
+                Each channel takes an ID/handle and/or a QR image (drag-drop,
+                PNG/JPG). WeChat is the primary channel for China sourcing. */}
             <FormSection title={t("section.messagingIds", "Messaging IDs")} icon={<MessageSquareIcon size={14} />}>
               <div className="space-y-3">
-                <PhoneField label={t("field.whatsappBusiness", "WhatsApp Business")} value={form.whatsapp_business} onChange={v => setField("whatsapp_business", v)} placeholder={t("field.whatsappBusiness", "WhatsApp Business")} defaultIso={form.country_code || "CN"} />
-                <div className="grid grid-cols-2 gap-3">
-                  <Input label={t("field.wechatId", "WeChat ID")} value={form.wechat_id} onChange={v => setField("wechat_id", v)} placeholder="@handle" icon={<MessageSquareIcon size={14} />} />
-                  <Input label={t("field.telegramId", "Telegram ID")} value={form.telegram_id} onChange={v => setField("telegram_id", v)} placeholder="@handle" icon={<MessageSquareIcon size={14} />} />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <Input label={t("field.lineId", "Line ID")} value={form.line_id} onChange={v => setField("line_id", v)} placeholder="@handle" icon={<MessageSquareIcon size={14} />} />
-                  <Input label={t("field.skypeId", "Skype ID")} value={form.skype_id} onChange={v => setField("skype_id", v)} placeholder="live:…" icon={<MessageSquareIcon size={14} />} />
+                <MessagingIdField
+                  hero
+                  label={t("field.wechat", "WeChat")}
+                  icon={<MessageSquareIcon size={14} />}
+                  idValue={form.wechat_id}
+                  onIdChange={v => setField("wechat_id", v)}
+                  placeholder={t("placeholder.wechatId", "WeChat ID / handle")}
+                  qrValue={form.wechat_qr}
+                  onQrChange={v => setField("wechat_qr", v)}
+                />
+                <MessagingIdField
+                  label={t("field.whatsappBusiness", "WhatsApp Business")}
+                  icon={<PhoneIcon size={14} />}
+                  idNode={<PhoneField value={form.whatsapp_business} onChange={v => setField("whatsapp_business", v)} placeholder={t("field.whatsappBusiness", "WhatsApp Business")} defaultIso={form.country_code || "CN"} />}
+                  qrValue={form.whatsapp_qr}
+                  onQrChange={v => setField("whatsapp_qr", v)}
+                />
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <MessagingIdField label={t("field.telegram", "Telegram")} idValue={form.telegram_id} onIdChange={v => setField("telegram_id", v)} placeholder="@handle" qrValue={form.telegram_qr} onQrChange={v => setField("telegram_qr", v)} />
+                  <MessagingIdField label={t("field.line", "Line")} idValue={form.line_id} onIdChange={v => setField("line_id", v)} placeholder={t("placeholder.lineId", "Line ID")} qrValue={form.line_qr} onQrChange={v => setField("line_qr", v)} />
+                  <MessagingIdField label={t("field.skype", "Skype")} idValue={form.skype_id} onIdChange={v => setField("skype_id", v)} placeholder="live:…" qrValue={form.skype_qr} onQrChange={v => setField("skype_qr", v)} />
                 </div>
               </div>
             </FormSection>
