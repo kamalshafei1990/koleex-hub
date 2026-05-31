@@ -46,6 +46,7 @@ import TagsIcon from "@/components/icons/ui/TagsIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import ScanLineIcon from "@/components/icons/ui/ScanLineIcon";
 import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
+import BrandGlyph from "@/components/icons/brands/BrandGlyph";
 import LanguagesIcon from "@/components/icons/ui/LanguagesIcon";
 import ShipIcon from "@/components/icons/ui/ShipIcon";
 import FileCheckIcon from "@/components/icons/ui/FileCheckIcon";
@@ -6316,7 +6317,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <MessagingIdField
                   hero
                   label={t("field.wechat", "WeChat")}
-                  icon={<MessageSquareIcon size={14} />}
+                  icon={<BrandGlyph name="WeChat" size={15} />}
                   idValue={form.wechat_id}
                   onIdChange={v => setField("wechat_id", v)}
                   placeholder={t("placeholder.wechatId", "WeChat ID / handle")}
@@ -6325,14 +6326,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 />
                 <MessagingIdField
                   label={t("field.whatsappBusiness", "WhatsApp Business")}
-                  icon={<PhoneIcon size={14} />}
+                  icon={<BrandGlyph name="WhatsApp" size={15} />}
                   idNode={<PhoneField value={form.whatsapp_business} onChange={v => setField("whatsapp_business", v)} placeholder={t("field.whatsappBusiness", "WhatsApp Business")} defaultIso={form.country_code || "CN"} />}
                   qrValue={form.whatsapp_qr}
                   onQrChange={v => setField("whatsapp_qr", v)}
                 />
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <MessagingIdField label={t("field.telegram", "Telegram")} idValue={form.telegram_id} onIdChange={v => setField("telegram_id", v)} placeholder="@handle" qrValue={form.telegram_qr} onQrChange={v => setField("telegram_qr", v)} />
-                  <MessagingIdField label={t("field.line", "Line")} idValue={form.line_id} onIdChange={v => setField("line_id", v)} placeholder={t("placeholder.lineId", "Line ID")} qrValue={form.line_qr} onQrChange={v => setField("line_qr", v)} />
+                  <MessagingIdField label={t("field.telegram", "Telegram")} icon={<BrandGlyph name="Telegram" size={15} />} idValue={form.telegram_id} onIdChange={v => setField("telegram_id", v)} placeholder="@handle" qrValue={form.telegram_qr} onQrChange={v => setField("telegram_qr", v)} />
+                  <MessagingIdField label={t("field.line", "Line")} icon={<BrandGlyph name="Line" size={15} />} idValue={form.line_id} onIdChange={v => setField("line_id", v)} placeholder={t("placeholder.lineId", "Line ID")} qrValue={form.line_qr} onQrChange={v => setField("line_qr", v)} />
                 </div>
               </div>
             </FormSection>
@@ -6347,6 +6348,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 {form.social_profiles.map((s, i) => (
                   <div key={i} className="flex items-center gap-2">
                     <RemoveBtn onClick={() => removeSocial(i)} />
+                    <span className="shrink-0 text-[var(--text-secondary)]"><BrandGlyph name={s.platform} size={18} /></span>
                     <div className="w-32 shrink-0 sm:w-40">
                       <LabelSelect value={s.platform} onChange={v => updateSocial(i, "platform", v)} options={SOCIAL_MEDIA_PLATFORMS} renderLabel={tOpt} />
                     </div>
@@ -6402,7 +6404,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                         <input type="tel" inputMode="tel" autoComplete="tel" value={cp.whatsapp ?? ""} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], whatsapp: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.whatsappBusiness", "WhatsApp")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
                         <MessagingIdField
                           label={t("field.wechat", "WeChat")}
-                          icon={<MessageSquareIcon size={14} />}
+                          icon={<BrandGlyph name="WeChat" size={15} />}
                           idValue={cp.wechat_id ?? ""}
                           onIdChange={v => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], wechat_id: v }; setField("contact_persons", arr); }}
                           placeholder={t("placeholder.wechatId", "WeChat ID / handle")}
