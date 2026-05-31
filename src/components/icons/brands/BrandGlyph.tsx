@@ -126,10 +126,10 @@ export default function BrandGlyph({ name, size = 16, className }: Props) {
       <img
         src={`${STORAGE_BASE}${slug}.${STORAGE_EXT[slug] ?? "svg"}`}
         alt=""
-        width={size}
-        height={size}
         className={className}
-        style={{ display: "inline-block", objectFit: "contain" }}
+        // Normalize by height so every uploaded logo matches the glyph height;
+        // width is auto (capped) so wide wordmarks don't blow out the layout.
+        style={{ height: size, width: "auto", maxWidth: size * 3, objectFit: "contain", display: "inline-block", verticalAlign: "middle" }}
         onError={() => setImgFailed(true)}
         aria-hidden
       />
