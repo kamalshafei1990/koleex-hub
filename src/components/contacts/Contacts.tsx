@@ -7368,14 +7368,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <div className="grid grid-cols-2 gap-3">
                   <Input label={t("field.factoryName", "Factory name")} value={String(sIntel.factory.factory_name)} onChange={(v) => setIntelFactory("factory_name", v)} icon={<FactoryIcon size={14} />} />
                   <SelectInput label={t("field.factoryType", "Factory type")} value={String(sIntel.factory.factory_type)} onChange={(v) => setIntelFactory("factory_type", v)} options={Object.keys(FACTORY_TYPE_LABELS)} renderLabel={(o) => FACTORY_TYPE_LABELS[o] ?? o} selectLabel={t("detail.select")} />
-                  <Input label={t("field.productionLines", "Production lines")} value={String(sIntel.factory.production_lines)} onChange={(v) => setIntelFactory("production_lines", v)} />
-                  <Input label={t("field.monthlyCapacity", "Monthly capacity")} value={String(sIntel.factory.monthly_capacity)} onChange={(v) => setIntelFactory("monthly_capacity", v)} />
-                  <Input label={t("field.annualOutput", "Annual output")} value={String(sIntel.factory.annual_output)} onChange={(v) => setIntelFactory("annual_output", v)} />
-                  <Input label={t("field.factorySize", "Factory size (sqm)")} value={String(sIntel.factory.factory_size_sqm)} onChange={(v) => setIntelFactory("factory_size_sqm", v)} />
-                  <Input label={t("field.employees", "Employees")} value={String(sIntel.factory.employee_count)} onChange={(v) => setIntelFactory("employee_count", v)} />
-                  <Input label={t("field.qcStaff", "QC staff")} value={String(sIntel.factory.qc_staff_count)} onChange={(v) => setIntelFactory("qc_staff_count", v)} />
-                  <Input label={t("field.rdStaff", "R&D staff")} value={String(sIntel.factory.rd_staff_count)} onChange={(v) => setIntelFactory("rd_staff_count", v)} />
-                  <Input label={t("field.exportPct", "Export %")} value={String(sIntel.factory.export_percentage)} onChange={(v) => setIntelFactory("export_percentage", v)} placeholder="0–100" />
+                  <Input label={t("field.productionLines", "Production lines")} value={String(sIntel.factory.production_lines)} onChange={(v) => setIntelFactory("production_lines", v)} inputMode="numeric" placeholder="e.g. 12" />
+                  <Input label={t("field.monthlyCapacity", "Monthly capacity")} value={String(sIntel.factory.monthly_capacity)} onChange={(v) => setIntelFactory("monthly_capacity", v)} placeholder="e.g. 50,000 units" />
+                  <Input label={t("field.annualOutput", "Annual output")} value={String(sIntel.factory.annual_output)} onChange={(v) => setIntelFactory("annual_output", v)} placeholder="e.g. 600,000 units" />
+                  <Input label={t("field.factorySize", "Factory size (sqm)")} value={String(sIntel.factory.factory_size_sqm)} onChange={(v) => setIntelFactory("factory_size_sqm", v)} inputMode="numeric" placeholder="e.g. 8000" />
+                  <Input label={t("field.employees", "Employees")} value={String(sIntel.factory.employee_count)} onChange={(v) => setIntelFactory("employee_count", v)} inputMode="numeric" placeholder="e.g. 250" />
+                  <Input label={t("field.qcStaff", "QC staff")} value={String(sIntel.factory.qc_staff_count)} onChange={(v) => setIntelFactory("qc_staff_count", v)} inputMode="numeric" placeholder="e.g. 15" />
+                  <Input label={t("field.rdStaff", "R&D staff")} value={String(sIntel.factory.rd_staff_count)} onChange={(v) => setIntelFactory("rd_staff_count", v)} inputMode="numeric" placeholder="e.g. 8" />
+                  <Input label={t("field.exportPct", "Export %")} value={String(sIntel.factory.export_percentage)} onChange={(v) => setIntelFactory("export_percentage", v)} inputMode="numeric" placeholder="0–100" />
                   <Input label={t("field.exportMarkets", "Export markets (comma)")} value={String(sIntel.factory.main_export_markets)} onChange={(v) => setIntelFactory("main_export_markets", v)} placeholder="US, EU, UAE" />
                   <Input label={t("field.prodCategories", "Production categories (comma)")} value={String(sIntel.factory.production_categories)} onChange={(v) => setIntelFactory("production_categories", v)} />
                 </div>
