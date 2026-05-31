@@ -500,6 +500,25 @@ const SUPPORT_TIERS = ["Basic", "Standard", "Premium", "Enterprise"];
 
 const CONTAINER_PREFERENCES = ["20ft", "40ft", "40HQ", "LCL", "FCL"];
 
+/* Common reasons behind a supplier's strategic status — suggestions only; the
+   field still accepts free text. */
+const STATUS_REASON_SUGGESTIONS = [
+  "Consistent quality & on-time delivery",
+  "Sole source for a critical component",
+  "Long-term strategic partnership",
+  "Most competitive pricing",
+  "Currently in trial / evaluation",
+  "Newly identified — not yet engaged",
+  "Pending audit / approval",
+  "Repeated quality issues",
+  "Late / unreliable deliveries",
+  "Failed audit or certification lapse",
+  "Compliance / sanctions concern",
+  "Pricing no longer competitive",
+  "No recent orders / dormant",
+  "Being replaced by an alternative supplier",
+];
+
 /* Incoterms® 2020 — the full standardized set (any mode + sea/inland waterway). */
 const INCOTERMS = [
   "EXW — Ex Works",
@@ -2551,6 +2570,60 @@ const DateField = React.memo(function DateField({ value, onChange, disabled, cla
           </div>
         </div>
       )}
+    </div>
+  );
+});
+
+/* ── Suggest input — free text with a branded suggestions dropdown ──────────
+   Replaces the native <datalist> (whose popup is OS-drawn and ignores the
+   theme). Type freely, or pick a suggestion; the list filters as you type and
+   is styled with Hub tokens (opaque, light/dark aware). */
+const SuggestInput = React.memo(function SuggestInput({ label, value, onChange, options, placeholder, icon }: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  placeholder?: string;
+  icon?: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => { if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+  const q = value.trim().toLowerCase();
+  const filtered = q ? options.filter(o => o.toLowerCase().includes(q)) : options;
+  return (
+    <div>
+      <label className="text-xs text-[var(--text-faint)] mb-1 block">{label}</label>
+      <div ref={wrapRef} className="relative">
+        {icon && <span className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)]">{icon}</span>}
+        <input
+          value={value}
+          onChange={e => { onChange(e.target.value); if (!open) setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={e => { if (e.key === "Escape") setOpen(false); }}
+          placeholder={placeholder || label}
+          className={`w-full h-10 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors ${icon ? "ps-9 pe-3" : "px-3"}`}
+        />
+        {open && filtered.length > 0 && (
+          <div className="absolute z-50 top-full mt-1 start-0 w-full max-h-52 overflow-y-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-1 shadow-2xl">
+            {filtered.map((o, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => { onChange(o); setOpen(false); }}
+                className={`w-full text-start px-3 py-2 rounded-lg text-sm transition-colors ${o === value ? "bg-[var(--bg-surface)] text-[var(--text-primary)]" : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface)]"}`}
+              >
+                {o}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 });
@@ -7261,23 +7334,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <FormSection title={t("section.strategicStatus", "Strategic Status")} icon={<TargetIcon size={14} />}>
               <div className="grid grid-cols-2 gap-3">
                 <SelectInput label={t("field.strategicStatus", "Strategic status")} value={sIntel.strategic_status} onChange={(v) => setSIntel((p) => ({ ...p, strategic_status: v }))} options={Object.keys(STRATEGIC_STATUS_LABELS)} renderLabel={(o) => STRATEGIC_STATUS_LABELS[o as keyof typeof STRATEGIC_STATUS_LABELS] ?? o} icon={<TargetIcon size={14} />} selectLabel={t("detail.select")} />
-                <Input label={t("field.statusReason", "Status reason")} value={sIntel.strategic_status_reason} onChange={(v) => setSIntel((p) => ({ ...p, strategic_status_reason: v }))} list="supplier-status-reasons" placeholder={t("placeholder.statusReason", "Pick a common reason or type your own")} />
-                <datalist id="supplier-status-reasons">
-                  <option value="Consistent quality & on-time delivery" />
-                  <option value="Sole source for a critical component" />
-                  <option value="Long-term strategic partnership" />
-                  <option value="Most competitive pricing" />
-                  <option value="Currently in trial / evaluation" />
-                  <option value="Newly identified — not yet engaged" />
-                  <option value="Pending audit / approval" />
-                  <option value="Repeated quality issues" />
-                  <option value="Late / unreliable deliveries" />
-                  <option value="Failed audit or certification lapse" />
-                  <option value="Compliance / sanctions concern" />
-                  <option value="Pricing no longer competitive" />
-                  <option value="No recent orders / dormant" />
-                  <option value="Being replaced by an alternative supplier" />
-                </datalist>
+                <SuggestInput
+                  label={t("field.statusReason", "Status reason")}
+                  value={sIntel.strategic_status_reason}
+                  onChange={(v) => setSIntel((p) => ({ ...p, strategic_status_reason: v }))}
+                  placeholder={t("placeholder.statusReason", "Pick a common reason or type your own")}
+                  options={STATUS_REASON_SUGGESTIONS}
+                />
               </div>
             </FormSection>
 
