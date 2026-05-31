@@ -1530,14 +1530,16 @@ const EMPTY_SINTEL: SupplierIntel = {
 
 /* Importance marker shown after a field label: red * for required,
    a subtle "preferred" tag for recommended. */
-const FieldMark = ({ tier }: { tier?: "required" | "preferred" }) =>
+type FieldTier = "required" | "preferred" | "optional";
+const FieldMark = ({ tier }: { tier?: FieldTier }) =>
   tier === "required" ? <span className="ms-0.5 text-rose-400" title="Required">*</span>
-    : tier === "preferred" ? <span className="ms-1.5 align-middle text-[9px] font-medium uppercase tracking-wide text-[var(--text-dim)]">preferred</span>
+    : tier === "preferred" ? <span className="ms-1.5 align-middle text-[9px] font-medium uppercase tracking-wide text-amber-400/80">preferred</span>
+    : tier === "optional" ? <span className="ms-1.5 align-middle text-[9px] font-medium uppercase tracking-wide text-[var(--text-ghost)]">optional</span>
     : null;
 
 const Input = React.memo(function Input({ label, value, onChange, type = "text", placeholder, icon, inputMode, autoComplete, list, tier }: {
   label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string; icon?: React.ReactNode;
-  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"]; autoComplete?: string; list?: string; tier?: "required" | "preferred";
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"]; autoComplete?: string; list?: string; tier?: FieldTier;
 }) {
   /* Sensible defaults so each field gets the right mobile keyboard + browser
      autofill even when the caller only passes `type`. */
@@ -1564,13 +1566,13 @@ const Input = React.memo(function Input({ label, value, onChange, type = "text",
 });
 
 /* ── Form select input ── */
-const SelectInput = React.memo(function SelectInput({ label, value, onChange, options, icon, renderLabel, selectLabel }: {
+const SelectInput = React.memo(function SelectInput({ label, value, onChange, options, icon, renderLabel, selectLabel, tier }: {
   label: string; value: string; onChange: (v: string) => void; options: string[]; icon?: React.ReactNode;
-  renderLabel?: (o: string) => string; selectLabel?: string;
+  renderLabel?: (o: string) => string; selectLabel?: string; tier?: FieldTier;
 }) {
   return (
     <div>
-      <label className="text-xs text-[var(--text-faint)] mb-1 block">{label}</label>
+      <label className="text-xs text-[var(--text-faint)] mb-1 block">{label}<FieldMark tier={tier} /></label>
       <div className="relative">
         {icon && <span className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] pointer-events-none">{icon}</span>}
         <select
@@ -2364,13 +2366,14 @@ const MessagingIdField = React.memo(function MessagingIdField({
 
 /* ── Document / photo uploader (landscape, drag-drop PNG/JPG) ─────────────── */
 const ImageDropField = React.memo(function ImageDropField({
-  label, value, onChange, hint, icon,
+  label, value, onChange, hint, icon, tier,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   hint?: string;
   icon?: React.ReactNode;
+  tier?: FieldTier;
 }) {
   const [drag, setDrag] = useState(false);
   const accept = (file?: File | null) => {
@@ -2382,7 +2385,7 @@ const ImageDropField = React.memo(function ImageDropField({
     <div>
       <label className="mb-1.5 flex items-center gap-2 text-xs font-medium text-[var(--text-secondary)]">
         <span className="text-[var(--text-muted)]">{icon ?? <ImageRawIcon size={14} />}</span>
-        {label}
+        {label}<FieldMark tier={tier} />
       </label>
       {value ? (
         <div className="relative w-full">
@@ -7044,7 +7047,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <FormSection title={t("section.companyName")} icon={<Building2Icon size={14} />}>
               <div className="space-y-3">
                 <Input label={t("field.companyNameEn")} value={form.company_name_en} onChange={v => setField("company_name_en", v)} placeholder={t("placeholder.companyNameEn")} icon={<Building2Icon size={14} />} tier="required" />
-                <Input label={t("field.companyNameCn")} value={form.company_name_cn} onChange={v => setField("company_name_cn", v)} placeholder={t("placeholder.companyNameCn")} icon={<LanguagesIcon size={14} />} />
+                <Input label={t("field.companyNameCn")} tier="optional" value={form.company_name_cn} onChange={v => setField("company_name_cn", v)} placeholder={t("placeholder.companyNameCn")} icon={<LanguagesIcon size={14} />} />
                 {/* Additional Company Names */}
                 <div>
                   <label className="text-xs text-[var(--text-faint)] mb-2 block">{t("field.additionalNames")}</label>
@@ -7114,8 +7117,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <SelectInput label={t("field.industry")} value={form.industry} onChange={v => setField("industry", v)} options={INDUSTRIES} icon={<FactoryIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
-                  <SelectInput label={t("field.source")} value={form.source} onChange={v => setField("source", v)} options={SUPPLIER_SOURCES} icon={<TargetIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
+                  <SelectInput label={t("field.industry")} tier="optional" value={form.industry} onChange={v => setField("industry", v)} options={INDUSTRIES} icon={<FactoryIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
+                  <SelectInput label={t("field.source")} tier="optional" value={form.source} onChange={v => setField("source", v)} options={SUPPLIER_SOURCES} icon={<TargetIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
                 </div>
                 {/* Supplier kind is captured once in the "Classifications" section below. */}
               </div>
@@ -7146,11 +7149,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <PhoneField label={t("field.contactMobile")} value={form.supplier_mobile} onChange={v => setField("supplier_mobile", v)} placeholder={t("field.contactMobile")} defaultIso={form.country_code || "CN"} />
                 </div>
                 <Input label={t("field.contactEmail")} type="email" value={form.supplier_email} onChange={v => setField("supplier_email", v)} placeholder="company@example.com" icon={<EnvelopeIcon size={14} />} />
-                <Input label={t("field.website")} type="url" value={form.supplier_website} onChange={v => setField("supplier_website", v)} placeholder="https://www.example.com" icon={<GlobeIcon size={14} />} />
+                <Input label={t("field.website")} tier="optional" type="url" value={form.supplier_website} onChange={v => setField("supplier_website", v)} placeholder="https://www.example.com" icon={<GlobeIcon size={14} />} />
                 {/* Address — structured like a standard postal address:
                     street line → country → province/state → city + postal code. */}
                 <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] p-3 space-y-2.5">
-                  <Input label={t("field.streetAddress", "Street address")} value={form.supplier_address} onChange={v => setField("supplier_address", v)} placeholder={t("placeholder.street", "Street, building, unit…")} icon={<MapPinIcon size={14} />} autoComplete="street-address" />
+                  <Input label={t("field.streetAddress", "Street address")} tier="preferred" value={form.supplier_address} onChange={v => setField("supplier_address", v)} placeholder={t("placeholder.street", "Street, building, unit…")} icon={<MapPinIcon size={14} />} autoComplete="street-address" />
                   <CountryDropdown value={form.country_code} displayValue={form.country} onChange={handleCountryChange} label={t("field.country")} placeholder={t("field.searchCountry")} noResults={t("detail.noCountries")} />
                   {form.country_code && hasStates && (
                     <ProvinceDropdown countryCode={form.country_code} value={form.province_code} displayValue={form.province} onChange={handleProvinceChange} label={t("field.provinceState")} placeholder={t("field.searchProvince")} noResults={t("detail.noProvinces")} />
@@ -7259,18 +7262,18 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             {/* Legal Identity — registration & company profile */}
             <FormSection title={t("section.legalIdentity", "Legal Identity")} icon={<Building2Icon size={14} />}>
               <div className="space-y-3">
-                <Input label={t("field.tradingName", "Trading / DBA Name")} value={form.trading_name} onChange={v => setField("trading_name", v)} placeholder={t("placeholder.tradingName", "Doing business as")} icon={<Building2Icon size={14} />} />
+                <Input label={t("field.tradingName", "Trading / DBA Name")} tier="optional" value={form.trading_name} onChange={v => setField("trading_name", v)} placeholder={t("placeholder.tradingName", "Doing business as")} icon={<Building2Icon size={14} />} />
                 <div className="grid grid-cols-2 gap-3">
-                  <SelectInput label={t("field.companyType", "Company Type")} value={form.company_type} onChange={v => setField("company_type", v)} options={COMPANY_TYPES} icon={<BriefcaseIcon size={14} />} selectLabel={t("detail.select")} />
-                  <Input label={t("field.businessRegNumber", "Business Registration #")} value={form.business_registration_number} onChange={v => setField("business_registration_number", v)} placeholder={t("placeholder.regNumber", "CR / Reg #")} icon={<HashtagIcon size={14} />} />
+                  <SelectInput label={t("field.companyType", "Company Type")} tier="optional" value={form.company_type} onChange={v => setField("company_type", v)} options={COMPANY_TYPES} icon={<BriefcaseIcon size={14} />} selectLabel={t("detail.select")} />
+                  <Input label={t("field.businessRegNumber", "Business Registration #")} tier="preferred" value={form.business_registration_number} onChange={v => setField("business_registration_number", v)} placeholder={t("placeholder.regNumber", "CR / Reg #")} icon={<HashtagIcon size={14} />} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <SelectInput label={t("field.registrationCountry", "Registration Country")} value={form.registration_country} onChange={v => setField("registration_country", v)} options={COUNTRY_NAMES} icon={<GlobeIcon size={14} />} selectLabel={t("detail.select")} />
-                  <SelectInput label={t("field.yearEstablished", "Year Established")} value={form.year_established} onChange={v => setField("year_established", v)} options={ESTABLISHED_YEARS} icon={<CalendarRawIcon size={14} />} selectLabel={t("detail.select")} />
+                  <SelectInput label={t("field.registrationCountry", "Registration Country")} tier="optional" value={form.registration_country} onChange={v => setField("registration_country", v)} options={COUNTRY_NAMES} icon={<GlobeIcon size={14} />} selectLabel={t("detail.select")} />
+                  <SelectInput label={t("field.yearEstablished", "Year Established")} tier="preferred" value={form.year_established} onChange={v => setField("year_established", v)} options={ESTABLISHED_YEARS} icon={<CalendarRawIcon size={14} />} selectLabel={t("detail.select")} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <SelectInput label={t("field.employeeCountRange", "Employee Count")} value={form.employee_count_range} onChange={v => setField("employee_count_range", v)} options={EMPLOYEE_COUNT_RANGES} icon={<UsersIcon size={14} />} selectLabel={t("detail.select")} />
-                  <SelectInput label={t("field.annualRevenueRange", "Annual Revenue")} value={form.annual_revenue_range} onChange={v => setField("annual_revenue_range", v)} options={ANNUAL_REVENUE_RANGES} icon={<TrendingUpIcon size={14} />} selectLabel={t("detail.select")} />
+                  <SelectInput label={t("field.employeeCountRange", "Employee Count")} tier="optional" value={form.employee_count_range} onChange={v => setField("employee_count_range", v)} options={EMPLOYEE_COUNT_RANGES} icon={<UsersIcon size={14} />} selectLabel={t("detail.select")} />
+                  <SelectInput label={t("field.annualRevenueRange", "Annual Revenue")} tier="optional" value={form.annual_revenue_range} onChange={v => setField("annual_revenue_range", v)} options={ANNUAL_REVENUE_RANGES} icon={<TrendingUpIcon size={14} />} selectLabel={t("detail.select")} />
                 </div>
                 <ImageDropField
                   label={t("field.businessLicense", "Business License")}
@@ -7278,6 +7281,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   onChange={v => setField("business_license_image", v)}
                   hint={t("hint.businessLicense", "Drop the company license photo — PNG / JPG")}
                   icon={<FileCheckIcon size={14} />}
+                  tier="preferred"
                 />
               </div>
             </FormSection>
@@ -7286,14 +7290,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <FormSection title={t("section.tradeIdentifiers", "Trade & Tax IDs")} icon={<FileCheckIcon size={14} />}>
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <Input label={t("field.gstNumber", "VAT / GST")} value={form.gst_number} onChange={v => setField("gst_number", v)} placeholder="VAT / GST number" icon={<HashtagIcon size={14} />} />
-                  <Input label={t("field.crNumber", "CR Number")} value={form.cr_number} onChange={v => setField("cr_number", v)} placeholder="Commercial registration" icon={<HashtagIcon size={14} />} />
+                  <Input label={t("field.gstNumber", "VAT / GST")} tier="optional" value={form.gst_number} onChange={v => setField("gst_number", v)} placeholder="VAT / GST number" icon={<HashtagIcon size={14} />} />
+                  <Input label={t("field.crNumber", "CR Number")} tier="optional" value={form.cr_number} onChange={v => setField("cr_number", v)} placeholder="Commercial registration" icon={<HashtagIcon size={14} />} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <Input label={t("field.dunsNumber", "D-U-N-S")} value={form.duns_number} onChange={v => setField("duns_number", v)} placeholder="123456789" icon={<HashtagIcon size={14} />} />
-                  <Input label={t("field.iec", "Importer / Exporter Code")} value={form.importer_exporter_code} onChange={v => setField("importer_exporter_code", v)} placeholder="IEC code" icon={<HashtagIcon size={14} />} />
+                  <Input label={t("field.dunsNumber", "D-U-N-S")} tier="optional" value={form.duns_number} onChange={v => setField("duns_number", v)} placeholder="123456789" icon={<HashtagIcon size={14} />} />
+                  <Input label={t("field.iec", "Importer / Exporter Code")} tier="optional" value={form.importer_exporter_code} onChange={v => setField("importer_exporter_code", v)} placeholder="IEC code" icon={<HashtagIcon size={14} />} />
                 </div>
-                <Input label={t("field.customsCode", "Customs Code")} value={form.customs_code} onChange={v => setField("customs_code", v)} placeholder="Customs code" icon={<HashtagIcon size={14} />} />
+                <Input label={t("field.customsCode", "Customs Code")} tier="optional" value={form.customs_code} onChange={v => setField("customs_code", v)} placeholder="Customs code" icon={<HashtagIcon size={14} />} />
               </div>
             </FormSection>
 
@@ -7304,8 +7308,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <div className="space-y-3">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.termsCurrency", "Terms & Currency")}</p>
                   <div className="grid grid-cols-2 gap-3">
-                    <SelectInput label={t("field.paymentTerms")} value={form.payment_terms} onChange={v => setField("payment_terms", v)} options={PAYMENT_TERMS_OPTIONS} icon={<ReceiptIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
-                    <SelectInput label={t("field.currency")} value={form.currency} onChange={v => setField("currency", v)} options={CURRENCIES} icon={<DollarSignIcon size={14} />} selectLabel={t("detail.select")} />
+                    <SelectInput label={t("field.paymentTerms")} tier="preferred" value={form.payment_terms} onChange={v => setField("payment_terms", v)} options={PAYMENT_TERMS_OPTIONS} icon={<ReceiptIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
+                    <SelectInput label={t("field.currency")} tier="preferred" value={form.currency} onChange={v => setField("currency", v)} options={CURRENCIES} icon={<DollarSignIcon size={14} />} selectLabel={t("detail.select")} />
                   </div>
                   <textarea value={form.payment_info} onChange={e => setField("payment_info", e.target.value)} placeholder={t("placeholder.bankTransfer")} rows={2} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none resize-none focus:border-[var(--border-focus)]" />
                 </div>
@@ -7372,14 +7376,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <FormSection title={t("section.logisticsTrade", "Logistics & Trade")} icon={<TruckIcon size={14} />}>
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <SelectInput label={t("field.incoterms", "Incoterms")} value={form.incoterms} onChange={v => setField("incoterms", v)} options={INCOTERMS} icon={<ShipIcon size={14} />} selectLabel={t("detail.select")} />
-                  <Input label={t("field.leadTime", "Lead Time")} value={form.lead_time} onChange={v => setField("lead_time", v)} placeholder="e.g. 30 days" icon={<TimerIcon size={14} />} />
+                  <SelectInput label={t("field.incoterms", "Incoterms")} tier="preferred" value={form.incoterms} onChange={v => setField("incoterms", v)} options={INCOTERMS} icon={<ShipIcon size={14} />} selectLabel={t("detail.select")} />
+                  <Input label={t("field.leadTime", "Lead Time")} tier="preferred" value={form.lead_time} onChange={v => setField("lead_time", v)} placeholder="e.g. 30 days" icon={<TimerIcon size={14} />} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <Input label={t("field.moq", "MOQ")} value={form.moq} onChange={v => setField("moq", v)} placeholder="Minimum order qty" icon={<PackageIcon size={14} />} />
-                  <SelectInput label={t("field.containerPreference", "Container Preference")} value={form.container_preference} onChange={v => setField("container_preference", v)} options={CONTAINER_PREFERENCES} icon={<BoxesIcon size={14} />} selectLabel={t("detail.select")} />
+                  <Input label={t("field.moq", "MOQ")} tier="preferred" value={form.moq} onChange={v => setField("moq", v)} placeholder="Minimum order qty" icon={<PackageIcon size={14} />} />
+                  <SelectInput label={t("field.containerPreference", "Container Preference")} tier="optional" value={form.container_preference} onChange={v => setField("container_preference", v)} options={CONTAINER_PREFERENCES} icon={<BoxesIcon size={14} />} selectLabel={t("detail.select")} />
                 </div>
-                <Input label={t("field.portOfEntry", "Port of Loading / Entry")} value={form.port_of_entry} onChange={v => setField("port_of_entry", v)} placeholder="Shanghai / Ningbo / Jebel Ali" icon={<ShipIcon size={14} />} />
+                <Input label={t("field.portOfEntry", "Port of Loading / Entry")} tier="optional" value={form.port_of_entry} onChange={v => setField("port_of_entry", v)} placeholder="Shanghai / Ningbo / Jebel Ali" icon={<ShipIcon size={14} />} />
               </div>
             </FormSection>
 
@@ -7471,7 +7475,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   </div>
                 </div>
                 {/* Reliability is captured as the Risk → Internal score (auto-calculated). */}
-                <SelectInput label={t("field.sampleStatus")} value={form.sample_status} onChange={v => setField("sample_status", v)} options={SAMPLE_STATUSES} icon={<PackageIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
+                <SelectInput label={t("field.sampleStatus")} tier="optional" value={form.sample_status} onChange={v => setField("sample_status", v)} options={SAMPLE_STATUSES} icon={<PackageIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
                 {/* Certifications */}
                 <div>
                   <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.certifications")}</label>
@@ -7557,7 +7561,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <div className="space-y-3 border-t border-[var(--border-color)] pt-3">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.overall", "Overall")}</p>
                   <ScoreSlider label={t("field.negotiationScore", "Negotiation score (0–100)")} value={sIntel.neg.negotiation_score} onChange={(v) => { setNegScoreManual(true); setIntelNeg("negotiation_score", v); }} max={100} isAuto={!negScoreManual} onUseAuto={() => setNegScoreManual(false)} />
-                  <Input label={t("field.internalNotes", "Internal notes")} value={sIntel.neg.internal_notes} onChange={(v) => setIntelNeg("internal_notes", v)} />
+                  <Input label={t("field.internalNotes", "Internal notes")} tier="optional" value={sIntel.neg.internal_notes} onChange={(v) => setIntelNeg("internal_notes", v)} />
                 </div>
               </div>
             </FormSection>
@@ -7565,7 +7569,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             {/* Strategic status */}
             <FormSection title={t("section.strategicStatus", "Strategic Status")} icon={<TargetIcon size={14} />}>
               <div className="grid grid-cols-2 gap-3">
-                <SelectInput label={t("field.strategicStatus", "Strategic status")} value={sIntel.strategic_status} onChange={(v) => setSIntel((p) => ({ ...p, strategic_status: v }))} options={Object.keys(STRATEGIC_STATUS_LABELS)} renderLabel={(o) => STRATEGIC_STATUS_LABELS[o as keyof typeof STRATEGIC_STATUS_LABELS] ?? o} icon={<TargetIcon size={14} />} selectLabel={t("detail.select")} />
+                <SelectInput label={t("field.strategicStatus", "Strategic status")} tier="preferred" value={sIntel.strategic_status} onChange={(v) => setSIntel((p) => ({ ...p, strategic_status: v }))} options={Object.keys(STRATEGIC_STATUS_LABELS)} renderLabel={(o) => STRATEGIC_STATUS_LABELS[o as keyof typeof STRATEGIC_STATUS_LABELS] ?? o} icon={<TargetIcon size={14} />} selectLabel={t("detail.select")} />
                 <SuggestInput
                   label={t("field.statusReason", "Status reason")}
                   value={sIntel.strategic_status_reason}
