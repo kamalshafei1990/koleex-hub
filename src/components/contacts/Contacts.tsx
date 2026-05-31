@@ -310,6 +310,7 @@ interface ContactForm {
   supplier_email: string;
   supplier_website: string;
   supplier_address: string;
+  supplier_postal_code: string;
   division: string;
   category: string;
   catalogues: { name: string; url: string; type: string; uploaded_at: string }[];
@@ -637,6 +638,7 @@ const EMPTY_FORM: ContactForm = {
   supplier_email: "",
   supplier_website: "",
   supplier_address: "",
+  supplier_postal_code: "",
   division: "",
   category: "",
   catalogues: [],
@@ -754,6 +756,7 @@ ALTER TABLE contacts ADD COLUMN IF NOT EXISTS supplier_mobile text;
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS supplier_email text;
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS supplier_website text;
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS supplier_address text;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS supplier_postal_code text;
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS division text;
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS category text;
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS catalogues jsonb DEFAULT '[]'::jsonb;
@@ -1097,6 +1100,7 @@ function contactToForm(c: ContactRow): ContactForm {
     supplier_email: c.supplier_email || "",
     supplier_website: c.supplier_website || "",
     supplier_address: c.supplier_address || "",
+    supplier_postal_code: c.supplier_postal_code || "",
     division: c.division || "",
     category: c.category || "",
     catalogues: Array.isArray(c.catalogues) ? c.catalogues : [],
@@ -1318,6 +1322,7 @@ function formToRow(f: ContactForm): Record<string, unknown> {
     supplier_email: f.supplier_email || null,
     supplier_website: f.supplier_website || null,
     supplier_address: f.supplier_address || null,
+    supplier_postal_code: f.supplier_postal_code || null,
     division: f.division || null,
     category: f.category || null,
     catalogues: f.catalogues.length > 0 ? f.catalogues : null,
@@ -4123,10 +4128,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
               )}
             </div>
-            {(c.country || c.province || c.city) && (
+            {(c.country || c.province || c.city || c.supplier_postal_code) && (
               <div className="mt-3 flex items-center gap-2">
                 {c.country_code && <span className="text-base">{countryCodeToFlag(c.country_code)}</span>}
-                <p className="text-sm text-[var(--text-primary)]">{[c.city, c.province, c.country].filter(Boolean).join(", ")}</p>
+                <p className="text-sm text-[var(--text-primary)]">{[c.city, c.province, c.country, c.supplier_postal_code].filter(Boolean).join(", ")}</p>
               </div>
             )}
           </Section>
@@ -6167,17 +6172,21 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
                 <Input label={t("field.contactEmail")} type="email" value={form.supplier_email} onChange={v => setField("supplier_email", v)} placeholder="company@example.com" icon={<EnvelopeIcon size={14} />} />
                 <Input label={t("field.website")} type="url" value={form.supplier_website} onChange={v => setField("supplier_website", v)} placeholder="https://www.example.com" icon={<GlobeIcon size={14} />} />
-                <Input label={t("field.supplierAddress")} value={form.supplier_address} onChange={v => setField("supplier_address", v)} placeholder={t("field.supplierAddress")} icon={<MapPinIcon size={14} />} />
-                <div>
-                  <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("placeholder.countryProvCity")}</label>
-                  <div className="space-y-2">
-                    <CountryDropdown value={form.country_code} displayValue={form.country} onChange={handleCountryChange} label={t("field.country")} placeholder={t("field.searchCountry")} noResults={t("detail.noCountries")} />
-                    {form.country_code && hasStates && (
-                      <ProvinceDropdown countryCode={form.country_code} value={form.province_code} displayValue={form.province} onChange={handleProvinceChange} label={t("field.provinceState")} placeholder={t("field.searchProvince")} noResults={t("detail.noProvinces")} />
-                    )}
-                    {showCity && (
+                {/* Address — structured like a standard postal address:
+                    street line → country → province/state → city + postal code. */}
+                <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] p-3 space-y-2.5">
+                  <Input label={t("field.streetAddress", "Street address")} value={form.supplier_address} onChange={v => setField("supplier_address", v)} placeholder={t("placeholder.street", "Street, building, unit…")} icon={<MapPinIcon size={14} />} autoComplete="street-address" />
+                  <CountryDropdown value={form.country_code} displayValue={form.country} onChange={handleCountryChange} label={t("field.country")} placeholder={t("field.searchCountry")} noResults={t("detail.noCountries")} />
+                  {form.country_code && hasStates && (
+                    <ProvinceDropdown countryCode={form.country_code} value={form.province_code} displayValue={form.province} onChange={handleProvinceChange} label={t("field.provinceState")} placeholder={t("field.searchProvince")} noResults={t("detail.noProvinces")} />
+                  )}
+                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                    {showCity ? (
                       <CityDropdown countryCode={form.country_code} stateCode={form.province_code} value={form.city} onChange={handleCityChange} label={t("field.city")} placeholder={t("field.searchCity")} noResults={t("detail.noCities")} />
+                    ) : (
+                      <Input label={t("field.city")} value={form.city} onChange={v => setField("city", v)} placeholder={t("placeholder.city", "City")} autoComplete="address-level2" />
                     )}
+                    <Input label={t("field.postalCode", "Postal / ZIP code")} value={form.supplier_postal_code} onChange={v => setField("supplier_postal_code", v)} placeholder={t("placeholder.zipCode", "Postal / ZIP code")} autoComplete="postal-code" />
                   </div>
                 </div>
               </div>

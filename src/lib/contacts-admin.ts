@@ -179,6 +179,7 @@ export interface ContactRow {
   supplier_email: string | null;
   supplier_website: string | null;
   supplier_address: string | null;
+  supplier_postal_code: string | null;
   division: string | null;
   category: string | null;
   catalogues: { name: string; url: string; type: string; uploaded_at: string }[];
