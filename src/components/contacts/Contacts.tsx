@@ -7595,13 +7595,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             {/* Negotiation */}
             <FormSection title={t("section.negotiation", "Negotiation")} icon={<HandCoinsIcon size={14} />}>
               <div className="space-y-4">
-                {/* Overall */}
-                <div className="space-y-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.overall", "Overall")}</p>
-                  <ScoreSlider label={t("field.negotiationScore", "Negotiation score (0–100)")} value={sIntel.neg.negotiation_score} onChange={(v) => { setNegScoreManual(true); setIntelNeg("negotiation_score", v); }} max={100} isAuto={!negScoreManual} onUseAuto={() => setNegScoreManual(false)} />
-                </div>
                 {/* Flexibility & terms */}
-                <div className="border-t border-[var(--border-color)] pt-3">
+                <div>
                   <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.flexibility", "Flexibility & Terms")}</p>
                   <div className="divide-y divide-[var(--border-color)]">
                     <SegmentedField layout="row" label={t("field.priceFlexibility", "Price flexibility")} value={sIntel.neg.price_flexibility} onChange={(v) => setIntelNeg("price_flexibility", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
@@ -7614,7 +7609,12 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     <SegmentedField layout="row" label={t("field.sampleSpeed", "Sample turnaround speed")} value={sIntel.neg.sample_turnaround_speed} onChange={(v) => setIntelNeg("sample_turnaround_speed", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
                   </div>
                 </div>
-                <Input label={t("field.internalNotes", "Internal notes")} value={sIntel.neg.internal_notes} onChange={(v) => setIntelNeg("internal_notes", v)} />
+                {/* Overall — score + notes (last, mirrors Risk) */}
+                <div className="space-y-3 border-t border-[var(--border-color)] pt-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.overall", "Overall")}</p>
+                  <ScoreSlider label={t("field.negotiationScore", "Negotiation score (0–100)")} value={sIntel.neg.negotiation_score} onChange={(v) => { setNegScoreManual(true); setIntelNeg("negotiation_score", v); }} max={100} isAuto={!negScoreManual} onUseAuto={() => setNegScoreManual(false)} />
+                  <Input label={t("field.internalNotes", "Internal notes")} value={sIntel.neg.internal_notes} onChange={(v) => setIntelNeg("internal_notes", v)} />
+                </div>
               </div>
             </FormSection>
 
