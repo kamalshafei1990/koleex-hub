@@ -2459,7 +2459,7 @@ const DateField = React.memo(function DateField({ value, onChange, disabled, cla
       </button>
 
       {open && (
-        <div className={`absolute z-50 ${openUp ? "bottom-full mb-1" : "top-full mt-1"} start-0 w-[17rem] rounded-xl border border-[var(--border-color)] bg-[var(--bg-elevated,var(--bg-surface))] p-3 shadow-xl`}>
+        <div className={`absolute z-50 ${openUp ? "bottom-full mb-1" : "top-full mt-1"} start-0 w-[17rem] rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3 shadow-2xl`}>
           {/* Header: month/year + nav */}
           <div className="mb-2 flex items-center justify-between">
             <button type="button" onClick={() => stepMonth(-1)} aria-label="Previous month" className="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-surface)]"><Chevron dir="left" /></button>
