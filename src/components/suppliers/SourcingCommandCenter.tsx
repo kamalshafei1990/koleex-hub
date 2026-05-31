@@ -12,8 +12,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import SuppliersNav from "./SuppliersNav";
-import GaugeIcon from "@/components/icons/ui/GaugeIcon";
+import SuppliersHeader from "./SuppliersHeader";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
 import NetworkIcon from "@/components/icons/ui/NetworkIcon";
 import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
@@ -169,16 +168,13 @@ export default function SourcingCommandCenter() {
   const isMgmt = data.callerTier === "management";
 
   return (
-    <>
-    <SuppliersNav active="sourcing" />
-    <div className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-2 text-[var(--text-secondary)]"><GaugeIcon className="h-5 w-5" /><span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-faint)]">Procurement Intelligence</span></div>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--text-primary)]">Sourcing Command Center</h1>
-        <p className="text-[12px] text-[var(--text-secondary)]">{o.activeSuppliers} active suppliers · {data.categories.length} categories · viewing as <span className="font-medium text-[var(--text-primary)]">{titleCase(data.callerTier)}</span></p>
-      </div>
+    <div className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6">
+      <SuppliersHeader
+        title="Sourcing Command Center"
+        subtitle={`${o.activeSuppliers} active suppliers · ${data.categories.length} categories · viewing as ${titleCase(data.callerTier)}`}
+      />
 
+      <div className="mt-6">
       {/* A. Global procurement overview — one aligned grid, grouped by label */}
       <section className="mb-8 grid grid-cols-3 gap-3">
         <div className="col-span-3"><GroupLabel>Portfolio</GroupLabel></div>
@@ -400,7 +396,7 @@ export default function SourcingCommandCenter() {
           </div>
         </section>
       </div>
+      </div>
     </div>
-    </>
   );
 }

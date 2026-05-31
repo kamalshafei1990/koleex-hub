@@ -38,7 +38,7 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import Edit3Icon from "@/components/icons/ui/Edit3Icon";
 import FactorySection from "./FactorySection";
-import SuppliersNav from "./SuppliersNav";
+import SuppliersHeader from "./SuppliersHeader";
 import ContactsSection from "./ContactsSection";
 import MediaSection from "./MediaSection";
 import TimelineSection from "./TimelineSection";
@@ -374,9 +374,10 @@ export default function SupplierDetail({ id }: { id: string }) {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
-      <SuppliersNav active="detail" supplierName={name} />
+      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 py-6">
+        <SuppliersHeader title="Suppliers" />
 
-      <main className="mx-auto w-full max-w-6xl px-4 md:px-8 py-6 md:py-10 space-y-10 pb-24">
+      <main className="mt-6 space-y-10 pb-24">
         {/* ── Identity ── */}
         <section className="flex flex-col gap-5 sm:flex-row sm:items-center">
           <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[var(--bg-surface-subtle)]">
@@ -897,6 +898,7 @@ export default function SupplierDetail({ id }: { id: string }) {
           </section>
         ) : null}
       </main>
+      </div>
     </div>
   );
 }

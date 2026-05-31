@@ -2677,7 +2677,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               filterType === "customer"
                 ? "bg-amber-500/10 border-amber-500/25 text-amber-400"
                 : filterType === "supplier"
-                  ? "bg-sky-500/10 border-sky-500/25 text-sky-400"
+                  ? "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-primary)]"
                   : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)]"
             }`}
           >
