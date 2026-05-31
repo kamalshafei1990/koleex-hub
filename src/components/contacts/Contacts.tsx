@@ -2629,11 +2629,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           {filterType === "supplier" && (
             <Link
               href="/suppliers/sourcing"
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-2.5 text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
+              className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
               title="Sourcing Command Center"
+              aria-label="Sourcing Command Center"
             >
               <TargetIcon size={14} />
-              <span className="hidden sm:inline">Command Center</span>
             </Link>
           )}
           {/* CSV export — customer directory only. Dumps whatever the
@@ -5968,6 +5968,21 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
+            {/* Messaging IDs — how the team reaches an overseas factory */}
+            <FormSection title={t("section.messagingIds", "Messaging IDs")} icon={<MessageSquareIcon size={14} />}>
+              <div className="space-y-3">
+                <Input label={t("field.whatsappBusiness", "WhatsApp Business")} value={form.whatsapp_business} onChange={v => setField("whatsapp_business", v)} placeholder="+86 …" icon={<PhoneIcon size={14} />} />
+                <div className="grid grid-cols-2 gap-3">
+                  <Input label={t("field.wechatId", "WeChat ID")} value={form.wechat_id} onChange={v => setField("wechat_id", v)} placeholder="@handle" icon={<MessageSquareIcon size={14} />} />
+                  <Input label={t("field.telegramId", "Telegram ID")} value={form.telegram_id} onChange={v => setField("telegram_id", v)} placeholder="@handle" icon={<MessageSquareIcon size={14} />} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input label={t("field.lineId", "Line ID")} value={form.line_id} onChange={v => setField("line_id", v)} placeholder="@handle" icon={<MessageSquareIcon size={14} />} />
+                  <Input label={t("field.skypeId", "Skype ID")} value={form.skype_id} onChange={v => setField("skype_id", v)} placeholder="live:…" icon={<MessageSquareIcon size={14} />} />
+                </div>
+              </div>
+            </FormSection>
+
             {/* 3. Contact Persons — Key people to communicate with */}
             <FormSection title={t("section.contactPersons")} icon={<UsersIcon size={14} />}>
               <div className="space-y-3">
@@ -6043,6 +6058,40 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
+            {/* Legal Identity — registration & company profile */}
+            <FormSection title={t("section.legalIdentity", "Legal Identity")} icon={<Building2Icon size={14} />}>
+              <div className="space-y-3">
+                <Input label={t("field.tradingName", "Trading / DBA Name")} value={form.trading_name} onChange={v => setField("trading_name", v)} placeholder={t("placeholder.tradingName", "Doing business as")} icon={<Building2Icon size={14} />} />
+                <div className="grid grid-cols-2 gap-3">
+                  <SelectInput label={t("field.companyType", "Company Type")} value={form.company_type} onChange={v => setField("company_type", v)} options={COMPANY_TYPES} icon={<BriefcaseIcon size={14} />} selectLabel={t("detail.select")} />
+                  <Input label={t("field.businessRegNumber", "Business Registration #")} value={form.business_registration_number} onChange={v => setField("business_registration_number", v)} placeholder={t("placeholder.regNumber", "CR / Reg #")} icon={<HashtagIcon size={14} />} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input label={t("field.registrationCountry", "Registration Country")} value={form.registration_country} onChange={v => setField("registration_country", v)} placeholder={t("placeholder.country", "Country")} icon={<GlobeIcon size={14} />} />
+                  <Input label={t("field.yearEstablished", "Year Established")} value={form.year_established} onChange={v => setField("year_established", v)} placeholder="2000" icon={<CalendarRawIcon size={14} />} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <SelectInput label={t("field.employeeCountRange", "Employee Count")} value={form.employee_count_range} onChange={v => setField("employee_count_range", v)} options={EMPLOYEE_COUNT_RANGES} icon={<UsersIcon size={14} />} selectLabel={t("detail.select")} />
+                  <SelectInput label={t("field.annualRevenueRange", "Annual Revenue")} value={form.annual_revenue_range} onChange={v => setField("annual_revenue_range", v)} options={ANNUAL_REVENUE_RANGES} icon={<TrendingUpIcon size={14} />} selectLabel={t("detail.select")} />
+                </div>
+              </div>
+            </FormSection>
+
+            {/* Trade & Tax IDs — VAT / customs identifiers */}
+            <FormSection title={t("section.tradeIdentifiers", "Trade & Tax IDs")} icon={<FileCheckIcon size={14} />}>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <Input label={t("field.gstNumber", "VAT / GST")} value={form.gst_number} onChange={v => setField("gst_number", v)} placeholder="VAT / GST number" icon={<HashtagIcon size={14} />} />
+                  <Input label={t("field.crNumber", "CR Number")} value={form.cr_number} onChange={v => setField("cr_number", v)} placeholder="Commercial registration" icon={<HashtagIcon size={14} />} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input label={t("field.dunsNumber", "D-U-N-S")} value={form.duns_number} onChange={v => setField("duns_number", v)} placeholder="123456789" icon={<HashtagIcon size={14} />} />
+                  <Input label={t("field.iec", "Importer / Exporter Code")} value={form.importer_exporter_code} onChange={v => setField("importer_exporter_code", v)} placeholder="IEC code" icon={<HashtagIcon size={14} />} />
+                </div>
+                <Input label={t("field.customsCode", "Customs Code")} value={form.customs_code} onChange={v => setField("customs_code", v)} placeholder="Customs code" icon={<HashtagIcon size={14} />} />
+              </div>
+            </FormSection>
+
             {/* 5. Payment & Currency */}
             <FormSection title={t("section.paymentCurrency")} icon={<DollarSignIcon size={14} />}>
               <div className="space-y-3">
@@ -6054,6 +6103,21 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.paymentInfo")}</label>
                   <textarea value={form.payment_info} onChange={e => setField("payment_info", e.target.value)} placeholder={t("placeholder.bankTransfer")} rows={3} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none resize-none focus:border-[var(--border-focus)]" />
                 </div>
+              </div>
+            </FormSection>
+
+            {/* Logistics & Trade — shipping terms a buyer needs at a glance */}
+            <FormSection title={t("section.logisticsTrade", "Logistics & Trade")} icon={<TruckIcon size={14} />}>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <Input label={t("field.incoterms", "Incoterms")} value={form.incoterms} onChange={v => setField("incoterms", v)} placeholder="FOB / CIF / EXW" icon={<ShipIcon size={14} />} />
+                  <Input label={t("field.leadTime", "Lead Time")} value={form.lead_time} onChange={v => setField("lead_time", v)} placeholder="e.g. 30 days" icon={<TimerIcon size={14} />} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input label={t("field.moq", "MOQ")} value={form.moq} onChange={v => setField("moq", v)} placeholder="Minimum order qty" icon={<PackageIcon size={14} />} />
+                  <SelectInput label={t("field.containerPreference", "Container Preference")} value={form.container_preference} onChange={v => setField("container_preference", v)} options={CONTAINER_PREFERENCES} icon={<BoxesIcon size={14} />} selectLabel={t("detail.select")} />
+                </div>
+                <Input label={t("field.portOfEntry", "Port of Loading / Entry")} value={form.port_of_entry} onChange={v => setField("port_of_entry", v)} placeholder="Shanghai / Ningbo / Jebel Ali" icon={<ShipIcon size={14} />} />
               </div>
             </FormSection>
 
