@@ -321,7 +321,7 @@ interface ContactForm {
   category: string;
   catalogues: { name: string; url: string; type: string; uploaded_at: string }[];
   documents: { doc_name: string; name: string; url: string; type: string; uploaded_at: string }[];
-  contact_persons: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string; whatsapp?: string; wechat_id?: string; wechat_qr?: string }[];
+  contact_persons: { name: string; name_cn?: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string; whatsapp?: string; wechat_id?: string; wechat_qr?: string }[];
   bank_accounts: { bank_name: string; account_name: string; account_number: string; swift_code: string; iban: string; branch: string; currency: string }[];
   payment_info: string;
   /* ── Employee-Specific ── */
@@ -3882,14 +3882,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {c.contact_type === "customer" && c.entity_type === "company" && detailTab("activity") && Array.isArray(c.contact_persons) && c.contact_persons.length > 0 && (
           <Section title={t("section.contactPersons")} icon={<UsersIcon size={14} />}>
             <div className="space-y-2">
-              {c.contact_persons.map((cp: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string; whatsapp?: string; wechat_id?: string; wechat_qr?: string }, i: number) => (
+              {c.contact_persons.map((cp: { name: string; name_cn?: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string; whatsapp?: string; wechat_id?: string; wechat_qr?: string }, i: number) => (
                 <div key={i} className="py-2 border-b border-[var(--border-faint)] last:border-0">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-[var(--bg-surface-hover)] flex items-center justify-center text-xs font-semibold text-[var(--text-subtle)]">
                       {(cp.name?.[0] || "?").toUpperCase()}
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm text-[var(--text-primary)] font-medium">{cp.name}</p>
+                      <p className="text-sm text-[var(--text-primary)] font-medium">{cp.name}{cp.name_cn ? <span className="text-[var(--text-faint)] font-normal"> · {cp.name_cn}</span> : null}</p>
                       <div className="flex items-center gap-2">
                         {cp.position && <span className="text-xs text-[var(--text-faint)]">{cp.position}</span>}
                         {cp.department && <span className="text-xs text-[var(--text-dim)]">{cp.position ? " · " : ""}{cp.department}</span>}
@@ -3960,14 +3960,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {c.contact_type === "company" && Array.isArray(c.contact_persons) && c.contact_persons.length > 0 && (
           <Section title={t("section.contactPersons")} icon={<UsersIcon size={14} />}>
             <div className="space-y-2">
-              {c.contact_persons.map((cp: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string; whatsapp?: string; wechat_id?: string; wechat_qr?: string }, i: number) => (
+              {c.contact_persons.map((cp: { name: string; name_cn?: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string; whatsapp?: string; wechat_id?: string; wechat_qr?: string }, i: number) => (
                 <div key={i} className="py-2 border-b border-[var(--border-faint)] last:border-0">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-[var(--bg-surface-hover)] flex items-center justify-center text-xs font-semibold text-[var(--text-subtle)]">
                       {(cp.name?.[0] || "?").toUpperCase()}
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm text-[var(--text-primary)] font-medium">{cp.name}</p>
+                      <p className="text-sm text-[var(--text-primary)] font-medium">{cp.name}{cp.name_cn ? <span className="text-[var(--text-faint)] font-normal"> · {cp.name_cn}</span> : null}</p>
                       <div className="flex items-center gap-2">
                         {cp.position && <span className="text-xs text-[var(--text-faint)]">{cp.position}</span>}
                         {cp.department && <span className="text-xs text-[var(--text-dim)]">{cp.position ? " · " : ""}{cp.department}</span>}
@@ -4249,14 +4249,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {c.contact_type === "supplier" && Array.isArray(c.contact_persons) && c.contact_persons.length > 0 && (
           <Section title={t("section.contactPersons")} icon={<UsersIcon size={14} />}>
             <div className="space-y-2">
-              {c.contact_persons.map((cp: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string; whatsapp?: string; wechat_id?: string; wechat_qr?: string }, i: number) => (
+              {c.contact_persons.map((cp: { name: string; name_cn?: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string; whatsapp?: string; wechat_id?: string; wechat_qr?: string }, i: number) => (
                 <div key={i} className="py-2 border-b border-[var(--border-faint)] last:border-0">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-[var(--bg-surface-hover)] flex items-center justify-center text-xs font-semibold text-[var(--text-subtle)]">
                       {(cp.name?.[0] || "?").toUpperCase()}
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm text-[var(--text-primary)] font-medium">{cp.name}</p>
+                      <p className="text-sm text-[var(--text-primary)] font-medium">{cp.name}{cp.name_cn ? <span className="text-[var(--text-faint)] font-normal"> · {cp.name_cn}</span> : null}</p>
                       <div className="flex items-center gap-2">
                         {cp.position && <span className="text-xs text-[var(--text-faint)]">{cp.position}</span>}
                         {cp.department && <span className="text-xs text-[var(--text-dim)]">{cp.position ? " · " : ""}{cp.department}</span>}
@@ -5267,7 +5267,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 )}
               </div>
             ))}
-            <AddButton label={t("add.contactPerson")} onClick={() => setField("contact_persons", [...form.contact_persons, { name: "", position: "", department: "", phone: "", mobile: "", email: "", notes: "", whatsapp: "", wechat_id: "", wechat_qr: "" }])} />
+            <AddButton label={t("add.contactPerson")} onClick={() => setField("contact_persons", [...form.contact_persons, { name: "", name_cn: "", position: "", department: "", phone: "", mobile: "", email: "", notes: "", whatsapp: "", wechat_id: "", wechat_qr: "" }])} />
           </div>
         </FormSection>
         )}
@@ -5371,7 +5371,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 )}
               </div>
             ))}
-            <AddButton label={t("add.contactPerson")} onClick={() => setField("contact_persons", [...form.contact_persons, { name: "", position: "", department: "", phone: "", mobile: "", email: "", notes: "", whatsapp: "", wechat_id: "", wechat_qr: "" }])} />
+            <AddButton label={t("add.contactPerson")} onClick={() => setField("contact_persons", [...form.contact_persons, { name: "", name_cn: "", position: "", department: "", phone: "", mobile: "", email: "", notes: "", whatsapp: "", wechat_id: "", wechat_qr: "" }])} />
           </div>
         </FormSection>
         </>
@@ -6372,25 +6372,28 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                       <input
                         value={cp.name}
                         onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], name: e.target.value }; setField("contact_persons", arr); }}
-                        placeholder={t("field.name")}
-                        className="flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
+                        placeholder={t("field.nameEn", "English name")}
+                        className="min-w-0 flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
                       />
                       <input
-                        value={cp.position}
-                        onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], position: e.target.value }; setField("contact_persons", arr); }}
-                        placeholder={t("field.position")}
-                        className="w-32 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
+                        value={cp.name_cn ?? ""}
+                        onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], name_cn: e.target.value }; setField("contact_persons", arr); }}
+                        placeholder={t("field.nameCn", "中文名 / Chinese name")}
+                        className="min-w-0 flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
                       />
                       <button
                         onClick={() => setExpandedFamily(expandedFamily === 1000 + i ? null : 1000 + i)}
-                        className="w-8 h-8 rounded-lg bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--text-primary)] transition-colors"
+                        className="w-8 h-8 shrink-0 rounded-lg bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--text-primary)] transition-colors"
                       >
                         <AngleDownIcon size={14} className={`transition-transform ${expandedFamily === 1000 + i ? "rotate-180" : ""}`} />
                       </button>
                     </div>
                     {expandedFamily === 1000 + i && (
                       <div className="px-3 pb-3 pt-1 ms-8 space-y-2 border-t border-[var(--border-faint)]">
-                        <input value={cp.department} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], department: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.department")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none mt-2" />
+                        <div className="grid grid-cols-2 gap-2 mt-2">
+                          <input value={cp.position} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], position: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.position")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                          <input value={cp.department} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], department: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.department")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                        </div>
                         <div className="grid grid-cols-2 gap-2">
                           <input type="tel" inputMode="tel" autoComplete="tel" value={cp.phone} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], phone: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.phone")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
                           <input type="tel" inputMode="tel" autoComplete="tel" value={cp.mobile} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], mobile: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.contactMobile")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
@@ -6411,7 +6414,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     )}
                   </div>
                 ))}
-                <AddButton label={t("add.contactPerson")} onClick={() => setField("contact_persons", [...form.contact_persons, { name: "", position: "", department: "", phone: "", mobile: "", email: "", notes: "", whatsapp: "", wechat_id: "", wechat_qr: "" }])} />
+                <AddButton label={t("add.contactPerson")} onClick={() => setField("contact_persons", [...form.contact_persons, { name: "", name_cn: "", position: "", department: "", phone: "", mobile: "", email: "", notes: "", whatsapp: "", wechat_id: "", wechat_qr: "" }])} />
               </div>
             </FormSection>
 
