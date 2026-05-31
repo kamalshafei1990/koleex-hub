@@ -134,6 +134,12 @@ export interface ContactRow {
   telegram_qr: string | null;
   line_qr: string | null;
   skype_qr: string | null;
+  qq_id: string | null;
+  qq_qr: string | null;
+  dingtalk_id: string | null;
+  dingtalk_qr: string | null;
+  messenger_id: string | null;
+  messenger_qr: string | null;
   /* ── Segmentation extras ── */
   sub_industry: string | null;
   buying_behavior: string | null;

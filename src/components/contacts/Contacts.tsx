@@ -267,6 +267,12 @@ interface ContactForm {
   telegram_qr: string;
   line_qr: string;
   skype_qr: string;
+  qq_id: string;
+  qq_qr: string;
+  dingtalk_id: string;
+  dingtalk_qr: string;
+  messenger_id: string;
+  messenger_qr: string;
   /* ── Segmentation extras ── */
   sub_industry: string;
   buying_behavior: string;
@@ -606,6 +612,12 @@ const EMPTY_FORM: ContactForm = {
   telegram_qr: "",
   line_qr: "",
   skype_qr: "",
+  qq_id: "",
+  qq_qr: "",
+  dingtalk_id: "",
+  dingtalk_qr: "",
+  messenger_id: "",
+  messenger_qr: "",
   /* Segmentation extras */
   sub_industry: "",
   buying_behavior: "",
@@ -1073,6 +1085,12 @@ function contactToForm(c: ContactRow): ContactForm {
     telegram_qr: c.telegram_qr || "",
     line_qr: c.line_qr || "",
     skype_qr: c.skype_qr || "",
+    qq_id: c.qq_id || "",
+    qq_qr: c.qq_qr || "",
+    dingtalk_id: c.dingtalk_id || "",
+    dingtalk_qr: c.dingtalk_qr || "",
+    messenger_id: c.messenger_id || "",
+    messenger_qr: c.messenger_qr || "",
     /* Segmentation extras */
     sub_industry: c.sub_industry || "",
     buying_behavior: c.buying_behavior || "",
@@ -1300,6 +1318,12 @@ function formToRow(f: ContactForm): Record<string, unknown> {
     telegram_qr: f.telegram_qr || null,
     line_qr: f.line_qr || null,
     skype_qr: f.skype_qr || null,
+    qq_id: f.qq_id || null,
+    qq_qr: f.qq_qr || null,
+    dingtalk_id: f.dingtalk_id || null,
+    dingtalk_qr: f.dingtalk_qr || null,
+    messenger_id: f.messenger_id || null,
+    messenger_qr: f.messenger_qr || null,
     /* Segmentation extras */
     sub_industry: f.sub_industry || null,
     buying_behavior: f.buying_behavior || null,
@@ -6373,7 +6397,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 />
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <MessagingIdField label={t("field.telegram", "Telegram")} icon={<BrandGlyph name="Telegram" size={15} />} idValue={form.telegram_id} onIdChange={v => setField("telegram_id", v)} placeholder="@handle" qrValue={form.telegram_qr} onQrChange={v => setField("telegram_qr", v)} />
-                  <MessagingIdField label={t("field.line", "Line")} icon={<BrandGlyph name="Line" size={15} />} idValue={form.line_id} onIdChange={v => setField("line_id", v)} placeholder={t("placeholder.lineId", "Line ID")} qrValue={form.line_qr} onQrChange={v => setField("line_qr", v)} />
+                  <MessagingIdField label={t("field.qq", "QQ")} icon={<BrandGlyph name="QQ" size={15} />} idValue={form.qq_id} onIdChange={v => setField("qq_id", v)} placeholder={t("placeholder.qqId", "QQ number")} qrValue={form.qq_qr} onQrChange={v => setField("qq_qr", v)} />
+                  <MessagingIdField label={t("field.dingtalk", "DingTalk")} icon={<BrandGlyph name="DingTalk" size={15} />} idValue={form.dingtalk_id} onIdChange={v => setField("dingtalk_id", v)} placeholder={t("placeholder.dingtalkId", "DingTalk ID")} qrValue={form.dingtalk_qr} onQrChange={v => setField("dingtalk_qr", v)} />
+                  <MessagingIdField label={t("field.messenger", "Messenger")} icon={<BrandGlyph name="Messenger" size={15} />} idValue={form.messenger_id} onIdChange={v => setField("messenger_id", v)} placeholder={t("placeholder.messenger", "m.me/username")} qrValue={form.messenger_qr} onQrChange={v => setField("messenger_qr", v)} />
                 </div>
               </div>
             </FormSection>
