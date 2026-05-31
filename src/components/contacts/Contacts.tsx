@@ -7224,31 +7224,6 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
-            {/* Social Media — add as many accounts as needed; each is a
-                platform + a link, page, or @account name. */}
-            <FormSection title={t("section.socialMedia", "Social Media")} icon={<Share2Icon size={14} />}>
-              <div className="space-y-2.5">
-                {form.social_profiles.length === 0 && (
-                  <p className="text-[11px] text-[var(--text-faint)]">{t("hint.socialMedia", "Add the factory's social pages — paste a link, page, or @account.")}</p>
-                )}
-                {form.social_profiles.map((s, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <RemoveBtn onClick={() => removeSocial(i)} />
-                    <div className="w-36 shrink-0 sm:w-44">
-                      <PlatformSelect value={s.platform} onChange={v => updateSocial(i, "platform", v)} options={SOCIAL_MEDIA_PLATFORMS} />
-                    </div>
-                    <input
-                      value={s.url}
-                      onChange={e => updateSocial(i, "url", e.target.value)}
-                      placeholder={t("placeholder.socialLink", "Link, page, or @account")}
-                      className="min-w-0 flex-1 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
-                    />
-                  </div>
-                ))}
-                <AddButton label={t("add.socialAccount", "Add social account")} onClick={() => setField("social_profiles", [...form.social_profiles, { platform: "LinkedIn", username: "", url: "", qr_code_url: "" }])} />
-              </div>
-            </FormSection>
-
             {/* Legal Identity — registration & company profile */}
             <FormSection title={t("section.legalIdentity", "Legal Identity")} icon={<Building2Icon size={14} />}>
               <div className="space-y-3">
@@ -7449,21 +7424,6 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
-            {/* Strategic status */}
-            <FormSection title={t("section.strategicStatus", "Strategic Status")} icon={<TargetIcon size={14} />}>
-              <div className="grid grid-cols-2 gap-3">
-                <SelectInput label={t("field.strategicStatus", "Strategic status")} value={sIntel.strategic_status} onChange={(v) => setSIntel((p) => ({ ...p, strategic_status: v }))} options={Object.keys(STRATEGIC_STATUS_LABELS)} renderLabel={(o) => STRATEGIC_STATUS_LABELS[o as keyof typeof STRATEGIC_STATUS_LABELS] ?? o} icon={<TargetIcon size={14} />} selectLabel={t("detail.select")} />
-                <SuggestInput
-                  label={t("field.statusReason", "Status reason")}
-                  value={sIntel.strategic_status_reason}
-                  onChange={(v) => setSIntel((p) => ({ ...p, strategic_status_reason: v }))}
-                  placeholder={t("placeholder.statusReason", "Pick a common reason or type your own")}
-                  options={STATUS_REASON_SUGGESTIONS}
-                  icon={<TargetIcon size={14} />}
-                />
-              </div>
-            </FormSection>
-
             {/* 9. Quality & Performance */}
             <FormSection title={t("section.qualityPerformance")} icon={<ShieldCheckIcon size={14} />}>
               <div className="space-y-3">
@@ -7570,6 +7530,21 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
+            {/* Strategic status */}
+            <FormSection title={t("section.strategicStatus", "Strategic Status")} icon={<TargetIcon size={14} />}>
+              <div className="grid grid-cols-2 gap-3">
+                <SelectInput label={t("field.strategicStatus", "Strategic status")} value={sIntel.strategic_status} onChange={(v) => setSIntel((p) => ({ ...p, strategic_status: v }))} options={Object.keys(STRATEGIC_STATUS_LABELS)} renderLabel={(o) => STRATEGIC_STATUS_LABELS[o as keyof typeof STRATEGIC_STATUS_LABELS] ?? o} icon={<TargetIcon size={14} />} selectLabel={t("detail.select")} />
+                <SuggestInput
+                  label={t("field.statusReason", "Status reason")}
+                  value={sIntel.strategic_status_reason}
+                  onChange={(v) => setSIntel((p) => ({ ...p, strategic_status_reason: v }))}
+                  placeholder={t("placeholder.statusReason", "Pick a common reason or type your own")}
+                  options={STATUS_REASON_SUGGESTIONS}
+                  icon={<TargetIcon size={14} />}
+                />
+              </div>
+            </FormSection>
+
             {/* 8. Documents */}
             <FormSection title={t("section.documents")} icon={<PaperclipIcon size={14} />}>
               <div className="space-y-2">
@@ -7618,6 +7593,31 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   </div>
                 ))}
                 <AddButton label={t("add.document")} onClick={() => setField("documents", [...form.documents, { doc_name: "", name: "", url: "", type: "", uploaded_at: "" }])} />
+              </div>
+            </FormSection>
+
+            {/* Social Media — add as many accounts as needed; each is a
+                platform + a link, page, or @account name. */}
+            <FormSection title={t("section.socialMedia", "Social Media")} icon={<Share2Icon size={14} />}>
+              <div className="space-y-2.5">
+                {form.social_profiles.length === 0 && (
+                  <p className="text-[11px] text-[var(--text-faint)]">{t("hint.socialMedia", "Add the factory's social pages — paste a link, page, or @account.")}</p>
+                )}
+                {form.social_profiles.map((s, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <RemoveBtn onClick={() => removeSocial(i)} />
+                    <div className="w-36 shrink-0 sm:w-44">
+                      <PlatformSelect value={s.platform} onChange={v => updateSocial(i, "platform", v)} options={SOCIAL_MEDIA_PLATFORMS} />
+                    </div>
+                    <input
+                      value={s.url}
+                      onChange={e => updateSocial(i, "url", e.target.value)}
+                      placeholder={t("placeholder.socialLink", "Link, page, or @account")}
+                      className="min-w-0 flex-1 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
+                    />
+                  </div>
+                ))}
+                <AddButton label={t("add.socialAccount", "Add social account")} onClick={() => setField("social_profiles", [...form.social_profiles, { platform: "LinkedIn", username: "", url: "", qr_code_url: "" }])} />
               </div>
             </FormSection>
 
