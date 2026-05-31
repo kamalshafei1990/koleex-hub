@@ -2785,7 +2785,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   }, [filterType, router]);
 
   const handleAdd = useCallback((type: ContactType, entityType?: "person" | "company") => {
-    setForm({ ...EMPTY_FORM, contact_type: type, entity_type: entityType || "" });
+    // New suppliers default to the Garment Machinery division so the
+    // category dropdown is populated out of the box.
+    setForm({ ...EMPTY_FORM, contact_type: type, entity_type: entityType || "", division: type === "supplier" ? "Garment Machinery" : "" });
     setSIntel(EMPTY_SINTEL);
     setEditingId(null);
     setView("form");
