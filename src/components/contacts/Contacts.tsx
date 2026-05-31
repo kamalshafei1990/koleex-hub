@@ -4804,7 +4804,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               <ArrowLeftIcon size={18} className="rtl:rotate-180" />
             </button>
             <h2 className="text-base md:text-lg font-semibold text-[var(--text-primary)] truncate">
-              {editingId ? t("editContact") : t("newContact")}
+              {filterType
+                ? `${editingId ? t("btn.edit", "Edit") : t("btn.new", "New")} ${t("type." + filterType, filterType.charAt(0).toUpperCase() + filterType.slice(1))}`
+                : editingId ? t("editContact") : t("newContact")}
             </h2>
           </div>
           <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
@@ -4889,7 +4891,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </label>
           )}
 
-          {/* Contact Type selector */}
+          {/* Contact Type selector — only in the generic Contacts app.
+              In a type-specific app (Suppliers, Customers) the contact type is
+              already fixed by the app you're in, so offering Customer / Supplier
+              / Company / People here is confusing. */}
+          {!filterType && (
           <div className="flex items-center gap-2 mt-4 overflow-x-auto md:overflow-visible no-scrollbar px-2 pb-1 md:justify-center md:flex-wrap">
             {CONTACT_TYPES.map(ct => (
               <button
@@ -4905,6 +4911,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </button>
             ))}
           </div>
+          )}
 
           {/* Entity type toggle for customers */}
           {form.contact_type === "customer" && (
