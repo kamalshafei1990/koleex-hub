@@ -7482,35 +7482,55 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
             {/* Risk */}
             <FormSection title={t("section.risk", "Risk")} icon={<TriangleWarningIcon size={14} />}>
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="col-span-2"><SegmentedField label={t("field.riskLevel", "Risk level")} value={String(sIntel.risk.risk_level)} onChange={(v) => setIntelRisk("risk_level", v)} options={LEVEL4_OPTS} renderLabel={capWord} polarity="goodLow" /></div>
-                  <div className="col-span-2"><SegmentedField label={t("field.dependencyLevel", "Dependency level")} value={String(sIntel.risk.dependency_level)} onChange={(v) => setIntelRisk("dependency_level", v)} options={LEVEL4_OPTS} renderLabel={capWord} polarity="goodLow" /></div>
-                  <SegmentedField label={t("field.financialStability", "Financial stability")} value={String(sIntel.risk.financial_stability)} onChange={(v) => setIntelRisk("financial_stability", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
-                  <SegmentedField label={t("field.deliveryStability", "Delivery stability")} value={String(sIntel.risk.delivery_stability)} onChange={(v) => setIntelRisk("delivery_stability", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
-                  <SegmentedField label={t("field.qualityStability", "Quality stability")} value={String(sIntel.risk.quality_stability)} onChange={(v) => setIntelRisk("quality_stability", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
-                  <SegmentedField label={t("field.communicationQuality", "Communication quality")} value={String(sIntel.risk.communication_quality)} onChange={(v) => setIntelRisk("communication_quality", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
-                  <SegmentedField label={t("field.trustLevel", "Trust level")} value={String(sIntel.risk.trust_level)} onChange={(v) => setIntelRisk("trust_level", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
+              <div className="space-y-4">
+                {/* Exposure — how risky the relationship is */}
+                <div className="space-y-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.exposure", "Exposure")}</p>
+                  <SegmentedField label={t("field.riskLevel", "Risk level")} value={String(sIntel.risk.risk_level)} onChange={(v) => setIntelRisk("risk_level", v)} options={LEVEL4_OPTS} renderLabel={capWord} polarity="goodLow" />
+                  <SegmentedField label={t("field.dependencyLevel", "Dependency level")} value={String(sIntel.risk.dependency_level)} onChange={(v) => setIntelRisk("dependency_level", v)} options={LEVEL4_OPTS} renderLabel={capWord} polarity="goodLow" />
                 </div>
-                <div className="border-t border-[var(--border-color)] pt-3">
+                {/* Reliability — how dependable they are */}
+                <div className="space-y-3 border-t border-[var(--border-color)] pt-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.reliability", "Reliability & Trust")}</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <SegmentedField label={t("field.financialStability", "Financial stability")} value={String(sIntel.risk.financial_stability)} onChange={(v) => setIntelRisk("financial_stability", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
+                    <SegmentedField label={t("field.deliveryStability", "Delivery stability")} value={String(sIntel.risk.delivery_stability)} onChange={(v) => setIntelRisk("delivery_stability", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
+                    <SegmentedField label={t("field.qualityStability", "Quality stability")} value={String(sIntel.risk.quality_stability)} onChange={(v) => setIntelRisk("quality_stability", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
+                    <SegmentedField label={t("field.communicationQuality", "Communication quality")} value={String(sIntel.risk.communication_quality)} onChange={(v) => setIntelRisk("communication_quality", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
+                    <div className="col-span-2"><SegmentedField label={t("field.trustLevel", "Trust level")} value={String(sIntel.risk.trust_level)} onChange={(v) => setIntelRisk("trust_level", v)} options={LEVEL3_OPTS} renderLabel={capWord} /></div>
+                  </div>
+                </div>
+                {/* Overall */}
+                <div className="space-y-3 border-t border-[var(--border-color)] pt-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.overall", "Overall")}</p>
                   <ScoreSlider label={t("field.internalScore", "Internal score (0–100)")} value={String(sIntel.risk.internal_evaluation_score)} onChange={(v) => setIntelRisk("internal_evaluation_score", v)} max={100} />
+                  <label className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)]"><input type="checkbox" checked={!!sIntel.risk.backup_supplier_exists} onChange={(e) => setIntelRisk("backup_supplier_exists", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.backupExists", "Backup supplier exists")}</label>
+                  <Input label={t("field.assessmentNotes", "Assessment notes")} value={String(sIntel.risk.assessment_notes)} onChange={(v) => setIntelRisk("assessment_notes", v)} />
                 </div>
-                <label className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)]"><input type="checkbox" checked={!!sIntel.risk.backup_supplier_exists} onChange={(e) => setIntelRisk("backup_supplier_exists", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.backupExists", "Backup supplier exists")}</label>
-                <Input label={t("field.assessmentNotes", "Assessment notes")} value={String(sIntel.risk.assessment_notes)} onChange={(v) => setIntelRisk("assessment_notes", v)} />
               </div>
             </FormSection>
 
             {/* Negotiation */}
             <FormSection title={t("section.negotiation", "Negotiation")} icon={<HandCoinsIcon size={14} />}>
-              <div className="pb-3"><ScoreSlider label={t("field.negotiationScore", "Negotiation score (0–100)")} value={sIntel.neg.negotiation_score} onChange={(v) => setIntelNeg("negotiation_score", v)} max={100} /></div>
-              <div className="grid grid-cols-2 gap-3 border-t border-[var(--border-color)] pt-3">
-                <SegmentedField label={t("field.priceFlexibility", "Price flexibility")} value={sIntel.neg.price_flexibility} onChange={(v) => setIntelNeg("price_flexibility", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
-                <SegmentedField label={t("field.moqFlexibility", "MOQ flexibility")} value={sIntel.neg.moq_flexibility} onChange={(v) => setIntelNeg("moq_flexibility", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
-                <SegmentedField label={t("field.paymentFlexibility", "Payment flexibility")} value={sIntel.neg.payment_flexibility} onChange={(v) => setIntelNeg("payment_flexibility", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
-                <SegmentedField label={t("field.negotiationDifficulty", "Negotiation difficulty")} value={sIntel.neg.negotiation_difficulty} onChange={(v) => setIntelNeg("negotiation_difficulty", v)} options={LEVEL3_OPTS} renderLabel={capWord} polarity="goodLow" />
-                <SegmentedField label={t("field.sampleSpeed", "Sample turnaround speed")} value={sIntel.neg.sample_turnaround_speed} onChange={(v) => setIntelNeg("sample_turnaround_speed", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
+              <div className="space-y-4">
+                {/* Overall */}
+                <div className="space-y-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.overall", "Overall")}</p>
+                  <ScoreSlider label={t("field.negotiationScore", "Negotiation score (0–100)")} value={sIntel.neg.negotiation_score} onChange={(v) => setIntelNeg("negotiation_score", v)} max={100} />
+                </div>
+                {/* Flexibility & terms */}
+                <div className="space-y-3 border-t border-[var(--border-color)] pt-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.flexibility", "Flexibility & Terms")}</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <SegmentedField label={t("field.priceFlexibility", "Price flexibility")} value={sIntel.neg.price_flexibility} onChange={(v) => setIntelNeg("price_flexibility", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
+                    <SegmentedField label={t("field.moqFlexibility", "MOQ flexibility")} value={sIntel.neg.moq_flexibility} onChange={(v) => setIntelNeg("moq_flexibility", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
+                    <SegmentedField label={t("field.paymentFlexibility", "Payment flexibility")} value={sIntel.neg.payment_flexibility} onChange={(v) => setIntelNeg("payment_flexibility", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
+                    <SegmentedField label={t("field.negotiationDifficulty", "Negotiation difficulty")} value={sIntel.neg.negotiation_difficulty} onChange={(v) => setIntelNeg("negotiation_difficulty", v)} options={LEVEL3_OPTS} renderLabel={capWord} polarity="goodLow" />
+                    <div className="col-span-2"><SegmentedField label={t("field.sampleSpeed", "Sample turnaround speed")} value={sIntel.neg.sample_turnaround_speed} onChange={(v) => setIntelNeg("sample_turnaround_speed", v)} options={LEVEL3_OPTS} renderLabel={capWord} /></div>
+                  </div>
+                </div>
+                <Input label={t("field.internalNotes", "Internal notes")} value={sIntel.neg.internal_notes} onChange={(v) => setIntelNeg("internal_notes", v)} />
               </div>
-              <div className="mt-3"><Input label={t("field.internalNotes", "Internal notes")} value={sIntel.neg.internal_notes} onChange={(v) => setIntelNeg("internal_notes", v)} /></div>
             </FormSection>
 
             {/* 10. Products (placeholder) */}
