@@ -1498,6 +1498,22 @@ const Section = React.memo(function Section({ title, icon, children }: { title: 
 const LEVEL3_OPTS = ["low", "medium", "high"];
 const LEVEL4_OPTS = ["low", "medium", "high", "critical"];
 const capWord = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
+
+/* Map a Low/Med/High[/Critical] rating to a 0..1 "goodness" (1 = best for us),
+   honouring polarity. Returns null when the field is unset. */
+function levelGoodness(option: string, polarity: "goodHigh" | "goodLow", opts: string[]): number | null {
+  const i = opts.indexOf(option);
+  if (i < 0) return null;
+  const max = opts.length - 1;
+  const frac = max === 0 ? 1 : i / max;
+  return polarity === "goodLow" ? 1 - frac : frac;
+}
+/* Average the set ratings into a 0–100 score, or null if nothing is rated. */
+function avgRatingScore(entries: Array<[string, "goodHigh" | "goodLow", string[]]>): number | null {
+  const vals = entries.map(([v, p, o]) => levelGoodness(v, p, o)).filter((x): x is number => x != null);
+  if (!vals.length) return null;
+  return Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100);
+}
 interface SupplierIntel {
   strategic_status: string; strategic_status_reason: string;
   classifications: string[]; primary_class: string;
@@ -2632,11 +2648,13 @@ const SuggestInput = React.memo(function SuggestInput({ label, value, onChange, 
 /* ── Score slider — drag a 0–N value instead of typing a number ─────────────
    Branded range input (blue fill), live readout, and a draggable thumb. Stores
    the value as a string to keep the existing field contract. */
-const ScoreSlider = React.memo(function ScoreSlider({ label, value, onChange, max = 100 }: {
+const ScoreSlider = React.memo(function ScoreSlider({ label, value, onChange, max = 100, isAuto, onUseAuto }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   max?: number;
+  isAuto?: boolean;
+  onUseAuto?: () => void;
 }) {
   const has = value !== "" && value != null;
   const raw = parseInt(value || "", 10);
@@ -2646,9 +2664,16 @@ const ScoreSlider = React.memo(function ScoreSlider({ label, value, onChange, ma
     <div>
       <div className="mb-1.5 flex items-center justify-between">
         <label className="text-xs text-[var(--text-faint)]">{label}</label>
-        <span className="text-sm font-semibold tabular-nums text-[var(--text-primary)]">
-          {has ? n : "—"}<span className="text-xs text-[var(--text-dim)]"> / {max}</span>
-        </span>
+        <div className="flex items-center gap-2">
+          {onUseAuto && (isAuto ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-surface)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-dim)]">✦ Auto</span>
+          ) : (
+            <button type="button" onClick={onUseAuto} className="text-[10px] font-medium text-[var(--accent,#0066FF)] hover:opacity-80">Use auto</button>
+          ))}
+          <span className="text-sm font-semibold tabular-nums text-[var(--text-primary)]">
+            {has ? n : "—"}<span className="text-xs text-[var(--text-dim)]"> / {max}</span>
+          </span>
+        </div>
       </div>
       <input
         type="range"
@@ -2993,6 +3018,35 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const setIntelFactory = (k: string, v: string | boolean) => setSIntel((p) => ({ ...p, factory: { ...p.factory, [k]: v } }));
   const setIntelRisk = (k: string, v: string | boolean) => setSIntel((p) => ({ ...p, risk: { ...p.risk, [k]: v } }));
   const setIntelNeg = (k: string, v: string) => setSIntel((p) => ({ ...p, neg: { ...p.neg, [k]: v } }));
+
+  /* Auto-score: the Risk / Negotiation scores follow the Low/Med/High choices
+     unless the user drags the slider (then it's manual until they hit "Use auto"). */
+  const [riskScoreManual, setRiskScoreManual] = useState(false);
+  const [negScoreManual, setNegScoreManual] = useState(false);
+  const autoRiskScore = useMemo(() => avgRatingScore([
+    [String(sIntel.risk.risk_level), "goodLow", LEVEL4_OPTS],
+    [String(sIntel.risk.dependency_level), "goodLow", LEVEL4_OPTS],
+    [String(sIntel.risk.financial_stability), "goodHigh", LEVEL3_OPTS],
+    [String(sIntel.risk.delivery_stability), "goodHigh", LEVEL3_OPTS],
+    [String(sIntel.risk.quality_stability), "goodHigh", LEVEL3_OPTS],
+    [String(sIntel.risk.communication_quality), "goodHigh", LEVEL3_OPTS],
+    [String(sIntel.risk.trust_level), "goodHigh", LEVEL3_OPTS],
+  ]), [sIntel.risk.risk_level, sIntel.risk.dependency_level, sIntel.risk.financial_stability, sIntel.risk.delivery_stability, sIntel.risk.quality_stability, sIntel.risk.communication_quality, sIntel.risk.trust_level]);
+  const autoNegScore = useMemo(() => avgRatingScore([
+    [sIntel.neg.price_flexibility, "goodHigh", LEVEL3_OPTS],
+    [sIntel.neg.moq_flexibility, "goodHigh", LEVEL3_OPTS],
+    [sIntel.neg.payment_flexibility, "goodHigh", LEVEL3_OPTS],
+    [sIntel.neg.negotiation_difficulty, "goodLow", LEVEL3_OPTS],
+    [sIntel.neg.sample_turnaround_speed, "goodHigh", LEVEL3_OPTS],
+  ]), [sIntel.neg.price_flexibility, sIntel.neg.moq_flexibility, sIntel.neg.payment_flexibility, sIntel.neg.negotiation_difficulty, sIntel.neg.sample_turnaround_speed]);
+  useEffect(() => {
+    if (riskScoreManual || autoRiskScore == null) return;
+    setSIntel((p) => p.risk.internal_evaluation_score === String(autoRiskScore) ? p : ({ ...p, risk: { ...p.risk, internal_evaluation_score: String(autoRiskScore) } }));
+  }, [autoRiskScore, riskScoreManual]);
+  useEffect(() => {
+    if (negScoreManual || autoNegScore == null) return;
+    setSIntel((p) => p.neg.negotiation_score === String(autoNegScore) ? p : ({ ...p, neg: { ...p.neg, negotiation_score: String(autoNegScore) } }));
+  }, [autoNegScore, negScoreManual]);
   const toggleIntelClass = (key: string) => setSIntel((p) => {
     const has = p.classifications.includes(key);
     const classifications = has ? p.classifications.filter((c) => c !== key) : [...p.classifications, key];
@@ -3236,6 +3290,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     // category dropdown is populated out of the box.
     setForm({ ...EMPTY_FORM, contact_type: type, entity_type: entityType || "", division: type === "supplier" ? "Garment Machinery" : "" });
     setSIntel(EMPTY_SINTEL);
+    setRiskScoreManual(false);
+    setNegScoreManual(false);
     setEditingId(null);
     setView("form");
     setShowTypeChooser(false);
@@ -7503,7 +7559,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 {/* Overall */}
                 <div className="space-y-3 border-t border-[var(--border-color)] pt-3">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.overall", "Overall")}</p>
-                  <ScoreSlider label={t("field.internalScore", "Internal score (0–100)")} value={String(sIntel.risk.internal_evaluation_score)} onChange={(v) => setIntelRisk("internal_evaluation_score", v)} max={100} />
+                  <ScoreSlider label={t("field.internalScore", "Internal score (0–100)")} value={String(sIntel.risk.internal_evaluation_score)} onChange={(v) => { setRiskScoreManual(true); setIntelRisk("internal_evaluation_score", v); }} max={100} isAuto={!riskScoreManual} onUseAuto={() => setRiskScoreManual(false)} />
                   <label className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)]"><input type="checkbox" checked={!!sIntel.risk.backup_supplier_exists} onChange={(e) => setIntelRisk("backup_supplier_exists", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.backupExists", "Backup supplier exists")}</label>
                   <Input label={t("field.assessmentNotes", "Assessment notes")} value={String(sIntel.risk.assessment_notes)} onChange={(v) => setIntelRisk("assessment_notes", v)} />
                 </div>
@@ -7516,7 +7572,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 {/* Overall */}
                 <div className="space-y-3">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.overall", "Overall")}</p>
-                  <ScoreSlider label={t("field.negotiationScore", "Negotiation score (0–100)")} value={sIntel.neg.negotiation_score} onChange={(v) => setIntelNeg("negotiation_score", v)} max={100} />
+                  <ScoreSlider label={t("field.negotiationScore", "Negotiation score (0–100)")} value={sIntel.neg.negotiation_score} onChange={(v) => { setNegScoreManual(true); setIntelNeg("negotiation_score", v); }} max={100} isAuto={!negScoreManual} onUseAuto={() => setNegScoreManual(false)} />
                 </div>
                 {/* Flexibility & terms */}
                 <div className="space-y-3 border-t border-[var(--border-color)] pt-3">
