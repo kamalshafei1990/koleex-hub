@@ -32,6 +32,8 @@ const STORAGE_BASE =
 const STORAGE_SLUGS = new Set([
   "qq", "bilibili", "dingtalk", "douyin", "1688", "made-in-china", "global-sources",
 ]);
+/* File extension per uploaded slug (default svg). */
+const STORAGE_EXT: Record<string, string> = { "made-in-china": "png" };
 
 function slugFor(name: string): string {
   const n = (name || "").toLowerCase().trim();
@@ -122,7 +124,7 @@ export default function BrandGlyph({ name, size = 16, className }: Props) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={`${STORAGE_BASE}${slug}.svg`}
+        src={`${STORAGE_BASE}${slug}.${STORAGE_EXT[slug] ?? "svg"}`}
         alt=""
         width={size}
         height={size}
