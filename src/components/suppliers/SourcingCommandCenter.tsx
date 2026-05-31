@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import SuppliersNav from "./SuppliersNav";
 import GaugeIcon from "@/components/icons/ui/GaugeIcon";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
 import NetworkIcon from "@/components/icons/ui/NetworkIcon";
@@ -165,15 +166,14 @@ export default function SourcingCommandCenter() {
   const isMgmt = data.callerTier === "management";
 
   return (
+    <>
+    <SuppliersNav active="sourcing" />
     <div className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8">
       {/* Header */}
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2 text-[var(--text-secondary)]"><GaugeIcon className="h-5 w-5" /><span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-faint)]">Procurement Intelligence</span></div>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--text-primary)]">Sourcing Command Center</h1>
-          <p className="text-[12px] text-[var(--text-secondary)]">{o.activeSuppliers} active suppliers · {data.categories.length} categories · viewing as <span className="font-medium text-[var(--text-primary)]">{titleCase(data.callerTier)}</span></p>
-        </div>
-        <Link href="/suppliers" className="rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-surface-subtle)]">All suppliers</Link>
+      <div className="mb-6">
+        <div className="flex items-center gap-2 text-[var(--text-secondary)]"><GaugeIcon className="h-5 w-5" /><span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-faint)]">Procurement Intelligence</span></div>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--text-primary)]">Sourcing Command Center</h1>
+        <p className="text-[12px] text-[var(--text-secondary)]">{o.activeSuppliers} active suppliers · {data.categories.length} categories · viewing as <span className="font-medium text-[var(--text-primary)]">{titleCase(data.callerTier)}</span></p>
       </div>
 
       {/* A. Global procurement overview */}
@@ -397,5 +397,6 @@ export default function SourcingCommandCenter() {
         </section>
       </div>
     </div>
+    </>
   );
 }

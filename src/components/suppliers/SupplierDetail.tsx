@@ -38,6 +38,7 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import Edit3Icon from "@/components/icons/ui/Edit3Icon";
 import FactorySection from "./FactorySection";
+import SuppliersNav from "./SuppliersNav";
 import ContactsSection from "./ContactsSection";
 import MediaSection from "./MediaSection";
 import TimelineSection from "./TimelineSection";
@@ -373,17 +374,7 @@ export default function SupplierDetail({ id }: { id: string }) {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
-      <header className="border-b border-[var(--border-subtle)]">
-        <div className="mx-auto w-full max-w-6xl px-4 md:px-8 py-4">
-          <Link
-            href="/suppliers"
-            className="inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
-          >
-            <ArrowLeftIcon className="h-4 w-4" />
-            <span>All suppliers</span>
-          </Link>
-        </div>
-      </header>
+      <SuppliersNav active="detail" supplierName={name} />
 
       <main className="mx-auto w-full max-w-6xl px-4 md:px-8 py-6 md:py-10 space-y-10 pb-24">
         {/* ── Identity ── */}
