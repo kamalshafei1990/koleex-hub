@@ -1524,8 +1524,8 @@ interface SupplierIntel {
 const EMPTY_SINTEL: SupplierIntel = {
   strategic_status: "", strategic_status_reason: "", classifications: [], primary_class: "",
   factory: { factory_name: "", factory_type: "", production_lines: "", monthly_capacity: "", annual_output: "", factory_size_sqm: "", employee_count: "", qc_staff_count: "", rd_staff_count: "", export_percentage: "", odm_supported: false, private_label_supported: false, low_moq_supported: false, main_export_markets: "", production_categories: "" },
-  risk: { risk_level: "", dependency_level: "", financial_stability: "", delivery_stability: "", quality_stability: "", communication_quality: "", trust_level: "", internal_evaluation_score: "", backup_supplier_exists: false, assessment_notes: "" },
-  neg: { negotiation_score: "", price_flexibility: "", moq_flexibility: "", payment_flexibility: "", negotiation_difficulty: "", sample_turnaround_speed: "", internal_notes: "" },
+  risk: { risk_level: "", dependency_level: "", geographic_risk: "", compliance_level: "", capacity_level: "", financial_stability: "", delivery_stability: "", quality_stability: "", communication_quality: "", trust_level: "", internal_evaluation_score: "", backup_supplier_exists: false, assessment_notes: "" },
+  neg: { negotiation_score: "", price_flexibility: "", moq_flexibility: "", payment_flexibility: "", leadtime_flexibility: "", volume_discount: "", contract_willingness: "", negotiation_difficulty: "", sample_turnaround_speed: "", internal_notes: "" },
 };
 
 const Input = React.memo(function Input({ label, value, onChange, type = "text", placeholder, icon, inputMode, autoComplete, list }: {
@@ -3026,19 +3026,27 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const autoRiskScore = useMemo(() => avgRatingScore([
     [String(sIntel.risk.risk_level), "goodLow", LEVEL4_OPTS],
     [String(sIntel.risk.dependency_level), "goodLow", LEVEL4_OPTS],
+    [String(sIntel.risk.geographic_risk), "goodLow", LEVEL3_OPTS],
+    [String(sIntel.risk.compliance_level), "goodHigh", LEVEL3_OPTS],
+    [String(sIntel.risk.capacity_level), "goodHigh", LEVEL3_OPTS],
     [String(sIntel.risk.financial_stability), "goodHigh", LEVEL3_OPTS],
     [String(sIntel.risk.delivery_stability), "goodHigh", LEVEL3_OPTS],
     [String(sIntel.risk.quality_stability), "goodHigh", LEVEL3_OPTS],
     [String(sIntel.risk.communication_quality), "goodHigh", LEVEL3_OPTS],
     [String(sIntel.risk.trust_level), "goodHigh", LEVEL3_OPTS],
-  ]), [sIntel.risk.risk_level, sIntel.risk.dependency_level, sIntel.risk.financial_stability, sIntel.risk.delivery_stability, sIntel.risk.quality_stability, sIntel.risk.communication_quality, sIntel.risk.trust_level]);
+    // Having a backup supplier is a risk mitigant → counts as a top mark when ticked.
+    ...(sIntel.risk.backup_supplier_exists ? [["high", "goodHigh", LEVEL3_OPTS] as [string, "goodHigh" | "goodLow", string[]]] : []),
+  ]), [sIntel.risk.risk_level, sIntel.risk.dependency_level, sIntel.risk.geographic_risk, sIntel.risk.compliance_level, sIntel.risk.capacity_level, sIntel.risk.financial_stability, sIntel.risk.delivery_stability, sIntel.risk.quality_stability, sIntel.risk.communication_quality, sIntel.risk.trust_level, sIntel.risk.backup_supplier_exists]);
   const autoNegScore = useMemo(() => avgRatingScore([
     [sIntel.neg.price_flexibility, "goodHigh", LEVEL3_OPTS],
     [sIntel.neg.moq_flexibility, "goodHigh", LEVEL3_OPTS],
     [sIntel.neg.payment_flexibility, "goodHigh", LEVEL3_OPTS],
+    [sIntel.neg.leadtime_flexibility, "goodHigh", LEVEL3_OPTS],
+    [sIntel.neg.volume_discount, "goodHigh", LEVEL3_OPTS],
+    [sIntel.neg.contract_willingness, "goodHigh", LEVEL3_OPTS],
     [sIntel.neg.negotiation_difficulty, "goodLow", LEVEL3_OPTS],
     [sIntel.neg.sample_turnaround_speed, "goodHigh", LEVEL3_OPTS],
-  ]), [sIntel.neg.price_flexibility, sIntel.neg.moq_flexibility, sIntel.neg.payment_flexibility, sIntel.neg.negotiation_difficulty, sIntel.neg.sample_turnaround_speed]);
+  ]), [sIntel.neg.price_flexibility, sIntel.neg.moq_flexibility, sIntel.neg.payment_flexibility, sIntel.neg.leadtime_flexibility, sIntel.neg.volume_discount, sIntel.neg.contract_willingness, sIntel.neg.negotiation_difficulty, sIntel.neg.sample_turnaround_speed]);
   useEffect(() => {
     if (riskScoreManual || autoRiskScore == null) return;
     setSIntel((p) => p.risk.internal_evaluation_score === String(autoRiskScore) ? p : ({ ...p, risk: { ...p.risk, internal_evaluation_score: String(autoRiskScore) } }));
@@ -7544,6 +7552,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.exposure", "Exposure")}</p>
                   <SegmentedField label={t("field.riskLevel", "Risk level")} value={String(sIntel.risk.risk_level)} onChange={(v) => setIntelRisk("risk_level", v)} options={LEVEL4_OPTS} renderLabel={capWord} polarity="goodLow" />
                   <SegmentedField label={t("field.dependencyLevel", "Dependency level")} value={String(sIntel.risk.dependency_level)} onChange={(v) => setIntelRisk("dependency_level", v)} options={LEVEL4_OPTS} renderLabel={capWord} polarity="goodLow" />
+                  <SegmentedField label={t("field.geographicRisk", "Geographic / political risk")} value={String(sIntel.risk.geographic_risk)} onChange={(v) => setIntelRisk("geographic_risk", v)} options={LEVEL3_OPTS} renderLabel={capWord} polarity="goodLow" />
                 </div>
                 {/* Reliability — how dependable they are */}
                 <div className="space-y-3 border-t border-[var(--border-color)] pt-3">
@@ -7553,6 +7562,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     <SegmentedField label={t("field.deliveryStability", "Delivery stability")} value={String(sIntel.risk.delivery_stability)} onChange={(v) => setIntelRisk("delivery_stability", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
                     <SegmentedField label={t("field.qualityStability", "Quality stability")} value={String(sIntel.risk.quality_stability)} onChange={(v) => setIntelRisk("quality_stability", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
                     <SegmentedField label={t("field.communicationQuality", "Communication quality")} value={String(sIntel.risk.communication_quality)} onChange={(v) => setIntelRisk("communication_quality", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
+                    <SegmentedField label={t("field.complianceLevel", "Compliance & certs")} value={String(sIntel.risk.compliance_level)} onChange={(v) => setIntelRisk("compliance_level", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
+                    <SegmentedField label={t("field.capacityLevel", "Capacity / scalability")} value={String(sIntel.risk.capacity_level)} onChange={(v) => setIntelRisk("capacity_level", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
                     <div className="col-span-2"><SegmentedField label={t("field.trustLevel", "Trust level")} value={String(sIntel.risk.trust_level)} onChange={(v) => setIntelRisk("trust_level", v)} options={LEVEL3_OPTS} renderLabel={capWord} /></div>
                   </div>
                 </div>
@@ -7581,8 +7592,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     <SegmentedField label={t("field.priceFlexibility", "Price flexibility")} value={sIntel.neg.price_flexibility} onChange={(v) => setIntelNeg("price_flexibility", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
                     <SegmentedField label={t("field.moqFlexibility", "MOQ flexibility")} value={sIntel.neg.moq_flexibility} onChange={(v) => setIntelNeg("moq_flexibility", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
                     <SegmentedField label={t("field.paymentFlexibility", "Payment flexibility")} value={sIntel.neg.payment_flexibility} onChange={(v) => setIntelNeg("payment_flexibility", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
+                    <SegmentedField label={t("field.leadtimeFlexibility", "Lead-time flexibility")} value={sIntel.neg.leadtime_flexibility} onChange={(v) => setIntelNeg("leadtime_flexibility", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
+                    <SegmentedField label={t("field.volumeDiscount", "Volume discounts")} value={sIntel.neg.volume_discount} onChange={(v) => setIntelNeg("volume_discount", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
+                    <SegmentedField label={t("field.contractWillingness", "Contract willingness")} value={sIntel.neg.contract_willingness} onChange={(v) => setIntelNeg("contract_willingness", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
                     <SegmentedField label={t("field.negotiationDifficulty", "Negotiation difficulty")} value={sIntel.neg.negotiation_difficulty} onChange={(v) => setIntelNeg("negotiation_difficulty", v)} options={LEVEL3_OPTS} renderLabel={capWord} polarity="goodLow" />
-                    <div className="col-span-2"><SegmentedField label={t("field.sampleSpeed", "Sample turnaround speed")} value={sIntel.neg.sample_turnaround_speed} onChange={(v) => setIntelNeg("sample_turnaround_speed", v)} options={LEVEL3_OPTS} renderLabel={capWord} /></div>
+                    <SegmentedField label={t("field.sampleSpeed", "Sample turnaround speed")} value={sIntel.neg.sample_turnaround_speed} onChange={(v) => setIntelNeg("sample_turnaround_speed", v)} options={LEVEL3_OPTS} renderLabel={capWord} />
                   </div>
                 </div>
                 <Input label={t("field.internalNotes", "Internal notes")} value={sIntel.neg.internal_notes} onChange={(v) => setIntelNeg("internal_notes", v)} />

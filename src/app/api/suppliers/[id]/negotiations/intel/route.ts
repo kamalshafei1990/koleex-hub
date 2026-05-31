@@ -18,6 +18,7 @@ const LEVEL3 = new Set(["low", "medium", "high"]);
 const LEVEL_FIELDS = new Set([
   "price_flexibility", "moq_flexibility", "payment_flexibility", "communication_flexibility",
   "customization_openness", "exclusivity_openness", "negotiation_difficulty", "sample_turnaround_speed",
+  "leadtime_flexibility", "volume_discount", "contract_willingness",
 ]);
 
 export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }) {

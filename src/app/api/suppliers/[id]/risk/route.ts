@@ -19,6 +19,7 @@ const LEVEL3 = new Set(["low", "medium", "high"]);               // stability/qu
 const LEVEL_FIELDS = new Set([
   "financial_stability", "delivery_stability", "quality_stability",
   "communication_quality", "response_speed", "negotiation_flexibility", "trust_level",
+  "geographic_risk", "compliance_level", "capacity_level",
 ]);
 
 export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }) {
