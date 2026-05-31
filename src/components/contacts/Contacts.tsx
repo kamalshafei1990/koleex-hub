@@ -2365,34 +2365,139 @@ const ImageDropField = React.memo(function ImageDropField({
   );
 });
 
-/* ── Date field — branded wrapper over the native date picker ───────────────
-   Keeps the browser's accessible native calendar (easiest + reliable) but adds
-   a left calendar icon to match the other inputs, opens the picker on a click
-   anywhere in the field, and uses the right color-scheme per theme so the popup
-   looks correct in both light and dark mode. */
+/* ── Date field — fully custom calendar popover (matches Koleex UI) ──────────
+   The native <input type=date> popup is drawn by the OS and can't be themed, so
+   this is a hand-built calendar styled with the Hub design tokens: works in both
+   light and dark mode, blue accent for the selected day, month/year navigation,
+   Today / Clear actions. Stores the value as ISO yyyy-mm-dd (unchanged contract). */
+const DATE_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const DATE_WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
+
+function parseISODate(v: string): { y: number; m: number; d: number } | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v || "");
+  if (!m) return null;
+  return { y: +m[1], m: +m[2] - 1, d: +m[3] };
+}
+function pad2(n: number) { return n < 10 ? `0${n}` : `${n}`; }
+
 const DateField = React.memo(function DateField({ value, onChange, disabled, className }: {
   value: string;
   onChange: (v: string) => void;
   disabled?: boolean;
   className?: string;
 }) {
-  const ref = useRef<HTMLInputElement>(null);
-  const openPicker = () => {
-    const el = ref.current as (HTMLInputElement & { showPicker?: () => void }) | null;
-    if (el && !disabled) { try { el.showPicker?.(); } catch { /* not supported — native indicator still works */ } }
+  const [open, setOpen] = useState(false);
+  const [openUp, setOpenUp] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const parsed = parseISODate(value);
+  const today = new Date();
+  // Month currently shown in the calendar grid.
+  const [view, setView] = useState(() => parsed ? { y: parsed.y, m: parsed.m } : { y: today.getFullYear(), m: today.getMonth() });
+
+  // Re-sync the visible month when the value changes externally / on (re)open.
+  useEffect(() => {
+    if (open) {
+      const p = parseISODate(value);
+      setView(p ? { y: p.y, m: p.m } : { y: new Date().getFullYear(), m: new Date().getMonth() });
+    }
+  }, [open, value]);
+
+  // Close on outside click / Escape.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => { if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
+  }, [open]);
+
+  const toggle = () => {
+    if (disabled) return;
+    if (!open && wrapRef.current) {
+      const r = wrapRef.current.getBoundingClientRect();
+      setOpenUp(window.innerHeight - r.bottom < 360); // flip up near the bottom of the viewport
+    }
+    setOpen(o => !o);
   };
+
+  const display = parsed
+    ? `${pad2(parsed.d)} ${DATE_MONTHS[parsed.m].slice(0, 3)} ${parsed.y}`
+    : "";
+
+  const firstWeekday = new Date(view.y, view.m, 1).getDay();
+  const daysInMonth = new Date(view.y, view.m + 1, 0).getDate();
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < firstWeekday; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const stepMonth = (delta: number) => setView(v => {
+    const m = v.m + delta;
+    return { y: v.y + Math.floor(m / 12), m: ((m % 12) + 12) % 12 };
+  });
+  const pick = (d: number) => { onChange(`${view.y}-${pad2(view.m + 1)}-${pad2(d)}`); setOpen(false); };
+
+  const isSel = (d: number) => parsed && parsed.y === view.y && parsed.m === view.m && parsed.d === d;
+  const isToday = (d: number) => today.getFullYear() === view.y && today.getMonth() === view.m && today.getDate() === d;
+
+  const Chevron = ({ dir }: { dir: "left" | "right" }) => (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d={dir === "left" ? "M15 18l-6-6 6-6" : "M9 18l6-6-6-6"} />
+    </svg>
+  );
+
   return (
-    <div className={`relative ${className ?? ""}`}>
-      <CalendarRawIcon size={14} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
-      <input
-        ref={ref}
-        type="date"
-        value={value}
+    <div ref={wrapRef} className={`relative ${className ?? ""}`}>
+      <button
+        type="button"
         disabled={disabled}
-        onChange={e => onChange(e.target.value)}
-        onClick={openPicker}
-        className="w-full h-10 ps-9 pe-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:light] dark:[color-scheme:dark] disabled:opacity-30 transition-colors cursor-pointer"
-      />
+        onClick={toggle}
+        className={`w-full h-10 ps-9 pe-3 flex items-center rounded-lg bg-[var(--bg-surface)] border text-sm text-start outline-none transition-colors disabled:opacity-30 ${open ? "border-[var(--border-focus)]" : "border-[var(--border-color)] hover:border-[var(--border-focus)]"} ${display ? "text-[var(--text-primary)]" : "text-[var(--text-ghost)]"}`}
+      >
+        <CalendarRawIcon size={14} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
+        {display || "Select date"}
+      </button>
+
+      {open && (
+        <div className={`absolute z-50 ${openUp ? "bottom-full mb-1" : "top-full mt-1"} start-0 w-[17rem] rounded-xl border border-[var(--border-color)] bg-[var(--bg-elevated,var(--bg-surface))] p-3 shadow-xl`}>
+          {/* Header: month/year + nav */}
+          <div className="mb-2 flex items-center justify-between">
+            <button type="button" onClick={() => stepMonth(-1)} aria-label="Previous month" className="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-surface)]"><Chevron dir="left" /></button>
+            <span className="text-sm font-semibold text-[var(--text-primary)]">{DATE_MONTHS[view.m]} {view.y}</span>
+            <button type="button" onClick={() => stepMonth(1)} aria-label="Next month" className="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-surface)]"><Chevron dir="right" /></button>
+          </div>
+          {/* Weekday header */}
+          <div className="grid grid-cols-7 gap-0.5 mb-1">
+            {DATE_WEEKDAYS.map((w, i) => (
+              <div key={i} className="h-7 flex items-center justify-center text-[10px] font-semibold text-[var(--text-dim)]">{w}</div>
+            ))}
+          </div>
+          {/* Day grid */}
+          <div className="grid grid-cols-7 gap-0.5">
+            {cells.map((d, i) => d === null ? <div key={i} className="h-8" /> : (
+              <button
+                key={i}
+                type="button"
+                onClick={() => pick(d)}
+                className={`h-8 rounded-lg text-sm flex items-center justify-center transition-colors ${
+                  isSel(d)
+                    ? "bg-[var(--accent,#0066FF)] text-white font-semibold"
+                    : isToday(d)
+                    ? "text-[var(--text-primary)] ring-1 ring-inset ring-[var(--border-focus)] hover:bg-[var(--bg-surface)]"
+                    : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface)]"
+                }`}
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+          {/* Actions */}
+          <div className="mt-2 flex items-center justify-between border-t border-[var(--border-color)] pt-2">
+            <button type="button" onClick={() => { onChange(""); setOpen(false); }} className="text-xs text-[var(--text-dim)] hover:text-[var(--text-primary)]">Clear</button>
+            <button type="button" onClick={() => { const t = new Date(); onChange(`${t.getFullYear()}-${pad2(t.getMonth() + 1)}-${pad2(t.getDate())}`); setOpen(false); }} className="text-xs font-medium text-[var(--accent,#0066FF)] hover:opacity-80">Today</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 });
