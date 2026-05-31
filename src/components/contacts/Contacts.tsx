@@ -2629,6 +2629,45 @@ const SuggestInput = React.memo(function SuggestInput({ label, value, onChange, 
   );
 });
 
+/* ── Score slider — drag a 0–N value instead of typing a number ─────────────
+   Branded range input (blue fill), live readout, and a draggable thumb. Stores
+   the value as a string to keep the existing field contract. */
+const ScoreSlider = React.memo(function ScoreSlider({ label, value, onChange, max = 100 }: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  max?: number;
+}) {
+  const has = value !== "" && value != null;
+  const raw = parseInt(value || "", 10);
+  const n = Number.isFinite(raw) ? Math.max(0, Math.min(max, raw)) : 0;
+  const pct = Math.round((n / max) * 100);
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between">
+        <label className="text-xs text-[var(--text-faint)]">{label}</label>
+        <span className="text-sm font-semibold tabular-nums text-[var(--text-primary)]">
+          {has ? n : "—"}<span className="text-xs text-[var(--text-dim)]"> / {max}</span>
+        </span>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={max}
+        step={1}
+        value={n}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label={label}
+        className="h-2 w-full cursor-pointer appearance-none rounded-full outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#0066FF] [&::-webkit-slider-thumb]:shadow [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-[#0066FF]"
+        style={{ background: `linear-gradient(to right, #0066FF ${pct}%, var(--bg-surface-active) ${pct}%)` }}
+      />
+      <div className="mt-1 flex justify-between text-[10px] text-[var(--text-dim)]">
+        <span>0</span><span>50</span><span>{max}</span>
+      </div>
+    </div>
+  );
+});
+
 /* ── Searchable Country Dropdown ── */
 function CountryDropdown({ value, displayValue, onChange, label, placeholder, noResults }: {
   value: string; // isoCode
@@ -7398,7 +7437,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <SelectInput label={t("field.qualityStability", "Quality stability")} value={String(sIntel.risk.quality_stability)} onChange={(v) => setIntelRisk("quality_stability", v)} options={LEVEL3_OPTS} renderLabel={capWord} selectLabel={t("detail.select")} />
                   <SelectInput label={t("field.communicationQuality", "Communication quality")} value={String(sIntel.risk.communication_quality)} onChange={(v) => setIntelRisk("communication_quality", v)} options={LEVEL3_OPTS} renderLabel={capWord} selectLabel={t("detail.select")} />
                   <SelectInput label={t("field.trustLevel", "Trust level")} value={String(sIntel.risk.trust_level)} onChange={(v) => setIntelRisk("trust_level", v)} options={LEVEL3_OPTS} renderLabel={capWord} selectLabel={t("detail.select")} />
-                  <Input label={t("field.internalScore", "Internal score (0–100)")} value={String(sIntel.risk.internal_evaluation_score)} onChange={(v) => setIntelRisk("internal_evaluation_score", v)} />
+                  <ScoreSlider label={t("field.internalScore", "Internal score (0–100)")} value={String(sIntel.risk.internal_evaluation_score)} onChange={(v) => setIntelRisk("internal_evaluation_score", v)} max={100} />
                 </div>
                 <label className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)]"><input type="checkbox" checked={!!sIntel.risk.backup_supplier_exists} onChange={(e) => setIntelRisk("backup_supplier_exists", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.backupExists", "Backup supplier exists")}</label>
                 <Input label={t("field.assessmentNotes", "Assessment notes")} value={String(sIntel.risk.assessment_notes)} onChange={(v) => setIntelRisk("assessment_notes", v)} />
@@ -7408,7 +7447,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             {/* Negotiation */}
             <FormSection title={t("section.negotiation", "Negotiation")} icon={<HandCoinsIcon size={14} />}>
               <div className="grid grid-cols-2 gap-3">
-                <Input label={t("field.negotiationScore", "Negotiation score (0–100)")} value={sIntel.neg.negotiation_score} onChange={(v) => setIntelNeg("negotiation_score", v)} />
+                <ScoreSlider label={t("field.negotiationScore", "Negotiation score (0–100)")} value={sIntel.neg.negotiation_score} onChange={(v) => setIntelNeg("negotiation_score", v)} max={100} />
                 <SelectInput label={t("field.priceFlexibility", "Price flexibility")} value={sIntel.neg.price_flexibility} onChange={(v) => setIntelNeg("price_flexibility", v)} options={LEVEL3_OPTS} renderLabel={capWord} selectLabel={t("detail.select")} />
                 <SelectInput label={t("field.moqFlexibility", "MOQ flexibility")} value={sIntel.neg.moq_flexibility} onChange={(v) => setIntelNeg("moq_flexibility", v)} options={LEVEL3_OPTS} renderLabel={capWord} selectLabel={t("detail.select")} />
                 <SelectInput label={t("field.paymentFlexibility", "Payment flexibility")} value={sIntel.neg.payment_flexibility} onChange={(v) => setIntelNeg("payment_flexibility", v)} options={LEVEL3_OPTS} renderLabel={capWord} selectLabel={t("detail.select")} />
