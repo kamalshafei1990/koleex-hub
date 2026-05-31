@@ -441,7 +441,7 @@ const PATCHABLE_FIELDS = new Set<string>([
 ]);
 
 const STRATEGIC_STATUSES = new Set([
-  "prospect", "trial", "approved", "preferred", "strategic",
+  "prospect", "trial", "experimental", "backup", "approved", "preferred", "strategic",
   "under_review", "suspended", "inactive", "phasing_out", "blocked", "blacklisted",
 ]);
 

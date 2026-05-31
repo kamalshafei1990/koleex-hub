@@ -326,13 +326,16 @@ interface ContactForm {
   supplier_mobile: string;
   supplier_email: string;
   supplier_website: string;
+  wechat_official_account: string;
+  wechat_sales_group_available: boolean;
+  wecom_support_available: boolean;
   supplier_address: string;
   supplier_postal_code: string;
   division: string;
   category: string;
   catalogues: { name: string; url: string; type: string; uploaded_at: string }[];
   documents: { doc_name: string; name: string; url: string; type: string; uploaded_at: string }[];
-  contact_persons: { name: string; name_cn?: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string; whatsapp?: string; wechat_id?: string; wechat_qr?: string }[];
+  contact_persons: { name: string; name_cn?: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string; whatsapp?: string; wechat_id?: string; wechat_qr?: string; role_category?: string; is_decision_maker?: boolean; is_primary?: boolean; telegram?: string; wecom_id?: string; line_id?: string; skype_id?: string; preferred_channel?: string; preferred_language?: string; timezone?: string; available_hours?: string; reliability?: string; response_speed?: string }[];
   bank_accounts: { bank_name: string; account_name: string; account_number: string; swift_code: string; iban: string; branch: string; currency: string; info_image?: string }[];
   payment_info: string;
   /* ── Mobile payment (China) — handle/account + QR image ── */
@@ -423,7 +426,8 @@ const LEAD_SOURCES = [
 ];
 const PAYMENT_TERMS_OPTIONS = [
   "Prepaid", "COD", "Net 15", "Net 30", "Net 45", "Net 60", "Net 90",
-  "EOM", "2/10 Net 30", "CIA", "CWO", "Upon Receipt", "Custom",
+  "EOM", "2/10 Net 30", "CIA", "CWO", "Upon Receipt",
+  "T/T", "L/C", "D/P", "D/A", "Custom",
 ];
 const CURRENCIES = [
   "USD", "EUR", "GBP", "CNY", "JPY", "AED", "SAR", "EGP", "INR", "BRL",
@@ -441,7 +445,9 @@ const LANGUAGES = [
 
 const SUPPLIER_TYPES = [
   "Manufacturer", "Distributor", "Wholesaler", "Agent", "Trading Company",
-  "Service Provider", "Freelancer", "OEM", "ODM", "Other",
+  "Service Provider", "Freelancer", "OEM", "ODM",
+  "Spare Parts", "Machinery", "Electronics", "Packaging", "Textile", "Chemical", "Logistics",
+  "Other",
 ];
 const SUPPLIER_SOURCES = [
   "Alibaba", "Made-in-China", "Global Sources", "Exhibition / Trade Show",
@@ -711,6 +717,9 @@ const EMPTY_FORM: ContactForm = {
   supplier_mobile: "",
   supplier_email: "",
   supplier_website: "",
+  wechat_official_account: "",
+  wechat_sales_group_available: false,
+  wecom_support_available: false,
   supplier_address: "",
   supplier_postal_code: "",
   division: "",
@@ -1189,6 +1198,9 @@ function contactToForm(c: ContactRow): ContactForm {
     supplier_mobile: c.supplier_mobile || "",
     supplier_email: c.supplier_email || "",
     supplier_website: c.supplier_website || "",
+    wechat_official_account: c.wechat_official_account || "",
+    wechat_sales_group_available: !!c.wechat_sales_group_available,
+    wecom_support_available: !!c.wecom_support_available,
     supplier_address: c.supplier_address || "",
     supplier_postal_code: c.supplier_postal_code || "",
     division: c.division || "",
@@ -1427,6 +1439,9 @@ function formToRow(f: ContactForm): Record<string, unknown> {
     supplier_mobile: f.supplier_mobile || null,
     supplier_email: f.supplier_email || null,
     supplier_website: f.supplier_website || null,
+    wechat_official_account: f.wechat_official_account || null,
+    wechat_sales_group_available: !!f.wechat_sales_group_available,
+    wecom_support_available: !!f.wecom_support_available,
     supplier_address: f.supplier_address || null,
     supplier_postal_code: f.supplier_postal_code || null,
     division: f.division || null,
@@ -1500,6 +1515,12 @@ const LEVEL3_OPTS = ["low", "medium", "high"];
 const LEVEL4_OPTS = ["low", "medium", "high", "critical"];
 const capWord = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
+/* Contact-person controlled vocabularies — mirror the DB CHECK + the
+   server-side whitelist in src/lib/suppliers/contact-fields.ts. */
+const CONTACT_ROLE_CATEGORIES = ["sales", "boss", "owner", "support", "finance", "logistics", "qc", "engineering", "management", "other"];
+const CONTACT_RELIABILITY = ["high", "medium", "low", "unknown"];
+const CONTACT_CHANNELS = ["wechat", "wecom", "whatsapp", "telegram", "email", "mobile", "line", "skype"];
+
 /* Map a Low/Med/High[/Critical] rating to a 0..1 "goodness" (1 = best for us),
    honouring polarity. Returns null when the field is unset. */
 function levelGoodness(option: string, polarity: "goodHigh" | "goodLow", opts: string[]): number | null {
@@ -1524,7 +1545,7 @@ interface SupplierIntel {
 }
 const EMPTY_SINTEL: SupplierIntel = {
   strategic_status: "", strategic_status_reason: "", classifications: [], primary_class: "",
-  factory: { factory_name: "", factory_type: "", production_lines: "", monthly_capacity: "", annual_output: "", factory_size_sqm: "", employee_count: "", qc_staff_count: "", rd_staff_count: "", export_percentage: "", odm_supported: false, private_label_supported: false, low_moq_supported: false, main_export_markets: "", production_categories: "" },
+  factory: { factory_name: "", factory_type: "", production_lines: "", monthly_capacity: "", annual_output: "", factory_size_sqm: "", employee_count: "", qc_staff_count: "", rd_staff_count: "", export_percentage: "", odm_supported: false, private_label_supported: false, low_moq_supported: false, main_export_markets: "", production_categories: "", supported_materials: "", capacity_unit: "", output_unit: "", lead_time_days: "", peak_season_months: "" },
   risk: { risk_level: "", dependency_level: "", geographic_risk: "", compliance_level: "", capacity_level: "", financial_stability: "", delivery_stability: "", quality_stability: "", communication_quality: "", trust_level: "", internal_evaluation_score: "", backup_supplier_exists: false, assessment_notes: "" },
   neg: { negotiation_score: "", price_flexibility: "", moq_flexibility: "", payment_flexibility: "", leadtime_flexibility: "", volume_discount: "", contract_willingness: "", negotiation_difficulty: "", sample_turnaround_speed: "", internal_notes: "" },
 };
@@ -3411,10 +3432,12 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     try {
       if (sIntel.strategic_status) await j(`/api/suppliers/${id}`, "PATCH", { strategic_status: sIntel.strategic_status, strategic_status_reason: sIntel.strategic_status_reason || null });
       for (const c of sIntel.classifications) await j(`/api/suppliers/${id}/classifications`, "POST", { classification: c, is_primary: c === sIntel.primary_class });
-      for (const p of form.contact_persons) { if ((p.name || "").trim()) await j(`/api/suppliers/${id}/contacts`, "POST", ne({ full_name: p.name, position: p.position, department: p.department, mobile: p.mobile || p.phone, email: p.email, notes: p.notes })); }
-      const fb = num(ne(sIntel.factory), ["production_lines", "monthly_capacity", "annual_output", "factory_size_sqm", "employee_count", "qc_staff_count", "rd_staff_count", "export_percentage"]);
+      for (const p of form.contact_persons) { if ((p.name || "").trim()) await j(`/api/suppliers/${id}/contacts`, "POST", ne({ full_name: p.name, name_cn: p.name_cn, position: p.position, department: p.department, mobile: p.mobile || p.phone, email: p.email, whatsapp: p.whatsapp, wechat_id: p.wechat_id, telegram: p.telegram, wecom_id: p.wecom_id, line_id: p.line_id, skype_id: p.skype_id, role_category: p.role_category, reliability: p.reliability, preferred_channel: p.preferred_channel, preferred_language: p.preferred_language, timezone: p.timezone, response_speed: p.response_speed, available_hours: p.available_hours, is_primary: p.is_primary, is_decision_maker: p.is_decision_maker, notes: p.notes })); }
+      const fb = num(ne(sIntel.factory), ["production_lines", "monthly_capacity", "annual_output", "factory_size_sqm", "employee_count", "qc_staff_count", "rd_staff_count", "export_percentage", "lead_time_days"]);
       const fem = sIntel.factory.main_export_markets; if (typeof fem === "string" && fem.trim()) fb.main_export_markets = fem.split(",").map((s) => s.trim()).filter(Boolean);
       const fpc = sIntel.factory.production_categories; if (typeof fpc === "string" && fpc.trim()) fb.production_categories = fpc.split(",").map((s) => s.trim()).filter(Boolean);
+      const fsm = sIntel.factory.supported_materials; if (typeof fsm === "string" && fsm.trim()) fb.supported_materials = fsm.split(",").map((s) => s.trim()).filter(Boolean);
+      const fps = sIntel.factory.peak_season_months; if (typeof fps === "string" && fps.trim()) fb.peak_season_months = fps.split(",").map((s) => s.trim()).filter(Boolean);
       if (Object.keys(fb).length) await j(`/api/suppliers/${id}/factory`, "PUT", fb);
       const rb = num(ne(sIntel.risk), ["internal_evaluation_score"]);
       if (Object.keys(rb).length) await j(`/api/suppliers/${id}/risk`, "PUT", rb);
@@ -7222,10 +7245,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
+                  <SelectInput label={t("field.supplierType", "Supplier Type")} tier="optional" value={form.supplier_type} onChange={v => setField("supplier_type", v)} options={SUPPLIER_TYPES} icon={<BriefcaseIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
                   <SelectInput label={t("field.industry")} tier="optional" value={form.industry} onChange={v => setField("industry", v)} options={INDUSTRIES} icon={<FactoryIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
                   <SelectInput label={t("field.source")} tier="optional" value={form.source} onChange={v => setField("source", v)} options={SUPPLIER_SOURCES} icon={<TargetIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
                 </div>
-                {/* Supplier kind is captured once in the "Classifications" section below. */}
+                {/* Supplier kind is ALSO captured richly in the "Classifications" section below (multi-select taxonomy). */}
               </div>
             </FormSection>
 
@@ -7323,7 +7349,26 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                           qrValue={cp.wechat_qr ?? ""}
                           onQrChange={v => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], wechat_qr: v }; setField("contact_persons", arr); }}
                         />
+                        <div className="grid grid-cols-2 gap-2">
+                          <input value={cp.telegram ?? ""} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], telegram: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.telegram", "Telegram")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                          <input value={cp.wecom_id ?? ""} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], wecom_id: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.wecom", "WeCom")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                          <input value={cp.line_id ?? ""} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], line_id: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.line", "LINE")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                          <input value={cp.skype_id ?? ""} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], skype_id: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.skype", "Skype")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <SelectInput label={t("field.roleCategory", "Role category")} value={cp.role_category ?? ""} onChange={v => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], role_category: v }; setField("contact_persons", arr); }} options={CONTACT_ROLE_CATEGORIES} renderLabel={capWord} selectLabel={t("detail.select")} />
+                          <SelectInput label={t("field.reliability", "Reliability")} value={cp.reliability ?? ""} onChange={v => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], reliability: v }; setField("contact_persons", arr); }} options={CONTACT_RELIABILITY} renderLabel={capWord} selectLabel={t("detail.select")} />
+                          <SelectInput label={t("field.preferredChannel", "Preferred channel")} value={cp.preferred_channel ?? ""} onChange={v => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], preferred_channel: v }; setField("contact_persons", arr); }} options={CONTACT_CHANNELS} renderLabel={capWord} selectLabel={t("detail.select")} />
+                          <Input label={t("field.responseSpeed", "Response speed")} value={cp.response_speed ?? ""} onChange={v => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], response_speed: v }; setField("contact_persons", arr); }} placeholder="e.g. within 2h" />
+                          <Input label={t("field.preferredLanguage", "Preferred language")} value={cp.preferred_language ?? ""} onChange={v => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], preferred_language: v }; setField("contact_persons", arr); }} placeholder="EN / 中文" />
+                          <Input label={t("field.timezone", "Timezone")} value={cp.timezone ?? ""} onChange={v => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], timezone: v }; setField("contact_persons", arr); }} placeholder="GMT+8" />
+                        </div>
+                        <Input label={t("field.availableHours", "Available hours")} value={cp.available_hours ?? ""} onChange={v => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], available_hours: v }; setField("contact_persons", arr); }} placeholder="e.g. 09:00–18:00 CST" />
                         <textarea value={cp.notes} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], notes: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.notes")} rows={2} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none resize-none" />
+                        <div className="flex flex-wrap gap-4 text-sm text-[var(--text-muted)]">
+                          <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!cp.is_primary} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], is_primary: e.target.checked }; setField("contact_persons", arr); }} className="accent-[var(--bg-inverted)]" />{t("field.isPrimaryContact", "Primary contact")}</label>
+                          <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!cp.is_decision_maker} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], is_decision_maker: e.target.checked }; setField("contact_persons", arr); }} className="accent-[var(--bg-inverted)]" />{t("field.isDecisionMaker", "Decision maker")}</label>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -7508,6 +7553,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <Input label={t("field.exportPct", "Export %")} help="supplier.export_pct" value={String(sIntel.factory.export_percentage)} onChange={(v) => setIntelFactory("export_percentage", v)} inputMode="numeric" placeholder="0–100" />
                   <Input label={t("field.exportMarkets", "Export markets (comma)")} help="supplier.export_markets" value={String(sIntel.factory.main_export_markets)} onChange={(v) => setIntelFactory("main_export_markets", v)} placeholder="US, EU, UAE" />
                   <Input label={t("field.prodCategories", "Production categories (comma)")} help="supplier.production_categories" value={String(sIntel.factory.production_categories)} onChange={(v) => setIntelFactory("production_categories", v)} />
+                  <Input label={t("field.supportedMaterials", "Supported materials (comma)")} value={String(sIntel.factory.supported_materials)} onChange={(v) => setIntelFactory("supported_materials", v)} placeholder="Cotton, Polyester, Steel" />
+                  <Input label={t("field.capacityUnit", "Capacity unit")} value={String(sIntel.factory.capacity_unit)} onChange={(v) => setIntelFactory("capacity_unit", v)} placeholder="units / month" />
+                  <Input label={t("field.outputUnit", "Output unit")} value={String(sIntel.factory.output_unit)} onChange={(v) => setIntelFactory("output_unit", v)} placeholder="units / year" />
+                  <Input label={t("field.leadTimeDays", "Lead time (days)")} value={String(sIntel.factory.lead_time_days)} onChange={(v) => setIntelFactory("lead_time_days", v)} inputMode="numeric" placeholder="e.g. 30" />
+                  <Input label={t("field.peakSeasonMonths", "Peak season months (comma)")} value={String(sIntel.factory.peak_season_months)} onChange={(v) => setIntelFactory("peak_season_months", v)} placeholder="Sep, Oct, Nov" />
+                </div>
+                <div>
+                  <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.factoryVisitDate", "Factory visit date")}</label>
+                  <DateField value={form.factory_visit_date} onChange={v => setField("factory_visit_date", v)} />
                 </div>
                 <div className="flex flex-wrap gap-4 text-sm text-[var(--text-muted)]">
                   <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!sIntel.factory.odm_supported} onChange={(e) => setIntelFactory("odm_supported", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.odm", "ODM support")}<GuidanceTip guidanceId="supplier.odm" size="xs" /></label>
@@ -7741,6 +7795,12 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 platform + a link, page, or @account name. */}
             <FormSection title={t("section.socialMedia", "Social Media")} icon={<Share2Icon size={14} />} owner={t("owner.marketing")} ownerLabel={t("owner.label")} dept="general" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
               <div className="space-y-2.5">
+                {/* Structured WeChat / WeCom presence (distinct from per-contact WeChat IDs). */}
+                <Input label={t("field.wechatOfficialAccount", "WeChat Official Account")} value={form.wechat_official_account} onChange={v => setField("wechat_official_account", v)} placeholder={t("placeholder.wechatOfficial", "Official Account name / ID")} icon={<BrandGlyph name="WeChat" size={14} />} />
+                <div className="flex flex-wrap gap-4 text-sm text-[var(--text-muted)] pt-0.5">
+                  <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!form.wechat_sales_group_available} onChange={e => setField("wechat_sales_group_available", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.wechatGroupAvailable", "WeChat group available")}</label>
+                  <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!form.wecom_support_available} onChange={e => setField("wecom_support_available", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.wecomSupport", "WeCom support")}</label>
+                </div>
                 {form.social_profiles.length === 0 && (
                   <p className="text-[11px] text-[var(--text-faint)]">{t("hint.socialMedia", "Add the factory's social pages — paste a link, page, or @account.")}</p>
                 )}

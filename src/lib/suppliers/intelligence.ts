@@ -392,6 +392,8 @@ export function certIsTrusted(row: {
 export type StrategicStatus =
   | "prospect"
   | "trial"
+  | "experimental"
+  | "backup"
   | "approved"
   | "preferred"
   | "strategic"
@@ -406,6 +408,8 @@ export type StrategicStatus =
 export const STRATEGIC_STATUS_LABELS: Record<StrategicStatus, string> = {
   prospect: "Prospect",
   trial: "Trial",
+  experimental: "Experimental",
+  backup: "Backup",
   approved: "Approved",
   preferred: "Preferred",
   strategic: "Strategic",
@@ -446,7 +450,12 @@ export type SupplierClassification =
   | "assembly"
   | "software"
   | "logistics_partner"
-  | "service_provider";
+  | "service_provider"
+  | "spare_parts"
+  | "textile"
+  | "chemical"
+  | "accessories"
+  | "machinery";
 
 export const CLASSIFICATION_LABELS: Record<SupplierClassification, string> = {
   manufacturer: "Manufacturer",
@@ -462,6 +471,11 @@ export const CLASSIFICATION_LABELS: Record<SupplierClassification, string> = {
   software: "Software Supplier",
   logistics_partner: "Logistics Partner",
   service_provider: "Service Provider",
+  spare_parts: "Spare Parts",
+  textile: "Textile",
+  chemical: "Chemical",
+  accessories: "Accessories",
+  machinery: "Machinery",
 };
 
 export const classificationLabel = (v: string): string =>
