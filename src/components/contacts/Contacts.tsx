@@ -1765,13 +1765,27 @@ const TaxonomySelect = React.memo(function TaxonomySelect({ value, onChange, opt
   );
 });
 
-/* ── Form section wrapper ── */
-const FormSection = React.memo(function FormSection({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
+/* ── Form section wrapper ──
+   `owner` (optional) shows which department / role is responsible for filling
+   this section — a supplier record spans Procurement, Finance, Compliance, QC…
+   so the badge makes accountability obvious without splitting the record. */
+const FormSection = React.memo(function FormSection({ title, icon, children, owner, ownerLabel }: { title: string; icon?: React.ReactNode; children: React.ReactNode; owner?: string; ownerLabel?: string }) {
   return (
     <div className="border-b border-[var(--border-color)] px-4 md:px-6 py-4 md:py-5">
-      <div className="flex items-center gap-2 mb-4">
-        {icon && <span className="text-[var(--text-dim)]">{icon}</span>}
-        <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{title}</h3>
+      <div className="flex items-center justify-between gap-2 mb-4">
+        <div className="flex items-center gap-2 min-w-0">
+          {icon && <span className="text-[var(--text-dim)]">{icon}</span>}
+          <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider truncate">{title}</h3>
+        </div>
+        {owner && (
+          <span
+            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide text-[var(--text-dim)]"
+            title={ownerLabel ? `${ownerLabel}: ${owner}` : owner}
+          >
+            <UserIcon size={10} className="text-[var(--text-ghost)]" />
+            {owner}
+          </span>
+        )}
       </div>
       {children}
     </div>
@@ -7045,7 +7059,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {form.contact_type === "supplier" && (
           <>
             {/* 1. Company Name — Most important, identity of the supplier */}
-            <FormSection title={t("section.companyName")} icon={<Building2Icon size={14} />}>
+            <FormSection title={t("section.companyName")} icon={<Building2Icon size={14} />} owner={t("owner.procurement")} ownerLabel={t("owner.label")}>
               <div className="space-y-3">
                 <Input label={t("field.companyNameEn")} value={form.company_name_en} onChange={v => setField("company_name_en", v)} placeholder={t("placeholder.companyNameEn")} icon={<Building2Icon size={14} />} tier="required" />
                 <Input label={t("field.companyNameCn")} tier="optional" value={form.company_name_cn} onChange={v => setField("company_name_cn", v)} placeholder={t("placeholder.companyNameCn")} icon={<LanguagesIcon size={14} />} />
@@ -7076,7 +7090,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* 4. Company Profile — Brand, classification, and business identity */}
-            <FormSection title={t("section.companyProfile")} icon={<BriefcaseIcon size={14} />}>
+            <FormSection title={t("section.companyProfile")} icon={<BriefcaseIcon size={14} />} owner={t("owner.procurement")} ownerLabel={t("owner.label")}>
               <div className="space-y-3">
                 {/* Brand Names */}
                 <div>
@@ -7126,7 +7140,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* Classifications */}
-            <FormSection title={t("section.classifications", "Classifications")} icon={<TagsIcon size={14} />}>
+            <FormSection title={t("section.classifications", "Classifications")} icon={<TagsIcon size={14} />} owner={t("owner.procurement")} ownerLabel={t("owner.label")}>
               <div className="flex flex-wrap gap-2">
                 {Object.entries(CLASSIFICATION_LABELS).map(([k, v]) => {
                   const on = sIntel.classifications.includes(k);
@@ -7142,7 +7156,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* 2. Contact Details — How to reach the supplier */}
-            <FormSection title={t("section.contactDetails")} icon={<PhoneIcon size={14} />}>
+            <FormSection title={t("section.contactDetails")} icon={<PhoneIcon size={14} />} owner={t("owner.procurement")} ownerLabel={t("owner.label")}>
               <div className="space-y-3">
                 <p className="text-[11px] text-[var(--text-dim)]">{t("hint.atLeastOneContact", "At least one of phone / mobile / email is required")} <span className="text-rose-400">*</span></p>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -7172,7 +7186,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* 3. Contact Persons — Key people to communicate with */}
-            <FormSection title={t("section.contactPersons")} icon={<UsersIcon size={14} />}>
+            <FormSection title={t("section.contactPersons")} icon={<UsersIcon size={14} />} owner={t("owner.procurement")} ownerLabel={t("owner.label")}>
               <div className="space-y-3">
                 <p className="text-[11px] text-[var(--text-dim)]">{t("hint.atLeastOnePerson", "At least one contact person is required")} <span className="text-rose-400">*</span></p>
                 {form.contact_persons.map((cp, i) => (
@@ -7231,7 +7245,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             {/* Messaging IDs — how the team reaches an overseas factory.
                 Each channel takes an ID/handle and/or a QR image (drag-drop,
                 PNG/JPG). WeChat is the primary channel for China sourcing. */}
-            <FormSection title={t("section.messagingIds", "Messaging IDs")} icon={<MessageSquareIcon size={14} />}>
+            <FormSection title={t("section.messagingIds", "Messaging IDs")} icon={<MessageSquareIcon size={14} />} owner={t("owner.procurement")} ownerLabel={t("owner.label")}>
               <div className="space-y-3">
                 <p className="text-[11px] text-[var(--text-dim)]">{t("hint.atLeastOneMessaging", "At least one messaging channel is required")} <span className="text-rose-400">*</span></p>
                 <MessagingIdField
@@ -7261,7 +7275,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* Legal Identity — registration & company profile */}
-            <FormSection title={t("section.legalIdentity", "Legal Identity")} icon={<Building2Icon size={14} />}>
+            <FormSection title={t("section.legalIdentity", "Legal Identity")} icon={<Building2Icon size={14} />} owner={t("owner.compliance")} ownerLabel={t("owner.label")}>
               <div className="space-y-3">
                 <Input label={t("field.tradingName", "Trading / DBA Name")} tier="optional" value={form.trading_name} onChange={v => setField("trading_name", v)} placeholder={t("placeholder.tradingName", "Doing business as")} icon={<Building2Icon size={14} />} />
                 <div className="grid grid-cols-2 gap-3">
@@ -7288,7 +7302,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* Trade & Tax IDs — VAT / customs identifiers */}
-            <FormSection title={t("section.tradeIdentifiers", "Trade & Tax IDs")} icon={<FileCheckIcon size={14} />}>
+            <FormSection title={t("section.tradeIdentifiers", "Trade & Tax IDs")} icon={<FileCheckIcon size={14} />} owner={t("owner.compliance")} ownerLabel={t("owner.label")}>
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <Input label={t("field.gstNumber", "VAT / GST")} help="supplier.gst_number" tier="optional" value={form.gst_number} onChange={v => setField("gst_number", v)} placeholder="VAT / GST number" icon={<HashtagIcon size={14} />} />
@@ -7303,7 +7317,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* Payment — terms + currency + bank accounts + mobile payment (WeChat Pay / Alipay) */}
-            <FormSection title={t("section.paymentInfo", "Payment Information")} icon={<LandmarkIcon size={14} />}>
+            <FormSection title={t("section.paymentInfo", "Payment Information")} icon={<LandmarkIcon size={14} />} owner={t("owner.finance")} ownerLabel={t("owner.label")}>
               <div className="space-y-4">
                 {/* Terms & currency (merged from the old Payment & Currency section) */}
                 <div className="space-y-3">
@@ -7374,7 +7388,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* Logistics & Trade — shipping terms a buyer needs at a glance */}
-            <FormSection title={t("section.logisticsTrade", "Logistics & Trade")} icon={<TruckIcon size={14} />}>
+            <FormSection title={t("section.logisticsTrade", "Logistics & Trade")} icon={<TruckIcon size={14} />} owner={t("owner.logistics")} ownerLabel={t("owner.label")}>
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <SelectInput label={t("field.incoterms", "Incoterms")} help="supplier.incoterms" tier="preferred" value={form.incoterms} onChange={v => setField("incoterms", v)} options={INCOTERMS} icon={<ShipIcon size={14} />} selectLabel={t("detail.select")} />
@@ -7389,7 +7403,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* Factory */}
-            <FormSection title={t("section.factory", "Factory")} icon={<FactoryIcon size={14} />}>
+            <FormSection title={t("section.factory", "Factory")} icon={<FactoryIcon size={14} />} owner={t("owner.sourcingQuality")} ownerLabel={t("owner.label")}>
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <Input label={t("field.factoryName", "Factory name")} help="supplier.factory_name" value={String(sIntel.factory.factory_name)} onChange={(v) => setIntelFactory("factory_name", v)} icon={<FactoryIcon size={14} />} />
@@ -7414,7 +7428,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* 7. Catalogue */}
-            <FormSection title={t("section.catalogue")} icon={<BookOpenIcon size={14} />}>
+            <FormSection title={t("section.catalogue")} icon={<BookOpenIcon size={14} />} owner={t("owner.product")} ownerLabel={t("owner.label")}>
               <div className="space-y-2">
                 {form.catalogues.map((cat, i) => (
                   <div key={i} className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-color)]">
@@ -7452,7 +7466,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* 10. Products (placeholder) */}
-            <FormSection title={t("section.products")} icon={<PackageIcon size={14} />}>
+            <FormSection title={t("section.products")} icon={<PackageIcon size={14} />} owner={t("owner.product")} ownerLabel={t("owner.label")}>
               <div className="flex items-center gap-3 py-4">
                 <div className="w-10 h-10 rounded-full bg-[var(--bg-surface)] flex items-center justify-center">
                   <PackageIcon size={18} className="text-[var(--text-ghost)]" />
@@ -7462,7 +7476,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* 9. Quality & Performance */}
-            <FormSection title={t("section.qualityPerformance")} icon={<ShieldCheckIcon size={14} />}>
+            <FormSection title={t("section.qualityPerformance")} icon={<ShieldCheckIcon size={14} />} owner={t("owner.quality")} ownerLabel={t("owner.label")}>
               <div className="space-y-3">
                 <div>
                   <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.rating")}</label>
@@ -7507,7 +7521,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* Risk */}
-            <FormSection title={t("section.risk", "Risk")} icon={<TriangleWarningIcon size={14} />}>
+            <FormSection title={t("section.risk", "Risk")} icon={<TriangleWarningIcon size={14} />} owner={t("owner.risk")} ownerLabel={t("owner.label")}>
               <div className="space-y-4">
                 {/* Exposure — how risky the relationship is */}
                 <div>
@@ -7542,7 +7556,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* Negotiation */}
-            <FormSection title={t("section.negotiation", "Negotiation")} icon={<HandCoinsIcon size={14} />}>
+            <FormSection title={t("section.negotiation", "Negotiation")} icon={<HandCoinsIcon size={14} />} owner={t("owner.commercial")} ownerLabel={t("owner.label")}>
               <div className="space-y-4">
                 {/* Flexibility & terms */}
                 <div>
@@ -7568,7 +7582,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* Strategic status */}
-            <FormSection title={t("section.strategicStatus", "Strategic Status")} icon={<TargetIcon size={14} />}>
+            <FormSection title={t("section.strategicStatus", "Strategic Status")} icon={<TargetIcon size={14} />} owner={t("owner.management")} ownerLabel={t("owner.label")}>
               <div className="grid grid-cols-2 gap-3">
                 <SelectInput label={t("field.strategicStatus", "Strategic status")} tier="preferred" value={sIntel.strategic_status} onChange={(v) => setSIntel((p) => ({ ...p, strategic_status: v }))} options={Object.keys(STRATEGIC_STATUS_LABELS)} renderLabel={(o) => STRATEGIC_STATUS_LABELS[o as keyof typeof STRATEGIC_STATUS_LABELS] ?? o} icon={<TargetIcon size={14} />} selectLabel={t("detail.select")} />
                 <SuggestInput
@@ -7583,7 +7597,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* 8. Documents */}
-            <FormSection title={t("section.documents")} icon={<PaperclipIcon size={14} />}>
+            <FormSection title={t("section.documents")} icon={<PaperclipIcon size={14} />} owner={t("owner.compliance")} ownerLabel={t("owner.label")}>
               <div className="space-y-2">
                 {form.documents.map((doc, i) => (
                   <div key={i} className="p-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] space-y-2">
@@ -7635,7 +7649,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
             {/* Social Media — add as many accounts as needed; each is a
                 platform + a link, page, or @account name. */}
-            <FormSection title={t("section.socialMedia", "Social Media")} icon={<Share2Icon size={14} />}>
+            <FormSection title={t("section.socialMedia", "Social Media")} icon={<Share2Icon size={14} />} owner={t("owner.marketing")} ownerLabel={t("owner.label")}>
               <div className="space-y-2.5">
                 {form.social_profiles.length === 0 && (
                   <p className="text-[11px] text-[var(--text-faint)]">{t("hint.socialMedia", "Add the factory's social pages — paste a link, page, or @account.")}</p>
@@ -7659,7 +7673,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* 11. Notes */}
-            <FormSection title={t("section.notes")} icon={<DocumentIcon size={14} />}>
+            <FormSection title={t("section.notes")} icon={<DocumentIcon size={14} />} owner={t("owner.anyTeam")} ownerLabel={t("owner.label")}>
               <textarea
                 value={form.notes}
                 onChange={e => setField("notes", e.target.value)}
@@ -7670,7 +7684,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* 12. Custom Fields */}
-            <FormSection title={t("section.customFields")} icon={<HashtagIcon size={14} />}>
+            <FormSection title={t("section.customFields")} icon={<HashtagIcon size={14} />} owner={t("owner.anyTeam")} ownerLabel={t("owner.label")}>
               {form.custom_fields.map((cf, i) => (
                 <div key={i} className="flex items-center gap-2 mb-3">
                   <RemoveBtn onClick={() => removeCustomField(i)} />
