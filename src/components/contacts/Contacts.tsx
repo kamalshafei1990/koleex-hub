@@ -2365,6 +2365,38 @@ const ImageDropField = React.memo(function ImageDropField({
   );
 });
 
+/* ── Date field — branded wrapper over the native date picker ───────────────
+   Keeps the browser's accessible native calendar (easiest + reliable) but adds
+   a left calendar icon to match the other inputs, opens the picker on a click
+   anywhere in the field, and uses the right color-scheme per theme so the popup
+   looks correct in both light and dark mode. */
+const DateField = React.memo(function DateField({ value, onChange, disabled, className }: {
+  value: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  const openPicker = () => {
+    const el = ref.current as (HTMLInputElement & { showPicker?: () => void }) | null;
+    if (el && !disabled) { try { el.showPicker?.(); } catch { /* not supported — native indicator still works */ } }
+  };
+  return (
+    <div className={`relative ${className ?? ""}`}>
+      <CalendarRawIcon size={14} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
+      <input
+        ref={ref}
+        type="date"
+        value={value}
+        disabled={disabled}
+        onChange={e => onChange(e.target.value)}
+        onClick={openPicker}
+        className="w-full h-10 ps-9 pe-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:light] dark:[color-scheme:dark] disabled:opacity-30 transition-colors cursor-pointer"
+      />
+    </div>
+  );
+});
+
 /* ── Searchable Country Dropdown ── */
 function CountryDropdown({ value, displayValue, onChange, label, placeholder, noResults }: {
   value: string; // isoCode
@@ -6034,12 +6066,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               <Input label={t("field.creditLimit")} value={form.credit_limit} onChange={v => setField("credit_limit", v)} placeholder="0.00" inputMode="decimal" icon={<WalletIcon size={14} />} />
               <div>
                 <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.lastOrderDate")}</label>
-                <input
-                  type="date"
-                  value={form.last_order_date}
-                  onChange={e => setField("last_order_date", e.target.value)}
-                  className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]"
-                />
+                <DateField value={form.last_order_date} onChange={v => setField("last_order_date", v)} />
               </div>
             </div>
           </FormSection>
@@ -6112,16 +6139,16 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.firstContact")}</label>
-                  <input type="date" value={form.first_contact_date} onChange={e => setField("first_contact_date", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]" />
+                  <DateField value={form.first_contact_date} onChange={v => setField("first_contact_date", v)} />
                 </div>
                 <div>
                   <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.lastContacted")}</label>
-                  <input type="date" value={form.last_contacted} onChange={e => setField("last_contacted", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]" />
+                  <DateField value={form.last_contacted} onChange={v => setField("last_contacted", v)} />
                 </div>
               </div>
               <div>
                 <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.followUpDate")}</label>
-                <input type="date" value={form.follow_up_date} onChange={e => setField("follow_up_date", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]" />
+                <DateField value={form.follow_up_date} onChange={v => setField("follow_up_date", v)} />
               </div>
             </div>
           </FormSection>
@@ -6219,7 +6246,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
               <div>
                 <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.exclusivityExpiry", "Exclusivity Expiry")}</label>
-                <input type="date" value={form.exclusivity_expiry} onChange={e => setField("exclusivity_expiry", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]" />
+                <DateField value={form.exclusivity_expiry} onChange={v => setField("exclusivity_expiry", v)} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Input label={t("field.salesRep", "Sales Rep")} value={form.sales_rep} onChange={v => setField("sales_rep", v)} placeholder={t("field.name")} icon={<UserIcon size={14} />} />
@@ -6232,11 +6259,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.levelAssignedDate", "Level Assigned")}</label>
-                  <input type="date" value={form.customer_level_assigned_date} onChange={e => setField("customer_level_assigned_date", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]" />
+                  <DateField value={form.customer_level_assigned_date} onChange={v => setField("customer_level_assigned_date", v)} />
                 </div>
                 <div>
                   <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.levelReviewDate", "Level Review Due")}</label>
-                  <input type="date" value={form.customer_level_review_date} onChange={e => setField("customer_level_review_date", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]" />
+                  <DateField value={form.customer_level_review_date} onChange={v => setField("customer_level_review_date", v)} />
                 </div>
               </div>
             </div>
@@ -6255,7 +6282,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <Input label={t("field.commissionRate", "Commission Rate (%)")} value={form.commission_rate} onChange={v => setField("commission_rate", v)} placeholder="0.00" inputMode="decimal" icon={<DollarSignIcon size={14} />} />
                 <div>
                   <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.contractPricingExpiry", "Contract Pricing Expiry")}</label>
-                  <input type="date" value={form.contract_pricing_expiry} onChange={e => setField("contract_pricing_expiry", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]" />
+                  <DateField value={form.contract_pricing_expiry} onChange={v => setField("contract_pricing_expiry", v)} />
                 </div>
               </div>
               <ToggleSwitch
@@ -6319,7 +6346,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <Input label={t("field.creditApprovedBy", "Limit Approved By")} value={form.credit_limit_approved_by} onChange={v => setField("credit_limit_approved_by", v)} placeholder={t("field.name")} icon={<UserCheckIcon size={14} />} />
                 <div>
                   <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.creditApprovedDate", "Approved Date")}</label>
-                  <input type="date" value={form.credit_limit_approved_date} onChange={e => setField("credit_limit_approved_date", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]" />
+                  <DateField value={form.credit_limit_approved_date} onChange={v => setField("credit_limit_approved_date", v)} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -6403,7 +6430,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <Input label={t("field.registrationCountry", "Registration Country")} value={form.registration_country} onChange={v => setField("registration_country", v)} placeholder={t("placeholder.country")} icon={<GlobeIcon size={14} />} />
                 <div>
                   <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.registrationDate", "Registration Date")}</label>
-                  <input type="date" value={form.registration_date} onChange={e => setField("registration_date", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]" />
+                  <DateField value={form.registration_date} onChange={v => setField("registration_date", v)} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -6446,19 +6473,19 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.kycVerifiedDate", "KYC Verified Date")}</label>
-                  <input type="date" value={form.kyc_verified_date} onChange={e => setField("kyc_verified_date", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]" />
+                  <DateField value={form.kyc_verified_date} onChange={v => setField("kyc_verified_date", v)} />
                 </div>
                 <Input label={t("field.kycVerifiedBy", "Verified By")} value={form.kyc_verified_by} onChange={v => setField("kyc_verified_by", v)} placeholder={t("field.name")} icon={<UserCheckIcon size={14} />} />
               </div>
               <div>
                 <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.kycReviewDueDate", "Next Review Due")}</label>
-                <input type="date" value={form.kyc_review_due_date} onChange={e => setField("kyc_review_due_date", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]" />
+                <DateField value={form.kyc_review_due_date} onChange={v => setField("kyc_review_due_date", v)} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <SelectInput label={t("field.sanctionsCheckStatus", "Sanctions Check")} value={form.sanctions_check_status} onChange={v => setField("sanctions_check_status", v)} options={SANCTIONS_STATUSES} icon={<ShieldExclamationIcon size={14} />} selectLabel={t("detail.select")} />
                 <div>
                   <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.sanctionsCheckDate", "Last Check")}</label>
-                  <input type="date" value={form.sanctions_check_date} onChange={e => setField("sanctions_check_date", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]" />
+                  <DateField value={form.sanctions_check_date} onChange={v => setField("sanctions_check_date", v)} />
                 </div>
               </div>
               <Input label={t("field.amlStatus", "AML Status")} value={form.aml_status} onChange={v => setField("aml_status", v)} placeholder={t("placeholder.amlStatus", "Clear / Pending / Flagged")} icon={<ShieldCheckIcon size={14} />} />
@@ -7063,7 +7090,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
                 <div>
                   <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.lastQualityIssueDate")}</label>
-                  <input type="date" value={form.last_quality_issue} onChange={e => setField("last_quality_issue", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]" />
+                  <DateField value={form.last_quality_issue} onChange={v => setField("last_quality_issue", v)} />
                 </div>
                 <div>
                   <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.qualityObs")}</label>
@@ -7288,11 +7315,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.startDate")}</label>
-                      <input type="date" value={rl.duration_start} onChange={e => updateResumeLine(i, "duration_start", e.target.value)} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]" />
+                      <DateField value={rl.duration_start} onChange={v => updateResumeLine(i, "duration_start", v)} />
                     </div>
                     <div>
                       <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.endDate")}</label>
-                      <input type="date" value={rl.duration_end} onChange={e => updateResumeLine(i, "duration_end", e.target.value)} disabled={rl.is_forever} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] disabled:opacity-30" />
+                      <DateField value={rl.duration_end} onChange={v => updateResumeLine(i, "duration_end", v)} disabled={rl.is_forever} />
                     </div>
                   </div>
                   <label className="flex items-center gap-2 cursor-pointer">
