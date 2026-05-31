@@ -5730,25 +5730,6 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       "phones", "emails", "addresses", "websites",
       "contact_persons", "brand_names", "certifications", "tags",
     ]);
-    const supplierFields: (keyof ContactForm)[] = [
-      "photo_url", "company_name_en", "company_name_cn",
-      "industry", "source", "year_established",
-      "supplier_tel", "supplier_mobile", "supplier_email", "supplier_website", "supplier_address",
-      "country", "province", "city", "division", "category", "brand_names",
-      // Legal & Trade IDs
-      "trading_name", "business_registration_number", "registration_country", "business_license_image",
-      "gst_number", "cr_number", "duns_number", "importer_exporter_code", "customs_code",
-      // Commercial
-      "payment_terms", "currency", "payment_info", "moq", "lead_time", "incoterms",
-      "annual_revenue_range", "employee_count_range",
-      // Logistics
-      "port_of_entry", "container_preference", "customs_broker", "freight_forwarder",
-      // Messaging (current channels — Line/Skype were removed)
-      "whatsapp_business", "wechat_id", "telegram_id", "qq_id", "dingtalk_id", "messenger_id",
-      // Quality
-      "certifications", "sample_status", "rating",
-      "contact_persons", "notes",
-    ];
     const customerFields: (keyof ContactForm)[] = [
       "photo_url", "first_name", "last_name", "company", "position",
       "country", "city", "birthday", "phones", "emails", "addresses",
@@ -5762,43 +5743,45 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       "country", "city", "birthday", "phones", "emails", "addresses",
       "websites", "notes",
     ];
-    const completenessFields = isSupplier
-      ? supplierFields
-      : isCustomer
-        ? customerFields
-        : genericFields;
     let filledCount = 0;
     let totalCount = 0;
-    for (const key of completenessFields) {
-      const v = form[key];
-      if (ARRAY_FIELDS.has(key) && Array.isArray(v)) {
-        /* Total = at least 1 expected slot, otherwise grows with the
-           number of entries the operator added. Filled = entries with
-           meaningful content. */
-        const len = v.length;
-        totalCount += Math.max(1, len);
-        filledCount += countArrayFilled(v);
-      } else {
-        totalCount += 1;
-        if (completenessIsFilledScalar(v)) filledCount += 1;
-      }
-    }
 
-    /* Supplier intelligence (held in sIntel, written to canonical tables on
-       save). Each area counts as one slot so the bar reflects the new
-       Strategic / Classifications / Factory / Risk / Negotiation sections. */
     if (isSupplier) {
-      const groupHasValue = (o: Record<string, unknown>) =>
-        Object.values(o).some((v) => v === true || (typeof v === "string" && v.trim().length > 0) || (typeof v === "number" && v > 0));
-      const intelSlots: boolean[] = [
-        !!sIntel.strategic_status,
-        sIntel.classifications.length > 0,
-        groupHasValue(sIntel.factory),
-        groupHasValue(sIntel.risk),
-        groupHasValue(sIntel.neg),
+      /* Importance-weighted completeness. Only the fields that make a profile
+         genuinely usable count toward the %, and "any-of" groups count as ONE
+         slot — so having WeChat is enough and a missing DingTalk never reads as
+         incomplete. Optional data (extra channels, social media, secondary
+         trade IDs, logistics extras, bank/mobile-pay detail, and the
+         assessment sections) is intentionally excluded so a clean core profile
+         can reach 100%. */
+      const filled = completenessIsFilledScalar;
+      const essentials: (keyof ContactForm)[] = [
+        "company_name_en", "country", "division", "category",
+        "supplier_address", "payment_terms", "incoterms",
       ];
-      totalCount += intelSlots.length;
-      filledCount += intelSlots.filter(Boolean).length;
+      for (const k of essentials) { totalCount += 1; if (filled(form[k])) filledCount += 1; }
+      // "Any of" — one slot each, complete if at least one member is set.
+      const anyOf: (keyof ContactForm)[][] = [
+        ["supplier_tel", "supplier_mobile", "supplier_email"],                                   // reachable
+        ["wechat_id", "whatsapp_business", "telegram_id", "qq_id", "dingtalk_id", "messenger_id"], // a messaging channel
+      ];
+      for (const grp of anyOf) { totalCount += 1; if (grp.some((k) => filled(form[k]))) filledCount += 1; }
+      // At least one contact person, and at least one classification (supplier kind).
+      totalCount += 1; if (form.contact_persons.some((p) => (p.name || "").trim().length > 0)) filledCount += 1;
+      totalCount += 1; if (sIntel.classifications.length > 0) filledCount += 1;
+    } else {
+      const completenessFields = isCustomer ? customerFields : genericFields;
+      for (const key of completenessFields) {
+        const v = form[key];
+        if (ARRAY_FIELDS.has(key) && Array.isArray(v)) {
+          const len = v.length;
+          totalCount += Math.max(1, len);
+          filledCount += countArrayFilled(v);
+        } else {
+          totalCount += 1;
+          if (completenessIsFilledScalar(v)) filledCount += 1;
+        }
+      }
     }
 
     /* Customer premium tabs — for non-customers, every tab check returns true so existing behaviour is preserved.
