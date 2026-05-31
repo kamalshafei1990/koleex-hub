@@ -2600,15 +2600,18 @@ const SuggestInput = React.memo(function SuggestInput({ label, value, onChange, 
     <div>
       <label className="text-xs text-[var(--text-faint)] mb-1 block">{label}</label>
       <div ref={wrapRef} className="relative">
-        {icon && <span className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)]">{icon}</span>}
+        {icon && <span className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] pointer-events-none">{icon}</span>}
         <input
           value={value}
           onChange={e => { onChange(e.target.value); if (!open) setOpen(true); }}
           onFocus={() => setOpen(true)}
           onKeyDown={e => { if (e.key === "Escape") setOpen(false); }}
           placeholder={placeholder || label}
-          className={`w-full h-10 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors ${icon ? "ps-9 pe-3" : "px-3"}`}
+          className={`w-full h-10 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors cursor-pointer ${icon ? "ps-9 pe-9" : "ps-3 pe-9"}`}
         />
+        <button type="button" tabIndex={-1} aria-label="Toggle options" onClick={() => setOpen(o => !o)} className="absolute end-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)]">
+          <AngleDownIcon size={14} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
         {open && filtered.length > 0 && (
           <div className="absolute z-50 top-full mt-1 start-0 w-full max-h-52 overflow-y-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-1 shadow-2xl">
             {filtered.map((o, i) => (
