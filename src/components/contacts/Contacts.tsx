@@ -4718,11 +4718,21 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     ]);
     const supplierFields: (keyof ContactForm)[] = [
       "photo_url", "company_name_en", "company_name_cn", "supplier_type",
-      "industry", "source", "supplier_tel", "supplier_mobile",
-      "supplier_email", "supplier_website", "supplier_address",
-      "country", "province", "city", "division", "category",
-      "brand_names", "payment_terms", "currency", "payment_info",
-      "moq", "lead_time", "certifications", "sample_status", "rating",
+      "industry", "source", "year_established",
+      "supplier_tel", "supplier_mobile", "supplier_email", "supplier_website", "supplier_address",
+      "country", "province", "city", "division", "category", "brand_names",
+      // Legal & Trade IDs
+      "trading_name", "business_registration_number", "registration_country",
+      "gst_number", "cr_number", "duns_number", "importer_exporter_code", "customs_code",
+      // Commercial
+      "payment_terms", "currency", "payment_info", "moq", "lead_time", "incoterms",
+      "annual_revenue_range", "employee_count_range",
+      // Logistics
+      "port_of_entry", "container_preference", "customs_broker", "freight_forwarder",
+      // Messaging
+      "whatsapp_business", "wechat_id", "telegram_id", "line_id", "skype_id",
+      // Quality
+      "certifications", "sample_status", "rating",
       "contact_persons", "notes",
     ];
     const customerFields: (keyof ContactForm)[] = [
@@ -4758,6 +4768,23 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         totalCount += 1;
         if (completenessIsFilledScalar(v)) filledCount += 1;
       }
+    }
+
+    /* Supplier intelligence (held in sIntel, written to canonical tables on
+       save). Each area counts as one slot so the bar reflects the new
+       Strategic / Classifications / Factory / Risk / Negotiation sections. */
+    if (isSupplier) {
+      const groupHasValue = (o: Record<string, unknown>) =>
+        Object.values(o).some((v) => v === true || (typeof v === "string" && v.trim().length > 0) || (typeof v === "number" && v > 0));
+      const intelSlots: boolean[] = [
+        !!sIntel.strategic_status,
+        sIntel.classifications.length > 0,
+        groupHasValue(sIntel.factory),
+        groupHasValue(sIntel.risk),
+        groupHasValue(sIntel.neg),
+      ];
+      totalCount += intelSlots.length;
+      filledCount += intelSlots.filter(Boolean).length;
     }
 
     /* Customer premium tabs — for non-customers, every tab check returns true so existing behaviour is preserved.
