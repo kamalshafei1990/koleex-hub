@@ -1536,19 +1536,30 @@ function avgRatingScore(entries: Array<[string, "goodHigh" | "goodLow", string[]
   if (!vals.length) return null;
   return Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100);
 }
+interface SupplierRiskItem { dimension: string; severity: string; status: string; title: string; description: string; mitigation: string }
 interface SupplierIntel {
   strategic_status: string; strategic_status_reason: string;
   classifications: string[]; primary_class: string;
   factory: Record<string, string | boolean>;
   risk: Record<string, string | boolean>;
   neg: Record<string, string>;
+  riskItems: SupplierRiskItem[];
+  sourcing: Record<string, string>;
 }
 const EMPTY_SINTEL: SupplierIntel = {
   strategic_status: "", strategic_status_reason: "", classifications: [], primary_class: "",
   factory: { factory_name: "", factory_type: "", production_lines: "", monthly_capacity: "", annual_output: "", factory_size_sqm: "", employee_count: "", qc_staff_count: "", rd_staff_count: "", export_percentage: "", odm_supported: false, private_label_supported: false, low_moq_supported: false, main_export_markets: "", production_categories: "", supported_materials: "", capacity_unit: "", output_unit: "", lead_time_days: "", peak_season_months: "" },
   risk: { risk_level: "", dependency_level: "", geographic_risk: "", compliance_level: "", capacity_level: "", financial_stability: "", delivery_stability: "", quality_stability: "", communication_quality: "", trust_level: "", internal_evaluation_score: "", backup_supplier_exists: false, assessment_notes: "" },
   neg: { negotiation_score: "", price_flexibility: "", moq_flexibility: "", payment_flexibility: "", leadtime_flexibility: "", volume_discount: "", contract_willingness: "", negotiation_difficulty: "", sample_turnaround_speed: "", communication_flexibility: "", customization_openness: "", exclusivity_openness: "", preferred_tactics: "", leverage_points: "", internal_notes: "" },
+  riskItems: [],
+  sourcing: { sourcing_priority: "", sourcing_score_override: "", sourcing_notes: "", diversification_note: "" },
 };
+
+/* Controlled vocabularies for the risk-items register — mirror the
+   /api/suppliers/[id]/risk/items route validation. */
+const RISK_ITEM_DIMS = ["operational", "financial", "strategic", "geographic", "relationship"];
+const RISK_ITEM_SEVERITY = ["low", "medium", "high", "critical"];
+const RISK_ITEM_STATUS = ["open", "mitigating", "resolved"];
 
 /* Importance marker shown after a field label: red * for required,
    a subtle "preferred" tag for recommended. */
@@ -3113,6 +3124,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const setIntelFactory = (k: string, v: string | boolean) => setSIntel((p) => ({ ...p, factory: { ...p.factory, [k]: v } }));
   const setIntelRisk = (k: string, v: string | boolean) => setSIntel((p) => ({ ...p, risk: { ...p.risk, [k]: v } }));
   const setIntelNeg = (k: string, v: string) => setSIntel((p) => ({ ...p, neg: { ...p.neg, [k]: v } }));
+  const setIntelSourcing = (k: string, v: string) => setSIntel((p) => ({ ...p, sourcing: { ...p.sourcing, [k]: v } }));
+  const setRiskItem = (i: number, k: string, v: string) => setSIntel((p) => { const arr = [...p.riskItems]; arr[i] = { ...arr[i], [k]: v }; return { ...p, riskItems: arr }; });
+  const addRiskItem = () => setSIntel((p) => ({ ...p, riskItems: [...p.riskItems, { dimension: "operational", severity: "medium", status: "open", title: "", description: "", mitigation: "" }] }));
+  const removeRiskItem = (i: number) => setSIntel((p) => ({ ...p, riskItems: p.riskItems.filter((_, idx) => idx !== i) }));
 
   /* Auto-score: the Risk / Negotiation scores follow the Low/Med/High choices
      unless the user drags the slider (then it's manual until they hit "Use auto"). */
@@ -3445,6 +3460,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       const npt = sIntel.neg.preferred_tactics; nb.preferred_tactics = typeof npt === "string" && npt.trim() ? npt.split(",").map((s) => s.trim()).filter(Boolean) : [];
       const nlp = sIntel.neg.leverage_points; nb.leverage_points = typeof nlp === "string" && nlp.trim() ? nlp.split(",").map((s) => s.trim()).filter(Boolean) : [];
       if (Object.keys(nb).length) await j(`/api/suppliers/${id}/negotiations/intel`, "PUT", nb);
+      // Sourcing override (supplier-level)
+      const sb = num(ne(sIntel.sourcing), ["sourcing_priority", "sourcing_score_override"]);
+      if (Object.keys(sb).length) await j(`/api/suppliers/${id}/sourcing`, "PUT", sb);
+      // Risk items register — one POST per item with a title
+      for (const ri of sIntel.riskItems) { if ((ri.title || "").trim()) await j(`/api/suppliers/${id}/risk/items`, "POST", ne({ dimension: ri.dimension, severity: ri.severity, status: ri.status, title: ri.title, description: ri.description, mitigation: ri.mitigation })); }
     } catch { /* best-effort */ }
   };
 
@@ -7697,6 +7717,40 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <ScoreSlider label={t("field.internalScore", "Internal score (0–100)")} value={String(sIntel.risk.internal_evaluation_score)} onChange={(v) => { setRiskScoreManual(true); setIntelRisk("internal_evaluation_score", v); }} max={100} isAuto={!riskScoreManual} onUseAuto={() => setRiskScoreManual(false)} />
                   <label className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)]"><input type="checkbox" checked={!!sIntel.risk.backup_supplier_exists} onChange={(e) => setIntelRisk("backup_supplier_exists", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.backupExists", "Backup supplier exists")}</label>
                   <Input label={t("field.assessmentNotes", "Assessment notes")} value={String(sIntel.risk.assessment_notes)} onChange={(v) => setIntelRisk("assessment_notes", v)} />
+                </div>
+                {/* Risk items register — specific issues by dimension (operational,
+                    financial, strategic, geographic, relationship). */}
+                <div className="space-y-3 border-t border-[var(--border-color)] pt-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.riskItems", "Risk Items")}</p>
+                  {sIntel.riskItems.map((ri, i) => (
+                    <div key={i} className="p-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] space-y-2">
+                      <div className="flex items-center gap-2">
+                        <RemoveBtn onClick={() => removeRiskItem(i)} />
+                        <input value={ri.title} onChange={e => setRiskItem(i, "title", e.target.value)} placeholder={t("field.riskItemTitle", "Risk title")} className="min-w-0 flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 ms-8">
+                        <SelectInput label={t("field.riskDimension", "Dimension")} value={ri.dimension} onChange={v => setRiskItem(i, "dimension", v)} options={RISK_ITEM_DIMS} renderLabel={capWord} selectLabel={t("detail.select")} />
+                        <SelectInput label={t("field.riskSeverity", "Severity")} value={ri.severity} onChange={v => setRiskItem(i, "severity", v)} options={RISK_ITEM_SEVERITY} renderLabel={capWord} selectLabel={t("detail.select")} />
+                        <SelectInput label={t("field.riskStatus", "Status")} value={ri.status} onChange={v => setRiskItem(i, "status", v)} options={RISK_ITEM_STATUS} renderLabel={capWord} selectLabel={t("detail.select")} />
+                      </div>
+                      <div className="ms-8 space-y-2">
+                        <Input label={t("field.riskDescription", "Description")} value={ri.description} onChange={v => setRiskItem(i, "description", v)} />
+                        <Input label={t("field.riskMitigation", "Mitigation")} value={ri.mitigation} onChange={v => setRiskItem(i, "mitigation", v)} />
+                      </div>
+                    </div>
+                  ))}
+                  <AddButton label={t("add.riskItem", "Add risk item")} onClick={addRiskItem} />
+                </div>
+                {/* Sourcing override — manual priority/score + notes (the computed
+                    sourcing score on the 360 page respects the override). */}
+                <div className="space-y-3 border-t border-[var(--border-color)] pt-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.sourcing", "Sourcing")}</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Input label={t("field.sourcingPriority", "Sourcing priority (#)")} value={sIntel.sourcing.sourcing_priority} onChange={(v) => setIntelSourcing("sourcing_priority", v)} inputMode="numeric" placeholder="e.g. 1" />
+                    <Input label={t("field.sourcingScoreOverride", "Sourcing score override (0–100)")} value={sIntel.sourcing.sourcing_score_override} onChange={(v) => setIntelSourcing("sourcing_score_override", v)} inputMode="numeric" placeholder="0–100" />
+                  </div>
+                  <Input label={t("field.sourcingNotes", "Sourcing notes")} value={sIntel.sourcing.sourcing_notes} onChange={(v) => setIntelSourcing("sourcing_notes", v)} />
+                  <Input label={t("field.diversificationNote", "Diversification note")} value={sIntel.sourcing.diversification_note} onChange={(v) => setIntelSourcing("diversification_note", v)} />
                 </div>
               </div>
             </FormSection>
