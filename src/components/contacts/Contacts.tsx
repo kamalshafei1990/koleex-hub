@@ -321,7 +321,7 @@ interface ContactForm {
   category: string;
   catalogues: { name: string; url: string; type: string; uploaded_at: string }[];
   documents: { doc_name: string; name: string; url: string; type: string; uploaded_at: string }[];
-  contact_persons: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string }[];
+  contact_persons: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string; whatsapp?: string; wechat_id?: string; wechat_qr?: string }[];
   bank_accounts: { bank_name: string; account_name: string; account_number: string; swift_code: string; iban: string; branch: string; currency: string }[];
   payment_info: string;
   /* ── Employee-Specific ── */
@@ -3882,7 +3882,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {c.contact_type === "customer" && c.entity_type === "company" && detailTab("activity") && Array.isArray(c.contact_persons) && c.contact_persons.length > 0 && (
           <Section title={t("section.contactPersons")} icon={<UsersIcon size={14} />}>
             <div className="space-y-2">
-              {c.contact_persons.map((cp: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string }, i: number) => (
+              {c.contact_persons.map((cp: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string; whatsapp?: string; wechat_id?: string; wechat_qr?: string }, i: number) => (
                 <div key={i} className="py-2 border-b border-[var(--border-faint)] last:border-0">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-[var(--bg-surface-hover)] flex items-center justify-center text-xs font-semibold text-[var(--text-subtle)]">
@@ -3896,11 +3896,19 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                       </div>
                     </div>
                   </div>
-                  {(cp.phone || cp.mobile || cp.email) && (
+                  {(cp.phone || cp.mobile || cp.email || cp.whatsapp || cp.wechat_id) && (
                     <div className="ms-11 mt-1 text-xs text-[var(--text-faint)] space-y-0.5">
                       {cp.phone && <p>{t("detail.tel")}: {cp.phone}</p>}
                       {cp.mobile && <p>{t("detail.mobile")}: {cp.mobile}</p>}
                       {cp.email && <p>{t("detail.email")}: {cp.email}</p>}
+                      {cp.whatsapp && <p>{t("field.whatsappBusiness", "WhatsApp")}: {cp.whatsapp}</p>}
+                      {cp.wechat_id && <p>{t("field.wechat", "WeChat")}: {cp.wechat_id}</p>}
+                    </div>
+                  )}
+                  {cp.wechat_qr && (
+                    <div className="ms-11 mt-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={cp.wechat_qr} alt={`${cp.name || "Contact"} WeChat QR`} className="h-24 w-24 rounded-lg border border-[var(--border-color)] object-cover bg-white" />
                     </div>
                   )}
                   {cp.notes && <p className="ms-11 mt-1 text-xs text-[var(--text-dim)]">{cp.notes}</p>}
@@ -3952,7 +3960,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {c.contact_type === "company" && Array.isArray(c.contact_persons) && c.contact_persons.length > 0 && (
           <Section title={t("section.contactPersons")} icon={<UsersIcon size={14} />}>
             <div className="space-y-2">
-              {c.contact_persons.map((cp: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string }, i: number) => (
+              {c.contact_persons.map((cp: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string; whatsapp?: string; wechat_id?: string; wechat_qr?: string }, i: number) => (
                 <div key={i} className="py-2 border-b border-[var(--border-faint)] last:border-0">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-[var(--bg-surface-hover)] flex items-center justify-center text-xs font-semibold text-[var(--text-subtle)]">
@@ -3966,11 +3974,19 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                       </div>
                     </div>
                   </div>
-                  {(cp.phone || cp.mobile || cp.email) && (
+                  {(cp.phone || cp.mobile || cp.email || cp.whatsapp || cp.wechat_id) && (
                     <div className="ms-11 mt-1 text-xs text-[var(--text-faint)] space-y-0.5">
                       {cp.phone && <p>{t("detail.tel")}: {cp.phone}</p>}
                       {cp.mobile && <p>{t("detail.mobile")}: {cp.mobile}</p>}
                       {cp.email && <p>{t("detail.email")}: {cp.email}</p>}
+                      {cp.whatsapp && <p>{t("field.whatsappBusiness", "WhatsApp")}: {cp.whatsapp}</p>}
+                      {cp.wechat_id && <p>{t("field.wechat", "WeChat")}: {cp.wechat_id}</p>}
+                    </div>
+                  )}
+                  {cp.wechat_qr && (
+                    <div className="ms-11 mt-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={cp.wechat_qr} alt={`${cp.name || "Contact"} WeChat QR`} className="h-24 w-24 rounded-lg border border-[var(--border-color)] object-cover bg-white" />
                     </div>
                   )}
                   {cp.notes && <p className="ms-11 mt-1 text-xs text-[var(--text-dim)]">{cp.notes}</p>}
@@ -4233,7 +4249,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {c.contact_type === "supplier" && Array.isArray(c.contact_persons) && c.contact_persons.length > 0 && (
           <Section title={t("section.contactPersons")} icon={<UsersIcon size={14} />}>
             <div className="space-y-2">
-              {c.contact_persons.map((cp: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string }, i: number) => (
+              {c.contact_persons.map((cp: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string; whatsapp?: string; wechat_id?: string; wechat_qr?: string }, i: number) => (
                 <div key={i} className="py-2 border-b border-[var(--border-faint)] last:border-0">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-[var(--bg-surface-hover)] flex items-center justify-center text-xs font-semibold text-[var(--text-subtle)]">
@@ -4247,11 +4263,19 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                       </div>
                     </div>
                   </div>
-                  {(cp.phone || cp.mobile || cp.email) && (
+                  {(cp.phone || cp.mobile || cp.email || cp.whatsapp || cp.wechat_id) && (
                     <div className="ms-11 mt-1 text-xs text-[var(--text-faint)] space-y-0.5">
                       {cp.phone && <p>{t("detail.tel")}: {cp.phone}</p>}
                       {cp.mobile && <p>{t("detail.mobile")}: {cp.mobile}</p>}
                       {cp.email && <p>{t("detail.email")}: {cp.email}</p>}
+                      {cp.whatsapp && <p>{t("field.whatsappBusiness", "WhatsApp")}: {cp.whatsapp}</p>}
+                      {cp.wechat_id && <p>{t("field.wechat", "WeChat")}: {cp.wechat_id}</p>}
+                    </div>
+                  )}
+                  {cp.wechat_qr && (
+                    <div className="ms-11 mt-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={cp.wechat_qr} alt={`${cp.name || "Contact"} WeChat QR`} className="h-24 w-24 rounded-lg border border-[var(--border-color)] object-cover bg-white" />
                     </div>
                   )}
                   {cp.notes && <p className="ms-11 mt-1 text-xs text-[var(--text-dim)]">{cp.notes}</p>}
@@ -5243,7 +5267,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 )}
               </div>
             ))}
-            <AddButton label={t("add.contactPerson")} onClick={() => setField("contact_persons", [...form.contact_persons, { name: "", position: "", department: "", phone: "", mobile: "", email: "", notes: "" }])} />
+            <AddButton label={t("add.contactPerson")} onClick={() => setField("contact_persons", [...form.contact_persons, { name: "", position: "", department: "", phone: "", mobile: "", email: "", notes: "", whatsapp: "", wechat_id: "", wechat_qr: "" }])} />
           </div>
         </FormSection>
         )}
@@ -5347,7 +5371,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 )}
               </div>
             ))}
-            <AddButton label={t("add.contactPerson")} onClick={() => setField("contact_persons", [...form.contact_persons, { name: "", position: "", department: "", phone: "", mobile: "", email: "", notes: "" }])} />
+            <AddButton label={t("add.contactPerson")} onClick={() => setField("contact_persons", [...form.contact_persons, { name: "", position: "", department: "", phone: "", mobile: "", email: "", notes: "", whatsapp: "", wechat_id: "", wechat_qr: "" }])} />
           </div>
         </FormSection>
         </>
@@ -6372,12 +6396,22 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                           <input type="tel" inputMode="tel" autoComplete="tel" value={cp.mobile} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], mobile: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.contactMobile")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
                         </div>
                         <input type="email" inputMode="email" autoComplete="email" value={cp.email} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], email: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.email")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                        <input type="tel" inputMode="tel" autoComplete="tel" value={cp.whatsapp ?? ""} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], whatsapp: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.whatsappBusiness", "WhatsApp")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                        <MessagingIdField
+                          label={t("field.wechat", "WeChat")}
+                          icon={<MessageSquareIcon size={14} />}
+                          idValue={cp.wechat_id ?? ""}
+                          onIdChange={v => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], wechat_id: v }; setField("contact_persons", arr); }}
+                          placeholder={t("placeholder.wechatId", "WeChat ID / handle")}
+                          qrValue={cp.wechat_qr ?? ""}
+                          onQrChange={v => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], wechat_qr: v }; setField("contact_persons", arr); }}
+                        />
                         <textarea value={cp.notes} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], notes: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.notes")} rows={2} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none resize-none" />
                       </div>
                     )}
                   </div>
                 ))}
-                <AddButton label={t("add.contactPerson")} onClick={() => setField("contact_persons", [...form.contact_persons, { name: "", position: "", department: "", phone: "", mobile: "", email: "", notes: "" }])} />
+                <AddButton label={t("add.contactPerson")} onClick={() => setField("contact_persons", [...form.contact_persons, { name: "", position: "", department: "", phone: "", mobile: "", email: "", notes: "", whatsapp: "", wechat_id: "", wechat_qr: "" }])} />
               </div>
             </FormSection>
 

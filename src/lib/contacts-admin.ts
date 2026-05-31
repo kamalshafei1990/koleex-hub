@@ -189,7 +189,7 @@ export interface ContactRow {
   category: string | null;
   catalogues: { name: string; url: string; type: string; uploaded_at: string }[];
   documents: { doc_name: string; name: string; url: string; type: string; uploaded_at: string }[];
-  contact_persons: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string }[];
+  contact_persons: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string; whatsapp?: string; wechat_id?: string; wechat_qr?: string }[];
   bank_accounts: { bank_name: string; account_name: string; account_number: string; swift_code: string; iban: string; branch: string; currency: string }[];
   payment_info: string | null;
   /* Employee-Specific */
