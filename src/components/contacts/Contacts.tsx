@@ -2090,6 +2090,14 @@ const ALL_COUNTRIES: CountryOption[] = Country.getAllCountries().map(c => ({
   flag: countryCodeToFlag(c.isoCode),
 }));
 
+/* All country names — for the Registration Country dropdown. */
+const COUNTRY_NAMES: string[] = ALL_COUNTRIES.map(c => c.name);
+/* Year options for "Year Established" — current year back to 1950. */
+const ESTABLISHED_YEARS: string[] = (() => {
+  const now = new Date().getFullYear();
+  return Array.from({ length: now - 1949 }, (_, i) => String(now - i));
+})();
+
 /* ── Phone dial codes (built from the same country dataset) ───────────────── */
 interface DialCode { iso: string; name: string; code: string; flag: string; }
 const DIAL_CODES: DialCode[] = Country.getAllCountries()
@@ -6674,8 +6682,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <Input label={t("field.businessRegNumber", "Business Registration #")} value={form.business_registration_number} onChange={v => setField("business_registration_number", v)} placeholder={t("placeholder.regNumber", "CR / Reg #")} icon={<HashtagIcon size={14} />} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <Input label={t("field.registrationCountry", "Registration Country")} value={form.registration_country} onChange={v => setField("registration_country", v)} placeholder={t("placeholder.country", "Country")} icon={<GlobeIcon size={14} />} />
-                  <Input label={t("field.yearEstablished", "Year Established")} value={form.year_established} onChange={v => setField("year_established", v)} placeholder="2000" icon={<CalendarRawIcon size={14} />} />
+                  <SelectInput label={t("field.registrationCountry", "Registration Country")} value={form.registration_country} onChange={v => setField("registration_country", v)} options={COUNTRY_NAMES} icon={<GlobeIcon size={14} />} selectLabel={t("detail.select")} />
+                  <SelectInput label={t("field.yearEstablished", "Year Established")} value={form.year_established} onChange={v => setField("year_established", v)} options={ESTABLISHED_YEARS} icon={<CalendarRawIcon size={14} />} selectLabel={t("detail.select")} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <SelectInput label={t("field.employeeCountRange", "Employee Count")} value={form.employee_count_range} onChange={v => setField("employee_count_range", v)} options={EMPLOYEE_COUNT_RANGES} icon={<UsersIcon size={14} />} selectLabel={t("detail.select")} />
