@@ -5756,15 +5756,16 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
        (recommended), Optional (counted, never penalised). "Any-of" groups
        count as ONE slot — having WeChat is enough; a missing DingTalk never
        reads as incomplete. */
-    let supplierTiers: { required: { filled: number; total: number }; preferred: { filled: number; total: number }; optionalAdded: number } | undefined;
+    let supplierTiers: { required: { filled: number; total: number }; preferred: { filled: number; total: number }; optional: { filled: number; total: number }; overall: { filled: number; total: number } } | undefined;
 
     if (isSupplier) {
       const filled = completenessIsFilledScalar;
       const groupHasValue = (o: Record<string, unknown>) =>
         Object.values(o).some((v) => v === true || (typeof v === "string" && v.trim().length > 0) || (typeof v === "number" && v > 0));
-      let rF = 0, rT = 0, pF = 0, pT = 0, optAdded = 0;
+      let rF = 0, rT = 0, pF = 0, pT = 0, oF = 0, oT = 0;
       const req = (ok: boolean) => { rT += 1; if (ok) rF += 1; };
       const pref = (ok: boolean) => { pT += 1; if (ok) pF += 1; };
+      const opt = (ok: boolean) => { oT += 1; if (ok) oF += 1; };
 
       // ── Required ──
       req(filled(form.company_name_en));
@@ -5789,26 +5790,31 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       pref(sIntel.classifications.length > 0);
       pref(!!sIntel.strategic_status);
 
-      // ── Optional (counted, no pressure) ──
+      // ── Optional (tracked as a real total, but never gates "Ready") ──
       const optScalars: (keyof ContactForm)[] = [
         "photo_url", "company_name_cn", "supplier_website", "industry", "source", "trading_name",
         "gst_number", "cr_number", "duns_number", "importer_exporter_code", "customs_code",
         "port_of_entry", "container_preference", "customs_broker", "freight_forwarder",
         "sample_status", "rating", "payment_info", "notes",
       ];
-      for (const k of optScalars) if (filled(form[k])) optAdded += 1;
-      if (form.brand_names.length > 0) optAdded += 1;
-      if (form.social_profiles.length > 0) optAdded += 1;
-      if (Array.isArray(form.bank_accounts) && form.bank_accounts.length > 0) optAdded += 1;
-      if (filled(form.wechat_pay_qr) || filled(form.wechat_pay_id) || filled(form.alipay_qr) || filled(form.alipay_id)) optAdded += 1;
-      if (groupHasValue(sIntel.factory)) optAdded += 1;
-      if (groupHasValue(sIntel.risk)) optAdded += 1;
-      if (groupHasValue(sIntel.neg)) optAdded += 1;
+      for (const k of optScalars) opt(filled(form[k]));
+      opt(form.brand_names.length > 0);
+      opt(form.social_profiles.length > 0);
+      opt(Array.isArray(form.bank_accounts) && form.bank_accounts.length > 0);
+      opt(filled(form.wechat_pay_qr) || filled(form.wechat_pay_id) || filled(form.alipay_qr) || filled(form.alipay_id));
+      opt(groupHasValue(sIntel.factory));
+      opt(groupHasValue(sIntel.risk));
+      opt(groupHasValue(sIntel.neg));
 
-      supplierTiers = { required: { filled: rF, total: rT }, preferred: { filled: pF, total: pT }, optionalAdded: optAdded };
-      // Keep the legacy overall numbers in sync (used elsewhere / fallback).
-      filledCount = rF + pF;
-      totalCount = rT + pT;
+      supplierTiers = {
+        required: { filled: rF, total: rT },
+        preferred: { filled: pF, total: pT },
+        optional: { filled: oF, total: oT },
+        overall: { filled: rF + pF + oF, total: rT + pT + oT },
+      };
+      // Keep the legacy overall numbers in sync (fallback).
+      filledCount = rF + pF + oF;
+      totalCount = rT + pT + oT;
     } else {
       const completenessFields = isCustomer ? customerFields : genericFields;
       for (const key of completenessFields) {

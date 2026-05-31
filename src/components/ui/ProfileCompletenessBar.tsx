@@ -9,8 +9,8 @@ interface Props {
   total: number;
   className?: string;
   /** When provided, render the multi-tier supplier view (Required + Preferred
-   *  bars + an optional count) instead of the single overall bar. */
-  tiers?: { required: Tier; preferred: Tier; optionalAdded: number };
+   *  + Optional bars + an Overall bar) instead of the single overall bar. */
+  tiers?: { required: Tier; preferred: Tier; optional: Tier; overall: Tier };
 }
 
 /**
@@ -28,16 +28,15 @@ export default function ProfileCompletenessBar({
   /* ── Multi-tier view (suppliers) ── */
   if (tiers) {
     const req = tiers.required;
-    const pref = tiers.preferred;
     const reqLeft = Math.max(0, req.total - req.filled);
     const ready = reqLeft === 0 && req.total > 0;
     const pctOf = (x: Tier) => (x.total > 0 ? Math.round((x.filled / x.total) * 100) : 0);
 
-    const Bar = ({ label, tier, tone }: { label: string; tier: Tier; tone: string }) => (
+    const Bar = ({ label, tier, tone, showPct }: { label: string; tier: Tier; tone: string; showPct?: boolean }) => (
       <div>
         <div className="flex items-baseline justify-between gap-3">
           <span className="text-[11px] font-medium text-[var(--text-secondary)]">{label}</span>
-          <span className="text-[11px] tabular-nums text-[var(--text-dim)]">{tier.filled}/{tier.total}</span>
+          <span className="text-[11px] tabular-nums text-[var(--text-dim)]">{showPct ? `${pctOf(tier)}%` : `${tier.filled}/${tier.total}`}</span>
         </div>
         <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
           <div aria-hidden className={`h-full ${tone} transition-[width] duration-300`} style={{ width: `${pctOf(tier)}%` }} />
@@ -59,8 +58,11 @@ export default function ProfileCompletenessBar({
         </div>
         <div className="space-y-2.5">
           <Bar label="Required" tier={req} tone={ready ? "bg-emerald-400" : "bg-rose-400"} />
-          <Bar label="Preferred" tier={pref} tone="bg-amber-400" />
-          <div className="text-[11px] text-[var(--text-dim)]">Optional · {tiers.optionalAdded} added</div>
+          <Bar label="Preferred" tier={tiers.preferred} tone="bg-amber-400" />
+          <Bar label="Optional" tier={tiers.optional} tone="bg-[var(--text-dim)]" />
+          <div className="mt-1 border-t border-[var(--border-subtle)] pt-2.5">
+            <Bar label="Overall" tier={tiers.overall} tone="bg-[var(--accent,#0066FF)]" showPct />
+          </div>
         </div>
       </div>
     );
