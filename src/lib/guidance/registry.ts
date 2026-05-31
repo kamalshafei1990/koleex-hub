@@ -1046,6 +1046,16 @@ const REGISTRY: Record<string, GuidanceEntry> = {
     },
   },
 
+  /* ── Supplier · Department filter ──────────────────────────────── */
+  "supplier.deptFilter": {
+    id: "supplier.deptFilter",
+    title: { en: "Filter fields by department", zh: "按部门筛选字段" },
+    default: {
+      en: "A supplier record holds data owned by many departments. Pick your department (e.g. Finance) to hide everything else and see only the fields you are responsible for. Choose 'All' to see the whole record again.",
+      zh: "一条供应商记录包含多个部门负责的数据。选择你所在的部门(如财务),即可隐藏其他内容、只显示你负责填写的字段。选择'全部'可重新查看完整记录。",
+    },
+  },
+
   /* ── Supplier · Trade & Tax IDs ─────────────────────────────────
      Consumed by Contacts.tsx supplier add/edit form. Bilingual field
      help for international-trade identifiers. ── */

@@ -1765,6 +1765,21 @@ const TaxonomySelect = React.memo(function TaxonomySelect({ value, onChange, opt
   );
 });
 
+/* ── Department colour key ──
+   Each owning department gets one functional colour, shared by the filter
+   chips and the section owner badge so the operator can connect "this chip"
+   to "these sections" at a glance. Classes are written out in full so
+   Tailwind's JIT keeps them. */
+const DEPT_TONE: Record<string, { dot: string; chipIdle: string; chipActive: string; badge: string }> = {
+  procurement: { dot: "bg-blue-400",    chipIdle: "border-blue-500/40 text-blue-300 hover:bg-blue-500/10",       chipActive: "bg-blue-500 text-white border-blue-500",       badge: "border-blue-500/40 text-blue-300" },
+  finance:     { dot: "bg-emerald-400", chipIdle: "border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10", chipActive: "bg-emerald-500 text-white border-emerald-500", badge: "border-emerald-500/40 text-emerald-300" },
+  legal:       { dot: "bg-violet-400",  chipIdle: "border-violet-500/40 text-violet-300 hover:bg-violet-500/10",   chipActive: "bg-violet-500 text-white border-violet-500",   badge: "border-violet-500/40 text-violet-300" },
+  logistics:   { dot: "bg-amber-400",   chipIdle: "border-amber-500/40 text-amber-300 hover:bg-amber-500/10",     chipActive: "bg-amber-500 text-black border-amber-500",     badge: "border-amber-500/40 text-amber-300" },
+  quality:     { dot: "bg-cyan-400",    chipIdle: "border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/10",        chipActive: "bg-cyan-500 text-black border-cyan-500",       badge: "border-cyan-500/40 text-cyan-300" },
+  commercial:  { dot: "bg-rose-400",    chipIdle: "border-rose-500/40 text-rose-300 hover:bg-rose-500/10",        chipActive: "bg-rose-500 text-white border-rose-500",       badge: "border-rose-500/40 text-rose-300" },
+  general:     { dot: "bg-slate-400",   chipIdle: "border-slate-500/40 text-slate-300 hover:bg-slate-500/10",     chipActive: "bg-slate-500 text-white border-slate-500",     badge: "border-slate-500/40 text-slate-300" },
+};
+
 /* ── Form section wrapper ──
    `owner` (optional) shows which department / role is responsible for filling
    this section — a supplier record spans Procurement, Finance, Compliance, QC…
@@ -1780,15 +1795,18 @@ const FormSection = React.memo(function FormSection({ title, icon, children, own
           {icon && <span className="text-[var(--text-dim)]">{icon}</span>}
           <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider truncate">{title}</h3>
         </div>
-        {owner && (
-          <span
-            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide text-[var(--text-dim)]"
-            title={ownerLabel ? `${ownerLabel}: ${owner}` : owner}
-          >
-            <UserIcon size={10} className="text-[var(--text-ghost)]" />
-            {owner}
-          </span>
-        )}
+        {owner && (() => {
+          const tone = dept ? DEPT_TONE[dept] : undefined;
+          return (
+            <span
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border bg-[var(--bg-surface)] px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide ${tone ? tone.badge : "border-[var(--border-subtle)] text-[var(--text-dim)]"}`}
+              title={ownerLabel ? `${ownerLabel}: ${owner}` : owner}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${tone ? tone.dot : "bg-[var(--text-ghost)]"}`} />
+              {owner}
+            </span>
+          );
+        })()}
       </div>
       {children}
     </div>
@@ -5934,8 +5952,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.16em] text-[var(--text-dim)] mb-1.5">
               <UsersIcon size={11} className="text-[var(--text-ghost)]" />
               {t("dept.filterHint", "Show fields for")}
+              <GuidanceTip guidanceId="supplier.deptFilter" size="xs" />
             </div>
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
               {[
                 { key: null,           label: t("dept.all", "All") },
                 { key: "procurement",  label: t("dept.procurement", "Procurement") },
@@ -5947,17 +5966,20 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 { key: "general",      label: t("dept.general", "General") },
               ].map((d) => {
                 const active = supplierDept === d.key;
+                const tone = d.key ? DEPT_TONE[d.key] : undefined;
+                const cls = !tone
+                  ? (active
+                      ? "bg-[var(--accent,#0066FF)] text-white border-transparent"
+                      : "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-[var(--border-color)] hover:text-[var(--text-primary)]")
+                  : (active ? tone.chipActive : `bg-[var(--bg-surface)] ${tone.chipIdle}`);
                 return (
                   <button
                     key={d.key ?? "all"}
                     type="button"
                     onClick={() => setSupplierDept(d.key)}
-                    className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium whitespace-nowrap transition-colors ${
-                      active
-                        ? "bg-[var(--accent,#0066FF)] text-white"
-                        : "border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-[var(--border-color)] hover:text-[var(--text-primary)]"
-                    }`}
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium whitespace-nowrap transition-colors ${cls}`}
                   >
+                    {tone && <span className={`h-1.5 w-1.5 rounded-full ${active ? "bg-current opacity-90" : tone.dot}`} />}
                     {d.label}
                   </button>
                 );
