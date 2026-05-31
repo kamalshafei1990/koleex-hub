@@ -2315,6 +2315,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       router.push(`/customers/${c.id}`);
       return;
     }
+    /* On the Suppliers app, route to the dedicated /suppliers/[id]
+       Supplier 360 intelligence page (Factory, Contacts, Media, Timeline,
+       Risk, Negotiation, Sourcing). The generic /contacts list keeps the
+       legacy side-panel for full base-field editing. */
+    if (filterType === "supplier" && c.contact_type === "supplier") {
+      router.push(`/suppliers/${c.id}`);
+      return;
+    }
     setSelectedId(c.id);
     setView("detail");
     setMobileShowDetail(true);
@@ -2356,6 +2364,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       } else {
         const { data: created, error } = await createContact(row);
         if (created) {
+          /* New suppliers open straight into the Supplier 360 intelligence
+             page so the operator immediately sees Factory / Contacts / Media /
+             Risk / Negotiation / Sourcing rather than the legacy panel. */
+          if (filterType === "supplier" || row.contact_type === "supplier") {
+            router.push(`/suppliers/${created.id}`);
+            return;
+          }
           await loadContacts();
           setSelectedId(created.id);
           setView("detail");
