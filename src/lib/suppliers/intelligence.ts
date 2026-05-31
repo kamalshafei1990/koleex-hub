@@ -302,6 +302,66 @@ export const RISK_EVENT_TYPE_LABELS: Record<string, string> = {
   payment_issue: "Payment issue",
 };
 
+/* ── Sourcing / Comparison Intelligence (Phase 3) ── */
+export const SOURCING_ROLE_LABELS: Record<string, string> = {
+  preferred: "Preferred", approved: "Approved", backup: "Backup",
+  experimental: "Experimental", blocked: "Blocked",
+};
+export const SOURCING_ROLE_ORDER = ["preferred", "approved", "backup", "experimental", "blocked"];
+export const sourcingRoleLabel = (v: string): string => SOURCING_ROLE_LABELS[v] ?? v;
+/** Rank used for ordering (preferred first); blocked sinks to the bottom. */
+export const SOURCING_ROLE_RANK: Record<string, number> = {
+  preferred: 0, approved: 1, backup: 2, experimental: 3, blocked: 9,
+};
+
+/* Sourcing-layer timeline event types. */
+export const SOURCING_EVENT_TYPE_LABELS: Record<string, string> = {
+  supplier_approved: "Supplier approved (sourcing)",
+  supplier_blocked: "Supplier blocked (sourcing)",
+  sourcing_role_changed: "Sourcing role changed",
+  backup_assigned: "Backup supplier assigned",
+  dependency_risk: "Dependency risk raised",
+  sourcing_ranking_changed: "Sourcing ranking changed",
+};
+
+/** Map a qualitative risk_level to a 0–100 "health" component (higher = safer). */
+function riskHealthFromLevel(level: string | null | undefined): number | null {
+  switch (level) { case "low": return 85; case "medium": return 60; case "high": return 30; case "critical": return 10; default: return null; }
+}
+const LEVEL_TO_SCORE: Record<string, number> = { low: 30, medium: 60, high: 90 };
+
+/** Compute a 0–100 sourcing-suitability score (higher = better to source from)
+ *  from existing signals. Manual override wins. Weighted mean of whatever
+ *  components are present (weights renormalised), so partial data still scores.
+ *  Separate from readiness (completeness) and risk (exposure). AI-ready. */
+export function computeSourcingScore(ctx: {
+  override?: number | null;
+  readiness?: number | null;            // 0–100 completeness
+  riskLevel?: string | null;            // low|medium|high|critical
+  negotiationScore?: number | null;     // 0–100
+  certsActive?: number | null;          // verified, non-expired certs
+  trustLevel?: string | null;           // low|medium|high
+}): number | null {
+  if (typeof ctx.override === "number" && Number.isFinite(ctx.override)) return Math.round(ctx.override);
+  const comps: { v: number; w: number }[] = [];
+  if (typeof ctx.readiness === "number") comps.push({ v: ctx.readiness, w: 0.30 });
+  const rh = riskHealthFromLevel(ctx.riskLevel);
+  if (rh != null) comps.push({ v: rh, w: 0.30 });
+  if (typeof ctx.negotiationScore === "number") comps.push({ v: ctx.negotiationScore, w: 0.20 });
+  if (ctx.certsActive != null) comps.push({ v: ctx.certsActive > 0 ? 100 : 0, w: 0.10 });
+  if (ctx.trustLevel && LEVEL_TO_SCORE[ctx.trustLevel] != null) comps.push({ v: LEVEL_TO_SCORE[ctx.trustLevel], w: 0.10 });
+  if (!comps.length) return null;
+  const wsum = comps.reduce((a, c) => a + c.w, 0);
+  return Math.round(comps.reduce((a, c) => a + c.v * c.w, 0) / wsum);
+}
+
+export function sourcingBand(score: number | null): { label: string; tone: "strong" | "viable" | "weak" | "none" } {
+  if (score == null) return { label: "Unscored", tone: "none" };
+  if (score >= 70) return { label: "Strong fit", tone: "strong" };
+  if (score >= 45) return { label: "Viable", tone: "viable" };
+  return { label: "Weak fit", tone: "weak" };
+}
+
 /* Categories whose assets are sensitive by nature → stored privately and
    served via signed URLs (never a public bucket). Visibility finance/management
    is also treated as sensitive regardless of category. */

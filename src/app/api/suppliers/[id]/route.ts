@@ -18,7 +18,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
-import { computeReadiness, resolveCallerTier, visibleTiers, certIsTrusted, STRATEGIC_STATUS_LABELS } from "@/lib/suppliers/intelligence";
+import { computeReadiness, resolveCallerTier, visibleTiers, certIsTrusted, computeSourcingScore, STRATEGIC_STATUS_LABELS } from "@/lib/suppliers/intelligence";
 import { PRIVATE_BUCKETS } from "@/lib/server/storage-tenant";
 import { logSupplierEvent, actorName } from "@/lib/suppliers/timeline";
 
@@ -70,7 +70,7 @@ export async function GET(
   }
 
   const profileGated = callerTier === "public" || callerTier === "internal";
-  const [purchaseOrders, bills, payments, products, receipts, returns, classifications, contactPersons, media, qrCodes, statusHistory, factoryRows, timeline, riskProfileRows, riskItems, negotiations, negotiationIntelRows] = await Promise.all([
+  const [purchaseOrders, bills, payments, products, receipts, returns, classifications, contactPersons, media, qrCodes, statusHistory, factoryRows, timeline, riskProfileRows, riskItems, negotiations, negotiationIntelRows, sourcingProfileRows, sourcingLinks, specializations] = await Promise.all([
     safe(() =>
       supabaseServer
         .from("purchase_orders")
@@ -226,6 +226,20 @@ export async function GET(
     profileGated ? Promise.resolve([] as Row[]) : safe(() =>
       supabaseServer.from("supplier_negotiation_intel").select("*")
         .eq("tenant_id", tid).eq("supplier_id", id).limit(1)),
+    // ── Sourcing intelligence ──
+    profileGated ? Promise.resolve([] as Row[]) : safe(() =>
+      supabaseServer.from("supplier_sourcing_profile").select("*")
+        .eq("tenant_id", tid).eq("supplier_id", id).limit(1)),
+    safe(() =>
+      supabaseServer.from("supplier_product_links")
+        .select("id, product_id, sourcing_role, sourcing_priority, target_price, quality_level, lead_time_days, moq, risk_notes, notes, products(product_name, category_slug)")
+        .eq("tenant_id", tid).eq("supplier_id", id).not("sourcing_role", "is", null)
+        .order("sourcing_priority", { ascending: true, nullsFirst: false }).limit(200)),
+    safe(() =>
+      supabaseServer.from("supplier_product_specializations")
+        .select("id, category_label, specialization_rank, strength_score, is_primary, notes")
+        .eq("tenant_id", tid).eq("supplier_id", id)
+        .order("specialization_rank", { ascending: true, nullsFirst: false }).limit(100)),
   ]);
 
   const factory = factoryRows[0] ?? null;
@@ -315,6 +329,24 @@ export async function GET(
     docsVerified,
   });
 
+  // ── Sourcing intelligence summary (computed; manual override wins) ──
+  const sourcingProfile = sourcingProfileRows[0] ?? null;
+  const sourcingScore = computeSourcingScore({
+    override: sourcingProfile && typeof sourcingProfile.sourcing_score_override === "number" ? sourcingProfile.sourcing_score_override : null,
+    readiness: readiness.score,
+    riskLevel: riskProfile && typeof riskProfile.risk_level === "string" ? riskProfile.risk_level : null,
+    negotiationScore: negotiationIntel && typeof negotiationIntel.negotiation_score === "number" ? negotiationIntel.negotiation_score : null,
+    certsActive,
+    trustLevel: riskProfile && typeof riskProfile.trust_level === "string" ? riskProfile.trust_level : null,
+  });
+  const sourcing = {
+    score: sourcingScore,
+    priority: sourcingProfile && typeof sourcingProfile.sourcing_priority === "number" ? sourcingProfile.sourcing_priority : null,
+    preferredProducts: sourcingLinks.filter((l) => l.sourcing_role === "preferred").length,
+    blockedProducts: sourcingLinks.filter((l) => l.sourcing_role === "blocked").length,
+    soleSource: !!(riskProfile && riskProfile.dependency_level === "critical") || !!(riskProfile && riskProfile.backup_supplier_exists === false && riskProfile.dependency_level === "high"),
+  };
+
   // ── Readiness-milestone timeline event ── fires at most once per 25-point
   //    threshold crossed upward (guarded by the persisted readiness_milestone
   //    marker, so a GET never re-emits). Idempotent + non-spammy.
@@ -355,6 +387,10 @@ export async function GET(
       negotiations,
       negotiationIntel,
       risk,
+      sourcingProfile,
+      sourcingLinks,
+      specializations,
+      sourcing,
       callerTier,
       readiness,
     },
