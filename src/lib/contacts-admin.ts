@@ -196,8 +196,12 @@ export interface ContactRow {
   catalogues: { name: string; url: string; type: string; uploaded_at: string }[];
   documents: { doc_name: string; name: string; url: string; type: string; uploaded_at: string }[];
   contact_persons: { name: string; name_cn?: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string; whatsapp?: string; wechat_id?: string; wechat_qr?: string }[];
-  bank_accounts: { bank_name: string; account_name: string; account_number: string; swift_code: string; iban: string; branch: string; currency: string }[];
+  bank_accounts: { bank_name: string; account_name: string; account_number: string; swift_code: string; iban: string; branch: string; currency: string; info_image?: string }[];
   payment_info: string | null;
+  wechat_pay_id: string | null;
+  wechat_pay_qr: string | null;
+  alipay_id: string | null;
+  alipay_qr: string | null;
   /* Employee-Specific */
   work_email: string | null;
   work_tel: string | null;

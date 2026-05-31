@@ -5,6 +5,7 @@ import {
   siWhatsapp, siWechat, siTelegram, siLine, siQq, siMessenger,
   siFacebook, siInstagram, siX, siYoutube, siTiktok, siPinterest, siReddit,
   siSnapchat, siThreads, siSinaweibo, siBilibili, siXiaohongshu, siAlibabadotcom,
+  siAlipay,
 } from "simple-icons";
 
 /* ---------------------------------------------------------------------------
@@ -73,6 +74,7 @@ const ICONS: Record<string, SI> = {
   bilibili: siBilibili,
   xiaohongshu: siXiaohongshu,
   alibaba: siAlibabadotcom,
+  alipay: siAlipay,
 };
 
 /* Not in Simple Icons — hand-authored. */
@@ -110,6 +112,7 @@ function keyFor(name: string): string {
   if (n.includes("weibo")) return "weibo";
   if (n.includes("bilibili")) return "bilibili";
   if (n.includes("xiaohongshu") || n === "red" || n.includes("(red)")) return "xiaohongshu";
+  if (n.includes("alipay")) return "alipay";
   if (n.includes("alibaba")) return "alibaba";
   if (n.includes("line")) return "line";
   if (n === "qq" || n.includes("qq")) return "qq";

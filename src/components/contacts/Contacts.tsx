@@ -332,8 +332,13 @@ interface ContactForm {
   catalogues: { name: string; url: string; type: string; uploaded_at: string }[];
   documents: { doc_name: string; name: string; url: string; type: string; uploaded_at: string }[];
   contact_persons: { name: string; name_cn?: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string; whatsapp?: string; wechat_id?: string; wechat_qr?: string }[];
-  bank_accounts: { bank_name: string; account_name: string; account_number: string; swift_code: string; iban: string; branch: string; currency: string }[];
+  bank_accounts: { bank_name: string; account_name: string; account_number: string; swift_code: string; iban: string; branch: string; currency: string; info_image?: string }[];
   payment_info: string;
+  /* ── Mobile payment (China) — handle/account + QR image ── */
+  wechat_pay_id: string;
+  wechat_pay_qr: string;
+  alipay_id: string;
+  alipay_qr: string;
   /* ── Employee-Specific ── */
   work_email: string;
   work_tel: string;
@@ -695,6 +700,10 @@ const EMPTY_FORM: ContactForm = {
   contact_persons: [],
   bank_accounts: [],
   payment_info: "",
+  wechat_pay_id: "",
+  wechat_pay_qr: "",
+  alipay_id: "",
+  alipay_qr: "",
   /* Employee-Specific */
   work_email: "",
   work_tel: "",
@@ -1169,6 +1178,10 @@ function contactToForm(c: ContactRow): ContactForm {
     contact_persons: Array.isArray(c.contact_persons) ? c.contact_persons : [],
     bank_accounts: Array.isArray(c.bank_accounts) ? c.bank_accounts : [],
     payment_info: c.payment_info || "",
+    wechat_pay_id: c.wechat_pay_id || "",
+    wechat_pay_qr: c.wechat_pay_qr || "",
+    alipay_id: c.alipay_id || "",
+    alipay_qr: c.alipay_qr || "",
     /* Employee-Specific */
     work_email: c.work_email || "",
     work_tel: c.work_tel || "",
@@ -1403,6 +1416,10 @@ function formToRow(f: ContactForm): Record<string, unknown> {
     contact_persons: f.contact_persons.length > 0 ? f.contact_persons : null,
     bank_accounts: f.bank_accounts.length > 0 ? f.bank_accounts : null,
     payment_info: f.payment_info || null,
+    wechat_pay_id: f.wechat_pay_id || null,
+    wechat_pay_qr: f.wechat_pay_qr || null,
+    alipay_id: f.alipay_id || null,
+    alipay_qr: f.alipay_qr || null,
     /* Employee-Specific */
     work_email: f.work_email || null,
     work_tel: f.work_tel || null,
@@ -4628,10 +4645,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* ── Supplier: 6. Bank Accounts ── */}
-        {c.contact_type === "supplier" && Array.isArray(c.bank_accounts) && c.bank_accounts.length > 0 && (
-          <Section title={t("section.bankAccounts")} icon={<LandmarkIcon size={14} />}>
+        {c.contact_type === "supplier" && ((Array.isArray(c.bank_accounts) && c.bank_accounts.length > 0) || c.wechat_pay_qr || c.wechat_pay_id || c.alipay_qr || c.alipay_id) && (
+          <Section title={t("section.paymentInfo", "Payment Information")} icon={<LandmarkIcon size={14} />}>
             <div className="space-y-3">
-              {c.bank_accounts.map((bank: { bank_name: string; account_name: string; account_number: string; swift_code: string; iban: string; branch: string; currency: string }, i: number) => (
+              {Array.isArray(c.bank_accounts) && c.bank_accounts.map((bank: { bank_name: string; account_name: string; account_number: string; swift_code: string; iban: string; branch: string; currency: string; info_image?: string }, i: number) => (
                 <div key={i} className="p-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-color)]">
                   <div className="flex items-center gap-2 mb-2">
                     <LandmarkIcon size={14} className="text-blue-400" />
@@ -4670,8 +4687,48 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                       </div>
                     )}
                   </div>
+                  {bank.info_image && (
+                    <a href={bank.info_image} target="_blank" rel="noopener noreferrer" className="mt-2 ms-5 block w-fit">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={bank.info_image} alt={t("field.bankInfoPhoto", "Bank info photo")} className="max-h-40 w-auto max-w-full rounded-lg border border-[var(--border-color)] object-contain bg-white" />
+                    </a>
+                  )}
                 </div>
               ))}
+              {(c.wechat_pay_qr || c.wechat_pay_id || c.alipay_qr || c.alipay_id) && (
+                <div className="grid grid-cols-2 gap-3">
+                  {(c.wechat_pay_qr || c.wechat_pay_id) && (
+                    <div className="p-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-color)]">
+                      <div className="flex items-center gap-2 mb-2">
+                        <BrandGlyph name="WeChat" size={16} />
+                        <span className="text-sm text-[var(--text-primary)] font-medium">WeChat Pay</span>
+                      </div>
+                      {c.wechat_pay_id && <p className="text-xs text-[var(--text-primary)] mb-2 break-all">{c.wechat_pay_id}</p>}
+                      {c.wechat_pay_qr && (
+                        <a href={c.wechat_pay_qr} target="_blank" rel="noopener noreferrer" className="block w-fit">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={c.wechat_pay_qr} alt="WeChat Pay QR" className="h-28 w-28 rounded-lg border border-[var(--border-color)] object-cover bg-white" />
+                        </a>
+                      )}
+                    </div>
+                  )}
+                  {(c.alipay_qr || c.alipay_id) && (
+                    <div className="p-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-color)]">
+                      <div className="flex items-center gap-2 mb-2">
+                        <BrandGlyph name="Alipay" size={16} />
+                        <span className="text-sm text-[var(--text-primary)] font-medium">Alipay</span>
+                      </div>
+                      {c.alipay_id && <p className="text-xs text-[var(--text-primary)] mb-2 break-all">{c.alipay_id}</p>}
+                      {c.alipay_qr && (
+                        <a href={c.alipay_qr} target="_blank" rel="noopener noreferrer" className="block w-fit">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={c.alipay_qr} alt="Alipay QR" className="h-28 w-28 rounded-lg border border-[var(--border-color)] object-cover bg-white" />
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </Section>
         )}
@@ -6817,33 +6874,65 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
-            {/* 6. Bank Account Information */}
-            <FormSection title={t("section.bankAccountInfo")} icon={<LandmarkIcon size={14} />}>
-              <div className="space-y-3">
-                {form.bank_accounts.map((bank, i) => (
-                  <div key={i} className="p-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] space-y-2">
-                    <div className="flex items-center gap-2 mb-1">
-                      <RemoveBtn onClick={() => setField("bank_accounts", form.bank_accounts.filter((_, idx) => idx !== i))} />
-                      <span className="text-xs text-[var(--text-subtle)] font-medium">{t("misc.account")} {i + 1}</span>
+            {/* 6. Payment Information — bank accounts + mobile payment (WeChat Pay / Alipay) */}
+            <FormSection title={t("section.paymentInfo", "Payment Information")} icon={<LandmarkIcon size={14} />}>
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.bankAccounts", "Bank Accounts")}</p>
+                  {form.bank_accounts.map((bank, i) => (
+                    <div key={i} className="p-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] space-y-2">
+                      <div className="flex items-center gap-2 mb-1">
+                        <RemoveBtn onClick={() => setField("bank_accounts", form.bank_accounts.filter((_, idx) => idx !== i))} />
+                        <span className="text-xs text-[var(--text-subtle)] font-medium">{t("misc.account")} {i + 1}</span>
+                      </div>
+                      <div className="space-y-2 ms-8">
+                        <div className="grid grid-cols-2 gap-2">
+                          <input value={bank.bank_name} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], bank_name: e.target.value }; setField("bank_accounts", arr); }} placeholder={t("field.bankName")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
+                          <input value={bank.account_name} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], account_name: e.target.value }; setField("bank_accounts", arr); }} placeholder={t("field.accountName")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
+                        </div>
+                        <input value={bank.account_number} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], account_number: e.target.value }; setField("bank_accounts", arr); }} placeholder={t("field.accountNumber")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
+                        <div className="grid grid-cols-2 gap-2">
+                          <input value={bank.swift_code} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], swift_code: e.target.value }; setField("bank_accounts", arr); }} placeholder={t("field.swiftCode")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
+                          <input value={bank.iban} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], iban: e.target.value }; setField("bank_accounts", arr); }} placeholder={t("field.iban")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <input value={bank.branch} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], branch: e.target.value }; setField("bank_accounts", arr); }} placeholder={t("field.branch")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
+                          <input value={bank.currency} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], currency: e.target.value }; setField("bank_accounts", arr); }} placeholder={t("field.currency")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
+                        </div>
+                        <ImageDropField
+                          label={t("field.bankInfoPhoto", "Bank info photo")}
+                          value={bank.info_image || ""}
+                          onChange={v => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], info_image: v }; setField("bank_accounts", arr); }}
+                          hint={t("hint.bankInfoPhoto", "Company sent bank details as an image? Drop it here — PNG / JPG")}
+                          icon={<LandmarkIcon size={14} />}
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-2 ms-8">
-                      <div className="grid grid-cols-2 gap-2">
-                        <input value={bank.bank_name} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], bank_name: e.target.value }; setField("bank_accounts", arr); }} placeholder={t("field.bankName")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
-                        <input value={bank.account_name} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], account_name: e.target.value }; setField("bank_accounts", arr); }} placeholder={t("field.accountName")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
-                      </div>
-                      <input value={bank.account_number} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], account_number: e.target.value }; setField("bank_accounts", arr); }} placeholder={t("field.accountNumber")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
-                      <div className="grid grid-cols-2 gap-2">
-                        <input value={bank.swift_code} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], swift_code: e.target.value }; setField("bank_accounts", arr); }} placeholder={t("field.swiftCode")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
-                        <input value={bank.iban} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], iban: e.target.value }; setField("bank_accounts", arr); }} placeholder={t("field.iban")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <input value={bank.branch} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], branch: e.target.value }; setField("bank_accounts", arr); }} placeholder={t("field.branch")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
-                        <input value={bank.currency} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], currency: e.target.value }; setField("bank_accounts", arr); }} placeholder={t("field.currency")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                <AddButton label={t("add.bankAccount")} onClick={() => setField("bank_accounts", [...form.bank_accounts, { bank_name: "", account_name: "", account_number: "", swift_code: "", iban: "", branch: "", currency: "" }])} />
+                  ))}
+                  <AddButton label={t("add.bankAccount")} onClick={() => setField("bank_accounts", [...form.bank_accounts, { bank_name: "", account_name: "", account_number: "", swift_code: "", iban: "", branch: "", currency: "" }])} />
+                </div>
+
+                <div className="space-y-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.mobilePayment", "Mobile Payment")}</p>
+                  <MessagingIdField
+                    label="WeChat Pay"
+                    icon={<BrandGlyph name="WeChat" size={16} />}
+                    idValue={form.wechat_pay_id}
+                    onIdChange={v => setField("wechat_pay_id", v)}
+                    placeholder={t("placeholder.wechatPayId", "WeChat Pay ID / name")}
+                    qrValue={form.wechat_pay_qr}
+                    onQrChange={v => setField("wechat_pay_qr", v)}
+                  />
+                  <MessagingIdField
+                    label="Alipay"
+                    icon={<BrandGlyph name="Alipay" size={16} />}
+                    idValue={form.alipay_id}
+                    onIdChange={v => setField("alipay_id", v)}
+                    placeholder={t("placeholder.alipayId", "Alipay account / name")}
+                    qrValue={form.alipay_qr}
+                    onQrChange={v => setField("alipay_qr", v)}
+                  />
+                </div>
               </div>
             </FormSection>
 
