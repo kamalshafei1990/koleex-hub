@@ -82,11 +82,45 @@ function monoFor(name: string): string {
   return (name || "?").trim().charAt(0).toUpperCase() || "?";
 }
 
+/* Official brand colors. Black/dark brands (X, TikTok) use currentColor so
+   they stay visible in both light and dark mode. */
+const COLORS: Record<string, string> = {
+  whatsapp: "#25D366",
+  wechat: "#07C160",
+  telegram: "#26A5E4",
+  linkedin: "#0A66C2",
+  facebook: "#1877F2",
+  youtube: "#FF0000",
+  pinterest: "#BD081C",
+  reddit: "#FF4500",
+  snapchat: "#FFFC00",
+  weibo: "#E6162D",
+  bilibili: "#00AEEC",
+  tiktok: "currentColor",
+  x: "currentColor",
+};
+
 export default function BrandGlyph({ name, size = 16, className }: Props) {
   const key = keyFor(name);
   if (key && PATHS[key]) {
+    if (key === "instagram") {
+      return (
+        <svg viewBox="0 0 24 24" width={size} height={size} className={className} aria-hidden focusable="false">
+          <defs>
+            <radialGradient id="ig-grad" cx="30%" cy="107%" r="135%">
+              <stop offset="0%" stopColor="#FDF497" />
+              <stop offset="5%" stopColor="#FDF497" />
+              <stop offset="45%" stopColor="#FD5949" />
+              <stop offset="60%" stopColor="#D6249F" />
+              <stop offset="90%" stopColor="#285AEB" />
+            </radialGradient>
+          </defs>
+          <path d={PATHS[key]} fill="url(#ig-grad)" />
+        </svg>
+      );
+    }
     return (
-      <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" className={className} aria-hidden focusable="false">
+      <svg viewBox="0 0 24 24" width={size} height={size} fill={COLORS[key] ?? "currentColor"} className={className} aria-hidden focusable="false">
         <path d={PATHS[key]} />
       </svg>
     );
