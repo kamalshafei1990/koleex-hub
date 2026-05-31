@@ -47,6 +47,8 @@ import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import ScanLineIcon from "@/components/icons/ui/ScanLineIcon";
 import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
 import BrandGlyph from "@/components/icons/brands/BrandGlyph";
+import { DIVISIONS, CATEGORIES } from "@/components/knowledge/product-coding/data";
+import { taxonomyLogoUrl } from "@/components/knowledge/product-coding/taxonomy-logo";
 import LanguagesIcon from "@/components/icons/ui/LanguagesIcon";
 import ShipIcon from "@/components/icons/ui/ShipIcon";
 import FileCheckIcon from "@/components/icons/ui/FileCheckIcon";
@@ -1573,6 +1575,100 @@ const PlatformSelect = React.memo(function PlatformSelect({ value, onChange, opt
               <span className="truncate">{o}</span>
             </button>
           ))}
+        </div>
+      )}
+    </div>
+  );
+});
+
+/* ── Taxonomy options (saved KOLEEX divisions + categories, with icons) ──── */
+const DIVISION_OPTIONS = DIVISIONS.map((d) => ({ value: d.name, label: d.name, iconUrl: taxonomyLogoUrl("divisions", d.id) }));
+const CATEGORY_OPTIONS = CATEGORIES.map((c) => ({ value: c.label, label: c.label, iconUrl: taxonomyLogoUrl("categories", c.slug) }));
+
+/* ── Searchable taxonomy dropdown (icon + label) with "create new" ──────────
+   Lists the saved divisions / categories and lets the user add a custom one. */
+const TaxonomySelect = React.memo(function TaxonomySelect({ value, onChange, options, placeholder, createLabel }: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string; iconUrl: string | null }[];
+  placeholder?: string;
+  createLabel?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [query, setQuery] = useState("");
+  const wrapRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    function h(e: MouseEvent) { if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) { setOpen(false); setQuery(""); } }
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+  const selected = options.find((o) => o.value === value);
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return q ? options.filter((o) => o.label.toLowerCase().includes(q)) : options;
+  }, [query, options]);
+
+  if (creating) {
+    return (
+      <div className="flex items-center gap-2">
+        <input
+          autoFocus
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="min-w-0 flex-1 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
+        />
+        <button type="button" onClick={() => setCreating(false)} title="Pick from list" className="h-10 shrink-0 px-2.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
+          <AngleDownIcon size={14} />
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div ref={wrapRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm flex items-center gap-2 outline-none hover:border-[var(--border-focus)] focus:border-[var(--border-focus)] transition-colors"
+      >
+        {selected?.iconUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={selected.iconUrl} alt="" className="h-4 w-4 shrink-0 object-contain" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+        ) : null}
+        <span className={`flex-1 text-start truncate ${value ? "text-[var(--text-primary)]" : "text-[var(--text-ghost)]"}`}>{value || placeholder}</span>
+        <AngleDownIcon size={12} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full max-h-72 overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+          <div className="p-2 border-b border-[var(--border-faint)]">
+            <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
+          </div>
+          <div className="max-h-52 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <div className="px-3 py-2 text-xs text-[var(--text-dim)]">No matches</div>
+            ) : filtered.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => { onChange(o.value); setOpen(false); setQuery(""); }}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-start hover:bg-[var(--bg-surface)] transition-colors ${o.value === value ? "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}
+              >
+                {o.iconUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={o.iconUrl} alt="" className="h-5 w-5 shrink-0 object-contain" onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
+                ) : <span className="h-5 w-5 shrink-0" />}
+                <span className="truncate">{o.label}</span>
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => { onChange(query.trim()); setQuery(""); setOpen(false); setCreating(true); }}
+            className="w-full flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-[var(--text-primary)] border-t border-[var(--border-faint)] hover:bg-[var(--bg-surface)]"
+          >
+            <PlusIcon size={14} /> {createLabel || "Create new"}
+          </button>
         </div>
       )}
     </div>
@@ -6506,8 +6602,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <Input label={t("field.division")} value={form.division} onChange={v => setField("division", v)} placeholder={t("field.division")} />
-                  <Input label={t("field.category")} value={form.category} onChange={v => setField("category", v)} placeholder={t("field.category")} />
+                  <div>
+                    <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.division")}</label>
+                    <TaxonomySelect value={form.division} onChange={v => setField("division", v)} options={DIVISION_OPTIONS} placeholder={t("field.division")} createLabel={t("create.newDivision", "Create new division")} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.category")}</label>
+                    <TaxonomySelect value={form.category} onChange={v => setField("category", v)} options={CATEGORY_OPTIONS} placeholder={t("field.category")} createLabel={t("create.newCategory", "Create new category")} />
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <SelectInput label={t("field.supplierType")} value={form.supplier_type} onChange={v => setField("supplier_type", v)} options={SUPPLIER_TYPES} icon={<Building2Icon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
