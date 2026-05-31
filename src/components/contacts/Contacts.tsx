@@ -495,6 +495,21 @@ const SUPPORT_TIERS = ["Basic", "Standard", "Premium", "Enterprise"];
 
 const CONTAINER_PREFERENCES = ["20ft", "40ft", "40HQ", "LCL", "FCL"];
 
+/* Incoterms® 2020 — the full standardized set (any mode + sea/inland waterway). */
+const INCOTERMS = [
+  "EXW — Ex Works",
+  "FCA — Free Carrier",
+  "CPT — Carriage Paid To",
+  "CIP — Carriage & Insurance Paid To",
+  "DAP — Delivered At Place",
+  "DPU — Delivered At Place Unloaded",
+  "DDP — Delivered Duty Paid",
+  "FAS — Free Alongside Ship",
+  "FOB — Free On Board",
+  "CFR — Cost & Freight",
+  "CIF — Cost, Insurance & Freight",
+];
+
 const EMPTY_FORM: ContactForm = {
   contact_type: "customer",
   entity_type: "",
@@ -6791,7 +6806,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <FormSection title={t("section.logisticsTrade", "Logistics & Trade")} icon={<TruckIcon size={14} />}>
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <Input label={t("field.incoterms", "Incoterms")} value={form.incoterms} onChange={v => setField("incoterms", v)} placeholder="FOB / CIF / EXW" icon={<ShipIcon size={14} />} />
+                  <SelectInput label={t("field.incoterms", "Incoterms")} value={form.incoterms} onChange={v => setField("incoterms", v)} options={INCOTERMS} icon={<ShipIcon size={14} />} selectLabel={t("detail.select")} />
                   <Input label={t("field.leadTime", "Lead Time")} value={form.lead_time} onChange={v => setField("lead_time", v)} placeholder="e.g. 30 days" icon={<TimerIcon size={14} />} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
