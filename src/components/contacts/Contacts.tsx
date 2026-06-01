@@ -5909,10 +5909,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       pref(!!sIntel.strategic_status);
 
       // ── Optional (tracked as a real total, but never gates "Ready") ──
+      /* Only fields that actually have an input in the SUPPLIER add form are
+         counted — phantom fields (customer-only customs_broker/freight_forwarder)
+         are excluded so the bar can reach a true 100%. Booleans are intentionally
+         not counted (a "no" toggle isn't "missing"). */
       const optScalars: (keyof ContactForm)[] = [
-        "photo_url", "company_name_cn", "supplier_website", "industry", "source", "trading_name",
+        "photo_url", "company_name_cn", "supplier_website", "supplier_type", "industry", "source", "trading_name",
+        "employee_count_range",
         "gst_number", "cr_number", "duns_number", "importer_exporter_code", "customs_code",
-        "port_of_entry", "container_preference", "customs_broker", "freight_forwarder",
+        "port_of_entry", "container_preference", "wechat_official_account", "factory_visit_date",
         "sample_status", "rating", "payment_info", "notes",
       ];
       for (const k of optScalars) opt(filled(form[k]));
@@ -5923,6 +5928,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       opt(groupHasValue(sIntel.factory));
       opt(groupHasValue(sIntel.risk));
       opt(groupHasValue(sIntel.neg));
+      opt(sIntel.riskItems.length > 0);
+      opt(groupHasValue(sIntel.sourcing));
 
       supplierTiers = {
         required: { filled: rF, total: rT },
