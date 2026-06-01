@@ -396,19 +396,17 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
     { label: t("sd.incoterms", "Incoterms"), value: str(s, "incoterms"), icon: <GlobeIcon className="h-4 w-4" /> },
   ].filter((t) => t.value);
 
-  const navItems: { id: string; label: string; count?: number }[] = [
-    { id: "overview", label: t("sd.overview", "Overview") },
-    { id: "factory", label: t("sd.factory", "Factory") },
-    { id: "contacts", label: t("sd.contacts", "Contacts"), count: data.contactPersons.length },
-    { id: "quality", label: t("sd.certifications", "Certifications") },
-    { id: "risk", label: t("sd.risk", "Risk"), count: (data.riskItems ?? []).filter((r) => r.status !== "resolved").length },
-    { id: "negotiation", label: t("sd.negotiation", "Negotiation"), count: (data.negotiations ?? []).length },
-    { id: "sourcing", label: t("sd.sourcing", "Sourcing"), count: (data.sourcingLinks ?? []).length },
-    { id: "products", label: t("sd.products", "Products"), count: data.products.length },
-    { id: "orders", label: t("sd.purchaseOrders", "Purchase Orders"), count: data.purchaseOrders.length },
-    { id: "bills", label: t("sd.billsPayments", "Bills & Payments"), count: data.bills.length + data.payments.length },
-    { id: "documents", label: t("sd.documents", "Documents"), count: data.media.length },
-    { id: "timeline", label: t("sd.timeline", "Timeline"), count: (data.timeline ?? []).length },
+  // Grouped operational layers (Section 3 of the UX brief) — replaces the flat
+  // 12-tab jump-nav. Each layer jumps to its lead section anchor; the counts
+  // roll up the items inside that layer so the eye scans workflows, not tables.
+  const openRisks = (data.riskItems ?? []).filter((r) => r.status !== "resolved").length;
+  const navItems: { id: string; label: string; target: string; count?: number }[] = [
+    { id: "overview", label: t("sd.layerOverview", "Overview"), target: "overview" },
+    { id: "operations", label: t("sd.layerOperations", "Operations"), target: "factory", count: data.contactPersons.length + data.products.length },
+    { id: "intelligence", label: t("sd.layerIntelligence", "Intelligence"), target: "risk", count: openRisks || undefined },
+    { id: "financial", label: t("sd.layerFinancial", "Financial"), target: "orders", count: data.purchaseOrders.length + data.bills.length + data.payments.length || undefined },
+    { id: "documents", label: t("sd.layerDocuments", "Documents"), target: "documents", count: data.media.length || undefined },
+    { id: "activity", label: t("sd.layerActivity", "Activity"), target: "timeline", count: (data.timeline ?? []).length || undefined },
   ];
 
   return (
@@ -794,16 +792,18 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
         ) : null}
 
 
-        {/* ── In-page jump navigation (sticky) — every section stays visible below ── */}
-        <nav className="sticky top-0 z-20 mx-4 md:mx-6 mt-3 flex gap-1 overflow-x-auto rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)]/95 px-2 py-1.5 backdrop-blur scrollbar-none">
+        {/* ── In-page layer navigation (sticky) — 6 operational layers, scan-first ── */}
+        <nav className="sticky top-0 z-20 mx-4 md:mx-6 mt-3 flex gap-1 overflow-x-auto rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)]/95 px-1.5 py-1.5 backdrop-blur scrollbar-none">
           {navItems.map((n) => (
             <a
               key={n.id}
-              href={`#${n.id}`}
-              className="shrink-0 rounded-full px-3 py-1.5 text-[12px] font-medium text-[var(--text-faint)] transition-colors hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
+              href={`#${n.target}`}
+              className="group/nav shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
             >
               {n.label}
-              {typeof n.count === "number" && n.count > 0 ? <span className="ms-1 text-[var(--text-ghost)]">{n.count}</span> : null}
+              {typeof n.count === "number" && n.count > 0 ? (
+                <span className="inline-flex min-w-[16px] items-center justify-center rounded-full bg-[var(--bg-surface-subtle)] px-1 text-[10px] tabular-nums text-[var(--text-faint)] group-hover/nav:text-[var(--text-secondary)]">{n.count}</span>
+              ) : null}
             </a>
           ))}
         </nav>
