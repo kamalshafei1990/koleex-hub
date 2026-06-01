@@ -1605,5 +1605,7 @@ export const contactsT: Translations = {
   "sd.low": { en: "Low", zh: "低", ar: "منخفض" },
   "sd.medium": { en: "Medium", zh: "中", ar: "متوسط" },
   "sd.high": { en: "High", zh: "高", ar: "مرتفع" },
+  "sd.socialMedia": { en: "Social media & marketplaces", zh: "社交媒体与电商平台", ar: "وسائل التواصل والأسواق الإلكترونية" },
+  "sd.messagingSupport": { en: "Messaging support & groups", zh: "通讯支持与群组", ar: "دعم المراسلة والمجموعات" },
 
 };

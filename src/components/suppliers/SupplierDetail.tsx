@@ -51,8 +51,10 @@ import {
 import Edit3Icon from "@/components/icons/ui/Edit3Icon";
 import BrandGlyph from "@/components/icons/brands/BrandGlyph";
 import TagsIcon from "@/components/icons/ui/TagsIcon";
+import Share2Icon from "@/components/icons/ui/Share2Icon";
 import { taxonomyLogoUrl } from "@/components/knowledge/product-coding/taxonomy-logo";
 import { DIVISIONS, CATEGORIES } from "@/components/knowledge/product-coding/data";
+import { fetchDivisionLogos, fetchCategoryLogos, fetchSubcategoryLogos } from "@/lib/products-admin";
 import FactorySection from "./FactorySection";
 import SuppliersHeader from "./SuppliersHeader";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
@@ -204,6 +206,20 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
   const [classOpen, setClassOpen] = useState(false);
   const [busyClass, setBusyClass] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
+
+  /* Division / category / subcategory icons — live from the same Supabase
+     Storage the Product Data app reads, so any icon swapped there shows here
+     immediately. Same source the customer/supplier form uses. */
+  const [divisionLogos, setDivisionLogos] = useState<Record<string, string>>({});
+  const [categoryLogos, setCategoryLogos] = useState<Record<string, string>>({});
+  const [subcategoryLogos, setSubcategoryLogos] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let alive = true;
+    fetchDivisionLogos().then((m) => { if (alive) setDivisionLogos(m); }).catch(() => {});
+    fetchCategoryLogos().then((m) => { if (alive) setCategoryLogos(m); }).catch(() => {});
+    fetchSubcategoryLogos().then((m) => { if (alive) setSubcategoryLogos(m); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
   const patchSupplier = useCallback(
     async (body: Record<string, unknown>) => {
@@ -480,47 +496,39 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
             </div>
           ) : null}
 
-          {/* Classifications — kept editable like before */}
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
-            {data.classifications.slice().sort((a, b) => Number(b.is_primary) - Number(a.is_primary)).map((c, i) => {
-              const val = str(c, "classification");
-              return (
-                <span key={`${val}-${i}`} className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium ${c.is_primary ? "bg-[var(--accent,#0066FF)]/15 text-[var(--accent,#0066FF)] ring-1 ring-[var(--accent,#0066FF)]/30" : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]"}`}>
-                  {c.is_primary ? <StarIcon className="h-2.5 w-2.5" /> : <TagsIcon className="h-2.5 w-2.5" />}
-                  {classificationLabel(val)}
-                </span>
-              );
-            })}
-            {/* Classifications can only be added from the Edit drawer — keep the view read-only here */}
-          </div>
-          {editError ? <div className="mt-2 text-[11px] text-rose-400">{editError}</div> : null}
-
-          {/* Division & subcategory chips — REAL icons pulled from Supabase Storage
-              (same source the Product Data app reads). Each falls back to a
-              generic glyph if a matching SVG hasn't been uploaded yet. */}
+          {/* Unified taxonomy row — classifications + division + category + sub-industry, all in ONE quiet line */}
           {(() => {
             const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
             const divName = str(s, "division");
             const catName = str(s, "category");
             const subInd = str(s, "sub_industry");
-            // Look up canonical slug by exact-name match first; fall back to slugified user input
             const divObj = DIVISIONS.find((d) => d.name.toLowerCase() === divName.toLowerCase());
             const catObj = CATEGORIES.find((c) => c.label.toLowerCase() === catName.toLowerCase());
-            const items: { label: string; iconUrl: string | null; fallback: React.ReactNode }[] = [];
-            if (divName) items.push({ label: divName, iconUrl: taxonomyLogoUrl("divisions", divObj?.id ?? slugify(divName)), fallback: <Building2Icon className="h-3.5 w-3.5" /> });
-            if (catName) items.push({ label: catName, iconUrl: taxonomyLogoUrl("categories", catObj?.slug ?? slugify(catName)), fallback: <TagsIcon className="h-3.5 w-3.5" /> });
-            if (subInd) items.push({ label: subInd, iconUrl: taxonomyLogoUrl("subcategories", slugify(subInd)), fallback: <FileCheckIcon className="h-3.5 w-3.5" /> });
-            if (!items.length) return null;
+            const divKey = divObj?.id ?? slugify(divName);
+            const catKey = catObj?.slug ?? slugify(catName);
+            const subKey = slugify(subInd);
+            type Tag = { label: string; iconUrl?: string | null; fallback?: React.ReactNode; primary?: boolean };
+            const classTags: Tag[] = data.classifications.slice().sort((a, b) => Number(b.is_primary) - Number(a.is_primary)).map((c) => ({
+              label: classificationLabel(str(c, "classification")),
+              primary: !!c.is_primary,
+              fallback: c.is_primary ? <StarIcon className="h-3 w-3" /> : <TagsIcon className="h-3 w-3" />,
+            }));
+            const taxoTags: Tag[] = [];
+            if (divName) taxoTags.push({ label: divName, iconUrl: divisionLogos[divKey] ?? taxonomyLogoUrl("divisions", divKey), fallback: <Building2Icon className="h-3 w-3" /> });
+            if (catName) taxoTags.push({ label: catName, iconUrl: categoryLogos[catKey] ?? taxonomyLogoUrl("categories", catKey), fallback: <TagsIcon className="h-3 w-3" /> });
+            if (subInd) taxoTags.push({ label: subInd, iconUrl: subcategoryLogos[subKey] ?? taxonomyLogoUrl("subcategories", subKey), fallback: <FileCheckIcon className="h-3 w-3" /> });
+            const all = [...classTags, ...taxoTags];
+            if (!all.length) return null;
             return (
               <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
-                {items.map((it, i) => (
-                  <span key={`${it.label}-${i}`} className="inline-flex items-center gap-1.5 rounded-full ps-1 pe-2.5 py-0.5 text-[11px] font-medium bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
+                {all.map((it, i) => (
+                  <span key={`${it.label}-${i}`} className={`inline-flex items-center gap-1.5 rounded-full ps-1 pe-2.5 py-0.5 text-[11px] font-medium ${it.primary ? "bg-[var(--accent,#0066FF)]/15 text-[var(--accent,#0066FF)] ring-1 ring-[var(--accent,#0066FF)]/30" : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]"}`}>
                     <span className="flex h-4 w-4 items-center justify-center">
                       {it.iconUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={it.iconUrl} alt="" className="h-4 w-4 object-contain" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; const sib = e.currentTarget.nextElementSibling as HTMLElement | null; if (sib) sib.style.display = "inline-flex"; }} />
                       ) : null}
-                      <span style={{ display: it.iconUrl ? "none" : "inline-flex" }} className="text-[var(--text-faint)]">{it.fallback}</span>
+                      <span style={{ display: it.iconUrl ? "none" : "inline-flex" }} className={it.primary ? "" : "text-[var(--text-faint)]"}>{it.fallback}</span>
                     </span>
                     {it.label}
                   </span>
@@ -528,6 +536,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
               </div>
             );
           })()}
+          {editError ? <div className="mt-2 text-[11px] text-rose-400">{editError}</div> : null}
         </div>
 
         {/* ─── Contact channels (Part B of hero) — calls, messaging, QR codes in one shell ─── */}
@@ -801,17 +810,6 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
           const banks = Array.isArray(s.bank_accounts) ? (s.bank_accounts as Row[]) : [];
           return (
             <div id="overview" className="scroll-mt-16">
-              <Sec tone="blue" title={t("sd.contact", "Contact")} icon={<PhoneIcon className="h-4 w-4" />}>
-                <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                  <Field label={t("cs.mobile", "Mobile")} value={str(s, "supplier_mobile", "mobile")} mono />
-                  <Field label={t("sd.phone", "Phone")} value={str(s, "supplier_tel", "phone")} mono />
-                  <Field label={t("cs.email", "Email")} value={str(s, "supplier_email", "email")} span2 />
-                  <Field label={t("sd.website", "Website")} value={str(s, "supplier_website", "website")} span2 />
-                  <Field label={t("sd.address", "Address")} value={addr} span2 />
-                  <Field label={t("cs.preferredLanguage", "Preferred language")} value={str(s, "language")} />
-                </div>
-              </Sec>
-
               <Sec title={t("sd.companyProfile", "Company profile")} icon={<Building2Icon className="h-4 w-4" />}>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                   <Field label={t("sd.legalName", "Legal name")} value={str(s, "legal_name", "company_name")} span2 />
@@ -882,17 +880,70 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                 </div>
               </Sec>
 
-              <Sec tone="cyan" title={t("sd.messaging", "Messaging support & groups")} icon={<MessageSquareIcon className="h-4 w-4" />}>
+              {/* Social media accounts — pulled from social_profiles jsonb on the
+                  contact row. Each profile renders with a real brand glyph and
+                  links out to the live profile when a URL is present. */}
+              {(() => {
+                type SP = { platform?: string; value?: string; url?: string; username?: string };
+                const socials: SP[] = Array.isArray(s.social_profiles) ? (s.social_profiles as SP[]) : [];
+                // Some tenants also store digital-presence URLs in dedicated
+                // supplier_digital_presence columns; expose them here as well.
+                const dp = (s as Row).digital_presence as Row | undefined;
+                const fromDigital: SP[] = dp ? [
+                  { platform: "LinkedIn", url: str(dp, "linkedin_url") },
+                  { platform: "Facebook", url: str(dp, "facebook_url") },
+                  { platform: "Instagram", url: str(dp, "instagram_url") },
+                  { platform: "YouTube", url: str(dp, "youtube_url") },
+                  { platform: "X", url: str(dp, "x_twitter_url") },
+                  { platform: "TikTok", url: str(dp, "tiktok_url") },
+                  { platform: "Douyin", url: str(dp, "douyin_url") },
+                  { platform: "Alibaba", url: str(dp, "alibaba_url") },
+                  { platform: "Made-in-China", url: str(dp, "made_in_china_url") },
+                  { platform: "Global Sources", url: str(dp, "global_sources_url") },
+                  { platform: "DHgate", url: str(dp, "dhgate_url") },
+                ].filter((p) => p.url) : [];
+                const all = [...socials, ...fromDigital].filter((p) => p.platform && (p.url || p.value || p.username));
+                if (!all.length) return null;
+                return (
+                  <Sec tone="cyan" title={t("sd.socialMedia", "Social media & marketplaces")} icon={<Share2Icon className="h-4 w-4" />}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                      {all.map((p, i) => {
+                        const label = p.platform ?? "";
+                        const handle = p.username || p.value || "";
+                        const url = p.url || "";
+                        const inner = (
+                          <span className="flex items-center gap-2.5 min-w-0">
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-surface-subtle)]">
+                              <BrandGlyph name={label} size={16} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-[10.5px] font-medium uppercase tracking-wider text-[var(--text-faint)]">{label}</span>
+                              <span className="block truncate text-sm text-[var(--text-primary)]">{handle || url.replace(/^https?:\/\//, "").replace(/\/$/, "")}</span>
+                            </span>
+                          </span>
+                        );
+                        return (
+                          <div key={`${label}-${i}`} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2.5">
+                            {url ? (
+                              <a href={url} target="_blank" rel="noreferrer" className="block hover:text-[var(--accent,#0066FF)]">{inner}</a>
+                            ) : inner}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </Sec>
+                );
+              })()}
+
+              {/* Messaging support & groups — yes/no flags that complement the
+                  per-platform IDs+QRs in the hero Contact & channels shell. */}
+              <Sec tone="cyan" title={t("sd.messagingSupport", "Messaging support & groups")} icon={<MessageSquareIcon className="h-4 w-4" />}>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                   <Field label={t("sd.wechatGroup", "WeChat sales group")} value={yn("wechat_sales_group_available")} />
                   <Field label={t("sd.wecomSupport", "WeCom support")} value={yn("wecom_support_available")} />
                   <Field label={t("sd.preferredCommunication", "Preferred channel")} value={str(s, "communication_preference")} />
                   <Field label={t("cs.preferredLanguage", "Preferred language")} value={str(s, "language")} />
                 </div>
-                <p className="mt-3 text-[10.5px] text-[var(--text-faint)] italic flex items-center gap-1.5">
-                  <MessageSquareIcon className="h-3 w-3" />
-                  {t("sd.messagingHint", "Individual messenger handles & QR codes are listed under Contact & channels at the top of this page.")}
-                </p>
               </Sec>
 
               <Sec tone="emerald" title={t("sd.banking", "Banking & payment")} icon={<LandmarkIcon className="h-4 w-4" />}>

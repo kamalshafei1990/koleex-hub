@@ -4025,11 +4025,21 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               {items.map(c => {
                 const isSelected = selectedId === c.id;
                 const tierInfo = c.contact_type === "customer" ? getTierInfo(c.customer_type) : null;
+                // Robust duplicate-name guard (trim + case-insensitive)
+                const dn = contactDisplayName(c).trim().toLowerCase();
+                const cn = (c.company_name_cn || "").trim().toLowerCase();
+                const co = (c.company || "").trim().toLowerCase();
+                const showCn = cn && cn !== dn;
+                const showCo = co && co !== dn && co !== cn;
+                const rating = Math.max(0, Math.min(5, Number(c.rating ?? 0)));
                 return (
-                  <button
+                  <div
                     key={c.id}
                     onClick={() => handleSelectContact(c)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-start transition-colors border-b border-[var(--border-faint)] contain-layout ${
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleSelectContact(c); } }}
+                    className={`group/row relative w-full flex items-center gap-3 px-4 py-3 text-start cursor-pointer transition-colors border-b border-[var(--border-faint)] contain-layout ${
                       isSelected ? "bg-[var(--bg-surface)]" : "hover:bg-[var(--bg-surface-subtle)]"
                     }`}
                   >
@@ -4056,23 +4066,51 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                           </span>
                         )}
                       </div>
-                      {c.company_name_cn && c.company_name_cn !== contactDisplayName(c) && (
+                      {showCn && (
                         <div lang="zh" className="text-xs text-[var(--text-secondary)] truncate mt-0.5">
                           {c.company_name_cn}
                         </div>
                       )}
-                      <div className="flex items-center gap-2 mt-0.5">
+                      <div className="flex items-center gap-1.5 mt-0.5">
                         <span className={`text-[10px] font-medium ${getTypeColor(c.contact_type)}`}>
                           {t("type." + c.contact_type, c.contact_type?.charAt(0).toUpperCase() + c.contact_type?.slice(1))}
                         </span>
-                        {c.company && c.company !== contactDisplayName(c) && c.company !== c.company_name_cn && (
+                        {rating > 0 && (
+                          <span className="flex items-center gap-0.5" aria-label={`${rating} of 5 stars`}>
+                            {[1, 2, 3, 4, 5].map((i) => (
+                              <StarIcon key={i} size={9} className={i <= rating ? "text-amber-400" : "text-[var(--text-faint)] opacity-40"} />
+                            ))}
+                          </span>
+                        )}
+                        {showCo && (
                           <span className="text-xs text-[var(--text-dim)] truncate">&middot; {c.company}</span>
                         )}
                       </div>
                     </div>
 
-                    <AngleRightIcon size={14} className="text-[var(--text-ghost)] shrink-0 rtl:rotate-180" />
-                  </button>
+                    {/* Row actions — appear on hover. Click stops bubble so the row doesn't select. */}
+                    <div className={`flex items-center gap-0.5 shrink-0 ${isSelected ? "opacity-100" : "opacity-0 group-hover/row:opacity-100"} transition-opacity`}>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setSelectedId(c.id); setEditingId(c.id); setForm({ ...EMPTY_FORM, ...c } as ContactForm); setView("form"); setMobileShowDetail(true); }}
+                        title={t("btn.edit", "Edit")}
+                        aria-label={t("btn.edit", "Edit")}
+                        className="w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"
+                      >
+                        <Edit3Icon size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setDeleteConfirm(c.id); }}
+                        title={t("btn.delete", "Delete")}
+                        aria-label={t("btn.delete", "Delete")}
+                        className="w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-faint)] hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+                      >
+                        <TrashIcon size={13} />
+                      </button>
+                    </div>
+                    <AngleRightIcon size={14} className="text-[var(--text-ghost)] shrink-0 rtl:rotate-180 hidden group-hover/row:hidden" />
+                  </div>
                 );
               })}
             </div>
