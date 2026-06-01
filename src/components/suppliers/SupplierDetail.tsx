@@ -208,6 +208,25 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
   const [busyClass, setBusyClass] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
 
+  /* Scroll-spy — which of the 6 layers is currently in view, so the sticky
+     nav highlights the active layer as the user scrolls (Section 3/7). */
+  const [activeLayer, setActiveLayer] = useState<string>("overview");
+  useEffect(() => {
+    if (!data) return;
+    const ids = ["overview", "factory", "risk", "orders", "documents", "timeline"];
+    const els = ids.map((x) => document.getElementById(x)).filter(Boolean) as HTMLElement[];
+    if (!els.length) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const vis = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (vis[0]) setActiveLayer((vis[0].target as HTMLElement).id);
+      },
+      { rootMargin: "-15% 0px -70% 0px", threshold: 0 },
+    );
+    els.forEach((el) => obs.observe(el));
+    return () => obs.disconnect();
+  }, [data, id]);
+
   /* Division / category / subcategory icons — live from the same Supabase
      Storage the Product Data app reads, so any icon swapped there shows here
      immediately. Same source the customer/supplier form uses. */
@@ -441,6 +460,36 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
           {cnName && cnName !== name ? (
             <p lang="zh" className="text-sm text-[var(--text-faint)] mt-0.5">{cnName}</p>
           ) : null}
+
+          {/* ── Operational intelligence strip (Section 4) — risk · trust · negotiation · readiness · tier ── */}
+          {(() => {
+            const rp = (data.riskProfile ?? {}) as Row;
+            const ni = (data.negotiationIntel ?? {}) as Row;
+            const tone = (k: "good" | "warn" | "bad") =>
+              k === "good" ? "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400"
+              : k === "warn" ? "bg-amber-500/12 text-amber-600 dark:text-amber-400"
+              : "bg-rose-500/12 text-rose-600 dark:text-rose-400";
+            const badges: { label: string; k: "good" | "warn" | "bad" }[] = [];
+            const lvl = str(rp, "risk_level");
+            if (lvl) badges.push({ label: `${lvl.toUpperCase()} RISK`, k: lvl === "low" ? "good" : lvl === "medium" ? "warn" : "bad" });
+            const trust = str(rp, "trust_level");
+            if (trust) badges.push({ label: trust === "excellent" || trust === "high" ? "TRUSTED" : trust.toUpperCase() + " TRUST", k: trust === "excellent" || trust === "high" ? "good" : trust === "medium" ? "warn" : "bad" });
+            const negScore = num(ni, "negotiation_score");
+            if (negScore) badges.push({ label: negScore >= 70 ? "STRONG NEGOTIATION" : negScore >= 40 ? "MODERATE NEGOTIATION" : "WEAK NEGOTIATION", k: negScore >= 70 ? "good" : negScore >= 40 ? "warn" : "bad" });
+            const ready = data.readiness?.score;
+            if (typeof ready === "number") badges.push({ label: `READY ${ready}%`, k: ready >= 80 ? "good" : ready >= 50 ? "warn" : "bad" });
+            const ss = str(s, "strategic_status");
+            if (ss === "strategic" || ss === "preferred") badges.push({ label: ss === "strategic" ? "TIER-1 SOURCE" : "PREFERRED", k: "good" });
+            if (!badges.length) return null;
+            return (
+              <div className="mt-2.5 flex flex-wrap items-center justify-center gap-1.5">
+                {badges.map((b, i) => (
+                  <span key={i} className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${tone(b.k)}`}>{b.label}</span>
+                ))}
+              </div>
+            );
+          })()}
+
           {rating > 0 ? (
             <div className="flex items-center justify-center gap-0.5 mt-2">
               {[1, 2, 3, 4, 5].map((i) => (
@@ -584,7 +633,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
           const hasAnything = phone || mobile || email || site || addr || channels.length || mediaQrs.length;
           if (!hasAnything) return null;
           return (
-            <Sec tone="blue" title={t("sd.contactChannels", "Contact & channels")} icon={<PhoneIcon className="h-4 w-4" />}>
+            <Sec tone="default" title={t("sd.contactChannels", "Contact & channels")} icon={<PhoneIcon className="h-4 w-4" />}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
                 {mobile ? (
                   <a href={`tel:${mobile}`} className="flex items-center gap-2.5 group">
@@ -710,25 +759,38 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
         })()}
 
         {/* ─── KPI strip (Total / Outstanding / Open POs / Products) ─── */}
-        <Sec tone="blue" title={t("sd.kpi", "Key metrics")} icon={<BarChart3Icon className="h-4 w-4" />}>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {[
+        <Sec tone="default" title={t("sd.kpi", "Key metrics")} icon={<BarChart3Icon className="h-4 w-4" />}>
+          {(() => {
+            const rp = (data.riskProfile ?? {}) as Row;
+            const sp = (data.sourcingProfile ?? {}) as Row;
+            const activeRisks = (data.riskItems ?? []).filter((r) => r.status !== "resolved").length;
+            const sourcingScore = num(sp, "sourcing_score_override") || (data.sourcing?.score ?? 0);
+            const evalScore = num(rp, "internal_evaluation_score");
+            const readyPct = data.readiness?.score;
+            const tiles: { label: string; value: string; accent?: "rose" | "emerald" }[] = [
               { label: t("sd.totalPurchases", "Total purchases"), value: money(stats.totalPurchases, currency) },
               { label: t("sd.outstandingPayable", "Outstanding payable"), value: money(stats.outstanding, currency) },
               { label: t("sd.openPos", "Open POs"), value: String(stats.openPos) },
-              { label: t("sd.productsSupplied", "Products supplied"), value: String(stats.products) },
-            ].map((k) => (
-              <div key={k.label} className="rounded-xl bg-[var(--bg-surface-subtle)] p-3.5">
-                <div className="text-lg font-semibold tracking-tight text-[var(--text-primary)]">{k.value}</div>
-                <div className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--text-faint)]">{k.label}</div>
+              { label: t("sd.kpiSourcingScore", "Sourcing score"), value: sourcingScore ? `${Math.round(sourcingScore)}` : (evalScore ? `${Math.round(evalScore)}` : "—") },
+              { label: t("sd.kpiReadiness", "Readiness"), value: typeof readyPct === "number" ? `${readyPct}%` : "—" },
+              { label: t("sd.kpiActiveRisks", "Active risks"), value: String(activeRisks), accent: activeRisks ? "rose" : "emerald" },
+            ];
+            return (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                {tiles.map((k) => (
+                  <div key={k.label} className="rounded-xl bg-[var(--bg-surface-subtle)] p-3.5">
+                    <div className={`text-lg font-semibold tracking-tight ${k.accent === "rose" ? "text-rose-500" : k.accent === "emerald" ? "text-emerald-600 dark:text-emerald-400" : "text-[var(--text-primary)]"}`}>{k.value}</div>
+                    <div className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--text-faint)]">{k.label}</div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            );
+          })()}
         </Sec>
 
         {/* ─── Commercial terms (Payment / Currency / MOQ / Lead time / Incoterms) ─── */}
         {terms.length > 0 ? (
-          <Sec tone="emerald" title={t("sd.commercialTerms", "Commercial terms")} icon={<HandCoinsIcon className="h-4 w-4" />}>
+          <Sec tone="violet" title={t("sd.commercialTerms", "Commercial terms")} icon={<HandCoinsIcon className="h-4 w-4" />}>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-x-6 gap-y-3">
               {terms.map((tm) => (
                 <Field key={tm.label} label={tm.label} value={tm.value} />
@@ -739,27 +801,62 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
 
         {/* ─── Onboarding readiness ─── */}
         {data.readiness ? (
-          <Sec tone="violet" title={t("sd.supplierReadiness", "Supplier readiness")} icon={<GaugeIcon className="h-4 w-4" />}>
-            <div className="flex items-baseline justify-between">
-              <span className="text-[11px] uppercase tracking-wider text-[var(--text-faint)]">{t("sd.onboarding", "Onboarding")}</span>
-              <span className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">{data.readiness.score}<span className="text-sm font-medium text-[var(--text-faint)]">%</span></span>
-            </div>
-            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface-subtle)]">
-              <div className="h-full rounded-full bg-[var(--text-primary)]" style={{ width: `${Math.max(2, data.readiness.score)}%` }} />
-            </div>
-            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3">
-              {data.readiness.dimensions.map((d) => (
-                <div key={d.key}>
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-[11px] text-[var(--text-secondary)]">{d.label}</span>
-                    <span className="text-[11px] tabular-nums text-[var(--text-faint)]">{d.met}/{d.total}</span>
+          <Sec tone="default" title={t("sd.supplierReadiness", "Onboarding readiness")} icon={<GaugeIcon className="h-4 w-4" />}>
+            {(() => {
+              const score = data.readiness.score;
+              const tone = score >= 80 ? "emerald" : score >= 50 ? "amber" : "rose";
+              const ring = tone === "emerald" ? "text-emerald-500" : tone === "amber" ? "text-amber-500" : "text-rose-500";
+              const txt = tone === "emerald" ? "text-emerald-600 dark:text-emerald-400" : tone === "amber" ? "text-amber-600 dark:text-amber-400" : "text-rose-600 dark:text-rose-400";
+              const R = 30, C = 2 * Math.PI * R;
+              const dims = data.readiness.dimensions.slice().sort((a, b) => a.fraction - b.fraction);
+              const blocked = dims.filter((d) => d.fraction < 0.5).length;
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-5 md:gap-6 items-center">
+                  {/* Radial gauge */}
+                  <div className="flex items-center gap-4 md:flex-col md:gap-2 md:w-32">
+                    <div className="relative h-[88px] w-[88px] shrink-0">
+                      <svg viewBox="0 0 72 72" className="h-full w-full -rotate-90">
+                        <circle cx="36" cy="36" r={R} fill="none" strokeWidth="7" className="stroke-[var(--bg-surface-subtle)]" />
+                        <circle cx="36" cy="36" r={R} fill="none" strokeWidth="7" strokeLinecap="round" className={ring} strokeDasharray={C} strokeDashoffset={C - (C * Math.max(0, Math.min(100, score))) / 100} />
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className={`text-xl font-bold tabular-nums ${txt}`}>{score}<span className="text-[11px] font-medium text-[var(--text-faint)]">%</span></span>
+                      </div>
+                    </div>
+                    <div className="md:text-center">
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-faint)]">{t("sd.onboarding", "Onboarding")}</div>
+                      <div className={`text-[11px] font-medium ${txt}`}>
+                        {blocked > 0 ? t("sd.blocksRemaining", "{n} areas blocking").replace("{n}", String(blocked)) : t("sd.readyToApprove", "Ready to approve")}
+                      </div>
+                    </div>
                   </div>
-                  <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-[var(--bg-surface-subtle)]">
-                    <div className="h-full rounded-full bg-[var(--text-secondary)]" style={{ width: `${Math.round(d.fraction * 100)}%` }} />
+                  {/* Dimension matrix — incomplete first, status badge each */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {dims.map((d) => {
+                      const pct = Math.round(d.fraction * 100);
+                      const st = d.fraction >= 0.9 ? "complete" : d.fraction >= 0.5 ? "pending" : "blocked";
+                      const stCls = st === "complete" ? "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400" : st === "pending" ? "bg-amber-500/12 text-amber-600 dark:text-amber-400" : "bg-rose-500/12 text-rose-600 dark:text-rose-400";
+                      const barCls = st === "complete" ? "bg-emerald-500" : st === "pending" ? "bg-amber-500" : "bg-rose-500";
+                      const stLabel = st === "complete" ? t("sd.rdComplete", "Complete") : st === "pending" ? t("sd.rdPending", "Pending") : t("sd.rdBlocked", "Blocked");
+                      return (
+                        <div key={d.key} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[12px] font-medium text-[var(--text-primary)] truncate">{d.label}</span>
+                            <span className={`shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${stCls}`}>{stLabel}</span>
+                          </div>
+                          <div className="mt-1.5 flex items-center gap-2">
+                            <div className="h-1 flex-1 overflow-hidden rounded-full bg-[var(--bg-surface-subtle)]">
+                              <div className={`h-full rounded-full ${barCls}`} style={{ width: `${Math.max(3, pct)}%` }} />
+                            </div>
+                            <span className="text-[10px] tabular-nums text-[var(--text-faint)]">{d.met}/{d.total}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            })()}
           </Sec>
         ) : null}
 
@@ -794,18 +891,26 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
 
         {/* ── In-page layer navigation (sticky) — 6 operational layers, scan-first ── */}
         <nav className="sticky top-0 z-20 mx-4 md:mx-6 mt-3 flex gap-1 overflow-x-auto rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)]/95 px-1.5 py-1.5 backdrop-blur scrollbar-none">
-          {navItems.map((n) => (
-            <a
-              key={n.id}
-              href={`#${n.target}`}
-              className="group/nav shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
-            >
-              {n.label}
-              {typeof n.count === "number" && n.count > 0 ? (
-                <span className="inline-flex min-w-[16px] items-center justify-center rounded-full bg-[var(--bg-surface-subtle)] px-1 text-[10px] tabular-nums text-[var(--text-faint)] group-hover/nav:text-[var(--text-secondary)]">{n.count}</span>
-              ) : null}
-            </a>
-          ))}
+          {navItems.map((n) => {
+            const active = n.target === activeLayer;
+            return (
+              <a
+                key={n.id}
+                href={`#${n.target}`}
+                aria-current={active ? "true" : undefined}
+                className={`group/nav shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-medium transition-colors ${
+                  active
+                    ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                    : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
+                }`}
+              >
+                {n.label}
+                {typeof n.count === "number" && n.count > 0 ? (
+                  <span className={`inline-flex min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] tabular-nums ${active ? "bg-white/20 text-[var(--text-inverted)]" : "bg-[var(--bg-surface-subtle)] text-[var(--text-faint)] group-hover/nav:text-[var(--text-secondary)]"}`}>{n.count}</span>
+                ) : null}
+              </a>
+            );
+          })}
         </nav>
 
         {/* ═══ Everything below is one continuous page — no hidden tabs ═══ */}
@@ -957,7 +1062,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                 </div>
               </Sec>
 
-              <Sec tone="emerald" title={t("sd.banking", "Banking & payment")} icon={<LandmarkIcon className="h-4 w-4" />}>
+              <Sec tone="violet" title={t("sd.banking", "Banking & payment")} icon={<LandmarkIcon className="h-4 w-4" />}>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                   <Field label={t("sd.paymentTerms", "Payment terms")} value={str(s, "payment_terms")} span2 />
                   <Field label={t("sd.preferredMethod", "Method")} value={str(s, "preferred_payment_method")} />

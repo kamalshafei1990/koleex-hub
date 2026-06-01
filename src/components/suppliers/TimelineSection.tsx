@@ -78,15 +78,28 @@ function relativeTime(iso: string, t: TFn): string {
   if (mo < 12) return t("ts.monthsAgo", "{mo}mo ago").replace("{mo}", String(mo));
   return t("ts.yearsAgo", "{y}y ago").replace("{y}", String(Math.round(mo / 12)));
 }
-function dayBucket(iso: string, t: TFn): string {
+/* Coarse relationship-history buckets (Section 8) — Today / Yesterday /
+   Last week / Last month / Older. Returns a stable key + display label. */
+const TIME_BUCKET_ORDER = ["today", "yesterday", "lastWeek", "lastMonth", "older"] as const;
+function timeBucketKey(iso: string): (typeof TIME_BUCKET_ORDER)[number] {
   const d = new Date(iso); const now = new Date();
   const dd = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const nn = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const diff = Math.round((nn.getTime() - dd.getTime()) / 86400000);
-  if (diff === 0) return t("ts.today", "Today");
-  if (diff === 1) return t("ts.yesterday", "Yesterday");
-  if (diff < 7) return t("ts.daysAgo", "{n} days ago").replace("{n}", String(diff));
-  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  if (diff <= 0) return "today";
+  if (diff === 1) return "yesterday";
+  if (diff < 7) return "lastWeek";
+  if (diff < 31) return "lastMonth";
+  return "older";
+}
+function bucketLabel(key: (typeof TIME_BUCKET_ORDER)[number], t: TFn): string {
+  return {
+    today: t("ts.today", "Today"),
+    yesterday: t("ts.yesterday", "Yesterday"),
+    lastWeek: t("ts.lastWeek", "Last week"),
+    lastMonth: t("ts.lastMonth", "Last month"),
+    older: t("ts.older", "Older"),
+  }[key];
 }
 function visibilityLabel(tier: string, t: TFn): string {
   const key = VISIBILITY_KEY[tier];
@@ -147,14 +160,14 @@ export default function TimelineSection({
   }, [timeline, cat, q]);
 
   const groups = useMemo(() => {
-    const by: { bucket: string; items: Row[] }[] = [];
+    const map = new Map<string, Row[]>();
     for (const e of filtered) {
-      const b = dayBucket(str(e, "created_at"), t);
-      const last = by[by.length - 1];
-      if (last && last.bucket === b) last.items.push(e);
-      else by.push({ bucket: b, items: [e] });
+      const k = timeBucketKey(str(e, "created_at"));
+      (map.get(k) ?? map.set(k, []).get(k)!).push(e);
     }
-    return by;
+    // Emit in fixed chronological order so headers never repeat or jump.
+    return TIME_BUCKET_ORDER.filter((k) => map.has(k)).map((k) => ({ key: k, bucket: bucketLabel(k, t), items: map.get(k)! }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered]);
 
   const counts = useMemo(() => {
@@ -249,20 +262,34 @@ export default function TimelineSection({
       ) : (
         <div className="space-y-6">
           {groups.map((g) => (
-            <div key={g.bucket} className="space-y-3">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-faint)]">{g.bucket}</div>
+            <div key={g.key} className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-faint)]">{g.bucket}</span>
+                <span className="text-[10px] tabular-nums text-[var(--text-ghost)]">{g.items.length}</span>
+                <span className="h-px flex-1 bg-[var(--border-subtle)]" />
+              </div>
               <ol className="relative space-y-3 border-l border-[var(--border-subtle)] pl-5">
                 {g.items.map((e) => {
                   const id = str(e, "id");
                   const Icon = CATEGORY_ICON[str(e, "event_category")] ?? GaugeIcon;
                   const imp = str(e, "importance") || "normal";
+                  const nodeCls = imp === "critical"
+                    ? "bg-rose-500/15 ring-rose-500/40 text-rose-600 dark:text-rose-400"
+                    : imp === "high"
+                      ? "bg-amber-500/15 ring-amber-500/40 text-amber-600 dark:text-amber-400"
+                      : "bg-[var(--bg-surface)] ring-[var(--border-subtle)] text-[var(--text-secondary)]";
+                  const cardCls = imp === "critical"
+                    ? "bg-rose-500/[0.06] ring-1 ring-rose-500/20"
+                    : imp === "high"
+                      ? "bg-amber-500/[0.06] ring-1 ring-amber-500/20"
+                      : "bg-[var(--bg-surface-subtle)]";
                   return (
                     <li key={id} className="relative">
-                      {/* node */}
-                      <span className="absolute -left-[27px] top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--bg-surface)] ring-1 ring-[var(--border-subtle)]">
-                        <Icon className="h-3 w-3 text-[var(--text-secondary)]" />
+                      {/* node — colored by importance */}
+                      <span className={`absolute -left-[27px] top-1 flex h-5 w-5 items-center justify-center rounded-full ring-1 ${nodeCls}`}>
+                        <Icon className="h-3 w-3" />
                       </span>
-                      <div className="rounded-xl bg-[var(--bg-surface-subtle)] p-3">
+                      <div className={`rounded-xl p-3 ${cardCls}`}>
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-1.5">
