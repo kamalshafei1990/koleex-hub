@@ -249,6 +249,7 @@ export default function SupplierDetail({ id, embedded = false }: { id: string; e
 
   const s = data?.supplier ?? {};
   const name = str(s, "company_name_en", "company_name", "display_name", "full_name") || t("sd.supplier", "Supplier");
+  const cnName = str(s, "company_name_cn");
   const isActive = (s.is_active ?? true) !== false;
   const rating = num(s, "rating");
   const certs = Array.isArray(s.certifications) ? (s.certifications as unknown[]).map(String) : [];
@@ -395,6 +396,9 @@ export default function SupplierDetail({ id, embedded = false }: { id: string; e
               {str(s, "supplier_type") || t("sd.supplier", "Supplier")}
             </div>
             <h1 className="mt-1 text-3xl md:text-4xl font-semibold tracking-[-0.02em] text-[var(--text-primary)]">{name}</h1>
+            {cnName && cnName !== name ? (
+              <div lang="zh" className="mt-1 text-lg md:text-xl font-medium text-[var(--text-secondary)]">{cnName}</div>
+            ) : null}
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-[var(--text-secondary)]">
               {rating > 0 ? (
                 <span className="inline-flex items-center gap-1">
@@ -650,8 +654,10 @@ export default function SupplierDetail({ id, embedded = false }: { id: string; e
 
         {/* ═══ Everything below is one continuous page — no hidden tabs ═══ */}
 
+        <GroupLabel>{t("sd.groupProfile", "Profile & operations")}</GroupLabel>
+
         {/* Overview: contact + notes */}
-        <Section id="overview">
+        <Section id="overview" noBorder>
           <SectionHead eyebrow={t("sd.profile", "Profile")} title={t("sd.overview", "Overview")} />
           <div className="mt-4 grid grid-cols-1 gap-8 md:grid-cols-2">
             <div className="space-y-3">
@@ -716,8 +722,10 @@ export default function SupplierDetail({ id, embedded = false }: { id: string; e
           </div>
         </Section>
 
+        <GroupLabel>{t("sd.groupCommercial", "Commercial intelligence")}</GroupLabel>
+
         {/* Risk */}
-        <Section id="risk">
+        <Section id="risk" noBorder>
           <RiskSection supplierId={id} riskProfile={data.riskProfile ?? null} riskItems={data.riskItems ?? []} risk={data.risk ?? null} onSaved={() => load({ silent: true })} />
         </Section>
 
@@ -739,8 +747,10 @@ export default function SupplierDetail({ id, embedded = false }: { id: string; e
           />
         </Section>
 
+        <GroupLabel>{t("sd.groupRecords", "Records & documents")}</GroupLabel>
+
         {/* Products supplied */}
-        <Section id="products">
+        <Section id="products" noBorder>
           <SectionHead eyebrow={t("sd.catalogue", "Catalogue")} title={t("sd.productsSupplied", "Products supplied")} />
           <div className="mt-4">
             {data.products.length === 0 ? (
@@ -886,9 +896,19 @@ const EmptyTab = ({ label }: { label: string }) => (
 );
 
 /* One stacked section on the single-page Supplier 360 — a top divider for clear
-   separation and a scroll-margin so the sticky jump-nav doesn't overlap it. */
-const Section = ({ id, children }: { id: string; children: React.ReactNode }) => (
-  <section id={id} className="scroll-mt-16 border-t border-[var(--border-subtle)] pt-8">
+   separation and a scroll-margin so the sticky jump-nav doesn't overlap it.
+   `noBorder` is used for the first section under a group label (the group
+   label already provides the separation). */
+const Section = ({ id, children, noBorder }: { id: string; children: React.ReactNode; noBorder?: boolean }) => (
+  <section id={id} className={`scroll-mt-16 pt-8 ${noBorder ? "" : "border-t border-[var(--border-subtle)]"}`}>
     {children}
   </section>
+);
+
+/* Group heading — clusters the page into clear bands (Profile · Commercial ·
+   Records) so a long single page still reads in an organized hierarchy. */
+const GroupLabel = ({ children }: { children: React.ReactNode }) => (
+  <div className="mt-4 border-t-2 border-[var(--border-subtle)] pt-7 text-[12px] font-bold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
+    {children}
+  </div>
 );

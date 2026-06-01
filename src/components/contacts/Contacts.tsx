@@ -3991,6 +3991,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                           </span>
                         )}
                       </div>
+                      {c.company_name_cn && c.company_name_cn !== contactDisplayName(c) && (
+                        <div lang="zh" className="text-xs text-[var(--text-secondary)] truncate mt-0.5">
+                          {c.company_name_cn}
+                        </div>
+                      )}
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className={`text-[10px] font-medium ${getTypeColor(c.contact_type)}`}>
                           {t("type." + c.contact_type, c.contact_type?.charAt(0).toUpperCase() + c.contact_type?.slice(1))}
