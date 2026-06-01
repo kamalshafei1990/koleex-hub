@@ -6,6 +6,7 @@ import KnowledgeIcon from "@/components/icons/KnowledgeIcon";
 import CommercialPolicyIcon from "@/components/icons/CommercialPolicyIcon";
 import FileCode2Icon from "@/components/icons/ui/FileCode2Icon";
 import HandshakeIcon from "@/components/icons/ui/HandshakeIcon";
+import WorkflowIcon from "@/components/icons/ui/WorkflowIcon";
 
 const knowledgeBases = [
   {
@@ -54,6 +55,25 @@ const knowledgeBases = [
       "Quality",
       "Commercial",
       "Workflow",
+    ],
+    color: "#0066FF",
+  },
+  {
+    id: "supplier-onboarding-workflow",
+    title: "Supplier Onboarding Workflow",
+    description:
+      "The operating procedure for onboarding a supplier — from sourcing online to active & purchasable. 10 stages with timing, status lifecycle, a RACI matrix of who enters/reviews/approves, and the factory-visit question bank.",
+    icon: WorkflowIcon,
+    href: "/knowledge/supplier-onboarding-workflow",
+    pages: 1,
+    sections: [
+      "Process",
+      "Stages",
+      "Timing",
+      "RACI",
+      "Roles",
+      "Approval",
+      "Factory Visit",
     ],
     color: "#0066FF",
   },
