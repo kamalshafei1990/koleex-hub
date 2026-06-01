@@ -1520,6 +1520,14 @@ const capWord = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 const CONTACT_ROLE_CATEGORIES = ["sales", "boss", "owner", "support", "finance", "logistics", "qc", "engineering", "management", "other"];
 const CONTACT_RELIABILITY = ["high", "medium", "low", "unknown"];
 const CONTACT_CHANNELS = ["wechat", "wecom", "whatsapp", "telegram", "email", "mobile", "line", "skype"];
+/* Free-text fields with a natural fixed vocabulary, surfaced as dropdowns.
+   Values are stored as plain strings (the routes accept free text), so these
+   pick-lists guide entry without locking the column. */
+const CONTACT_RESPONSE_SPEEDS = ["Within 1 hour", "Within 2 hours", "Same day", "Within 24 hours", "Within 48 hours", "2–3 days", "Slow / varies"];
+const CONTACT_LANGUAGES = ["English", "Chinese (Mandarin)", "Chinese (Cantonese)", "Arabic", "Spanish", "French", "Russian", "Portuguese", "German", "Japanese", "Korean", "Hindi", "Other"];
+const TIMEZONES = ["GMT-12", "GMT-11", "GMT-10", "GMT-9", "GMT-8", "GMT-7", "GMT-6", "GMT-5", "GMT-4", "GMT-3", "GMT-2", "GMT-1", "GMT+0", "GMT+1", "GMT+2", "GMT+3", "GMT+3:30", "GMT+4", "GMT+4:30", "GMT+5", "GMT+5:30", "GMT+6", "GMT+7", "GMT+8", "GMT+9", "GMT+9:30", "GMT+10", "GMT+11", "GMT+12", "GMT+13", "GMT+14"];
+const FACTORY_CAPACITY_UNITS = ["units / month", "pcs / month", "sets / month", "pairs / month", "tons / month", "meters / month", "rolls / month", "containers / month"];
+const FACTORY_OUTPUT_UNITS = ["units / year", "pcs / year", "sets / year", "pairs / year", "tons / year", "meters / year", "rolls / year", "containers / year"];
 
 /* Map a Low/Med/High[/Critical] rating to a 0..1 "goodness" (1 = best for us),
    honouring polarity. Returns null when the field is unset. */
@@ -7381,9 +7389,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                           <SelectInput label={t("field.roleCategory", "Role category")} value={cp.role_category ?? ""} onChange={v => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], role_category: v }; setField("contact_persons", arr); }} options={CONTACT_ROLE_CATEGORIES} renderLabel={capWord} selectLabel={t("detail.select")} />
                           <SelectInput label={t("field.reliability", "Reliability")} value={cp.reliability ?? ""} onChange={v => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], reliability: v }; setField("contact_persons", arr); }} options={CONTACT_RELIABILITY} renderLabel={capWord} selectLabel={t("detail.select")} />
                           <SelectInput label={t("field.preferredChannel", "Preferred channel")} value={cp.preferred_channel ?? ""} onChange={v => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], preferred_channel: v }; setField("contact_persons", arr); }} options={CONTACT_CHANNELS} renderLabel={capWord} selectLabel={t("detail.select")} />
-                          <Input label={t("field.responseSpeed", "Response speed")} value={cp.response_speed ?? ""} onChange={v => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], response_speed: v }; setField("contact_persons", arr); }} placeholder="e.g. within 2h" />
-                          <Input label={t("field.preferredLanguage", "Preferred language")} value={cp.preferred_language ?? ""} onChange={v => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], preferred_language: v }; setField("contact_persons", arr); }} placeholder="EN / 中文" />
-                          <Input label={t("field.timezone", "Timezone")} value={cp.timezone ?? ""} onChange={v => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], timezone: v }; setField("contact_persons", arr); }} placeholder="GMT+8" />
+                          <SelectInput label={t("field.responseSpeed", "Response speed")} value={cp.response_speed ?? ""} onChange={v => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], response_speed: v }; setField("contact_persons", arr); }} options={CONTACT_RESPONSE_SPEEDS} selectLabel={t("detail.select")} />
+                          <SelectInput label={t("field.preferredLanguage", "Preferred language")} value={cp.preferred_language ?? ""} onChange={v => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], preferred_language: v }; setField("contact_persons", arr); }} options={CONTACT_LANGUAGES} selectLabel={t("detail.select")} />
+                          <SelectInput label={t("field.timezone", "Timezone")} value={cp.timezone ?? ""} onChange={v => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], timezone: v }; setField("contact_persons", arr); }} options={TIMEZONES} selectLabel={t("detail.select")} />
                         </div>
                         <Input label={t("field.availableHours", "Available hours")} value={cp.available_hours ?? ""} onChange={v => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], available_hours: v }; setField("contact_persons", arr); }} placeholder="e.g. 09:00–18:00 CST" />
                         <textarea value={cp.notes} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], notes: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.notes")} rows={2} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none resize-none" />
@@ -7576,8 +7584,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <Input label={t("field.exportMarkets", "Export markets (comma)")} help="supplier.export_markets" value={String(sIntel.factory.main_export_markets)} onChange={(v) => setIntelFactory("main_export_markets", v)} placeholder="US, EU, UAE" />
                   <Input label={t("field.prodCategories", "Production categories (comma)")} help="supplier.production_categories" value={String(sIntel.factory.production_categories)} onChange={(v) => setIntelFactory("production_categories", v)} />
                   <Input label={t("field.supportedMaterials", "Supported materials (comma)")} value={String(sIntel.factory.supported_materials)} onChange={(v) => setIntelFactory("supported_materials", v)} placeholder="Cotton, Polyester, Steel" />
-                  <Input label={t("field.capacityUnit", "Capacity unit")} value={String(sIntel.factory.capacity_unit)} onChange={(v) => setIntelFactory("capacity_unit", v)} placeholder="units / month" />
-                  <Input label={t("field.outputUnit", "Output unit")} value={String(sIntel.factory.output_unit)} onChange={(v) => setIntelFactory("output_unit", v)} placeholder="units / year" />
+                  <SelectInput label={t("field.capacityUnit", "Capacity unit")} value={String(sIntel.factory.capacity_unit)} onChange={(v) => setIntelFactory("capacity_unit", v)} options={FACTORY_CAPACITY_UNITS} selectLabel={t("detail.select")} />
+                  <SelectInput label={t("field.outputUnit", "Output unit")} value={String(sIntel.factory.output_unit)} onChange={(v) => setIntelFactory("output_unit", v)} options={FACTORY_OUTPUT_UNITS} selectLabel={t("detail.select")} />
                   <Input label={t("field.leadTimeDays", "Lead time (days)")} value={String(sIntel.factory.lead_time_days)} onChange={(v) => setIntelFactory("lead_time_days", v)} inputMode="numeric" placeholder="e.g. 30" />
                   <Input label={t("field.peakSeasonMonths", "Peak season months (comma)")} value={String(sIntel.factory.peak_season_months)} onChange={(v) => setIntelFactory("peak_season_months", v)} placeholder="Sep, Oct, Nov" />
                 </div>
