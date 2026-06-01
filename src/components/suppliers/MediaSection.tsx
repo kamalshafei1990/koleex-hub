@@ -292,7 +292,7 @@ export default function MediaSection({
                 <div className="relative h-[64px] w-[64px] shrink-0">
                   <svg viewBox="0 0 64 64" className="h-full w-full -rotate-90">
                     <circle cx="32" cy="32" r={R} fill="none" strokeWidth="6" className="stroke-[var(--bg-surface)]" />
-                    <circle cx="32" cy="32" r={R} fill="none" strokeWidth="6" strokeLinecap="round" className={ring} strokeDasharray={C} strokeDashoffset={C - (C * Math.max(0, Math.min(100, sc))) / 100} />
+                    <circle cx="32" cy="32" r={R} fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" className={ring} strokeDasharray={C} strokeDashoffset={C - (C * Math.max(0, Math.min(100, sc))) / 100} />
                   </svg>
                   <div className="absolute inset-0 flex items-center justify-center">
                     <span className={`text-[15px] font-bold tabular-nums ${tone}`}>{compliance.score}<span className="text-[9px] font-medium text-[var(--text-faint)]">%</span></span>

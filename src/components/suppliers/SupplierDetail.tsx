@@ -882,7 +882,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                     <div className="relative h-[88px] w-[88px] shrink-0">
                       <svg viewBox="0 0 72 72" className="h-full w-full -rotate-90">
                         <circle cx="36" cy="36" r={R} fill="none" strokeWidth="7" className="stroke-[var(--bg-surface-subtle)]" />
-                        <circle cx="36" cy="36" r={R} fill="none" strokeWidth="7" strokeLinecap="round" className={ring} strokeDasharray={C} strokeDashoffset={C - (C * Math.max(0, Math.min(100, score))) / 100} />
+                        <circle cx="36" cy="36" r={R} fill="none" stroke="currentColor" strokeWidth="7" strokeLinecap="round" className={ring} strokeDasharray={C} strokeDashoffset={C - (C * Math.max(0, Math.min(100, score))) / 100} />
                       </svg>
                       <div className="absolute inset-0 flex flex-col items-center justify-center">
                         <span className={`text-xl font-bold tabular-nums ${txt}`}>{score}<span className="text-[11px] font-medium text-[var(--text-faint)]">%</span></span>
