@@ -320,6 +320,9 @@ interface ContactForm {
   last_quality_issue: string;
   sample_status: string;
   factory_visit_date: string;
+  /* ── Sidebar mini-intelligence (read-only, already on the contacts row) ── */
+  strategic_status: string;
+  readiness_milestone: number;
   /* ── Supplier Redesign ── */
   company_name_en: string;
   company_name_cn: string;
@@ -711,6 +714,8 @@ const EMPTY_FORM: ContactForm = {
   last_quality_issue: "",
   sample_status: "",
   factory_visit_date: "",
+  strategic_status: "",
+  readiness_milestone: 0,
   /* Supplier Redesign */
   company_name_en: "",
   company_name_cn: "",
@@ -1192,6 +1197,8 @@ function contactToForm(c: ContactRow): ContactForm {
     last_quality_issue: c.last_quality_issue || "",
     sample_status: c.sample_status || "",
     factory_visit_date: c.factory_visit_date || "",
+    strategic_status: c.strategic_status || "",
+    readiness_milestone: typeof c.readiness_milestone === "number" ? c.readiness_milestone : Number(c.readiness_milestone) || 0,
     /* Supplier Redesign */
     company_name_en: c.company_name_en || "",
     company_name_cn: c.company_name_cn || "",
@@ -4091,6 +4098,29 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                           <span className="text-xs text-[var(--text-dim)] truncate">&middot; {c.company}</span>
                         )}
                       </div>
+                      {/* ── Supplier mini-intelligence — readiness · strategic · type.
+                            Sourced entirely from the list payload (contacts row), so it
+                            adds zero queries and scales to large directories. ── */}
+                      {c.contact_type === "supplier" && ((c.readiness_milestone ?? 0) > 0 || c.strategic_status || c.supplier_type) ? (
+                        <div className="flex flex-wrap items-center gap-1 mt-1">
+                          {(c.readiness_milestone ?? 0) > 0 ? (
+                            <span className={`inline-flex items-center rounded px-1 py-0.5 text-[9px] font-semibold tabular-nums ${(c.readiness_milestone ?? 0) >= 75 ? "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400" : (c.readiness_milestone ?? 0) >= 50 ? "bg-amber-500/12 text-amber-600 dark:text-amber-400" : "bg-[var(--bg-surface-subtle)] text-[var(--text-faint)]"}`}>
+                              {c.readiness_milestone}%
+                            </span>
+                          ) : null}
+                          {c.strategic_status ? (
+                            <span className={`inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[9px] font-semibold ${c.strategic_status === "strategic" || c.strategic_status === "preferred" ? "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400" : c.strategic_status === "watchlist" || c.strategic_status === "phasing_out" ? "bg-rose-500/12 text-rose-600 dark:text-rose-300" : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]"}`}>
+                              {(c.strategic_status === "strategic" || c.strategic_status === "preferred") ? <StarIcon size={8} /> : null}
+                              {t("opt." + c.strategic_status, STRATEGIC_STATUS_LABELS[c.strategic_status as keyof typeof STRATEGIC_STATUS_LABELS] ?? c.strategic_status)}
+                            </span>
+                          ) : null}
+                          {c.supplier_type ? (
+                            <span className="inline-flex items-center rounded px-1 py-0.5 text-[9px] font-medium bg-[var(--bg-surface-subtle)] text-[var(--text-faint)]">
+                              {t("opt." + c.supplier_type, c.supplier_type)}
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
 
                     {/* Row actions — appear on hover. Click stops bubble so the row doesn't select. */}

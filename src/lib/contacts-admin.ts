@@ -32,6 +32,9 @@ export interface ContactRow {
   website: string | null;
   is_active: boolean;
   customer_type: string | null;
+  /* Supplier sidebar mini-intelligence (already on the contacts row) */
+  strategic_status?: string | null;
+  readiness_milestone?: number | null;
   phones: { label: string; number: string }[];
   emails: { label: string; email: string }[];
   addresses: { label: string; street: string; city: string; state: string; zip: string; country: string }[];
