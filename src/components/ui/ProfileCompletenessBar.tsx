@@ -51,17 +51,17 @@ export default function ProfileCompletenessBar({
             {t("profile.completeness.title")}
           </div>
           {ready ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-300 ring-1 ring-inset ring-emerald-500/30">✓ Ready</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-300 ring-1 ring-inset ring-emerald-500/30">✓ {t("profile.ready")}</span>
           ) : (
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-300 ring-1 ring-inset ring-amber-500/30">{reqLeft} required left</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-300 ring-1 ring-inset ring-amber-500/30">{t("profile.requiredLeft").replace("{n}", String(reqLeft))}</span>
           )}
         </div>
         <div className="space-y-2.5">
-          <Bar label="Required" tier={req} tone={ready ? "bg-emerald-400" : "bg-rose-400"} />
-          <Bar label="Preferred" tier={tiers.preferred} tone="bg-amber-400" />
-          <Bar label="Optional" tier={tiers.optional} tone="bg-[var(--text-dim)]" />
+          <Bar label={t("profile.tier.required")} tier={req} tone={ready ? "bg-emerald-400" : "bg-rose-400"} />
+          <Bar label={t("profile.tier.preferred")} tier={tiers.preferred} tone="bg-amber-400" />
+          <Bar label={t("profile.tier.optional")} tier={tiers.optional} tone="bg-[var(--text-dim)]" />
           <div className="mt-1 border-t border-[var(--border-subtle)] pt-2.5">
-            <Bar label="Overall" tier={tiers.overall} tone="bg-[var(--accent,#0066FF)]" showPct />
+            <Bar label={t("profile.tier.overall")} tier={tiers.overall} tone="bg-[var(--accent,#0066FF)]" showPct />
           </div>
         </div>
       </div>
