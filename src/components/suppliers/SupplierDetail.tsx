@@ -54,6 +54,7 @@ import TagsIcon from "@/components/icons/ui/TagsIcon";
 import Share2Icon from "@/components/icons/ui/Share2Icon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import XCircleIcon from "@/components/icons/ui/XCircleIcon";
 import { taxonomyLogoUrl } from "@/components/knowledge/product-coding/taxonomy-logo";
 import { DIVISIONS, CATEGORIES } from "@/components/knowledge/product-coding/data";
 import { fetchDivisionLogos, fetchCategoryLogos, fetchSubcategoryLogos } from "@/lib/products-admin";
@@ -68,6 +69,21 @@ import NegotiationSection from "./NegotiationSection";
 import SourcingSection from "./SourcingSection";
 
 type Row = Record<string, unknown>;
+
+/* Readiness WHY hints — generic, reusable per readiness dimension key.
+   `why` = why this matters for sourcing; `nav` routes the operator to where
+   the missing data is captured. Strings are translated with t() at render. */
+const READINESS_HINTS: Record<string, { why: string; nav: "edit" | "documents" | "operations" | "financial" }> = {
+  identity: { why: "Confirms this is a real, registered entity you can legally contract with.", nav: "edit" },
+  commercial: { why: "Sets how you transact — without terms, every PO needs renegotiation.", nav: "edit" },
+  factory: { why: "Proves real production capacity behind the quote, not just a trading desk.", nav: "edit" },
+  certifications: { why: "Verified certificates are the basis of compliance and market access.", nav: "documents" },
+  contacts: { why: "Reachable, ranked contacts keep sourcing moving when issues arise.", nav: "operations" },
+  media: { why: "Photos and a logo make the supplier verifiable at a glance.", nav: "documents" },
+  legal: { why: "KYC, tax ID and a live website are the minimum for onboarding approval.", nav: "edit" },
+  operational: { why: "A real order/receipt/bill history is the strongest proof of a working relationship.", nav: "financial" },
+};
+const READINESS_NAV_TARGET: Record<string, string> = { documents: "documents", operations: "factory", financial: "orders" };
 interface Payload {
   supplier: Row;
   purchaseOrders: Row[];
@@ -92,7 +108,7 @@ interface Payload {
   sourcingLinks: Row[];
   specializations: Row[];
   sourcing: { score: number | null; priority: number | null; preferredProducts: number; blockedProducts: number; soleSource: boolean } | null;
-  readiness: { score: number; dimensions: { key: string; label: string; weight: number; met: number; total: number; fraction: number }[] };
+  readiness: { score: number; dimensions: { key: string; label: string; weight: number; met: number; total: number; fraction: number; checks?: { label: string; met: boolean }[] }[] };
 }
 
 /* ── defensive getters (the API returns raw rows of unknown shape) ── */
@@ -216,6 +232,9 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
   const LEVEL_B_KEYS = ["companyProfile", "identity", "logistics", "social", "messagingSupport", "banking", "quality", "notes"];
   const [execMode, setExecMode] = useState(false);
   const [collapsedKeys, setCollapsedKeys] = useState<Set<string>>(new Set());
+  // Readiness WHY layer — which incomplete dimensions are expanded.
+  const [openDim, setOpenDim] = useState<Set<string>>(new Set());
+  const toggleDim = (k: string) => setOpenDim((p) => { const n = new Set(p); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const toggleKey = useCallback((k: string) => {
     setCollapsedKeys((prev) => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   }, []);
@@ -880,7 +899,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                       </div>
                     </div>
                   </div>
-                  {/* Dimension matrix — incomplete first, status badge each */}
+                  {/* Dimension matrix — incomplete first; incomplete dims expand to a WHY layer */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {dims.map((d) => {
                       const pct = Math.round(d.fraction * 100);
@@ -888,18 +907,70 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                       const stCls = st === "complete" ? "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400" : st === "pending" ? "bg-amber-500/12 text-amber-600 dark:text-amber-400" : "bg-rose-500/12 text-rose-600 dark:text-rose-400";
                       const barCls = st === "complete" ? "bg-emerald-500" : st === "pending" ? "bg-amber-500" : "bg-rose-500";
                       const stLabel = st === "complete" ? t("sd.rdComplete", "Complete") : st === "pending" ? t("sd.rdPending", "Pending") : t("sd.rdBlocked", "Blocked");
+                      const incomplete = d.fraction < 1;
+                      const isOpen = openDim.has(d.key);
+                      const hint = READINESS_HINTS[d.key];
+                      const missing = (d.checks ?? []).filter((c) => !c.met);
+                      const navTo = () => {
+                        const nav = hint?.nav;
+                        if (!nav || nav === "edit") { onEdit ? onEdit() : router.push(`/suppliers?selected=${id}`); return; }
+                        const target = READINESS_NAV_TARGET[nav];
+                        const el = target ? document.getElementById(target) : null;
+                        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                      };
                       return (
-                        <div key={d.key} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2.5">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-[12px] font-medium text-[var(--text-primary)] truncate">{d.label}</span>
-                            <span className={`shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${stCls}`}>{stLabel}</span>
-                          </div>
-                          <div className="mt-1.5 flex items-center gap-2">
-                            <div className="h-1 flex-1 overflow-hidden rounded-full bg-[var(--bg-surface-subtle)]">
-                              <div className={`h-full rounded-full ${barCls}`} style={{ width: `${Math.max(3, pct)}%` }} />
+                        <div key={d.key} className={`rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] ${isOpen ? "sm:col-span-2" : ""}`}>
+                          {incomplete ? (
+                            <button type="button" onClick={() => toggleDim(d.key)} aria-expanded={isOpen} className="w-full px-3 py-2.5 text-start">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="flex items-center gap-1.5 min-w-0">
+                                  <AngleDownIcon className={`h-3 w-3 shrink-0 text-[var(--text-faint)] transition-transform ${isOpen ? "" : "-rotate-90 rtl:rotate-90"}`} />
+                                  <span className="text-[12px] font-medium text-[var(--text-primary)] truncate">{d.label}</span>
+                                </span>
+                                <span className={`shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${stCls}`}>{stLabel}</span>
+                              </div>
+                              <div className="mt-1.5 flex items-center gap-2">
+                                <div className="h-1 flex-1 overflow-hidden rounded-full bg-[var(--bg-surface-subtle)]">
+                                  <div className={`h-full rounded-full ${barCls}`} style={{ width: `${Math.max(3, pct)}%` }} />
+                                </div>
+                                <span className="text-[10px] tabular-nums text-[var(--text-faint)]">{d.met}/{d.total}</span>
+                              </div>
+                            </button>
+                          ) : (
+                            <div className="px-3 py-2.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[12px] font-medium text-[var(--text-primary)] truncate ps-[18px]">{d.label}</span>
+                                <span className={`shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${stCls}`}>{stLabel}</span>
+                              </div>
+                              <div className="mt-1.5 flex items-center gap-2">
+                                <div className="h-1 flex-1 overflow-hidden rounded-full bg-[var(--bg-surface-subtle)]">
+                                  <div className={`h-full rounded-full ${barCls}`} style={{ width: `${Math.max(3, pct)}%` }} />
+                                </div>
+                                <span className="text-[10px] tabular-nums text-[var(--text-faint)]">{d.met}/{d.total}</span>
+                              </div>
                             </div>
-                            <span className="text-[10px] tabular-nums text-[var(--text-faint)]">{d.met}/{d.total}</span>
-                          </div>
+                          )}
+                          {/* WHY layer */}
+                          {incomplete && isOpen ? (
+                            <div className="border-t border-[var(--border-subtle)] px-3 py-3 space-y-2.5">
+                              {hint ? <p className="text-[11px] leading-relaxed text-[var(--text-secondary)]">{t("rdWhy." + d.key, hint.why)}</p> : null}
+                              {missing.length ? (
+                                <div>
+                                  <div className="text-[9px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-1">{t("sd.rdMissing", "Still missing")}</div>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {missing.map((c, i) => (
+                                      <span key={i} className="inline-flex items-center gap-1 rounded-md bg-rose-500/10 px-2 py-0.5 text-[10.5px] font-medium text-rose-600 dark:text-rose-300">
+                                        <XCircleIcon className="h-2.5 w-2.5" />{t("rdChk." + c.label, c.label)}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : null}
+                              <button type="button" onClick={navTo} className="inline-flex items-center gap-1 rounded-lg bg-[var(--bg-inverted)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-inverted)] hover:opacity-90">
+                                {t("sd.rdComplete2", "Complete this")} <AngleRightIcon className="h-3 w-3 rtl:rotate-180" />
+                              </button>
+                            </div>
+                          ) : null}
                         </div>
                       );
                     })}

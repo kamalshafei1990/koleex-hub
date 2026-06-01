@@ -526,6 +526,11 @@ export interface ReadinessContext {
   docsVerified?: number;
 }
 
+export interface ReadinessCheck {
+  /** short label of the individual completeness check (e.g. "Payment terms") */
+  label: string;
+  met: boolean;
+}
 export interface ReadinessDimension {
   key: string;
   label: string;
@@ -533,6 +538,9 @@ export interface ReadinessDimension {
   met: number;
   total: number;
   fraction: number;
+  /** the individual checks behind this dimension, so the UI can show
+   *  exactly what is captured vs. still missing. */
+  checks: ReadinessCheck[];
 }
 export interface Readiness {
   score: number;
@@ -553,108 +561,104 @@ export function computeReadiness(ctx: ReadinessContext): Readiness {
   const f = ctx.factory ?? {};
   const fg = (...keys: string[]) => keys.some((k) => filled(f[k]));
 
-  const dims: Array<Omit<ReadinessDimension, "fraction">> = [
+  const dims: Array<{ key: string; label: string; weight: number; checks: ReadinessCheck[] }> = [
     {
       key: "identity",
       label: "Identity",
       weight: 15,
-      total: 5,
-      met:
-        Number(g("company_name_en", "company_name", "display_name")) +
-        Number(g("country", "origin_country")) +
-        Number(g("year_established")) +
-        Number(g("business_registration_number", "tax_id")) +
-        Number(g("supplier_type") || ctx.classifications > 0),
+      checks: [
+        { label: "Legal name", met: g("company_name_en", "company_name", "display_name") },
+        { label: "Country of origin", met: g("country", "origin_country") },
+        { label: "Year established", met: g("year_established") },
+        { label: "Registration / tax ID", met: g("business_registration_number", "tax_id") },
+        { label: "Supplier type / classification", met: g("supplier_type") || ctx.classifications > 0 },
+      ],
     },
     {
       key: "commercial",
       label: "Commercial",
       weight: 15,
-      total: 5,
-      met:
-        Number(g("payment_terms")) +
-        Number(g("currency")) +
-        Number(g("moq")) +
-        Number(g("lead_time")) +
-        Number(g("incoterms")),
+      checks: [
+        { label: "Payment terms", met: g("payment_terms") },
+        { label: "Currency", met: g("currency") },
+        { label: "MOQ", met: g("moq") },
+        { label: "Lead time", met: g("lead_time") },
+        { label: "Incoterms", met: g("incoterms") },
+      ],
     },
     {
       key: "factory",
       label: "Factory",
       weight: 12,
-      total: 6,
-      met:
-        Number(g("employee_count_range") || fg("employee_count")) +
-        Number(g("annual_revenue_range") || fg("annual_output")) +
-        Number(g("factory_visit_date")) +
-        Number(fg("factory_type")) +
-        Number(fg("production_lines") || fg("monthly_capacity")) +
-        Number(fg("factory_size_sqm") || fg("main_export_markets") || fg("production_categories")),
+      checks: [
+        { label: "Headcount", met: g("employee_count_range") || fg("employee_count") },
+        { label: "Output / revenue", met: g("annual_revenue_range") || fg("annual_output") },
+        { label: "Factory visit logged", met: g("factory_visit_date") },
+        { label: "Factory type", met: fg("factory_type") },
+        { label: "Capacity / production lines", met: fg("production_lines") || fg("monthly_capacity") },
+        { label: "Size / markets / categories", met: fg("factory_size_sqm") || fg("main_export_markets") || fg("production_categories") },
+      ],
     },
     {
       key: "certifications",
       label: "Certifications",
       weight: 13,
-      total: 3,
-      met:
-        Number(g("certifications") || (ctx.certsActive ?? 0) > 0) +
-        Number(g("sample_status")) +
-        // verified, non-expired certification evidence (not just a claim)
-        Number((ctx.certsActive ?? 0) > 0),
+      checks: [
+        { label: "Certifications listed", met: g("certifications") || (ctx.certsActive ?? 0) > 0 },
+        { label: "Sample status", met: g("sample_status") },
+        { label: "Verified certificate on file", met: (ctx.certsActive ?? 0) > 0 },
+      ],
     },
     {
       key: "contacts",
       label: "Contacts",
       weight: 10,
-      total: 5,
-      met:
-        Number(g("supplier_email", "email")) +
-        Number(g("supplier_tel", "supplier_mobile", "phone")) +
-        Number(g("contact_persons") || ctx.contactPersons > 0) +
-        Number((ctx.contactsWithChannel ?? 0) > 0) +
-        Number(
-          (ctx.qrCodes ?? 0) > 0 ||
-          (ctx.contactsWithPreferences ?? 0) > 0,
-        ),
+      checks: [
+        { label: "Company email", met: g("supplier_email", "email") },
+        { label: "Company phone", met: g("supplier_tel", "supplier_mobile", "phone") },
+        { label: "Contact persons added", met: g("contact_persons") || ctx.contactPersons > 0 },
+        { label: "Messaging channel on a contact", met: (ctx.contactsWithChannel ?? 0) > 0 },
+        { label: "Channel / QR preferences", met: (ctx.qrCodes ?? 0) > 0 || (ctx.contactsWithPreferences ?? 0) > 0 },
+      ],
     },
     {
       key: "media",
       label: "Media",
       weight: 10,
-      total: 3,
-      met:
-        Number(g("photo_url")) +
-        Number(ctx.media > 0) +
-        Number((ctx.factoryMediaCount ?? 0) > 0),
+      checks: [
+        { label: "Logo / profile photo", met: g("photo_url") },
+        { label: "Documents uploaded", met: ctx.media > 0 },
+        { label: "Factory media (photos/video)", met: (ctx.factoryMediaCount ?? 0) > 0 },
+      ],
     },
     {
       key: "legal",
       label: "Legal",
       weight: 15,
-      total: 3,
-      met:
-        Number(g("kyc_status")) +
-        Number(g("tax_id", "business_registration_number")) +
-        Number(g("website", "supplier_website")),
+      checks: [
+        { label: "KYC status", met: g("kyc_status") },
+        { label: "Tax ID / registration number", met: g("tax_id", "business_registration_number") },
+        { label: "Website", met: g("website", "supplier_website") },
+      ],
     },
     {
       key: "operational",
       label: "Operational",
       weight: 10,
-      total: 4,
-      met:
-        Number(ctx.purchaseOrders > 0) +
-        Number(ctx.receipts > 0) +
-        Number(ctx.bills > 0) +
-        // verified operational evidence (audit / inspection / sample report)
-        Number((ctx.docsVerified ?? 0) > 0),
+      checks: [
+        { label: "Purchase order history", met: ctx.purchaseOrders > 0 },
+        { label: "Goods receipts", met: ctx.receipts > 0 },
+        { label: "Bills / invoices", met: ctx.bills > 0 },
+        { label: "Verified operational evidence", met: (ctx.docsVerified ?? 0) > 0 },
+      ],
     },
   ];
 
-  const dimensions: ReadinessDimension[] = dims.map((d) => ({
-    ...d,
-    fraction: d.total > 0 ? d.met / d.total : 0,
-  }));
+  const dimensions: ReadinessDimension[] = dims.map((d) => {
+    const met = d.checks.filter((c) => c.met).length;
+    const total = d.checks.length;
+    return { key: d.key, label: d.label, weight: d.weight, met, total, fraction: total > 0 ? met / total : 0, checks: d.checks };
+  });
   const score = Math.round(
     dimensions.reduce((sum, d) => sum + d.fraction * d.weight, 0),
   );
