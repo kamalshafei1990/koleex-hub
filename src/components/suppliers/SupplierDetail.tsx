@@ -15,6 +15,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { humanizeError } from "@/lib/ui/humanize-error";
+import { useTranslation } from "@/lib/i18n";
+import { contactsT } from "@/lib/translations/contacts";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import StarIcon from "@/components/icons/ui/StarIcon";
 import Building2Icon from "@/components/icons/ui/Building2Icon";
@@ -148,6 +150,7 @@ const StatusPill = ({ value }: { value: string }) =>
 type Tab = "overview" | "factory" | "contacts" | "media" | "timeline" | "risk" | "negotiation" | "sourcing" | "orders" | "bills" | "products" | "quality";
 
 export default function SupplierDetail({ id }: { id: string }) {
+  const { t } = useTranslation(contactsT);
   const router = useRouter();
   const [data, setData] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -248,7 +251,7 @@ export default function SupplierDetail({ id }: { id: string }) {
   );
 
   const s = data?.supplier ?? {};
-  const name = str(s, "company_name_en", "company_name", "display_name", "full_name") || "Supplier";
+  const name = str(s, "company_name_en", "company_name", "display_name", "full_name") || t("sd.supplier", "Supplier");
   const isActive = (s.is_active ?? true) !== false;
   const rating = num(s, "rating");
   const certs = Array.isArray(s.certifications) ? (s.certifications as unknown[]).map(String) : [];
@@ -339,44 +342,44 @@ export default function SupplierDetail({ id }: { id: string }) {
   if (error || !data) {
     return (
       <div className="mx-auto w-full max-w-3xl px-4 md:px-8 py-16 text-center">
-        <p className="text-sm text-[var(--text-secondary)]">{error ?? "Supplier not found."}</p>
+        <p className="text-sm text-[var(--text-secondary)]">{error ?? t("sd.supplierNotFound", "Supplier not found.")}</p>
         <button
           onClick={() => router.push("/suppliers")}
           className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90"
         >
-          <ArrowLeftIcon className="h-4 w-4" /> Back to suppliers
+          <ArrowLeftIcon className="h-4 w-4" /> {t("sd.backToSuppliers", "Back to suppliers")}
         </button>
       </div>
     );
   }
 
   const terms: { label: string; value: string; icon: React.ReactNode }[] = [
-    { label: "Payment terms", value: str(s, "payment_terms"), icon: <WalletIcon className="h-4 w-4" /> },
-    { label: "Currency", value: str(s, "currency"), icon: <ReceiptIcon className="h-4 w-4" /> },
-    { label: "MOQ", value: str(s, "moq"), icon: <PackageIcon className="h-4 w-4" /> },
-    { label: "Lead time", value: str(s, "lead_time"), icon: <ShipIcon className="h-4 w-4" /> },
-    { label: "Incoterms", value: str(s, "incoterms"), icon: <GlobeIcon className="h-4 w-4" /> },
+    { label: t("sd.paymentTerms", "Payment terms"), value: str(s, "payment_terms"), icon: <WalletIcon className="h-4 w-4" /> },
+    { label: t("sd.currency", "Currency"), value: str(s, "currency"), icon: <ReceiptIcon className="h-4 w-4" /> },
+    { label: t("sd.moq", "MOQ"), value: str(s, "moq"), icon: <PackageIcon className="h-4 w-4" /> },
+    { label: t("sd.leadTime", "Lead time"), value: str(s, "lead_time"), icon: <ShipIcon className="h-4 w-4" /> },
+    { label: t("sd.incoterms", "Incoterms"), value: str(s, "incoterms"), icon: <GlobeIcon className="h-4 w-4" /> },
   ].filter((t) => t.value);
 
   const tabs: { key: Tab; label: string; count?: number }[] = [
-    { key: "overview", label: "Overview" },
-    { key: "factory", label: "Factory" },
-    { key: "contacts", label: "Contacts", count: data.contactPersons.length },
-    { key: "media", label: "Documents", count: data.media.length },
-    { key: "timeline", label: "Timeline", count: (data.timeline ?? []).length },
-    { key: "risk", label: "Risk", count: (data.riskItems ?? []).filter((r) => r.status !== "resolved").length },
-    { key: "negotiation", label: "Negotiation", count: (data.negotiations ?? []).length },
-    { key: "sourcing", label: "Sourcing", count: (data.sourcingLinks ?? []).length },
-    { key: "orders", label: "Purchase Orders", count: data.purchaseOrders.length },
-    { key: "bills", label: "Bills & Payments", count: data.bills.length + data.payments.length },
-    { key: "products", label: "Products", count: data.products.length },
-    { key: "quality", label: "Certifications" },
+    { key: "overview", label: t("sd.overview", "Overview") },
+    { key: "factory", label: t("sd.factory", "Factory") },
+    { key: "contacts", label: t("sd.contacts", "Contacts"), count: data.contactPersons.length },
+    { key: "media", label: t("sd.documents", "Documents"), count: data.media.length },
+    { key: "timeline", label: t("sd.timeline", "Timeline"), count: (data.timeline ?? []).length },
+    { key: "risk", label: t("sd.risk", "Risk"), count: (data.riskItems ?? []).filter((r) => r.status !== "resolved").length },
+    { key: "negotiation", label: t("sd.negotiation", "Negotiation"), count: (data.negotiations ?? []).length },
+    { key: "sourcing", label: t("sd.sourcing", "Sourcing"), count: (data.sourcingLinks ?? []).length },
+    { key: "orders", label: t("sd.purchaseOrders", "Purchase Orders"), count: data.purchaseOrders.length },
+    { key: "bills", label: t("sd.billsPayments", "Bills & Payments"), count: data.bills.length + data.payments.length },
+    { key: "products", label: t("sd.products", "Products"), count: data.products.length },
+    { key: "quality", label: t("sd.certifications", "Certifications") },
   ];
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
       <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 py-6">
-        <SuppliersHeader title="Suppliers" />
+        <SuppliersHeader title={t("sd.suppliers", "Suppliers")} />
 
       <main className="mt-6 space-y-10 pb-24">
         {/* ── Identity ── */}
@@ -392,7 +395,7 @@ export default function SupplierDetail({ id }: { id: string }) {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-faint)]">
               <Building2Icon className="h-3.5 w-3.5" />
-              {str(s, "supplier_type") || "Supplier"}
+              {str(s, "supplier_type") || t("sd.supplier", "Supplier")}
             </div>
             <h1 className="mt-1 text-3xl md:text-4xl font-semibold tracking-[-0.02em] text-[var(--text-primary)]">{name}</h1>
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-[var(--text-secondary)]">
@@ -426,7 +429,7 @@ export default function SupplierDetail({ id }: { id: string }) {
                     onClick={() => { setStatusDraft(ss); setStatusReason(""); setStatusOpen((o) => !o); }}
                     className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold transition-colors ${cls}`}
                   >
-                    {ss ? (STRATEGIC_STATUS_LABELS[ss as StrategicStatus] ?? ss) : "Set status"}
+                    {ss ? (STRATEGIC_STATUS_LABELS[ss as StrategicStatus] ?? ss) : t("sd.setStatus", "Set status")}
                     <Edit3Icon className="h-3 w-3 opacity-70" />
                   </button>
                 );
@@ -436,7 +439,7 @@ export default function SupplierDetail({ id }: { id: string }) {
                   isActive ? "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]" : "bg-rose-500/10 text-rose-300"
                 }`}
               >
-                {isActive ? "Active" : "Archived"}
+                {isActive ? t("sd.active", "Active") : t("sd.archived", "Archived")}
               </span>
             </div>
 
@@ -462,7 +465,7 @@ export default function SupplierDetail({ id }: { id: string }) {
                 <input
                   value={statusReason}
                   onChange={(e) => setStatusReason(e.target.value)}
-                  placeholder="Reason / internal note (optional)"
+                  placeholder={t("sd.reasonPlaceholder", "Reason / internal note (optional)")}
                   className="w-full rounded-lg bg-[var(--bg-surface-subtle)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-faint)] outline-none"
                 />
                 <div className="flex items-center gap-3">
@@ -472,10 +475,10 @@ export default function SupplierDetail({ id }: { id: string }) {
                     onClick={saveStatus}
                     className="rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50"
                   >
-                    {savingStatus ? "Saving…" : "Save status"}
+                    {savingStatus ? t("sd.saving", "Saving…") : t("sd.saveStatus", "Save status")}
                   </button>
                   <button type="button" onClick={() => setStatusOpen(false)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">
-                    Cancel
+                    {t("sd.cancel", "Cancel")}
                   </button>
                 </div>
               </div>
@@ -503,7 +506,7 @@ export default function SupplierDetail({ id }: { id: string }) {
                         disabled={busyClass === val}
                         onClick={() => mutateClassification(val, "remove")}
                         className="text-[var(--text-faint)] hover:text-rose-400 disabled:opacity-40"
-                        aria-label="Remove classification"
+                        aria-label={t("sd.removeClassification", "Remove classification")}
                       >
                         <CrossIcon className="h-3 w-3" />
                       </button>
@@ -516,7 +519,7 @@ export default function SupplierDetail({ id }: { id: string }) {
                   onClick={() => setClassOpen((o) => !o)}
                   className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-surface-subtle)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-faint)] hover:text-[var(--text-primary)]"
                 >
-                  <PlusIcon className="h-3 w-3" /> Classification
+                  <PlusIcon className="h-3 w-3" /> {t("sd.classification", "Classification")}
                 </button>
                 {classOpen ? (
                   <div className="absolute z-10 mt-1 max-h-64 w-56 overflow-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-1.5 shadow-lg">
@@ -536,7 +539,7 @@ export default function SupplierDetail({ id }: { id: string }) {
                     {(Object.keys(CLASSIFICATION_LABELS) as string[]).filter(
                       (k) => !data.classifications.some((c) => str(c, "classification") === k),
                     ).length === 0 ? (
-                      <div className="px-2.5 py-2 text-[11px] text-[var(--text-faint)]">All classifications added</div>
+                      <div className="px-2.5 py-2 text-[11px] text-[var(--text-faint)]">{t("sd.allClassificationsAdded", "All classifications added")}</div>
                     ) : null}
                   </div>
                 ) : null}
@@ -562,10 +565,10 @@ export default function SupplierDetail({ id }: { id: string }) {
         {/* ── KPI row ── */}
         <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {[
-            { label: "Total purchases", value: money(stats.totalPurchases, currency) },
-            { label: "Outstanding payable", value: money(stats.outstanding, currency) },
-            { label: "Open POs", value: String(stats.openPos) },
-            { label: "Products supplied", value: String(stats.products) },
+            { label: t("sd.totalPurchases", "Total purchases"), value: money(stats.totalPurchases, currency) },
+            { label: t("sd.outstandingPayable", "Outstanding payable"), value: money(stats.outstanding, currency) },
+            { label: t("sd.openPos", "Open POs"), value: String(stats.openPos) },
+            { label: t("sd.productsSupplied", "Products supplied"), value: String(stats.products) },
           ].map((k) => (
             <div key={k.label} className="rounded-2xl bg-[var(--bg-surface-subtle)] p-5">
               <div className="text-xl md:text-2xl font-semibold tracking-tight text-[var(--text-primary)]">{k.value}</div>
@@ -578,7 +581,7 @@ export default function SupplierDetail({ id }: { id: string }) {
         {data.readiness ? (
           <section className="rounded-2xl bg-[var(--bg-surface-subtle)] p-6">
             <div className="flex items-center justify-between gap-4">
-              <SectionHead eyebrow="Onboarding" title="Supplier readiness" />
+              <SectionHead eyebrow={t("sd.onboarding", "Onboarding")} title={t("sd.supplierReadiness", "Supplier readiness")} />
               <div className="flex items-baseline gap-1">
                 <span className="text-3xl font-semibold tracking-[-0.02em] text-[var(--text-primary)]">{data.readiness.score}</span>
                 <span className="text-sm font-medium text-[var(--text-faint)]">%</span>
@@ -605,16 +608,16 @@ export default function SupplierDetail({ id }: { id: string }) {
 
         {/* ── Performance scorecard ── */}
         <section className="space-y-4">
-          <SectionHead eyebrow="Track record" title="Performance scorecard" />
+          <SectionHead eyebrow={t("sd.trackRecord", "Track record")} title={t("sd.performanceScorecard", "Performance scorecard")} />
           {!scorecard.hasHistory ? (
-            <EmptyTab label="No purchasing history yet — on-time, lead-time, and return metrics appear once POs and receipts are recorded." />
+            <EmptyTab label={t("sd.noPurchasingHistory", "No purchasing history yet — on-time, lead-time, and return metrics appear once POs and receipts are recorded.")} />
           ) : (
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               {[
-                { label: "On-time delivery", value: scorecard.onTimePct === null ? "—" : `${scorecard.onTimePct}%`, meter: scorecard.onTimePct },
-                { label: "Avg lead time", value: scorecard.avgLeadDays === null ? "—" : `${scorecard.avgLeadDays}`, unit: "days" },
-                { label: "Returns", value: String(scorecard.returns), sub: scorecard.defects ? `${scorecard.defects} quality` : undefined },
-                { label: "Return rate", value: scorecard.returnRate === null ? "—" : `${scorecard.returnRate}%` },
+                { label: t("sd.onTimeDelivery", "On-time delivery"), value: scorecard.onTimePct === null ? "—" : `${scorecard.onTimePct}%`, meter: scorecard.onTimePct },
+                { label: t("sd.avgLeadTime", "Avg lead time"), value: scorecard.avgLeadDays === null ? "—" : `${scorecard.avgLeadDays}`, unit: t("sd.days", "days") },
+                { label: t("sd.returns", "Returns"), value: String(scorecard.returns), sub: scorecard.defects ? `${scorecard.defects} ${t("sd.quality", "quality")}` : undefined },
+                { label: t("sd.returnRate", "Return rate"), value: scorecard.returnRate === null ? "—" : `${scorecard.returnRate}%` },
               ].map((k) => (
                 <div key={k.label} className="rounded-2xl bg-[var(--bg-surface-subtle)] p-5">
                   <div className="flex items-baseline gap-1.5">
@@ -656,7 +659,7 @@ export default function SupplierDetail({ id }: { id: string }) {
         {tab === "overview" ? (
           <section className="grid grid-cols-1 gap-8 md:grid-cols-2">
             <div className="space-y-3">
-              <SectionHead title="Contact" />
+              <SectionHead title={t("sd.contact", "Contact")} />
               <div className="space-y-2.5 text-sm">
                 {[
                   { icon: <EnvelopeIcon className="h-4 w-4" />, v: str(s, "supplier_email", "email") },
@@ -675,7 +678,7 @@ export default function SupplierDetail({ id }: { id: string }) {
             </div>
             {str(s, "notes") ? (
               <div className="space-y-3">
-                <SectionHead title="Notes" />
+                <SectionHead title={t("sd.notes", "Notes")} />
                 <p className="text-sm leading-relaxed text-[var(--text-secondary)]"><AutoTranslatedText text={str(s, "notes")} /></p>
               </div>
             ) : null}
@@ -738,7 +741,7 @@ export default function SupplierDetail({ id }: { id: string }) {
         {tab === "sourcing" ? (
           <SourcingSection
             supplierId={id}
-            supplierName={str(s, "company_name_en") || str(s, "display_name") || "Supplier"}
+            supplierName={str(s, "company_name_en") || str(s, "display_name") || t("sd.supplier", "Supplier")}
             sourcing={data.sourcing ?? null}
             sourcingProfile={data.sourcingProfile ?? null}
             sourcingLinks={data.sourcingLinks ?? []}
@@ -749,16 +752,16 @@ export default function SupplierDetail({ id }: { id: string }) {
 
         {tab === "orders" ? (
           data.purchaseOrders.length === 0 ? (
-            <EmptyTab label="No purchase orders linked to this supplier yet." />
+            <EmptyTab label={t("sd.noPurchaseOrders", "No purchase orders linked to this supplier yet.")} />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-[var(--border-subtle)] text-left text-[11px] uppercase tracking-wider text-[var(--text-faint)]">
-                    <th className="py-2.5 pe-4 font-medium">Order</th>
-                    <th className="py-2.5 pe-4 font-medium">Date</th>
-                    <th className="py-2.5 pe-4 font-medium">Status</th>
-                    <th className="py-2.5 text-end font-medium">Total</th>
+                    <th className="py-2.5 pe-4 font-medium">{t("sd.order", "Order")}</th>
+                    <th className="py-2.5 pe-4 font-medium">{t("sd.date", "Date")}</th>
+                    <th className="py-2.5 pe-4 font-medium">{t("sd.status", "Status")}</th>
+                    <th className="py-2.5 text-end font-medium">{t("sd.total", "Total")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -779,19 +782,19 @@ export default function SupplierDetail({ id }: { id: string }) {
         {tab === "bills" ? (
           <div className="space-y-8">
             <div className="space-y-3">
-              <SectionHead eyebrow="Accounts payable" title="Vendor bills" />
+              <SectionHead eyebrow={t("sd.accountsPayable", "Accounts payable")} title={t("sd.vendorBills", "Vendor bills")} />
               {data.bills.length === 0 ? (
-                <EmptyTab label="No bills recorded for this supplier." />
+                <EmptyTab label={t("sd.noBills", "No bills recorded for this supplier.")} />
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse text-sm">
                     <thead>
                       <tr className="border-b border-[var(--border-subtle)] text-left text-[11px] uppercase tracking-wider text-[var(--text-faint)]">
-                        <th className="py-2.5 pe-4 font-medium">Bill</th>
-                        <th className="py-2.5 pe-4 font-medium">Due</th>
-                        <th className="py-2.5 pe-4 font-medium">Status</th>
-                        <th className="py-2.5 pe-4 text-end font-medium">Total</th>
-                        <th className="py-2.5 text-end font-medium">Balance</th>
+                        <th className="py-2.5 pe-4 font-medium">{t("sd.bill", "Bill")}</th>
+                        <th className="py-2.5 pe-4 font-medium">{t("sd.due", "Due")}</th>
+                        <th className="py-2.5 pe-4 font-medium">{t("sd.status", "Status")}</th>
+                        <th className="py-2.5 pe-4 text-end font-medium">{t("sd.total", "Total")}</th>
+                        <th className="py-2.5 text-end font-medium">{t("sd.balance", "Balance")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -810,18 +813,18 @@ export default function SupplierDetail({ id }: { id: string }) {
               )}
             </div>
             <div className="space-y-3">
-              <SectionHead eyebrow="Settlements" title="Payments" />
+              <SectionHead eyebrow={t("sd.settlements", "Settlements")} title={t("sd.payments", "Payments")} />
               {data.payments.length === 0 ? (
-                <EmptyTab label="No payments recorded for this supplier." />
+                <EmptyTab label={t("sd.noPayments", "No payments recorded for this supplier.")} />
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse text-sm">
                     <thead>
                       <tr className="border-b border-[var(--border-subtle)] text-left text-[11px] uppercase tracking-wider text-[var(--text-faint)]">
-                        <th className="py-2.5 pe-4 font-medium">Date</th>
-                        <th className="py-2.5 pe-4 font-medium">Reference</th>
-                        <th className="py-2.5 pe-4 font-medium">Status</th>
-                        <th className="py-2.5 text-end font-medium">Amount</th>
+                        <th className="py-2.5 pe-4 font-medium">{t("sd.date", "Date")}</th>
+                        <th className="py-2.5 pe-4 font-medium">{t("sd.reference", "Reference")}</th>
+                        <th className="py-2.5 pe-4 font-medium">{t("sd.status", "Status")}</th>
+                        <th className="py-2.5 text-end font-medium">{t("sd.amount", "Amount")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -843,7 +846,7 @@ export default function SupplierDetail({ id }: { id: string }) {
 
         {tab === "products" ? (
           data.products.length === 0 ? (
-            <EmptyTab label="No products are linked to this supplier yet." />
+            <EmptyTab label={t("sd.noProducts", "No products are linked to this supplier yet.")} />
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
               {data.products.map((p, i) => {
@@ -853,7 +856,7 @@ export default function SupplierDetail({ id }: { id: string }) {
                     <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl bg-[var(--bg-surface)] text-[var(--text-faint)]">
                       <PackageIcon className="h-7 w-7" />
                     </div>
-                    <div className="mt-2 truncate text-sm font-medium text-[var(--text-primary)]">{str(p, "product_name") || "Untitled"}</div>
+                    <div className="mt-2 truncate text-sm font-medium text-[var(--text-primary)]">{str(p, "product_name") || t("sd.untitled", "Untitled")}</div>
                     {str(p, "category_slug") ? (
                       <div className="truncate text-[11px] text-[var(--text-faint)]">{str(p, "category_slug")}</div>
                     ) : null}
@@ -872,9 +875,9 @@ export default function SupplierDetail({ id }: { id: string }) {
         {tab === "quality" ? (
           <section className="space-y-6">
             <div className="space-y-3">
-              <SectionHead eyebrow="Compliance" title="Certifications" />
+              <SectionHead eyebrow={t("sd.compliance", "Compliance")} title={t("sd.certifications", "Certifications")} />
               {certs.length === 0 ? (
-                <EmptyTab label="No certifications recorded." />
+                <EmptyTab label={t("sd.noCertifications", "No certifications recorded.")} />
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {certs.map((c) => (
@@ -890,7 +893,7 @@ export default function SupplierDetail({ id }: { id: string }) {
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 {str(s, "sample_status") ? (
                   <div className="space-y-2">
-                    <SectionHead title="Sample status" />
+                    <SectionHead title={t("sd.sampleStatus", "Sample status")} />
                     <StatusPill value={str(s, "sample_status")} />
                   </div>
                 ) : null}

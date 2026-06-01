@@ -15,6 +15,8 @@
    --------------------------------------------------------------------------- */
 
 import { useMemo, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { contactsT } from "@/lib/translations/contacts";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { uploadToStorage } from "@/lib/storage-client";
 import {
@@ -136,6 +138,7 @@ export default function ContactsSection({
   onSaved: () => void | Promise<void>;
 }) {
   // editingId: contact id being edited, "new" for add, null for none
+  const { t } = useTranslation(contactsT);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [saving, setSaving] = useState(false);
@@ -182,7 +185,7 @@ export default function ContactsSection({
   const openEdit = (c: Row) => { setDraft(draftFrom(c)); setEditingId(str(c, "id")); setErr(null); };
 
   const saveContact = async () => {
-    if (!draft.full_name.trim()) { setErr("Name is required"); return; }
+    if (!draft.full_name.trim()) { setErr(t("cs.nameRequired", "Name is required")); return; }
     setSaving(true); setErr(null);
     try {
       const body: Record<string, unknown> = {
@@ -214,7 +217,7 @@ export default function ContactsSection({
 
   const archiveContact = async (c: Row) => {
     const id = str(c, "id");
-    if (!confirm(`Archive ${str(c, "full_name") || "this contact"}? They can be re-added later.`)) return;
+    if (!confirm(`${t("cs.archiveConfirmPrefix", "Archive")} ${str(c, "full_name") || t("cs.thisContact", "this contact")}${t("cs.archiveConfirmSuffix", "? They can be re-added later.")}`)) return;
     setBusyId(id); setErr(null);
     try {
       const r = await fetch(`/api/suppliers/${supplierId}/contacts/${id}`, {
@@ -239,7 +242,7 @@ export default function ContactsSection({
   };
 
   const saveQr = async () => {
-    if (!qrFile) { setQrErr("Choose a QR image first"); return; }
+    if (!qrFile) { setQrErr(t("cs.chooseQrFirst", "Choose a QR image first")); return; }
     setQrBusy(true); setQrErr(null);
     try {
       const ext = (qrFile.name.split(".").pop() || "png").toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -276,7 +279,7 @@ export default function ContactsSection({
 
   const removeQr = async (q: Row) => {
     const id = str(q, "id");
-    if (!confirm("Remove this QR code?")) return;
+    if (!confirm(t("cs.removeQrConfirm", "Remove this QR code?"))) return;
     setBusyId(id); setQrErr(null);
     try {
       const r = await fetch(`/api/suppliers/${supplierId}/qr/${id}`, {
@@ -302,7 +305,7 @@ export default function ContactsSection({
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <UsersIcon className="h-4 w-4 text-[var(--text-secondary)]" />
-          <h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">Communication Intelligence</h3>
+          <h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">{t("cs.title", "Communication Intelligence")}</h3>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -310,14 +313,14 @@ export default function ContactsSection({
             onClick={() => openQr(null)}
             className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-surface-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
           >
-            <ScanLineIcon className="h-3.5 w-3.5" /> Add QR
+            <ScanLineIcon className="h-3.5 w-3.5" /> {t("cs.addQr", "Add QR")}
           </button>
           <button
             type="button"
             onClick={openAdd}
             className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90"
           >
-            <PlusIcon className="h-3.5 w-3.5" /> Add contact
+            <PlusIcon className="h-3.5 w-3.5" /> {t("cs.addContact", "Add contact")}
           </button>
         </div>
       </div>
@@ -330,53 +333,53 @@ export default function ContactsSection({
           <div className="flex items-center gap-2">
             <UserIcon className="h-4 w-4 text-[var(--text-secondary)]" />
             <span className="text-[13px] font-semibold text-[var(--text-primary)]">
-              {editingId === "new" ? "New contact" : "Edit contact"}
+              {editingId === "new" ? t("cs.newContact", "New contact") : t("cs.editContact", "Edit contact")}
             </span>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
-            <Field label="Full name *"><input className={inputCls} value={draft.full_name} onChange={(e) => set("full_name", e.target.value)} placeholder="e.g. Wang Lei" /></Field>
-            <Field label="Name (中文)"><input className={inputCls} value={draft.name_cn} onChange={(e) => set("name_cn", e.target.value)} placeholder="王磊" /></Field>
-            <Field label="Role category">
+            <Field label={t("cs.fullName", "Full name *")}><input className={inputCls} value={draft.full_name} onChange={(e) => set("full_name", e.target.value)} placeholder="e.g. Wang Lei" /></Field>
+            <Field label={t("cs.nameCn", "Name (中文)")}><input className={inputCls} value={draft.name_cn} onChange={(e) => set("name_cn", e.target.value)} placeholder="王磊" /></Field>
+            <Field label={t("cs.roleCategory", "Role category")}>
               <select className={inputCls} value={draft.role_category} onChange={(e) => set("role_category", e.target.value)}>
                 <option value="">—</option>
-                {ROLE_CATEGORY_ORDER.map((k) => <option key={k} value={k}>{ROLE_CATEGORY_LABELS[k]}</option>)}
+                {ROLE_CATEGORY_ORDER.map((k) => <option key={k} value={k}>{t("opt." + k, ROLE_CATEGORY_LABELS[k])}</option>)}
               </select>
             </Field>
-            <Field label="Position / title"><input className={inputCls} value={draft.position} onChange={(e) => set("position", e.target.value)} placeholder="Export Sales Lead" /></Field>
-            <Field label="Department"><input className={inputCls} value={draft.department} onChange={(e) => set("department", e.target.value)} placeholder="International Sales" /></Field>
-            <Field label="Visibility">
+            <Field label={t("cs.positionTitle", "Position / title")}><input className={inputCls} value={draft.position} onChange={(e) => set("position", e.target.value)} placeholder="Export Sales Lead" /></Field>
+            <Field label={t("cs.department", "Department")}><input className={inputCls} value={draft.department} onChange={(e) => set("department", e.target.value)} placeholder="International Sales" /></Field>
+            <Field label={t("cs.visibility", "Visibility")}>
               <select className={inputCls} value={draft.visibility_tier} onChange={(e) => set("visibility_tier", e.target.value)}>
-                {VISIBILITY_TIERS.map((t) => <option key={t} value={t}>{VISIBILITY_LABELS[t]}</option>)}
+                {VISIBILITY_TIERS.map((tier) => <option key={tier} value={tier}>{t("opt." + tier, VISIBILITY_LABELS[tier])}</option>)}
               </select>
             </Field>
-            <Field label="Email"><input className={inputCls} value={draft.email} onChange={(e) => set("email", e.target.value)} placeholder="name@factory.com" /></Field>
-            <Field label="Mobile"><input className={inputCls} value={draft.mobile} onChange={(e) => set("mobile", e.target.value)} placeholder="+86 …" /></Field>
-            <Field label="WhatsApp"><input className={inputCls} value={draft.whatsapp} onChange={(e) => set("whatsapp", e.target.value)} placeholder="+86 …" /></Field>
-            <Field label="Telegram"><input className={inputCls} value={draft.telegram} onChange={(e) => set("telegram", e.target.value)} placeholder="@handle" /></Field>
-            <Field label="WeChat ID"><input className={inputCls} value={draft.wechat_id} onChange={(e) => set("wechat_id", e.target.value)} placeholder="wxid_…" /></Field>
-            <Field label="WeCom ID"><input className={inputCls} value={draft.wecom_id} onChange={(e) => set("wecom_id", e.target.value)} /></Field>
-            <Field label="Preferred channel">
+            <Field label={t("cs.email", "Email")}><input className={inputCls} value={draft.email} onChange={(e) => set("email", e.target.value)} placeholder="name@factory.com" /></Field>
+            <Field label={t("cs.mobile", "Mobile")}><input className={inputCls} value={draft.mobile} onChange={(e) => set("mobile", e.target.value)} placeholder="+86 …" /></Field>
+            <Field label={t("cs.whatsapp", "WhatsApp")}><input className={inputCls} value={draft.whatsapp} onChange={(e) => set("whatsapp", e.target.value)} placeholder="+86 …" /></Field>
+            <Field label={t("cs.telegram", "Telegram")}><input className={inputCls} value={draft.telegram} onChange={(e) => set("telegram", e.target.value)} placeholder="@handle" /></Field>
+            <Field label={t("cs.wechatId", "WeChat ID")}><input className={inputCls} value={draft.wechat_id} onChange={(e) => set("wechat_id", e.target.value)} placeholder="wxid_…" /></Field>
+            <Field label={t("cs.wecomId", "WeCom ID")}><input className={inputCls} value={draft.wecom_id} onChange={(e) => set("wecom_id", e.target.value)} /></Field>
+            <Field label={t("cs.preferredChannel", "Preferred channel")}>
               <select className={inputCls} value={draft.preferred_channel} onChange={(e) => set("preferred_channel", e.target.value)}>
                 <option value="">—</option>
-                {Object.keys(CHANNEL_LABELS).map((k) => <option key={k} value={k}>{CHANNEL_LABELS[k]}</option>)}
+                {Object.keys(CHANNEL_LABELS).map((k) => <option key={k} value={k}>{t("opt." + k, CHANNEL_LABELS[k])}</option>)}
               </select>
             </Field>
-            <Field label="Preferred language"><input className={inputCls} value={draft.preferred_language} onChange={(e) => set("preferred_language", e.target.value)} placeholder="Chinese / English" /></Field>
-            <Field label="Timezone"><input className={inputCls} value={draft.timezone} onChange={(e) => set("timezone", e.target.value)} placeholder="CST (UTC+8)" /></Field>
-            <Field label="Available hours"><input className={inputCls} value={draft.available_hours} onChange={(e) => set("available_hours", e.target.value)} placeholder="Active after 18:00 CST" /></Field>
-            <Field label="Reliability">
+            <Field label={t("cs.preferredLanguage", "Preferred language")}><input className={inputCls} value={draft.preferred_language} onChange={(e) => set("preferred_language", e.target.value)} placeholder="Chinese / English" /></Field>
+            <Field label={t("cs.timezone", "Timezone")}><input className={inputCls} value={draft.timezone} onChange={(e) => set("timezone", e.target.value)} placeholder="CST (UTC+8)" /></Field>
+            <Field label={t("cs.availableHours", "Available hours")}><input className={inputCls} value={draft.available_hours} onChange={(e) => set("available_hours", e.target.value)} placeholder="Active after 18:00 CST" /></Field>
+            <Field label={t("cs.reliability", "Reliability")}>
               <select className={inputCls} value={draft.reliability} onChange={(e) => set("reliability", e.target.value)}>
                 <option value="">—</option>
-                {Object.keys(RELIABILITY_LABELS).map((k) => <option key={k} value={k}>{RELIABILITY_LABELS[k]}</option>)}
+                {Object.keys(RELIABILITY_LABELS).map((k) => <option key={k} value={k}>{t("opt." + k, RELIABILITY_LABELS[k])}</option>)}
               </select>
             </Field>
-            <Field label="Response speed"><input className={inputCls} value={draft.response_speed} onChange={(e) => set("response_speed", e.target.value)} placeholder="Replies fastest on WeChat" /></Field>
+            <Field label={t("cs.responseSpeed", "Response speed")}><input className={inputCls} value={draft.response_speed} onChange={(e) => set("response_speed", e.target.value)} placeholder="Replies fastest on WeChat" /></Field>
           </div>
-          <Field label="Notes (operational intelligence)">
+          <Field label={t("cs.notes", "Notes (operational intelligence)")}>
             <textarea className={`${inputCls} min-h-[60px]`} value={draft.notes} onChange={(e) => set("notes", e.target.value)} placeholder="Weak English · handles technical problems · prefers calls" />
           </Field>
           <div className="flex flex-wrap gap-1.5">
-            {([["is_primary", "Primary contact"], ["is_decision_maker", "Decision maker"]] as const).map(([k, label]) => {
+            {([["is_primary", t("cs.primaryContact", "Primary contact")], ["is_decision_maker", t("cs.decisionMaker", "Decision maker")]] as const).map(([k, label]) => {
               const on = draft[k];
               return (
                 <button key={k} type="button" onClick={() => set(k, !on)}
@@ -389,9 +392,9 @@ export default function ContactsSection({
           <div className="flex items-center gap-3">
             <button type="button" disabled={saving} onClick={saveContact}
               className="rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
-              {saving ? "Saving…" : "Save contact"}
+              {saving ? t("cs.saving", "Saving…") : t("cs.saveContact", "Save contact")}
             </button>
-            <button type="button" onClick={() => setEditingId(null)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">Cancel</button>
+            <button type="button" onClick={() => setEditingId(null)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">{t("cs.cancel", "Cancel")}</button>
           </div>
         </div>
       ) : null}
@@ -399,14 +402,14 @@ export default function ContactsSection({
       {/* ── empty state ── */}
       {!hasData && !editingId ? (
         <div className="rounded-2xl bg-[var(--bg-surface-subtle)]/50 px-6 py-12 text-center text-sm text-[var(--text-faint)]">
-          No communication intelligence yet — add the people you actually talk to, their channels, and WeChat QR codes to strengthen sourcing readiness.
+          {t("cs.emptyState", "No communication intelligence yet — add the people you actually talk to, their channels, and WeChat QR codes to strengthen sourcing readiness.")}
         </div>
       ) : null}
 
       {/* ── contact cards, grouped by role hierarchy ── */}
       {grouped.map(({ cat, items }) => (
         <div key={cat} className="space-y-2.5">
-          <SectionLabel>{roleCategoryLabel(cat)}</SectionLabel>
+          <SectionLabel>{t("opt." + cat, roleCategoryLabel(cat))}</SectionLabel>
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             {items.map((c) => {
               const id = str(c, "id");
@@ -422,22 +425,22 @@ export default function ContactsSection({
                         <span className="text-[14px] font-semibold text-[var(--text-primary)]">{str(c, "full_name")}</span>
                         {str(c, "name_cn") ? <span className="text-[12px] text-[var(--text-faint)]">{str(c, "name_cn")}</span> : null}
                         {isTrue(c, "is_primary") ? (
-                          <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--text-primary)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--bg-primary)]"><StarIcon className="h-2.5 w-2.5" />Primary</span>
+                          <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--text-primary)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--bg-primary)]"><StarIcon className="h-2.5 w-2.5" />{t("cs.primary", "Primary")}</span>
                         ) : null}
                         {isTrue(c, "is_decision_maker") ? (
-                          <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--bg-surface)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]"><UserCheckIcon className="h-2.5 w-2.5" />Decision</span>
+                          <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--bg-surface)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]"><UserCheckIcon className="h-2.5 w-2.5" />{t("cs.decision", "Decision")}</span>
                         ) : null}
                       </div>
                       <div className="mt-0.5 truncate text-[11px] text-[var(--text-faint)]">
-                        {[str(c, "position") || str(c, "role"), str(c, "department")].filter(Boolean).join(" · ") || roleCategoryLabel(cat)}
+                        {[str(c, "position") || str(c, "role"), str(c, "department")].filter(Boolean).join(" · ") || t("opt." + cat, roleCategoryLabel(cat))}
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
-                      <button type="button" title="Add QR for this contact" onClick={() => openQr(id)}
+                      <button type="button" title={t("cs.addQrForContact", "Add QR for this contact")} onClick={() => openQr(id)}
                         className="rounded-md p-1.5 text-[var(--text-faint)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"><ScanLineIcon className="h-3.5 w-3.5" /></button>
-                      <button type="button" title="Edit" onClick={() => openEdit(c)}
+                      <button type="button" title={t("cs.edit", "Edit")} onClick={() => openEdit(c)}
                         className="rounded-md p-1.5 text-[var(--text-faint)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"><Edit3Icon className="h-3.5 w-3.5" /></button>
-                      <button type="button" title="Archive" disabled={busyId === id} onClick={() => archiveContact(c)}
+                      <button type="button" title={t("cs.archive", "Archive")} disabled={busyId === id} onClick={() => archiveContact(c)}
                         className="rounded-md p-1.5 text-[var(--text-faint)] hover:bg-[var(--bg-surface)] hover:text-rose-400 disabled:opacity-40"><TrashIcon className="h-3.5 w-3.5" /></button>
                     </div>
                   </div>
@@ -456,9 +459,9 @@ export default function ContactsSection({
                         );
                         const cls = `inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium ${pref ? "bg-[var(--bg-surface)] text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)]" : "bg-[var(--bg-surface)] text-[var(--text-secondary)]"}`;
                         return ch.href ? (
-                          <a key={ch.key} href={ch.href} target="_blank" rel="noopener noreferrer" className={`${cls} hover:text-[var(--text-primary)]`} title={channelLabel(ch.key)}>{inner}</a>
+                          <a key={ch.key} href={ch.href} target="_blank" rel="noopener noreferrer" className={`${cls} hover:text-[var(--text-primary)]`} title={t("opt." + ch.key, channelLabel(ch.key))}>{inner}</a>
                         ) : (
-                          <span key={ch.key} className={cls} title={channelLabel(ch.key)}>{inner}</span>
+                          <span key={ch.key} className={cls} title={t("opt." + ch.key, channelLabel(ch.key))}>{inner}</span>
                         );
                       })}
                     </div>
@@ -473,7 +476,7 @@ export default function ContactsSection({
                         <span className="inline-flex items-center gap-1"><ClockIcon className="h-3 w-3" />{typeof c.available_hours === "object" && c.available_hours ? String((c.available_hours as Row).text ?? "") : str(c, "available_hours")}</span>
                       ) : null}
                       {str(c, "response_speed") ? <span className="inline-flex items-center gap-1"><ZapIcon className="h-3 w-3" />{str(c, "response_speed")}</span> : null}
-                      {str(c, "reliability") ? <span className="inline-flex items-center gap-1"><ShieldCheckIcon className="h-3 w-3" />{RELIABILITY_LABELS[str(c, "reliability")] ?? str(c, "reliability")} reliability</span> : null}
+                      {str(c, "reliability") ? <span className="inline-flex items-center gap-1"><ShieldCheckIcon className="h-3 w-3" />{t("opt." + str(c, "reliability"), RELIABILITY_LABELS[str(c, "reliability")] ?? str(c, "reliability"))} {t("cs.reliabilitySuffix", "reliability")}</span> : null}
                     </div>
                   ) : null}
 
@@ -482,13 +485,13 @@ export default function ContactsSection({
                   {/* per-contact QR strip */}
                   {qrs.length ? (
                     <div className="flex flex-wrap gap-2 pt-1">
-                      {qrs.map((q) => <QrThumb key={str(q, "id")} q={q} busy={busyId === str(q, "id")} onRemove={() => removeQr(q)} />)}
+                      {qrs.map((q) => <QrThumb key={str(q, "id")} q={q} busy={busyId === str(q, "id")} onRemove={() => removeQr(q)} t={t} />)}
                     </div>
                   ) : null}
 
                   {/* visibility footer */}
                   <div className="flex items-center gap-1 pt-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--text-faint)]">
-                    <ShieldCheckIcon className="h-3 w-3" />{VISIBILITY_LABELS[str(c, "visibility_tier")] ?? "Internal"}
+                    <ShieldCheckIcon className="h-3 w-3" />{t("opt." + str(c, "visibility_tier"), VISIBILITY_LABELS[str(c, "visibility_tier")] ?? "Internal")}
                   </div>
                 </div>
               );
@@ -500,9 +503,9 @@ export default function ContactsSection({
       {/* ── supplier-level QR gallery ── */}
       {(qrByContact._supplier ?? []).length ? (
         <div className="space-y-2.5">
-          <SectionLabel>WeChat / WeCom QR codes</SectionLabel>
+          <SectionLabel>{t("cs.qrGalleryTitle", "WeChat / WeCom QR codes")}</SectionLabel>
           <div className="flex flex-wrap gap-3">
-            {qrByContact._supplier.map((q) => <QrThumb key={str(q, "id")} q={q} large busy={busyId === str(q, "id")} onRemove={() => removeQr(q)} />)}
+            {qrByContact._supplier.map((q) => <QrThumb key={str(q, "id")} q={q} large busy={busyId === str(q, "id")} onRemove={() => removeQr(q)} t={t} />)}
           </div>
         </div>
       ) : null}
@@ -513,33 +516,33 @@ export default function ContactsSection({
           <div className="w-full max-w-md space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2">
               <ScanLineIcon className="h-4 w-4 text-[var(--text-secondary)]" />
-              <span className="text-[14px] font-semibold text-[var(--text-primary)]">Add communication QR</span>
+              <span className="text-[14px] font-semibold text-[var(--text-primary)]">{t("cs.addCommunicationQr", "Add communication QR")}</span>
             </div>
-            <Field label="QR image">
+            <Field label={t("cs.qrImage", "QR image")}>
               <input type="file" accept="image/*" onChange={(e) => setQrFile(e.target.files?.[0] ?? null)}
                 className="block w-full text-[12px] text-[var(--text-secondary)] file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--bg-surface-subtle)] file:px-3 file:py-1.5 file:text-[12px] file:font-medium file:text-[var(--text-primary)]" />
             </Field>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Category">
+              <Field label={t("cs.category", "Category")}>
                 <select className={inputCls} value={qrCategory} onChange={(e) => setQrCategory(e.target.value)}>
-                  {Object.keys(QR_CATEGORY_LABELS).map((k) => <option key={k} value={k}>{QR_CATEGORY_LABELS[k]}</option>)}
+                  {Object.keys(QR_CATEGORY_LABELS).map((k) => <option key={k} value={k}>{t("opt." + k, QR_CATEGORY_LABELS[k])}</option>)}
                 </select>
               </Field>
-              <Field label="Visibility">
+              <Field label={t("cs.visibility", "Visibility")}>
                 <select className={inputCls} value={qrVisibility} onChange={(e) => setQrVisibility(e.target.value)}>
-                  {VISIBILITY_TIERS.map((t) => <option key={t} value={t}>{VISIBILITY_LABELS[t]}</option>)}
+                  {VISIBILITY_TIERS.map((tier) => <option key={tier} value={tier}>{t("opt." + tier, VISIBILITY_LABELS[tier])}</option>)}
                 </select>
               </Field>
             </div>
-            <Field label="Label (optional)"><input className={inputCls} value={qrTitle} onChange={(e) => setQrTitle(e.target.value)} placeholder="e.g. Sales group · Lily" /></Field>
-            {qrContactId ? <div className="text-[11px] text-[var(--text-faint)]">Linked to the selected contact.</div> : null}
+            <Field label={t("cs.labelOptional", "Label (optional)")}><input className={inputCls} value={qrTitle} onChange={(e) => setQrTitle(e.target.value)} placeholder="e.g. Sales group · Lily" /></Field>
+            {qrContactId ? <div className="text-[11px] text-[var(--text-faint)]">{t("cs.linkedToContact", "Linked to the selected contact.")}</div> : null}
             {qrErr ? <div className="text-[12px] text-rose-400">{qrErr}</div> : null}
             <div className="flex items-center gap-3">
               <button type="button" disabled={qrBusy} onClick={saveQr}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
-                <UploadIcon className="h-3.5 w-3.5" />{qrBusy ? "Uploading…" : "Upload QR"}
+                <UploadIcon className="h-3.5 w-3.5" />{qrBusy ? t("cs.uploading", "Uploading…") : t("cs.uploadQr", "Upload QR")}
               </button>
-              <button type="button" onClick={() => setQrOpen(false)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">Cancel</button>
+              <button type="button" onClick={() => setQrOpen(false)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">{t("cs.cancel", "Cancel")}</button>
             </div>
           </div>
         </div>
@@ -557,7 +560,7 @@ function ChannelIcon({ k }: { k: string }) {
 }
 
 /* a QR thumbnail tile with label, category, download + remove */
-function QrThumb({ q, large, busy, onRemove }: { q: Row; large?: boolean; busy: boolean; onRemove: () => void }) {
+function QrThumb({ q, large, busy, onRemove, t }: { q: Row; large?: boolean; busy: boolean; onRemove: () => void; t: (key: string, fallback?: string) => string }) {
   const url = str(q, "preview_url") || str(q, "file_url");
   const size = large ? "h-28 w-28" : "h-16 w-16";
   return (
@@ -567,16 +570,16 @@ function QrThumb({ q, large, busy, onRemove }: { q: Row; large?: boolean; busy: 
         {url ? <img src={url} alt={str(q, "title") || "QR"} className="h-full w-full object-contain" /> : null}
       </div>
       <div className="mt-1 max-w-[7rem] truncate text-center text-[10px] font-medium text-[var(--text-secondary)]">
-        {str(q, "title") || qrCategoryLabel(str(q, "category"))}
+        {str(q, "title") || t("opt." + str(q, "category"), qrCategoryLabel(str(q, "category")))}
       </div>
-      <div className="text-center text-[9px] uppercase tracking-wide text-[var(--text-faint)]">{qrCategoryLabel(str(q, "category"))}</div>
+      <div className="text-center text-[9px] uppercase tracking-wide text-[var(--text-faint)]">{t("opt." + str(q, "category"), qrCategoryLabel(str(q, "category")))}</div>
       <div className="absolute right-0.5 top-0.5 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
         {str(q, "file_url") ? (
           <a href={str(q, "file_url")} download target="_blank" rel="noopener noreferrer"
-            className="rounded-md bg-[var(--bg-surface)]/90 p-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="Download"><DownloadIcon className="h-3 w-3" /></a>
+            className="rounded-md bg-[var(--bg-surface)]/90 p-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title={t("cs.download", "Download")}><DownloadIcon className="h-3 w-3" /></a>
         ) : null}
         <button type="button" disabled={busy} onClick={onRemove}
-          className="rounded-md bg-[var(--bg-surface)]/90 p-1 text-[var(--text-secondary)] hover:text-rose-400 disabled:opacity-40" title="Remove"><TrashIcon className="h-3 w-3" /></button>
+          className="rounded-md bg-[var(--bg-surface)]/90 p-1 text-[var(--text-secondary)] hover:text-rose-400 disabled:opacity-40" title={t("cs.remove", "Remove")}><TrashIcon className="h-3 w-3" /></button>
       </div>
     </div>
   );

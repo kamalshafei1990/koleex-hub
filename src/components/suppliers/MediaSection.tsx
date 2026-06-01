@@ -15,6 +15,8 @@
    --------------------------------------------------------------------------- */
 
 import { useMemo, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { contactsT } from "@/lib/translations/contacts";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { uploadToStorage } from "@/lib/storage-client";
 import {
@@ -72,16 +74,16 @@ const inputCls =
   "w-full rounded-lg bg-[var(--bg-surface)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-faint)] outline-none focus:ring-1 focus:ring-[var(--border-subtle)]";
 
 /* certification expiry state */
-function certState(m: Row): { label: string; tone: "ok" | "warn" | "danger" | "neutral" } {
+function certState(m: Row, t: (key: string, fallback?: string) => string): { label: string; tone: "ok" | "warn" | "danger" | "neutral" } {
   const exp = str(m, "expiry_date");
   const verified = !!m.verified_at;
-  if (exp && exp < todayStr()) return { label: "Expired", tone: "danger" };
+  if (exp && exp < todayStr()) return { label: t("ms.expired", "Expired"), tone: "danger" };
   if (exp) {
     const days = Math.ceil((new Date(exp).getTime() - Date.now()) / 86400000);
-    if (days <= 60) return { label: `Expires in ${days}d`, tone: "warn" };
+    if (days <= 60) return { label: `${t("ms.expiresIn", "Expires in")} ${days}d`, tone: "warn" };
   }
-  if (!verified) return { label: "Pending", tone: "neutral" };
-  return { label: "Verified", tone: "ok" };
+  if (!verified) return { label: t("ms.pending", "Pending"), tone: "neutral" };
+  return { label: t("ms.verified", "Verified"), tone: "ok" };
 }
 const toneCls: Record<string, string> = {
   ok: "bg-[var(--text-primary)] text-[var(--bg-primary)]",
@@ -107,6 +109,7 @@ export default function MediaSection({
   media: Row[];
   onSaved: () => void | Promise<void>;
 }) {
+  const { t } = useTranslation(contactsT);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -145,7 +148,7 @@ export default function MediaSection({
   };
 
   const save = async () => {
-    if (!file) { setUpErr("Choose a file first"); return; }
+    if (!file) { setUpErr(t("ms.chooseFileFirst", "Choose a file first")); return; }
     setBusy(true); setUpErr(null);
     try {
       const ext = (file.name.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -213,7 +216,7 @@ export default function MediaSection({
 
   const remove = async (m: Row) => {
     const id = str(m, "id");
-    if (!confirm("Remove this asset? It will be archived (recoverable).")) return;
+    if (!confirm(t("ms.removeAssetConfirm", "Remove this asset? It will be archived (recoverable)."))) return;
     setBusyId(id); setErr(null);
     try {
       const r = await fetch(`/api/suppliers/${supplierId}/media/${id}`, { method: "DELETE", credentials: "include" });
@@ -241,37 +244,37 @@ export default function MediaSection({
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <LayersIcon className="h-4 w-4 text-[var(--text-secondary)]" />
-          <h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">Evidence &amp; Documents</h3>
+          <h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">{t("ms.title", "Evidence & Documents")}</h3>
         </div>
         <button type="button" onClick={openUpload}
           className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90">
-          <PlusIcon className="h-3.5 w-3.5" /> Add asset
+          <PlusIcon className="h-3.5 w-3.5" /> {t("ms.addAsset", "Add asset")}
         </button>
       </div>
 
       {expiredCount > 0 ? (
         <div className="flex items-center gap-2 rounded-xl bg-rose-500/[0.08] px-3 py-2 text-[12px] text-rose-300">
           <TriangleWarningIcon className="h-4 w-4 shrink-0" />
-          {expiredCount} certification{expiredCount > 1 ? "s have" : " has"} expired — re-verify to restore sourcing trust.
+          {expiredCount} {expiredCount > 1 ? t("ms.certsHaveExpired", "certifications have expired — re-verify to restore sourcing trust.") : t("ms.certHasExpired", "certification has expired — re-verify to restore sourcing trust.")}
         </div>
       ) : null}
       {err ? <div className="text-[12px] text-rose-400">{err}</div> : null}
 
       {!hasData ? (
         <div className="rounded-2xl bg-[var(--bg-surface-subtle)]/50 px-6 py-12 text-center text-sm text-[var(--text-faint)]">
-          No evidence assets yet — upload certifications, factory photos, catalogs, and audit reports to build verifiable sourcing trust.
+          {t("ms.emptyState", "No evidence assets yet — upload certifications, factory photos, catalogs, and audit reports to build verifiable sourcing trust.")}
         </div>
       ) : null}
 
       {grouped.map((g) => (
         <div key={g.key} className="space-y-2.5">
-          <SectionLabel>{g.label}</SectionLabel>
+          <SectionLabel>{t("opt." + g.key, g.label)}</SectionLabel>
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             {g.items.map((m) => {
               const id = str(m, "id");
               const url = str(m, "file_url");
               const isCertCard = m.category === "certification";
-              const st = certState(m);
+              const st = certState(m, t);
               const verified = !!m.verified_at;
               return (
                 <div key={id} className="rounded-2xl bg-[var(--bg-surface-subtle)] p-4 space-y-3">
@@ -292,15 +295,15 @@ export default function MediaSection({
                         <div className="flex flex-wrap items-center gap-1.5">
                           {isCertCard && str(m, "cert_type") ? (
                             <span className="rounded-md bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)]">
-                              {certTypeLabel(str(m, "cert_type"))}
+                              {t("opt." + str(m, "cert_type"), certTypeLabel(str(m, "cert_type")))}
                             </span>
                           ) : null}
                           <span className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
-                            {str(m, "title") || docCategoryLabel(str(m, "category"))}
+                            {str(m, "title") || t("opt." + str(m, "category"), docCategoryLabel(str(m, "category")))}
                           </span>
                         </div>
                         <div className="mt-0.5 truncate text-[11px] text-[var(--text-faint)]">
-                          {[docCategoryLabel(str(m, "category")), str(m, "issuer")].filter(Boolean).join(" · ")}
+                          {[t("opt." + str(m, "category"), docCategoryLabel(str(m, "category"))), str(m, "issuer")].filter(Boolean).join(" · ")}
                         </div>
                       </div>
                     </div>
@@ -315,9 +318,9 @@ export default function MediaSection({
                   {isCertCard && (str(m, "issued_date") || str(m, "expiry_date") || arr(m, "markets_covered").length) ? (
                     <div className="space-y-1.5">
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[var(--text-faint)]">
-                        {str(m, "issued_date") ? <span>Issued {str(m, "issued_date")}</span> : null}
-                        {str(m, "expiry_date") ? <span>Expires {str(m, "expiry_date")}</span> : null}
-                        {str(m, "doc_number") ? <span>No. {str(m, "doc_number")}</span> : null}
+                        {str(m, "issued_date") ? <span>{t("ms.issued", "Issued")} {str(m, "issued_date")}</span> : null}
+                        {str(m, "expiry_date") ? <span>{t("ms.expires", "Expires")} {str(m, "expiry_date")}</span> : null}
+                        {str(m, "doc_number") ? <span>{t("ms.no", "No.")} {str(m, "doc_number")}</span> : null}
                       </div>
                       {arr(m, "markets_covered").length ? (
                         <div className="flex flex-wrap gap-1">
@@ -335,11 +338,11 @@ export default function MediaSection({
                   <div className="flex items-center justify-between gap-2 pt-0.5">
                     <div className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-wide text-[var(--text-faint)]">
                       <button type="button" onClick={() => cycleVisibility(m)} disabled={busyId === id}
-                        className="inline-flex items-center gap-1 hover:text-[var(--text-primary)] disabled:opacity-40" title="Click to change visibility">
-                        <ShieldCheckIcon className="h-3 w-3" />{VISIBILITY_LABELS[str(m, "visibility")] ?? "Internal"}
+                        className="inline-flex items-center gap-1 hover:text-[var(--text-primary)] disabled:opacity-40" title={t("ms.clickToChangeVisibility", "Click to change visibility")}>
+                        <ShieldCheckIcon className="h-3 w-3" />{t("opt." + str(m, "visibility"), VISIBILITY_LABELS[str(m, "visibility")] ?? "Internal")}
                       </button>
                       {str(m, "lifecycle_status") && str(m, "lifecycle_status") !== "active" ? (
-                        <span className="text-[var(--text-faint)]">· {LIFECYCLE_LABELS[str(m, "lifecycle_status")] ?? str(m, "lifecycle_status")}</span>
+                        <span className="text-[var(--text-faint)]">· {t("opt." + str(m, "lifecycle_status"), LIFECYCLE_LABELS[str(m, "lifecycle_status")] ?? str(m, "lifecycle_status"))}</span>
                       ) : null}
                     </div>
                     <div className="flex shrink-0 items-center gap-0.5">

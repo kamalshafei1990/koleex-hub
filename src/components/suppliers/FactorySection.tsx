@@ -10,6 +10,8 @@
    --------------------------------------------------------------------------- */
 
 import { useMemo, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { contactsT } from "@/lib/translations/contacts";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { FACTORY_TYPE_LABELS, factoryTypeLabel } from "@/lib/suppliers/intelligence";
 import FactoryIcon from "@/components/icons/ui/FactoryIcon";
@@ -93,6 +95,7 @@ export default function FactorySection({
   factory: Row | null;
   onSaved: () => void | Promise<void>;
 }) {
+  const { t } = useTranslation(contactsT);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -205,12 +208,12 @@ export default function FactorySection({
   /* ── VIEW MODE ── */
   if (!editing) {
     const capView = [
-      { label: "OEM", on: isTrue(supplier, "supports_oem_branding") },
-      { label: "ODM", on: isTrue(f, "odm_supported") },
-      { label: "Private label", on: isTrue(f, "private_label_supported") },
-      { label: "Low MOQ", on: isTrue(f, "low_moq_supported") },
-      { label: "Custom packaging", on: isTrue(supplier, "supports_packaging_customization") },
-      { label: "Samples", on: isTrue(supplier, "supports_samples") },
+      { label: t("fs.capOem", "OEM"), on: isTrue(supplier, "supports_oem_branding") },
+      { label: t("fs.capOdm", "ODM"), on: isTrue(f, "odm_supported") },
+      { label: t("fs.capPrivateLabel", "Private label"), on: isTrue(f, "private_label_supported") },
+      { label: t("fs.capLowMoq", "Low MOQ"), on: isTrue(f, "low_moq_supported") },
+      { label: t("fs.capPackaging", "Custom packaging"), on: isTrue(supplier, "supports_packaging_customization") },
+      { label: t("fs.capSamples", "Samples"), on: isTrue(supplier, "supports_samples") },
     ].filter((c) => c.on);
 
     return (
@@ -218,20 +221,20 @@ export default function FactorySection({
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <FactoryIcon className="h-4 w-4 text-[var(--text-secondary)]" />
-            <h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">Factory Intelligence</h3>
+            <h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">{t("fs.title", "Factory Intelligence")}</h3>
           </div>
           <button
             type="button"
             onClick={openEdit}
             className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-surface-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
           >
-            <Edit3Icon className="h-3.5 w-3.5" /> {hasData ? "Edit" : "Add factory data"}
+            <Edit3Icon className="h-3.5 w-3.5" /> {hasData ? t("fs.edit", "Edit") : t("fs.addFactoryData", "Add factory data")}
           </button>
         </div>
 
         {!hasData ? (
           <div className="rounded-2xl bg-[var(--bg-surface-subtle)]/50 px-6 py-12 text-center text-sm text-[var(--text-faint)]">
-            No factory intelligence yet — add capacity, capabilities, and export markets to strengthen sourcing readiness.
+            {t("fs.emptyState", "No factory intelligence yet — add capacity, capabilities, and export markets to strengthen sourcing readiness.")}
           </div>
         ) : (
           <div className="space-y-6">
@@ -242,30 +245,30 @@ export default function FactorySection({
                   {str(f, "factory_name") ? <span className="text-base font-semibold text-[var(--text-primary)]">{str(f, "factory_name")}</span> : null}
                   {str(f, "factory_type") ? (
                     <span className="rounded-full bg-[var(--bg-surface)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
-                      {factoryTypeLabel(str(f, "factory_type"))}
+                      {t("opt." + str(f, "factory_type"), factoryTypeLabel(str(f, "factory_type")))}
                     </span>
                   ) : null}
                 </div>
               ) : null}
               <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 md:grid-cols-4">
-                <Metric label="Employees" value={fmtNum(f.employee_count)} />
-                <Metric label="Production lines" value={fmtNum(f.production_lines)} />
-                <Metric label="QC staff" value={fmtNum(f.qc_staff_count)} />
-                <Metric label="R&D staff" value={fmtNum(f.rd_staff_count)} />
-                <Metric label="Factory area" value={fmtNum(f.factory_size_sqm)} unit="m²" />
-                <Metric label="Founded" value={str(supplier, "year_established")} />
+                <Metric label={t("fs.employees", "Employees")} value={fmtNum(f.employee_count)} />
+                <Metric label={t("fs.productionLines", "Production lines")} value={fmtNum(f.production_lines)} />
+                <Metric label={t("fs.qcStaff", "QC staff")} value={fmtNum(f.qc_staff_count)} />
+                <Metric label={t("fs.rdStaff", "R&D staff")} value={fmtNum(f.rd_staff_count)} />
+                <Metric label={t("fs.factoryArea", "Factory area")} value={fmtNum(f.factory_size_sqm)} unit="m²" />
+                <Metric label={t("fs.founded", "Founded")} value={str(supplier, "year_established")} />
               </div>
             </div>
 
             {/* Capacity */}
             {(f.monthly_capacity || f.annual_output || f.lead_time_days || f.export_percentage) ? (
               <div className="space-y-2">
-                <SectionLabel>Capacity & operations</SectionLabel>
+                <SectionLabel>{t("fs.capacityOperations", "Capacity & operations")}</SectionLabel>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-4 rounded-2xl bg-[var(--bg-surface-subtle)] p-5 sm:grid-cols-4">
-                  <Metric label="Monthly capacity" value={fmtNum(f.monthly_capacity)} unit={str(f, "capacity_unit")} />
-                  <Metric label="Annual output" value={fmtNum(f.annual_output)} unit={str(f, "output_unit")} />
-                  <Metric label="Lead time" value={fmtNum(f.lead_time_days)} unit="days" />
-                  <Metric label="Export share" value={f.export_percentage != null ? String(f.export_percentage) : ""} unit="%" />
+                  <Metric label={t("fs.monthlyCapacity", "Monthly capacity")} value={fmtNum(f.monthly_capacity)} unit={str(f, "capacity_unit")} />
+                  <Metric label={t("fs.annualOutput", "Annual output")} value={fmtNum(f.annual_output)} unit={str(f, "output_unit")} />
+                  <Metric label={t("fs.leadTime", "Lead time")} value={fmtNum(f.lead_time_days)} unit={t("fs.daysUnit", "days")} />
+                  <Metric label={t("fs.exportShare", "Export share")} value={f.export_percentage != null ? String(f.export_percentage) : ""} unit="%" />
                 </div>
               </div>
             ) : null}
@@ -273,7 +276,7 @@ export default function FactorySection({
             {/* Capabilities */}
             {capView.length ? (
               <div className="space-y-2">
-                <SectionLabel>Manufacturing capabilities</SectionLabel>
+                <SectionLabel>{t("fs.manufacturingCapabilities", "Manufacturing capabilities")}</SectionLabel>
                 <div className="flex flex-wrap gap-1.5">
                   {capView.map((c) => (
                     <span key={c.label} className="rounded-full bg-[var(--bg-surface-subtle)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)]">
@@ -286,13 +289,13 @@ export default function FactorySection({
 
             {/* Markets / categories / materials */}
             {arr(f, "main_export_markets").length ? (
-              <div className="space-y-2"><SectionLabel>Main export markets</SectionLabel><div className="flex items-center gap-2"><GlobeIcon className="h-4 w-4 shrink-0 text-[var(--text-faint)]" /><Chips items={arr(f, "main_export_markets")} /></div></div>
+              <div className="space-y-2"><SectionLabel>{t("fs.mainExportMarkets", "Main export markets")}</SectionLabel><div className="flex items-center gap-2"><GlobeIcon className="h-4 w-4 shrink-0 text-[var(--text-faint)]" /><Chips items={arr(f, "main_export_markets")} /></div></div>
             ) : null}
             {arr(f, "production_categories").length ? (
-              <div className="space-y-2"><SectionLabel>Production categories</SectionLabel><div className="flex items-center gap-2"><PackageIcon className="h-4 w-4 shrink-0 text-[var(--text-faint)]" /><Chips items={arr(f, "production_categories")} /></div></div>
+              <div className="space-y-2"><SectionLabel>{t("fs.productionCategories", "Production categories")}</SectionLabel><div className="flex items-center gap-2"><PackageIcon className="h-4 w-4 shrink-0 text-[var(--text-faint)]" /><Chips items={arr(f, "production_categories")} /></div></div>
             ) : null}
             {arr(f, "supported_materials").length ? (
-              <div className="space-y-2"><SectionLabel>Supported materials</SectionLabel><Chips items={arr(f, "supported_materials")} /></div>
+              <div className="space-y-2"><SectionLabel>{t("fs.supportedMaterials", "Supported materials")}</SectionLabel><Chips items={arr(f, "supported_materials")} /></div>
             ) : null}
           </div>
         )}
@@ -305,37 +308,37 @@ export default function FactorySection({
     <section className="space-y-5">
       <div className="flex items-center gap-2">
         <FactoryIcon className="h-4 w-4 text-[var(--text-secondary)]" />
-        <h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">Edit Factory Intelligence</h3>
+        <h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">{t("fs.editTitle", "Edit Factory Intelligence")}</h3>
       </div>
 
       <div className="space-y-5 rounded-2xl bg-[var(--bg-surface-subtle)] p-5">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
-          <Field label="Factory name"><input className={inputCls} value={d.factory_name} onChange={(e) => set("factory_name", e.target.value)} placeholder="e.g. Main plant — Taizhou" /></Field>
-          <Field label="Factory type">
+          <Field label={t("fs.factoryName", "Factory name")}><input className={inputCls} value={d.factory_name} onChange={(e) => set("factory_name", e.target.value)} placeholder={t("fs.factoryNamePlaceholder", "e.g. Main plant — Taizhou")} /></Field>
+          <Field label={t("fs.factoryType", "Factory type")}>
             <select className={inputCls} value={d.factory_type} onChange={(e) => set("factory_type", e.target.value)}>
               <option value="">—</option>
-              {Object.entries(FACTORY_TYPE_LABELS).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+              {Object.entries(FACTORY_TYPE_LABELS).map(([k, label]) => <option key={k} value={k}>{t("opt." + k, label)}</option>)}
             </select>
           </Field>
-          <Field label="Employees"><input type="number" min={0} className={inputCls} value={d.employee_count} onChange={(e) => set("employee_count", e.target.value)} /></Field>
-          <Field label="Production lines"><input type="number" min={0} className={inputCls} value={d.production_lines} onChange={(e) => set("production_lines", e.target.value)} /></Field>
-          <Field label="QC staff"><input type="number" min={0} className={inputCls} value={d.qc_staff_count} onChange={(e) => set("qc_staff_count", e.target.value)} /></Field>
-          <Field label="R&D staff"><input type="number" min={0} className={inputCls} value={d.rd_staff_count} onChange={(e) => set("rd_staff_count", e.target.value)} /></Field>
-          <Field label="Factory area (m²)"><input type="number" min={0} className={inputCls} value={d.factory_size_sqm} onChange={(e) => set("factory_size_sqm", e.target.value)} /></Field>
-          <Field label="Lead time (days)"><input type="number" min={0} className={inputCls} value={d.lead_time_days} onChange={(e) => set("lead_time_days", e.target.value)} /></Field>
-          <Field label="Export share (%)"><input type="number" min={0} max={100} className={inputCls} value={d.export_percentage} onChange={(e) => set("export_percentage", e.target.value)} /></Field>
-          <Field label="Monthly capacity"><input type="number" min={0} className={inputCls} value={d.monthly_capacity} onChange={(e) => set("monthly_capacity", e.target.value)} /></Field>
-          <Field label="Capacity unit"><input className={inputCls} value={d.capacity_unit} onChange={(e) => set("capacity_unit", e.target.value)} placeholder="units/mo" /></Field>
-          <Field label="Annual output"><input type="number" min={0} className={inputCls} value={d.annual_output} onChange={(e) => set("annual_output", e.target.value)} /></Field>
-          <Field label="Output unit"><input className={inputCls} value={d.output_unit} onChange={(e) => set("output_unit", e.target.value)} placeholder="units/yr" /></Field>
+          <Field label={t("fs.employees", "Employees")}><input type="number" min={0} className={inputCls} value={d.employee_count} onChange={(e) => set("employee_count", e.target.value)} /></Field>
+          <Field label={t("fs.productionLines", "Production lines")}><input type="number" min={0} className={inputCls} value={d.production_lines} onChange={(e) => set("production_lines", e.target.value)} /></Field>
+          <Field label={t("fs.qcStaff", "QC staff")}><input type="number" min={0} className={inputCls} value={d.qc_staff_count} onChange={(e) => set("qc_staff_count", e.target.value)} /></Field>
+          <Field label={t("fs.rdStaff", "R&D staff")}><input type="number" min={0} className={inputCls} value={d.rd_staff_count} onChange={(e) => set("rd_staff_count", e.target.value)} /></Field>
+          <Field label={t("fs.factoryAreaSqm", "Factory area (m²)")}><input type="number" min={0} className={inputCls} value={d.factory_size_sqm} onChange={(e) => set("factory_size_sqm", e.target.value)} /></Field>
+          <Field label={t("fs.leadTimeDays", "Lead time (days)")}><input type="number" min={0} className={inputCls} value={d.lead_time_days} onChange={(e) => set("lead_time_days", e.target.value)} /></Field>
+          <Field label={t("fs.exportSharePct", "Export share (%)")}><input type="number" min={0} max={100} className={inputCls} value={d.export_percentage} onChange={(e) => set("export_percentage", e.target.value)} /></Field>
+          <Field label={t("fs.monthlyCapacity", "Monthly capacity")}><input type="number" min={0} className={inputCls} value={d.monthly_capacity} onChange={(e) => set("monthly_capacity", e.target.value)} /></Field>
+          <Field label={t("fs.capacityUnit", "Capacity unit")}><input className={inputCls} value={d.capacity_unit} onChange={(e) => set("capacity_unit", e.target.value)} placeholder={t("fs.capacityUnitPlaceholder", "units/mo")} /></Field>
+          <Field label={t("fs.annualOutput", "Annual output")}><input type="number" min={0} className={inputCls} value={d.annual_output} onChange={(e) => set("annual_output", e.target.value)} /></Field>
+          <Field label={t("fs.outputUnit", "Output unit")}><input className={inputCls} value={d.output_unit} onChange={(e) => set("output_unit", e.target.value)} placeholder={t("fs.outputUnitPlaceholder", "units/yr")} /></Field>
         </div>
 
         <div className="space-y-2">
-          <SectionLabel>Manufacturing capabilities</SectionLabel>
+          <SectionLabel>{t("fs.manufacturingCapabilities", "Manufacturing capabilities")}</SectionLabel>
           <div className="flex flex-wrap gap-1.5">
             {([
-              ["oem", "OEM"], ["odm", "ODM"], ["private_label", "Private label"],
-              ["low_moq", "Low MOQ"], ["packaging", "Custom packaging"], ["samples", "Samples"],
+              ["oem", t("fs.capOem", "OEM")], ["odm", t("fs.capOdm", "ODM")], ["private_label", t("fs.capPrivateLabel", "Private label")],
+              ["low_moq", t("fs.capLowMoq", "Low MOQ")], ["packaging", t("fs.capPackaging", "Custom packaging")], ["samples", t("fs.capSamples", "Samples")],
             ] as const).map(([k, label]) => {
               const on = d[k] as boolean;
               return (
@@ -349,18 +352,18 @@ export default function FactorySection({
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Field label="Main export markets (comma-separated)"><input className={inputCls} value={d.main_export_markets} onChange={(e) => set("main_export_markets", e.target.value)} placeholder="USA, EU, Middle East" /></Field>
-          <Field label="Production categories (comma-separated)"><input className={inputCls} value={d.production_categories} onChange={(e) => set("production_categories", e.target.value)} placeholder="Lockstitch heads, Servo motors" /></Field>
-          <Field label="Supported materials (comma-separated)"><input className={inputCls} value={d.supported_materials} onChange={(e) => set("supported_materials", e.target.value)} placeholder="Steel, Aluminium, ABS" /></Field>
+          <Field label={t("fs.mainExportMarketsCsv", "Main export markets (comma-separated)")}><input className={inputCls} value={d.main_export_markets} onChange={(e) => set("main_export_markets", e.target.value)} placeholder={t("fs.mainExportMarketsPlaceholder", "USA, EU, Middle East")} /></Field>
+          <Field label={t("fs.productionCategoriesCsv", "Production categories (comma-separated)")}><input className={inputCls} value={d.production_categories} onChange={(e) => set("production_categories", e.target.value)} placeholder={t("fs.productionCategoriesPlaceholder", "Lockstitch heads, Servo motors")} /></Field>
+          <Field label={t("fs.supportedMaterialsCsv", "Supported materials (comma-separated)")}><input className={inputCls} value={d.supported_materials} onChange={(e) => set("supported_materials", e.target.value)} placeholder={t("fs.supportedMaterialsPlaceholder", "Steel, Aluminium, ABS")} /></Field>
         </div>
 
         {err ? <div className="text-[12px] text-rose-400">{err}</div> : null}
         <div className="flex items-center gap-3">
           <button type="button" disabled={saving} onClick={save}
             className="rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
-            {saving ? "Saving…" : "Save factory data"}
+            {saving ? t("fs.saving", "Saving…") : t("fs.saveFactoryData", "Save factory data")}
           </button>
-          <button type="button" onClick={() => setEditing(false)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">Cancel</button>
+          <button type="button" onClick={() => setEditing(false)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">{t("fs.cancel", "Cancel")}</button>
         </div>
       </div>
     </section>
