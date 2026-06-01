@@ -121,6 +121,27 @@ export default function FloatingPanel() {
     try { window.localStorage.setItem("koleex-fab-minimized", minimized ? "1" : "0"); } catch { /* private mode */ }
   }, [minimized]);
 
+  /* ── Calm-down: auto-hide the collapsed dock while the operator is
+       actively scrolling, so it never sits on top of the content they're
+       reading. Reappears after a short pause. Capture-phase so it also
+       catches scrolls inside nested overflow containers (e.g. the embedded
+       Supplier 360). ── */
+  const [scrollHidden, setScrollHidden] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onScroll = () => {
+      setScrollHidden(true);
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => setScrollHidden(false), 650);
+    };
+    document.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    return () => {
+      document.removeEventListener("scroll", onScroll, { capture: true } as EventListenerOptions);
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
+
   /* ── Auto-switch tab when the current one becomes hidden.
      Keeps the sliding highlight behind whatever side is visible. */
   useEffect(() => {
@@ -516,7 +537,12 @@ export default function FloatingPanel() {
   }
 
   return (
-    <div ref={panelRef} className={`fixed ${fabBottomClass} end-6 z-[90]`}>
+    <div
+      ref={panelRef}
+      className={`fab-root fixed ${fabBottomClass} end-6 z-[90]`}
+      data-idle={!open ? "true" : "false"}
+      data-scrollhidden={scrollHidden && !open ? "true" : "false"}
+    >
       {/* ── Panel ── */}
       {(open || closing) && (
         <div
@@ -934,6 +960,23 @@ export default function FloatingPanel() {
             transform: translateY(0) scale(1);
             pointer-events: auto;
           }
+        }
+        /* ── Calm-down: the collapsed dock rests at lowered opacity so it
+              never competes with page content, and lifts to full strength
+              on hover / keyboard focus. Touch devices (no hover) keep it
+              fully visible since there's no hover to restore it. ── */
+        .fab-root { transition: opacity 0.25s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        @media (hover: hover) and (pointer: fine) {
+          .fab-root[data-idle="true"] { opacity: 0.5; }
+          .fab-root[data-idle="true"]:hover,
+          .fab-root[data-idle="true"]:focus-within { opacity: 1; }
+        }
+        /* Auto-hide while the operator is actively scrolling, so the dock
+           never sits on top of the row they're reading. Reappears on pause. */
+        .fab-root[data-scrollhidden="true"] {
+          opacity: 0 !important;
+          transform: translateY(16px);
+          pointer-events: none;
         }
       `}</style>
       <div className="fab-wrap relative">
