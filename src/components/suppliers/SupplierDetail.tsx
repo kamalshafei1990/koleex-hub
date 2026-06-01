@@ -470,63 +470,63 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
         {!embedded && <div className="px-4 sm:px-6 pt-6"><SuppliersHeader title={t("sd.suppliers", "Suppliers")} /></div>}
 
       <main className="pb-24">
-        {/* ─── Executive cockpit hero — 3 columns: identity · intelligence · critical metrics ───
-              Answers in 5 seconds: can we trust & use this supplier, and what is the main risk. ─── */}
-        <div className="mx-4 md:mx-6 mt-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4 md:p-5">
-          {/* Top bar — mode toggle (start) · Edit / Delete (end) */}
-          <div className="flex items-center justify-between gap-3 mb-4 md:mb-5">
-            <div className="inline-flex items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-0.5 text-[11px] font-medium">
-              <button type="button" onClick={() => setMode(false)} aria-pressed={!execMode}
-                className={`rounded-md px-2 py-1 transition-colors ${!execMode ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "text-[var(--text-faint)] hover:text-[var(--text-secondary)]"}`}>
-                {t("sd.modeAnalytical", "Analytical")}
-              </button>
-              <button type="button" onClick={() => setMode(true)} aria-pressed={execMode}
-                className={`rounded-md px-2 py-1 transition-colors ${execMode ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "text-[var(--text-faint)] hover:text-[var(--text-secondary)]"}`}>
-                {t("sd.modeExecutive", "Executive")}
-              </button>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <button onClick={() => (onEdit ? onEdit() : router.push(`/suppliers?selected=${id}`))} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:bg-[var(--bg-surface-hover)] text-[12px] font-medium transition-colors text-[var(--text-primary)]">
-                <Edit3Icon className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{t("sd.edit", "Edit")}</span>
-              </button>
-              {onDelete ? (
-                <button onClick={() => onDelete()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[12px] font-medium transition-colors" aria-label={t("sd.delete", "Delete")}>
-                  <TrashIcon className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">{t("sd.delete", "Delete")}</span>
+        {/* ─── Premium centered supplier identity hero with layered intelligence ───
+              A calm, executive identity card — logo + name dominant, intelligence
+              supporting underneath, and a soft-pill metric rail fused to the bottom
+              edge. Not a dashboard table. ─── */}
+        <div className="mx-4 md:mx-6 mt-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
+          <div className="px-4 sm:px-8 md:px-10 pt-4">
+            {/* Top bar — subtle mode toggle (start) · Edit / Delete (end) */}
+            <div className="flex items-center justify-between gap-3">
+              <div className="inline-flex items-center rounded-lg bg-[var(--bg-surface-subtle)] p-0.5 text-[10.5px] font-medium">
+                <button type="button" onClick={() => setMode(false)} aria-pressed={!execMode}
+                  className={`rounded-md px-2 py-0.5 transition-colors ${!execMode ? "bg-[var(--bg-surface)] text-[var(--text-secondary)] shadow-sm" : "text-[var(--text-ghost)] hover:text-[var(--text-faint)]"}`}>
+                  {t("sd.modeAnalytical", "Analytical")}
                 </button>
-              ) : null}
+                <button type="button" onClick={() => setMode(true)} aria-pressed={execMode}
+                  className={`rounded-md px-2 py-0.5 transition-colors ${execMode ? "bg-[var(--bg-surface)] text-[var(--text-secondary)] shadow-sm" : "text-[var(--text-ghost)] hover:text-[var(--text-faint)]"}`}>
+                  {t("sd.modeExecutive", "Executive")}
+                </button>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button onClick={() => (onEdit ? onEdit() : router.push(`/suppliers?selected=${id}`))} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:bg-[var(--bg-surface-hover)] text-[12px] font-medium transition-colors text-[var(--text-primary)]">
+                  <Edit3Icon className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{t("sd.edit", "Edit")}</span>
+                </button>
+                {onDelete ? (
+                  <button onClick={() => onDelete()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[12px] font-medium transition-colors" aria-label={t("sd.delete", "Delete")}>
+                    <TrashIcon className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">{t("sd.delete", "Delete")}</span>
+                  </button>
+                ) : null}
+              </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)_minmax(0,300px)] gap-5 lg:gap-0">
-            {/* ════ LEFT — Identity ════ */}
-            <div className="lg:pe-6 space-y-3.5 text-start">
-              <div className="flex items-start gap-3.5">
-                <div className="w-16 h-16 shrink-0 rounded-xl bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)] flex items-center justify-center overflow-hidden">
-                  {str(s, "photo_url", "logo_url") ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={str(s, "photo_url", "logo_url")} alt={name} className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="font-mono text-lg font-bold text-[var(--text-secondary)]">{initials(name)}</span>
-                  )}
-                </div>
-                <div className="min-w-0 pt-0.5">
-                  <h2 className="text-lg font-semibold leading-snug text-[var(--text-primary)]">{name}</h2>
-                  {cnName && cnName !== name ? (
-                    <p lang="zh" className="text-[13px] text-[var(--text-faint)] mt-0.5">{cnName}</p>
-                  ) : null}
-                  {rating > 0 ? (
-                    <div className="flex items-center gap-0.5 mt-1">
-                      {[1, 2, 3, 4, 5].map((i) => (
-                        <StarIcon key={i} className={`h-3 w-3 ${i <= rating ? "text-amber-400" : "text-[var(--text-faint)]"}`} />
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
+            {/* ── Centered identity ── */}
+            <div className="flex flex-col items-center text-center pt-1 pb-7 md:pb-8">
+              <div className="w-24 h-24 rounded-2xl bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)] shadow-[0_8px_30px_-12px_rgba(0,0,0,0.5)] flex items-center justify-center overflow-hidden">
+                {str(s, "photo_url", "logo_url") ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={str(s, "photo_url", "logo_url")} alt={name} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="font-mono text-2xl font-bold text-[var(--text-secondary)]">{initials(name)}</span>
+                )}
               </div>
 
+              <h2 className="mt-4 text-2xl md:text-[28px] font-semibold leading-tight tracking-tight text-[var(--text-primary)] max-w-2xl">{name}</h2>
+              {cnName && cnName !== name ? (
+                <p lang="zh" className="mt-1 text-[14px] text-[var(--text-faint)]">{cnName}</p>
+              ) : null}
+
+              {rating > 0 ? (
+                <div className="flex items-center justify-center gap-0.5 mt-2.5">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <StarIcon key={i} className={`h-3.5 w-3.5 ${i <= rating ? "text-amber-400" : "text-[var(--text-faint)]"}`} />
+                  ))}
+                </div>
+              ) : null}
+
               {/* type · location · strategic status · active */}
-              <div className="flex flex-wrap items-center gap-1.5">
+              <div className="flex flex-wrap items-center justify-center gap-1.5 mt-4">
                 <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)] inline-flex items-center gap-1">
                   <Building2Icon className="h-3 w-3" /> {str(s, "supplier_type") || t("sd.supplier", "Supplier")}
                 </span>
@@ -557,7 +557,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                 </span>
               </div>
 
-              {/* ── What they make — taxonomy breadcrumb (real Product-Data icons) + classifications ── */}
+              {/* ── Category path + classifications (centered) ── */}
               {(() => {
                 const slugify = (x: string) => x.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
                 const divName = str(s, "division");
@@ -578,9 +578,9 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                   .filter((c) => classificationLabel(str(c, "classification")).toLowerCase().replace(/[^a-z0-9]/g, "") !== typeNorm);
                 if (!crumbs.length && !classes.length) return null;
                 return (
-                  <div className="pt-3.5 border-t border-[var(--border-subtle)] space-y-2.5">
+                  <div className="mt-3.5 space-y-2">
                     {crumbs.length ? (
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
                         {crumbs.map((c, i) => (
                           <span key={`${c.label}-${i}`} className="inline-flex items-center gap-1.5">
                             {i > 0 ? <AngleRightIcon className="h-3 w-3 text-[var(--text-ghost)] rtl:rotate-180" /> : null}
@@ -597,7 +597,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                       </div>
                     ) : null}
                     {classes.length ? (
-                      <div className="flex flex-wrap items-center gap-1.5">
+                      <div className="flex flex-wrap items-center justify-center gap-1.5">
                         {classes.map((c, i) => {
                           const val = str(c, "classification");
                           return (
@@ -612,19 +612,16 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                   </div>
                 );
               })()}
-            </div>
 
-            {/* ════ CENTER — Intelligence summary ════ */}
-            <div className="lg:px-6 lg:border-x border-[var(--border-subtle)] border-t lg:border-t-0 pt-4 lg:pt-0">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-2.5">{t("sd.intelligence", "Intelligence")}</div>
+              {/* ── One clean intelligence strip — supports the hero, does not dominate ── */}
               {(() => {
                 const rp = (data.riskProfile ?? {}) as Row;
                 const ni = (data.negotiationIntel ?? {}) as Row;
                 const tone = (k: "good" | "warn" | "bad" | "neutral") =>
-                  k === "good" ? "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20"
-                  : k === "warn" ? "bg-amber-500/12 text-amber-600 dark:text-amber-400 ring-amber-500/20"
-                  : k === "bad" ? "bg-rose-500/12 text-rose-600 dark:text-rose-400 ring-rose-500/20"
-                  : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] ring-[var(--border-subtle)]";
+                  k === "good" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                  : k === "warn" ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                  : k === "bad" ? "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                  : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]";
                 const badges: { label: string; k: "good" | "warn" | "bad" | "neutral" }[] = [];
                 const lvl = str(rp, "risk_level");
                 if (lvl) badges.push({ label: `${lvl.toUpperCase()} RISK`, k: lvl === "low" ? "good" : lvl === "medium" ? "warn" : "bad" });
@@ -639,68 +636,67 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                 const prio = data.sourcing?.priority;
                 if (typeof prio === "number" && prio > 0) badges.push({ label: `PRIORITY ${prio}`, k: "neutral" });
                 if (data.sourcing?.soleSource) badges.push({ label: "SOLE SOURCE", k: "warn" });
-                if (!badges.length) return <div className="text-[12px] text-[var(--text-faint)]">{t("sd.noIntel", "No intelligence captured yet.")}</div>;
+                if (!badges.length) return null;
                 return (
-                  <div className="flex flex-wrap items-center gap-1.5">
+                  <div className="mt-5 flex flex-wrap items-center justify-center gap-1.5 max-w-2xl">
                     {badges.map((b, i) => (
-                      <span key={i} className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-wide ring-1 ${tone(b.k)}`}>{b.label}</span>
+                      <span key={i} className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${tone(b.k)}`}>{b.label}</span>
                     ))}
                   </div>
                 );
               })()}
-            </div>
 
-            {/* ════ RIGHT — Critical metrics ════ */}
-            <div className="lg:ps-6 border-t lg:border-t-0 pt-4 lg:pt-0">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-2.5">{t("sd.criticalMetrics", "Critical metrics")}</div>
-              {(() => {
-                const rp = (data.riskProfile ?? {}) as Row;
-                const sp = (data.sourcingProfile ?? {}) as Row;
-                const activeRisks = (data.riskItems ?? []).filter((r) => r.status !== "resolved").length;
-                const sourcingScore = num(sp, "sourcing_score_override") || (data.sourcing?.score ?? 0);
-                const evalScore = num(rp, "internal_evaluation_score");
-                const readyPct = data.readiness?.score;
-                const lastIso = (data.timeline ?? []).map((e) => str(e, "created_at")).filter(Boolean).sort().at(-1);
-                const fmtDate = (iso?: string) => { if (!iso) return "—"; const d = new Date(iso); return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString(undefined, { month: "short", day: "numeric" }); };
-                const cards: { label: string; value: string; accent?: "rose" | "emerald"; span?: boolean }[] = [
-                  { label: t("sd.kpiSourcingScore", "Sourcing score"), value: sourcingScore ? `${Math.round(sourcingScore)}` : (evalScore ? `${Math.round(evalScore)}` : "—") },
-                  { label: t("sd.kpiReadiness", "Readiness"), value: typeof readyPct === "number" ? `${readyPct}%` : "—" },
-                  { label: t("sd.kpiActiveRisks", "Active risks"), value: String(activeRisks), accent: activeRisks ? "rose" : "emerald" },
-                  { label: t("sd.openPos", "Open POs"), value: String(stats.openPos) },
-                  { label: t("sd.outstandingPayable", "Outstanding payable"), value: money(stats.outstanding, currency), span: true },
-                  { label: t("sd.leadTime", "Lead time"), value: str(s, "lead_time") || "—" },
-                  { label: t("sd.lastActivity", "Last activity"), value: fmtDate(lastIso) },
-                ];
-                return (
-                  <div className="grid grid-cols-2 gap-2">
-                    {cards.map((k) => (
-                      <div key={k.label} className={`rounded-xl bg-[var(--bg-surface-subtle)] px-3 py-2.5 ${k.span ? "col-span-2" : ""}`}>
-                        <div className={`text-[15px] font-semibold tracking-tight tabular-nums leading-tight ${k.accent === "rose" ? "text-rose-500" : k.accent === "emerald" ? "text-emerald-600 dark:text-emerald-400" : "text-[var(--text-primary)]"}`}>{k.value}</div>
-                        <div className="mt-0.5 text-[9.5px] font-medium uppercase tracking-wider text-[var(--text-faint)]">{k.label}</div>
-                      </div>
+              {/* Strategic status editor (inline, centered) */}
+              {statusOpen ? (
+                <div className="mt-5 w-full max-w-md space-y-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-start">
+                  <div className="flex flex-wrap gap-1.5">
+                    {(Object.keys(STRATEGIC_STATUS_LABELS) as StrategicStatus[]).map((k) => (
+                      <button key={k} type="button" onClick={() => setStatusDraft(k)} className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${statusDraft === k ? "bg-[var(--text-primary)] text-[var(--bg-primary)]" : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>{STRATEGIC_STATUS_LABELS[k]}</button>
                     ))}
                   </div>
-                );
-              })()}
+                  <input value={statusReason} onChange={(e) => setStatusReason(e.target.value)} placeholder={t("sd.reasonPlaceholder", "Reason / internal note (optional)")} className="w-full rounded-lg bg-[var(--bg-surface-subtle)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-faint)] outline-none" />
+                  <div className="flex items-center gap-3">
+                    <button type="button" disabled={savingStatus} onClick={saveStatus} className="rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">{savingStatus ? t("sd.saving", "Saving…") : t("sd.saveStatus", "Save status")}</button>
+                    <button type="button" onClick={() => setStatusOpen(false)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">{t("sd.cancel", "Cancel")}</button>
+                  </div>
+                </div>
+              ) : null}
+              {editError ? <div className="mt-3 text-[11px] text-rose-400">{editError}</div> : null}
             </div>
           </div>
 
-          {/* Strategic status editor (inline) */}
-          {statusOpen ? (
-            <div className="mt-4 max-w-md space-y-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-start">
-              <div className="flex flex-wrap gap-1.5">
-                {(Object.keys(STRATEGIC_STATUS_LABELS) as StrategicStatus[]).map((k) => (
-                  <button key={k} type="button" onClick={() => setStatusDraft(k)} className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${statusDraft === k ? "bg-[var(--text-primary)] text-[var(--bg-primary)]" : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>{STRATEGIC_STATUS_LABELS[k]}</button>
-                ))}
+          {/* ── Metric rail — soft pills fused to the bottom edge, not a side dashboard ── */}
+          {(() => {
+            const rp = (data.riskProfile ?? {}) as Row;
+            const sp = (data.sourcingProfile ?? {}) as Row;
+            const activeRisks = (data.riskItems ?? []).filter((r) => r.status !== "resolved").length;
+            const sourcingScore = num(sp, "sourcing_score_override") || (data.sourcing?.score ?? 0);
+            const evalScore = num(rp, "internal_evaluation_score");
+            const readyPct = data.readiness?.score;
+            const lastIso = (data.timeline ?? []).map((e) => str(e, "created_at")).filter(Boolean).sort().at(-1);
+            const fmtDate = (iso?: string) => { if (!iso) return "—"; const d = new Date(iso); return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString(undefined, { month: "short", day: "numeric" }); };
+            const metrics: { label: string; value: string; accent?: "rose" | "emerald" }[] = [
+              { label: t("sd.kpiSourcingScore", "Sourcing score"), value: sourcingScore ? `${Math.round(sourcingScore)}` : (evalScore ? `${Math.round(evalScore)}` : "—") },
+              { label: t("sd.kpiReadiness", "Readiness"), value: typeof readyPct === "number" ? `${readyPct}%` : "—" },
+              { label: t("sd.kpiActiveRisks", "Active risks"), value: String(activeRisks), accent: activeRisks ? "rose" : "emerald" },
+              { label: t("sd.openPos", "Open POs"), value: String(stats.openPos) },
+              { label: t("sd.outstandingPayable", "Outstanding"), value: money(stats.outstanding, currency) },
+              { label: t("sd.leadTime", "Lead time"), value: str(s, "lead_time") || "—" },
+              { label: t("sd.lastActivity", "Last activity"), value: fmtDate(lastIso) },
+            ];
+            return (
+              <div className="border-t border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 px-4 sm:px-6 py-3">
+                <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
+                  {metrics.map((m) => (
+                    <span key={m.label} className="inline-flex items-baseline gap-1.5 rounded-full bg-[var(--bg-surface)] px-3 py-1.5 ring-1 ring-[var(--border-subtle)]/60">
+                      <span className={`text-[13px] font-semibold tabular-nums leading-none ${m.accent === "rose" ? "text-rose-500" : m.accent === "emerald" ? "text-emerald-600 dark:text-emerald-400" : "text-[var(--text-primary)]"}`}>{m.value}</span>
+                      <span className="text-[9.5px] font-medium uppercase tracking-wider text-[var(--text-faint)]">{m.label}</span>
+                    </span>
+                  ))}
+                </div>
               </div>
-              <input value={statusReason} onChange={(e) => setStatusReason(e.target.value)} placeholder={t("sd.reasonPlaceholder", "Reason / internal note (optional)")} className="w-full rounded-lg bg-[var(--bg-surface-subtle)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-faint)] outline-none" />
-              <div className="flex items-center gap-3">
-                <button type="button" disabled={savingStatus} onClick={saveStatus} className="rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">{savingStatus ? t("sd.saving", "Saving…") : t("sd.saveStatus", "Save status")}</button>
-                <button type="button" onClick={() => setStatusOpen(false)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">{t("sd.cancel", "Cancel")}</button>
-              </div>
-            </div>
-          ) : null}
-          {editError ? <div className="mt-3 text-[11px] text-rose-400">{editError}</div> : null}
+            );
+          })()}
         </div>
 
         {/* ─── Contact channels (Part B of hero) — calls, messaging, QR codes in one shell ─── */}
