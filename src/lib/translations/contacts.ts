@@ -604,6 +604,11 @@ export const contactsT: Translations = {
   "add.tag":               { en: "Add tag...",            zh: "添加标签...",            ar: "إضافة علامة..." },
   "add.brand":             { en: "Add brand...",          zh: "添加品牌...",            ar: "إضافة علامة تجارية..." },
   "add.certification":     { en: "Add certification...",  zh: "添加认证...",            ar: "إضافة شهادة..." },
+  "hint.brandAlreadyAdded":{ en: "Already added — pick a different name", zh: "已添加 — 请选择不同的名称", ar: "تمت الإضافة بالفعل — اختر اسمًا مختلفًا" },
+  "hint.classifications":  { en: "Pick everything that describes this supplier. Star one as the primary type.", zh: "选择所有描述此供应商的项。星标一项作为主要类型。", ar: "اختر كل ما يصف هذا المورد. ضع نجمة على واحد كنوع رئيسي." },
+  "hint.noClassifications":{ en: "Tip: at least one classification helps the team route this supplier correctly.", zh: "提示：至少一个分类有助于团队正确分流此供应商。", ar: "نصيحة: تساعد فئة واحدة على الأقل الفريق في توجيه هذا المورد بشكل صحيح." },
+  "classifications.selected":{ en: "selected",            zh: "已选",                  ar: "مُحدد" },
+  "action.makePrimary":    { en: "Make primary",          zh: "设为主要",              ar: "تعيين كأساسي" },
 
   /* ═══════════════════════════════════════════════════════════════════════════
      KPI / DASHBOARD LABELS

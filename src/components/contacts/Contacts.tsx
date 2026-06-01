@@ -1635,7 +1635,7 @@ const SelectInput = React.memo(function SelectInput({ label, value, onChange, op
 /* ── Add button ── */
 const AddButton = React.memo(function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <button onClick={onClick} className="flex items-center gap-2 text-sm text-[var(--text-subtle)] hover:text-[var(--text-primary)] py-2 transition-colors">
+    <button type="button" onClick={onClick} className="flex items-center gap-2 text-sm text-[var(--text-subtle)] hover:text-[var(--text-primary)] py-2 transition-colors">
       <div className="w-6 h-6 rounded-full bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] flex items-center justify-center">
         <PlusIcon size={14} className="text-[var(--text-muted)]" />
       </div>
@@ -1647,9 +1647,74 @@ const AddButton = React.memo(function AddButton({ label, onClick }: { label: str
 /* ── Remove button ── */
 const RemoveBtn = React.memo(function RemoveBtn({ onClick }: { onClick: () => void }) {
   return (
-    <button onClick={onClick} className="w-6 h-6 rounded-full bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0 hover:bg-[var(--bg-surface-bright)] transition-colors">
+    <button type="button" onClick={onClick} className="w-6 h-6 rounded-full bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0 hover:bg-[var(--bg-surface-bright)] transition-colors">
       <MinusIcon size={14} className="text-[var(--text-muted)]" />
     </button>
+  );
+});
+
+/* ── Tag/Chip input — controlled, dedupes, Enter or click-to-add ── */
+const TagInput = React.memo(function TagInput({
+  values, onChange, placeholder, icon, addLabel, duplicateLabel,
+}: {
+  values: string[];
+  onChange: (next: string[]) => void;
+  placeholder: string;
+  icon?: React.ReactNode;
+  addLabel: string;
+  duplicateLabel?: string;
+}) {
+  const [draft, setDraft] = React.useState("");
+  const [dupHint, setDupHint] = React.useState(false);
+  const trimmed = draft.trim();
+  const isDup = !!trimmed && values.some((v) => v.toLowerCase() === trimmed.toLowerCase());
+  const canAdd = trimmed.length > 0 && !isDup;
+  const commit = () => {
+    if (!trimmed) return;
+    if (isDup) { setDupHint(true); window.setTimeout(() => setDupHint(false), 1600); return; }
+    onChange([...values, trimmed]);
+    setDraft("");
+    setDupHint(false);
+  };
+  return (
+    <div>
+      {values.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {values.map((b, i) => (
+            <span key={`${b}-${i}`} className="group flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-secondary)]">
+              {b}
+              <button type="button" onClick={() => onChange(values.filter((_, idx) => idx !== i))} aria-label={`Remove ${b}`} className="w-4 h-4 rounded-full bg-[var(--bg-surface-hover)] flex items-center justify-center text-[var(--text-dim)] hover:bg-[var(--accent,#0066FF)]/15 hover:text-[var(--accent,#0066FF)] transition-colors">
+                <CrossIcon size={9} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          {icon && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none">{icon}</span>}
+          <input
+            value={draft}
+            onChange={(e) => { setDraft(e.target.value); if (dupHint) setDupHint(false); }}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commit(); } }}
+            placeholder={placeholder}
+            className={`w-full h-9 ${icon ? "pl-9" : "pl-3"} pr-3 rounded-lg bg-[var(--bg-surface)] border ${isDup && draft.length > 0 ? "border-amber-400/50" : "border-[var(--border-color)]"} text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors`}
+          />
+        </div>
+        <button
+          type="button"
+          onClick={commit}
+          disabled={!canAdd}
+          className={`h-9 px-3.5 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 transition-colors ${canAdd ? "bg-[var(--accent,#0066FF)] text-white hover:opacity-90" : "bg-[var(--bg-surface)] border border-[var(--border-color)] text-[var(--text-ghost)] cursor-not-allowed"}`}
+        >
+          <PlusIcon size={12} />
+          {addLabel}
+        </button>
+      </div>
+      {dupHint && duplicateLabel && (
+        <p className="text-[10.5px] text-amber-400 mt-1.5">{duplicateLabel}</p>
+      )}
+    </div>
   );
 });
 
@@ -7249,22 +7314,17 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             {/* 4. Company Profile — Brand, classification, and business identity */}
             <FormSection title={t("section.companyProfile")} icon={<BriefcaseIcon size={14} />} owner={t("owner.procurement")} ownerLabel={t("owner.label")} dept="procurement" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
               <div className="space-y-3">
-                {/* Brand Names */}
+                {/* Brand Names — controlled tag input with Enter / click-to-add + dedupe */}
                 <div>
                   <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.brand")}</label>
-                  <div className="flex flex-wrap gap-1.5 mb-2">
-                    {form.brand_names.map((b, i) => (
-                      <span key={i} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-secondary)]">
-                        {b}
-                        <button onClick={() => setField("brand_names", form.brand_names.filter((_, idx) => idx !== i))} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]"><CrossIcon size={10} /></button>
-                      </span>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <input id="brand-input" placeholder={t("add.brand")} className="flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
-                      onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); const val = (e.target as HTMLInputElement).value.trim(); if (val && !form.brand_names.includes(val)) { setField("brand_names", [...form.brand_names, val]); (e.target as HTMLInputElement).value = ""; } } }} />
-                    <button onClick={() => { const input = document.getElementById("brand-input") as HTMLInputElement; const val = input?.value.trim(); if (val && !form.brand_names.includes(val)) { setField("brand_names", [...form.brand_names, val]); input.value = ""; } }} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors">{t("btn.add")}</button>
-                  </div>
+                  <TagInput
+                    values={form.brand_names}
+                    onChange={(next) => setField("brand_names", next)}
+                    placeholder={t("add.brand")}
+                    icon={<TagsIcon size={13} />}
+                    addLabel={t("btn.add")}
+                    duplicateLabel={t("hint.brandAlreadyAdded", "Already added — pick a different name")}
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -7299,20 +7359,90 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
-            {/* Classifications */}
+            {/* Classifications — pick what describes this supplier, star one as primary */}
             <FormSection title={t("section.classifications", "Classifications")} icon={<TagsIcon size={14} />} owner={t("owner.procurement")} ownerLabel={t("owner.label")} dept="procurement" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(CLASSIFICATION_LABELS).map(([k, v]) => {
-                  const on = sIntel.classifications.includes(k);
-                  return <button type="button" key={k} onClick={() => toggleIntelClass(k)} className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${on ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent" : "bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--border-focus)]"}`}>{t("opt." + k, v)}</button>;
-                })}
-              </div>
-              {sIntel.classifications.length > 1 && (
-                <div className="mt-3 flex items-center gap-2">
-                  <span className="text-xs text-[var(--text-faint)]">{t("field.primary", "Primary")}:</span>
-                  <LabelSelect value={sIntel.primary_class} onChange={(v) => setSIntel((p) => ({ ...p, primary_class: v }))} options={sIntel.classifications} renderLabel={(o) => t("opt." + o, CLASSIFICATION_LABELS[o as keyof typeof CLASSIFICATION_LABELS] ?? o)} />
+              <div className="space-y-3">
+                {/* Header: helper text + selected count + primary chip */}
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-[11.5px] leading-relaxed text-[var(--text-dim)] flex-1">
+                    {t("hint.classifications", "Pick everything that describes this supplier. Star one as the primary type.")}
+                  </p>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full text-[11px] font-semibold bg-[var(--bg-surface)] border border-[var(--border-color)] text-[var(--text-secondary)]">
+                      {sIntel.classifications.length}
+                    </span>
+                    <span className="text-[10.5px] uppercase tracking-wider text-[var(--text-faint)]">{t("classifications.selected", "selected")}</span>
+                  </div>
                 </div>
-              )}
+
+                {/* Selected summary strip with primary star — only when something is selected */}
+                {sIntel.classifications.length > 0 && (
+                  <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-2.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {sIntel.classifications.map((k) => {
+                        const isPrimary = sIntel.primary_class === k;
+                        return (
+                          <span key={k} className={`inline-flex items-center gap-1 pl-2 pr-1 py-1 rounded-full text-[11px] font-medium border transition-colors ${isPrimary ? "bg-[var(--accent,#0066FF)] text-white border-transparent" : "bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)]"}`}>
+                            {isPrimary && <StarIcon size={10} className="opacity-90" />}
+                            {t("opt." + k, CLASSIFICATION_LABELS[k as keyof typeof CLASSIFICATION_LABELS] ?? k)}
+                            {sIntel.classifications.length > 1 && !isPrimary && (
+                              <button
+                                type="button"
+                                title={t("action.makePrimary", "Make primary")}
+                                onClick={() => setSIntel((p) => ({ ...p, primary_class: k }))}
+                                className="w-4 h-4 rounded-full flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--accent,#0066FF)] transition-colors"
+                                aria-label={t("action.makePrimary", "Make primary")}
+                              >
+                                <StarIcon size={10} />
+                              </button>
+                            )}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Picker grid — 3 columns on desktop, 2 on tablet, 1 on mobile */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5">
+                  {Object.entries(CLASSIFICATION_LABELS).map(([k, v]) => {
+                    const on = sIntel.classifications.includes(k);
+                    const isPrimary = on && sIntel.primary_class === k;
+                    return (
+                      <button
+                        type="button"
+                        key={k}
+                        onClick={() => toggleIntelClass(k)}
+                        className={`group relative flex items-center gap-2 rounded-xl border px-3 py-2 text-left transition-all ${
+                          on
+                            ? "bg-[var(--bg-surface)] border-[var(--accent,#0066FF)]/40 text-[var(--text-primary)] shadow-[0_0_0_1px_var(--accent,#0066FF)_inset]"
+                            : "bg-[var(--bg-surface)] border-[var(--border-color)] text-[var(--text-muted)] hover:border-[var(--border-focus)] hover:text-[var(--text-primary)]"
+                        }`}
+                      >
+                        {/* Check / empty indicator */}
+                        <span className={`flex items-center justify-center w-4 h-4 rounded-md border shrink-0 transition-colors ${on ? "bg-[var(--accent,#0066FF)] border-transparent text-white" : "border-[var(--border-color)] text-transparent group-hover:border-[var(--border-focus)]"}`}>
+                          {on && <CheckIcon size={10} />}
+                        </span>
+                        <span className="flex-1 text-[12px] font-medium leading-tight">
+                          {t("opt." + k, v)}
+                        </span>
+                        {isPrimary && (
+                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[var(--accent,#0066FF)]/15 text-[var(--accent,#0066FF)]" title={t("field.primary", "Primary")}>
+                            <StarIcon size={11} />
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Empty hint when nothing is picked */}
+                {sIntel.classifications.length === 0 && (
+                  <p className="text-[11px] text-[var(--text-faint)] italic">
+                    {t("hint.noClassifications", "Tip: at least one classification helps the team route this supplier correctly.")}
+                  </p>
+                )}
+              </div>
             </FormSection>
 
             {/* 2. Contact Details — How to reach the supplier */}
