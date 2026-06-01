@@ -497,8 +497,8 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
             </div>
           ) : null}
 
-          {/* Taxonomy breadcrumb — REAL icons from Product Data storage, connected
-              division › category › subcategory. One clean line, not a chip cloud. */}
+          {/* ── "What they make" group — separated from status by a hairline.
+                Taxonomy breadcrumb (real Product-Data icons) + classifications. ── */}
           {(() => {
             const slugify = (x: string) => x.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
             const divName = str(s, "division");
@@ -513,40 +513,47 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
             if (divName) crumbs.push({ label: divName, iconUrl: divisionLogos[divKey] ?? taxonomyLogoUrl("divisions", divKey), fallback: <Building2Icon className="h-3.5 w-3.5" /> });
             if (catName) crumbs.push({ label: catName, iconUrl: categoryLogos[catKey] ?? taxonomyLogoUrl("categories", catKey), fallback: <TagsIcon className="h-3.5 w-3.5" /> });
             if (subInd) crumbs.push({ label: subInd, iconUrl: subcategoryLogos[subKey] ?? taxonomyLogoUrl("subcategories", subKey), fallback: <FileCheckIcon className="h-3.5 w-3.5" /> });
-            if (!crumbs.length) return null;
+            // Classifications, minus any that just repeat the supplier type (e.g. "Manufacturer")
+            const typeNorm = str(s, "supplier_type").toLowerCase().replace(/[^a-z0-9]/g, "");
+            const classes = data.classifications.slice()
+              .sort((a, b) => Number(b.is_primary) - Number(a.is_primary))
+              .filter((c) => classificationLabel(str(c, "classification")).toLowerCase().replace(/[^a-z0-9]/g, "") !== typeNorm);
+            if (!crumbs.length && !classes.length) return null;
             return (
-              <div className="mt-3.5 flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
-                {crumbs.map((c, i) => (
-                  <span key={`${c.label}-${i}`} className="inline-flex items-center gap-1.5">
-                    {i > 0 ? <AngleRightIcon className="h-3 w-3 text-[var(--text-ghost)] rtl:rotate-180" /> : null}
-                    <span className="flex h-5 w-5 items-center justify-center rounded-md bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)]">
-                      {c.iconUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={c.iconUrl} alt="" className="h-3.5 w-3.5 object-contain" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; const sib = e.currentTarget.nextElementSibling as HTMLElement | null; if (sib) sib.style.display = "inline-flex"; }} />
-                      ) : null}
-                      <span style={{ display: c.iconUrl ? "none" : "inline-flex" }} className="text-[var(--text-faint)]">{c.fallback}</span>
-                    </span>
-                    <span className="text-[12px] font-medium text-[var(--text-secondary)]">{c.label}</span>
-                  </span>
-                ))}
+              <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] max-w-lg mx-auto space-y-2.5">
+                {crumbs.length ? (
+                  <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+                    {crumbs.map((c, i) => (
+                      <span key={`${c.label}-${i}`} className="inline-flex items-center gap-1.5">
+                        {i > 0 ? <AngleRightIcon className="h-3 w-3 text-[var(--text-ghost)] rtl:rotate-180" /> : null}
+                        <span className="flex h-5 w-5 items-center justify-center rounded-md bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)]">
+                          {c.iconUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={c.iconUrl} alt="" className="h-3.5 w-3.5 object-contain" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; const sib = e.currentTarget.nextElementSibling as HTMLElement | null; if (sib) sib.style.display = "inline-flex"; }} />
+                          ) : null}
+                          <span style={{ display: c.iconUrl ? "none" : "inline-flex" }} className="text-[var(--text-faint)]">{c.fallback}</span>
+                        </span>
+                        <span className="text-[12px] font-medium text-[var(--text-secondary)]">{c.label}</span>
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                {classes.length ? (
+                  <div className="flex flex-wrap items-center justify-center gap-1.5">
+                    {classes.map((c, i) => {
+                      const val = str(c, "classification");
+                      return (
+                        <span key={`${val}-${i}`} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10.5px] font-medium ${c.is_primary ? "bg-[var(--accent,#0066FF)]/12 text-[var(--accent,#0066FF)] ring-1 ring-[var(--accent,#0066FF)]/25" : "bg-[var(--bg-surface-subtle)] text-[var(--text-faint)]"}`}>
+                          {c.is_primary ? <StarIcon className="h-2.5 w-2.5" /> : null}
+                          {classificationLabel(val)}
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : null}
               </div>
             );
           })()}
-
-          {/* Classifications — quiet separate line; primary starred in accent */}
-          {data.classifications.length > 0 ? (
-            <div className="mt-2.5 flex flex-wrap items-center justify-center gap-1.5">
-              {data.classifications.slice().sort((a, b) => Number(b.is_primary) - Number(a.is_primary)).map((c, i) => {
-                const val = str(c, "classification");
-                return (
-                  <span key={`${val}-${i}`} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10.5px] font-medium ${c.is_primary ? "bg-[var(--accent,#0066FF)]/12 text-[var(--accent,#0066FF)] ring-1 ring-[var(--accent,#0066FF)]/25" : "bg-[var(--bg-surface-subtle)] text-[var(--text-faint)]"}`}>
-                    {c.is_primary ? <StarIcon className="h-2.5 w-2.5" /> : null}
-                    {classificationLabel(val)}
-                  </span>
-                );
-              })}
-            </div>
-          ) : null}
           {editError ? <div className="mt-2 text-[11px] text-rose-400">{editError}</div> : null}
         </div>
 

@@ -4025,12 +4025,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               {items.map(c => {
                 const isSelected = selectedId === c.id;
                 const tierInfo = c.contact_type === "customer" ? getTierInfo(c.customer_type) : null;
-                // Robust duplicate-name guard (trim + case-insensitive)
-                const dn = contactDisplayName(c).trim().toLowerCase();
-                const cn = (c.company_name_cn || "").trim().toLowerCase();
-                const co = (c.company || "").trim().toLowerCase();
-                const showCn = cn && cn !== dn;
-                const showCo = co && co !== dn && co !== cn;
+                // Robust duplicate-name guard — normalize away ALL punctuation,
+                // spacing and case so "CO.,LTD" === "CO.,LTD." (the real bug).
+                // Keep CJK so a Chinese name is never collapsed into a Latin one.
+                const norm = (x: string) => (x || "").toLowerCase().replace(/[^a-z0-9一-鿿]/g, "");
+                const dnN = norm(contactDisplayName(c));
+                const cnN = norm(c.company_name_cn || "");
+                const coN = norm(c.company || "");
+                const showCn = !!cnN && cnN !== dnN;
+                const showCo = !!coN && coN !== dnN && coN !== cnN;
                 const rating = Math.max(0, Math.min(5, Number(c.rating ?? 0)));
                 return (
                   <div
