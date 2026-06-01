@@ -33,7 +33,7 @@ export default function PriceListsModule({ t }: PurchaseModuleProps) {
           .select("id,supplier_id,name,currency,valid_from,valid_to,is_active,created_at")
           .order("created_at", { ascending: false }),
         supabase.from("supplier_price_list_items").select("price_list_id"),
-        supabase.from("contacts").select("id,display_name,company_name,full_name").not("supplier_type", "is", null),
+        supabase.from("contacts").select("id,display_name,company_name,full_name").eq("contact_type", "supplier"),
       ]);
       if (cancelled) return;
       setRows((pR.data ?? []) as PriceList[]);

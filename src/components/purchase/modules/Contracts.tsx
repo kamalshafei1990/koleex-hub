@@ -41,7 +41,7 @@ export default function ContractsModule({ t }: PurchaseModuleProps) {
           .select("id,contract_no,title,supplier_id,start_date,end_date,total_value,currency,status")
           .order("created_at", { ascending: false })
           .limit(30),
-        supabase.from("contacts").select("id,display_name,company_name,full_name").not("supplier_type", "is", null),
+        supabase.from("contacts").select("id,display_name,company_name,full_name").eq("contact_type", "supplier"),
       ]);
       if (cancelled) return;
       setRows((r.data ?? []) as Contract[]);

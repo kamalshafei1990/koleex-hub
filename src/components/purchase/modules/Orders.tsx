@@ -37,7 +37,7 @@ export default function OrdersModule({ t }: PurchaseModuleProps) {
         .select("id,po_no,status,supplier_id,total,currency,order_date,expected_delivery_date,created_at")
         .order("created_at", { ascending: false })
         .limit(30),
-      supabase.from("contacts").select("id,display_name,company_name,full_name").not("supplier_type", "is", null),
+      supabase.from("contacts").select("id,display_name,company_name,full_name").eq("contact_type", "supplier"),
     ]);
     setRows((pR.data ?? []) as PO[]);
     const m = new Map<string, string>();

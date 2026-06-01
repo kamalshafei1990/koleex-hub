@@ -40,7 +40,7 @@ export default function ReturnsModule({ t }: PurchaseModuleProps) {
           .select("id,return_no,status,supplier_id,reason,total_value,refund_amount,currency,return_date,created_at")
           .order("created_at", { ascending: false })
           .limit(30),
-        supabase.from("contacts").select("id,display_name,company_name,full_name").not("supplier_type", "is", null),
+        supabase.from("contacts").select("id,display_name,company_name,full_name").eq("contact_type", "supplier"),
       ]);
       if (cancelled) return;
       setRows((rR.data ?? []) as Return[]);

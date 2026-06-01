@@ -34,7 +34,7 @@ export default function BillsModule({ t }: PurchaseModuleProps) {
         .select("id,bill_no,supplier_invoice_no,status,supplier_id,total,balance,currency,bill_date,due_date,created_at")
         .order("created_at", { ascending: false })
         .limit(30),
-      supabase.from("contacts").select("id,display_name,company_name,full_name").not("supplier_type", "is", null),
+      supabase.from("contacts").select("id,display_name,company_name,full_name").eq("contact_type", "supplier"),
     ]);
     setRows((bR.data ?? []) as Bill[]);
     const m = new Map<string, string>();

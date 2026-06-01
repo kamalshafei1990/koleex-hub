@@ -36,7 +36,7 @@ export default function SuppliersModule({ t }: PurchaseModuleProps) {
         supabase
           .from("contacts")
           .select("id,display_name,full_name,company_name,company_name_en,country,supplier_type,preferred_payment_method,rating,is_active,certifications")
-          .not("supplier_type", "is", null)
+          .eq("contact_type", "supplier")
           .order("updated_at", { ascending: false, nullsFirst: false })
           .limit(50),
         supabase.from("vendor_payments").select("supplier_id,amount"),

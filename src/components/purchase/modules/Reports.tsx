@@ -32,7 +32,7 @@ export default function ReportsModule({ t }: PurchaseModuleProps) {
         supabase.from("vendor_payments").select("amount,paid_at,created_at,supplier_id"),
         supabase.from("vendor_bill_items").select("line_total,category_id"),
         supabase.from("purchase_categories").select("id,name,kind"),
-        supabase.from("contacts").select("id,display_name,company_name,full_name").not("supplier_type", "is", null),
+        supabase.from("contacts").select("id,display_name,company_name,full_name").eq("contact_type", "supplier"),
       ]);
       if (cancelled) return;
       setPayments((pR.data ?? []) as PaymentRow[]);

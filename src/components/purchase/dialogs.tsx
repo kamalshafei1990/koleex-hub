@@ -76,7 +76,7 @@ function useSuppliers(open: boolean): SupplierOption[] {
       const r = await supabase
         .from("contacts")
         .select("id,display_name,company_name,full_name")
-        .not("supplier_type", "is", null)
+        .eq("contact_type", "supplier")
         .order("company_name", { ascending: true, nullsFirst: false })
         .limit(500);
       if (cancelled) return;

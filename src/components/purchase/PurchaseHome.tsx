@@ -165,7 +165,7 @@ export default function PurchaseHome() {
           supabase.from("purchase_requisitions").select("id,pr_no,status,total_estimated,created_at").order("created_at", { ascending: false }).limit(50),
           supabase.from("purchase_rfqs").select("id,rfq_no,status,supplier_id,total_estimated,created_at").order("created_at", { ascending: false }).limit(50),
           supabase.from("purchase_receipts").select("id,gr_no,po_id,status,created_at").order("created_at", { ascending: false }).limit(50),
-          supabase.from("contacts").select("id,supplier_type,is_active").not("supplier_type", "is", null),
+          supabase.from("contacts").select("id,supplier_type,is_active").eq("contact_type", "supplier"),
         ]);
         if (cancelled) return;
 
