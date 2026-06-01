@@ -52,6 +52,7 @@ import Edit3Icon from "@/components/icons/ui/Edit3Icon";
 import BrandGlyph from "@/components/icons/brands/BrandGlyph";
 import TagsIcon from "@/components/icons/ui/TagsIcon";
 import Share2Icon from "@/components/icons/ui/Share2Icon";
+import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import { taxonomyLogoUrl } from "@/components/knowledge/product-coding/taxonomy-logo";
 import { DIVISIONS, CATEGORIES } from "@/components/knowledge/product-coding/data";
 import { fetchDivisionLogos, fetchCategoryLogos, fetchSubcategoryLogos } from "@/lib/products-admin";
@@ -496,9 +497,10 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
             </div>
           ) : null}
 
-          {/* Unified taxonomy row — classifications + division + category + sub-industry, all in ONE quiet line */}
+          {/* Taxonomy breadcrumb — REAL icons from Product Data storage, connected
+              division › category › subcategory. One clean line, not a chip cloud. */}
           {(() => {
-            const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+            const slugify = (x: string) => x.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
             const divName = str(s, "division");
             const catName = str(s, "category");
             const subInd = str(s, "sub_industry");
@@ -507,35 +509,44 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
             const divKey = divObj?.id ?? slugify(divName);
             const catKey = catObj?.slug ?? slugify(catName);
             const subKey = slugify(subInd);
-            type Tag = { label: string; iconUrl?: string | null; fallback?: React.ReactNode; primary?: boolean };
-            const classTags: Tag[] = data.classifications.slice().sort((a, b) => Number(b.is_primary) - Number(a.is_primary)).map((c) => ({
-              label: classificationLabel(str(c, "classification")),
-              primary: !!c.is_primary,
-              fallback: c.is_primary ? <StarIcon className="h-3 w-3" /> : <TagsIcon className="h-3 w-3" />,
-            }));
-            const taxoTags: Tag[] = [];
-            if (divName) taxoTags.push({ label: divName, iconUrl: divisionLogos[divKey] ?? taxonomyLogoUrl("divisions", divKey), fallback: <Building2Icon className="h-3 w-3" /> });
-            if (catName) taxoTags.push({ label: catName, iconUrl: categoryLogos[catKey] ?? taxonomyLogoUrl("categories", catKey), fallback: <TagsIcon className="h-3 w-3" /> });
-            if (subInd) taxoTags.push({ label: subInd, iconUrl: subcategoryLogos[subKey] ?? taxonomyLogoUrl("subcategories", subKey), fallback: <FileCheckIcon className="h-3 w-3" /> });
-            const all = [...classTags, ...taxoTags];
-            if (!all.length) return null;
+            const crumbs: { label: string; iconUrl?: string | null; fallback: React.ReactNode }[] = [];
+            if (divName) crumbs.push({ label: divName, iconUrl: divisionLogos[divKey] ?? taxonomyLogoUrl("divisions", divKey), fallback: <Building2Icon className="h-3.5 w-3.5" /> });
+            if (catName) crumbs.push({ label: catName, iconUrl: categoryLogos[catKey] ?? taxonomyLogoUrl("categories", catKey), fallback: <TagsIcon className="h-3.5 w-3.5" /> });
+            if (subInd) crumbs.push({ label: subInd, iconUrl: subcategoryLogos[subKey] ?? taxonomyLogoUrl("subcategories", subKey), fallback: <FileCheckIcon className="h-3.5 w-3.5" /> });
+            if (!crumbs.length) return null;
             return (
-              <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
-                {all.map((it, i) => (
-                  <span key={`${it.label}-${i}`} className={`inline-flex items-center gap-1.5 rounded-full ps-1 pe-2.5 py-0.5 text-[11px] font-medium ${it.primary ? "bg-[var(--accent,#0066FF)]/15 text-[var(--accent,#0066FF)] ring-1 ring-[var(--accent,#0066FF)]/30" : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]"}`}>
-                    <span className="flex h-4 w-4 items-center justify-center">
-                      {it.iconUrl ? (
+              <div className="mt-3.5 flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+                {crumbs.map((c, i) => (
+                  <span key={`${c.label}-${i}`} className="inline-flex items-center gap-1.5">
+                    {i > 0 ? <AngleRightIcon className="h-3 w-3 text-[var(--text-ghost)] rtl:rotate-180" /> : null}
+                    <span className="flex h-5 w-5 items-center justify-center rounded-md bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)]">
+                      {c.iconUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={it.iconUrl} alt="" className="h-4 w-4 object-contain" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; const sib = e.currentTarget.nextElementSibling as HTMLElement | null; if (sib) sib.style.display = "inline-flex"; }} />
+                        <img src={c.iconUrl} alt="" className="h-3.5 w-3.5 object-contain" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; const sib = e.currentTarget.nextElementSibling as HTMLElement | null; if (sib) sib.style.display = "inline-flex"; }} />
                       ) : null}
-                      <span style={{ display: it.iconUrl ? "none" : "inline-flex" }} className={it.primary ? "" : "text-[var(--text-faint)]"}>{it.fallback}</span>
+                      <span style={{ display: c.iconUrl ? "none" : "inline-flex" }} className="text-[var(--text-faint)]">{c.fallback}</span>
                     </span>
-                    {it.label}
+                    <span className="text-[12px] font-medium text-[var(--text-secondary)]">{c.label}</span>
                   </span>
                 ))}
               </div>
             );
           })()}
+
+          {/* Classifications — quiet separate line; primary starred in accent */}
+          {data.classifications.length > 0 ? (
+            <div className="mt-2.5 flex flex-wrap items-center justify-center gap-1.5">
+              {data.classifications.slice().sort((a, b) => Number(b.is_primary) - Number(a.is_primary)).map((c, i) => {
+                const val = str(c, "classification");
+                return (
+                  <span key={`${val}-${i}`} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10.5px] font-medium ${c.is_primary ? "bg-[var(--accent,#0066FF)]/12 text-[var(--accent,#0066FF)] ring-1 ring-[var(--accent,#0066FF)]/25" : "bg-[var(--bg-surface-subtle)] text-[var(--text-faint)]"}`}>
+                    {c.is_primary ? <StarIcon className="h-2.5 w-2.5" /> : null}
+                    {classificationLabel(val)}
+                  </span>
+                );
+              })}
+            </div>
+          ) : null}
           {editError ? <div className="mt-2 text-[11px] text-rose-400">{editError}</div> : null}
         </div>
 

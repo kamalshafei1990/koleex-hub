@@ -1301,7 +1301,7 @@ export const contactsT: Translations = {
   "cs.archiveConfirmSuffix": { en: "? They can be re-added later.", zh: "？稍后可重新添加。", ar: "؟ يمكن إعادة إضافتها لاحقًا." },
   "cs.chooseQrFirst": { en: "Choose a QR image first", zh: "请先选择二维码图片", ar: "اختر صورة رمز QR أولاً" },
   "cs.removeQrConfirm": { en: "Remove this QR code?", zh: "移除此二维码？", ar: "إزالة رمز QR هذا؟" },
-  "cs.title": { en: "Communication Intelligence", zh: "沟通情报", ar: "معلومات التواصل" },
+  "cs.title": { en: "Contact Persons", zh: "联系人", ar: "جهات الاتصال" },
   "cs.addQr": { en: "Add QR", zh: "添加二维码", ar: "إضافة رمز QR" },
   "cs.addContact": { en: "Add contact", zh: "添加联系人", ar: "إضافة جهة اتصال" },
   "cs.newContact": { en: "New contact", zh: "新建联系人", ar: "جهة اتصال جديدة" },

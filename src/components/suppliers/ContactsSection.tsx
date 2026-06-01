@@ -419,6 +419,16 @@ export default function ContactsSection({
               return (
                 <div key={id} className="rounded-2xl bg-[var(--bg-surface-subtle)] p-4 space-y-3">
                   <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-3 min-w-0">
+                      {/* Person avatar — photo if present, else monogram initials */}
+                      <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[var(--bg-surface)] ring-1 ring-[var(--border-subtle)] flex items-center justify-center">
+                        {str(c, "photo_url") ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={str(c, "photo_url")} alt={str(c, "full_name")} className="h-full w-full object-cover" />
+                        ) : (
+                          <span className="text-[12px] font-semibold text-[var(--text-secondary)]">{(str(c, "full_name").trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("") || "?").toUpperCase()}</span>
+                        )}
+                      </div>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-1.5">
                         {isBoss ? <CrownIcon className="h-3.5 w-3.5 text-[var(--text-secondary)]" /> : null}
@@ -434,6 +444,7 @@ export default function ContactsSection({
                       <div className="mt-0.5 truncate text-[11px] text-[var(--text-faint)]">
                         {[str(c, "position") || str(c, "role"), str(c, "department")].filter(Boolean).join(" · ") || t("opt." + cat, roleCategoryLabel(cat))}
                       </div>
+                    </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
                       <button type="button" title={t("cs.addQrForContact", "Add QR for this contact")} onClick={() => openQr(id)}
