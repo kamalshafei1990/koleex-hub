@@ -451,114 +451,224 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
         {!embedded && <div className="px-4 sm:px-6 pt-6"><SuppliersHeader title={t("sd.suppliers", "Suppliers")} /></div>}
 
       <main className="pb-24">
-        {/* ─── Contacts-style centered header (avatar · name · type) — Edit/Delete in top-right ─── */}
-        <div className="mx-4 md:mx-6 mt-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 md:px-6 py-6 md:py-8 text-center relative">
-          {/* Top-left — Executive / Analytical mode toggle (Section 3) */}
-          <div className="absolute top-3 start-3 inline-flex items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-0.5 text-[11px] font-medium">
-            <button type="button" onClick={() => setMode(false)} aria-pressed={!execMode}
-              className={`rounded-md px-2 py-1 transition-colors ${!execMode ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "text-[var(--text-faint)] hover:text-[var(--text-secondary)]"}`}>
-              {t("sd.modeAnalytical", "Analytical")}
-            </button>
-            <button type="button" onClick={() => setMode(true)} aria-pressed={execMode}
-              className={`rounded-md px-2 py-1 transition-colors ${execMode ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "text-[var(--text-faint)] hover:text-[var(--text-secondary)]"}`}>
-              {t("sd.modeExecutive", "Executive")}
-            </button>
-          </div>
-          {/* Top-right action buttons (Edit / Delete) */}
-          <div className="absolute top-3 end-3 flex items-center gap-1.5">
-            <button onClick={() => (onEdit ? onEdit() : router.push(`/suppliers?selected=${id}`))} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:bg-[var(--bg-surface-hover)] text-[12px] font-medium transition-colors text-[var(--text-primary)]">
-              <Edit3Icon className="h-3.5 w-3.5" /> {t("sd.edit", "Edit")}
-            </button>
-            {onDelete ? (
-              <button onClick={() => onDelete()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[12px] font-medium transition-colors" aria-label={t("sd.delete", "Delete")}>
-                <TrashIcon className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{t("sd.delete", "Delete")}</span>
+        {/* ─── Executive cockpit hero — 3 columns: identity · intelligence · critical metrics ───
+              Answers in 5 seconds: can we trust & use this supplier, and what is the main risk. ─── */}
+        <div className="mx-4 md:mx-6 mt-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4 md:p-5">
+          {/* Top bar — mode toggle (start) · Edit / Delete (end) */}
+          <div className="flex items-center justify-between gap-3 mb-4 md:mb-5">
+            <div className="inline-flex items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-0.5 text-[11px] font-medium">
+              <button type="button" onClick={() => setMode(false)} aria-pressed={!execMode}
+                className={`rounded-md px-2 py-1 transition-colors ${!execMode ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "text-[var(--text-faint)] hover:text-[var(--text-secondary)]"}`}>
+                {t("sd.modeAnalytical", "Analytical")}
               </button>
-            ) : null}
-          </div>
-          <div className="w-24 h-24 mx-auto mb-4 rounded-2xl bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)] flex items-center justify-center overflow-hidden">
-            {str(s, "photo_url", "logo_url") ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={str(s, "photo_url", "logo_url")} alt={name} className="w-full h-full object-cover" />
-            ) : (
-              <span className="font-mono text-2xl font-bold text-[var(--text-secondary)]">{initials(name)}</span>
-            )}
-          </div>
-          <h2 className="text-xl font-semibold text-[var(--text-primary)]">{name}</h2>
-          {cnName && cnName !== name ? (
-            <p lang="zh" className="text-sm text-[var(--text-faint)] mt-0.5">{cnName}</p>
-          ) : null}
-
-          {/* ── Operational intelligence strip (Section 4) — risk · trust · negotiation · readiness · tier ── */}
-          {(() => {
-            const rp = (data.riskProfile ?? {}) as Row;
-            const ni = (data.negotiationIntel ?? {}) as Row;
-            const tone = (k: "good" | "warn" | "bad") =>
-              k === "good" ? "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400"
-              : k === "warn" ? "bg-amber-500/12 text-amber-600 dark:text-amber-400"
-              : "bg-rose-500/12 text-rose-600 dark:text-rose-400";
-            const badges: { label: string; k: "good" | "warn" | "bad" }[] = [];
-            const lvl = str(rp, "risk_level");
-            if (lvl) badges.push({ label: `${lvl.toUpperCase()} RISK`, k: lvl === "low" ? "good" : lvl === "medium" ? "warn" : "bad" });
-            const trust = str(rp, "trust_level");
-            if (trust) badges.push({ label: trust === "excellent" || trust === "high" ? "TRUSTED" : trust.toUpperCase() + " TRUST", k: trust === "excellent" || trust === "high" ? "good" : trust === "medium" ? "warn" : "bad" });
-            const negScore = num(ni, "negotiation_score");
-            if (negScore) badges.push({ label: negScore >= 70 ? "STRONG NEGOTIATION" : negScore >= 40 ? "MODERATE NEGOTIATION" : "WEAK NEGOTIATION", k: negScore >= 70 ? "good" : negScore >= 40 ? "warn" : "bad" });
-            const ready = data.readiness?.score;
-            if (typeof ready === "number") badges.push({ label: `READY ${ready}%`, k: ready >= 80 ? "good" : ready >= 50 ? "warn" : "bad" });
-            const ss = str(s, "strategic_status");
-            if (ss === "strategic" || ss === "preferred") badges.push({ label: ss === "strategic" ? "TIER-1 SOURCE" : "PREFERRED", k: "good" });
-            if (!badges.length) return null;
-            return (
-              <div className="mt-2.5 flex flex-wrap items-center justify-center gap-1.5">
-                {badges.map((b, i) => (
-                  <span key={i} className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${tone(b.k)}`}>{b.label}</span>
-                ))}
-              </div>
-            );
-          })()}
-
-          {rating > 0 ? (
-            <div className="flex items-center justify-center gap-0.5 mt-2">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <StarIcon key={i} className={`h-3.5 w-3.5 ${i <= rating ? "text-amber-400" : "text-[var(--text-faint)]"}`} />
-              ))}
+              <button type="button" onClick={() => setMode(true)} aria-pressed={execMode}
+                className={`rounded-md px-2 py-1 transition-colors ${execMode ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "text-[var(--text-faint)] hover:text-[var(--text-secondary)]"}`}>
+                {t("sd.modeExecutive", "Executive")}
+              </button>
             </div>
-          ) : null}
-          <div className="flex flex-wrap items-center justify-center gap-1.5 mt-3">
-            <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)] inline-flex items-center gap-1">
-              <Building2Icon className="h-3 w-3" /> {str(s, "supplier_type") || t("sd.supplier", "Supplier")}
-            </span>
-            {str(s, "country") ? (
-              <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)] inline-flex items-center gap-1">
-                <MapPinIcon className="h-3 w-3" /> {[str(s, "city"), str(s, "country")].filter(Boolean).join(", ")}
-              </span>
-            ) : null}
-            {(() => {
-              const ss = str(s, "strategic_status");
-              const tone = strategicStatusTone(ss);
-              const cls = ss
-                ? tone === "positive"
-                  ? "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400 border-emerald-500/25"
-                  : tone === "danger"
-                    ? "bg-rose-500/12 text-rose-600 dark:text-rose-400 border-rose-500/25"
-                    : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] border-[var(--border-subtle)]"
-                : "border-dashed border-[var(--border-subtle)] text-[var(--text-faint)] hover:text-[var(--text-secondary)]";
-              return (
-                <button type="button" onClick={() => { setStatusDraft(ss); setStatusReason(""); setStatusOpen((o) => !o); }} className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border inline-flex items-center gap-1 transition-colors ${cls}`}>
-                  {ss ? (STRATEGIC_STATUS_LABELS[ss as StrategicStatus] ?? ss) : t("sd.setStatus", "Set status")}
-                  <Edit3Icon className="h-3 w-3 opacity-70" />
+            <div className="flex items-center gap-1.5">
+              <button onClick={() => (onEdit ? onEdit() : router.push(`/suppliers?selected=${id}`))} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:bg-[var(--bg-surface-hover)] text-[12px] font-medium transition-colors text-[var(--text-primary)]">
+                <Edit3Icon className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{t("sd.edit", "Edit")}</span>
+              </button>
+              {onDelete ? (
+                <button onClick={() => onDelete()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[12px] font-medium transition-colors" aria-label={t("sd.delete", "Delete")}>
+                  <TrashIcon className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">{t("sd.delete", "Delete")}</span>
                 </button>
-              );
-            })()}
-            <span className={`text-[11px] font-medium px-2.5 py-0.5 rounded-full ${isActive ? "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/10 text-rose-500"}`}>
-              {isActive ? t("sd.active", "Active") : t("sd.archived", "Archived")}
-            </span>
+              ) : null}
+            </div>
           </div>
 
-          {/* Strategic status editor (inline, like the original) */}
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)_minmax(0,300px)] gap-5 lg:gap-0">
+            {/* ════ LEFT — Identity ════ */}
+            <div className="lg:pe-6 space-y-3.5 text-start">
+              <div className="flex items-start gap-3.5">
+                <div className="w-16 h-16 shrink-0 rounded-xl bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)] flex items-center justify-center overflow-hidden">
+                  {str(s, "photo_url", "logo_url") ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={str(s, "photo_url", "logo_url")} alt={name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="font-mono text-lg font-bold text-[var(--text-secondary)]">{initials(name)}</span>
+                  )}
+                </div>
+                <div className="min-w-0 pt-0.5">
+                  <h2 className="text-lg font-semibold leading-snug text-[var(--text-primary)]">{name}</h2>
+                  {cnName && cnName !== name ? (
+                    <p lang="zh" className="text-[13px] text-[var(--text-faint)] mt-0.5">{cnName}</p>
+                  ) : null}
+                  {rating > 0 ? (
+                    <div className="flex items-center gap-0.5 mt-1">
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <StarIcon key={i} className={`h-3 w-3 ${i <= rating ? "text-amber-400" : "text-[var(--text-faint)]"}`} />
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              {/* type · location · strategic status · active */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)] inline-flex items-center gap-1">
+                  <Building2Icon className="h-3 w-3" /> {str(s, "supplier_type") || t("sd.supplier", "Supplier")}
+                </span>
+                {str(s, "country") ? (
+                  <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)] inline-flex items-center gap-1">
+                    <MapPinIcon className="h-3 w-3" /> {[str(s, "city"), str(s, "country")].filter(Boolean).join(", ")}
+                  </span>
+                ) : null}
+                {(() => {
+                  const ss = str(s, "strategic_status");
+                  const tone = strategicStatusTone(ss);
+                  const cls = ss
+                    ? tone === "positive"
+                      ? "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400 border-emerald-500/25"
+                      : tone === "danger"
+                        ? "bg-rose-500/12 text-rose-600 dark:text-rose-400 border-rose-500/25"
+                        : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] border-[var(--border-subtle)]"
+                    : "border-dashed border-[var(--border-subtle)] text-[var(--text-faint)] hover:text-[var(--text-secondary)]";
+                  return (
+                    <button type="button" onClick={() => { setStatusDraft(ss); setStatusReason(""); setStatusOpen((o) => !o); }} className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border inline-flex items-center gap-1 transition-colors ${cls}`}>
+                      {ss ? (STRATEGIC_STATUS_LABELS[ss as StrategicStatus] ?? ss) : t("sd.setStatus", "Set status")}
+                      <Edit3Icon className="h-3 w-3 opacity-70" />
+                    </button>
+                  );
+                })()}
+                <span className={`text-[11px] font-medium px-2.5 py-0.5 rounded-full ${isActive ? "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/10 text-rose-500"}`}>
+                  {isActive ? t("sd.active", "Active") : t("sd.archived", "Archived")}
+                </span>
+              </div>
+
+              {/* ── What they make — taxonomy breadcrumb (real Product-Data icons) + classifications ── */}
+              {(() => {
+                const slugify = (x: string) => x.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+                const divName = str(s, "division");
+                const catName = str(s, "category");
+                const subInd = str(s, "sub_industry");
+                const divObj = DIVISIONS.find((d) => d.name.toLowerCase() === divName.toLowerCase());
+                const catObj = CATEGORIES.find((c) => c.label.toLowerCase() === catName.toLowerCase());
+                const divKey = divObj?.id ?? slugify(divName);
+                const catKey = catObj?.slug ?? slugify(catName);
+                const subKey = slugify(subInd);
+                const crumbs: { label: string; iconUrl?: string | null; fallback: React.ReactNode }[] = [];
+                if (divName) crumbs.push({ label: divName, iconUrl: divisionLogos[divKey] ?? taxonomyLogoUrl("divisions", divKey), fallback: <Building2Icon className="h-3.5 w-3.5" /> });
+                if (catName) crumbs.push({ label: catName, iconUrl: categoryLogos[catKey] ?? taxonomyLogoUrl("categories", catKey), fallback: <TagsIcon className="h-3.5 w-3.5" /> });
+                if (subInd) crumbs.push({ label: subInd, iconUrl: subcategoryLogos[subKey] ?? taxonomyLogoUrl("subcategories", subKey), fallback: <FileCheckIcon className="h-3.5 w-3.5" /> });
+                const typeNorm = str(s, "supplier_type").toLowerCase().replace(/[^a-z0-9]/g, "");
+                const classes = data.classifications.slice()
+                  .sort((a, b) => Number(b.is_primary) - Number(a.is_primary))
+                  .filter((c) => classificationLabel(str(c, "classification")).toLowerCase().replace(/[^a-z0-9]/g, "") !== typeNorm);
+                if (!crumbs.length && !classes.length) return null;
+                return (
+                  <div className="pt-3.5 border-t border-[var(--border-subtle)] space-y-2.5">
+                    {crumbs.length ? (
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        {crumbs.map((c, i) => (
+                          <span key={`${c.label}-${i}`} className="inline-flex items-center gap-1.5">
+                            {i > 0 ? <AngleRightIcon className="h-3 w-3 text-[var(--text-ghost)] rtl:rotate-180" /> : null}
+                            <span className="flex h-5 w-5 items-center justify-center rounded-md bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)]">
+                              {c.iconUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={c.iconUrl} alt="" className="h-3.5 w-3.5 object-contain" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; const sib = e.currentTarget.nextElementSibling as HTMLElement | null; if (sib) sib.style.display = "inline-flex"; }} />
+                              ) : null}
+                              <span style={{ display: c.iconUrl ? "none" : "inline-flex" }} className="text-[var(--text-faint)]">{c.fallback}</span>
+                            </span>
+                            <span className="text-[12px] font-medium text-[var(--text-secondary)]">{c.label}</span>
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    {classes.length ? (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {classes.map((c, i) => {
+                          const val = str(c, "classification");
+                          return (
+                            <span key={`${val}-${i}`} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10.5px] font-medium ${c.is_primary ? "bg-[var(--accent,#0066FF)]/12 text-[var(--accent,#0066FF)] ring-1 ring-[var(--accent,#0066FF)]/25" : "bg-[var(--bg-surface-subtle)] text-[var(--text-faint)]"}`}>
+                              {c.is_primary ? <StarIcon className="h-2.5 w-2.5" /> : null}
+                              {classificationLabel(val)}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* ════ CENTER — Intelligence summary ════ */}
+            <div className="lg:px-6 lg:border-x border-[var(--border-subtle)] border-t lg:border-t-0 pt-4 lg:pt-0">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-2.5">{t("sd.intelligence", "Intelligence")}</div>
+              {(() => {
+                const rp = (data.riskProfile ?? {}) as Row;
+                const ni = (data.negotiationIntel ?? {}) as Row;
+                const tone = (k: "good" | "warn" | "bad" | "neutral") =>
+                  k === "good" ? "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20"
+                  : k === "warn" ? "bg-amber-500/12 text-amber-600 dark:text-amber-400 ring-amber-500/20"
+                  : k === "bad" ? "bg-rose-500/12 text-rose-600 dark:text-rose-400 ring-rose-500/20"
+                  : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] ring-[var(--border-subtle)]";
+                const badges: { label: string; k: "good" | "warn" | "bad" | "neutral" }[] = [];
+                const lvl = str(rp, "risk_level");
+                if (lvl) badges.push({ label: `${lvl.toUpperCase()} RISK`, k: lvl === "low" ? "good" : lvl === "medium" ? "warn" : "bad" });
+                const trust = str(rp, "trust_level");
+                if (trust) badges.push({ label: trust === "excellent" || trust === "high" ? "TRUSTED" : trust.toUpperCase() + " TRUST", k: trust === "excellent" || trust === "high" ? "good" : trust === "medium" ? "warn" : "bad" });
+                const negScore = num(ni, "negotiation_score");
+                if (negScore) badges.push({ label: negScore >= 70 ? "STRONG NEGOTIATION" : negScore >= 40 ? "MODERATE NEGOTIATION" : "WEAK NEGOTIATION", k: negScore >= 70 ? "good" : negScore >= 40 ? "warn" : "bad" });
+                const ready = data.readiness?.score;
+                if (typeof ready === "number") badges.push({ label: `READY ${ready}%`, k: ready >= 80 ? "good" : ready >= 50 ? "warn" : "bad" });
+                const ss = str(s, "strategic_status");
+                if (ss === "strategic" || ss === "preferred") badges.push({ label: ss === "strategic" ? "TIER-1 SOURCE" : "PREFERRED", k: "good" });
+                const prio = data.sourcing?.priority;
+                if (typeof prio === "number" && prio > 0) badges.push({ label: `PRIORITY ${prio}`, k: "neutral" });
+                if (data.sourcing?.soleSource) badges.push({ label: "SOLE SOURCE", k: "warn" });
+                if (!badges.length) return <div className="text-[12px] text-[var(--text-faint)]">{t("sd.noIntel", "No intelligence captured yet.")}</div>;
+                return (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {badges.map((b, i) => (
+                      <span key={i} className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-wide ring-1 ${tone(b.k)}`}>{b.label}</span>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* ════ RIGHT — Critical metrics ════ */}
+            <div className="lg:ps-6 border-t lg:border-t-0 pt-4 lg:pt-0">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-2.5">{t("sd.criticalMetrics", "Critical metrics")}</div>
+              {(() => {
+                const rp = (data.riskProfile ?? {}) as Row;
+                const sp = (data.sourcingProfile ?? {}) as Row;
+                const activeRisks = (data.riskItems ?? []).filter((r) => r.status !== "resolved").length;
+                const sourcingScore = num(sp, "sourcing_score_override") || (data.sourcing?.score ?? 0);
+                const evalScore = num(rp, "internal_evaluation_score");
+                const readyPct = data.readiness?.score;
+                const lastIso = (data.timeline ?? []).map((e) => str(e, "created_at")).filter(Boolean).sort().at(-1);
+                const fmtDate = (iso?: string) => { if (!iso) return "—"; const d = new Date(iso); return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString(undefined, { month: "short", day: "numeric" }); };
+                const cards: { label: string; value: string; accent?: "rose" | "emerald"; span?: boolean }[] = [
+                  { label: t("sd.kpiSourcingScore", "Sourcing score"), value: sourcingScore ? `${Math.round(sourcingScore)}` : (evalScore ? `${Math.round(evalScore)}` : "—") },
+                  { label: t("sd.kpiReadiness", "Readiness"), value: typeof readyPct === "number" ? `${readyPct}%` : "—" },
+                  { label: t("sd.kpiActiveRisks", "Active risks"), value: String(activeRisks), accent: activeRisks ? "rose" : "emerald" },
+                  { label: t("sd.openPos", "Open POs"), value: String(stats.openPos) },
+                  { label: t("sd.outstandingPayable", "Outstanding payable"), value: money(stats.outstanding, currency), span: true },
+                  { label: t("sd.leadTime", "Lead time"), value: str(s, "lead_time") || "—" },
+                  { label: t("sd.lastActivity", "Last activity"), value: fmtDate(lastIso) },
+                ];
+                return (
+                  <div className="grid grid-cols-2 gap-2">
+                    {cards.map((k) => (
+                      <div key={k.label} className={`rounded-xl bg-[var(--bg-surface-subtle)] px-3 py-2.5 ${k.span ? "col-span-2" : ""}`}>
+                        <div className={`text-[15px] font-semibold tracking-tight tabular-nums leading-tight ${k.accent === "rose" ? "text-rose-500" : k.accent === "emerald" ? "text-emerald-600 dark:text-emerald-400" : "text-[var(--text-primary)]"}`}>{k.value}</div>
+                        <div className="mt-0.5 text-[9.5px] font-medium uppercase tracking-wider text-[var(--text-faint)]">{k.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* Strategic status editor (inline) */}
           {statusOpen ? (
-            <div className="mt-4 max-w-md mx-auto space-y-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-start">
+            <div className="mt-4 max-w-md space-y-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-start">
               <div className="flex flex-wrap gap-1.5">
                 {(Object.keys(STRATEGIC_STATUS_LABELS) as StrategicStatus[]).map((k) => (
                   <button key={k} type="button" onClick={() => setStatusDraft(k)} className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${statusDraft === k ? "bg-[var(--text-primary)] text-[var(--bg-primary)]" : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>{STRATEGIC_STATUS_LABELS[k]}</button>
@@ -571,65 +681,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
               </div>
             </div>
           ) : null}
-
-          {/* ── "What they make" group — separated from status by a hairline.
-                Taxonomy breadcrumb (real Product-Data icons) + classifications. ── */}
-          {(() => {
-            const slugify = (x: string) => x.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-            const divName = str(s, "division");
-            const catName = str(s, "category");
-            const subInd = str(s, "sub_industry");
-            const divObj = DIVISIONS.find((d) => d.name.toLowerCase() === divName.toLowerCase());
-            const catObj = CATEGORIES.find((c) => c.label.toLowerCase() === catName.toLowerCase());
-            const divKey = divObj?.id ?? slugify(divName);
-            const catKey = catObj?.slug ?? slugify(catName);
-            const subKey = slugify(subInd);
-            const crumbs: { label: string; iconUrl?: string | null; fallback: React.ReactNode }[] = [];
-            if (divName) crumbs.push({ label: divName, iconUrl: divisionLogos[divKey] ?? taxonomyLogoUrl("divisions", divKey), fallback: <Building2Icon className="h-3.5 w-3.5" /> });
-            if (catName) crumbs.push({ label: catName, iconUrl: categoryLogos[catKey] ?? taxonomyLogoUrl("categories", catKey), fallback: <TagsIcon className="h-3.5 w-3.5" /> });
-            if (subInd) crumbs.push({ label: subInd, iconUrl: subcategoryLogos[subKey] ?? taxonomyLogoUrl("subcategories", subKey), fallback: <FileCheckIcon className="h-3.5 w-3.5" /> });
-            // Classifications, minus any that just repeat the supplier type (e.g. "Manufacturer")
-            const typeNorm = str(s, "supplier_type").toLowerCase().replace(/[^a-z0-9]/g, "");
-            const classes = data.classifications.slice()
-              .sort((a, b) => Number(b.is_primary) - Number(a.is_primary))
-              .filter((c) => classificationLabel(str(c, "classification")).toLowerCase().replace(/[^a-z0-9]/g, "") !== typeNorm);
-            if (!crumbs.length && !classes.length) return null;
-            return (
-              <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] max-w-lg mx-auto space-y-2.5">
-                {crumbs.length ? (
-                  <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
-                    {crumbs.map((c, i) => (
-                      <span key={`${c.label}-${i}`} className="inline-flex items-center gap-1.5">
-                        {i > 0 ? <AngleRightIcon className="h-3 w-3 text-[var(--text-ghost)] rtl:rotate-180" /> : null}
-                        <span className="flex h-5 w-5 items-center justify-center rounded-md bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)]">
-                          {c.iconUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={c.iconUrl} alt="" className="h-3.5 w-3.5 object-contain" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; const sib = e.currentTarget.nextElementSibling as HTMLElement | null; if (sib) sib.style.display = "inline-flex"; }} />
-                          ) : null}
-                          <span style={{ display: c.iconUrl ? "none" : "inline-flex" }} className="text-[var(--text-faint)]">{c.fallback}</span>
-                        </span>
-                        <span className="text-[12px] font-medium text-[var(--text-secondary)]">{c.label}</span>
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-                {classes.length ? (
-                  <div className="flex flex-wrap items-center justify-center gap-1.5">
-                    {classes.map((c, i) => {
-                      const val = str(c, "classification");
-                      return (
-                        <span key={`${val}-${i}`} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10.5px] font-medium ${c.is_primary ? "bg-[var(--accent,#0066FF)]/12 text-[var(--accent,#0066FF)] ring-1 ring-[var(--accent,#0066FF)]/25" : "bg-[var(--bg-surface-subtle)] text-[var(--text-faint)]"}`}>
-                          {c.is_primary ? <StarIcon className="h-2.5 w-2.5" /> : null}
-                          {classificationLabel(val)}
-                        </span>
-                      );
-                    })}
-                  </div>
-                ) : null}
-              </div>
-            );
-          })()}
-          {editError ? <div className="mt-2 text-[11px] text-rose-400">{editError}</div> : null}
+          {editError ? <div className="mt-3 text-[11px] text-rose-400">{editError}</div> : null}
         </div>
 
         {/* ─── Contact channels (Part B of hero) — calls, messaging, QR codes in one shell ─── */}
@@ -785,36 +837,6 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
             </Sec>
           );
         })()}
-
-        {/* ─── KPI strip (Total / Outstanding / Open POs / Products) ─── */}
-        <Sec tone="default" title={t("sd.kpi", "Key metrics")} icon={<BarChart3Icon className="h-4 w-4" />}>
-          {(() => {
-            const rp = (data.riskProfile ?? {}) as Row;
-            const sp = (data.sourcingProfile ?? {}) as Row;
-            const activeRisks = (data.riskItems ?? []).filter((r) => r.status !== "resolved").length;
-            const sourcingScore = num(sp, "sourcing_score_override") || (data.sourcing?.score ?? 0);
-            const evalScore = num(rp, "internal_evaluation_score");
-            const readyPct = data.readiness?.score;
-            const tiles: { label: string; value: string; accent?: "rose" | "emerald" }[] = [
-              { label: t("sd.totalPurchases", "Total purchases"), value: money(stats.totalPurchases, currency) },
-              { label: t("sd.outstandingPayable", "Outstanding payable"), value: money(stats.outstanding, currency) },
-              { label: t("sd.openPos", "Open POs"), value: String(stats.openPos) },
-              { label: t("sd.kpiSourcingScore", "Sourcing score"), value: sourcingScore ? `${Math.round(sourcingScore)}` : (evalScore ? `${Math.round(evalScore)}` : "—") },
-              { label: t("sd.kpiReadiness", "Readiness"), value: typeof readyPct === "number" ? `${readyPct}%` : "—" },
-              { label: t("sd.kpiActiveRisks", "Active risks"), value: String(activeRisks), accent: activeRisks ? "rose" : "emerald" },
-            ];
-            return (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                {tiles.map((k) => (
-                  <div key={k.label} className="rounded-xl bg-[var(--bg-surface-subtle)] p-3.5">
-                    <div className={`text-lg font-semibold tracking-tight ${k.accent === "rose" ? "text-rose-500" : k.accent === "emerald" ? "text-emerald-600 dark:text-emerald-400" : "text-[var(--text-primary)]"}`}>{k.value}</div>
-                    <div className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--text-faint)]">{k.label}</div>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-        </Sec>
 
         {/* ─── Commercial terms (Payment / Currency / MOQ / Lead time / Incoterms) ─── */}
         {terms.length > 0 ? (
