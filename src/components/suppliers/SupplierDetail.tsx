@@ -396,8 +396,8 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
         {!embedded && <div className="px-4 sm:px-6 pt-6"><SuppliersHeader title={t("sd.suppliers", "Suppliers")} /></div>}
 
       <main className="pb-24">
-        {/* ─── Contacts-style centered header (avatar · name · type · edit/delete) ─── */}
-        <div className="px-4 md:px-6 py-6 md:py-8 text-center border-b border-[var(--border-subtle)]">
+        {/* ─── Contacts-style centered header (avatar · name · type · edit/delete) — its own shell ─── */}
+        <div className="mx-4 md:mx-6 mt-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 md:px-6 py-6 md:py-8 text-center">
           <div className="w-24 h-24 mx-auto mb-4 rounded-2xl bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)] flex items-center justify-center overflow-hidden">
             {str(s, "photo_url", "logo_url") ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -617,7 +617,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
 
 
         {/* ── In-page jump navigation (sticky) — every section stays visible below ── */}
-        <nav className="sticky top-0 z-20 -mx-4 flex gap-1 overflow-x-auto border-y border-[var(--border-subtle)] bg-[var(--bg-primary)]/95 px-4 py-2 backdrop-blur scrollbar-none sm:-mx-6 sm:px-6">
+        <nav className="sticky top-0 z-20 mx-4 md:mx-6 mt-3 flex gap-1 overflow-x-auto rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)]/95 px-2 py-1.5 backdrop-blur scrollbar-none">
           {navItems.map((n) => (
             <a
               key={n.id}
@@ -931,12 +931,13 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
   );
 }
 
-/* ─── Contacts-app grammar: a bordered, padded Section with uppercase mini-title
-   and an icon — same pattern used in the Contacts customer / company detail. */
+/* ─── Each section is its own SHELL — a rounded, bordered card surface that
+   sets the section visually apart on the page. Uppercase mini-title + icon
+   (Contacts grammar) sits at the top of the shell. */
 const Sec = ({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) => (
-  <div className="border-b border-[var(--border-subtle)] px-4 md:px-6 py-4">
+  <div className="mx-4 md:mx-6 my-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 md:px-5 py-4">
     <div className="flex items-center gap-2 mb-3">
-      <span className="text-[var(--text-faint)]">{icon}</span>
+      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]">{icon}</span>
       <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{title}</h3>
     </div>
     {children}
@@ -965,8 +966,8 @@ const EmptyTab = ({ label }: { label: string }) => (
    separation and a scroll-margin so the sticky jump-nav doesn't overlap it.
    `noBorder` is used for the first section under a group label (the group
    label already provides the separation). */
-const Section = ({ id, children, noBorder }: { id: string; children: React.ReactNode; noBorder?: boolean }) => (
-  <section id={id} className={`scroll-mt-16 pt-8 ${noBorder ? "" : "border-t border-[var(--border-subtle)]"}`}>
+const Section = ({ id, children }: { id: string; children: React.ReactNode; noBorder?: boolean }) => (
+  <section id={id} className="scroll-mt-16 mx-4 md:mx-6 my-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 md:px-5 py-4">
     {children}
   </section>
 );
@@ -998,7 +999,7 @@ const InfoCard = ({ icon, title, rows, children }: { icon: React.ReactNode; titl
 /* Group heading — clusters the page into clear bands (Profile · Commercial ·
    Records) so a long single page still reads in an organized hierarchy. */
 const GroupLabel = ({ children }: { children: React.ReactNode }) => (
-  <div className="mt-4 border-t-2 border-[var(--border-subtle)] pt-7 text-[12px] font-bold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
+  <div className="mx-4 md:mx-6 mt-6 mb-1 text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--text-faint)]">
     {children}
   </div>
 );
