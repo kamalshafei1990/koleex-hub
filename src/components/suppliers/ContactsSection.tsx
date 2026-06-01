@@ -49,6 +49,7 @@ import Edit3Icon from "@/components/icons/ui/Edit3Icon";
 import BrandGlyph from "@/components/icons/brands/BrandGlyph";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import UploadIcon from "@/components/icons/ui/UploadIcon";
+import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 
 type Row = Record<string, unknown>;
 
@@ -145,6 +146,14 @@ export default function ContactsSection({
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Compact rows: which contacts are expanded to full detail.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpand = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
 
   // QR upload modal
   const [qrOpen, setQrOpen] = useState(false);
@@ -165,12 +174,14 @@ export default function ContactsSection({
       (by[cat] ||= []).push(c);
     }
     const order = [...ROLE_CATEGORY_ORDER];
+    const rank = (c: Row) => (isTrue(c, "is_primary") ? 2 : 0) + (isTrue(c, "is_decision_maker") ? 1 : 0);
     return Object.keys(by)
       .sort((a, b) => {
         const ia = order.indexOf(a); const ib = order.indexOf(b);
         return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
       })
-      .map((cat) => ({ cat, items: by[cat] }));
+      // Decision-makers / primary contacts surface first inside each group.
+      .map((cat) => ({ cat, items: by[cat].slice().sort((a, b) => rank(b) - rank(a)) }));
   }, [contactPersons]);
 
   const qrByContact = useMemo(() => {
@@ -407,116 +418,135 @@ export default function ContactsSection({
         </div>
       ) : null}
 
-      {/* ── contact cards, grouped by role hierarchy ── */}
+      {/* ── contact rows, grouped by role hierarchy — compact, expand for detail ── */}
       {grouped.map(({ cat, items }) => (
-        <div key={cat} className="space-y-2.5">
+        <div key={cat} className="space-y-2">
           <SectionLabel>{t("opt." + cat, roleCategoryLabel(cat))}</SectionLabel>
-          <div className="space-y-3">
+          <div className="space-y-2">
             {items.map((c) => {
               const id = str(c, "id");
               const chans = channelsFor(c);
               const qrs = qrByContact[id] ?? [];
               const isBoss = ["boss", "owner"].includes(str(c, "role_category"));
+              const open = expanded.has(id);
+              const prefKey = str(c, "preferred_channel");
+              const prefChan = prefKey ? chans.find((ch) => ch.key === prefKey) : undefined;
+              const availHours = typeof c.available_hours === "object" && c.available_hours ? String((c.available_hours as Row).text ?? "") : str(c, "available_hours");
               return (
-                <div key={id} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
-                  {/* ── shell header bar: avatar · name/role · actions ── */}
-                  <div className="flex items-start gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/30 p-4">
-                    {/* avatar — photo if present, else monogram */}
-                    <div className="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)] flex items-center justify-center">
+                <div key={id} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
+                  {/* ── compact row header (click to expand) ── */}
+                  <button type="button" onClick={() => toggleExpand(id)} aria-expanded={open}
+                    className="flex w-full items-center gap-3 px-3.5 py-3 text-start transition-colors hover:bg-[var(--bg-surface-subtle)]/40">
+                    {/* avatar */}
+                    <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)] flex items-center justify-center">
                       {str(c, "photo_url") ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={str(c, "photo_url")} alt={str(c, "full_name")} className="h-full w-full object-cover" />
                       ) : (
-                        <span className="text-[13px] font-semibold text-[var(--text-secondary)]">{(str(c, "full_name").trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("") || "?").toUpperCase()}</span>
+                        <span className="text-[12px] font-semibold text-[var(--text-secondary)]">{(str(c, "full_name").trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("") || "?").toUpperCase()}</span>
                       )}
                     </div>
+                    {/* identity + signals */}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        {isBoss ? <CrownIcon className="h-3.5 w-3.5 text-amber-500" /> : null}
-                        <span className="text-[14px] font-semibold text-[var(--text-primary)] truncate">{str(c, "full_name")}</span>
-                        {str(c, "name_cn") ? <span lang="zh" className="text-[12px] text-[var(--text-faint)]">{str(c, "name_cn")}</span> : null}
+                        {isBoss ? <CrownIcon className="h-3.5 w-3.5 shrink-0 text-amber-500" /> : null}
+                        <span className="text-[13.5px] font-semibold text-[var(--text-primary)] truncate">{str(c, "full_name")}</span>
+                        {str(c, "name_cn") ? <span lang="zh" className="text-[11.5px] text-[var(--text-faint)]">{str(c, "name_cn")}</span> : null}
+                        {isTrue(c, "is_primary") ? (
+                          <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--accent,#0066FF)]/12 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--accent,#0066FF)]"><StarIcon className="h-2.5 w-2.5" />{t("cs.primary", "Primary")}</span>
+                        ) : null}
+                        {isTrue(c, "is_decision_maker") ? (
+                          <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--bg-surface-subtle)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]"><UserCheckIcon className="h-2.5 w-2.5" />{t("cs.decision", "Decision maker")}</span>
+                        ) : null}
                       </div>
-                      <div className="mt-0.5 text-[12px] text-[var(--text-secondary)] truncate">
+                      <div className="mt-0.5 text-[11.5px] text-[var(--text-secondary)] truncate">
                         {[str(c, "position") || str(c, "role"), str(c, "department")].filter(Boolean).join(" · ") || t("opt." + cat, roleCategoryLabel(cat))}
                       </div>
-                      {(isTrue(c, "is_primary") || isTrue(c, "is_decision_maker")) ? (
-                        <div className="mt-1.5 flex flex-wrap items-center gap-1">
-                          {isTrue(c, "is_primary") ? (
-                            <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--accent,#0066FF)]/12 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--accent,#0066FF)]"><StarIcon className="h-2.5 w-2.5" />{t("cs.primary", "Primary")}</span>
+                      {/* compact signal chips */}
+                      {(prefChan || prefKey || str(c, "preferred_language") || str(c, "timezone") || str(c, "response_speed") || str(c, "reliability")) ? (
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                          {(prefChan || prefKey) ? (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-surface-subtle)] px-1.5 py-0.5 text-[10.5px] text-[var(--text-secondary)]">
+                              <ChannelIcon k={prefChan?.key ?? prefKey} size={11} />
+                              <span className="truncate max-w-[10rem]">{prefChan?.value || t("opt." + prefKey, channelLabel(prefKey))}</span>
+                            </span>
                           ) : null}
-                          {isTrue(c, "is_decision_maker") ? (
-                            <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--bg-surface-subtle)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]"><UserCheckIcon className="h-2.5 w-2.5" />{t("cs.decision", "Decision maker")}</span>
-                          ) : null}
+                          {str(c, "preferred_language") ? <span className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-surface-subtle)] px-1.5 py-0.5 text-[10.5px] text-[var(--text-secondary)]"><LanguagesIcon className="h-3 w-3 text-[var(--text-faint)]" />{str(c, "preferred_language")}</span> : null}
+                          {str(c, "timezone") ? <span className="hidden sm:inline-flex items-center gap-1 rounded-md bg-[var(--bg-surface-subtle)] px-1.5 py-0.5 text-[10.5px] text-[var(--text-secondary)]"><GlobeIcon className="h-3 w-3 text-[var(--text-faint)]" />{str(c, "timezone")}</span> : null}
+                          {str(c, "response_speed") ? <span className="hidden sm:inline-flex items-center gap-1 rounded-md bg-[var(--bg-surface-subtle)] px-1.5 py-0.5 text-[10.5px] text-[var(--text-secondary)]"><ZapIcon className="h-3 w-3 text-amber-500" />{str(c, "response_speed")}</span> : null}
+                          {str(c, "reliability") ? <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[10.5px] font-medium text-emerald-600 dark:text-emerald-400"><ShieldCheckIcon className="h-3 w-3" />{t("opt." + str(c, "reliability"), RELIABILITY_LABELS[str(c, "reliability")] ?? str(c, "reliability"))}</span> : null}
                         </div>
                       ) : null}
                     </div>
-                    <div className="flex shrink-0 items-center gap-0.5">
-                      <button type="button" title={t("cs.addQrForContact", "Add QR for this contact")} onClick={() => openQr(id)}
-                        className="rounded-md p-1.5 text-[var(--text-faint)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"><ScanLineIcon className="h-3.5 w-3.5" /></button>
-                      <button type="button" title={t("cs.edit", "Edit")} onClick={() => openEdit(c)}
-                        className="rounded-md p-1.5 text-[var(--text-faint)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"><Edit3Icon className="h-3.5 w-3.5" /></button>
-                      <button type="button" title={t("cs.archive", "Archive")} disabled={busyId === id} onClick={() => archiveContact(c)}
-                        className="rounded-md p-1.5 text-[var(--text-faint)] hover:bg-rose-500/10 hover:text-rose-500 disabled:opacity-40"><TrashIcon className="h-3.5 w-3.5" /></button>
-                    </div>
-                  </div>
+                    <AngleDownIcon className={`h-4 w-4 shrink-0 text-[var(--text-faint)] transition-transform ${open ? "" : "-rotate-90 rtl:rotate-90"}`} />
+                  </button>
 
-                  {/* ── channels — clean labeled rows, icon chip + label + value ── */}
-                  {chans.length ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-2.5 px-4 py-3.5">
-                      {chans.map((ch) => {
-                        const pref = str(c, "preferred_channel") === ch.key;
-                        const inner = (
-                          <span className="flex items-center gap-2.5 min-w-0">
-                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-surface-subtle)]"><ChannelIcon k={ch.key} size={14} /></span>
-                            <span className="min-w-0 flex-1">
-                              <span className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-[var(--text-faint)]">
-                                {t("opt." + ch.key, channelLabel(ch.key))}
-                                {pref ? <StarIcon className="h-2.5 w-2.5 text-[var(--accent,#0066FF)]" /> : null}
+                  {/* ── expanded detail ── */}
+                  {open ? (
+                    <div className="border-t border-[var(--border-subtle)]">
+                      {/* channels — labeled rows, icon chip + label + value */}
+                      {chans.length ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-2.5 px-4 py-3.5">
+                          {chans.map((ch) => {
+                            const pref = str(c, "preferred_channel") === ch.key;
+                            const inner = (
+                              <span className="flex items-center gap-2.5 min-w-0">
+                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-surface-subtle)]"><ChannelIcon k={ch.key} size={14} /></span>
+                                <span className="min-w-0 flex-1">
+                                  <span className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-[var(--text-faint)]">
+                                    {t("opt." + ch.key, channelLabel(ch.key))}
+                                    {pref ? <StarIcon className="h-2.5 w-2.5 text-[var(--accent,#0066FF)]" /> : null}
+                                  </span>
+                                  <span className="block truncate text-[12.5px] font-medium text-[var(--text-primary)] group-hover:text-[var(--accent,#0066FF)]">{ch.value}</span>
+                                </span>
                               </span>
-                              <span className="block truncate text-[12.5px] font-medium text-[var(--text-primary)] group-hover:text-[var(--accent,#0066FF)]">{ch.value}</span>
-                            </span>
-                          </span>
-                        );
-                        return ch.href ? (
-                          <a key={ch.key} href={ch.href} target="_blank" rel="noopener noreferrer" className="group" title={t("opt." + ch.key, channelLabel(ch.key))}>{inner}</a>
-                        ) : (
-                          <div key={ch.key} title={t("opt." + ch.key, channelLabel(ch.key))}>{inner}</div>
-                        );
-                      })}
-                    </div>
-                  ) : null}
-
-                  {/* ── signals — labeled stat chips ── */}
-                  {(str(c, "preferred_language") || str(c, "timezone") || str(c, "available_hours") || str(c, "response_speed") || str(c, "reliability")) ? (
-                    <div className="flex flex-wrap gap-1.5 border-t border-[var(--border-subtle)] px-4 py-3">
-                      {str(c, "preferred_language") ? <span className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-surface-subtle)] px-2 py-1 text-[11px] text-[var(--text-secondary)]"><LanguagesIcon className="h-3 w-3 text-[var(--text-faint)]" />{str(c, "preferred_language")}</span> : null}
-                      {str(c, "timezone") ? <span className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-surface-subtle)] px-2 py-1 text-[11px] text-[var(--text-secondary)]"><GlobeIcon className="h-3 w-3 text-[var(--text-faint)]" />{str(c, "timezone")}</span> : null}
-                      {str(c, "available_hours") || (typeof c.available_hours === "object" && c.available_hours) ? (
-                        <span className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-surface-subtle)] px-2 py-1 text-[11px] text-[var(--text-secondary)]"><ClockIcon className="h-3 w-3 text-[var(--text-faint)]" />{typeof c.available_hours === "object" && c.available_hours ? String((c.available_hours as Row).text ?? "") : str(c, "available_hours")}</span>
+                            );
+                            return ch.href ? (
+                              <a key={ch.key} href={ch.href} target="_blank" rel="noopener noreferrer" className="group" title={t("opt." + ch.key, channelLabel(ch.key))}>{inner}</a>
+                            ) : (
+                              <div key={ch.key} title={t("opt." + ch.key, channelLabel(ch.key))}>{inner}</div>
+                            );
+                          })}
+                        </div>
                       ) : null}
-                      {str(c, "response_speed") ? <span className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-surface-subtle)] px-2 py-1 text-[11px] text-[var(--text-secondary)]"><ZapIcon className="h-3 w-3 text-amber-500" />{str(c, "response_speed")}</span> : null}
-                      {str(c, "reliability") ? <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400"><ShieldCheckIcon className="h-3 w-3" />{t("opt." + str(c, "reliability"), RELIABILITY_LABELS[str(c, "reliability")] ?? str(c, "reliability"))} {t("cs.reliabilitySuffix", "reliability")}</span> : null}
+
+                      {/* available hours */}
+                      {availHours ? (
+                        <div className="flex items-center gap-1.5 border-t border-[var(--border-subtle)] px-4 py-3 text-[11.5px] text-[var(--text-secondary)]">
+                          <ClockIcon className="h-3.5 w-3.5 text-[var(--text-faint)]" />{availHours}
+                        </div>
+                      ) : null}
+
+                      {/* notes */}
+                      {str(c, "notes") ? (
+                        <div className="border-t border-[var(--border-subtle)] px-4 py-3">
+                          <p className="text-[11.5px] leading-relaxed text-[var(--text-secondary)]">{str(c, "notes")}</p>
+                        </div>
+                      ) : null}
+
+                      {/* per-contact QR strip */}
+                      {qrs.length ? (
+                        <div className="flex flex-wrap gap-2 border-t border-[var(--border-subtle)] px-4 py-3">
+                          {qrs.map((q) => <QrThumb key={str(q, "id")} q={q} busy={busyId === str(q, "id")} onRemove={() => removeQr(q)} t={t} />)}
+                        </div>
+                      ) : null}
+
+                      {/* footer — visibility + actions */}
+                      <div className="flex items-center justify-between gap-2 border-t border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/30 px-4 py-2">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-[var(--text-faint)]">
+                          <ShieldCheckIcon className="h-3 w-3" />{t("opt." + str(c, "visibility_tier"), VISIBILITY_LABELS[str(c, "visibility_tier")] ?? "Internal")}
+                        </span>
+                        <div className="flex items-center gap-0.5">
+                          <button type="button" title={t("cs.addQrForContact", "Add QR for this contact")} onClick={() => openQr(id)}
+                            className="rounded-md p-1.5 text-[var(--text-faint)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"><ScanLineIcon className="h-3.5 w-3.5" /></button>
+                          <button type="button" title={t("cs.edit", "Edit")} onClick={() => openEdit(c)}
+                            className="rounded-md p-1.5 text-[var(--text-faint)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"><Edit3Icon className="h-3.5 w-3.5" /></button>
+                          <button type="button" title={t("cs.archive", "Archive")} disabled={busyId === id} onClick={() => archiveContact(c)}
+                            className="rounded-md p-1.5 text-[var(--text-faint)] hover:bg-rose-500/10 hover:text-rose-500 disabled:opacity-40"><TrashIcon className="h-3.5 w-3.5" /></button>
+                        </div>
+                      </div>
                     </div>
                   ) : null}
-
-                  {/* ── notes ── */}
-                  {str(c, "notes") ? (
-                    <div className="border-t border-[var(--border-subtle)] px-4 py-3">
-                      <p className="text-[11.5px] leading-relaxed text-[var(--text-secondary)]">{str(c, "notes")}</p>
-                    </div>
-                  ) : null}
-
-                  {/* ── per-contact QR strip ── */}
-                  {qrs.length ? (
-                    <div className="flex flex-wrap gap-2 border-t border-[var(--border-subtle)] px-4 py-3">
-                      {qrs.map((q) => <QrThumb key={str(q, "id")} q={q} busy={busyId === str(q, "id")} onRemove={() => removeQr(q)} t={t} />)}
-                    </div>
-                  ) : null}
-
-                  {/* ── visibility footer ── */}
-                  <div className="flex items-center gap-1 border-t border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/30 px-4 py-2 text-[10px] font-medium uppercase tracking-wide text-[var(--text-faint)]">
-                    <ShieldCheckIcon className="h-3 w-3" />{t("opt." + str(c, "visibility_tier"), VISIBILITY_LABELS[str(c, "visibility_tier")] ?? "Internal")}
-                  </div>
                 </div>
               );
             })}
