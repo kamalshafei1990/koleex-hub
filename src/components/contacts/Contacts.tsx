@@ -4000,7 +4000,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                         <span className={`text-[10px] font-medium ${getTypeColor(c.contact_type)}`}>
                           {t("type." + c.contact_type, c.contact_type?.charAt(0).toUpperCase() + c.contact_type?.slice(1))}
                         </span>
-                        {c.company && (
+                        {c.company && c.company !== contactDisplayName(c) && c.company !== c.company_name_cn && (
                           <span className="text-xs text-[var(--text-dim)] truncate">&middot; {c.company}</span>
                         )}
                       </div>
@@ -4025,7 +4025,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     /* Suppliers: render the full Supplier 360 inline (all intel sections),
        not the legacy base-field panel. */
     if (filterType === "supplier" && selectedContact && view === "detail") {
-      return <SupplierDetail id={selectedContact.id} embedded />;
+      return <SupplierDetail id={selectedContact.id} embedded onEdit={handleEdit} onDelete={() => setDeleteConfirm(selectedContact.id)} />;
     }
     if (!selectedContact) {
       /* ── Supplier KPI Dashboard ── */

@@ -29,6 +29,12 @@ import ReceiptIcon from "@/components/icons/ui/ReceiptIcon";
 import WalletIcon from "@/components/icons/ui/WalletIcon";
 import FileCheckIcon from "@/components/icons/ui/FileCheckIcon";
 import ShipIcon from "@/components/icons/ui/ShipIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
+import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
+import LandmarkIcon from "@/components/icons/ui/LandmarkIcon";
+import IdCardIcon from "@/components/icons/ui/IdCardIcon";
+import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import {
   STRATEGIC_STATUS_LABELS,
   strategicStatusTone,
@@ -152,12 +158,13 @@ const StatusPill = ({ value }: { value: string }) =>
     <span className="text-[var(--text-faint)]">—</span>
   );
 
-export default function SupplierDetail({ id, embedded = false }: { id: string; embedded?: boolean }) {
+export default function SupplierDetail({ id, embedded = false, onEdit, onDelete }: { id: string; embedded?: boolean; onEdit?: () => void; onDelete?: () => void }) {
   const { t } = useTranslation(contactsT);
   const router = useRouter();
   const [data, setData] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const load = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -384,70 +391,118 @@ export default function SupplierDetail({ id, embedded = false }: { id: string; e
       <div className={embedded ? "mx-auto w-full max-w-5xl px-4 sm:px-6 py-6" : "mx-auto w-full max-w-6xl px-4 sm:px-6 py-6"}>
         {!embedded && <SuppliersHeader title={t("sd.suppliers", "Suppliers")} />}
 
-      <main className="mt-6 space-y-10 pb-24">
-        {/* ── Identity ── */}
-        <section className="flex flex-col gap-5 sm:flex-row sm:items-center">
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[var(--bg-surface-subtle)]">
-            {str(s, "photo_url", "logo_url") ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={str(s, "photo_url", "logo_url")} alt={name} className="h-full w-full object-cover" />
-            ) : (
-              <span className="font-mono text-2xl font-bold text-[var(--text-secondary)]">{initials(name)}</span>
-            )}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-faint)]">
-              <Building2Icon className="h-3.5 w-3.5" />
-              {str(s, "supplier_type") || t("sd.supplier", "Supplier")}
+      <main className="mt-6 space-y-8 pb-24">
+        {/* ── Identity header (Contacts-style card) ── */}
+        <section className="rounded-3xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 md:p-7">
+          <div className="flex items-start gap-5">
+            <div className="flex h-20 w-20 md:h-24 md:w-24 shrink-0 items-center justify-center overflow-hidden rounded-3xl bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)]">
+              {str(s, "photo_url", "logo_url") ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={str(s, "photo_url", "logo_url")} alt={name} className="h-full w-full object-cover" />
+              ) : (
+                <span className="font-mono text-2xl font-bold text-[var(--text-secondary)]">{initials(name)}</span>
+              )}
             </div>
-            <h1 className="mt-1 text-3xl md:text-4xl font-semibold tracking-[-0.02em] text-[var(--text-primary)]">{name}</h1>
-            {cnName && cnName !== name ? (
-              <div lang="zh" className="mt-1 text-lg md:text-xl font-medium text-[var(--text-secondary)]">{cnName}</div>
-            ) : null}
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-[var(--text-secondary)]">
-              {rating > 0 ? (
-                <span className="inline-flex items-center gap-1">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <StarIcon key={i} className={`h-3.5 w-3.5 ${i <= rating ? "text-[var(--text-primary)]" : "text-[var(--text-faint)]"}`} />
-                  ))}
-                </span>
-              ) : null}
-              {str(s, "country") ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <MapPinIcon className="h-3.5 w-3.5 text-[var(--text-faint)]" />
-                  {str(s, "country")}
-                </span>
-              ) : null}
-              {/* Strategic status — editable pill */}
-              {(() => {
-                const ss = str(s, "strategic_status");
-                const tone = strategicStatusTone(ss);
-                const cls = ss
-                  ? tone === "positive"
-                    ? "bg-[var(--text-primary)] text-[var(--bg-primary)]"
-                    : tone === "danger"
-                      ? "bg-rose-500/10 text-rose-300"
-                      : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]"
-                  : "bg-[var(--bg-surface-subtle)] text-[var(--text-faint)] hover:text-[var(--text-secondary)]";
-                return (
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-faint)]">
+                    <Building2Icon className="h-3.5 w-3.5" />
+                    {str(s, "supplier_type") || t("sd.supplier", "Supplier")}
+                  </div>
+                  <h1 className="mt-1 text-2xl md:text-3xl font-semibold tracking-[-0.02em] text-[var(--text-primary)]">{name}</h1>
+                  {cnName && cnName !== name ? (
+                    <div lang="zh" className="mt-0.5 text-base md:text-lg font-medium text-[var(--text-secondary)]">{cnName}</div>
+                  ) : null}
+                </div>
+                {/* Edit + overflow menu */}
+                <div className="flex shrink-0 items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => { setStatusDraft(ss); setStatusReason(""); setStatusOpen((o) => !o); }}
-                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold transition-colors ${cls}`}
+                    onClick={() => (onEdit ? onEdit() : router.push(`/suppliers?selected=${id}`))}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent,#0066FF)]/10 px-3.5 py-1.5 text-[12px] font-semibold text-[var(--accent,#0066FF)] transition-colors hover:bg-[var(--accent,#0066FF)]/15"
                   >
-                    {ss ? (STRATEGIC_STATUS_LABELS[ss as StrategicStatus] ?? ss) : t("sd.setStatus", "Set status")}
-                    <Edit3Icon className="h-3 w-3 opacity-70" />
+                    <Edit3Icon className="h-3.5 w-3.5" /> {t("sd.edit", "Edit")}
                   </button>
-                );
-              })()}
-              <span
-                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
-                  isActive ? "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]" : "bg-rose-500/10 text-rose-300"
-                }`}
-              >
-                {isActive ? t("sd.active", "Active") : t("sd.archived", "Archived")}
-              </span>
-            </div>
+                  {onDelete ? (
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setMenuOpen((o) => !o)}
+                        className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+                        aria-label={t("sd.more", "More")}
+                      >
+                        <MoreHorizontalIcon className="h-4 w-4" />
+                      </button>
+                      {menuOpen ? (
+                        <>
+                          <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                          <div className="absolute end-0 z-20 mt-1 w-44 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] py-1 shadow-lg">
+                            <button
+                              type="button"
+                              onClick={() => { setMenuOpen(false); onEdit ? onEdit() : router.push(`/suppliers?selected=${id}`); }}
+                              className="flex w-full items-center gap-2 px-3.5 py-2 text-left text-[13px] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
+                            >
+                              <Edit3Icon className="h-3.5 w-3.5" /> {t("sd.editSupplier", "Edit supplier")}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setMenuOpen(false); onDelete(); }}
+                              className="flex w-full items-center gap-2 px-3.5 py-2 text-left text-[13px] text-rose-500 hover:bg-rose-500/10"
+                            >
+                              <TrashIcon className="h-3.5 w-3.5" /> {t("sd.deleteSupplier", "Delete supplier")}
+                            </button>
+                          </div>
+                        </>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+              <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-[var(--text-secondary)]">
+                {rating > 0 ? (
+                  <span className="inline-flex items-center gap-0.5">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <StarIcon key={i} className={`h-3.5 w-3.5 ${i <= rating ? "text-amber-400" : "text-[var(--text-faint)]"}`} />
+                    ))}
+                  </span>
+                ) : null}
+                {str(s, "country") ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <MapPinIcon className="h-3.5 w-3.5 text-[var(--text-faint)]" />
+                    {[str(s, "city"), str(s, "country")].filter(Boolean).join(", ")}
+                  </span>
+                ) : null}
+                {/* Strategic status — editable pill */}
+                {(() => {
+                  const ss = str(s, "strategic_status");
+                  const tone = strategicStatusTone(ss);
+                  const cls = ss
+                    ? tone === "positive"
+                      ? "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400 ring-1 ring-inset ring-emerald-500/25"
+                      : tone === "danger"
+                        ? "bg-rose-500/12 text-rose-600 dark:text-rose-400 ring-1 ring-inset ring-rose-500/25"
+                        : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] ring-1 ring-inset ring-[var(--border-subtle)]"
+                    : "bg-[var(--bg-surface-subtle)] text-[var(--text-faint)] hover:text-[var(--text-secondary)]";
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => { setStatusDraft(ss); setStatusReason(""); setStatusOpen((o) => !o); }}
+                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold transition-colors ${cls}`}
+                    >
+                      {ss ? (STRATEGIC_STATUS_LABELS[ss as StrategicStatus] ?? ss) : t("sd.setStatus", "Set status")}
+                      <Edit3Icon className="h-3 w-3 opacity-70" />
+                    </button>
+                  );
+                })()}
+                <span
+                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
+                    isActive ? "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/10 text-rose-500"
+                  }`}
+                >
+                  {isActive ? t("sd.active", "Active") : t("sd.archived", "Archived")}
+                </span>
+              </div>
 
             {/* Strategic status editor */}
             {statusOpen ? (
@@ -552,7 +607,37 @@ export default function SupplierDetail({ id, embedded = false }: { id: string; e
               </div>
             </div>
             {editError ? <div className="mt-2 text-[11px] text-rose-400">{editError}</div> : null}
+            </div>
           </div>
+
+          {/* Quick actions — Contacts-style buttons */}
+          {(() => {
+            const phone = str(s, "supplier_tel", "phone", "supplier_mobile", "mobile");
+            const email = str(s, "supplier_email", "email");
+            const site = str(s, "supplier_website", "website");
+            const wa = str(s, "whatsapp_business");
+            const actions: { key: string; label: string; icon: React.ReactNode; href: string; ext?: boolean; green?: boolean }[] = [];
+            if (phone) actions.push({ key: "call", label: t("sd.call", "Call"), icon: <PhoneIcon className="h-5 w-5" />, href: `tel:${phone}` });
+            if (email) actions.push({ key: "email", label: t("sd.email", "Email"), icon: <EnvelopeIcon className="h-5 w-5" />, href: `mailto:${email}` });
+            if (site) actions.push({ key: "web", label: t("sd.website", "Website"), icon: <GlobeIcon className="h-5 w-5" />, href: site.startsWith("http") ? site : `https://${site}`, ext: true });
+            if (wa) actions.push({ key: "wa", label: "WhatsApp", icon: <MessageSquareIcon className="h-5 w-5" />, href: `https://wa.me/${wa.replace(/[^0-9]/g, "")}`, ext: true, green: true });
+            if (!actions.length) return null;
+            return (
+              <div className="mt-5 flex flex-wrap gap-2 border-t border-[var(--border-subtle)] pt-5">
+                {actions.map((a) => (
+                  <a
+                    key={a.key}
+                    href={a.href}
+                    {...(a.ext ? { target: "_blank", rel: "noreferrer" } : {})}
+                    className="flex min-w-[76px] flex-1 flex-col items-center gap-1.5 rounded-2xl bg-[var(--bg-surface-subtle)] px-3 py-3 transition-colors hover:bg-[var(--bg-surface-hover)]"
+                  >
+                    <span className={`flex h-10 w-10 items-center justify-center rounded-full ${a.green ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-[var(--accent,#0066FF)]/12 text-[var(--accent,#0066FF)]"}`}>{a.icon}</span>
+                    <span className="text-[11px] font-medium text-[var(--text-secondary)]">{a.label}</span>
+                  </a>
+                ))}
+              </div>
+            );
+          })()}
         </section>
 
         {/* ── Commercial terms strip ── */}
@@ -661,59 +746,110 @@ export default function SupplierDetail({ id, embedded = false }: { id: string; e
 
         <GroupLabel>{t("sd.groupProfile", "Profile & operations")}</GroupLabel>
 
-        {/* Overview + Quality — two compact sections, side by side on wide screens */}
-        <div className="grid grid-cols-1 gap-x-10 gap-y-10 border-t border-[var(--border-subtle)] pt-8 lg:grid-cols-2">
-          <section id="overview" className="scroll-mt-16">
-            <SectionHead eyebrow={t("sd.profile", "Profile")} title={t("sd.overview", "Overview")} icon={<Building2Icon className="h-4 w-4" />} />
-            <div className="mt-4 space-y-5">
-              <div className="space-y-2.5 text-sm">
-                {[
-                  { icon: <EnvelopeIcon className="h-4 w-4" />, v: str(s, "supplier_email", "email") },
-                  { icon: <PhoneIcon className="h-4 w-4" />, v: str(s, "supplier_tel", "phone", "supplier_mobile") },
-                  { icon: <GlobeIcon className="h-4 w-4" />, v: str(s, "supplier_website", "website") },
-                  { icon: <MapPinIcon className="h-4 w-4" />, v: [str(s, "city"), str(s, "province"), str(s, "country")].filter(Boolean).join(", ") || str(s, "supplier_address", "address") },
-                ]
-                  .filter((x) => x.v)
-                  .map((x, i) => (
-                    <div key={i} className="flex items-start gap-2.5 text-[var(--text-secondary)]">
-                      <span className="mt-0.5 text-[var(--text-faint)]">{x.icon}</span>
-                      <span className="text-[var(--text-primary)]">{x.v}</span>
-                    </div>
-                  ))}
+        {/* Detail cards — iOS-Contacts grouped lists; only non-empty cards show */}
+        {(() => {
+          const lst = (...keys: string[]): string => { for (const k of keys) { const v = (s as Row)[k]; if (Array.isArray(v) && v.length) return v.map(String).join(", "); } return ""; };
+          const yn = (k: string): string => { const v = (s as Row)[k]; return v === true ? t("sd.yes", "Yes") : v === false ? t("sd.no", "No") : ""; };
+          const addr = [str(s, "address_1", "supplier_address"), str(s, "city"), str(s, "province"), str(s, "country"), str(s, "supplier_postal_code")].filter(Boolean).join(", ");
+          const banks = Array.isArray(s.bank_accounts) ? (s.bank_accounts as Row[]) : [];
+          return (
+            <div id="overview" className="scroll-mt-16 grid grid-cols-1 gap-4 border-t border-[var(--border-subtle)] pt-8 md:grid-cols-2">
+              <InfoCard icon={<PhoneIcon className="h-4 w-4" />} title={t("sd.contact", "Contact")} rows={[
+                { label: t("cs.mobile", "Mobile"), value: str(s, "supplier_mobile", "mobile") },
+                { label: t("sd.phone", "Phone"), value: str(s, "supplier_tel", "phone") },
+                { label: t("cs.email", "Email"), value: str(s, "supplier_email", "email") },
+                { label: t("sd.website", "Website"), value: str(s, "supplier_website", "website") },
+                { label: t("sd.address", "Address"), value: addr },
+                { label: t("cs.preferredLanguage", "Preferred language"), value: str(s, "language") },
+              ]} />
+              <InfoCard icon={<Building2Icon className="h-4 w-4" />} title={t("sd.companyProfile", "Company profile")} rows={[
+                { label: t("sd.legalName", "Legal name"), value: str(s, "legal_name", "company_name") },
+                { label: t("sd.tradingName", "Trading name"), value: str(s, "trading_name") },
+                { label: t("sd.yearEstablished", "Year established"), value: str(s, "year_established") },
+                { label: t("sd.companyTypeField", "Company type"), value: str(s, "company_type") },
+                { label: t("sd.employees", "Employees"), value: str(s, "employee_count_range") },
+                { label: t("sd.annualRevenue", "Annual revenue"), value: str(s, "annual_revenue_range") },
+                { label: t("sd.industry", "Industry"), value: [str(s, "industry"), str(s, "sub_industry")].filter(Boolean).join(" · ") },
+              ]} />
+              <InfoCard icon={<IdCardIcon className="h-4 w-4" />} title={t("sd.identityCompliance", "Identity & compliance")} rows={[
+                { label: t("sd.businessRegNo", "Business reg. no."), value: str(s, "business_registration_number") },
+                { label: t("sd.taxId", "Tax ID / VAT"), value: str(s, "tax_id") },
+                { label: t("sd.usci", "USCI / CR"), value: str(s, "cr_number") },
+                { label: t("sd.eori", "EORI"), value: str(s, "eori_number") },
+                { label: t("sd.duns", "DUNS"), value: str(s, "duns_number") },
+                { label: t("sd.ieCode", "Import/Export code"), value: str(s, "importer_exporter_code") },
+                { label: t("sd.customsCode", "Customs code"), value: str(s, "customs_code") },
+                { label: t("sd.kyc", "KYC"), value: str(s, "kyc_status") },
+                { label: t("sd.sanctions", "Sanctions check"), value: str(s, "sanctions_check_status") },
+              ]} />
+              <InfoCard icon={<ShipIcon className="h-4 w-4" />} title={t("sd.logisticsTrade", "Logistics & trade")} rows={[
+                { label: t("sd.incoterms", "Incoterms"), value: str(s, "incoterms") },
+                { label: t("sd.portOfEntry", "Port"), value: str(s, "port_of_entry") },
+                { label: t("sd.carriers", "Preferred carriers"), value: lst("preferred_carriers") },
+                { label: t("sd.container", "Container"), value: str(s, "container_preference") },
+                { label: t("sd.hsCodes", "HS codes"), value: lst("hs_codes") },
+                { label: t("sd.shippingMarks", "Shipping marks"), value: str(s, "shipping_marks") },
+                { label: t("sd.labeling", "Labeling"), value: str(s, "labeling_requirements") },
+              ]} />
+              <InfoCard icon={<MessageSquareIcon className="h-4 w-4" />} title={t("sd.messaging", "Messaging")} rows={[
+                { label: t("cs.wechatId", "WeChat ID"), value: str(s, "wechat_id") },
+                { label: t("sd.wechatOfficial", "WeChat official"), value: str(s, "wechat_official_account") },
+                { label: t("sd.wechatGroup", "WeChat sales group"), value: yn("wechat_sales_group_available") },
+                { label: t("sd.wecomSupport", "WeCom support"), value: yn("wecom_support_available") },
+                { label: "WhatsApp", value: str(s, "whatsapp_business") },
+                { label: "Telegram", value: str(s, "telegram_id") },
+                { label: "Line", value: str(s, "line_id") },
+                { label: "Skype", value: str(s, "skype_id") },
+                { label: "QQ", value: str(s, "qq_id") },
+              ]} />
+              <InfoCard icon={<LandmarkIcon className="h-4 w-4" />} title={t("sd.banking", "Banking & payment")} rows={[
+                { label: t("sd.paymentTerms", "Payment terms"), value: str(s, "payment_terms") },
+                { label: t("sd.preferredMethod", "Method"), value: str(s, "preferred_payment_method") },
+                { label: t("sd.currency", "Currency"), value: str(s, "currency") },
+              ]}>
+                {banks.map((b, i) => (
+                  <div key={i} className="rounded-xl bg-[var(--bg-surface)] px-3 py-2.5 text-[12.5px]">
+                    <div className="font-medium text-[var(--text-primary)]">{str(b, "bank")}</div>
+                    <div className="mt-0.5 text-[var(--text-faint)]">{[str(b, "account_name"), str(b, "account_no"), str(b, "swift")].filter(Boolean).join(" · ")}</div>
+                  </div>
+                ))}
+                {!banks.length && str(s, "payment_info") ? <div className="text-[12.5px] leading-relaxed text-[var(--text-secondary)]">{str(s, "payment_info")}</div> : null}
+              </InfoCard>
+              {/* Quality & certifications */}
+              <div id="quality" className="scroll-mt-16 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]"><FileCheckIcon className="h-4 w-4" /></span>
+                  <h3 className="text-[14px] font-semibold tracking-tight text-[var(--text-primary)]">{t("sd.qualityCertifications", "Quality & certifications")}</h3>
+                </div>
+                {certs.length ? (
+                  <div className="flex flex-wrap gap-2">
+                    {certs.map((c) => (
+                      <span key={c} className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1.5 text-[12px] font-medium text-emerald-700 dark:text-emerald-400">
+                        <FileCheckIcon className="h-3.5 w-3.5" /> {c}
+                      </span>
+                    ))}
+                  </div>
+                ) : <div className="text-[12.5px] text-[var(--text-faint)]">{t("sd.noCertifications", "No certifications recorded.")}</div>}
+                {str(s, "sample_status") ? (
+                  <div className="mt-3 flex items-center gap-2 text-[12.5px]">
+                    <span className="text-[var(--text-faint)]">{t("sd.sampleStatus", "Sample status")}</span>
+                    <StatusPill value={str(s, "sample_status")} />
+                  </div>
+                ) : null}
               </div>
+              {/* Notes */}
               {str(s, "notes") ? (
-                <div className="space-y-1.5">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-faint)]">{t("sd.notes", "Notes")}</div>
-                  <p className="text-sm leading-relaxed text-[var(--text-secondary)]"><AutoTranslatedText text={str(s, "notes")} /></p>
+                <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4 md:col-span-2">
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]"><DocumentIcon className="h-4 w-4" /></span>
+                    <h3 className="text-[14px] font-semibold tracking-tight text-[var(--text-primary)]">{t("sd.notes", "Notes")}</h3>
+                  </div>
+                  <p className="text-[13px] leading-relaxed text-[var(--text-secondary)]"><AutoTranslatedText text={str(s, "notes")} /></p>
                 </div>
               ) : null}
             </div>
-          </section>
-
-          <section id="quality" className="scroll-mt-16">
-            <SectionHead eyebrow={t("sd.compliance", "Compliance")} title={t("sd.qualityCertifications", "Quality & certifications")} icon={<FileCheckIcon className="h-4 w-4" />} />
-            <div className="mt-4 space-y-5">
-              {certs.length === 0 ? (
-                <EmptyTab label={t("sd.noCertifications", "No certifications recorded.")} />
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {certs.map((c) => (
-                    <span key={c} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--bg-surface-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-primary)]">
-                      <FileCheckIcon className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
-                      {c}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {str(s, "sample_status") ? (
-                <div className="flex items-center gap-3">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-faint)]">{t("sd.sampleStatus", "Sample status")}</span>
-                  <StatusPill value={str(s, "sample_status")} />
-                </div>
-              ) : null}
-            </div>
-          </section>
-        </div>
+          );
+        })()}
 
         {/* Factory */}
         <Section id="factory">
@@ -907,6 +1043,30 @@ const Section = ({ id, children, noBorder }: { id: string; children: React.React
     {children}
   </section>
 );
+
+/* iOS-Contacts grouped card: a titled rounded panel listing label→value rows.
+   Rows with empty values are dropped; the whole card hides if nothing to show. */
+const InfoCard = ({ icon, title, rows, children }: { icon: React.ReactNode; title: string; rows: { label: string; value?: string }[]; children?: React.ReactNode }) => {
+  const filled = rows.filter((r) => r.value && r.value.trim());
+  if (!filled.length && !children) return null;
+  return (
+    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
+      <div className="mb-2 flex items-center gap-2">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]">{icon}</span>
+        <h3 className="text-[14px] font-semibold tracking-tight text-[var(--text-primary)]">{title}</h3>
+      </div>
+      <dl className="divide-y divide-[var(--border-faint)]">
+        {filled.map((r) => (
+          <div key={r.label} className="flex items-start justify-between gap-4 py-2">
+            <dt className="shrink-0 text-[12.5px] text-[var(--text-faint)]">{r.label}</dt>
+            <dd className="min-w-0 break-words text-end text-[13px] font-medium text-[var(--text-primary)]">{r.value}</dd>
+          </div>
+        ))}
+      </dl>
+      {children ? <div className="mt-2 space-y-2">{children}</div> : null}
+    </div>
+  );
+};
 
 /* Group heading — clusters the page into clear bands (Profile · Commercial ·
    Records) so a long single page still reads in an organized hierarchy. */
