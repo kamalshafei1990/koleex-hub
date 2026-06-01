@@ -33,6 +33,10 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
+import BadgeCheckIcon from "@/components/icons/ui/BadgeCheckIcon";
+import TrendingUpIcon from "@/components/icons/ui/TrendingUpIcon";
+import TargetIcon from "@/components/icons/ui/TargetIcon";
+import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
 
 type Row = Record<string, unknown>;
 const str = (r: Row, k: string): string => {
@@ -60,6 +64,23 @@ const CATEGORY_ICON: Record<string, React.ComponentType<{ className?: string }>>
   procurement: ShoppingCartIcon,
   system: GaugeIcon,
 };
+
+/* ── Event-type visual treatment (Section 8) ──
+   Beyond the broad category icon, give notable operational-memory events
+   (milestones, upgrades, negotiation wins, verifications, risks, sourcing)
+   a distinct glyph + semantic tone so the timeline reads as memory, not a
+   log. Pure frontend mapping over the existing event_type string. */
+type EventTone = "good" | "warn" | "neutral";
+function eventVisual(eventType: string, category: string): { Icon: React.ComponentType<{ className?: string }>; tone: EventTone } {
+  const ty = (eventType || "").toLowerCase();
+  if (/verif|certif|approv|complete|pass/.test(ty)) return { Icon: BadgeCheckIcon, tone: "good" };
+  if (/milestone|readiness/.test(ty)) return { Icon: GaugeIcon, tone: "good" };
+  if (/upgrade|promot|tier|strateg|preferred/.test(ty)) return { Icon: TrendingUpIcon, tone: "good" };
+  if (/negoti|deal|win|agreement|contract|price/.test(ty)) return { Icon: HandshakeIcon, tone: "good" };
+  if (/risk|issue|delay|defect|dispute|warn|expir|fail|reject/.test(ty)) return { Icon: TriangleWarningIcon, tone: "warn" };
+  if (/sourc|order|\bpo\b|purchase|quote|rfq/.test(ty)) return { Icon: TargetIcon, tone: "neutral" };
+  return { Icon: CATEGORY_ICON[category] ?? GaugeIcon, tone: "neutral" };
+}
 
 type TFn = (key: string, fallback?: string) => string;
 
@@ -271,13 +292,21 @@ export default function TimelineSection({
               <ol className="relative space-y-3 border-l border-[var(--border-subtle)] pl-5">
                 {g.items.map((e) => {
                   const id = str(e, "id");
-                  const Icon = CATEGORY_ICON[str(e, "event_category")] ?? GaugeIcon;
+                  const ev = eventVisual(str(e, "event_type"), str(e, "event_category"));
+                  const Icon = ev.Icon;
                   const imp = str(e, "importance") || "normal";
+                  // Importance escalation wins; otherwise fall back to the
+                  // event-type semantic tone so wins/verifications read green
+                  // and risks read amber even at normal importance.
                   const nodeCls = imp === "critical"
                     ? "bg-rose-500/15 ring-rose-500/40 text-rose-600 dark:text-rose-400"
                     : imp === "high"
                       ? "bg-amber-500/15 ring-amber-500/40 text-amber-600 dark:text-amber-400"
-                      : "bg-[var(--bg-surface)] ring-[var(--border-subtle)] text-[var(--text-secondary)]";
+                      : ev.tone === "good"
+                        ? "bg-emerald-500/12 ring-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                        : ev.tone === "warn"
+                          ? "bg-amber-500/12 ring-amber-500/30 text-amber-600 dark:text-amber-400"
+                          : "bg-[var(--bg-surface)] ring-[var(--border-subtle)] text-[var(--text-secondary)]";
                   const cardCls = imp === "critical"
                     ? "bg-rose-500/[0.06] ring-1 ring-rose-500/20"
                     : imp === "high"
@@ -285,7 +314,7 @@ export default function TimelineSection({
                       : "bg-[var(--bg-surface-subtle)]";
                   return (
                     <li key={id} className="relative">
-                      {/* node — colored by importance */}
+                      {/* node — event-type glyph, colored by importance then type tone */}
                       <span className={`absolute -left-[27px] top-1 flex h-5 w-5 items-center justify-center rounded-full ring-1 ${nodeCls}`}>
                         <Icon className="h-3 w-3" />
                       </span>
@@ -295,11 +324,14 @@ export default function TimelineSection({
                             <div className="flex flex-wrap items-center gap-1.5">
                               {imp !== "normal" ? <span className={`h-1.5 w-1.5 rounded-full ${importanceDot[imp]}`} title={IMPORTANCE_LABELS[imp]} /> : null}
                               <span className="text-[13px] font-semibold text-[var(--text-primary)]">{str(e, "title")}</span>
+                              {/* summary label — the operational verb of this memory entry */}
+                              <span className="inline-flex items-center rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--text-faint)] ring-1 ring-[var(--border-subtle)]">
+                                {eventTypeLabel(str(e, "event_type"))}
+                              </span>
                             </div>
                             {str(e, "description") ? <div className="mt-0.5 text-[11px] leading-relaxed text-[var(--text-secondary)]">{str(e, "description")}</div> : null}
                             <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[10px] text-[var(--text-faint)]">
                               <span className="uppercase tracking-wide">{timelineCategoryLabel(str(e, "event_category"))}</span>
-                              <span>· {eventTypeLabel(str(e, "event_type"))}</span>
                               {str(e, "actor_name") ? <span>· {str(e, "actor_name")}</span> : null}
                               <span title={new Date(str(e, "created_at")).toLocaleString()}>· {relativeTime(str(e, "created_at"), t)}</span>
                               {e.is_manual ? <span className="rounded bg-[var(--bg-surface)] px-1 py-0.5">{t("ts.manual", "Manual")}</span> : null}
