@@ -916,28 +916,29 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                 if (!all.length) return null;
                 return (
                   <Sec tone="cyan" title={t("sd.socialMedia", "Social media & marketplaces")} icon={<Share2Icon className="h-4 w-4" />}>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                    {/* Same big-logo card grammar as Messaging */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {all.map((p, i) => {
                         const label = p.platform ?? "";
                         const handle = p.username || p.value || "";
                         const url = p.url || "";
+                        const display = handle || url.replace(/^https?:\/\//, "").replace(/\/$/, "");
                         const inner = (
-                          <span className="flex items-center gap-2.5 min-w-0">
-                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-surface-subtle)]">
-                              <BrandGlyph name={label} size={16} />
-                            </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="block text-[10.5px] font-medium uppercase tracking-wider text-[var(--text-faint)]">{label}</span>
-                              <span className="block truncate text-sm text-[var(--text-primary)]">{handle || url.replace(/^https?:\/\//, "").replace(/\/$/, "")}</span>
-                            </span>
-                          </span>
-                        );
-                        return (
-                          <div key={`${label}-${i}`} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2.5">
-                            {url ? (
-                              <a href={url} target="_blank" rel="noreferrer" className="block hover:text-[var(--accent,#0066FF)]">{inner}</a>
-                            ) : inner}
+                          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 flex items-center gap-3.5">
+                            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)]">
+                              <BrandGlyph name={label} size={32} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[13px] font-semibold text-[var(--text-primary)]">{label}</div>
+                              <div className="truncate text-[12.5px] text-[var(--text-secondary)] group-hover:text-[var(--accent,#0066FF)]">{display}</div>
+                            </div>
+                            {url ? <GlobeIcon className="h-4 w-4 shrink-0 text-[var(--text-faint)] group-hover:text-[var(--accent,#0066FF)]" /> : null}
                           </div>
+                        );
+                        return url ? (
+                          <a key={`${label}-${i}`} href={url} target="_blank" rel="noreferrer" className="group block">{inner}</a>
+                        ) : (
+                          <div key={`${label}-${i}`}>{inner}</div>
                         );
                       })}
                     </div>
