@@ -1263,6 +1263,54 @@ const REGISTRY: Record<string, GuidanceEntry> = {
       zh: "工厂是否接受较小的最小起订量 — 适用于试单或小批量产品线。",
     },
   },
+  "supplier.factory_visit_date": {
+    id: "supplier.factory_visit_date",
+    title: { en: "Factory visit date", zh: "工厂考察日期" },
+    default: {
+      en: "The date your team last visited or audited this factory in person — a recent visit raises confidence in the assessment.",
+      zh: "贵方团队最近一次实地考察或审核该工厂的日期 — 近期到访可提升评估的可信度。",
+    },
+  },
+  "supplier.supported_materials": {
+    id: "supplier.supported_materials",
+    title: { en: "Supported materials", zh: "可加工材料" },
+    default: {
+      en: "The raw materials the factory can work with (comma-separated, e.g. Cotton, Polyester, Steel) — confirms it can make your product.",
+      zh: "工厂可加工的原材料(用逗号分隔,如棉、涤纶、钢材)— 用于确认其能否生产您的产品。",
+    },
+  },
+  "supplier.capacity_unit": {
+    id: "supplier.capacity_unit",
+    title: { en: "Capacity unit", zh: "产能单位" },
+    default: {
+      en: "The unit the monthly-capacity figure is measured in (e.g. units, pcs, tons, containers per month) so the number is comparable.",
+      zh: "月产能数值所采用的计量单位(如:件、个、吨、集装箱/月),以便横向比较。",
+    },
+  },
+  "supplier.output_unit": {
+    id: "supplier.output_unit",
+    title: { en: "Output unit", zh: "产量单位" },
+    default: {
+      en: "The unit the annual-output figure is measured in (e.g. units, pcs, tons per year) so the number is comparable.",
+      zh: "年产量数值所采用的计量单位(如:件、个、吨/年),以便横向比较。",
+    },
+  },
+  "supplier.lead_time_days": {
+    id: "supplier.lead_time_days",
+    title: { en: "Lead time (days)", zh: "交货周期(天)" },
+    default: {
+      en: "The factory's standard production lead time in days — the basis for planning reorders and delivery commitments.",
+      zh: "工厂标准生产交货周期(天)— 是安排补货与交付承诺的依据。",
+    },
+  },
+  "supplier.peak_season_months": {
+    id: "supplier.peak_season_months",
+    title: { en: "Peak season months", zh: "旺季月份" },
+    default: {
+      en: "Months when the factory is busiest (comma-separated, e.g. Sep, Oct, Nov) — expect longer lead times and less flexibility then.",
+      zh: "工厂最繁忙的月份(用逗号分隔,如 9月、10月、11月)— 这些时段交期会更长、灵活性更低。",
+    },
+  },
 };
 
 /* ---------------------------------------------------------------------------
