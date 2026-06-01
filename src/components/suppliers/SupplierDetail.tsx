@@ -147,15 +147,12 @@ const StatusPill = ({ value }: { value: string }) =>
     <span className="text-[var(--text-faint)]">—</span>
   );
 
-type Tab = "overview" | "factory" | "contacts" | "media" | "timeline" | "risk" | "negotiation" | "sourcing" | "orders" | "bills" | "products" | "quality";
-
 export default function SupplierDetail({ id, embedded = false }: { id: string; embedded?: boolean }) {
   const { t } = useTranslation(contactsT);
   const router = useRouter();
   const [data, setData] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("overview");
 
   const load = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -361,19 +358,19 @@ export default function SupplierDetail({ id, embedded = false }: { id: string; e
     { label: t("sd.incoterms", "Incoterms"), value: str(s, "incoterms"), icon: <GlobeIcon className="h-4 w-4" /> },
   ].filter((t) => t.value);
 
-  const tabs: { key: Tab; label: string; count?: number }[] = [
-    { key: "overview", label: t("sd.overview", "Overview") },
-    { key: "factory", label: t("sd.factory", "Factory") },
-    { key: "contacts", label: t("sd.contacts", "Contacts"), count: data.contactPersons.length },
-    { key: "media", label: t("sd.documents", "Documents"), count: data.media.length },
-    { key: "timeline", label: t("sd.timeline", "Timeline"), count: (data.timeline ?? []).length },
-    { key: "risk", label: t("sd.risk", "Risk"), count: (data.riskItems ?? []).filter((r) => r.status !== "resolved").length },
-    { key: "negotiation", label: t("sd.negotiation", "Negotiation"), count: (data.negotiations ?? []).length },
-    { key: "sourcing", label: t("sd.sourcing", "Sourcing"), count: (data.sourcingLinks ?? []).length },
-    { key: "orders", label: t("sd.purchaseOrders", "Purchase Orders"), count: data.purchaseOrders.length },
-    { key: "bills", label: t("sd.billsPayments", "Bills & Payments"), count: data.bills.length + data.payments.length },
-    { key: "products", label: t("sd.products", "Products"), count: data.products.length },
-    { key: "quality", label: t("sd.certifications", "Certifications") },
+  const navItems: { id: string; label: string; count?: number }[] = [
+    { id: "overview", label: t("sd.overview", "Overview") },
+    { id: "factory", label: t("sd.factory", "Factory") },
+    { id: "contacts", label: t("sd.contacts", "Contacts"), count: data.contactPersons.length },
+    { id: "quality", label: t("sd.certifications", "Certifications") },
+    { id: "risk", label: t("sd.risk", "Risk"), count: (data.riskItems ?? []).filter((r) => r.status !== "resolved").length },
+    { id: "negotiation", label: t("sd.negotiation", "Negotiation"), count: (data.negotiations ?? []).length },
+    { id: "sourcing", label: t("sd.sourcing", "Sourcing"), count: (data.sourcingLinks ?? []).length },
+    { id: "products", label: t("sd.products", "Products"), count: data.products.length },
+    { id: "orders", label: t("sd.purchaseOrders", "Purchase Orders"), count: data.purchaseOrders.length },
+    { id: "bills", label: t("sd.billsPayments", "Bills & Payments"), count: data.bills.length + data.payments.length },
+    { id: "documents", label: t("sd.documents", "Documents"), count: data.media.length },
+    { id: "timeline", label: t("sd.timeline", "Timeline"), count: (data.timeline ?? []).length },
   ];
 
   return (
@@ -637,29 +634,28 @@ export default function SupplierDetail({ id, embedded = false }: { id: string; e
           )}
         </section>
 
-        {/* ── Tabs ── */}
-        <div className="flex flex-wrap gap-1 border-b border-[var(--border-subtle)]">
-          {tabs.map((tb) => (
-            <button
-              key={tb.key}
-              onClick={() => setTab(tb.key)}
-              className={`-mb-px border-b-2 px-3 py-2.5 text-[13px] font-medium transition-colors ${
-                tab === tb.key
-                  ? "border-[var(--text-primary)] text-[var(--text-primary)]"
-                  : "border-transparent text-[var(--text-faint)] hover:text-[var(--text-secondary)]"
-              }`}
+        {/* ── In-page jump navigation (sticky) — every section stays visible below ── */}
+        <nav className="sticky top-0 z-20 -mx-4 flex gap-1 overflow-x-auto border-y border-[var(--border-subtle)] bg-[var(--bg-primary)]/95 px-4 py-2 backdrop-blur scrollbar-none sm:-mx-6 sm:px-6">
+          {navItems.map((n) => (
+            <a
+              key={n.id}
+              href={`#${n.id}`}
+              className="shrink-0 rounded-full px-3 py-1.5 text-[12px] font-medium text-[var(--text-faint)] transition-colors hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
             >
-              {tb.label}
-              {typeof tb.count === "number" ? <span className="ms-1.5 text-[var(--text-faint)]">{tb.count}</span> : null}
-            </button>
+              {n.label}
+              {typeof n.count === "number" && n.count > 0 ? <span className="ms-1 text-[var(--text-ghost)]">{n.count}</span> : null}
+            </a>
           ))}
-        </div>
+        </nav>
 
-        {/* ── Tab content ── */}
-        {tab === "overview" ? (
-          <section className="grid grid-cols-1 gap-8 md:grid-cols-2">
+        {/* ═══ Everything below is one continuous page — no hidden tabs ═══ */}
+
+        {/* Overview: contact + notes */}
+        <Section id="overview">
+          <SectionHead eyebrow={t("sd.profile", "Profile")} title={t("sd.overview", "Overview")} />
+          <div className="mt-4 grid grid-cols-1 gap-8 md:grid-cols-2">
             <div className="space-y-3">
-              <SectionHead title={t("sd.contact", "Contact")} />
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-faint)]">{t("sd.contact", "Contact")}</div>
               <div className="space-y-2.5 text-sm">
                 {[
                   { icon: <EnvelopeIcon className="h-4 w-4" />, v: str(s, "supplier_email", "email") },
@@ -678,67 +674,60 @@ export default function SupplierDetail({ id, embedded = false }: { id: string; e
             </div>
             {str(s, "notes") ? (
               <div className="space-y-3">
-                <SectionHead title={t("sd.notes", "Notes")} />
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-faint)]">{t("sd.notes", "Notes")}</div>
                 <p className="text-sm leading-relaxed text-[var(--text-secondary)]"><AutoTranslatedText text={str(s, "notes")} /></p>
               </div>
             ) : null}
-          </section>
-        ) : null}
+          </div>
+        </Section>
 
-        {tab === "factory" ? (
-          <FactorySection
-            supplierId={id}
-            supplier={s}
-            factory={data.factory}
-            onSaved={() => load({ silent: true })}
-          />
-        ) : null}
+        {/* Factory */}
+        <Section id="factory">
+          <FactorySection supplierId={id} supplier={s} factory={data.factory} onSaved={() => load({ silent: true })} />
+        </Section>
 
-        {tab === "contacts" ? (
-          <ContactsSection
-            supplierId={id}
-            contactPersons={data.contactPersons}
-            qrCodes={data.qrCodes ?? []}
-            onSaved={() => load({ silent: true })}
-          />
-        ) : null}
+        {/* Contacts (people) */}
+        <Section id="contacts">
+          <ContactsSection supplierId={id} contactPersons={data.contactPersons} qrCodes={data.qrCodes ?? []} onSaved={() => load({ silent: true })} />
+        </Section>
 
-        {tab === "media" ? (
-          <MediaSection
-            supplierId={id}
-            media={data.media}
-            onSaved={() => load({ silent: true })}
-          />
-        ) : null}
+        {/* Quality & certifications */}
+        <Section id="quality">
+          <SectionHead eyebrow={t("sd.compliance", "Compliance")} title={t("sd.qualityCertifications", "Quality & certifications")} />
+          <div className="mt-4 space-y-5">
+            {certs.length === 0 ? (
+              <EmptyTab label={t("sd.noCertifications", "No certifications recorded.")} />
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {certs.map((c) => (
+                  <span key={c} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--bg-surface-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-primary)]">
+                    <FileCheckIcon className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
+                    {c}
+                  </span>
+                ))}
+              </div>
+            )}
+            {str(s, "sample_status") ? (
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-faint)]">{t("sd.sampleStatus", "Sample status")}</span>
+                <StatusPill value={str(s, "sample_status")} />
+              </div>
+            ) : null}
+          </div>
+        </Section>
 
-        {tab === "timeline" ? (
-          <TimelineSection
-            supplierId={id}
-            timeline={data.timeline ?? []}
-            onSaved={() => load({ silent: true })}
-          />
-        ) : null}
+        {/* Risk */}
+        <Section id="risk">
+          <RiskSection supplierId={id} riskProfile={data.riskProfile ?? null} riskItems={data.riskItems ?? []} risk={data.risk ?? null} onSaved={() => load({ silent: true })} />
+        </Section>
 
-        {tab === "risk" ? (
-          <RiskSection
-            supplierId={id}
-            riskProfile={data.riskProfile ?? null}
-            riskItems={data.riskItems ?? []}
-            risk={data.risk ?? null}
-            onSaved={() => load({ silent: true })}
-          />
-        ) : null}
+        {/* Negotiation */}
+        <Section id="negotiation">
+          <NegotiationSection supplierId={id} negotiations={data.negotiations ?? []} negotiationIntel={data.negotiationIntel ?? null} onSaved={() => load({ silent: true })} />
+        </Section>
 
-        {tab === "negotiation" ? (
-          <NegotiationSection
-            supplierId={id}
-            negotiations={data.negotiations ?? []}
-            negotiationIntel={data.negotiationIntel ?? null}
-            onSaved={() => load({ silent: true })}
-          />
-        ) : null}
-
-        {tab === "sourcing" ? (
+        {/* Sourcing */}
+        <Section id="sourcing">
           <SourcingSection
             supplierId={id}
             supplierName={str(s, "company_name_en") || str(s, "display_name") || t("sd.supplier", "Supplier")}
@@ -748,38 +737,69 @@ export default function SupplierDetail({ id, embedded = false }: { id: string; e
             specializations={data.specializations ?? []}
             onSaved={() => load({ silent: true })}
           />
-        ) : null}
+        </Section>
 
-        {tab === "orders" ? (
-          data.purchaseOrders.length === 0 ? (
-            <EmptyTab label={t("sd.noPurchaseOrders", "No purchase orders linked to this supplier yet.")} />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--border-subtle)] text-left text-[11px] uppercase tracking-wider text-[var(--text-faint)]">
-                    <th className="py-2.5 pe-4 font-medium">{t("sd.order", "Order")}</th>
-                    <th className="py-2.5 pe-4 font-medium">{t("sd.date", "Date")}</th>
-                    <th className="py-2.5 pe-4 font-medium">{t("sd.status", "Status")}</th>
-                    <th className="py-2.5 text-end font-medium">{t("sd.total", "Total")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.purchaseOrders.map((p, i) => (
-                    <tr key={str(p, "id") || i} className="border-b border-[var(--border-subtle)] last:border-0">
-                      <td className="py-3 pe-4 font-medium text-[var(--text-primary)]">{str(p, "po_number", "number", "code", "id") || "—"}</td>
-                      <td className="py-3 pe-4 text-[var(--text-secondary)]">{fmtDate(str(p, "order_date", "created_at", "date"))}</td>
-                      <td className="py-3 pe-4"><StatusPill value={str(p, "status")} /></td>
-                      <td className="py-3 text-end font-medium text-[var(--text-primary)]">{money(num(p, "total", "total_amount", "grand_total"), str(p, "currency") || currency)}</td>
+        {/* Products supplied */}
+        <Section id="products">
+          <SectionHead eyebrow={t("sd.catalogue", "Catalogue")} title={t("sd.productsSupplied", "Products supplied")} />
+          <div className="mt-4">
+            {data.products.length === 0 ? (
+              <EmptyTab label={t("sd.noProducts", "No products are linked to this supplier yet.")} />
+            ) : (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                {data.products.map((p, i) => {
+                  const pid = str(p, "slug", "id");
+                  const card = (
+                    <div className="rounded-2xl bg-[var(--bg-surface-subtle)] p-3 transition-colors hover:bg-[var(--bg-surface-hover)]">
+                      <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl bg-[var(--bg-surface)] text-[var(--text-faint)]">
+                        <PackageIcon className="h-7 w-7" />
+                      </div>
+                      <div className="mt-2 truncate text-sm font-medium text-[var(--text-primary)]">{str(p, "product_name") || t("sd.untitled", "Untitled")}</div>
+                      {str(p, "category_slug") ? <div className="truncate text-[11px] text-[var(--text-faint)]">{str(p, "category_slug")}</div> : null}
+                    </div>
+                  );
+                  return pid ? <Link key={str(p, "id") || i} href={`/products/${pid}`}>{card}</Link> : <div key={i}>{card}</div>;
+                })}
+              </div>
+            )}
+          </div>
+        </Section>
+
+        {/* Purchase orders */}
+        <Section id="orders">
+          <SectionHead eyebrow={t("sd.purchasing", "Purchasing")} title={t("sd.purchaseOrders", "Purchase Orders")} />
+          <div className="mt-4">
+            {data.purchaseOrders.length === 0 ? (
+              <EmptyTab label={t("sd.noPurchaseOrders", "No purchase orders linked to this supplier yet.")} />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--border-subtle)] text-left text-[11px] uppercase tracking-wider text-[var(--text-faint)]">
+                      <th className="py-2.5 pe-4 font-medium">{t("sd.order", "Order")}</th>
+                      <th className="py-2.5 pe-4 font-medium">{t("sd.date", "Date")}</th>
+                      <th className="py-2.5 pe-4 font-medium">{t("sd.status", "Status")}</th>
+                      <th className="py-2.5 text-end font-medium">{t("sd.total", "Total")}</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )
-        ) : null}
+                  </thead>
+                  <tbody>
+                    {data.purchaseOrders.map((p, i) => (
+                      <tr key={str(p, "id") || i} className="border-b border-[var(--border-subtle)] last:border-0">
+                        <td className="py-3 pe-4 font-medium text-[var(--text-primary)]">{str(p, "po_number", "number", "code", "id") || "—"}</td>
+                        <td className="py-3 pe-4 text-[var(--text-secondary)]">{fmtDate(str(p, "order_date", "created_at", "date"))}</td>
+                        <td className="py-3 pe-4"><StatusPill value={str(p, "status")} /></td>
+                        <td className="py-3 text-end font-medium text-[var(--text-primary)]">{money(num(p, "total", "total_amount", "grand_total"), str(p, "currency") || currency)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </Section>
 
-        {tab === "bills" ? (
+        {/* Bills & payments */}
+        <Section id="bills">
           <div className="space-y-8">
             <div className="space-y-3">
               <SectionHead eyebrow={t("sd.accountsPayable", "Accounts payable")} title={t("sd.vendorBills", "Vendor bills")} />
@@ -842,65 +862,17 @@ export default function SupplierDetail({ id, embedded = false }: { id: string; e
               )}
             </div>
           </div>
-        ) : null}
+        </Section>
 
-        {tab === "products" ? (
-          data.products.length === 0 ? (
-            <EmptyTab label={t("sd.noProducts", "No products are linked to this supplier yet.")} />
-          ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-              {data.products.map((p, i) => {
-                const pid = str(p, "slug", "id");
-                const card = (
-                  <div className="rounded-2xl bg-[var(--bg-surface-subtle)] p-3 transition-colors hover:bg-[var(--bg-surface-hover)]">
-                    <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl bg-[var(--bg-surface)] text-[var(--text-faint)]">
-                      <PackageIcon className="h-7 w-7" />
-                    </div>
-                    <div className="mt-2 truncate text-sm font-medium text-[var(--text-primary)]">{str(p, "product_name") || t("sd.untitled", "Untitled")}</div>
-                    {str(p, "category_slug") ? (
-                      <div className="truncate text-[11px] text-[var(--text-faint)]">{str(p, "category_slug")}</div>
-                    ) : null}
-                  </div>
-                );
-                return pid ? (
-                  <Link key={str(p, "id") || i} href={`/products/${pid}`}>{card}</Link>
-                ) : (
-                  <div key={i}>{card}</div>
-                );
-              })}
-            </div>
-          )
-        ) : null}
+        {/* Documents */}
+        <Section id="documents">
+          <MediaSection supplierId={id} media={data.media} onSaved={() => load({ silent: true })} />
+        </Section>
 
-        {tab === "quality" ? (
-          <section className="space-y-6">
-            <div className="space-y-3">
-              <SectionHead eyebrow={t("sd.compliance", "Compliance")} title={t("sd.certifications", "Certifications")} />
-              {certs.length === 0 ? (
-                <EmptyTab label={t("sd.noCertifications", "No certifications recorded.")} />
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {certs.map((c) => (
-                    <span key={c} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--bg-surface-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-primary)]">
-                      <FileCheckIcon className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
-                      {c}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-            {(str(s, "sample_status") || str(s, "notes")) ? (
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                {str(s, "sample_status") ? (
-                  <div className="space-y-2">
-                    <SectionHead title={t("sd.sampleStatus", "Sample status")} />
-                    <StatusPill value={str(s, "sample_status")} />
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-          </section>
-        ) : null}
+        {/* Timeline */}
+        <Section id="timeline">
+          <TimelineSection supplierId={id} timeline={data.timeline ?? []} onSaved={() => load({ silent: true })} />
+        </Section>
       </main>
       </div>
     </div>
@@ -911,4 +883,12 @@ const EmptyTab = ({ label }: { label: string }) => (
   <div className="rounded-2xl bg-[var(--bg-surface-subtle)]/50 px-6 py-12 text-center text-sm text-[var(--text-faint)]">
     {label}
   </div>
+);
+
+/* One stacked section on the single-page Supplier 360 — a top divider for clear
+   separation and a scroll-margin so the sticky jump-nav doesn't overlap it. */
+const Section = ({ id, children }: { id: string; children: React.ReactNode }) => (
+  <section id={id} className="scroll-mt-16 border-t border-[var(--border-subtle)] pt-8">
+    {children}
+  </section>
 );
