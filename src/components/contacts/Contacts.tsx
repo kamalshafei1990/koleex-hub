@@ -104,6 +104,7 @@ import EntityInvoicesStrip from "@/components/invoices/EntityInvoicesStrip";
 import ProfileCompletenessBar from "@/components/ui/ProfileCompletenessBar";
 import GuidanceTip from "@/components/ui/GuidanceTip";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
+import SupplierDetail from "@/components/suppliers/SupplierDetail";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TYPES
@@ -3398,14 +3399,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       router.push(`/customers/${c.id}`);
       return;
     }
-    /* On the Suppliers app, route to the dedicated /suppliers/[id]
-       Supplier 360 intelligence page (Factory, Contacts, Media, Timeline,
-       Risk, Negotiation, Sourcing). The generic /contacts list keeps the
-       legacy side-panel for full base-field editing. */
-    if (filterType === "supplier" && c.contact_type === "supplier") {
-      router.push(`/suppliers/${c.id}`);
-      return;
-    }
+    /* On the Suppliers app, show the full Supplier 360 (Factory, Contacts,
+       Media, Timeline, Risk, Negotiation, Sourcing) inline in the right
+       detail panel — no full-page navigation. */
     setSelectedId(c.id);
     setView("detail");
     setMobileShowDetail(true);
@@ -4021,6 +4017,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
      ═════════════════════════════════════════════════════════════════════════ */
 
   const renderDetailPanel = () => {
+    /* Suppliers: render the full Supplier 360 inline (all intel sections),
+       not the legacy base-field panel. */
+    if (filterType === "supplier" && selectedContact && view === "detail") {
+      return <SupplierDetail id={selectedContact.id} embedded />;
+    }
     if (!selectedContact) {
       /* ── Supplier KPI Dashboard ── */
       if (filterType === "supplier" && supplierKpis) {

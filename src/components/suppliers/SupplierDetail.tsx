@@ -149,7 +149,7 @@ const StatusPill = ({ value }: { value: string }) =>
 
 type Tab = "overview" | "factory" | "contacts" | "media" | "timeline" | "risk" | "negotiation" | "sourcing" | "orders" | "bills" | "products" | "quality";
 
-export default function SupplierDetail({ id }: { id: string }) {
+export default function SupplierDetail({ id, embedded = false }: { id: string; embedded?: boolean }) {
   const { t } = useTranslation(contactsT);
   const router = useRouter();
   const [data, setData] = useState<Payload | null>(null);
@@ -377,9 +377,9 @@ export default function SupplierDetail({ id }: { id: string }) {
   ];
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)]">
-      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 py-6">
-        <SuppliersHeader title={t("sd.suppliers", "Suppliers")} />
+    <div className={embedded ? "h-full overflow-y-auto bg-[var(--bg-primary)]" : "min-h-screen bg-[var(--bg-primary)]"}>
+      <div className={embedded ? "mx-auto w-full max-w-5xl px-4 sm:px-6 py-6" : "mx-auto w-full max-w-6xl px-4 sm:px-6 py-6"}>
+        {!embedded && <SuppliersHeader title={t("sd.suppliers", "Suppliers")} />}
 
       <main className="mt-6 space-y-10 pb-24">
         {/* ── Identity ── */}
