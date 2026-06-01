@@ -86,9 +86,9 @@ function certState(m: Row, t: (key: string, fallback?: string) => string): { lab
   return { label: t("ms.verified", "Verified"), tone: "ok" };
 }
 const toneCls: Record<string, string> = {
-  ok: "bg-[var(--text-primary)] text-[var(--bg-primary)]",
-  warn: "bg-amber-500/15 text-amber-300",
-  danger: "bg-rose-500/15 text-rose-300",
+  ok: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+  warn: "bg-amber-500/15 text-amber-600 dark:text-amber-300",
+  danger: "bg-rose-500/15 text-rose-600 dark:text-rose-300",
   neutral: "bg-[var(--bg-surface)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]",
 };
 
@@ -140,6 +140,33 @@ export default function MediaSection({
     () => media.filter((m) => m.category === "certification" && str(m, "expiry_date") && str(m, "expiry_date") < todayStr()).length,
     [media],
   );
+
+  /* Compliance snapshot — a transparent rollup of the certification trust
+     states already shown on each card. NOT a fabricated scoring model:
+     score = certifications that are verified AND in force ÷ total certs. */
+  const compliance = useMemo(() => {
+    const today = todayStr();
+    const certs = media.filter((m) => m.category === "certification");
+    let verified = 0, expiring = 0, expired = 0, pending = 0, compliant = 0;
+    for (const m of certs) {
+      const exp = str(m, "expiry_date");
+      const isVerified = !!m.verified_at;
+      const isExpired = !!exp && exp < today;
+      const isExpiring = !isExpired && !!exp && Math.ceil((new Date(exp).getTime() - Date.now()) / 86400000) <= 60;
+      if (isExpired) expired++;
+      else if (!isVerified) pending++;
+      else if (isExpiring) expiring++;
+      else verified++;
+      if (isVerified && !isExpired) compliant++;
+    }
+    return {
+      total: certs.length,
+      verified, expiring, expired, pending,
+      score: certs.length ? Math.round((compliant / certs.length) * 100) : null,
+    };
+  }, [media]);
+
+  const expiringCount = compliance.expiring;
 
   const openUpload = () => {
     setFile(null); setCategory("certification"); setVisibility("internal");
@@ -252,10 +279,51 @@ export default function MediaSection({
         </button>
       </div>
 
+      {/* ── Compliance snapshot — rolled up from the certification trust states ── */}
+      {compliance.total > 0 ? (
+        <div className="flex flex-col gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3.5">
+            {(() => {
+              const sc = compliance.score ?? 0;
+              const tone = sc >= 80 ? "text-emerald-600 dark:text-emerald-400" : sc >= 50 ? "text-amber-600 dark:text-amber-400" : "text-rose-600 dark:text-rose-400";
+              const ring = sc >= 80 ? "text-emerald-500" : sc >= 50 ? "text-amber-500" : "text-rose-500";
+              const R = 26, C = 2 * Math.PI * R;
+              return (
+                <div className="relative h-[64px] w-[64px] shrink-0">
+                  <svg viewBox="0 0 64 64" className="h-full w-full -rotate-90">
+                    <circle cx="32" cy="32" r={R} fill="none" strokeWidth="6" className="stroke-[var(--bg-surface)]" />
+                    <circle cx="32" cy="32" r={R} fill="none" strokeWidth="6" strokeLinecap="round" className={ring} strokeDasharray={C} strokeDashoffset={C - (C * Math.max(0, Math.min(100, sc))) / 100} />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className={`text-[15px] font-bold tabular-nums ${tone}`}>{compliance.score}<span className="text-[9px] font-medium text-[var(--text-faint)]">%</span></span>
+                  </div>
+                </div>
+              );
+            })()}
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-faint)]">{t("ms.complianceScore", "Compliance")}</div>
+              <div className="mt-0.5 text-[12px] text-[var(--text-secondary)]">{compliance.verified + compliance.expiring}/{compliance.total} {t("ms.certsInForce", "certifications in force")}</div>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {compliance.verified > 0 ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-600 dark:text-emerald-400"><BadgeCheckIcon className="h-3 w-3" />{compliance.verified} {t("ms.verified", "Verified")}</span> : null}
+            {compliance.expiring > 0 ? <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10.5px] font-semibold text-amber-600 dark:text-amber-300"><ClockIcon className="h-3 w-3" />{compliance.expiring} {t("ms.expiringSoon", "Expiring soon")}</span> : null}
+            {compliance.pending > 0 ? <span className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-surface)] px-2 py-0.5 text-[10.5px] font-semibold text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">{compliance.pending} {t("ms.pending", "Pending")}</span> : null}
+            {compliance.expired > 0 ? <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[10.5px] font-semibold text-rose-600 dark:text-rose-300"><TriangleWarningIcon className="h-3 w-3" />{compliance.expired} {t("ms.expired", "Expired")}</span> : null}
+          </div>
+        </div>
+      ) : null}
+
       {expiredCount > 0 ? (
-        <div className="flex items-center gap-2 rounded-xl bg-rose-500/[0.08] px-3 py-2 text-[12px] text-rose-300">
+        <div className="flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/[0.08] px-3.5 py-2.5 text-[12px] font-medium text-rose-600 dark:text-rose-300">
           <TriangleWarningIcon className="h-4 w-4 shrink-0" />
           {expiredCount} {expiredCount > 1 ? t("ms.certsHaveExpired", "certifications have expired — re-verify to restore sourcing trust.") : t("ms.certHasExpired", "certification has expired — re-verify to restore sourcing trust.")}
+        </div>
+      ) : null}
+      {expiringCount > 0 ? (
+        <div className="flex items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/[0.07] px-3.5 py-2.5 text-[12px] font-medium text-amber-600 dark:text-amber-300">
+          <ClockIcon className="h-4 w-4 shrink-0" />
+          {expiringCount} {expiringCount > 1 ? t("ms.certsExpiringSoon", "certifications expire within 60 days — plan renewal to keep sourcing trust.") : t("ms.certExpiringSoon", "certification expires within 60 days — plan renewal to keep sourcing trust.")}
         </div>
       ) : null}
       {err ? <div className="text-[12px] text-rose-400">{err}</div> : null}
