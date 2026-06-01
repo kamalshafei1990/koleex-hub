@@ -5,6 +5,7 @@ import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import KnowledgeIcon from "@/components/icons/KnowledgeIcon";
 import CommercialPolicyIcon from "@/components/icons/CommercialPolicyIcon";
 import FileCode2Icon from "@/components/icons/ui/FileCode2Icon";
+import HandshakeIcon from "@/components/icons/ui/HandshakeIcon";
 
 const knowledgeBases = [
   {
@@ -36,6 +37,25 @@ const knowledgeBases = [
       "Garment Machinery",
     ],
     color: "#5E5CE6",
+  },
+  {
+    id: "supplier-data-guide",
+    title: "Supplier Data Entry Guide",
+    description:
+      "Step-by-step manual for onboarding suppliers — what to enter in each of the 21 form sections, which department owns it, the fill order, and how completeness is scored.",
+    icon: HandshakeIcon,
+    href: "/knowledge/supplier-data-guide",
+    pages: 1,
+    sections: [
+      "Procurement",
+      "Legal",
+      "Finance",
+      "Logistics",
+      "Quality",
+      "Commercial",
+      "Workflow",
+    ],
+    color: "#0066FF",
   },
 ];
 
