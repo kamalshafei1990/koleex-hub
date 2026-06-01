@@ -53,13 +53,59 @@ const levelToneCls: Record<string, string> = {
   elevated: "bg-amber-500/15 text-amber-300",
   high: "bg-rose-500/15 text-rose-300",
 };
-const severityCls: Record<string, string> = {
-  low: "bg-[var(--bg-surface)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]",
-  medium: "bg-[var(--bg-surface)] text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)]",
-  high: "bg-amber-500/15 text-amber-300",
-  critical: "bg-rose-500/15 text-rose-300",
+/* ── Risk escalation visual system ──
+   LOW      subtle neutral
+   MEDIUM   amber
+   HIGH     stronger amber-red, elevated
+   CRITICAL danger glow edge + pulse dot, sorted first — impossible to miss */
+const SEV_RANK: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+type SevStyle = { card: string; badge: string; dot: string; pulse: boolean };
+const sevStyle = (sev: string): SevStyle => {
+  switch (sev) {
+    case "critical":
+      return {
+        card: "border border-rose-500/50 bg-rose-500/[0.08] shadow-[0_0_22px_-6px_rgba(244,63,94,0.5)]",
+        badge: "bg-rose-500 text-white",
+        dot: "bg-rose-500",
+        pulse: true,
+      };
+    case "high":
+      return {
+        card: "border border-rose-400/35 bg-rose-500/[0.055]",
+        badge: "bg-rose-500/15 text-rose-600 dark:text-rose-300",
+        dot: "bg-rose-400",
+        pulse: false,
+      };
+    case "medium":
+      return {
+        card: "border border-amber-500/30 bg-amber-500/[0.045]",
+        badge: "bg-amber-500/15 text-amber-600 dark:text-amber-300",
+        dot: "bg-amber-400",
+        pulse: false,
+      };
+    default: // low
+      return {
+        card: "border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]",
+        badge: "bg-[var(--bg-surface)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]",
+        dot: "bg-[var(--text-faint)]",
+        pulse: false,
+      };
+  }
 };
 const qualityLabel = (v: string) => QUALITY_LEVEL_LABELS[v] ?? "—";
+
+/* compact relative age (e.g. "12d", "3mo") for a risk item's date */
+const relAge = (iso: string): string => {
+  if (!iso) return "";
+  const ts = new Date(iso).getTime();
+  if (Number.isNaN(ts)) return "";
+  const days = Math.floor((Date.now() - ts) / 86_400_000);
+  if (days < 0) return "";
+  if (days === 0) return "today";
+  if (days < 30) return `${days}d`;
+  if (days < 365) return `${Math.floor(days / 30)}mo`;
+  return `${Math.floor(days / 365)}y`;
+};
 
 export default function RiskSection({
   supplierId, riskProfile, riskItems, risk, onSaved,
@@ -136,7 +182,16 @@ export default function RiskSection({
   };
 
   const hasProfile = !!riskProfile;
-  const openItems = riskItems.filter((r) => r.status !== "resolved");
+  // Critical first, then high → medium → low. Within a tier, newest first.
+  const openItems = riskItems
+    .filter((r) => r.status !== "resolved")
+    .slice()
+    .sort((a, b) => {
+      const sa = SEV_RANK[str(a, "severity")] ?? 0;
+      const sb = SEV_RANK[str(b, "severity")] ?? 0;
+      if (sb !== sa) return sb - sa;
+      return new Date(str(b, "created_at")).getTime() - new Date(str(a, "created_at")).getTime();
+    });
   const resolvedItems = riskItems.filter((r) => r.status === "resolved");
   const levelTone = riskLevelTone(risk?.level);
 
@@ -201,14 +256,29 @@ export default function RiskSection({
           <div className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--text-faint)]">{t("rs.trustLevel", "Trust level")}</div>
         </div>
         <div className="rounded-2xl bg-[var(--bg-surface-subtle)] p-4">
-          <div className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">{openItems.length}</div>
+          <div className={`text-2xl font-semibold tracking-tight ${(risk?.openHighRisks ?? 0) > 0 ? "text-rose-500" : openItems.length > 0 ? "text-amber-500" : "text-[var(--text-primary)]"}`}>{openItems.length}</div>
           <div className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--text-faint)]">{t("rs.activeRisks", "Active risks")}</div>
         </div>
       </div>
 
-      {(risk?.openHighRisks ?? 0) > 0 ? (
-        <div className="flex items-center gap-2 rounded-xl bg-rose-500/[0.08] px-3 py-2 text-[12px] text-rose-300"><TriangleWarningIcon className="h-4 w-4 shrink-0" />{risk?.openHighRisks} {(risk?.openHighRisks ?? 0) > 1 ? t("rs.highRisksOpenPlural", "high/critical risks are open and unresolved.") : t("rs.highRiskOpenSingular", "high/critical risk is open and unresolved.")}</div>
-      ) : null}
+      {(() => {
+        const hc = risk?.openHighRisks ?? 0;
+        if (hc <= 0) return null;
+        const hasCritical = openItems.some((it) => str(it, "severity") === "critical");
+        return (
+          <div className={`flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-[12px] font-medium border ${hasCritical ? "bg-rose-500/[0.10] border-rose-500/40 text-rose-600 dark:text-rose-300 shadow-[0_0_18px_-8px_rgba(244,63,94,0.5)]" : "bg-rose-500/[0.07] border-rose-400/25 text-rose-600 dark:text-rose-300"}`}>
+            {hasCritical ? (
+              <span className="relative flex h-2.5 w-2.5 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-500/70" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-rose-500" />
+              </span>
+            ) : (
+              <TriangleWarningIcon className="h-4 w-4 shrink-0" />
+            )}
+            {hc} {hc > 1 ? t("rs.highRisksOpenPlural", "high/critical risks are open and unresolved.") : t("rs.highRiskOpenSingular", "high/critical risk is open and unresolved.")}
+          </div>
+        );
+      })()}
 
       {hasProfile ? (
         <div className="space-y-2.5">
@@ -245,16 +315,41 @@ export default function RiskSection({
           <div className="space-y-2">
             {openItems.map((it) => {
               const id = str(it, "id");
+              const sev = str(it, "severity");
+              const st = sevStyle(sev);
+              const owner = str(it, "owner") || str(it, "owner_name") || str(it, "assigned_to") || str(it, "assigned_owner");
+              const mitigation = str(it, "mitigation_plan") || str(it, "mitigation");
+              const age = relAge(str(it, "created_at") || str(it, "identified_at") || str(it, "detected_at"));
               return (
-                <div key={id} className="rounded-xl bg-[var(--bg-surface-subtle)] p-3">
+                <div key={id} className={`rounded-xl p-3.5 ${st.card}`}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${severityCls[str(it, "severity")] ?? severityCls.medium}`}>{t("opt." + str(it, "severity"), SEVERITY_LABELS[str(it, "severity")] ?? str(it, "severity"))}</span>
+                        {st.pulse ? (
+                          <span className="relative flex h-2 w-2 shrink-0">
+                            <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${st.dot} opacity-70`} />
+                            <span className={`relative inline-flex h-2 w-2 rounded-full ${st.dot}`} />
+                          </span>
+                        ) : null}
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${st.badge}`}>{t("opt." + sev, SEVERITY_LABELS[sev] ?? sev)}</span>
                         <span className="text-[13px] font-semibold text-[var(--text-primary)]">{str(it, "title")}</span>
                       </div>
-                      <div className="mt-0.5 text-[11px] text-[var(--text-faint)]">{t("opt." + str(it, "dimension"), riskDimensionLabel(str(it, "dimension")))} · {t("opt." + str(it, "status"), RISK_STATUS_LABELS[str(it, "status")] ?? str(it, "status"))} · <ShieldCheckIcon className="inline h-2.5 w-2.5" /> {t("opt." + str(it, "visibility_tier"), VISIBILITY_LABELS[str(it, "visibility_tier")] ?? "Procurement")}</div>
-                      {str(it, "description") ? <div className="mt-1 text-[11px] leading-relaxed text-[var(--text-secondary)]">{str(it, "description")}</div> : null}
+                      <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-[var(--text-faint)]">
+                        <span>{t("opt." + str(it, "dimension"), riskDimensionLabel(str(it, "dimension")))}</span>
+                        <span aria-hidden>·</span>
+                        <span>{t("opt." + str(it, "status"), RISK_STATUS_LABELS[str(it, "status")] ?? str(it, "status"))}</span>
+                        {owner ? (<><span aria-hidden>·</span><span>{t("rs.ownerPrefix", "Owner:")} {owner}</span></>) : null}
+                        {age ? (<><span aria-hidden>·</span><span>{age}</span></>) : null}
+                        <span aria-hidden>·</span>
+                        <span className="inline-flex items-center gap-0.5"><ShieldCheckIcon className="h-2.5 w-2.5" /> {t("opt." + str(it, "visibility_tier"), VISIBILITY_LABELS[str(it, "visibility_tier")] ?? "Procurement")}</span>
+                      </div>
+                      {str(it, "description") ? <div className="mt-1.5 text-[11px] leading-relaxed text-[var(--text-secondary)]">{str(it, "description")}</div> : null}
+                      {mitigation ? (
+                        <div className="mt-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]/60 px-2.5 py-1.5">
+                          <span className="text-[9px] font-semibold uppercase tracking-wider text-[var(--text-faint)]">{t("rs.mitigationLabel", "Mitigation")}</span>
+                          <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--text-secondary)]">{mitigation}</p>
+                        </div>
+                      ) : null}
                     </div>
                     <div className="flex shrink-0 items-center gap-0.5">
                       {str(it, "status") !== "mitigating" ? <button type="button" disabled={busyId === id} onClick={() => patchItem(it, { status: "mitigating" })} className="rounded-md px-1.5 py-1 text-[10px] font-medium text-[var(--text-faint)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] disabled:opacity-40">{t("rs.mitigate", "Mitigate")}</button> : null}

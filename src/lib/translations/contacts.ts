@@ -1412,6 +1412,8 @@ export const contactsT: Translations = {
   "rs.noBackupSupplier": { en: "No backup supplier", zh: "无备用供应商", ar: "لا يوجد مورد احتياطي" },
   "rs.noActiveRisks": { en: "No active risks recorded.", zh: "未记录任何活跃风险。", ar: "لا توجد مخاطر نشطة مسجلة." },
   "rs.mitigate": { en: "Mitigate", zh: "缓解", ar: "تخفيف" },
+  "rs.ownerPrefix": { en: "Owner:", zh: "负责人：", ar: "المسؤول:" },
+  "rs.mitigationLabel": { en: "Mitigation", zh: "缓解措施", ar: "خطة التخفيف" },
   "rs.resolve": { en: "Resolve", zh: "解决", ar: "حل" },
   "rs.remove": { en: "Remove", zh: "移除", ar: "إزالة" },
   "rs.resolvedRisksHistoryPlural": { en: "resolved risks in history.", zh: "项已解决风险记录在历史中。", ar: "مخاطر محلولة في السجل." },
