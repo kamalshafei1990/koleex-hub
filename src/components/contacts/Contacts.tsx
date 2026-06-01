@@ -7297,13 +7297,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               <div className="flex flex-wrap gap-2">
                 {Object.entries(CLASSIFICATION_LABELS).map(([k, v]) => {
                   const on = sIntel.classifications.includes(k);
-                  return <button type="button" key={k} onClick={() => toggleIntelClass(k)} className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${on ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent" : "bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--border-focus)]"}`}>{v}</button>;
+                  return <button type="button" key={k} onClick={() => toggleIntelClass(k)} className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${on ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent" : "bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--border-focus)]"}`}>{t("opt." + k, v)}</button>;
                 })}
               </div>
               {sIntel.classifications.length > 1 && (
                 <div className="mt-3 flex items-center gap-2">
                   <span className="text-xs text-[var(--text-faint)]">{t("field.primary", "Primary")}:</span>
-                  <LabelSelect value={sIntel.primary_class} onChange={(v) => setSIntel((p) => ({ ...p, primary_class: v }))} options={sIntel.classifications} renderLabel={(o) => CLASSIFICATION_LABELS[o as keyof typeof CLASSIFICATION_LABELS] ?? o} />
+                  <LabelSelect value={sIntel.primary_class} onChange={(v) => setSIntel((p) => ({ ...p, primary_class: v }))} options={sIntel.classifications} renderLabel={(o) => t("opt." + o, CLASSIFICATION_LABELS[o as keyof typeof CLASSIFICATION_LABELS] ?? o)} />
                 </div>
               )}
             </FormSection>
@@ -7579,7 +7579,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <Input label={t("field.factoryName", "Factory name")} help="supplier.factory_name" value={String(sIntel.factory.factory_name)} onChange={(v) => setIntelFactory("factory_name", v)} icon={<FactoryIcon size={14} />} />
-                  <SelectInput label={t("field.factoryType", "Factory type")} help="supplier.factory_type" value={String(sIntel.factory.factory_type)} onChange={(v) => setIntelFactory("factory_type", v)} options={Object.keys(FACTORY_TYPE_LABELS)} renderLabel={(o) => FACTORY_TYPE_LABELS[o] ?? o} selectLabel={t("detail.select")} />
+                  <SelectInput label={t("field.factoryType", "Factory type")} help="supplier.factory_type" value={String(sIntel.factory.factory_type)} onChange={(v) => setIntelFactory("factory_type", v)} options={Object.keys(FACTORY_TYPE_LABELS)} renderLabel={(o) => t("opt." + o, FACTORY_TYPE_LABELS[o] ?? o)} selectLabel={t("detail.select")} />
                   <Input label={t("field.productionLines", "Production lines")} help="supplier.production_lines" value={String(sIntel.factory.production_lines)} onChange={(v) => setIntelFactory("production_lines", v)} inputMode="numeric" placeholder="e.g. 12" />
                   <Input label={t("field.monthlyCapacity", "Monthly capacity")} help="supplier.monthly_capacity" value={String(sIntel.factory.monthly_capacity)} onChange={(v) => setIntelFactory("monthly_capacity", v)} placeholder="e.g. 50,000 units" />
                   <Input label={t("field.annualOutput", "Annual output")} help="supplier.annual_output" value={String(sIntel.factory.annual_output)} onChange={(v) => setIntelFactory("annual_output", v)} placeholder="e.g. 600,000 units" />
@@ -7808,7 +7808,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             {/* Strategic status */}
             <FormSection title={t("section.strategicStatus", "Strategic Status")} icon={<TargetIcon size={14} />} owner={t("owner.management")} ownerLabel={t("owner.label")} dept="commercial" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
               <div className="grid grid-cols-2 gap-3">
-                <SelectInput label={t("field.strategicStatus", "Strategic status")} tier="preferred" value={sIntel.strategic_status} onChange={(v) => setSIntel((p) => ({ ...p, strategic_status: v }))} options={Object.keys(STRATEGIC_STATUS_LABELS)} renderLabel={(o) => STRATEGIC_STATUS_LABELS[o as keyof typeof STRATEGIC_STATUS_LABELS] ?? o} icon={<TargetIcon size={14} />} selectLabel={t("detail.select")} />
+                <SelectInput label={t("field.strategicStatus", "Strategic status")} tier="preferred" value={sIntel.strategic_status} onChange={(v) => setSIntel((p) => ({ ...p, strategic_status: v }))} options={Object.keys(STRATEGIC_STATUS_LABELS)} renderLabel={(o) => t("opt." + o, STRATEGIC_STATUS_LABELS[o as keyof typeof STRATEGIC_STATUS_LABELS] ?? o)} icon={<TargetIcon size={14} />} selectLabel={t("detail.select")} />
                 <SuggestInput
                   label={t("field.statusReason", "Status reason")}
                   value={sIntel.strategic_status_reason}
