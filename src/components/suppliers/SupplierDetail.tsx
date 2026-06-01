@@ -641,40 +641,32 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                     <MessageSquareIcon className="h-3 w-3" />
                     {t("sd.messaging", "Messaging")}
                   </div>
-                  {/* Each platform → its own card; ID and QR live side-by-side */}
+                  {/* Each platform → its own card; BIG app logo · name + ID · QR */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {channels.map((c) => {
-                      const idBlock = c.value ? (
+                    {channels.map((c) => (
+                      <div key={c.key} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 flex items-center gap-3.5">
+                        {/* Prominent app logo */}
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)]">
+                          <BrandGlyph name={c.brand} size={32} />
+                        </div>
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-wider text-[var(--text-faint)] mb-0.5">
-                            <BrandGlyph name={c.brand} size={11} />
-                            {c.label}
-                          </div>
-                          {c.href ? (
-                            <a href={c.href} target={c.href.startsWith("http") ? "_blank" : undefined} rel="noreferrer" className="block truncate font-mono tabular-nums text-sm text-[var(--text-primary)] hover:text-[var(--accent,#0066FF)]">{c.value}</a>
+                          <div className="text-[13px] font-semibold text-[var(--text-primary)]">{c.label}</div>
+                          {c.value ? (
+                            c.href ? (
+                              <a href={c.href} target={c.href.startsWith("http") ? "_blank" : undefined} rel="noreferrer" className="block truncate font-mono tabular-nums text-[12.5px] text-[var(--text-secondary)] hover:text-[var(--accent,#0066FF)]">{c.value}</a>
+                            ) : (
+                              <div className="truncate font-mono tabular-nums text-[12.5px] text-[var(--text-secondary)]">{c.value}</div>
+                            )
                           ) : (
-                            <div className="truncate font-mono tabular-nums text-sm text-[var(--text-primary)]">{c.value}</div>
+                            <div className="text-[12px] text-[var(--text-faint)] italic">{t("sd.scanQr", "Scan QR to connect")}</div>
                           )}
                         </div>
-                      ) : (
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-wider text-[var(--text-faint)] mb-0.5">
-                            <BrandGlyph name={c.brand} size={11} />
-                            {c.label}
-                          </div>
-                          <div className="text-xs text-[var(--text-faint)] italic">{t("sd.scanQr", "Scan QR to connect")}</div>
-                        </div>
-                      );
-                      return (
-                        <div key={c.key} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2.5 flex items-center gap-3">
-                          {idBlock}
-                          {c.qr ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={c.qr} alt={`${c.label} QR`} className="h-16 w-16 shrink-0 object-contain rounded-md bg-white p-0.5" />
-                          ) : null}
-                        </div>
-                      );
-                    })}
+                        {c.qr ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={c.qr} alt={`${c.label} QR`} className="h-16 w-16 shrink-0 object-contain rounded-lg bg-white p-1 ring-1 ring-[var(--border-subtle)]" />
+                        ) : null}
+                      </div>
+                    ))}
                   </div>
                 </div>
               ) : null}
@@ -686,7 +678,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                     <PackageIcon className="h-3 w-3" />
                     {t("sd.additionalQrs", "Additional QR codes")}
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {mediaQrs.map((m: Row, i: number) => {
                       const url = str(m, "file_url", "preview_url");
                       if (!url) return null;
@@ -699,16 +691,16 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                         /alipay/i.test(title + " " + cat) ? "alipay" :
                         /telegram/i.test(title + " " + cat) ? "telegram" : "";
                       return (
-                        <div key={`m-${i}`} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2.5 flex items-center gap-3">
+                        <div key={`m-${i}`} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 flex items-center gap-3.5">
+                          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)]">
+                            {brand ? <BrandGlyph name={brand} size={32} /> : <PackageIcon className="h-6 w-6 text-[var(--text-faint)]" />}
+                          </div>
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-wider text-[var(--text-faint)] mb-0.5">
-                              {brand ? <BrandGlyph name={brand} size={11} /> : <PackageIcon className="h-3 w-3" />}
-                              <span className="truncate">{title}</span>
-                            </div>
-                            {cat ? <div className="text-[10.5px] text-[var(--text-faint)] truncate">{cat}</div> : null}
+                            <div className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{title}</div>
+                            {cat ? <div className="text-[11px] text-[var(--text-faint)] truncate capitalize">{cat}</div> : null}
                           </div>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={url} alt={title} className="h-16 w-16 shrink-0 object-contain rounded-md bg-white p-0.5" />
+                          <img src={url} alt={title} className="h-16 w-16 shrink-0 object-contain rounded-lg bg-white p-1 ring-1 ring-[var(--border-subtle)]" />
                         </div>
                       );
                     })}

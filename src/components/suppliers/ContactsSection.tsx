@@ -411,7 +411,7 @@ export default function ContactsSection({
       {grouped.map(({ cat, items }) => (
         <div key={cat} className="space-y-2.5">
           <SectionLabel>{t("opt." + cat, roleCategoryLabel(cat))}</SectionLabel>
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <div className="space-y-3">
             {items.map((c) => {
               const id = str(c, "id");
               const chans = channelsFor(c);
@@ -419,8 +419,8 @@ export default function ContactsSection({
               const isBoss = ["boss", "owner"].includes(str(c, "role_category"));
               return (
                 <div key={id} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
-                  {/* ── header: avatar · name/role · actions ── */}
-                  <div className="flex items-start gap-3 p-4">
+                  {/* ── shell header bar: avatar · name/role · actions ── */}
+                  <div className="flex items-start gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/30 p-4">
                     {/* avatar — photo if present, else monogram */}
                     <div className="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)] flex items-center justify-center">
                       {str(c, "photo_url") ? (
@@ -462,7 +462,7 @@ export default function ContactsSection({
 
                   {/* ── channels — clean labeled rows, icon chip + label + value ── */}
                   {chans.length ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-2.5 border-t border-[var(--border-subtle)] px-4 py-3.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-2.5 px-4 py-3.5">
                       {chans.map((ch) => {
                         const pref = str(c, "preferred_channel") === ch.key;
                         const inner = (
