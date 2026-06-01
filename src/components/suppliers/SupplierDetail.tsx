@@ -39,6 +39,8 @@ import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
 import HandCoinsIcon from "@/components/icons/ui/HandCoinsIcon";
 import GaugeIcon from "@/components/icons/ui/GaugeIcon";
 import TrendingUpIcon from "@/components/icons/ui/TrendingUpIcon";
+import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
+import HandshakeIcon from "@/components/icons/ui/HandshakeIcon";
 import {
   STRATEGIC_STATUS_LABELS,
   strategicStatusTone,
@@ -534,7 +536,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
         </div>
 
         {/* ─── KPI strip (Total / Outstanding / Open POs / Products) ─── */}
-        <Sec title={t("sd.kpi", "Key metrics")} icon={<BarChart3Icon className="h-3.5 w-3.5" />}>
+        <Sec tone="blue" title={t("sd.kpi", "Key metrics")} icon={<BarChart3Icon className="h-4 w-4" />}>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
               { label: t("sd.totalPurchases", "Total purchases"), value: money(stats.totalPurchases, currency) },
@@ -552,7 +554,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
 
         {/* ─── Commercial terms (Payment / Currency / MOQ / Lead time / Incoterms) ─── */}
         {terms.length > 0 ? (
-          <Sec title={t("sd.commercialTerms", "Commercial terms")} icon={<HandCoinsIcon className="h-3.5 w-3.5" />}>
+          <Sec tone="emerald" title={t("sd.commercialTerms", "Commercial terms")} icon={<HandCoinsIcon className="h-4 w-4" />}>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-x-6 gap-y-3">
               {terms.map((tm) => (
                 <Field key={tm.label} label={tm.label} value={tm.value} />
@@ -563,7 +565,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
 
         {/* ─── Onboarding readiness ─── */}
         {data.readiness ? (
-          <Sec title={t("sd.supplierReadiness", "Supplier readiness")} icon={<GaugeIcon className="h-3.5 w-3.5" />}>
+          <Sec tone="violet" title={t("sd.supplierReadiness", "Supplier readiness")} icon={<GaugeIcon className="h-4 w-4" />}>
             <div className="flex items-baseline justify-between">
               <span className="text-[11px] uppercase tracking-wider text-[var(--text-faint)]">{t("sd.onboarding", "Onboarding")}</span>
               <span className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">{data.readiness.score}<span className="text-sm font-medium text-[var(--text-faint)]">%</span></span>
@@ -589,7 +591,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
 
         {/* ─── Performance scorecard ─── */}
         {scorecard.hasHistory ? (
-          <Sec title={t("sd.performanceScorecard", "Performance scorecard")} icon={<TrendingUpIcon className="h-3.5 w-3.5" />}>
+          <Sec tone="cyan" title={t("sd.performanceScorecard", "Performance scorecard")} icon={<TrendingUpIcon className="h-4 w-4" />}>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
                 { label: t("sd.onTimeDelivery", "On-time delivery"), value: scorecard.onTimePct === null ? "—" : `${scorecard.onTimePct}%`, meter: scorecard.onTimePct },
@@ -642,7 +644,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
           const banks = Array.isArray(s.bank_accounts) ? (s.bank_accounts as Row[]) : [];
           return (
             <div id="overview" className="scroll-mt-16">
-              <Sec title={t("sd.contact", "Contact")} icon={<PhoneIcon className="h-3.5 w-3.5" />}>
+              <Sec tone="blue" title={t("sd.contact", "Contact")} icon={<PhoneIcon className="h-4 w-4" />}>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                   <Field label={t("cs.mobile", "Mobile")} value={str(s, "supplier_mobile", "mobile")} mono />
                   <Field label={t("sd.phone", "Phone")} value={str(s, "supplier_tel", "phone")} mono />
@@ -653,7 +655,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                 </div>
               </Sec>
 
-              <Sec title={t("sd.companyProfile", "Company profile")} icon={<Building2Icon className="h-3.5 w-3.5" />}>
+              <Sec title={t("sd.companyProfile", "Company profile")} icon={<Building2Icon className="h-4 w-4" />}>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                   <Field label={t("sd.legalName", "Legal name")} value={str(s, "legal_name", "company_name")} span2 />
                   <Field label={t("sd.tradingName", "Trading name")} value={str(s, "trading_name")} />
@@ -665,7 +667,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                 </div>
               </Sec>
 
-              <Sec title={t("sd.identityCompliance", "Identity & compliance")} icon={<IdCardIcon className="h-3.5 w-3.5" />}>
+              <Sec tone="violet" title={t("sd.identityCompliance", "Identity & compliance")} icon={<IdCardIcon className="h-4 w-4" />}>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                   <Field label={t("sd.businessRegNo", "Business reg. no.")} value={str(s, "business_registration_number")} mono />
                   <Field label={t("sd.taxId", "Tax ID / VAT")} value={str(s, "tax_id")} mono />
@@ -679,7 +681,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                 </div>
               </Sec>
 
-              <Sec title={t("sd.logisticsTrade", "Logistics & trade")} icon={<ShipIcon className="h-3.5 w-3.5" />}>
+              <Sec tone="amber" title={t("sd.logisticsTrade", "Logistics & trade")} icon={<ShipIcon className="h-4 w-4" />}>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                   <Field label={t("sd.incoterms", "Incoterms")} value={str(s, "incoterms")} />
                   <Field label={t("sd.portOfEntry", "Port")} value={str(s, "port_of_entry")} />
@@ -691,7 +693,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                 </div>
               </Sec>
 
-              <Sec title={t("sd.messaging", "Messaging")} icon={<MessageSquareIcon className="h-3.5 w-3.5" />}>
+              <Sec tone="cyan" title={t("sd.messaging", "Messaging")} icon={<MessageSquareIcon className="h-4 w-4" />}>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                   <Field label={t("cs.wechatId", "WeChat ID")} value={str(s, "wechat_id")} mono />
                   <Field label={t("sd.wechatOfficial", "WeChat official")} value={str(s, "wechat_official_account")} mono />
@@ -705,7 +707,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                 </div>
               </Sec>
 
-              <Sec title={t("sd.banking", "Banking & payment")} icon={<LandmarkIcon className="h-3.5 w-3.5" />}>
+              <Sec tone="emerald" title={t("sd.banking", "Banking & payment")} icon={<LandmarkIcon className="h-4 w-4" />}>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                   <Field label={t("sd.paymentTerms", "Payment terms")} value={str(s, "payment_terms")} span2 />
                   <Field label={t("sd.preferredMethod", "Method")} value={str(s, "preferred_payment_method")} />
@@ -726,7 +728,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
               </Sec>
 
               <div id="quality" className="scroll-mt-16">
-                <Sec title={t("sd.qualityCertifications", "Quality & certifications")} icon={<FileCheckIcon className="h-3.5 w-3.5" />}>
+                <Sec tone="emerald" title={t("sd.qualityCertifications", "Quality & certifications")} icon={<FileCheckIcon className="h-4 w-4" />}>
                   {certs.length ? (
                     <div className="flex flex-wrap gap-2">
                       {certs.map((c) => (
@@ -746,7 +748,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
               </div>
 
               {str(s, "notes") ? (
-                <Sec title={t("sd.notes", "Notes")} icon={<DocumentIcon className="h-3.5 w-3.5" />}>
+                <Sec title={t("sd.notes", "Notes")} icon={<DocumentIcon className="h-4 w-4" />}>
                   <p className="text-sm leading-relaxed text-[var(--text-secondary)]"><AutoTranslatedText text={str(s, "notes")} /></p>
                 </Sec>
               ) : null}
@@ -766,12 +768,117 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
 
         <GroupLabel>{t("sd.groupCommercial", "Commercial intelligence")}</GroupLabel>
 
-        {/* Risk */}
-        <Section id="risk" noBorder>
+        {/* Risk — summary bars + the full RiskSection underneath */}
+        <Sec tone="rose" title={t("sd.risk", "Risk")} icon={<ShieldCheckIcon className="h-4 w-4" />}>
+          {(() => {
+            const rp = (data.riskProfile ?? {}) as Row;
+            const overall = num(rp, "internal_evaluation_score");
+            const riskScore = data.risk?.score ?? null;
+            const level = str(rp, "risk_level");
+            const trust = str(rp, "trust_level");
+            const dep = str(rp, "dependency_level");
+            const backup = rp.backup_supplier_exists === true;
+            const openItems = data.risk?.openItems ?? (data.riskItems ?? []).filter((r) => r.status !== "resolved").length;
+            const openHigh = data.risk?.openHighRisks ?? 0;
+            const lev: Record<string, number> = { low: 25, medium: 50, high: 75, critical: 95 };
+            const trustLev: Record<string, number> = { low: 25, medium: 50, high: 80, excellent: 95 };
+            const depLev: Record<string, number> = { low: 25, medium: 50, high: 75, critical: 95 };
+            const stability = [
+              { key: "financial_stability", label: t("sd.financialStability", "Financial stability") },
+              { key: "communication_quality", label: t("sd.communicationQuality", "Communication") },
+              { key: "delivery_stability", label: t("sd.deliveryStability", "Delivery") },
+              { key: "quality_stability", label: t("sd.qualityStability", "Quality") },
+              { key: "response_speed", label: t("sd.responseSpeed", "Response speed") },
+            ];
+            return (
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <BarRow label={t("sd.evaluationScore", "Evaluation score")} pct={overall || 0} tone={overall >= 75 ? "emerald" : overall >= 50 ? "amber" : "rose"} valueText={overall ? `${Math.round(overall)}/100` : "—"} />
+                  {riskScore != null ? <BarRow label={t("sd.riskScore", "Risk score")} pct={riskScore || 0} tone={(riskScore || 0) <= 35 ? "emerald" : (riskScore || 0) <= 65 ? "amber" : "rose"} valueText={`${Math.round(riskScore || 0)}/100`} /> : null}
+                  {level ? <BarRow label={t("sd.overallRiskLevel", "Overall risk level")} pct={lev[level] ?? 50} tone={level === "low" ? "emerald" : level === "medium" ? "amber" : "rose"} valueText={level} /> : null}
+                  {trust ? <BarRow label={t("sd.trustLevel", "Trust level")} pct={trustLev[trust] ?? 50} tone={trust === "excellent" || trust === "high" ? "emerald" : trust === "medium" ? "amber" : "rose"} valueText={trust} /> : null}
+                  {dep ? <BarRow label={t("sd.dependencyLevel", "Dependency level")} pct={depLev[dep] ?? 50} tone={dep === "low" ? "emerald" : dep === "medium" ? "amber" : "rose"} valueText={dep} /> : null}
+                </div>
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-2.5">{t("sd.stabilityQuality", "Stability & quality")}</div>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    {stability.map((m) => {
+                      const v = str(rp, m.key);
+                      if (!v) return null;
+                      const pct = ({ poor: 20, weak: 30, fair: 50, medium: 50, good: 70, strong: 80, high: 80, excellent: 95 } as Record<string, number>)[v] ?? 60;
+                      const tone = pct >= 75 ? "emerald" : pct >= 50 ? "amber" : "rose";
+                      return <BarRow key={m.key} label={m.label} pct={pct} tone={tone} valueText={v} />;
+                    })}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                  <Mini label={t("sd.activeRisks", "Active risks")} value={String(openItems)} tone={openItems ? "amber" : "emerald"} />
+                  <Mini label={t("sd.highCritical", "High / critical")} value={String(openHigh)} tone={openHigh ? "rose" : "emerald"} />
+                  <Mini label={t("sd.backupAvailable", "Backup available")} value={backup ? t("sd.yes", "Yes") : t("sd.no", "No")} tone={backup ? "emerald" : "rose"} />
+                  <Mini label={t("sd.assessmentNotes", "Notes")} value={str(rp, "assessment_notes") ? "—" : "—"} tone="default" />
+                </div>
+              </div>
+            );
+          })()}
+        </Sec>
+        <Section id="risk">
           <RiskSection supplierId={id} riskProfile={data.riskProfile ?? null} riskItems={data.riskItems ?? []} risk={data.risk ?? null} onSaved={() => load({ silent: true })} />
         </Section>
 
-        {/* Negotiation */}
+        {/* Negotiation — summary bars + the full NegotiationSection underneath */}
+        <Sec tone="amber" title={t("sd.negotiation", "Negotiation")} icon={<HandshakeIcon className="h-4 w-4" />}>
+          {(() => {
+            const ni = (data.negotiationIntel ?? {}) as Row;
+            const score = num(ni, "negotiation_score");
+            const lev: Record<string, number> = { low: 25, medium: 50, high: 80 };
+            const bars = [
+              { key: "price_flexibility", label: t("sd.priceFlexibility", "Price flexibility") },
+              { key: "moq_flexibility", label: t("sd.moqFlexibility", "MOQ flexibility") },
+              { key: "payment_flexibility", label: t("sd.paymentFlexibility", "Payment flexibility") },
+              { key: "communication_flexibility", label: t("sd.communicationFlexibility", "Communication") },
+              { key: "customization_openness", label: t("sd.customizationOpenness", "Customization") },
+              { key: "exclusivity_openness", label: t("sd.exclusivityOpenness", "Exclusivity") },
+              { key: "leadtime_flexibility", label: t("sd.leadtimeFlexibility", "Lead-time flexibility") },
+            ];
+            const tactics = Array.isArray(ni.preferred_tactics) ? (ni.preferred_tactics as unknown[]).map(String) : [];
+            const leverage = Array.isArray(ni.leverage_points) ? (ni.leverage_points as unknown[]).map(String) : [];
+            return (
+              <div className="space-y-5">
+                <BarRow label={t("sd.negotiationScore", "Negotiation score")} pct={score || 0} tone={score >= 70 ? "emerald" : score >= 40 ? "amber" : "rose"} valueText={score ? `${Math.round(score)}/100` : "—"} big />
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  {bars.map((b) => {
+                    const v = str(ni, b.key);
+                    if (!v) return null;
+                    const pct = lev[v] ?? 50;
+                    return <BarRow key={b.key} label={b.label} pct={pct} tone={pct >= 70 ? "emerald" : pct >= 40 ? "amber" : "rose"} valueText={v} />;
+                  })}
+                </div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <Mini label={t("sd.negotiationDifficulty", "Difficulty")} value={str(ni, "negotiation_difficulty") || "—"} tone="default" />
+                  <Mini label={t("sd.sampleTurnaround", "Sample turnaround")} value={str(ni, "sample_turnaround_speed") || "—"} tone="default" />
+                  <Mini label={t("sd.contractWillingness", "Contract willingness")} value={str(ni, "contract_willingness") || "—"} tone="default" />
+                </div>
+                {(tactics.length || leverage.length) ? (
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    {tactics.length ? (
+                      <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-2">{t("neg.tacticsLabel", "Tactics:")}</div>
+                        <div className="flex flex-wrap gap-1.5">{tactics.map((tg, i) => <span key={i} className="rounded-full bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-700 dark:text-amber-300">{tg}</span>)}</div>
+                      </div>
+                    ) : null}
+                    {leverage.length ? (
+                      <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-2">{t("neg.leverageLabel", "Leverage:")}</div>
+                        <div className="flex flex-wrap gap-1.5">{leverage.map((lg, i) => <span key={i} className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">{lg}</span>)}</div>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+                {str(ni, "ai_summary") ? <p className="text-sm leading-relaxed text-[var(--text-secondary)]"><AutoTranslatedText text={str(ni, "ai_summary")} /></p> : null}
+              </div>
+            );
+          })()}
+        </Sec>
         <Section id="negotiation">
           <NegotiationSection supplierId={id} negotiations={data.negotiations ?? []} negotiationIntel={data.negotiationIntel ?? null} onSaved={() => load({ silent: true })} />
         </Section>
@@ -934,15 +1041,29 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
 /* ─── Each section is its own SHELL — a rounded, bordered card surface that
    sets the section visually apart on the page. Uppercase mini-title + icon
    (Contacts grammar) sits at the top of the shell. */
-const Sec = ({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) => (
-  <div className="mx-4 md:mx-6 my-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 md:px-5 py-4">
-    <div className="flex items-center gap-2 mb-3">
-      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]">{icon}</span>
-      <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{title}</h3>
+const Sec = ({ title, icon, children, tone = "default", action }: { title: string; icon: React.ReactNode; children: React.ReactNode; tone?: "default" | "blue" | "emerald" | "amber" | "rose" | "violet" | "cyan"; action?: React.ReactNode }) => {
+  const toneCls: Record<string, string> = {
+    default: "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]",
+    blue: "bg-blue-500/12 text-blue-600 dark:text-blue-400",
+    emerald: "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400",
+    amber: "bg-amber-500/12 text-amber-700 dark:text-amber-400",
+    rose: "bg-rose-500/12 text-rose-600 dark:text-rose-400",
+    violet: "bg-violet-500/12 text-violet-600 dark:text-violet-400",
+    cyan: "bg-cyan-500/12 text-cyan-600 dark:text-cyan-400",
+  };
+  return (
+    <div className="mx-4 md:mx-6 my-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
+      <header className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/30 px-4 md:px-5 py-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${toneCls[tone]}`}>{icon}</span>
+          <h3 className="text-[13px] font-semibold tracking-tight text-[var(--text-primary)] truncate">{title}</h3>
+        </div>
+        {action ? <div className="shrink-0">{action}</div> : null}
+      </header>
+      <div className="px-4 md:px-5 py-4">{children}</div>
     </div>
-    {children}
-  </div>
-);
+  );
+};
 
 /* A label/value field cell — uppercase tiny label above the value, used inside
    2-column grids (grid-cols-2 gap-x-6 gap-y-3) like the customer detail. */
@@ -952,6 +1073,45 @@ const Field = ({ label, value, span2, mono }: { label: string; value?: string | 
     <div className={span2 ? "col-span-2" : ""}>
       <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{label}</span>
       <p className={`text-sm text-[var(--text-primary)] ${mono ? "font-mono" : ""} break-words`}>{value}</p>
+    </div>
+  );
+};
+
+/* Horizontal percentage bar with label + value text — used in Risk + Negotiation. */
+const BarRow = ({ label, pct, tone = "blue", valueText, big }: { label: string; pct: number; tone?: "blue" | "emerald" | "amber" | "rose" | "violet"; valueText?: string; big?: boolean }) => {
+  const fill: Record<string, string> = {
+    blue: "bg-[var(--accent,#0066FF)]",
+    emerald: "bg-emerald-500",
+    amber: "bg-amber-500",
+    rose: "bg-rose-500",
+    violet: "bg-violet-500",
+  };
+  const clamped = Math.max(0, Math.min(100, Math.round(pct)));
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-3">
+        <span className={`text-[12px] ${big ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}>{label}</span>
+        <span className={`text-[12px] tabular-nums ${big ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-faint)]"} capitalize`}>{valueText ?? `${clamped}%`}</span>
+      </div>
+      <div className={`mt-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface-subtle)] ${big ? "h-2.5" : "h-1.5"}`}>
+        <div className={`h-full rounded-full ${fill[tone]} transition-[width] duration-300`} style={{ width: `${Math.max(2, clamped)}%` }} />
+      </div>
+    </div>
+  );
+};
+
+/* Tiny stat tile used in Risk + Negotiation rows under the bars. */
+const Mini = ({ label, value, tone = "default" }: { label: string; value: string; tone?: "default" | "emerald" | "amber" | "rose" }) => {
+  const cls: Record<string, string> = {
+    default: "text-[var(--text-primary)]",
+    emerald: "text-emerald-600 dark:text-emerald-400",
+    amber: "text-amber-700 dark:text-amber-400",
+    rose: "text-rose-600 dark:text-rose-400",
+  };
+  return (
+    <div className="rounded-xl bg-[var(--bg-surface-subtle)] px-3 py-2.5">
+      <div className={`text-base font-semibold ${cls[tone]} capitalize`}>{value}</div>
+      <div className="text-[10px] font-medium uppercase tracking-wider text-[var(--text-faint)] mt-0.5">{label}</div>
     </div>
   );
 };
