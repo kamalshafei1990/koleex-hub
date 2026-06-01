@@ -1594,5 +1594,16 @@ export const contactsT: Translations = {
   "sd.businessLicense": { en: "Business license", zh: "营业执照", ar: "الترخيص التجاري" },
   "sd.messagingHint": { en: "Individual messenger handles & QR codes are listed under Contact & channels at the top of this page.", zh: "各个即时通讯账号和二维码已列在页面顶部的「联系方式与渠道」中。", ar: "تُدرج معرّفات الرسائل ورموز QR الفردية تحت «الاتصال والقنوات» في أعلى الصفحة." },
   "sd.preferredCommunication": { en: "Preferred channel", zh: "首选沟通渠道", ar: "القناة المفضلة" },
+  "sd.overallRiskRating": { en: "Overall risk rating", zh: "总体风险评级", ar: "تقييم المخاطر الإجمالي" },
+  "sd.overallNegotiationRating": { en: "Overall negotiation rating", zh: "总体谈判评级", ar: "تقييم التفاوض الإجمالي" },
+  "sd.scanQr": { en: "Scan QR to connect", zh: "扫描二维码以连接", ar: "امسح QR للاتصال" },
+  "sd.scanQrToPay": { en: "Scan QR to pay", zh: "扫码付款", ar: "امسح QR للدفع" },
+  "sd.additionalQrs": { en: "Additional QR codes", zh: "其他二维码", ar: "رموز QR إضافية" },
+  "sd.strong": { en: "Strong", zh: "强", ar: "قوي" },
+  "sd.moderate": { en: "Moderate", zh: "中等", ar: "متوسط" },
+  "sd.weak": { en: "Weak", zh: "弱", ar: "ضعيف" },
+  "sd.low": { en: "Low", zh: "低", ar: "منخفض" },
+  "sd.medium": { en: "Medium", zh: "中", ar: "متوسط" },
+  "sd.high": { en: "High", zh: "高", ar: "مرتفع" },
 
 };

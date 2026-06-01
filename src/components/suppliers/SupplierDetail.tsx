@@ -51,6 +51,8 @@ import {
 import Edit3Icon from "@/components/icons/ui/Edit3Icon";
 import BrandGlyph from "@/components/icons/brands/BrandGlyph";
 import TagsIcon from "@/components/icons/ui/TagsIcon";
+import { taxonomyLogoUrl } from "@/components/knowledge/product-coding/taxonomy-logo";
+import { DIVISIONS, CATEGORIES } from "@/components/knowledge/product-coding/data";
 import FactorySection from "./FactorySection";
 import SuppliersHeader from "./SuppliersHeader";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
@@ -398,8 +400,20 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
         {!embedded && <div className="px-4 sm:px-6 pt-6"><SuppliersHeader title={t("sd.suppliers", "Suppliers")} /></div>}
 
       <main className="pb-24">
-        {/* ─── Contacts-style centered header (avatar · name · type · edit/delete) — its own shell ─── */}
-        <div className="mx-4 md:mx-6 mt-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 md:px-6 py-6 md:py-8 text-center">
+        {/* ─── Contacts-style centered header (avatar · name · type) — Edit/Delete in top-right ─── */}
+        <div className="mx-4 md:mx-6 mt-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 md:px-6 py-6 md:py-8 text-center relative">
+          {/* Top-right action buttons (Edit / Delete) */}
+          <div className="absolute top-3 end-3 flex items-center gap-1.5">
+            <button onClick={() => (onEdit ? onEdit() : router.push(`/suppliers?selected=${id}`))} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:bg-[var(--bg-surface-hover)] text-[12px] font-medium transition-colors text-[var(--text-primary)]">
+              <Edit3Icon className="h-3.5 w-3.5" /> {t("sd.edit", "Edit")}
+            </button>
+            {onDelete ? (
+              <button onClick={() => onDelete()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[12px] font-medium transition-colors" aria-label={t("sd.delete", "Delete")}>
+                <TrashIcon className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">{t("sd.delete", "Delete")}</span>
+              </button>
+            ) : null}
+          </div>
           <div className="w-24 h-24 mx-auto mb-4 rounded-2xl bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)] flex items-center justify-center overflow-hidden">
             {str(s, "photo_url", "logo_url") ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -481,33 +495,34 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
           </div>
           {editError ? <div className="mt-2 text-[11px] text-rose-400">{editError}</div> : null}
 
-          {/* Action buttons (Edit / Delete) — Contacts grammar, centered */}
-          <div className="flex items-center justify-center gap-2 mt-5">
-            <button onClick={() => (onEdit ? onEdit() : router.push(`/suppliers?selected=${id}`))} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:bg-[var(--bg-surface-hover)] text-sm transition-colors text-[var(--text-primary)]">
-              <Edit3Icon className="h-3.5 w-3.5" /> {t("sd.edit", "Edit")}
-            </button>
-            {onDelete ? (
-              <button onClick={() => onDelete()} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 text-sm transition-colors">
-                <TrashIcon className="h-3.5 w-3.5" /> {t("sd.delete", "Delete")}
-              </button>
-            ) : null}
-          </div>
-
-          {/* Division & subcategory chips (icons + bold codes) */}
+          {/* Division & subcategory chips — REAL icons pulled from Supabase Storage
+              (same source the Product Data app reads). Each falls back to a
+              generic glyph if a matching SVG hasn't been uploaded yet. */}
           {(() => {
+            const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
             const divName = str(s, "division");
             const catName = str(s, "category");
             const subInd = str(s, "sub_industry");
-            const items: { label: string; icon: React.ReactNode }[] = [];
-            if (divName) items.push({ label: divName, icon: <Building2Icon className="h-3 w-3" /> });
-            if (catName) items.push({ label: catName, icon: <TagsIcon className="h-3 w-3" /> });
-            if (subInd) items.push({ label: subInd, icon: <FileCheckIcon className="h-3 w-3" /> });
+            // Look up canonical slug by exact-name match first; fall back to slugified user input
+            const divObj = DIVISIONS.find((d) => d.name.toLowerCase() === divName.toLowerCase());
+            const catObj = CATEGORIES.find((c) => c.label.toLowerCase() === catName.toLowerCase());
+            const items: { label: string; iconUrl: string | null; fallback: React.ReactNode }[] = [];
+            if (divName) items.push({ label: divName, iconUrl: taxonomyLogoUrl("divisions", divObj?.id ?? slugify(divName)), fallback: <Building2Icon className="h-3.5 w-3.5" /> });
+            if (catName) items.push({ label: catName, iconUrl: taxonomyLogoUrl("categories", catObj?.slug ?? slugify(catName)), fallback: <TagsIcon className="h-3.5 w-3.5" /> });
+            if (subInd) items.push({ label: subInd, iconUrl: taxonomyLogoUrl("subcategories", slugify(subInd)), fallback: <FileCheckIcon className="h-3.5 w-3.5" /> });
             if (!items.length) return null;
             return (
               <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
                 {items.map((it, i) => (
-                  <span key={`${it.label}-${i}`} className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
-                    {it.icon}{it.label}
+                  <span key={`${it.label}-${i}`} className="inline-flex items-center gap-1.5 rounded-full ps-1 pe-2.5 py-0.5 text-[11px] font-medium bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
+                    <span className="flex h-4 w-4 items-center justify-center">
+                      {it.iconUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={it.iconUrl} alt="" className="h-4 w-4 object-contain" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; const sib = e.currentTarget.nextElementSibling as HTMLElement | null; if (sib) sib.style.display = "inline-flex"; }} />
+                      ) : null}
+                      <span style={{ display: it.iconUrl ? "none" : "inline-flex" }} className="text-[var(--text-faint)]">{it.fallback}</span>
+                    </span>
+                    {it.label}
                   </span>
                 ))}
               </div>
@@ -523,50 +538,25 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
           const site = str(s, "supplier_website", "website");
           const addr = [str(s, "address_1", "supplier_address"), str(s, "city"), str(s, "province"), str(s, "country"), str(s, "supplier_postal_code")].filter(Boolean).join(", ");
 
-          type Msg = { id: string; label: string; value: string; brand: string; href?: string };
-          const msgs: Msg[] = [];
-          const wechatId = str(s, "wechat_id");
-          if (wechatId) msgs.push({ id: "wechat", label: "WeChat", value: wechatId, brand: "wechat" });
-          const wechatOfc = str(s, "wechat_official_account");
-          if (wechatOfc) msgs.push({ id: "wechat-official", label: t("sd.wechatOfficial", "WeChat official"), value: wechatOfc, brand: "wechat" });
-          const wa = str(s, "whatsapp_business");
-          if (wa) msgs.push({ id: "wa", label: "WhatsApp", value: wa, brand: "whatsapp", href: `https://wa.me/${wa.replace(/[^0-9]/g, "")}` });
-          const tg = str(s, "telegram_id");
-          if (tg) msgs.push({ id: "tg", label: "Telegram", value: tg, brand: "telegram", href: tg.startsWith("@") ? `https://t.me/${tg.slice(1)}` : undefined });
-          const line = str(s, "line_id");
-          if (line) msgs.push({ id: "line", label: "Line", value: line, brand: "line" });
-          const skype = str(s, "skype_id");
-          if (skype) msgs.push({ id: "skype", label: "Skype", value: skype, brand: "skype", href: `skype:${skype}?chat` });
-          const qq = str(s, "qq_id");
-          if (qq) msgs.push({ id: "qq", label: "QQ", value: qq, brand: "qq" });
-          const dingtalk = str(s, "dingtalk_id");
-          if (dingtalk) msgs.push({ id: "dingtalk", label: "DingTalk", value: dingtalk, brand: "dingtalk" });
-          const messenger = str(s, "messenger_id");
-          if (messenger) msgs.push({ id: "messenger", label: "Messenger", value: messenger, brand: "messenger" });
-
-          // QR thumbnails from the contact row (also wechat-pay / alipay live on the row)
-          const qrs: { key: string; label: string; brand: string; src: string }[] = [];
-          const wechatQr = str(s, "wechat_qr");
-          if (wechatQr) qrs.push({ key: "wechat", label: "WeChat", brand: "wechat", src: wechatQr });
-          const waQr = str(s, "whatsapp_qr");
-          if (waQr) qrs.push({ key: "wa", label: "WhatsApp", brand: "whatsapp", src: waQr });
-          const tgQr = str(s, "telegram_qr");
-          if (tgQr) qrs.push({ key: "tg", label: "Telegram", brand: "telegram", src: tgQr });
-          const lineQr = str(s, "line_qr");
-          if (lineQr) qrs.push({ key: "line", label: "Line", brand: "line", src: lineQr });
-          const qqQr = str(s, "qq_qr");
-          if (qqQr) qrs.push({ key: "qq", label: "QQ", brand: "qq", src: qqQr });
-          const skypeQr = str(s, "skype_qr");
-          if (skypeQr) qrs.push({ key: "skype", label: "Skype", brand: "skype", src: skypeQr });
-          const dingtalkQr = str(s, "dingtalk_qr");
-          if (dingtalkQr) qrs.push({ key: "dingtalk", label: "DingTalk", brand: "dingtalk", src: dingtalkQr });
-          const messengerQr = str(s, "messenger_qr");
-          if (messengerQr) qrs.push({ key: "messenger", label: "Messenger", brand: "messenger", src: messengerQr });
+          // Pair every messaging app with its own ID + QR side-by-side.
+          // A platform appears as a card if EITHER an ID or a QR is present.
+          type Channel = { key: string; label: string; brand: string; value?: string; qr?: string; href?: string };
+          const channels: Channel[] = [
+            { key: "wechat", label: "WeChat", brand: "wechat", value: str(s, "wechat_id"), qr: str(s, "wechat_qr") },
+            { key: "wechat-official", label: t("sd.wechatOfficial", "WeChat official"), brand: "wechat", value: str(s, "wechat_official_account") },
+            ...(str(s, "whatsapp_business") || str(s, "whatsapp_qr") ? [{ key: "wa", label: "WhatsApp", brand: "whatsapp", value: str(s, "whatsapp_business"), qr: str(s, "whatsapp_qr"), href: str(s, "whatsapp_business") ? `https://wa.me/${str(s, "whatsapp_business").replace(/[^0-9]/g, "")}` : undefined } as Channel] : []),
+            ...(str(s, "telegram_id") || str(s, "telegram_qr") ? [{ key: "tg", label: "Telegram", brand: "telegram", value: str(s, "telegram_id"), qr: str(s, "telegram_qr"), href: str(s, "telegram_id").startsWith("@") ? `https://t.me/${str(s, "telegram_id").slice(1)}` : undefined } as Channel] : []),
+            { key: "line", label: "Line", brand: "line", value: str(s, "line_id"), qr: str(s, "line_qr") },
+            { key: "skype", label: "Skype", brand: "skype", value: str(s, "skype_id"), qr: str(s, "skype_qr"), href: str(s, "skype_id") ? `skype:${str(s, "skype_id")}?chat` : undefined },
+            { key: "qq", label: "QQ", brand: "qq", value: str(s, "qq_id"), qr: str(s, "qq_qr") },
+            { key: "dingtalk", label: "DingTalk", brand: "dingtalk", value: str(s, "dingtalk_id"), qr: str(s, "dingtalk_qr") },
+            { key: "messenger", label: "Messenger", brand: "messenger", value: str(s, "messenger_id"), qr: str(s, "messenger_qr") },
+          ].filter((c) => c.value || c.qr);
 
           // Pull QR media for richer gallery
           const mediaQrs = (data.media ?? []).filter((m: Row) => str(m, "media_class") === "qr_code");
 
-          const hasAnything = phone || mobile || email || site || addr || msgs.length || qrs.length || mediaQrs.length;
+          const hasAnything = phone || mobile || email || site || addr || channels.length || mediaQrs.length;
           if (!hasAnything) return null;
           return (
             <Sec tone="blue" title={t("sd.contactChannels", "Contact & channels")} icon={<PhoneIcon className="h-4 w-4" />}>
@@ -618,52 +608,58 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                 ) : null}
               </div>
 
-              {msgs.length > 0 ? (
+              {channels.length > 0 ? (
                 <div className="mt-5 pt-5 border-t border-[var(--border-subtle)]">
                   <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-3 flex items-center gap-1.5">
                     <MessageSquareIcon className="h-3 w-3" />
                     {t("sd.messaging", "Messaging")}
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2.5">
-                    {msgs.map((m) => {
-                      const inner = (
-                        <span className="flex items-center gap-2.5 min-w-0">
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-surface-subtle)]">
-                            <BrandGlyph name={m.brand} size={16} />
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block text-[10.5px] font-medium uppercase tracking-wider text-[var(--text-faint)]">{m.label}</span>
-                            <span className="block truncate text-sm font-mono tabular-nums text-[var(--text-primary)]">{m.value}</span>
-                          </span>
-                        </span>
-                      );
-                      return m.href ? (
-                        <a key={m.id} href={m.href} target={m.href.startsWith("http") ? "_blank" : undefined} rel="noreferrer" className="group hover:text-[var(--accent,#0066FF)]">{inner}</a>
+                  {/* Each platform → its own card; ID and QR live side-by-side */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {channels.map((c) => {
+                      const idBlock = c.value ? (
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-wider text-[var(--text-faint)] mb-0.5">
+                            <BrandGlyph name={c.brand} size={11} />
+                            {c.label}
+                          </div>
+                          {c.href ? (
+                            <a href={c.href} target={c.href.startsWith("http") ? "_blank" : undefined} rel="noreferrer" className="block truncate font-mono tabular-nums text-sm text-[var(--text-primary)] hover:text-[var(--accent,#0066FF)]">{c.value}</a>
+                          ) : (
+                            <div className="truncate font-mono tabular-nums text-sm text-[var(--text-primary)]">{c.value}</div>
+                          )}
+                        </div>
                       ) : (
-                        <div key={m.id}>{inner}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-wider text-[var(--text-faint)] mb-0.5">
+                            <BrandGlyph name={c.brand} size={11} />
+                            {c.label}
+                          </div>
+                          <div className="text-xs text-[var(--text-faint)] italic">{t("sd.scanQr", "Scan QR to connect")}</div>
+                        </div>
+                      );
+                      return (
+                        <div key={c.key} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2.5 flex items-center gap-3">
+                          {idBlock}
+                          {c.qr ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={c.qr} alt={`${c.label} QR`} className="h-16 w-16 shrink-0 object-contain rounded-md bg-white p-0.5" />
+                          ) : null}
+                        </div>
                       );
                     })}
                   </div>
                 </div>
               ) : null}
 
-              {(qrs.length > 0 || mediaQrs.length > 0) ? (
+              {/* Any extra QR images uploaded to supplier_media (e.g. WeCom support, sales-team QR) */}
+              {mediaQrs.length > 0 ? (
                 <div className="mt-5 pt-5 border-t border-[var(--border-subtle)]">
                   <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-3 flex items-center gap-1.5">
                     <PackageIcon className="h-3 w-3" />
-                    {t("sd.qrCodes", "QR codes")}
+                    {t("sd.additionalQrs", "Additional QR codes")}
                   </div>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
-                    {qrs.map((q) => (
-                      <div key={q.key} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-2 flex flex-col items-center">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={q.src} alt={q.label} className="w-full aspect-square object-contain rounded-lg bg-white" />
-                        <div className="mt-1.5 flex items-center gap-1 text-[10.5px] font-medium text-[var(--text-secondary)]">
-                          <BrandGlyph name={q.brand} size={11} />
-                          {q.label}
-                        </div>
-                      </div>
-                    ))}
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     {mediaQrs.map((m: Row, i: number) => {
                       const url = str(m, "file_url", "preview_url");
                       if (!url) return null;
@@ -676,13 +672,16 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                         /alipay/i.test(title + " " + cat) ? "alipay" :
                         /telegram/i.test(title + " " + cat) ? "telegram" : "";
                       return (
-                        <div key={`m-${i}`} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-2 flex flex-col items-center">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={url} alt={title} className="w-full aspect-square object-contain rounded-lg bg-white" />
-                          <div className="mt-1.5 flex items-center gap-1 text-[10.5px] font-medium text-[var(--text-secondary)] truncate w-full justify-center">
-                            {brand ? <BrandGlyph name={brand} size={11} /> : null}
-                            <span className="truncate">{title}</span>
+                        <div key={`m-${i}`} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2.5 flex items-center gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-wider text-[var(--text-faint)] mb-0.5">
+                              {brand ? <BrandGlyph name={brand} size={11} /> : <PackageIcon className="h-3 w-3" />}
+                              <span className="truncate">{title}</span>
+                            </div>
+                            {cat ? <div className="text-[10.5px] text-[var(--text-faint)] truncate">{cat}</div> : null}
                           </div>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={url} alt={title} className="h-16 w-16 shrink-0 object-contain rounded-md bg-white p-0.5" />
                         </div>
                       );
                     })}
@@ -929,31 +928,36 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                         <WalletIcon className="h-3 w-3" />
                         {t("sd.digitalPay", "Digital payment")}
                       </div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {wcPayQr ? (
-                          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-2">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={wcPayQr} alt="WeChat Pay" className="w-full aspect-square object-contain rounded-lg bg-white" />
-                            <div className="mt-1.5 flex items-center gap-1 justify-center text-[10.5px] font-medium text-[var(--text-secondary)]"><BrandGlyph name="wechat" size={11} />WeChat Pay</div>
+                      {/* Each payment method → its own card; ID + QR side-by-side */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {(wcPayId || wcPayQr) ? (
+                          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2.5 flex items-center gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-wider text-[var(--text-faint)] mb-0.5">
+                                <BrandGlyph name="wechat" size={11} />
+                                WeChat Pay
+                              </div>
+                              {wcPayId ? <div className="font-mono text-sm text-[var(--text-primary)] truncate">{wcPayId}</div> : <div className="text-xs text-[var(--text-faint)] italic">{t("sd.scanQrToPay", "Scan QR to pay")}</div>}
+                            </div>
+                            {wcPayQr ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={wcPayQr} alt="WeChat Pay" className="h-16 w-16 shrink-0 object-contain rounded-md bg-white p-0.5" />
+                            ) : null}
                           </div>
                         ) : null}
-                        {aliQr ? (
-                          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-2">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={aliQr} alt="Alipay" className="w-full aspect-square object-contain rounded-lg bg-white" />
-                            <div className="mt-1.5 flex items-center gap-1 justify-center text-[10.5px] font-medium text-[var(--text-secondary)]"><BrandGlyph name="alipay" size={11} />Alipay</div>
-                          </div>
-                        ) : null}
-                        {wcPayId ? (
-                          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3 flex flex-col items-start justify-center gap-1">
-                            <div className="flex items-center gap-1 text-[10.5px] font-medium uppercase tracking-wider text-[var(--text-faint)]"><BrandGlyph name="wechat" size={11} />WeChat Pay ID</div>
-                            <div className="font-mono text-xs text-[var(--text-primary)] truncate w-full">{wcPayId}</div>
-                          </div>
-                        ) : null}
-                        {aliId ? (
-                          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3 flex flex-col items-start justify-center gap-1">
-                            <div className="flex items-center gap-1 text-[10.5px] font-medium uppercase tracking-wider text-[var(--text-faint)]"><BrandGlyph name="alipay" size={11} />Alipay ID</div>
-                            <div className="font-mono text-xs text-[var(--text-primary)] truncate w-full">{aliId}</div>
+                        {(aliId || aliQr) ? (
+                          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2.5 flex items-center gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-wider text-[var(--text-faint)] mb-0.5">
+                                <BrandGlyph name="alipay" size={11} />
+                                Alipay
+                              </div>
+                              {aliId ? <div className="font-mono text-sm text-[var(--text-primary)] truncate">{aliId}</div> : <div className="text-xs text-[var(--text-faint)] italic">{t("sd.scanQrToPay", "Scan QR to pay")}</div>}
+                            </div>
+                            {aliQr ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={aliQr} alt="Alipay" className="h-16 w-16 shrink-0 object-contain rounded-md bg-white p-0.5" />
+                            ) : null}
                           </div>
                         ) : null}
                       </div>
@@ -1003,9 +1007,9 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
 
         <GroupLabel>{t("sd.groupCommercial", "Commercial intelligence")}</GroupLabel>
 
-        {/* Risk — one shell: visual summary on top, full intelligence editor folded in below */}
+        {/* Risk — one shell: hero overall bar + visual summary + intelligence editor */}
         <div id="risk" className="scroll-mt-16">
-        <Sec tone="rose" title={t("sd.riskIntelligence", "Risk intelligence")} icon={<ShieldCheckIcon className="h-4 w-4" />}>
+        <Sec tone="rose" title={t("sd.risk", "Risk")} icon={<ShieldCheckIcon className="h-4 w-4" />}>
           {(() => {
             const rp = (data.riskProfile ?? {}) as Row;
             const overall = num(rp, "internal_evaluation_score");
@@ -1026,8 +1030,33 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
               { key: "quality_stability", label: t("sd.qualityStability", "Quality") },
               { key: "response_speed", label: t("sd.responseSpeed", "Response speed") },
             ];
+            const heroPct = overall || (riskScore != null ? riskScore : 0);
+            const heroTone: "emerald" | "amber" | "rose" = heroPct >= 75 ? "emerald" : heroPct >= 50 ? "amber" : "rose";
+            const heroToneRing = heroTone === "emerald" ? "ring-emerald-500/30 bg-emerald-500/8" : heroTone === "amber" ? "ring-amber-500/30 bg-amber-500/8" : "ring-rose-500/30 bg-rose-500/8";
+            const heroToneText = heroTone === "emerald" ? "text-emerald-600 dark:text-emerald-400" : heroTone === "amber" ? "text-amber-600 dark:text-amber-400" : "text-rose-600 dark:text-rose-400";
+            const heroToneFill = heroTone === "emerald" ? "bg-emerald-500" : heroTone === "amber" ? "bg-amber-500" : "bg-rose-500";
+            const heroLabel = level || (heroPct >= 75 ? t("sd.low", "Low") : heroPct >= 50 ? t("sd.medium", "Medium") : t("sd.high", "High"));
             return (
               <div className="space-y-5">
+                {/* Hero overall risk rating bar */}
+                <div className={`rounded-2xl ring-1 ${heroToneRing} px-4 py-4`}>
+                  <div className="flex items-start justify-between gap-4 mb-3">
+                    <div>
+                      <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--text-faint)] flex items-center gap-1.5">
+                        <ShieldCheckIcon className="h-3 w-3" />
+                        {t("sd.overallRiskRating", "Overall risk rating")}
+                      </div>
+                      <div className={`mt-1 text-[11px] font-medium ${heroToneText} capitalize`}>{heroLabel}</div>
+                    </div>
+                    <div className={`text-3xl font-bold tabular-nums ${heroToneText}`}>
+                      {Math.round(heroPct)}<span className="text-base font-medium text-[var(--text-faint)]">/100</span>
+                    </div>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
+                    <div className={`h-full rounded-full ${heroToneFill}`} style={{ width: `${Math.max(4, Math.min(100, heroPct))}%` }} />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <BarRow label={t("sd.evaluationScore", "Evaluation score")} pct={overall || 0} tone={overall >= 75 ? "emerald" : overall >= 50 ? "amber" : "rose"} valueText={overall ? `${Math.round(overall)}/100` : "—"} />
                   {riskScore != null ? <BarRow label={t("sd.riskScore", "Risk score")} pct={riskScore || 0} tone={(riskScore || 0) <= 35 ? "emerald" : (riskScore || 0) <= 65 ? "amber" : "rose"} valueText={`${Math.round(riskScore || 0)}/100`} /> : null}
@@ -1057,14 +1086,18 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
             );
           })()}
           <div className="mt-5 pt-5 border-t border-[var(--border-subtle)]">
+            <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-3 flex items-center gap-1.5">
+              <ShieldCheckIcon className="h-3 w-3" />
+              {t("sd.riskIntelligence", "Risk Intelligence")}
+            </div>
             <RiskSection supplierId={id} riskProfile={data.riskProfile ?? null} riskItems={data.riskItems ?? []} risk={data.risk ?? null} onSaved={() => load({ silent: true })} />
           </div>
         </Sec>
         </div>
 
-        {/* Negotiation — one shell: visual summary on top, full intelligence editor folded in below */}
+        {/* Negotiation — one shell: hero overall bar + visual summary + intelligence editor */}
         <div id="negotiation" className="scroll-mt-16">
-        <Sec tone="amber" title={t("sd.negotiationIntelligence", "Negotiation intelligence")} icon={<HandshakeIcon className="h-4 w-4" />}>
+        <Sec tone="amber" title={t("sd.negotiation", "Negotiation")} icon={<HandshakeIcon className="h-4 w-4" />}>
           {(() => {
             const ni = (data.negotiationIntel ?? {}) as Row;
             const score = num(ni, "negotiation_score");
@@ -1080,9 +1113,31 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
             ];
             const tactics = Array.isArray(ni.preferred_tactics) ? (ni.preferred_tactics as unknown[]).map(String) : [];
             const leverage = Array.isArray(ni.leverage_points) ? (ni.leverage_points as unknown[]).map(String) : [];
+            const negTone: "emerald" | "amber" | "rose" = score >= 70 ? "emerald" : score >= 40 ? "amber" : "rose";
+            const negToneRing = negTone === "emerald" ? "ring-emerald-500/30 bg-emerald-500/8" : negTone === "amber" ? "ring-amber-500/30 bg-amber-500/8" : "ring-rose-500/30 bg-rose-500/8";
+            const negToneText = negTone === "emerald" ? "text-emerald-600 dark:text-emerald-400" : negTone === "amber" ? "text-amber-600 dark:text-amber-400" : "text-rose-600 dark:text-rose-400";
+            const negToneFill = negTone === "emerald" ? "bg-emerald-500" : negTone === "amber" ? "bg-amber-500" : "bg-rose-500";
+            const negLabel = score >= 70 ? t("sd.strong", "Strong") : score >= 40 ? t("sd.moderate", "Moderate") : t("sd.weak", "Weak");
             return (
               <div className="space-y-5">
-                <BarRow label={t("sd.negotiationScore", "Negotiation score")} pct={score || 0} tone={score >= 70 ? "emerald" : score >= 40 ? "amber" : "rose"} valueText={score ? `${Math.round(score)}/100` : "—"} big />
+                {/* Hero overall negotiation rating bar */}
+                <div className={`rounded-2xl ring-1 ${negToneRing} px-4 py-4`}>
+                  <div className="flex items-start justify-between gap-4 mb-3">
+                    <div>
+                      <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--text-faint)] flex items-center gap-1.5">
+                        <HandshakeIcon className="h-3 w-3" />
+                        {t("sd.overallNegotiationRating", "Overall negotiation rating")}
+                      </div>
+                      <div className={`mt-1 text-[11px] font-medium ${negToneText}`}>{negLabel}</div>
+                    </div>
+                    <div className={`text-3xl font-bold tabular-nums ${negToneText}`}>
+                      {Math.round(score) || 0}<span className="text-base font-medium text-[var(--text-faint)]">/100</span>
+                    </div>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
+                    <div className={`h-full rounded-full ${negToneFill}`} style={{ width: `${Math.max(4, Math.min(100, score || 0))}%` }} />
+                  </div>
+                </div>
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                   {bars.map((b) => {
                     const v = str(ni, b.key);
@@ -1117,6 +1172,10 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
             );
           })()}
           <div className="mt-5 pt-5 border-t border-[var(--border-subtle)]">
+            <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-3 flex items-center gap-1.5">
+              <HandshakeIcon className="h-3 w-3" />
+              {t("sd.negotiationIntelligence", "Negotiation Intelligence")}
+            </div>
             <NegotiationSection supplierId={id} negotiations={data.negotiations ?? []} negotiationIntel={data.negotiationIntel ?? null} onSaved={() => load({ silent: true })} />
           </div>
         </Sec>
