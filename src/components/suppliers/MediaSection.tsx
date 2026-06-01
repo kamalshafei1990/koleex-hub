@@ -344,6 +344,11 @@ export default function MediaSection({
               const isCertCard = m.category === "certification";
               const st = certState(m, t);
               const verified = !!m.verified_at;
+              // The trust/verification badge is only meaningful for items that
+              // carry compliance weight — certifications, anything with an
+              // expiry, or anything actually verified. Plain evidence (factory
+              // photos, catalogs) shouldn't read as "Pending verification".
+              const showStateBadge = isCertCard || !!str(m, "expiry_date") || verified;
               return (
                 <div key={id} className="rounded-2xl bg-[var(--bg-surface-subtle)] p-4 space-y-3">
                   <div className="flex items-start justify-between gap-2">
@@ -375,11 +380,13 @@ export default function MediaSection({
                         </div>
                       </div>
                     </div>
-                    {/* verification / state badge */}
-                    <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${toneCls[st.tone]}`}>
-                      {st.tone === "danger" ? <TriangleWarningIcon className="h-2.5 w-2.5" /> : st.tone === "ok" ? <BadgeCheckIcon className="h-2.5 w-2.5" /> : st.tone === "warn" ? <ClockIcon className="h-2.5 w-2.5" /> : null}
-                      {st.label}
-                    </span>
+                    {/* verification / state badge — only where it carries meaning */}
+                    {showStateBadge ? (
+                      <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${toneCls[st.tone]}`}>
+                        {st.tone === "danger" ? <TriangleWarningIcon className="h-2.5 w-2.5" /> : st.tone === "ok" ? <BadgeCheckIcon className="h-2.5 w-2.5" /> : st.tone === "warn" ? <ClockIcon className="h-2.5 w-2.5" /> : null}
+                        {st.label}
+                      </span>
+                    ) : null}
                   </div>
 
                   {/* certification metadata */}
