@@ -105,14 +105,12 @@ export const contactsT: Translations = {
   /* ═══════════════════════════════════════════════════════════════════════════
      PHONE LABELS
      ═══════════════════════════════════════════════════════════════════════════ */
-  "opt.mobile":           { en: "mobile",                zh: "手机",                 ar: "جوال" },
   "opt.home":             { en: "home",                  zh: "住宅",                 ar: "منزل" },
   "opt.work":             { en: "work",                  zh: "工作",                 ar: "عمل" },
   "opt.main":             { en: "main",                  zh: "主号",                 ar: "رئيسي" },
   "opt.work fax":         { en: "work fax",              zh: "工作传真",              ar: "فاكس عمل" },
   "opt.home fax":         { en: "home fax",              zh: "住宅传真",              ar: "فاكس منزل" },
   "opt.pager":            { en: "pager",                 zh: "寻呼机",               ar: "بيجر" },
-  "opt.other":            { en: "other",                 zh: "其他",                 ar: "أخرى" },
 
   /* ═══════════════════════════════════════════════════════════════════════════
      EMAIL LABELS
@@ -1054,4 +1052,80 @@ export const contactsT: Translations = {
   "pipeline.weighted":          { en: "weighted",                  zh: "加权",                 ar: "مرجّح" },
   "pipeline.won":               { en: "Won",                       zh: "已赢单",                ar: "رابحة" },
   "pipeline.wonLabel":          { en: "Won",                       zh: "已赢单",                ar: "رابحة" },
+
+  /* ── Dropdown option VALUES (rendered via tOpt = t("opt."+value)) ──
+     Supplier types (new), trade-finance terms, contact-person enums, risk-item
+     enums, level scales, response speeds, languages, factory units. ── */
+  "opt.Spare Parts":            { en: "Spare Parts",   zh: "备件",        ar: "قطع الغيار" },
+  "opt.Machinery":              { en: "Machinery",     zh: "机械",        ar: "الآلات" },
+  "opt.Packaging":              { en: "Packaging",     zh: "包装",        ar: "التغليف" },
+  "opt.Textile":                { en: "Textile",       zh: "纺织",        ar: "المنسوجات" },
+  "opt.Chemical":               { en: "Chemical",      zh: "化工",        ar: "الكيماويات" },
+  "opt.Logistics":              { en: "Logistics",     zh: "物流",        ar: "الخدمات اللوجستية" },
+
+  "opt.T/T":                    { en: "T/T",  zh: "电汇 (T/T)",   ar: "تحويل بنكي (T/T)" },
+  "opt.L/C":                    { en: "L/C",  zh: "信用证 (L/C)", ar: "اعتماد مستندي (L/C)" },
+  "opt.D/P":                    { en: "D/P",  zh: "付款交单 (D/P)", ar: "الدفع مقابل المستندات (D/P)" },
+  "opt.D/A":                    { en: "D/A",  zh: "承兑交单 (D/A)", ar: "القبول مقابل المستندات (D/A)" },
+
+  "opt.sales":                  { en: "Sales",        zh: "销售",      ar: "المبيعات" },
+  "opt.boss":                   { en: "Boss",         zh: "老板",      ar: "المدير" },
+  "opt.owner":                  { en: "Owner",        zh: "所有者",     ar: "المالك" },
+  "opt.support":                { en: "Support",      zh: "客服支持",   ar: "الدعم" },
+  "opt.finance":                { en: "Finance",      zh: "财务",      ar: "المالية" },
+  "opt.logistics":              { en: "Logistics",    zh: "物流",      ar: "اللوجستيات" },
+  "opt.qc":                     { en: "QC",           zh: "质检",      ar: "مراقبة الجودة" },
+  "opt.engineering":            { en: "Engineering",  zh: "工程",      ar: "الهندسة" },
+  "opt.management":             { en: "Management",   zh: "管理层",     ar: "الإدارة" },
+  "opt.other":                  { en: "Other",        zh: "其他",      ar: "أخرى" },
+
+  "opt.high":                   { en: "High",         zh: "高",        ar: "مرتفع" },
+  "opt.medium":                 { en: "Medium",       zh: "中",        ar: "متوسط" },
+  "opt.low":                    { en: "Low",          zh: "低",        ar: "منخفض" },
+  "opt.critical":               { en: "Critical",     zh: "严重",      ar: "حرج" },
+  "opt.unknown":                { en: "Unknown",      zh: "未知",      ar: "غير معروف" },
+
+  "opt.wechat":                 { en: "WeChat",       zh: "微信",      ar: "WeChat" },
+  "opt.wecom":                  { en: "WeCom",        zh: "企业微信",   ar: "WeCom" },
+  "opt.whatsapp":               { en: "WhatsApp",     zh: "WhatsApp",  ar: "واتساب" },
+  "opt.telegram":               { en: "Telegram",     zh: "Telegram",  ar: "تيليجرام" },
+  "opt.email":                  { en: "Email",        zh: "邮箱",      ar: "البريد الإلكتروني" },
+  "opt.mobile":                 { en: "Mobile",       zh: "手机",      ar: "الجوال" },
+  "opt.line":                   { en: "LINE",         zh: "LINE",      ar: "LINE" },
+  "opt.skype":                  { en: "Skype",        zh: "Skype",     ar: "Skype" },
+
+  "opt.operational":            { en: "Operational",  zh: "运营",      ar: "تشغيلي" },
+  "opt.financial":              { en: "Financial",    zh: "财务",      ar: "مالي" },
+  "opt.strategic":              { en: "Strategic",    zh: "战略",      ar: "استراتيجي" },
+  "opt.geographic":             { en: "Geographic",   zh: "地理",      ar: "جغرافي" },
+  "opt.relationship":           { en: "Relationship", zh: "关系",      ar: "علاقة" },
+  "opt.open":                   { en: "Open",         zh: "未处理",     ar: "مفتوح" },
+  "opt.mitigating":             { en: "Mitigating",   zh: "处理中",     ar: "قيد المعالجة" },
+  "opt.resolved":               { en: "Resolved",     zh: "已解决",     ar: "تم الحل" },
+
+  "opt.Within 1 hour":          { en: "Within 1 hour",   zh: "1小时内",  ar: "خلال ساعة" },
+  "opt.Within 2 hours":         { en: "Within 2 hours",  zh: "2小时内",  ar: "خلال ساعتين" },
+  "opt.Same day":               { en: "Same day",        zh: "当天",     ar: "نفس اليوم" },
+  "opt.Within 24 hours":        { en: "Within 24 hours", zh: "24小时内", ar: "خلال 24 ساعة" },
+  "opt.Within 48 hours":        { en: "Within 48 hours", zh: "48小时内", ar: "خلال 48 ساعة" },
+  "opt.2–3 days":               { en: "2–3 days",        zh: "2–3天",   ar: "2–3 أيام" },
+  "opt.Slow / varies":          { en: "Slow / varies",   zh: "较慢 / 不定", ar: "بطيء / متغيّر" },
+
+
+  "opt.units / month":          { en: "units / month",       zh: "件 / 月",      ar: "وحدة / شهر" },
+  "opt.pcs / month":            { en: "pcs / month",         zh: "个 / 月",      ar: "قطعة / شهر" },
+  "opt.sets / month":           { en: "sets / month",        zh: "套 / 月",      ar: "طقم / شهر" },
+  "opt.pairs / month":          { en: "pairs / month",       zh: "双 / 月",      ar: "زوج / شهر" },
+  "opt.tons / month":           { en: "tons / month",        zh: "吨 / 月",      ar: "طن / شهر" },
+  "opt.meters / month":         { en: "meters / month",      zh: "米 / 月",      ar: "متر / شهر" },
+  "opt.rolls / month":          { en: "rolls / month",       zh: "卷 / 月",      ar: "لفة / شهر" },
+  "opt.containers / month":     { en: "containers / month",  zh: "集装箱 / 月",   ar: "حاوية / شهر" },
+  "opt.units / year":           { en: "units / year",        zh: "件 / 年",      ar: "وحدة / سنة" },
+  "opt.pcs / year":             { en: "pcs / year",          zh: "个 / 年",      ar: "قطعة / سنة" },
+  "opt.sets / year":            { en: "sets / year",         zh: "套 / 年",      ar: "طقم / سنة" },
+  "opt.pairs / year":           { en: "pairs / year",        zh: "双 / 年",      ar: "زوج / سنة" },
+  "opt.tons / year":            { en: "tons / year",         zh: "吨 / 年",      ar: "طن / سنة" },
+  "opt.meters / year":          { en: "meters / year",       zh: "米 / 年",      ar: "متر / سنة" },
+  "opt.rolls / year":           { en: "rolls / year",        zh: "卷 / 年",      ar: "لفة / سنة" },
+  "opt.containers / year":      { en: "containers / year",   zh: "集装箱 / 年",   ar: "حاوية / سنة" },
 };
