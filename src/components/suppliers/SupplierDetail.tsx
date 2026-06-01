@@ -48,9 +48,9 @@ import {
   CLASSIFICATION_LABELS,
   type StrategicStatus,
 } from "@/lib/suppliers/intelligence";
-import PlusIcon from "@/components/icons/ui/PlusIcon";
-import CrossIcon from "@/components/icons/ui/CrossIcon";
 import Edit3Icon from "@/components/icons/ui/Edit3Icon";
+import BrandGlyph from "@/components/icons/brands/BrandGlyph";
+import TagsIcon from "@/components/icons/ui/TagsIcon";
 import FactorySection from "./FactorySection";
 import SuppliersHeader from "./SuppliersHeader";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
@@ -471,31 +471,13 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
             {data.classifications.slice().sort((a, b) => Number(b.is_primary) - Number(a.is_primary)).map((c, i) => {
               const val = str(c, "classification");
               return (
-                <span key={`${val}-${i}`} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium ${c.is_primary ? "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)] ring-1 ring-[var(--border-subtle)]" : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]"}`}>
+                <span key={`${val}-${i}`} className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium ${c.is_primary ? "bg-[var(--accent,#0066FF)]/15 text-[var(--accent,#0066FF)] ring-1 ring-[var(--accent,#0066FF)]/30" : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]"}`}>
+                  {c.is_primary ? <StarIcon className="h-2.5 w-2.5" /> : <TagsIcon className="h-2.5 w-2.5" />}
                   {classificationLabel(val)}
-                  <button type="button" disabled={busyClass === val} onClick={() => mutateClassification(val, "remove")} className="text-[var(--text-faint)] hover:text-rose-400 disabled:opacity-40" aria-label={t("sd.removeClassification", "Remove classification")}>
-                    <CrossIcon className="h-3 w-3" />
-                  </button>
                 </span>
               );
             })}
-            <div className="relative">
-              <button type="button" onClick={() => setClassOpen((o) => !o)} className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-surface-subtle)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--text-faint)] hover:text-[var(--text-primary)]">
-                <PlusIcon className="h-3 w-3" /> {t("sd.classification", "Classification")}
-              </button>
-              {classOpen ? (
-                <div className="absolute z-10 mt-1 max-h-64 w-56 overflow-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-1.5 shadow-lg text-start">
-                  {(Object.keys(CLASSIFICATION_LABELS) as (keyof typeof CLASSIFICATION_LABELS)[]).filter((k) => !data.classifications.some((c) => str(c, "classification") === k)).map((k) => (
-                    <button key={k} type="button" disabled={busyClass === k} onClick={async () => { await mutateClassification(k, "add"); setClassOpen(false); }} className="block w-full rounded-lg px-2.5 py-1.5 text-left text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] disabled:opacity-50">
-                      {CLASSIFICATION_LABELS[k]}
-                    </button>
-                  ))}
-                  {(Object.keys(CLASSIFICATION_LABELS) as string[]).filter((k) => !data.classifications.some((c) => str(c, "classification") === k)).length === 0 ? (
-                    <div className="px-2.5 py-2 text-[11px] text-[var(--text-faint)]">{t("sd.allClassificationsAdded", "All classifications added")}</div>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
+            {/* Classifications can only be added from the Edit drawer — keep the view read-only here */}
           </div>
           {editError ? <div className="mt-2 text-[11px] text-rose-400">{editError}</div> : null}
 
@@ -511,29 +493,205 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
             ) : null}
           </div>
 
-          {/* Quick actions (Call / Email / Website / WhatsApp) */}
+          {/* Division & subcategory chips (icons + bold codes) */}
           {(() => {
-            const phone = str(s, "supplier_tel", "phone", "supplier_mobile", "mobile");
-            const email = str(s, "supplier_email", "email");
-            const site = str(s, "supplier_website", "website");
-            const wa = str(s, "whatsapp_business");
-            const actions: { key: string; label: string; icon: React.ReactNode; href: string; ext?: boolean; green?: boolean }[] = [];
-            if (phone) actions.push({ key: "call", label: t("sd.call", "Call"), icon: <PhoneIcon className="h-4 w-4" />, href: `tel:${phone}` });
-            if (email) actions.push({ key: "email", label: t("sd.email", "Email"), icon: <EnvelopeIcon className="h-4 w-4" />, href: `mailto:${email}` });
-            if (site) actions.push({ key: "web", label: t("sd.website", "Website"), icon: <GlobeIcon className="h-4 w-4" />, href: site.startsWith("http") ? site : `https://${site}`, ext: true });
-            if (wa) actions.push({ key: "wa", label: "WhatsApp", icon: <MessageSquareIcon className="h-4 w-4" />, href: `https://wa.me/${wa.replace(/[^0-9]/g, "")}`, ext: true, green: true });
-            if (!actions.length) return null;
+            const divName = str(s, "division");
+            const catName = str(s, "category");
+            const subInd = str(s, "sub_industry");
+            const items: { label: string; icon: React.ReactNode }[] = [];
+            if (divName) items.push({ label: divName, icon: <Building2Icon className="h-3 w-3" /> });
+            if (catName) items.push({ label: catName, icon: <TagsIcon className="h-3 w-3" /> });
+            if (subInd) items.push({ label: subInd, icon: <FileCheckIcon className="h-3 w-3" /> });
+            if (!items.length) return null;
             return (
-              <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-                {actions.map((a) => (
-                  <a key={a.key} href={a.href} {...(a.ext ? { target: "_blank", rel: "noreferrer" } : {})} className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm transition-colors ${a.green ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/15" : "bg-[var(--accent,#0066FF)]/10 text-[var(--accent,#0066FF)] hover:bg-[var(--accent,#0066FF)]/15"}`}>
-                    {a.icon} {a.label}
-                  </a>
+              <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
+                {items.map((it, i) => (
+                  <span key={`${it.label}-${i}`} className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
+                    {it.icon}{it.label}
+                  </span>
                 ))}
               </div>
             );
           })()}
         </div>
+
+        {/* ─── Contact channels (Part B of hero) — calls, messaging, QR codes in one shell ─── */}
+        {(() => {
+          const phone = str(s, "supplier_tel", "phone");
+          const mobile = str(s, "supplier_mobile", "mobile");
+          const email = str(s, "supplier_email", "email");
+          const site = str(s, "supplier_website", "website");
+          const addr = [str(s, "address_1", "supplier_address"), str(s, "city"), str(s, "province"), str(s, "country"), str(s, "supplier_postal_code")].filter(Boolean).join(", ");
+
+          type Msg = { id: string; label: string; value: string; brand: string; href?: string };
+          const msgs: Msg[] = [];
+          const wechatId = str(s, "wechat_id");
+          if (wechatId) msgs.push({ id: "wechat", label: "WeChat", value: wechatId, brand: "wechat" });
+          const wechatOfc = str(s, "wechat_official_account");
+          if (wechatOfc) msgs.push({ id: "wechat-official", label: t("sd.wechatOfficial", "WeChat official"), value: wechatOfc, brand: "wechat" });
+          const wa = str(s, "whatsapp_business");
+          if (wa) msgs.push({ id: "wa", label: "WhatsApp", value: wa, brand: "whatsapp", href: `https://wa.me/${wa.replace(/[^0-9]/g, "")}` });
+          const tg = str(s, "telegram_id");
+          if (tg) msgs.push({ id: "tg", label: "Telegram", value: tg, brand: "telegram", href: tg.startsWith("@") ? `https://t.me/${tg.slice(1)}` : undefined });
+          const line = str(s, "line_id");
+          if (line) msgs.push({ id: "line", label: "Line", value: line, brand: "line" });
+          const skype = str(s, "skype_id");
+          if (skype) msgs.push({ id: "skype", label: "Skype", value: skype, brand: "skype", href: `skype:${skype}?chat` });
+          const qq = str(s, "qq_id");
+          if (qq) msgs.push({ id: "qq", label: "QQ", value: qq, brand: "qq" });
+          const dingtalk = str(s, "dingtalk_id");
+          if (dingtalk) msgs.push({ id: "dingtalk", label: "DingTalk", value: dingtalk, brand: "dingtalk" });
+          const messenger = str(s, "messenger_id");
+          if (messenger) msgs.push({ id: "messenger", label: "Messenger", value: messenger, brand: "messenger" });
+
+          // QR thumbnails from the contact row (also wechat-pay / alipay live on the row)
+          const qrs: { key: string; label: string; brand: string; src: string }[] = [];
+          const wechatQr = str(s, "wechat_qr");
+          if (wechatQr) qrs.push({ key: "wechat", label: "WeChat", brand: "wechat", src: wechatQr });
+          const waQr = str(s, "whatsapp_qr");
+          if (waQr) qrs.push({ key: "wa", label: "WhatsApp", brand: "whatsapp", src: waQr });
+          const tgQr = str(s, "telegram_qr");
+          if (tgQr) qrs.push({ key: "tg", label: "Telegram", brand: "telegram", src: tgQr });
+          const lineQr = str(s, "line_qr");
+          if (lineQr) qrs.push({ key: "line", label: "Line", brand: "line", src: lineQr });
+          const qqQr = str(s, "qq_qr");
+          if (qqQr) qrs.push({ key: "qq", label: "QQ", brand: "qq", src: qqQr });
+          const skypeQr = str(s, "skype_qr");
+          if (skypeQr) qrs.push({ key: "skype", label: "Skype", brand: "skype", src: skypeQr });
+          const dingtalkQr = str(s, "dingtalk_qr");
+          if (dingtalkQr) qrs.push({ key: "dingtalk", label: "DingTalk", brand: "dingtalk", src: dingtalkQr });
+          const messengerQr = str(s, "messenger_qr");
+          if (messengerQr) qrs.push({ key: "messenger", label: "Messenger", brand: "messenger", src: messengerQr });
+
+          // Pull QR media for richer gallery
+          const mediaQrs = (data.media ?? []).filter((m: Row) => str(m, "media_class") === "qr_code");
+
+          const hasAnything = phone || mobile || email || site || addr || msgs.length || qrs.length || mediaQrs.length;
+          if (!hasAnything) return null;
+          return (
+            <Sec tone="blue" title={t("sd.contactChannels", "Contact & channels")} icon={<PhoneIcon className="h-4 w-4" />}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+                {mobile ? (
+                  <a href={`tel:${mobile}`} className="flex items-center gap-2.5 group">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] group-hover:text-[var(--accent,#0066FF)] transition-colors"><PhoneIcon className="h-4 w-4" /></span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[10.5px] font-medium uppercase tracking-wider text-[var(--text-faint)]">{t("cs.mobile", "Mobile")}</span>
+                      <span className="block truncate text-sm font-mono tabular-nums text-[var(--text-primary)] group-hover:text-[var(--accent,#0066FF)]">{mobile}</span>
+                    </span>
+                  </a>
+                ) : null}
+                {phone ? (
+                  <a href={`tel:${phone}`} className="flex items-center gap-2.5 group">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] group-hover:text-[var(--accent,#0066FF)] transition-colors"><PhoneIcon className="h-4 w-4" /></span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[10.5px] font-medium uppercase tracking-wider text-[var(--text-faint)]">{t("sd.phone", "Phone")}</span>
+                      <span className="block truncate text-sm font-mono tabular-nums text-[var(--text-primary)] group-hover:text-[var(--accent,#0066FF)]">{phone}</span>
+                    </span>
+                  </a>
+                ) : null}
+                {email ? (
+                  <a href={`mailto:${email}`} className="flex items-center gap-2.5 group md:col-span-2">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] group-hover:text-[var(--accent,#0066FF)] transition-colors"><EnvelopeIcon className="h-4 w-4" /></span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[10.5px] font-medium uppercase tracking-wider text-[var(--text-faint)]">{t("cs.email", "Email")}</span>
+                      <span className="block truncate text-sm text-[var(--text-primary)] group-hover:text-[var(--accent,#0066FF)]">{email}</span>
+                    </span>
+                  </a>
+                ) : null}
+                {site ? (
+                  <a href={site.startsWith("http") ? site : `https://${site}`} target="_blank" rel="noreferrer" className="flex items-center gap-2.5 group md:col-span-2">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] group-hover:text-[var(--accent,#0066FF)] transition-colors"><GlobeIcon className="h-4 w-4" /></span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[10.5px] font-medium uppercase tracking-wider text-[var(--text-faint)]">{t("sd.website", "Website")}</span>
+                      <span className="block truncate text-sm text-[var(--text-primary)] group-hover:text-[var(--accent,#0066FF)]">{site}</span>
+                    </span>
+                  </a>
+                ) : null}
+                {addr ? (
+                  <div className="flex items-start gap-2.5 md:col-span-2">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]"><MapPinIcon className="h-4 w-4" /></span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[10.5px] font-medium uppercase tracking-wider text-[var(--text-faint)]">{t("sd.address", "Address")}</span>
+                      <span className="block text-sm text-[var(--text-primary)] leading-snug">{addr}</span>
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+
+              {msgs.length > 0 ? (
+                <div className="mt-5 pt-5 border-t border-[var(--border-subtle)]">
+                  <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-3 flex items-center gap-1.5">
+                    <MessageSquareIcon className="h-3 w-3" />
+                    {t("sd.messaging", "Messaging")}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2.5">
+                    {msgs.map((m) => {
+                      const inner = (
+                        <span className="flex items-center gap-2.5 min-w-0">
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-surface-subtle)]">
+                            <BrandGlyph name={m.brand} size={16} />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[10.5px] font-medium uppercase tracking-wider text-[var(--text-faint)]">{m.label}</span>
+                            <span className="block truncate text-sm font-mono tabular-nums text-[var(--text-primary)]">{m.value}</span>
+                          </span>
+                        </span>
+                      );
+                      return m.href ? (
+                        <a key={m.id} href={m.href} target={m.href.startsWith("http") ? "_blank" : undefined} rel="noreferrer" className="group hover:text-[var(--accent,#0066FF)]">{inner}</a>
+                      ) : (
+                        <div key={m.id}>{inner}</div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              {(qrs.length > 0 || mediaQrs.length > 0) ? (
+                <div className="mt-5 pt-5 border-t border-[var(--border-subtle)]">
+                  <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-3 flex items-center gap-1.5">
+                    <PackageIcon className="h-3 w-3" />
+                    {t("sd.qrCodes", "QR codes")}
+                  </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                    {qrs.map((q) => (
+                      <div key={q.key} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-2 flex flex-col items-center">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={q.src} alt={q.label} className="w-full aspect-square object-contain rounded-lg bg-white" />
+                        <div className="mt-1.5 flex items-center gap-1 text-[10.5px] font-medium text-[var(--text-secondary)]">
+                          <BrandGlyph name={q.brand} size={11} />
+                          {q.label}
+                        </div>
+                      </div>
+                    ))}
+                    {mediaQrs.map((m: Row, i: number) => {
+                      const url = str(m, "file_url", "preview_url");
+                      if (!url) return null;
+                      const title = str(m, "title") || "QR";
+                      const cat = str(m, "category");
+                      const brand =
+                        /wechat/i.test(title + " " + cat) ? "wechat" :
+                        /whatsapp/i.test(title + " " + cat) ? "whatsapp" :
+                        /wecom/i.test(title + " " + cat) ? "wechat" :
+                        /alipay/i.test(title + " " + cat) ? "alipay" :
+                        /telegram/i.test(title + " " + cat) ? "telegram" : "";
+                      return (
+                        <div key={`m-${i}`} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-2 flex flex-col items-center">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={url} alt={title} className="w-full aspect-square object-contain rounded-lg bg-white" />
+                          <div className="mt-1.5 flex items-center gap-1 text-[10.5px] font-medium text-[var(--text-secondary)] truncate w-full justify-center">
+                            {brand ? <BrandGlyph name={brand} size={11} /> : null}
+                            <span className="truncate">{title}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+            </Sec>
+          );
+        })()}
 
         {/* ─── KPI strip (Total / Outstanding / Open POs / Products) ─── */}
         <Sec tone="blue" title={t("sd.kpi", "Key metrics")} icon={<BarChart3Icon className="h-4 w-4" />}>
@@ -665,19 +823,51 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                   <Field label={t("sd.annualRevenue", "Annual revenue")} value={str(s, "annual_revenue_range")} />
                   <Field label={t("sd.industry", "Industry")} value={[str(s, "industry"), str(s, "sub_industry")].filter(Boolean).join(" · ")} />
                 </div>
+                {(() => {
+                  const brands = Array.isArray(s.brand_names) ? (s.brand_names as unknown[]).map(String).filter(Boolean) : [];
+                  if (!brands.length) return null;
+                  return (
+                    <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]">
+                      <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-2 flex items-center gap-1.5">
+                        <TagsIcon className="h-3 w-3" />
+                        {t("sd.brands", "Brands")}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {brands.map((b, i) => (
+                          <span key={`${b}-${i}`} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-secondary)]">
+                            <Building2Icon className="h-3 w-3 text-[var(--text-faint)]" />
+                            {b}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
               </Sec>
 
               <Sec tone="violet" title={t("sd.identityCompliance", "Identity & compliance")} icon={<IdCardIcon className="h-4 w-4" />}>
-                <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                  <Field label={t("sd.businessRegNo", "Business reg. no.")} value={str(s, "business_registration_number")} mono />
-                  <Field label={t("sd.taxId", "Tax ID / VAT")} value={str(s, "tax_id")} mono />
-                  <Field label={t("sd.usci", "USCI / CR")} value={str(s, "cr_number")} mono />
-                  <Field label={t("sd.eori", "EORI")} value={str(s, "eori_number")} mono />
-                  <Field label={t("sd.duns", "DUNS")} value={str(s, "duns_number")} mono />
-                  <Field label={t("sd.ieCode", "Import/Export code")} value={str(s, "importer_exporter_code")} mono />
-                  <Field label={t("sd.customsCode", "Customs code")} value={str(s, "customs_code")} mono />
-                  <Field label={t("sd.kyc", "KYC")} value={str(s, "kyc_status")} />
-                  <Field label={t("sd.sanctions", "Sanctions check")} value={str(s, "sanctions_check_status")} />
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_180px] gap-5">
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                    <Field label={t("sd.businessRegNo", "Business reg. no.")} value={str(s, "business_registration_number")} mono />
+                    <Field label={t("sd.taxId", "Tax ID / VAT")} value={str(s, "tax_id")} mono />
+                    <Field label={t("sd.usci", "USCI / CR")} value={str(s, "cr_number")} mono />
+                    <Field label={t("sd.eori", "EORI")} value={str(s, "eori_number")} mono />
+                    <Field label={t("sd.duns", "DUNS")} value={str(s, "duns_number")} mono />
+                    <Field label={t("sd.ieCode", "Import/Export code")} value={str(s, "importer_exporter_code")} mono />
+                    <Field label={t("sd.customsCode", "Customs code")} value={str(s, "customs_code")} mono />
+                    <Field label={t("sd.kyc", "KYC")} value={str(s, "kyc_status")} />
+                    <Field label={t("sd.sanctions", "Sanctions check")} value={str(s, "sanctions_check_status")} />
+                  </div>
+                  {str(s, "business_license_image") ? (
+                    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-2 self-start">
+                      <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-2 px-1 flex items-center gap-1.5">
+                        <FileCheckIcon className="h-3 w-3" />
+                        {t("sd.businessLicense", "Business license")}
+                      </div>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={str(s, "business_license_image")} alt={t("sd.businessLicense", "Business license")} className="w-full aspect-[4/3] object-contain rounded-lg bg-white" />
+                    </div>
+                  ) : null}
                 </div>
               </Sec>
 
@@ -693,18 +883,17 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                 </div>
               </Sec>
 
-              <Sec tone="cyan" title={t("sd.messaging", "Messaging")} icon={<MessageSquareIcon className="h-4 w-4" />}>
+              <Sec tone="cyan" title={t("sd.messaging", "Messaging support & groups")} icon={<MessageSquareIcon className="h-4 w-4" />}>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                  <Field label={t("cs.wechatId", "WeChat ID")} value={str(s, "wechat_id")} mono />
-                  <Field label={t("sd.wechatOfficial", "WeChat official")} value={str(s, "wechat_official_account")} mono />
                   <Field label={t("sd.wechatGroup", "WeChat sales group")} value={yn("wechat_sales_group_available")} />
                   <Field label={t("sd.wecomSupport", "WeCom support")} value={yn("wecom_support_available")} />
-                  <Field label="WhatsApp" value={str(s, "whatsapp_business")} mono />
-                  <Field label="Telegram" value={str(s, "telegram_id")} mono />
-                  <Field label="Line" value={str(s, "line_id")} mono />
-                  <Field label="Skype" value={str(s, "skype_id")} mono />
-                  <Field label="QQ" value={str(s, "qq_id")} mono />
+                  <Field label={t("sd.preferredCommunication", "Preferred channel")} value={str(s, "communication_preference")} />
+                  <Field label={t("cs.preferredLanguage", "Preferred language")} value={str(s, "language")} />
                 </div>
+                <p className="mt-3 text-[10.5px] text-[var(--text-faint)] italic flex items-center gap-1.5">
+                  <MessageSquareIcon className="h-3 w-3" />
+                  {t("sd.messagingHint", "Individual messenger handles & QR codes are listed under Contact & channels at the top of this page.")}
+                </p>
               </Sec>
 
               <Sec tone="emerald" title={t("sd.banking", "Banking & payment")} icon={<LandmarkIcon className="h-4 w-4" />}>
@@ -717,14 +906,60 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                   <div className="mt-3 space-y-2">
                     {banks.map((b, i) => (
                       <div key={i} className="rounded-lg bg-[var(--bg-surface-subtle)] px-3 py-2.5 text-sm">
-                        <div className="font-medium text-[var(--text-primary)]">{str(b, "bank")}</div>
-                        <div className="mt-0.5 text-xs text-[var(--text-faint)]">{[str(b, "account_name"), str(b, "account_no"), str(b, "swift")].filter(Boolean).join(" · ")}</div>
+                        <div className="flex items-center gap-2">
+                          <LandmarkIcon className="h-3.5 w-3.5 text-[var(--text-faint)]" />
+                          <span className="font-medium text-[var(--text-primary)]">{str(b, "bank")}</span>
+                        </div>
+                        <div className="mt-0.5 text-xs text-[var(--text-faint)] font-mono tabular-nums">{[str(b, "account_name"), str(b, "account_no"), str(b, "swift")].filter(Boolean).join(" · ")}</div>
                       </div>
                     ))}
                   </div>
                 ) : str(s, "payment_info") ? (
                   <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">{str(s, "payment_info")}</p>
                 ) : null}
+                {(() => {
+                  const wcPayQr = str(s, "wechat_pay_qr");
+                  const aliQr = str(s, "alipay_qr");
+                  const wcPayId = str(s, "wechat_pay_id");
+                  const aliId = str(s, "alipay_id");
+                  if (!wcPayQr && !aliQr && !wcPayId && !aliId) return null;
+                  return (
+                    <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]">
+                      <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-3 flex items-center gap-1.5">
+                        <WalletIcon className="h-3 w-3" />
+                        {t("sd.digitalPay", "Digital payment")}
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {wcPayQr ? (
+                          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-2">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={wcPayQr} alt="WeChat Pay" className="w-full aspect-square object-contain rounded-lg bg-white" />
+                            <div className="mt-1.5 flex items-center gap-1 justify-center text-[10.5px] font-medium text-[var(--text-secondary)]"><BrandGlyph name="wechat" size={11} />WeChat Pay</div>
+                          </div>
+                        ) : null}
+                        {aliQr ? (
+                          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-2">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={aliQr} alt="Alipay" className="w-full aspect-square object-contain rounded-lg bg-white" />
+                            <div className="mt-1.5 flex items-center gap-1 justify-center text-[10.5px] font-medium text-[var(--text-secondary)]"><BrandGlyph name="alipay" size={11} />Alipay</div>
+                          </div>
+                        ) : null}
+                        {wcPayId ? (
+                          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3 flex flex-col items-start justify-center gap-1">
+                            <div className="flex items-center gap-1 text-[10.5px] font-medium uppercase tracking-wider text-[var(--text-faint)]"><BrandGlyph name="wechat" size={11} />WeChat Pay ID</div>
+                            <div className="font-mono text-xs text-[var(--text-primary)] truncate w-full">{wcPayId}</div>
+                          </div>
+                        ) : null}
+                        {aliId ? (
+                          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3 flex flex-col items-start justify-center gap-1">
+                            <div className="flex items-center gap-1 text-[10.5px] font-medium uppercase tracking-wider text-[var(--text-faint)]"><BrandGlyph name="alipay" size={11} />Alipay ID</div>
+                            <div className="font-mono text-xs text-[var(--text-primary)] truncate w-full">{aliId}</div>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })()}
               </Sec>
 
               <div id="quality" className="scroll-mt-16">
@@ -768,8 +1003,9 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
 
         <GroupLabel>{t("sd.groupCommercial", "Commercial intelligence")}</GroupLabel>
 
-        {/* Risk — summary bars + the full RiskSection underneath */}
-        <Sec tone="rose" title={t("sd.risk", "Risk")} icon={<ShieldCheckIcon className="h-4 w-4" />}>
+        {/* Risk — one shell: visual summary on top, full intelligence editor folded in below */}
+        <div id="risk" className="scroll-mt-16">
+        <Sec tone="rose" title={t("sd.riskIntelligence", "Risk intelligence")} icon={<ShieldCheckIcon className="h-4 w-4" />}>
           {(() => {
             const rp = (data.riskProfile ?? {}) as Row;
             const overall = num(rp, "internal_evaluation_score");
@@ -820,13 +1056,15 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
               </div>
             );
           })()}
+          <div className="mt-5 pt-5 border-t border-[var(--border-subtle)]">
+            <RiskSection supplierId={id} riskProfile={data.riskProfile ?? null} riskItems={data.riskItems ?? []} risk={data.risk ?? null} onSaved={() => load({ silent: true })} />
+          </div>
         </Sec>
-        <Section id="risk">
-          <RiskSection supplierId={id} riskProfile={data.riskProfile ?? null} riskItems={data.riskItems ?? []} risk={data.risk ?? null} onSaved={() => load({ silent: true })} />
-        </Section>
+        </div>
 
-        {/* Negotiation — summary bars + the full NegotiationSection underneath */}
-        <Sec tone="amber" title={t("sd.negotiation", "Negotiation")} icon={<HandshakeIcon className="h-4 w-4" />}>
+        {/* Negotiation — one shell: visual summary on top, full intelligence editor folded in below */}
+        <div id="negotiation" className="scroll-mt-16">
+        <Sec tone="amber" title={t("sd.negotiationIntelligence", "Negotiation intelligence")} icon={<HandshakeIcon className="h-4 w-4" />}>
           {(() => {
             const ni = (data.negotiationIntel ?? {}) as Row;
             const score = num(ni, "negotiation_score");
@@ -878,10 +1116,11 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
               </div>
             );
           })()}
+          <div className="mt-5 pt-5 border-t border-[var(--border-subtle)]">
+            <NegotiationSection supplierId={id} negotiations={data.negotiations ?? []} negotiationIntel={data.negotiationIntel ?? null} onSaved={() => load({ silent: true })} />
+          </div>
         </Sec>
-        <Section id="negotiation">
-          <NegotiationSection supplierId={id} negotiations={data.negotiations ?? []} negotiationIntel={data.negotiationIntel ?? null} onSaved={() => load({ silent: true })} />
-        </Section>
+        </div>
 
         {/* Sourcing */}
         <Section id="sourcing">

@@ -1585,5 +1585,14 @@ export const contactsT: Translations = {
   "sd.wecomSupport": { en: "WeCom support", zh: "企业微信支持", ar: "دعم WeCom" },
   "sd.banking": { en: "Banking & payment", zh: "银行与付款", ar: "المصرفية والدفع" },
   "sd.preferredMethod": { en: "Method", zh: "付款方式", ar: "الطريقة" },
+  "sd.contactChannels": { en: "Contact & channels", zh: "联系方式与渠道", ar: "الاتصال والقنوات" },
+  "sd.qrCodes": { en: "QR codes", zh: "二维码", ar: "رموز QR" },
+  "sd.brands": { en: "Brands", zh: "品牌", ar: "العلامات التجارية" },
+  "sd.digitalPay": { en: "Digital payment", zh: "数字支付", ar: "الدفع الرقمي" },
+  "sd.riskIntelligence": { en: "Risk intelligence", zh: "风险情报", ar: "ذكاء المخاطر" },
+  "sd.negotiationIntelligence": { en: "Negotiation intelligence", zh: "谈判情报", ar: "ذكاء التفاوض" },
+  "sd.businessLicense": { en: "Business license", zh: "营业执照", ar: "الترخيص التجاري" },
+  "sd.messagingHint": { en: "Individual messenger handles & QR codes are listed under Contact & channels at the top of this page.", zh: "各个即时通讯账号和二维码已列在页面顶部的「联系方式与渠道」中。", ar: "تُدرج معرّفات الرسائل ورموز QR الفردية تحت «الاتصال والقنوات» في أعلى الصفحة." },
+  "sd.preferredCommunication": { en: "Preferred channel", zh: "首选沟通渠道", ar: "القناة المفضلة" },
 
 };
