@@ -15,6 +15,8 @@
    --------------------------------------------------------------------------- */
 
 import { useMemo, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { contactsT } from "@/lib/translations/contacts";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import {
   TIMELINE_CATEGORY_LABELS, TIMELINE_CATEGORY_ORDER, timelineCategoryLabel,
@@ -41,9 +43,13 @@ const str = (r: Row, k: string): string => {
 };
 
 const VISIBILITY_TIERS = ["public", "internal", "procurement", "finance", "management"] as const;
-const VISIBILITY_LABELS: Record<string, string> = {
+const VISIBILITY_FALLBACK: Record<string, string> = {
   public: "Public", internal: "Internal", procurement: "Procurement",
   finance: "Finance only", management: "Management only",
+};
+const VISIBILITY_KEY: Record<string, string> = {
+  public: "ts.visPublic", internal: "ts.visInternal", procurement: "ts.visProcurement",
+  finance: "ts.visFinance", management: "ts.visManagement",
 };
 
 const CATEGORY_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -55,30 +61,38 @@ const CATEGORY_ICON: Record<string, React.ComponentType<{ className?: string }>>
   system: GaugeIcon,
 };
 
-function relativeTime(iso: string): string {
-  const t = new Date(iso).getTime();
-  if (!Number.isFinite(t)) return "";
-  const s = Math.round((Date.now() - t) / 1000);
-  if (s < 60) return "just now";
+type TFn = (key: string, fallback?: string) => string;
+
+function relativeTime(iso: string, t: TFn): string {
+  const ms = new Date(iso).getTime();
+  if (!Number.isFinite(ms)) return "";
+  const s = Math.round((Date.now() - ms) / 1000);
+  if (s < 60) return t("ts.justNow", "just now");
   const m = Math.round(s / 60);
-  if (m < 60) return `${m}m ago`;
+  if (m < 60) return t("ts.minutesAgo", "{m}m ago").replace("{m}", String(m));
   const h = Math.round(m / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return t("ts.hoursAgo", "{h}h ago").replace("{h}", String(h));
   const d = Math.round(h / 24);
-  if (d < 30) return `${d}d ago`;
+  if (d < 30) return t("ts.daysAgoShort", "{d}d ago").replace("{d}", String(d));
   const mo = Math.round(d / 30);
-  if (mo < 12) return `${mo}mo ago`;
-  return `${Math.round(mo / 12)}y ago`;
+  if (mo < 12) return t("ts.monthsAgo", "{mo}mo ago").replace("{mo}", String(mo));
+  return t("ts.yearsAgo", "{y}y ago").replace("{y}", String(Math.round(mo / 12)));
 }
-function dayBucket(iso: string): string {
+function dayBucket(iso: string, t: TFn): string {
   const d = new Date(iso); const now = new Date();
   const dd = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const nn = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const diff = Math.round((nn.getTime() - dd.getTime()) / 86400000);
-  if (diff === 0) return "Today";
-  if (diff === 1) return "Yesterday";
-  if (diff < 7) return `${diff} days ago`;
+  if (diff === 0) return t("ts.today", "Today");
+  if (diff === 1) return t("ts.yesterday", "Yesterday");
+  if (diff < 7) return t("ts.daysAgo", "{n} days ago").replace("{n}", String(diff));
   return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+function visibilityLabel(tier: string, t: TFn): string {
+  const key = VISIBILITY_KEY[tier];
+  const fallback = VISIBILITY_FALLBACK[tier];
+  if (key && fallback) return t(key, fallback);
+  return t("ts.visInternal", "Internal");
 }
 
 const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
@@ -104,6 +118,7 @@ export default function TimelineSection({
   timeline: Row[];
   onSaved: () => void | Promise<void>;
 }) {
+  const { t } = useTranslation(contactsT);
   const [cat, setCat] = useState<string>("all");
   const [q, setQ] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -134,7 +149,7 @@ export default function TimelineSection({
   const groups = useMemo(() => {
     const by: { bucket: string; items: Row[] }[] = [];
     for (const e of filtered) {
-      const b = dayBucket(str(e, "created_at"));
+      const b = dayBucket(str(e, "created_at"), t);
       const last = by[by.length - 1];
       if (last && last.bucket === b) last.items.push(e);
       else by.push({ bucket: b, items: [e] });
@@ -149,7 +164,7 @@ export default function TimelineSection({
   }, [timeline]);
 
   const save = async () => {
-    if (!title.trim()) { setCErr("Title is required"); return; }
+    if (!title.trim()) { setCErr(t("ts.titleRequired", "Title is required")); return; }
     setBusy(true); setCErr(null);
     try {
       const r = await fetch(`/api/suppliers/${supplierId}/timeline`, {
@@ -170,7 +185,7 @@ export default function TimelineSection({
 
   const remove = async (e: Row) => {
     const id = str(e, "id");
-    if (!confirm("Remove this logged event?")) return;
+    if (!confirm(t("ts.confirmRemove", "Remove this logged event?"))) return;
     setBusyId(id); setErr(null);
     try {
       const r = await fetch(`/api/suppliers/${supplierId}/timeline/${id}`, { method: "DELETE", credentials: "include" });
@@ -194,11 +209,11 @@ export default function TimelineSection({
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <HistoryIcon className="h-4 w-4 text-[var(--text-secondary)]" />
-          <h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">Operational Timeline</h3>
+          <h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">{t("ts.title", "Operational Timeline")}</h3>
         </div>
         <button type="button" onClick={openComposer}
           className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90">
-          <PlusIcon className="h-3.5 w-3.5" /> Log event
+          <PlusIcon className="h-3.5 w-3.5" /> {t("ts.logEvent", "Log event")}
         </button>
       </div>
 
@@ -207,7 +222,7 @@ export default function TimelineSection({
         <div className="flex flex-wrap gap-1.5">
           <button type="button" onClick={() => setCat("all")}
             className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${cat === "all" ? "bg-[var(--text-primary)] text-[var(--bg-primary)]" : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>
-            All {timeline.length ? <span className="opacity-60">{timeline.length}</span> : null}
+            {t("ts.all", "All")} {timeline.length ? <span className="opacity-60">{timeline.length}</span> : null}
           </button>
           {TIMELINE_CATEGORY_ORDER.filter((c) => counts[c]).map((c) => (
             <button key={c} type="button" onClick={() => setCat(c)}
@@ -218,7 +233,7 @@ export default function TimelineSection({
         </div>
         <div className="relative ml-auto">
           <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-faint)]" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search timeline…"
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("ts.searchPlaceholder", "Search timeline…")}
             className="w-48 rounded-lg bg-[var(--bg-surface-subtle)] py-1.5 pl-8 pr-3 text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-faint)] outline-none" />
         </div>
       </div>
@@ -227,10 +242,10 @@ export default function TimelineSection({
 
       {timeline.length === 0 ? (
         <div className="rounded-2xl bg-[var(--bg-surface-subtle)]/50 px-6 py-12 text-center text-sm text-[var(--text-faint)]">
-          No activity yet — operational events (status, contacts, documents, factory) appear here automatically, and you can log meetings, visits, and calls.
+          {t("ts.emptyState", "No activity yet — operational events (status, contacts, documents, factory) appear here automatically, and you can log meetings, visits, and calls.")}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-2xl bg-[var(--bg-surface-subtle)]/50 px-6 py-10 text-center text-sm text-[var(--text-faint)]">No events match this filter.</div>
+        <div className="rounded-2xl bg-[var(--bg-surface-subtle)]/50 px-6 py-10 text-center text-sm text-[var(--text-faint)]">{t("ts.noMatch", "No events match this filter.")}</div>
       ) : (
         <div className="space-y-6">
           {groups.map((g) => (
@@ -259,14 +274,14 @@ export default function TimelineSection({
                               <span className="uppercase tracking-wide">{timelineCategoryLabel(str(e, "event_category"))}</span>
                               <span>· {eventTypeLabel(str(e, "event_type"))}</span>
                               {str(e, "actor_name") ? <span>· {str(e, "actor_name")}</span> : null}
-                              <span title={new Date(str(e, "created_at")).toLocaleString()}>· {relativeTime(str(e, "created_at"))}</span>
-                              {e.is_manual ? <span className="rounded bg-[var(--bg-surface)] px-1 py-0.5">Manual</span> : null}
-                              <span className="inline-flex items-center gap-0.5"><ShieldCheckIcon className="h-2.5 w-2.5" />{VISIBILITY_LABELS[str(e, "visibility_tier")] ?? "Internal"}</span>
+                              <span title={new Date(str(e, "created_at")).toLocaleString()}>· {relativeTime(str(e, "created_at"), t)}</span>
+                              {e.is_manual ? <span className="rounded bg-[var(--bg-surface)] px-1 py-0.5">{t("ts.manual", "Manual")}</span> : null}
+                              <span className="inline-flex items-center gap-0.5"><ShieldCheckIcon className="h-2.5 w-2.5" />{visibilityLabel(str(e, "visibility_tier"), t)}</span>
                             </div>
                           </div>
                           {e.is_manual ? (
                             <button type="button" disabled={busyId === id} onClick={() => remove(e)}
-                              className="shrink-0 rounded-md p-1 text-[var(--text-faint)] hover:bg-[var(--bg-surface)] hover:text-rose-400 disabled:opacity-40" title="Remove"><TrashIcon className="h-3.5 w-3.5" /></button>
+                              className="shrink-0 rounded-md p-1 text-[var(--text-faint)] hover:bg-[var(--bg-surface)] hover:text-rose-400 disabled:opacity-40" title={t("ts.remove", "Remove")}><TrashIcon className="h-3.5 w-3.5" /></button>
                           ) : null}
                         </div>
                       </div>
@@ -285,34 +300,34 @@ export default function TimelineSection({
           <div className="w-full max-w-md space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(ev) => ev.stopPropagation()}>
             <div className="flex items-center gap-2">
               <HistoryIcon className="h-4 w-4 text-[var(--text-secondary)]" />
-              <span className="text-[14px] font-semibold text-[var(--text-primary)]">Log operational event</span>
+              <span className="text-[14px] font-semibold text-[var(--text-primary)]">{t("ts.logOperationalEvent", "Log operational event")}</span>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Type">
+              <Field label={t("ts.fieldType", "Type")}>
                 <select className={inputCls} value={evType} onChange={(e) => setEvType(e.target.value)}>
-                  {MANUAL_EVENT_TYPES.map((t) => <option key={t.type} value={t.type}>{t.label}</option>)}
+                  {MANUAL_EVENT_TYPES.map((mt) => <option key={mt.type} value={mt.type}>{mt.label}</option>)}
                 </select>
               </Field>
-              <Field label="Importance">
+              <Field label={t("ts.fieldImportance", "Importance")}>
                 <select className={inputCls} value={importance} onChange={(e) => setImportance(e.target.value)}>
                   {Object.keys(IMPORTANCE_LABELS).map((k) => <option key={k} value={k}>{IMPORTANCE_LABELS[k]}</option>)}
                 </select>
               </Field>
             </div>
-            <Field label="Title"><input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Factory visit — Taizhou plant" /></Field>
-            <Field label="Details"><textarea className={`${inputCls} min-h-[72px]`} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What happened, outcomes, follow-ups…" /></Field>
-            <Field label="Visibility">
+            <Field label={t("ts.fieldTitle", "Title")}><input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("ts.titlePlaceholder", "e.g. Factory visit — Taizhou plant")} /></Field>
+            <Field label={t("ts.fieldDetails", "Details")}><textarea className={`${inputCls} min-h-[72px]`} value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t("ts.detailsPlaceholder", "What happened, outcomes, follow-ups…")} /></Field>
+            <Field label={t("ts.fieldVisibility", "Visibility")}>
               <select className={inputCls} value={visibility} onChange={(e) => setVisibility(e.target.value)}>
-                {VISIBILITY_TIERS.map((t) => <option key={t} value={t}>{VISIBILITY_LABELS[t]}</option>)}
+                {VISIBILITY_TIERS.map((tier) => <option key={tier} value={tier}>{visibilityLabel(tier, t)}</option>)}
               </select>
             </Field>
             {cErr ? <div className="text-[12px] text-rose-400">{cErr}</div> : null}
             <div className="flex items-center gap-3">
               <button type="button" disabled={busy} onClick={save}
                 className="rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
-                {busy ? "Saving…" : "Log event"}
+                {busy ? t("ts.saving", "Saving…") : t("ts.logEvent", "Log event")}
               </button>
-              <button type="button" onClick={() => setOpen(false)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">Cancel</button>
+              <button type="button" onClick={() => setOpen(false)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">{t("ts.cancel", "Cancel")}</button>
             </div>
           </div>
         </div>

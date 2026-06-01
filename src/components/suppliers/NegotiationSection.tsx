@@ -11,6 +11,8 @@
    --------------------------------------------------------------------------- */
 
 import { useState } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { contactsT } from "@/lib/translations/contacts";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { NEGOTIATION_INTEL_FIELDS, QUALITY_LEVELS, QUALITY_LEVEL_LABELS } from "@/lib/suppliers/intelligence";
 import HandshakeIcon from "@/components/icons/ui/HandshakeIcon";
@@ -55,6 +57,7 @@ export default function NegotiationSection({
   negotiationIntel: Row | null;
   onSaved: () => void | Promise<void>;
 }) {
+  const { t } = useTranslation(contactsT);
   const [open, setOpen] = useState(false);
   const [d, setD] = useState(emptyDraft);
   const [busy, setBusy] = useState(false);
@@ -95,7 +98,7 @@ export default function NegotiationSection({
   };
 
   const save = async () => {
-    if (!d.topic.trim()) { setErr("Topic is required"); return; }
+    if (!d.topic.trim()) { setErr(t("neg.topicRequired", "Topic is required")); return; }
     setBusy(true); setErr(null);
     try {
       const r = await fetch(`/api/suppliers/${supplierId}/negotiations`, {
@@ -107,7 +110,7 @@ export default function NegotiationSection({
   };
 
   const remove = async (n: Row) => {
-    const id = str(n, "id"); if (!confirm("Remove this negotiation round?")) return;
+    const id = str(n, "id"); if (!confirm(t("neg.confirmRemove", "Remove this negotiation round?"))) return;
     setBusyId(id); setListErr(null);
     try {
       const r = await fetch(`/api/suppliers/${supplierId}/negotiations/${id}`, { method: "DELETE", credentials: "include" });
@@ -119,10 +122,10 @@ export default function NegotiationSection({
   return (
     <section className="space-y-5">
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2"><HandshakeIcon className="h-4 w-4 text-[var(--text-secondary)]" /><h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">Negotiation Intelligence</h3></div>
+        <div className="flex items-center gap-2"><HandshakeIcon className="h-4 w-4 text-[var(--text-secondary)]" /><h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">{t("neg.title", "Negotiation Intelligence")}</h3></div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => { setNiD(niInitial()); setNiErr(null); setNiEdit(true); }} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-surface-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"><Edit3Icon className="h-3.5 w-3.5" /> {hasIntel ? "Edit scorecard" : "Score"}</button>
-          <button type="button" onClick={() => { setD(emptyDraft()); setErr(null); setOpen(true); }} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90"><PlusIcon className="h-3.5 w-3.5" /> Log round</button>
+          <button type="button" onClick={() => { setNiD(niInitial()); setNiErr(null); setNiEdit(true); }} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-surface-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"><Edit3Icon className="h-3.5 w-3.5" /> {hasIntel ? t("neg.editScorecard", "Edit scorecard") : t("neg.score", "Score")}</button>
+          <button type="button" onClick={() => { setD(emptyDraft()); setErr(null); setOpen(true); }} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90"><PlusIcon className="h-3.5 w-3.5" /> {t("neg.logRound", "Log round")}</button>
         </div>
       </div>
 
@@ -130,7 +133,7 @@ export default function NegotiationSection({
       {hasIntel ? (
         <div className="space-y-3 rounded-2xl bg-[var(--bg-surface-subtle)] p-5">
           <div className="flex items-center justify-between gap-2">
-            <SectionLabel>Negotiation scorecard</SectionLabel>
+            <SectionLabel>{t("neg.scorecard", "Negotiation scorecard")}</SectionLabel>
             {typeof ni.negotiation_score === "number" ? <span className="inline-flex items-baseline gap-1 text-[var(--text-primary)]"><GaugeIcon className="h-3.5 w-3.5 text-[var(--text-faint)]" /><span className="text-lg font-semibold tracking-tight">{ni.negotiation_score as number}</span><span className="text-[10px] text-[var(--text-faint)]">/100</span></span> : null}
           </div>
           <div className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">
@@ -142,10 +145,10 @@ export default function NegotiationSection({
             ))}
           </div>
           {Array.isArray(ni.leverage_points) && (ni.leverage_points as unknown[]).length ? (
-            <div className="flex flex-wrap gap-1.5"><span className="text-[10px] uppercase tracking-wide text-[var(--text-faint)]">Leverage:</span>{(ni.leverage_points as unknown[]).map((x, i) => <span key={i} className="rounded-full bg-[var(--bg-surface)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">{String(x)}</span>)}</div>
+            <div className="flex flex-wrap gap-1.5"><span className="text-[10px] uppercase tracking-wide text-[var(--text-faint)]">{t("neg.leverageLabel", "Leverage:")}</span>{(ni.leverage_points as unknown[]).map((x, i) => <span key={i} className="rounded-full bg-[var(--bg-surface)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">{String(x)}</span>)}</div>
           ) : null}
           {Array.isArray(ni.preferred_tactics) && (ni.preferred_tactics as unknown[]).length ? (
-            <div className="flex flex-wrap gap-1.5"><span className="text-[10px] uppercase tracking-wide text-[var(--text-faint)]">Tactics:</span>{(ni.preferred_tactics as unknown[]).map((x, i) => <span key={i} className="rounded-full bg-[var(--bg-surface)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">{String(x)}</span>)}</div>
+            <div className="flex flex-wrap gap-1.5"><span className="text-[10px] uppercase tracking-wide text-[var(--text-faint)]">{t("neg.tacticsLabel", "Tactics:")}</span>{(ni.preferred_tactics as unknown[]).map((x, i) => <span key={i} className="rounded-full bg-[var(--bg-surface)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">{String(x)}</span>)}</div>
           ) : null}
           {str(ni, "internal_notes") ? <div className="text-[11px] leading-relaxed text-[var(--text-secondary)]">{str(ni, "internal_notes")}</div> : null}
         </div>
@@ -157,27 +160,27 @@ export default function NegotiationSection({
       {niEdit ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !niBusy && setNiEdit(false)}>
           <div className="max-h-[88vh] w-full max-w-lg space-y-4 overflow-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-2"><GaugeIcon className="h-4 w-4 text-[var(--text-secondary)]" /><span className="text-[14px] font-semibold text-[var(--text-primary)]">Negotiation scorecard</span></div>
+            <div className="flex items-center gap-2"><GaugeIcon className="h-4 w-4 text-[var(--text-secondary)]" /><span className="text-[14px] font-semibold text-[var(--text-primary)]">{t("neg.scorecard", "Negotiation scorecard")}</span></div>
             <div className="grid grid-cols-2 gap-3">
               {NEGOTIATION_INTEL_FIELDS.map((f) => (
                 <Field key={f.col} label={f.label}><select className={inputCls} value={niD[f.col] ?? ""} onChange={(e) => setNi(f.col, e.target.value)}><option value="">—</option>{QUALITY_LEVELS.map((k) => <option key={k} value={k}>{QUALITY_LEVEL_LABELS[k]}</option>)}</select></Field>
               ))}
             </div>
-            <Field label="Negotiation score (0–100)"><input type="number" min={0} max={100} className={inputCls} value={niD.negotiation_score} onChange={(e) => setNi("negotiation_score", e.target.value)} /></Field>
-            <Field label="Leverage points (comma-separated)"><input className={inputCls} value={niD.leverage_points} onChange={(e) => setNi("leverage_points", e.target.value)} placeholder="60% of export volume, few alternatives" /></Field>
-            <Field label="Preferred tactics (comma-separated)"><input className={inputCls} value={niD.preferred_tactics} onChange={(e) => setNi("preferred_tactics", e.target.value)} placeholder="anchor high, bundle MOQ + price" /></Field>
-            <Field label="Internal notes"><textarea className={`${inputCls} min-h-[56px]`} value={niD.internal_notes} onChange={(e) => setNi("internal_notes", e.target.value)} /></Field>
+            <Field label={t("neg.fieldNegotiationScore", "Negotiation score (0–100)")}><input type="number" min={0} max={100} className={inputCls} value={niD.negotiation_score} onChange={(e) => setNi("negotiation_score", e.target.value)} /></Field>
+            <Field label={t("neg.fieldLeveragePoints", "Leverage points (comma-separated)")}><input className={inputCls} value={niD.leverage_points} onChange={(e) => setNi("leverage_points", e.target.value)} placeholder={t("neg.phLeveragePoints", "60% of export volume, few alternatives")} /></Field>
+            <Field label={t("neg.fieldPreferredTactics", "Preferred tactics (comma-separated)")}><input className={inputCls} value={niD.preferred_tactics} onChange={(e) => setNi("preferred_tactics", e.target.value)} placeholder={t("neg.phPreferredTactics", "anchor high, bundle MOQ + price")} /></Field>
+            <Field label={t("neg.fieldInternalNotes", "Internal notes")}><textarea className={`${inputCls} min-h-[56px]`} value={niD.internal_notes} onChange={(e) => setNi("internal_notes", e.target.value)} /></Field>
             {niErr ? <div className="text-[12px] text-rose-400">{niErr}</div> : null}
             <div className="flex items-center gap-3">
-              <button type="button" disabled={niBusy} onClick={saveIntel} className="rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">{niBusy ? "Saving…" : "Save scorecard"}</button>
-              <button type="button" onClick={() => setNiEdit(false)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">Cancel</button>
+              <button type="button" disabled={niBusy} onClick={saveIntel} className="rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">{niBusy ? t("neg.saving", "Saving…") : t("neg.saveScorecard", "Save scorecard")}</button>
+              <button type="button" onClick={() => setNiEdit(false)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">{t("neg.cancel", "Cancel")}</button>
             </div>
           </div>
         </div>
       ) : null}
 
       {negotiations.length === 0 ? (
-        <div className="rounded-2xl bg-[var(--bg-surface-subtle)]/50 px-6 py-12 text-center text-sm text-[var(--text-faint)]">No negotiation history yet — log rounds, concessions, leverage points, and red flags to build negotiation memory.</div>
+        <div className="rounded-2xl bg-[var(--bg-surface-subtle)]/50 px-6 py-12 text-center text-sm text-[var(--text-faint)]">{t("neg.empty", "No negotiation history yet — log rounds, concessions, leverage points, and red flags to build negotiation memory.")}</div>
       ) : (
         <div className="space-y-3">
           {negotiations.map((n) => {
@@ -190,27 +193,27 @@ export default function NegotiationSection({
                       {str(n, "round_no") ? <span className="rounded-md bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">R{str(n, "round_no")}</span> : null}
                       <span className="text-[13px] font-semibold text-[var(--text-primary)]">{str(n, "topic")}</span>
                     </div>
-                    <div className="mt-0.5 text-[11px] text-[var(--text-faint)]">{str(n, "occurred_on") || ""}{str(n, "occurred_on") ? " · " : ""}<ShieldCheckIcon className="inline h-2.5 w-2.5" /> {VISIBILITY_LABELS[str(n, "visibility_tier")] ?? "Management only"}</div>
+                    <div className="mt-0.5 text-[11px] text-[var(--text-faint)]">{str(n, "occurred_on") || ""}{str(n, "occurred_on") ? " · " : ""}<ShieldCheckIcon className="inline h-2.5 w-2.5" /> {VISIBILITY_LABELS[str(n, "visibility_tier")] ?? t("neg.managementOnly", "Management only")}</div>
                   </div>
-                  <button type="button" disabled={busyId === id} onClick={() => remove(n)} className="shrink-0 rounded-md p-1.5 text-[var(--text-faint)] hover:bg-[var(--bg-surface)] hover:text-rose-400 disabled:opacity-40" title="Remove"><TrashIcon className="h-3.5 w-3.5" /></button>
+                  <button type="button" disabled={busyId === id} onClick={() => remove(n)} className="shrink-0 rounded-md p-1.5 text-[var(--text-faint)] hover:bg-[var(--bg-surface)] hover:text-rose-400 disabled:opacity-40" title={t("neg.remove", "Remove")}><TrashIcon className="h-3.5 w-3.5" /></button>
                 </div>
 
                 {str(n, "outcome") ? <div className="text-[12px] leading-relaxed text-[var(--text-primary)]">{str(n, "outcome")}</div> : null}
 
                 {(str(n, "price_concession") || str(n, "moq_concession") || str(n, "payment_terms_concession") || str(n, "discount_pct") || isTrue(n, "exclusivity_discussed") || isTrue(n, "territory_discussed")) ? (
                   <div className="flex flex-wrap gap-1.5">
-                    <Chip label="Price" value={str(n, "price_concession")} />
-                    <Chip label="MOQ" value={str(n, "moq_concession")} />
-                    <Chip label="Terms" value={str(n, "payment_terms_concession")} />
+                    <Chip label={t("neg.chipPrice", "Price")} value={str(n, "price_concession")} />
+                    <Chip label={t("neg.chipMoq", "MOQ")} value={str(n, "moq_concession")} />
+                    <Chip label={t("neg.chipTerms", "Terms")} value={str(n, "payment_terms_concession")} />
                     {str(n, "discount_pct") ? <span className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-surface)] px-2.5 py-1 text-[11px] text-[var(--text-secondary)]"><PercentIcon className="h-3 w-3" />{str(n, "discount_pct")}%</span> : null}
-                    {isTrue(n, "exclusivity_discussed") ? <span className="rounded-full bg-[var(--bg-surface)] px-2.5 py-1 text-[11px] text-[var(--text-secondary)]">Exclusivity discussed</span> : null}
-                    {isTrue(n, "territory_discussed") ? <span className="rounded-full bg-[var(--bg-surface)] px-2.5 py-1 text-[11px] text-[var(--text-secondary)]">Territory discussed</span> : null}
+                    {isTrue(n, "exclusivity_discussed") ? <span className="rounded-full bg-[var(--bg-surface)] px-2.5 py-1 text-[11px] text-[var(--text-secondary)]">{t("neg.exclusivityDiscussed", "Exclusivity discussed")}</span> : null}
+                    {isTrue(n, "territory_discussed") ? <span className="rounded-full bg-[var(--bg-surface)] px-2.5 py-1 text-[11px] text-[var(--text-secondary)]">{t("neg.territoryDiscussed", "Territory discussed")}</span> : null}
                   </div>
                 ) : null}
 
-                {str(n, "leverage_notes") ? <div className="flex items-start gap-1.5 text-[11px] text-[var(--text-secondary)]"><ScaleIcon className="mt-0.5 h-3 w-3 shrink-0 text-[var(--text-faint)]" /><span><span className="text-[var(--text-faint)]">Leverage:</span> {str(n, "leverage_notes")}</span></div> : null}
+                {str(n, "leverage_notes") ? <div className="flex items-start gap-1.5 text-[11px] text-[var(--text-secondary)]"><ScaleIcon className="mt-0.5 h-3 w-3 shrink-0 text-[var(--text-faint)]" /><span><span className="text-[var(--text-faint)]">{t("neg.leverageLabel", "Leverage:")}</span> {str(n, "leverage_notes")}</span></div> : null}
                 {str(n, "red_flags") ? <div className="flex items-start gap-1.5 text-[11px] text-rose-300"><FlagIcon className="mt-0.5 h-3 w-3 shrink-0" /><span>{str(n, "red_flags")}</span></div> : null}
-                {str(n, "behavior_notes") ? <div className="text-[11px] leading-relaxed text-[var(--text-secondary)]"><span className="text-[var(--text-faint)]">Behavior:</span> {str(n, "behavior_notes")}</div> : null}
+                {str(n, "behavior_notes") ? <div className="text-[11px] leading-relaxed text-[var(--text-secondary)]"><span className="text-[var(--text-faint)]">{t("neg.behaviorLabel", "Behavior:")}</span> {str(n, "behavior_notes")}</div> : null}
               </div>
             );
           })}
@@ -221,33 +224,33 @@ export default function NegotiationSection({
       {open ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !busy && setOpen(false)}>
           <div className="max-h-[88vh] w-full max-w-lg space-y-4 overflow-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-2"><HandshakeIcon className="h-4 w-4 text-[var(--text-secondary)]" /><span className="text-[14px] font-semibold text-[var(--text-primary)]">Log negotiation round</span></div>
+            <div className="flex items-center gap-2"><HandshakeIcon className="h-4 w-4 text-[var(--text-secondary)]" /><span className="text-[14px] font-semibold text-[var(--text-primary)]">{t("neg.logModalTitle", "Log negotiation round")}</span></div>
             <div className="grid grid-cols-3 gap-3">
-              <Field label="Round #"><input type="number" min={1} className={inputCls} value={d.round_no ?? ""} onChange={(e) => set("round_no" as keyof ReturnType<typeof emptyDraft>, e.target.value)} /></Field>
-              <Field label="Date"><input type="date" className={inputCls} value={d.occurred_on} onChange={(e) => set("occurred_on", e.target.value)} /></Field>
-              <Field label="Visibility"><select className={inputCls} value={d.visibility_tier} onChange={(e) => set("visibility_tier", e.target.value)}>{VISIBILITY_TIERS.map((t) => <option key={t} value={t}>{VISIBILITY_LABELS[t]}</option>)}</select></Field>
+              <Field label={t("neg.fieldRoundNo", "Round #")}><input type="number" min={1} className={inputCls} value={d.round_no ?? ""} onChange={(e) => set("round_no" as keyof ReturnType<typeof emptyDraft>, e.target.value)} /></Field>
+              <Field label={t("neg.fieldDate", "Date")}><input type="date" className={inputCls} value={d.occurred_on} onChange={(e) => set("occurred_on", e.target.value)} /></Field>
+              <Field label={t("neg.fieldVisibility", "Visibility")}><select className={inputCls} value={d.visibility_tier} onChange={(e) => set("visibility_tier", e.target.value)}>{VISIBILITY_TIERS.map((tier) => <option key={tier} value={tier}>{VISIBILITY_LABELS[tier]}</option>)}</select></Field>
             </div>
-            <Field label="Topic"><input className={inputCls} value={d.topic} onChange={(e) => set("topic", e.target.value)} placeholder="e.g. 2025 annual pricing + MOQ" /></Field>
-            <Field label="Outcome / agreement"><textarea className={`${inputCls} min-h-[56px]`} value={d.outcome} onChange={(e) => set("outcome", e.target.value)} placeholder="Recording an outcome logs an 'Agreement reached' timeline event." /></Field>
+            <Field label={t("neg.fieldTopic", "Topic")}><input className={inputCls} value={d.topic} onChange={(e) => set("topic", e.target.value)} placeholder={t("neg.phTopic", "e.g. 2025 annual pricing + MOQ")} /></Field>
+            <Field label={t("neg.fieldOutcome", "Outcome / agreement")}><textarea className={`${inputCls} min-h-[56px]`} value={d.outcome} onChange={(e) => set("outcome", e.target.value)} placeholder={t("neg.phOutcome", "Recording an outcome logs an 'Agreement reached' timeline event.")} /></Field>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Price concession"><input className={inputCls} value={d.price_concession} onChange={(e) => set("price_concession", e.target.value)} placeholder="-4% on servo motors" /></Field>
-              <Field label="MOQ concession"><input className={inputCls} value={d.moq_concession} onChange={(e) => set("moq_concession", e.target.value)} placeholder="500 → 300 units" /></Field>
-              <Field label="Payment-term concession"><input className={inputCls} value={d.payment_terms_concession} onChange={(e) => set("payment_terms_concession", e.target.value)} placeholder="30% TT → 20% TT" /></Field>
-              <Field label="Discount %"><input type="number" min={0} max={100} className={inputCls} value={d.discount_pct} onChange={(e) => set("discount_pct", e.target.value)} /></Field>
+              <Field label={t("neg.fieldPriceConcession", "Price concession")}><input className={inputCls} value={d.price_concession} onChange={(e) => set("price_concession", e.target.value)} placeholder={t("neg.phPriceConcession", "-4% on servo motors")} /></Field>
+              <Field label={t("neg.fieldMoqConcession", "MOQ concession")}><input className={inputCls} value={d.moq_concession} onChange={(e) => set("moq_concession", e.target.value)} placeholder={t("neg.phMoqConcession", "500 → 300 units")} /></Field>
+              <Field label={t("neg.fieldPaymentTermConcession", "Payment-term concession")}><input className={inputCls} value={d.payment_terms_concession} onChange={(e) => set("payment_terms_concession", e.target.value)} placeholder={t("neg.phPaymentTermConcession", "30% TT → 20% TT")} /></Field>
+              <Field label={t("neg.fieldDiscountPct", "Discount %")}><input type="number" min={0} max={100} className={inputCls} value={d.discount_pct} onChange={(e) => set("discount_pct", e.target.value)} /></Field>
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {([["exclusivity_discussed", "Exclusivity discussed"], ["territory_discussed", "Territory discussed"]] as const).map(([k, label]) => {
+              {([["exclusivity_discussed", t("neg.exclusivityDiscussed", "Exclusivity discussed")], ["territory_discussed", t("neg.territoryDiscussed", "Territory discussed")]] as const).map(([k, label]) => {
                 const on = d[k] as boolean;
                 return <button key={k} type="button" onClick={() => set(k, !on)} className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors ${on ? "bg-[var(--text-primary)] text-[var(--bg-primary)]" : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>{label}</button>;
               })}
             </div>
-            <Field label="Leverage points"><textarea className={`${inputCls} min-h-[48px]`} value={d.leverage_notes} onChange={(e) => set("leverage_notes", e.target.value)} placeholder="We are 60% of their export volume…" /></Field>
-            <Field label="Red flags"><textarea className={`${inputCls} min-h-[48px]`} value={d.red_flags} onChange={(e) => set("red_flags", e.target.value)} /></Field>
-            <Field label="Behavior patterns"><textarea className={`${inputCls} min-h-[48px]`} value={d.behavior_notes} onChange={(e) => set("behavior_notes", e.target.value)} placeholder="Holds firm early, concedes near quarter-end…" /></Field>
+            <Field label={t("neg.fieldLeverageNotes", "Leverage points")}><textarea className={`${inputCls} min-h-[48px]`} value={d.leverage_notes} onChange={(e) => set("leverage_notes", e.target.value)} placeholder={t("neg.phLeverageNotes", "We are 60% of their export volume…")} /></Field>
+            <Field label={t("neg.fieldRedFlags", "Red flags")}><textarea className={`${inputCls} min-h-[48px]`} value={d.red_flags} onChange={(e) => set("red_flags", e.target.value)} /></Field>
+            <Field label={t("neg.fieldBehaviorNotes", "Behavior patterns")}><textarea className={`${inputCls} min-h-[48px]`} value={d.behavior_notes} onChange={(e) => set("behavior_notes", e.target.value)} placeholder={t("neg.phBehaviorNotes", "Holds firm early, concedes near quarter-end…")} /></Field>
             {err ? <div className="text-[12px] text-rose-400">{err}</div> : null}
             <div className="flex items-center gap-3">
-              <button type="button" disabled={busy} onClick={save} className="rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">{busy ? "Saving…" : "Log round"}</button>
-              <button type="button" onClick={() => setOpen(false)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">Cancel</button>
+              <button type="button" disabled={busy} onClick={save} className="rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">{busy ? t("neg.saving", "Saving…") : t("neg.logRound", "Log round")}</button>
+              <button type="button" onClick={() => setOpen(false)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">{t("neg.cancel", "Cancel")}</button>
             </div>
           </div>
         </div>
