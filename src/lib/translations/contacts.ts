@@ -1197,6 +1197,8 @@ export const contactsT: Translations = {
   "sd.rdComplete": { en: "Complete", zh: "完成", ar: "مكتمل" },
   "sd.rdPending": { en: "Pending", zh: "进行中", ar: "قيد الإنجاز" },
   "sd.rdBlocked": { en: "Blocked", zh: "受阻", ar: "معطّل" },
+  "sd.modeAnalytical": { en: "Analytical", zh: "分析", ar: "تحليلي" },
+  "sd.modeExecutive": { en: "Executive", zh: "高管", ar: "تنفيذي" },
   "sd.factory": { en: "Factory", zh: "工厂", ar: "المصنع" },
   "sd.contacts": { en: "Contacts", zh: "联系人", ar: "جهات الاتصال" },
   "sd.certifications": { en: "Certifications", zh: "认证", ar: "الشهادات" },

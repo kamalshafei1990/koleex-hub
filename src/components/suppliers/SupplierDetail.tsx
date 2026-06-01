@@ -53,6 +53,7 @@ import BrandGlyph from "@/components/icons/brands/BrandGlyph";
 import TagsIcon from "@/components/icons/ui/TagsIcon";
 import Share2Icon from "@/components/icons/ui/Share2Icon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
+import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import { taxonomyLogoUrl } from "@/components/knowledge/product-coding/taxonomy-logo";
 import { DIVISIONS, CATEGORIES } from "@/components/knowledge/product-coding/data";
 import { fetchDivisionLogos, fetchCategoryLogos, fetchSubcategoryLogos } from "@/lib/products-admin";
@@ -207,6 +208,22 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
   const [classOpen, setClassOpen] = useState(false);
   const [busyClass, setBusyClass] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
+
+  /* Executive vs Analytical mode (Section 3) + progressive disclosure of the
+     Level-B operational sections (Section 1). Executive mode collapses every
+     Level-B section to a summary; Analytical mode shows them expanded. Each
+     section can still be toggled individually. */
+  const LEVEL_B_KEYS = ["companyProfile", "identity", "logistics", "social", "messagingSupport", "banking", "quality", "notes"];
+  const [execMode, setExecMode] = useState(false);
+  const [collapsedKeys, setCollapsedKeys] = useState<Set<string>>(new Set());
+  const toggleKey = useCallback((k: string) => {
+    setCollapsedKeys((prev) => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n; });
+  }, []);
+  const setMode = useCallback((exec: boolean) => {
+    setExecMode(exec);
+    setCollapsedKeys(exec ? new Set(LEVEL_B_KEYS) : new Set());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /* Scroll-spy — which of the 6 layers is currently in view, so the sticky
      nav highlights the active layer as the user scrolls (Section 3/7). */
@@ -436,6 +453,17 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
       <main className="pb-24">
         {/* ─── Contacts-style centered header (avatar · name · type) — Edit/Delete in top-right ─── */}
         <div className="mx-4 md:mx-6 mt-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 md:px-6 py-6 md:py-8 text-center relative">
+          {/* Top-left — Executive / Analytical mode toggle (Section 3) */}
+          <div className="absolute top-3 start-3 inline-flex items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-0.5 text-[11px] font-medium">
+            <button type="button" onClick={() => setMode(false)} aria-pressed={!execMode}
+              className={`rounded-md px-2 py-1 transition-colors ${!execMode ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "text-[var(--text-faint)] hover:text-[var(--text-secondary)]"}`}>
+              {t("sd.modeAnalytical", "Analytical")}
+            </button>
+            <button type="button" onClick={() => setMode(true)} aria-pressed={execMode}
+              className={`rounded-md px-2 py-1 transition-colors ${execMode ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "text-[var(--text-faint)] hover:text-[var(--text-secondary)]"}`}>
+              {t("sd.modeExecutive", "Executive")}
+            </button>
+          </div>
           {/* Top-right action buttons (Edit / Delete) */}
           <div className="absolute top-3 end-3 flex items-center gap-1.5">
             <button onClick={() => (onEdit ? onEdit() : router.push(`/suppliers?selected=${id}`))} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:bg-[var(--bg-surface-hover)] text-[12px] font-medium transition-colors text-[var(--text-primary)]">
@@ -925,7 +953,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
           const banks = Array.isArray(s.bank_accounts) ? (s.bank_accounts as Row[]) : [];
           return (
             <div id="overview" className="scroll-mt-16">
-              <Sec title={t("sd.companyProfile", "Company profile")} icon={<Building2Icon className="h-4 w-4" />}>
+              <Sec title={t("sd.companyProfile", "Company profile")} icon={<Building2Icon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("companyProfile")} onToggle={() => toggleKey("companyProfile")} preview={[str(s, "company_type"), str(s, "year_established")].filter(Boolean).join(" · ")}>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                   <Field label={t("sd.legalName", "Legal name")} value={str(s, "legal_name", "company_name")} span2 />
                   <Field label={t("sd.tradingName", "Trading name")} value={str(s, "trading_name")} />
@@ -957,7 +985,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                 })()}
               </Sec>
 
-              <Sec tone="violet" title={t("sd.identityCompliance", "Identity & compliance")} icon={<IdCardIcon className="h-4 w-4" />}>
+              <Sec tone="violet" title={t("sd.identityCompliance", "Identity & compliance")} icon={<IdCardIcon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("identity")} onToggle={() => toggleKey("identity")} preview={str(s, "kyc_status") ? `KYC ${str(s, "kyc_status")}` : ""}>
                 <div className="grid grid-cols-1 lg:grid-cols-[1fr_180px] gap-5">
                   <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                     <Field label={t("sd.businessRegNo", "Business reg. no.")} value={str(s, "business_registration_number")} mono />
@@ -983,7 +1011,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                 </div>
               </Sec>
 
-              <Sec tone="amber" title={t("sd.logisticsTrade", "Logistics & trade")} icon={<ShipIcon className="h-4 w-4" />}>
+              <Sec tone="amber" title={t("sd.logisticsTrade", "Logistics & trade")} icon={<ShipIcon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("logistics")} onToggle={() => toggleKey("logistics")} preview={[str(s, "incoterms"), str(s, "port_of_entry")].filter(Boolean).join(" · ")}>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                   <Field label={t("sd.incoterms", "Incoterms")} value={str(s, "incoterms")} />
                   <Field label={t("sd.portOfEntry", "Port")} value={str(s, "port_of_entry")} />
@@ -1020,7 +1048,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                 const all = [...socials, ...fromDigital].filter((p) => p.platform && (p.url || p.value || p.username));
                 if (!all.length) return null;
                 return (
-                  <Sec tone="cyan" title={t("sd.socialMedia", "Social media & marketplaces")} icon={<Share2Icon className="h-4 w-4" />}>
+                  <Sec tone="cyan" title={t("sd.socialMedia", "Social media & marketplaces")} icon={<Share2Icon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("social")} onToggle={() => toggleKey("social")} preview={`${all.length}`}>
                     {/* Same big-logo card grammar as Messaging */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {all.map((p, i) => {
@@ -1053,7 +1081,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
 
               {/* Messaging support & groups — yes/no flags that complement the
                   per-platform IDs+QRs in the hero Contact & channels shell. */}
-              <Sec tone="cyan" title={t("sd.messagingSupport", "Messaging support & groups")} icon={<MessageSquareIcon className="h-4 w-4" />}>
+              <Sec tone="cyan" title={t("sd.messagingSupport", "Messaging support & groups")} icon={<MessageSquareIcon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("messagingSupport")} onToggle={() => toggleKey("messagingSupport")} preview={str(s, "communication_preference")}>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                   <Field label={t("sd.wechatGroup", "WeChat sales group")} value={yn("wechat_sales_group_available")} />
                   <Field label={t("sd.wecomSupport", "WeCom support")} value={yn("wecom_support_available")} />
@@ -1062,7 +1090,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                 </div>
               </Sec>
 
-              <Sec tone="violet" title={t("sd.banking", "Banking & payment")} icon={<LandmarkIcon className="h-4 w-4" />}>
+              <Sec tone="violet" title={t("sd.banking", "Banking & payment")} icon={<LandmarkIcon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("banking")} onToggle={() => toggleKey("banking")} preview={str(s, "preferred_payment_method") || str(s, "payment_terms")}>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                   <Field label={t("sd.paymentTerms", "Payment terms")} value={str(s, "payment_terms")} span2 />
                   <Field label={t("sd.preferredMethod", "Method")} value={str(s, "preferred_payment_method")} />
@@ -1134,7 +1162,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
               </Sec>
 
               <div id="quality" className="scroll-mt-16">
-                <Sec tone="emerald" title={t("sd.qualityCertifications", "Quality & certifications")} icon={<FileCheckIcon className="h-4 w-4" />}>
+                <Sec tone="emerald" title={t("sd.qualityCertifications", "Quality & certifications")} icon={<FileCheckIcon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("quality")} onToggle={() => toggleKey("quality")} preview={certs.length ? `${certs.length}` : ""}>
                   {certs.length ? (
                     <div className="flex flex-wrap gap-2">
                       {certs.map((c) => (
@@ -1506,7 +1534,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
 /* ─── Each section is its own SHELL — a rounded, bordered card surface that
    sets the section visually apart on the page. Uppercase mini-title + icon
    (Contacts grammar) sits at the top of the shell. */
-const Sec = ({ title, icon, children, tone = "default", action }: { title: string; icon: React.ReactNode; children: React.ReactNode; tone?: "default" | "blue" | "emerald" | "amber" | "rose" | "violet" | "cyan"; action?: React.ReactNode }) => {
+const Sec = ({ title, icon, children, tone = "default", action, collapsible = false, collapsed: collapsedProp, onToggle, preview }: { title: string; icon: React.ReactNode; children: React.ReactNode; tone?: "default" | "blue" | "emerald" | "amber" | "rose" | "violet" | "cyan"; action?: React.ReactNode; collapsible?: boolean; collapsed?: boolean; onToggle?: () => void; preview?: React.ReactNode }) => {
   const toneCls: Record<string, string> = {
     default: "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]",
     blue: "bg-blue-500/12 text-blue-600 dark:text-blue-400",
@@ -1516,16 +1544,29 @@ const Sec = ({ title, icon, children, tone = "default", action }: { title: strin
     violet: "bg-violet-500/12 text-violet-600 dark:text-violet-400",
     cyan: "bg-cyan-500/12 text-cyan-600 dark:text-cyan-400",
   };
+  // Uncontrolled fallback when collapsible but no controlled state is passed.
+  const [localCollapsed, setLocalCollapsed] = useState(false);
+  const isControlled = collapsedProp !== undefined;
+  const collapsed = collapsible && (isControlled ? collapsedProp : localCollapsed);
+  const toggle = () => { if (onToggle) onToggle(); if (!isControlled) setLocalCollapsed((c) => !c); };
+  const HeaderTag = collapsible ? "button" : "div";
   return (
     <div className="mx-4 md:mx-6 my-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
-      <header className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/30 px-4 md:px-5 py-3">
+      <HeaderTag
+        {...(collapsible ? { type: "button" as const, onClick: toggle, "aria-expanded": !collapsed } : {})}
+        className={`flex w-full items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/30 px-4 md:px-5 py-3 text-start ${collapsible ? "cursor-pointer hover:bg-[var(--bg-surface-subtle)]/60 transition-colors" : ""} ${collapsed ? "border-b-transparent" : ""}`}
+      >
         <div className="flex items-center gap-2.5 min-w-0">
           <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${toneCls[tone]}`}>{icon}</span>
           <h3 className="text-[13px] font-semibold tracking-tight text-[var(--text-primary)] truncate">{title}</h3>
+          {collapsed && preview ? <span className="ms-1 truncate text-[11px] text-[var(--text-faint)] hidden sm:inline">{preview}</span> : null}
         </div>
-        {action ? <div className="shrink-0">{action}</div> : null}
-      </header>
-      <div className="px-4 md:px-5 py-4">{children}</div>
+        <div className="flex items-center gap-2 shrink-0">
+          {action ? <div onClick={(e) => e.stopPropagation()}>{action}</div> : null}
+          {collapsible ? <AngleDownIcon className={`h-4 w-4 text-[var(--text-faint)] transition-transform ${collapsed ? "-rotate-90 rtl:rotate-90" : ""}`} /> : null}
+        </div>
+      </HeaderTag>
+      {!collapsed ? <div className="px-4 md:px-5 py-4">{children}</div> : null}
     </div>
   );
 };
