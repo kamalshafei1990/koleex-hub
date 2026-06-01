@@ -3175,6 +3175,42 @@ function CityDropdown({ countryCode, stateCode, value, onChange, label, placehol
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   DELETE CONFIRMATION HOST
+   Self-contained modal driven by a window event. Keeping the open-state OUT
+   of the giant Contacts component means firing a delete no longer re-renders
+   the whole tree (list + Supplier 360) — which previously caused a ~1.7s lag
+   just to open the confirm dialog.
+   ═══════════════════════════════════════════════════════════════════════════ */
+type PendingDelete = { id: string; name: string; onConfirm: () => void };
+function DeleteConfirmHost({ t }: { t: (key: string, fallback?: string) => string }) {
+  const [pending, setPending] = useState<PendingDelete | null>(null);
+  useEffect(() => {
+    const handler = (e: Event) => setPending((e as CustomEvent<PendingDelete>).detail);
+    window.addEventListener("koleex:confirm-delete", handler as EventListener);
+    return () => window.removeEventListener("koleex:confirm-delete", handler as EventListener);
+  }, []);
+  if (!pending) return null;
+  return (
+    <ScrollLockOverlay className="fixed inset-0 z-[60] bg-[var(--bg-overlay)] flex items-center justify-center p-4" onClick={() => setPending(null)}>
+      <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">{t("delete.title")}</h3>
+        <p className="text-sm text-[var(--text-subtle)] mb-6">
+          {t("delete.confirm")} <strong className="text-[var(--text-primary)]">{pending.name}</strong>{t("delete.cannotUndo")}
+        </p>
+        <div className="flex gap-3 justify-end">
+          <button onClick={() => setPending(null)} className="px-4 py-2 rounded-lg text-sm border border-[var(--border-color)] hover:bg-[var(--bg-surface)] transition-colors">
+            {t("btn.cancel")}
+          </button>
+          <button onClick={() => { pending.onConfirm(); setPending(null); }} className="px-4 py-2 rounded-lg text-sm bg-red-600 hover:bg-red-500 text-white transition-colors">
+            {t("btn.delete")}
+          </button>
+        </div>
+      </div>
+    </ScrollLockOverlay>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    MAIN COMPONENT
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -3258,7 +3294,6 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const [saving, setSaving] = useState(false);
   const [setupNeeded, setSetupNeeded] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [showTypeChooser, setShowTypeChooser] = useState(false);
   const [typeChooserStep, setTypeChooserStep] = useState<1 | 2>(1);
   const [expandedFamily, setExpandedFamily] = useState<number | null>(null);
@@ -3598,8 +3633,16 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     if (ok) {
       setContacts(prev => prev.filter(c => c.id !== id));
       if (selectedId === id) { setSelectedId(null); setView("list"); setMobileShowDetail(false); }
-      setDeleteConfirm(null);
     }
+  };
+
+  /* Fire the delete confirmation via a window event so the (huge) Contacts
+     tree doesn't re-render just to open the dialog — see DeleteConfirmHost. */
+  const requestDelete = (c: ContactRow) => {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(new CustomEvent("koleex:confirm-delete", {
+      detail: { id: c.id, name: contactDisplayName(c), onConfirm: () => handleDelete(c.id) },
+    }));
   };
 
   const handleCancel = () => {
@@ -4146,7 +4189,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                       </button>
                       <button
                         type="button"
-                        onClick={(e) => { e.stopPropagation(); setDeleteConfirm(c.id); }}
+                        onClick={(e) => { e.stopPropagation(); requestDelete(c); }}
                         title={t("btn.delete", "Delete")}
                         aria-label={t("btn.delete", "Delete")}
                         className="w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-faint)] hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
@@ -4173,7 +4216,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     /* Suppliers: render the full Supplier 360 inline (all intel sections),
        not the legacy base-field panel. */
     if (filterType === "supplier" && selectedContact && view === "detail") {
-      return <SupplierDetail id={selectedContact.id} embedded onEdit={handleEdit} onDelete={() => setDeleteConfirm(selectedContact.id)} />;
+      return <SupplierDetail id={selectedContact.id} embedded onEdit={handleEdit} onDelete={() => requestDelete(selectedContact)} />;
     }
     if (!selectedContact) {
       /* ── Supplier KPI Dashboard ── */
@@ -4606,7 +4649,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               <Edit3Icon size={14} /> {t("btn.edit")}
             </button>
             <button
-              onClick={() => setDeleteConfirm(c.id)}
+              onClick={() => requestDelete(c)}
               className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-sm transition-colors"
             >
               <TrashIcon size={14} /> {t("btn.delete")}
@@ -8636,30 +8679,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       {/* Type chooser modal */}
       {showTypeChooser && renderTypeChooser()}
 
-      {/* ── Delete confirmation — top-level so it works from the side-list row
-            actions in every flow (incl. the Suppliers app, where the detail
-            pane renders the Supplier 360 instead of the legacy panel). ── */}
-      {deleteConfirm && (() => {
-        const dc = contacts.find((x) => x.id === deleteConfirm);
-        return (
-          <ScrollLockOverlay className="fixed inset-0 z-50 bg-[var(--bg-overlay)] flex items-center justify-center p-4">
-            <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl p-6 max-w-sm w-full">
-              <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">{t("delete.title")}</h3>
-              <p className="text-sm text-[var(--text-subtle)] mb-6">
-                {t("delete.confirm")} <strong className="text-[var(--text-primary)]">{dc ? contactDisplayName(dc) : ""}</strong>{t("delete.cannotUndo")}
-              </p>
-              <div className="flex gap-3 justify-end">
-                <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 rounded-lg text-sm border border-[var(--border-color)] hover:bg-[var(--bg-surface)] transition-colors">
-                  {t("btn.cancel")}
-                </button>
-                <button onClick={() => handleDelete(deleteConfirm)} className="px-4 py-2 rounded-lg text-sm bg-red-600 hover:bg-red-500 text-white transition-colors">
-                  {t("btn.delete")}
-                </button>
-              </div>
-            </div>
-          </ScrollLockOverlay>
-        );
-      })()}
+      {/* Delete confirmation — isolated host (window-event driven) so opening
+          it never re-renders this giant component. */}
+      <DeleteConfirmHost t={t} />
     </div>
   );
 }
