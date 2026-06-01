@@ -103,6 +103,7 @@ import EntityTasksStrip from "@/components/projects/EntityTasksStrip";
 import EntityInvoicesStrip from "@/components/invoices/EntityInvoicesStrip";
 import ProfileCompletenessBar from "@/components/ui/ProfileCompletenessBar";
 import GuidanceTip from "@/components/ui/GuidanceTip";
+import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TYPES
@@ -5197,7 +5198,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             {c.payment_info && (
               <div className="mt-3">
                 <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider block mb-1">{t("field.paymentInfo")}</span>
-                <p className="text-sm text-[var(--text-muted)] whitespace-pre-wrap">{c.payment_info}</p>
+                <p className="text-sm text-[var(--text-muted)] whitespace-pre-wrap"><AutoTranslatedText text={c.payment_info} /></p>
               </div>
             )}
           </Section>
@@ -5388,7 +5389,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             {c.quality_notes && (
               <div className="mt-3">
                 <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider block mb-1">{t("detail.qualityNotes")}</span>
-                <p className="text-sm text-[var(--text-muted)] whitespace-pre-wrap">{c.quality_notes}</p>
+                <p className="text-sm text-[var(--text-muted)] whitespace-pre-wrap"><AutoTranslatedText text={c.quality_notes} /></p>
               </div>
             )}
           </Section>

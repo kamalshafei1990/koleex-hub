@@ -4,6 +4,8 @@ import type { Translations } from "@/lib/i18n";
    ProfileCompletenessBar. Import via `commonT` and pass to useTranslation. */
 
 export const commonT: Translations = {
+  "translate.showOriginal": { en: "show original", zh: "显示原文", ar: "عرض الأصل" },
+  "translate.autoTranslated": { en: "auto-translated", zh: "自动翻译", ar: "ترجمة آلية" },
   "profile.completeness.title": {
     en: "Profile completeness",
     zh: "资料完成度",

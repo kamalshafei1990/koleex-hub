@@ -39,6 +39,7 @@ import CrossIcon from "@/components/icons/ui/CrossIcon";
 import Edit3Icon from "@/components/icons/ui/Edit3Icon";
 import FactorySection from "./FactorySection";
 import SuppliersHeader from "./SuppliersHeader";
+import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import ContactsSection from "./ContactsSection";
 import MediaSection from "./MediaSection";
 import TimelineSection from "./TimelineSection";
@@ -675,7 +676,7 @@ export default function SupplierDetail({ id }: { id: string }) {
             {str(s, "notes") ? (
               <div className="space-y-3">
                 <SectionHead title="Notes" />
-                <p className="text-sm leading-relaxed text-[var(--text-secondary)]">{str(s, "notes")}</p>
+                <p className="text-sm leading-relaxed text-[var(--text-secondary)]"><AutoTranslatedText text={str(s, "notes")} /></p>
               </div>
             ) : null}
           </section>
