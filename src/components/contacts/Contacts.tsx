@@ -3497,22 +3497,32 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     setExpandedFamily(null);
   }, []);
 
-  const handleEdit = useCallback(() => {
-    if (!selectedContact) return;
-    setForm(contactToForm(selectedContact));
-    setEditingId(selectedContact.id);
+  /* Open the edit form for a specific contact. Used by the in-detail Edit
+     button (via handleEdit) and the side-list row Edit button — both must
+     map the row through contactToForm (NOT a raw spread) so every field
+     populates and the supplier section-audit loads. */
+  const openEditFor = useCallback((c: ContactRow) => {
+    setSelectedId(c.id);
+    setForm(contactToForm(c));
+    setEditingId(c.id);
     setSupplierDept(null);
     setSupplierSectionAudit({});
     /* Load section-level attribution for suppliers (who edited each dept). */
-    if (selectedContact.contact_type === "supplier") {
-      fetch(`/api/suppliers/${selectedContact.id}/section-audit`, { credentials: "include" })
+    if (c.contact_type === "supplier") {
+      fetch(`/api/suppliers/${c.id}/section-audit`, { credentials: "include" })
         .then((r) => (r.ok ? r.json() : null))
         .then((d) => { if (d?.audit) setSupplierSectionAudit(d.audit); })
         .catch(() => { /* attribution is best-effort */ });
     }
     setView("form");
+    setMobileShowDetail(true);
     setExpandedFamily(null);
-  }, [selectedContact]);
+  }, []);
+
+  const handleEdit = useCallback(() => {
+    if (!selectedContact) return;
+    openEditFor(selectedContact);
+  }, [selectedContact, openEditFor]);
 
   /* After a supplier's base contact row is created, push the intelligence
      captured in the form into the canonical tables via the existing APIs.
@@ -4127,7 +4137,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     <div className={`flex items-center gap-0.5 shrink-0 ${isSelected ? "opacity-100" : "opacity-0 group-hover/row:opacity-100"} transition-opacity`}>
                       <button
                         type="button"
-                        onClick={(e) => { e.stopPropagation(); setSelectedId(c.id); setEditingId(c.id); setForm({ ...EMPTY_FORM, ...c } as ContactForm); setView("form"); setMobileShowDetail(true); }}
+                        onClick={(e) => { e.stopPropagation(); openEditFor(c); }}
                         title={t("btn.edit", "Edit")}
                         aria-label={t("btn.edit", "Edit")}
                         className="w-7 h-7 rounded-md flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"
@@ -5925,25 +5935,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </Section>
         )}
 
-        {/* Delete confirm */}
-        {deleteConfirm === c.id && (
-          <ScrollLockOverlay className="fixed inset-0 z-50 bg-[var(--bg-overlay)] flex items-center justify-center p-4">
-            <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl p-6 max-w-sm w-full">
-              <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">{t("delete.title")}</h3>
-              <p className="text-sm text-[var(--text-subtle)] mb-6">
-                {t("delete.confirm")} <strong className="text-[var(--text-primary)]">{contactDisplayName(c)}</strong>{t("delete.cannotUndo")}
-              </p>
-              <div className="flex gap-3 justify-end">
-                <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 rounded-lg text-sm border border-[var(--border-color)] hover:bg-[var(--bg-surface)] transition-colors">
-                  {t("btn.cancel")}
-                </button>
-                <button onClick={() => handleDelete(c.id)} className="px-4 py-2 rounded-lg text-sm bg-red-600 hover:bg-red-500 transition-colors">
-                  {t("btn.delete")}
-                </button>
-              </div>
-            </div>
-          </ScrollLockOverlay>
-        )}
+        {/* Delete confirmation is rendered once at the top level (see main
+            return) so it works from every entry point, including supplier
+            rows where this legacy detail panel is replaced by Supplier 360. */}
       </div>
     );
   };
@@ -8641,6 +8635,31 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
       {/* Type chooser modal */}
       {showTypeChooser && renderTypeChooser()}
+
+      {/* ── Delete confirmation — top-level so it works from the side-list row
+            actions in every flow (incl. the Suppliers app, where the detail
+            pane renders the Supplier 360 instead of the legacy panel). ── */}
+      {deleteConfirm && (() => {
+        const dc = contacts.find((x) => x.id === deleteConfirm);
+        return (
+          <ScrollLockOverlay className="fixed inset-0 z-50 bg-[var(--bg-overlay)] flex items-center justify-center p-4">
+            <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl p-6 max-w-sm w-full">
+              <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">{t("delete.title")}</h3>
+              <p className="text-sm text-[var(--text-subtle)] mb-6">
+                {t("delete.confirm")} <strong className="text-[var(--text-primary)]">{dc ? contactDisplayName(dc) : ""}</strong>{t("delete.cannotUndo")}
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 rounded-lg text-sm border border-[var(--border-color)] hover:bg-[var(--bg-surface)] transition-colors">
+                  {t("btn.cancel")}
+                </button>
+                <button onClick={() => handleDelete(deleteConfirm)} className="px-4 py-2 rounded-lg text-sm bg-red-600 hover:bg-red-500 text-white transition-colors">
+                  {t("btn.delete")}
+                </button>
+              </div>
+            </div>
+          </ScrollLockOverlay>
+        );
+      })()}
     </div>
   );
 }
