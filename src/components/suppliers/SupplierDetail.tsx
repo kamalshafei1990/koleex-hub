@@ -129,12 +129,17 @@ function statusTone(s: string): string {
   return "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]";
 }
 
-const SectionHead = ({ eyebrow, title }: { eyebrow?: string; title: string }) => (
-  <div className="space-y-1">
-    {eyebrow ? (
-      <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-faint)]">{eyebrow}</div>
+const SectionHead = ({ eyebrow, title, icon }: { eyebrow?: string; title: string; icon?: React.ReactNode }) => (
+  <div className="flex items-center gap-2.5">
+    {icon ? (
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]">{icon}</span>
     ) : null}
-    <h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">{title}</h3>
+    <div className="space-y-0.5">
+      {eyebrow ? (
+        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-faint)]">{eyebrow}</div>
+      ) : null}
+      <h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">{title}</h3>
+    </div>
   </div>
 );
 
@@ -656,12 +661,11 @@ export default function SupplierDetail({ id, embedded = false }: { id: string; e
 
         <GroupLabel>{t("sd.groupProfile", "Profile & operations")}</GroupLabel>
 
-        {/* Overview: contact + notes */}
-        <Section id="overview" noBorder>
-          <SectionHead eyebrow={t("sd.profile", "Profile")} title={t("sd.overview", "Overview")} />
-          <div className="mt-4 grid grid-cols-1 gap-8 md:grid-cols-2">
-            <div className="space-y-3">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-faint)]">{t("sd.contact", "Contact")}</div>
+        {/* Overview + Quality — two compact sections, side by side on wide screens */}
+        <div className="grid grid-cols-1 gap-x-10 gap-y-10 border-t border-[var(--border-subtle)] pt-8 lg:grid-cols-2">
+          <section id="overview" className="scroll-mt-16">
+            <SectionHead eyebrow={t("sd.profile", "Profile")} title={t("sd.overview", "Overview")} icon={<Building2Icon className="h-4 w-4" />} />
+            <div className="mt-4 space-y-5">
               <div className="space-y-2.5 text-sm">
                 {[
                   { icon: <EnvelopeIcon className="h-4 w-4" />, v: str(s, "supplier_email", "email") },
@@ -677,15 +681,39 @@ export default function SupplierDetail({ id, embedded = false }: { id: string; e
                     </div>
                   ))}
               </div>
+              {str(s, "notes") ? (
+                <div className="space-y-1.5">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-faint)]">{t("sd.notes", "Notes")}</div>
+                  <p className="text-sm leading-relaxed text-[var(--text-secondary)]"><AutoTranslatedText text={str(s, "notes")} /></p>
+                </div>
+              ) : null}
             </div>
-            {str(s, "notes") ? (
-              <div className="space-y-3">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-faint)]">{t("sd.notes", "Notes")}</div>
-                <p className="text-sm leading-relaxed text-[var(--text-secondary)]"><AutoTranslatedText text={str(s, "notes")} /></p>
-              </div>
-            ) : null}
-          </div>
-        </Section>
+          </section>
+
+          <section id="quality" className="scroll-mt-16">
+            <SectionHead eyebrow={t("sd.compliance", "Compliance")} title={t("sd.qualityCertifications", "Quality & certifications")} icon={<FileCheckIcon className="h-4 w-4" />} />
+            <div className="mt-4 space-y-5">
+              {certs.length === 0 ? (
+                <EmptyTab label={t("sd.noCertifications", "No certifications recorded.")} />
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {certs.map((c) => (
+                    <span key={c} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--bg-surface-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-primary)]">
+                      <FileCheckIcon className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
+                      {c}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {str(s, "sample_status") ? (
+                <div className="flex items-center gap-3">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-faint)]">{t("sd.sampleStatus", "Sample status")}</span>
+                  <StatusPill value={str(s, "sample_status")} />
+                </div>
+              ) : null}
+            </div>
+          </section>
+        </div>
 
         {/* Factory */}
         <Section id="factory">
@@ -695,31 +723,6 @@ export default function SupplierDetail({ id, embedded = false }: { id: string; e
         {/* Contacts (people) */}
         <Section id="contacts">
           <ContactsSection supplierId={id} contactPersons={data.contactPersons} qrCodes={data.qrCodes ?? []} onSaved={() => load({ silent: true })} />
-        </Section>
-
-        {/* Quality & certifications */}
-        <Section id="quality">
-          <SectionHead eyebrow={t("sd.compliance", "Compliance")} title={t("sd.qualityCertifications", "Quality & certifications")} />
-          <div className="mt-4 space-y-5">
-            {certs.length === 0 ? (
-              <EmptyTab label={t("sd.noCertifications", "No certifications recorded.")} />
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {certs.map((c) => (
-                  <span key={c} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--bg-surface-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-primary)]">
-                    <FileCheckIcon className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
-                    {c}
-                  </span>
-                ))}
-              </div>
-            )}
-            {str(s, "sample_status") ? (
-              <div className="flex items-center gap-3">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-faint)]">{t("sd.sampleStatus", "Sample status")}</span>
-                <StatusPill value={str(s, "sample_status")} />
-              </div>
-            ) : null}
-          </div>
         </Section>
 
         <GroupLabel>{t("sd.groupCommercial", "Commercial intelligence")}</GroupLabel>
@@ -751,7 +754,7 @@ export default function SupplierDetail({ id, embedded = false }: { id: string; e
 
         {/* Products supplied */}
         <Section id="products" noBorder>
-          <SectionHead eyebrow={t("sd.catalogue", "Catalogue")} title={t("sd.productsSupplied", "Products supplied")} />
+          <SectionHead eyebrow={t("sd.catalogue", "Catalogue")} title={t("sd.productsSupplied", "Products supplied")} icon={<PackageIcon className="h-4 w-4" />} />
           <div className="mt-4">
             {data.products.length === 0 ? (
               <EmptyTab label={t("sd.noProducts", "No products are linked to this supplier yet.")} />
@@ -777,7 +780,7 @@ export default function SupplierDetail({ id, embedded = false }: { id: string; e
 
         {/* Purchase orders */}
         <Section id="orders">
-          <SectionHead eyebrow={t("sd.purchasing", "Purchasing")} title={t("sd.purchaseOrders", "Purchase Orders")} />
+          <SectionHead eyebrow={t("sd.purchasing", "Purchasing")} title={t("sd.purchaseOrders", "Purchase Orders")} icon={<ReceiptIcon className="h-4 w-4" />} />
           <div className="mt-4">
             {data.purchaseOrders.length === 0 ? (
               <EmptyTab label={t("sd.noPurchaseOrders", "No purchase orders linked to this supplier yet.")} />
@@ -812,7 +815,7 @@ export default function SupplierDetail({ id, embedded = false }: { id: string; e
         <Section id="bills">
           <div className="space-y-8">
             <div className="space-y-3">
-              <SectionHead eyebrow={t("sd.accountsPayable", "Accounts payable")} title={t("sd.vendorBills", "Vendor bills")} />
+              <SectionHead eyebrow={t("sd.accountsPayable", "Accounts payable")} title={t("sd.vendorBills", "Vendor bills")} icon={<WalletIcon className="h-4 w-4" />} />
               {data.bills.length === 0 ? (
                 <EmptyTab label={t("sd.noBills", "No bills recorded for this supplier.")} />
               ) : (
