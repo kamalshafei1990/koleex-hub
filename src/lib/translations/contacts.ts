@@ -1278,6 +1278,10 @@ export const contactsT: Translations = {
   "cov.clearAll": { en: "Clear", zh: "清除", ar: "مسح" },
   "cov.pickSubFirst": { en: "Select at least one subcategory above", zh: "请先在上方选择至少一个子类别", ar: "اختر فئة فرعية واحدة على الأقل أعلاه" },
   "cov.coversN": { en: "covers {n}", zh: "已覆盖 {n}", ar: "يغطي {n}" },
+  /* catalog viewer */
+  "cov.catalog": { en: "Catalog", zh: "目录", ar: "الكتالوج" },
+  "cov.viewCatalog": { en: "View catalog", zh: "查看目录", ar: "عرض الكتالوج" },
+  "cov.openInNewTab": { en: "Open in new tab", zh: "在新标签页打开", ar: "فتح في علامة تبويب جديدة" },
 
   /* ── Supplier 360 — risk / negotiation / stability labels (audit fill) ── */
   "sd.delete": { en: "Delete", zh: "删除", ar: "حذف" },

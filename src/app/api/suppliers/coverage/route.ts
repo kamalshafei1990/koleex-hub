@@ -38,7 +38,7 @@ async function enrichSuppliers(tid: string, supplierIds: string[]): Promise<Map<
   const map = new Map<string, CoverageSupplier>();
   if (supplierIds.length === 0) return map;
 
-  const [contactsRes, riskRes, sourcingRes] = await Promise.all([
+  const [contactsRes, riskRes, sourcingRes, catalogRes] = await Promise.all([
     supabaseServer.from("contacts")
       .select("id, company_name_en, display_name, photo_url, country, strategic_status, is_active")
       .eq("tenant_id", tid).eq("contact_type", "supplier").in("id", supplierIds),
@@ -48,6 +48,14 @@ async function enrichSuppliers(tid: string, supplierIds: string[]): Promise<Map<
     supabaseServer.from("supplier_sourcing_profile")
       .select("supplier_id, sourcing_score_override")
       .eq("tenant_id", tid).in("supplier_id", supplierIds),
+    // Catalog / brochure PDFs (non-sensitive → public `media` bucket, direct URL).
+    supabaseServer.from("supplier_media")
+      .select("supplier_id, title, file_name, file_url, is_primary, created_at")
+      .eq("tenant_id", tid).in("supplier_id", supplierIds)
+      .in("category", ["product_catalog", "brochure"])
+      .is("deleted_at", null)
+      .order("is_primary", { ascending: false })
+      .order("created_at", { ascending: false }),
   ]);
 
   const riskBy = new Map<string, { risk_level: string | null; internal_evaluation_score: number | null }>();
@@ -57,6 +65,12 @@ async function enrichSuppliers(tid: string, supplierIds: string[]): Promise<Map<
   const srcBy = new Map<string, number | null>();
   for (const r of (sourcingRes.data ?? []) as Array<{ supplier_id: string; sourcing_score_override: number | null }>) {
     srcBy.set(r.supplier_id, r.sourcing_score_override);
+  }
+  // First (most recent / primary) catalog wins — query is already ordered.
+  const catalogBy = new Map<string, { url: string; name: string }>();
+  for (const r of (catalogRes.data ?? []) as Array<{ supplier_id: string; title: string | null; file_name: string | null; file_url: string | null }>) {
+    if (!r.file_url || catalogBy.has(r.supplier_id)) continue;
+    catalogBy.set(r.supplier_id, { url: r.file_url, name: (r.title || r.file_name || "Catalog").trim() });
   }
 
   for (const c of (contactsRes.data ?? []) as Array<Record<string, unknown>>) {
@@ -72,6 +86,8 @@ async function enrichSuppliers(tid: string, supplierIds: string[]): Promise<Map<
       riskLevel: risk?.risk_level ?? null,
       evaluationScore: typeof risk?.internal_evaluation_score === "number" ? risk.internal_evaluation_score : null,
       sourcingScore: srcBy.get(id) ?? null,
+      catalogUrl: catalogBy.get(id)?.url ?? null,
+      catalogName: catalogBy.get(id)?.name ?? null,
     });
   }
   return map;

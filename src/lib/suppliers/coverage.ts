@@ -3,13 +3,17 @@
 
    A coverage row assigns ONE supplier to ONE taxonomy node
    (division → category → subcategory) with a sourcing role. This module holds
-   the shared types, the coverage-health rule, and the taxonomy-tree builder
-   that drives the visual board. Taxonomy source-of-truth is the canonical
-   DIVISIONS / CATEGORIES constants (product-coding/data.ts) — no parallel
-   taxonomy is introduced.
-   --------------------------------------------------------------------------- */
+   the shared types, the coverage-health rule, and the board's index helpers.
 
-import { DIVISIONS, CATEGORIES, type Category } from "@/components/knowledge/product-coding/data";
+   Taxonomy source-of-truth is the RUNTIME Supabase taxonomy (divisions /
+   categories / subcategories tables — the same ones the /categories and
+   /subcategories admin edit). The board fetches it from /api/suppliers/taxonomy
+   so that adding or renaming a category/subcategory, or swapping an icon, is
+   reflected here immediately. The per-subcategory coverage key is the
+   subcategory `code` when set, else its `slug` — every subcategory is therefore
+   assignable, including ones added later via the admin (which don't carry a
+   KOLEEX code yet).
+   --------------------------------------------------------------------------- */
 
 export const COVERAGE_ROLES = ["preferred", "approved", "backup", "experimental", "blocked"] as const;
 export type CoverageRole = (typeof COVERAGE_ROLES)[number];
@@ -34,6 +38,8 @@ export interface CoverageSupplier {
   riskLevel: string | null;        // low | medium | high | critical | null
   evaluationScore: number | null;  // 0-100 (internal_evaluation_score)
   sourcingScore: number | null;    // 0-100 override, if set
+  catalogUrl: string | null;       // latest product-catalog / brochure PDF, if any
+  catalogName: string | null;      // its title / file name (for the popup header)
 }
 
 /** One persisted assignment, enriched with the supplier snapshot for the UI. */
@@ -82,46 +88,19 @@ export function computeCoverageHealth(rows: CoverageRow[]): CoverageHealth {
   return { status, total: rows.length, usable: usable.length, approved: approved.length, backups: backups.length, soleSource };
 }
 
-/* ── Taxonomy tree ──────────────────────────────────────────────────────────
-   Categories carry an X-style code; the matching division is the one whose
-   `prefix` is the longest prefix of that code. Only "live" divisions that
-   actually own categories are rendered as full coverage maps. */
-export interface TaxonomySubcategory { code: string; label: string }
-export interface TaxonomyCategory { code: string; label: string; slug: string; blurb: string; subcategories: TaxonomySubcategory[] }
+/* ── Taxonomy tree (runtime, DB-driven) ─────────────────────────────────────
+   Mirrors the Supabase divisions/categories/subcategories tables. `key` is the
+   per-subcategory coverage key (the subcategory `code` when set, else its
+   `slug`); `code` is the human KOLEEX code for display (may be null); `slug`
+   drives the icon lookup. The board fetches this from /api/suppliers/taxonomy. */
+export interface TaxonomySubcategory { key: string; code: string | null; label: string; slug: string }
+export interface TaxonomyCategory { slug: string; label: string; blurb: string; subcategories: TaxonomySubcategory[] }
 export interface TaxonomyDivision {
-  id: string;
+  id: string;            // division slug — used as coverage `division_slug`
   name: string;
   description: string;
   status: "live" | "planned";
   categories: TaxonomyCategory[];
-}
-
-function divisionIdForCategory(cat: Category): string | null {
-  const matches = DIVISIONS
-    .filter((d) => cat.code.toUpperCase().startsWith(d.prefix.toUpperCase()))
-    .sort((a, b) => b.prefix.length - a.prefix.length);
-  return matches[0]?.id ?? null;
-}
-
-/** Build the full Division → Category → Subcategory tree from the canonical
- *  constants. Divisions are returned in canonical order; live divisions that
- *  own categories come first, planned/empty ones after. */
-export function buildTaxonomyTree(): TaxonomyDivision[] {
-  return DIVISIONS.map((d) => ({
-    id: d.id,
-    name: d.name,
-    description: d.description,
-    status: d.status,
-    categories: CATEGORIES
-      .filter((c) => divisionIdForCategory(c) === d.id)
-      .map((c) => ({
-        code: c.code,
-        label: c.label,
-        slug: c.slug,
-        blurb: c.blurb,
-        subcategories: c.subcategories.map((s) => ({ code: s.code, label: s.label })),
-      })),
-  }));
 }
 
 /** Index coverage rows by `${category_slug}::${subcategory_code}` for O(1) board lookups. */
