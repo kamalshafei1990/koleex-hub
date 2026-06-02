@@ -343,7 +343,7 @@ interface ContactForm {
   category: string;
   catalogues: { name: string; url: string; type: string; uploaded_at: string }[];
   documents: { doc_name: string; name: string; url: string; type: string; uploaded_at: string }[];
-  contact_persons: { name: string; name_cn?: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string; whatsapp?: string; wechat_id?: string; wechat_qr?: string; role_category?: string; is_decision_maker?: boolean; is_primary?: boolean; telegram?: string; wecom_id?: string; line_id?: string; skype_id?: string; preferred_channel?: string; preferred_language?: string; timezone?: string; available_hours?: string; reliability?: string; response_speed?: string }[];
+  contact_persons: { name: string; name_cn?: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string; whatsapp?: string; wechat_id?: string; wechat_qr?: string; role_category?: string; is_decision_maker?: boolean; is_primary?: boolean; telegram?: string; wecom_id?: string; line_id?: string; skype_id?: string; preferred_channel?: string; preferred_language?: string; timezone?: string; available_hours?: string; reliability?: string; response_speed?: string; id_image?: string }[];
   bank_accounts: { bank_name: string; account_name: string; account_number: string; swift_code: string; iban: string; branch: string; currency: string; info_image?: string }[];
   payment_info: string;
   /* ── Mobile payment (China) — handle/account + QR image ── */
@@ -3729,7 +3729,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       const tasks: Promise<unknown>[] = [];
       if (sIntel.strategic_status) tasks.push(j(`/api/suppliers/${id}`, "PATCH", { strategic_status: sIntel.strategic_status, strategic_status_reason: sIntel.strategic_status_reason || null }));
       for (const c of sIntel.classifications) tasks.push(j(`/api/suppliers/${id}/classifications`, "POST", { classification: c, is_primary: c === sIntel.primary_class }));
-      for (const p of form.contact_persons) { if ((p.name || "").trim()) tasks.push(j(`/api/suppliers/${id}/contacts`, "POST", ne({ full_name: p.name, name_cn: p.name_cn, position: p.position, department: p.department, mobile: p.mobile || p.phone, email: p.email, whatsapp: p.whatsapp, wechat_id: p.wechat_id, telegram: p.telegram, wecom_id: p.wecom_id, line_id: p.line_id, skype_id: p.skype_id, role_category: p.role_category, reliability: p.reliability, preferred_channel: p.preferred_channel, preferred_language: p.preferred_language, timezone: p.timezone, response_speed: p.response_speed, available_hours: p.available_hours, is_primary: p.is_primary, is_decision_maker: p.is_decision_maker, notes: p.notes }))); }
+      for (const p of form.contact_persons) { if ((p.name || "").trim()) tasks.push(j(`/api/suppliers/${id}/contacts`, "POST", ne({ full_name: p.name, name_cn: p.name_cn, position: p.position, department: p.department, mobile: p.mobile || p.phone, email: p.email, whatsapp: p.whatsapp, wechat_id: p.wechat_id, telegram: p.telegram, wecom_id: p.wecom_id, line_id: p.line_id, skype_id: p.skype_id, role_category: p.role_category, reliability: p.reliability, preferred_channel: p.preferred_channel, preferred_language: p.preferred_language, timezone: p.timezone, response_speed: p.response_speed, available_hours: p.available_hours, id_image: p.id_image, is_primary: p.is_primary, is_decision_maker: p.is_decision_maker, notes: p.notes }))); }
       const fb = num(ne(sIntel.factory), ["production_lines", "monthly_capacity", "annual_output", "factory_size_sqm", "employee_count", "qc_staff_count", "rd_staff_count", "export_percentage", "lead_time_days"]);
       const fem = sIntel.factory.main_export_markets; if (typeof fem === "string" && fem.trim()) fb.main_export_markets = fem.split(",").map((s) => s.trim()).filter(Boolean);
       const fpc = sIntel.factory.production_categories; if (typeof fpc === "string" && fpc.trim()) fb.production_categories = fpc.split(",").map((s) => s.trim()).filter(Boolean);
@@ -7838,9 +7838,16 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     {expandedFamily === 1000 + i && (
                       <div className="px-3 pb-3 pt-1 ms-8 space-y-2 border-t border-[var(--border-faint)]">
                         <div className="grid grid-cols-2 gap-2 mt-2">
-                          <input value={cp.position} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], position: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.position")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
-                          <input value={cp.department} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], department: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.department")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                          <input value={cp.position} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], position: e.target.value }; setField("contact_persons", arr); }} placeholder={t("placeholder.positionsMulti", "Position(s) — comma-separated")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                          <input value={cp.department} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], department: e.target.value }; setField("contact_persons", arr); }} placeholder={t("placeholder.departmentsMulti", "Department(s) — comma-separated")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
                         </div>
+                        {((cp.position || "").includes(",") || (cp.department || "").includes(",")) && (
+                          <div className="flex flex-wrap gap-1">
+                            {[...(cp.position || "").split(","), ...(cp.department || "").split(",")].map(s => s.trim()).filter(Boolean).map((tag, ti) => (
+                              <span key={ti} className="inline-flex items-center rounded-full bg-[var(--bg-surface-subtle)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-secondary)]">{tag}</span>
+                            ))}
+                          </div>
+                        )}
                         <div className="grid grid-cols-2 gap-2">
                           <input type="tel" inputMode="tel" autoComplete="tel" value={cp.phone} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], phone: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.phone")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
                           <input type="tel" inputMode="tel" autoComplete="tel" value={cp.mobile} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], mobile: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.contactMobile")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
@@ -7870,7 +7877,30 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                           <SelectInput label={t("field.preferredLanguage", "Preferred language")} value={cp.preferred_language ?? ""} onChange={v => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], preferred_language: v }; setField("contact_persons", arr); }} options={CONTACT_LANGUAGES} renderLabel={tOpt} selectLabel={t("detail.select")} />
                           <SelectInput label={t("field.timezone", "Timezone")} value={cp.timezone ?? ""} onChange={v => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], timezone: v }; setField("contact_persons", arr); }} options={TIMEZONES} selectLabel={t("detail.select")} />
                         </div>
-                        <Input label={t("field.availableHours", "Available hours")} value={cp.available_hours ?? ""} onChange={v => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], available_hours: v }; setField("contact_persons", arr); }} placeholder="e.g. 09:00–18:00 CST" />
+                        {(() => {
+                          const parts = (cp.available_hours ?? "").split(/[–-]/);
+                          const from = (parts[0] || "").trim();
+                          const to = (parts[1] || "").trim();
+                          const setHours = (f: string, tt: string) => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], available_hours: (f || tt) ? `${f}–${tt}` : "" }; setField("contact_persons", arr); };
+                          const cls = "h-9 flex-1 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
+                          return (
+                            <div>
+                              <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.availableHours", "Available hours")} {cp.timezone ? <span className="text-[var(--text-dim)]">({cp.timezone})</span> : null}</label>
+                              <div className="flex items-center gap-2">
+                                <input type="time" value={from} onChange={e => setHours(e.target.value, to)} aria-label={t("field.fromTime", "From")} className={cls} />
+                                <span className="text-[var(--text-dim)]">–</span>
+                                <input type="time" value={to} onChange={e => setHours(from, e.target.value)} aria-label={t("field.toTime", "To")} className={cls} />
+                              </div>
+                            </div>
+                          );
+                        })()}
+                        <ImageDropField
+                          label={t("field.contactIdUpload", "ID / business card (image or QR)")}
+                          value={cp.id_image || ""}
+                          onChange={v => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], id_image: v }; setField("contact_persons", arr); }}
+                          hint={t("hint.contactIdUpload", "Drop the ID card, badge, or QR — PNG / JPG")}
+                          icon={<FileCheckIcon size={14} />}
+                        />
                         <textarea value={cp.notes} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], notes: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.notes")} rows={2} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none resize-none" />
                         <div className="flex flex-wrap gap-4 text-sm text-[var(--text-muted)]">
                           <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!cp.is_primary} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], is_primary: e.target.checked }; setField("contact_persons", arr); }} className="accent-[var(--bg-inverted)]" />{t("field.isPrimaryContact", "Primary contact")}</label>

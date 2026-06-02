@@ -12,7 +12,7 @@ const TEXT_FIELDS = new Set<string>([
   "full_name", "name_cn", "role", "department", "position",
   "email", "mobile", "whatsapp", "telegram", "wechat_id", "wecom_id",
   "line_id", "skype_id", "preferred_language", "timezone",
-  "response_speed", "notes",
+  "response_speed", "notes", "id_image",
 ]);
 const BOOL_FIELDS = new Set<string>(["is_primary", "is_decision_maker"]);
 const NUM_FIELDS = new Set<string>(["reliability_score", "avg_response_hours"]);
