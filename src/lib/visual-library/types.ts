@@ -37,6 +37,72 @@ export const ASSET_CATEGORIES = [
 ] as const;
 export type AssetCategory = (typeof ASSET_CATEGORIES)[number];
 
+/* ── Collections / Icon Packs (Phase: Collections Intelligence) ── */
+
+export const COLLECTION_TYPES = [
+  "ui_system", "business_system", "product_system", "icon_pack", "illustration_pack",
+  "brand_assets", "navigation", "dashboard", "semantic_group", "style_system", "experimental",
+] as const;
+export type CollectionType = (typeof COLLECTION_TYPES)[number];
+
+export const COLLECTION_TYPE_LABEL: Record<CollectionType, string> = {
+  ui_system: "UI System", business_system: "Business System", product_system: "Product System",
+  icon_pack: "Icon Pack", illustration_pack: "Illustration Pack", brand_assets: "Brand Assets",
+  navigation: "Navigation", dashboard: "Dashboard", semantic_group: "Semantic Group",
+  style_system: "Style System", experimental: "Experimental",
+};
+
+export const COLLECTION_ROLES = [
+  "primary", "secondary", "accent", "deprecated", "recommended", "fallback", "featured",
+] as const;
+export type CollectionRole = (typeof COLLECTION_ROLES)[number];
+
+export const COLLECTION_STATES = ["draft", "approved", "archived", "deprecated", "internal_only"] as const;
+export type CollectionState = (typeof COLLECTION_STATES)[number];
+
+export const COLLECTION_STYLES = [
+  "minimal_outline", "apple_style", "rounded_geometry", "industrial_controls",
+  "technical_icons", "monochrome", "filled",
+] as const;
+
+/** Free grouping buckets shown in the browser sidebar. */
+export const COLLECTION_CATEGORIES = ["Core System", "Business", "Design", "Product", "Other"] as const;
+
+export interface VisualCollection {
+  id: string;
+  tenant_id: string;
+  code: string | null;
+  name: string;
+  slug: string;
+  description: string | null;
+  category: string | null;
+  collection_type: CollectionType;
+  style_type: string | null;
+  icon_asset_id: string | null;
+  cover_asset_id: string | null;
+  approval_status: CollectionState;
+  visibility: string;
+  usage_context: Record<string, unknown>;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  // Enriched at read-time
+  asset_count?: number;
+  icon_url?: string | null;
+  cover_url?: string | null;
+}
+
+export interface CollectionAsset {
+  id: string;
+  collection_id: string;
+  asset_id: string;
+  role: CollectionRole;
+  sort_order: number;
+  notes: string | null;
+  created_at: string;
+  asset?: VisualAsset | null;
+}
+
 /* ── Semantic Relationships (Phase: Semantic Intelligence) ── */
 
 export const RELATIONSHIP_TYPES = [

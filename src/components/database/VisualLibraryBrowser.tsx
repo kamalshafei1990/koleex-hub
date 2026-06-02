@@ -18,6 +18,8 @@ import { GENERAL_ICON_CATEGORIES } from "@/lib/visual-library/taxonomy";
 import VisualAssetCard, { STATE_PILL } from "@/components/database/VisualAssetCard";
 import VisualAssetDetailDrawer from "@/components/database/VisualAssetDetailDrawer";
 import VisualLibraryUploadModal from "@/components/database/VisualLibraryUploadModal";
+import AddToCollectionModal from "@/components/database/AddToCollectionModal";
+import LayersIcon from "@/components/icons/ui/LayersIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import BadgeCheckIcon from "@/components/icons/ui/BadgeCheckIcon";
@@ -43,6 +45,7 @@ export default function VisualLibraryBrowser() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [openAsset, setOpenAsset] = useState<VisualAsset | null>(null);
   const [showUpload, setShowUpload] = useState(false);
+  const [showBulkCol, setShowBulkCol] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
 
   const reqRef = useRef(0);
@@ -239,6 +242,10 @@ export default function VisualLibraryBrowser() {
               className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
               {bulkBusy ? <SpinnerIcon size={12} className="animate-spin" /> : <BadgeCheckIcon size={12} />} Approve
             </button>
+            <button type="button" disabled={bulkBusy} onClick={() => setShowBulkCol(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-50">
+              <LayersIcon size={12} /> Collection
+            </button>
             <button type="button" disabled={bulkBusy} onClick={() => bulkAction("archive")}
               className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-50">
               <ArchiveIcon size={12} /> Archive
@@ -254,6 +261,9 @@ export default function VisualLibraryBrowser() {
       )}
       {showUpload && (
         <VisualLibraryUploadModal onClose={() => setShowUpload(false)} onUploaded={() => { setShowUpload(false); load(); }} />
+      )}
+      {showBulkCol && (
+        <AddToCollectionModal assetIds={Array.from(selected)} onClose={() => setShowBulkCol(false)} onDone={() => { setShowBulkCol(false); clearSelection(); }} />
       )}
     </div>
   );

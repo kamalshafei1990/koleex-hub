@@ -12,6 +12,8 @@ import { displayState } from "@/lib/visual-library/types";
 import { uploadToStorage } from "@/lib/storage-client";
 import { STATE_PILL } from "@/components/database/VisualAssetCard";
 import SemanticRelationships from "@/components/database/SemanticRelationships";
+import AddToCollectionModal from "@/components/database/AddToCollectionModal";
+import LayersIcon from "@/components/icons/ui/LayersIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import BadgeCheckIcon from "@/components/icons/ui/BadgeCheckIcon";
 import ArchiveIcon from "@/components/icons/ui/ArchiveIcon";
@@ -131,6 +133,15 @@ export default function VisualAssetDetailDrawer({
     setAiBusy(false);
     if (ok) { setAiDirty(false); onChanged(); }
   };
+  // Collection memberships
+  const [memberships, setMemberships] = useState<{ link_id: string; collection_id: string; name: string; slug: string | null }[]>([]);
+  const [showAddCol, setShowAddCol] = useState(false);
+  const loadMemberships = async () => {
+    const res = await fetch(`/api/visual-library/${asset.id}/collections`, { credentials: "include", cache: "no-store" });
+    const j = res.ok ? await res.json() : { memberships: [] };
+    setMemberships(j.memberships ?? []);
+  };
+  useEffect(() => { loadMemberships(); }, [asset.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const state = displayState(asset);
   const isApproved = asset.approval_status === "approved";
   const isArchived = asset.status === "archived";
@@ -275,6 +286,31 @@ export default function VisualAssetDetailDrawer({
               value={ai.ai_prompt_description} onChange={(v) => { setAi((s) => ({ ...s, ai_prompt_description: v })); setAiDirty(true); }} />
           </div>
 
+          {/* Collections */}
+          <div className="mt-4">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">
+                Collections{memberships.length > 0 ? ` · ${memberships.length}` : ""}
+              </span>
+              <button type="button" onClick={() => setShowAddCol(true)}
+                className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11.5px] font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)]">
+                <LayersIcon size={12} /> Add
+              </button>
+            </div>
+            {memberships.length === 0 ? (
+              <p className="text-[11.5px] text-[var(--text-dim)]">Not in any collection yet.</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {memberships.map((m) => (
+                  <a key={m.link_id} href={m.slug ? `/database/collections/${m.slug}` : "#"}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1 text-[11.5px] text-[var(--text-primary)] hover:border-[var(--border-color)]">
+                    <LayersIcon size={11} className="text-[var(--text-dim)]" /> {m.name}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Semantic relationships */}
           <SemanticRelationships asset={{ id: asset.id, title: asset.title }} onOpenAsset={onOpenAsset} />
 
@@ -310,6 +346,10 @@ export default function VisualAssetDetailDrawer({
           )}
         </div>
       </div>
+
+      {showAddCol && (
+        <AddToCollectionModal assetIds={[asset.id]} onClose={() => setShowAddCol(false)} onDone={() => { setShowAddCol(false); loadMemberships(); }} />
+      )}
     </div>
   );
 }

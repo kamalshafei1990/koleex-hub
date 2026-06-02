@@ -13,6 +13,7 @@ interface RouteMeta { title: string; subtitle?: string }
 const ROUTE_META: Record<string, RouteMeta> = {
   "/database":                { title: "Database",       subtitle: "Centralized data systems for the KOLEEX ecosystem." },
   "/database/visual-library": { title: "Visual Library", subtitle: "One approved source of truth for every icon, image and visual asset." },
+  "/database/collections":    { title: "Collections",    subtitle: "Curated visual systems & icon packs — the KOLEEX design infrastructure." },
 };
 
 function metaFor(pathname: string): RouteMeta {
