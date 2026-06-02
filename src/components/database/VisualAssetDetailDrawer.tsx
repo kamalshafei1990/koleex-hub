@@ -22,6 +22,7 @@ import { STATE_PILL } from "@/components/database/VisualAssetCard";
 import SemanticRelationships from "@/components/database/SemanticRelationships";
 import AddToCollectionModal from "@/components/database/AddToCollectionModal";
 import UsageGovernance from "@/components/database/UsageGovernance";
+import AssetQuality from "@/components/database/AssetQuality";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import BadgeCheckIcon from "@/components/icons/ui/BadgeCheckIcon";
@@ -92,7 +93,7 @@ function AiField({ label, value, placeholder, onChange }: { label: string; value
   );
 }
 
-const TABS = ["Overview", "Intelligence", "Governance", "Collections", "Relationships", "Usage", "History"] as const;
+const TABS = ["Overview", "Intelligence", "Governance", "Collections", "Relationships", "Usage", "History", "Quality"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function VisualAssetDetailDrawer({
@@ -175,6 +176,7 @@ export default function VisualAssetDetailDrawer({
           {tab === "Relationships" && <SemanticRelationships asset={{ id: asset.id, title: asset.title }} onOpenAsset={onOpenAsset} />}
           {tab === "Usage" && <UsageTab asset={asset} />}
           {tab === "History" && <HistoryTab assetId={asset.id} />}
+          {tab === "Quality" && <AssetQuality asset={{ id: asset.id, title: asset.title, public_url: asset.public_url }} onOpenAsset={onOpenAsset} />}
         </div>
 
         {/* Footer actions (always available) */}

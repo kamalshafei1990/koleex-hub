@@ -302,6 +302,55 @@ export interface VisualAsset {
   public_url?: string | null;
 }
 
+/* ── Visual Quality Control (Phase: Visual QA) ── */
+
+export const QUALITY_STATUSES = ["excellent", "good", "acceptable", "poor", "rejected"] as const;
+export type QualityStatus = (typeof QUALITY_STATUSES)[number];
+
+export interface QualityWarning {
+  kind: string;
+  severity: "warning" | "error";
+  message: string;
+}
+
+export interface QualityProfile {
+  id?: string;
+  asset_id: string;
+  quality_score: number;
+  style_consistency_score: number;
+  stroke_consistency_score: number;
+  spacing_score: number;
+  dark_mode_score: number;
+  simplicity_score: number;
+  uniqueness_score: number;
+  readability_score: number;
+  scalability_score: number;
+  duplicate_risk_score: number;
+  visual_noise_score: number;
+  outdated_risk_score: number;
+  collection_match_score: number;
+  overall_status: QualityStatus;
+  stroke_width: string | null;
+  stroke_style: string | null;
+  corner_style: string | null;
+  shape_language: string | null;
+  complexity_level: string | null;
+  visual_density: number | null;
+  padding_ratio: number | null;
+  symmetry_score: number | null;
+  optical_balance_score: number | null;
+  monochrome_compatibility: number | null;
+  dark_background_compatibility: number | null;
+  small_size_readability: number | null;
+  duplicate_group_id: string | null;
+  visually_similar_to: string[];
+  ai_notes: string | null;
+  manual_notes: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  computed_at?: string;
+}
+
 export interface VisualAssetEvent {
   id: string;
   asset_id: string;
