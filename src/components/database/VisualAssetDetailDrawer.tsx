@@ -24,6 +24,7 @@ import AddToCollectionModal from "@/components/database/AddToCollectionModal";
 import UsageGovernance from "@/components/database/UsageGovernance";
 import AssetQuality from "@/components/database/AssetQuality";
 import AssetDna from "@/components/database/AssetDna";
+import AssetReview from "@/components/database/AssetReview";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import BadgeCheckIcon from "@/components/icons/ui/BadgeCheckIcon";
@@ -94,7 +95,7 @@ function AiField({ label, value, placeholder, onChange }: { label: string; value
   );
 }
 
-const TABS = ["Overview", "Intelligence", "Governance", "Collections", "Relationships", "Usage", "History", "Quality", "DNA"] as const;
+const TABS = ["Overview", "Intelligence", "Governance", "Collections", "Relationships", "Usage", "History", "Quality", "DNA", "Review"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function VisualAssetDetailDrawer({
@@ -179,6 +180,7 @@ export default function VisualAssetDetailDrawer({
           {tab === "History" && <HistoryTab assetId={asset.id} />}
           {tab === "Quality" && <AssetQuality asset={{ id: asset.id, title: asset.title, public_url: asset.public_url }} onOpenAsset={onOpenAsset} />}
           {tab === "DNA" && <AssetDna asset={{ id: asset.id, title: asset.title }} onOpenAsset={onOpenAsset} />}
+          {tab === "Review" && <AssetReview asset={{ id: asset.id, title: asset.title, public_url: asset.public_url }} onOpenAsset={onOpenAsset} onChanged={onChanged} />}
         </div>
 
         {/* Footer actions (always available) */}
@@ -387,7 +389,7 @@ function UsageTab({ asset }: { asset: VisualAsset }) {
 const EVENT_LABEL: Record<string, string> = {
   approved: "Approved", unapprove: "Approval removed", submit: "Submitted for review", deprecate: "Deprecated",
   archive: "Archived", restore: "Restored", file_attached: "Icon attached", file_replaced: "Icon replaced",
-  governance_rule: "Governance rule", relationship: "Relationship", collection: "Collection", edited: "Edited", uploaded: "Uploaded",
+  governance_rule: "Governance rule", relationship: "Relationship", collection: "Collection", edited: "Edited", uploaded: "Uploaded", review: "Review decision",
 };
 function HistoryTab({ assetId }: { assetId: string }) {
   const [events, setEvents] = useState<VisualAssetEvent[]>([]);

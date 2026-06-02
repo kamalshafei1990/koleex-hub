@@ -30,6 +30,22 @@ async function loadOwned(id: string, tenantId: string) {
   return data as { id: string; tenant_id: string; svg_path: string | null; version: number; usage_count: number } | null;
 }
 
+export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const auth = await requireAuth(req);
+  if (auth instanceof NextResponse) return auth;
+  const deny = await requireModuleAccess(auth, "Database");
+  if (deny) return deny;
+  const { id } = await ctx.params;
+  const { data, error } = await supabaseServer.from("visual_assets").select("*").eq("id", id).eq("tenant_id", auth.tenant_id).maybeSingle();
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!data) return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const bucket = (data.storage_bucket as string) || "media";
+  const path = data.svg_path as string | null;
+  const asset = { ...data, public_url: path ? `${base}/storage/v1/object/public/${bucket}/${path}` : null };
+  return NextResponse.json({ asset });
+}
+
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;

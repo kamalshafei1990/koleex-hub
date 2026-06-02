@@ -302,6 +302,48 @@ export interface VisualAsset {
   public_url?: string | null;
 }
 
+/* ── Visual Review Board (Phase: Approval Workflow) ── */
+
+export const REVIEW_STATUSES = ["pending", "approved", "approved_with_notes", "needs_revision", "replace_recommended", "deprecated", "rejected"] as const;
+export type ReviewStatus = (typeof REVIEW_STATUSES)[number];
+
+export const REVIEW_PRIORITIES = ["low", "medium", "high", "critical"] as const;
+export type ReviewPriority = (typeof REVIEW_PRIORITIES)[number];
+
+export const RISK_LEVELS = ["low", "medium", "high", "critical"] as const;
+export type RiskLevel = (typeof RISK_LEVELS)[number];
+
+export const REVIEW_STATUS_LABEL: Record<ReviewStatus, string> = {
+  pending: "Pending", approved: "Approved", approved_with_notes: "Approved (notes)",
+  needs_revision: "Needs revision", replace_recommended: "Replace recommended",
+  deprecated: "Deprecated", rejected: "Rejected",
+};
+
+export const BOARD_TYPES = ["production", "design_review", "migration", "cleanup", "duplicate_review", "quality_review", "branding_review"] as const;
+export type BoardType = (typeof BOARD_TYPES)[number];
+
+export interface ReviewChecklist { id: string; name: string; category: string | null; weight: number; required: boolean; sort_order: number }
+export interface ReviewScore { id?: string; checklist_id: string; score: number; passed: boolean; notes: string | null }
+export interface ReviewComment { id: string; user_name: string | null; comment: string; comment_type: string; created_at: string }
+
+export interface AssetReview {
+  id?: string; asset_id: string; board_id: string | null;
+  review_status: ReviewStatus; review_priority: ReviewPriority;
+  production_ready: boolean; approval_score: number; risk_level: RiskLevel;
+  recommendation: string | null; reviewer_notes: string | null; internal_notes: string | null;
+  reviewed_by: string | null; reviewed_at: string | null; expires_at: string | null;
+  replacement_asset_id: string | null; redesign_required: boolean; redesign_reason: string | null;
+  usage_blocked: boolean;
+  ai_review_score: number | null; ai_review_notes: string | null; ai_review_confidence: number | null;
+  ai_suggested_replacement: string | null; ai_detected_issues: string[];
+}
+
+export interface ReviewRecommendation {
+  approval_score: number; production_ready: boolean; risk_level: RiskLevel;
+  recommendation: string; suggested_status: ReviewStatus;
+  safety: { kind: string; severity: "warning" | "error"; message: string }[];
+}
+
 /* ── KOLEEX Design DNA (Phase: Brand Visual Intelligence) ── */
 
 export const DNA_PERSONALITIES = [
