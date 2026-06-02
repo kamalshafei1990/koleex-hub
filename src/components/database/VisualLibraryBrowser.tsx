@@ -177,7 +177,7 @@ export default function VisualLibraryBrowser() {
             <p className="mt-1 text-[12px] text-[var(--text-dim)]">Try a different category, state, or search term.</p>
           </div>
         ) : view === "grid" ? (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-9">
             {filtered.map((a) => (
               <VisualAssetCard key={a.id} asset={a} selected={selected.has(a.id)} onToggleSelect={() => toggleSelect(a.id)} onOpen={() => setOpenAsset(a)} />
             ))}

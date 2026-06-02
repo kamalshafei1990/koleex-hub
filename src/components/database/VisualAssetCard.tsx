@@ -20,6 +20,16 @@ export const STATE_PILL: Record<string, string> = {
   archived:   "bg-[var(--bg-surface)] text-[var(--text-dim)] border-[var(--border-subtle)]",
 };
 
+/** Compact status dot for small cards. */
+export const STATE_DOT: Record<string, string> = {
+  approved:   "bg-emerald-400",
+  pending:    "bg-amber-400",
+  draft:      "bg-blue-400",
+  missing:    "bg-[var(--text-dim)] opacity-40 ring-1 ring-[var(--border-color)]",
+  deprecated: "bg-[var(--text-dim)]",
+  archived:   "bg-[var(--text-dim)]",
+};
+
 export default function VisualAssetCard({
   asset,
   selected,
@@ -34,7 +44,7 @@ export default function VisualAssetCard({
   const state = displayState(asset);
   return (
     <div
-      className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-[var(--bg-surface)] transition-all duration-200 hover:bg-[var(--bg-surface-hover)] ${
+      className={`group relative flex flex-col overflow-hidden rounded-lg border bg-[var(--bg-surface)] transition-all duration-200 hover:bg-[var(--bg-surface-hover)] ${
         selected ? "border-[var(--accent)] ring-1 ring-[var(--accent)]" : "border-[var(--border-subtle)] hover:border-[var(--border-color)]"
       }`}
     >
@@ -51,26 +61,24 @@ export default function VisualAssetCard({
         <CheckIcon size={11} />
       </button>
 
-      <button type="button" onClick={onOpen} className="flex aspect-square w-full items-center justify-center bg-[var(--bg-primary)] p-5">
+      <button type="button" onClick={onOpen} className="flex aspect-square w-full items-center justify-center bg-white p-3 text-neutral-900">
         {asset.public_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={asset.public_url} alt={asset.title} className="h-full w-full object-contain p-2 text-[var(--text-primary)]" loading="lazy" />
+          <img src={asset.public_url} alt={asset.title} className="h-full w-full object-contain" loading="lazy" />
         ) : (
-          <span className="flex flex-col items-center gap-1.5 text-[var(--text-dim)]">
-            <ImageRawIcon size={26} />
-            <span className="text-[9px] font-semibold uppercase tracking-wide">No icon</span>
+          <span className="flex flex-col items-center gap-1 text-neutral-400">
+            <ImageRawIcon size={20} />
+            <span className="text-[8px] font-semibold uppercase tracking-wide">No icon</span>
           </span>
         )}
       </button>
 
-      <button type="button" onClick={onOpen} className="flex flex-col items-start gap-1 border-t border-[var(--border-subtle)] px-3 py-2.5 text-left">
-        <div className="flex w-full items-center justify-between gap-2">
-          <span className="truncate text-[12px] font-medium text-[var(--text-primary)]">{asset.title}</span>
-          <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${STATE_PILL[state] ?? STATE_PILL.draft}`}>
-            {state}
-          </span>
+      <button type="button" onClick={onOpen} className="flex flex-col items-start gap-0.5 border-t border-[var(--border-subtle)] px-2 py-1.5 text-left">
+        <div className="flex w-full items-center justify-between gap-1.5">
+          <span className="truncate text-[11px] font-medium text-[var(--text-primary)]">{asset.title}</span>
+          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${STATE_DOT[state] ?? STATE_DOT.draft}`} title={state} />
         </div>
-        <span className="truncate font-mono text-[10px] text-[var(--text-dim)]">{asset.visual_asset_code}</span>
+        <span className="truncate font-mono text-[9px] text-[var(--text-dim)]">{asset.visual_asset_code}</span>
       </button>
     </div>
   );
