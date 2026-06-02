@@ -4134,12 +4134,12 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleSelectContact(c); } }}
                     className={`group/row relative w-full flex items-center gap-3 ps-4 pe-4 py-3 text-start cursor-pointer transition-colors border-b border-[var(--border-faint)] contain-layout border-s-2 ${
                       isSelected
-                        ? "border-s-[var(--accent,#0066FF)] bg-gradient-to-r from-[var(--accent,#0066FF)]/12 to-transparent"
+                        ? "border-s-[var(--accent,#0066FF)] bg-[var(--bg-surface-active)]"
                         : "border-s-transparent hover:bg-[var(--bg-surface-subtle)]"
                     }`}
                   >
                     {/* Avatar — stronger container on the active row */}
-                    <div className={`w-10 h-10 ${c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && c.entity_type === "company") ? "rounded-lg" : "rounded-full"} ${isSelected ? "bg-[var(--bg-surface)] ring-1 ring-[var(--accent,#0066FF)]/30" : "bg-[var(--bg-surface-hover)]"} flex items-center justify-center text-sm font-semibold text-[var(--text-muted)] shrink-0 overflow-hidden transition-shadow`}>
+                    <div className={`w-10 h-10 ${c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && c.entity_type === "company") ? "rounded-lg" : "rounded-full"} ${isSelected ? "bg-[var(--bg-surface)] ring-1 ring-[var(--border-color)]" : "bg-[var(--bg-surface-hover)]"} flex items-center justify-center text-sm font-semibold text-[var(--text-muted)] shrink-0 overflow-hidden transition-shadow`}>
                       {c.photo_url ? (
                         <img src={c.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                       ) : c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && c.entity_type === "company") ? (
