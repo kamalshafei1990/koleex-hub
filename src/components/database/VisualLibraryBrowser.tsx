@@ -189,11 +189,11 @@ export default function VisualLibraryBrowser() {
               return (
                 <button key={a.id} type="button" onClick={() => setOpenAsset(a)}
                   className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[var(--bg-surface-hover)] ${i > 0 ? "border-t border-[var(--border-subtle)]" : ""}`}>
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)]">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-white text-neutral-900">
                     {a.public_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={a.public_url} alt="" className="h-5 w-5 object-contain" loading="lazy" />
-                    ) : <ImageRawIcon size={14} className="text-[var(--text-dim)]" />}
+                    ) : <ImageRawIcon size={14} className="text-neutral-400" />}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] font-medium text-[var(--text-primary)]">{a.title}</span>

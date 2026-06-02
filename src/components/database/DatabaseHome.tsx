@@ -94,11 +94,11 @@ function IconStrip({ title, assets }: { title: string; assets: VisualAsset[] }) 
           return (
             <Link key={a.id} href={`/database/visual-library?q=${encodeURIComponent(a.title)}`}
               className="group flex w-[92px] shrink-0 flex-col items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-2.5 transition-colors hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)]">
-              <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--bg-primary)] text-[var(--text-primary)]">
+              <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-white text-neutral-900">
                 {a.public_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={a.public_url} alt={a.title} className="h-6 w-6 object-contain" loading="lazy" />
-                ) : <ImageRawIcon size={16} className="text-[var(--text-dim)]" />}
+                ) : <ImageRawIcon size={16} className="text-neutral-400" />}
               </span>
               <span className="w-full truncate text-center text-[10.5px] text-[var(--text-muted)]">{a.title}</span>
               <span className={`rounded-full border px-1 py-0.5 text-[8px] font-semibold uppercase ${STATE_PILL[st] ?? STATE_PILL.draft}`}>{st}</span>

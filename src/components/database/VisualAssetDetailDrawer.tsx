@@ -106,12 +106,12 @@ export default function VisualAssetDetailDrawer({
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {/* Preview / attach */}
-          <div className="relative flex aspect-video w-full items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] p-8 text-[var(--text-primary)]">
+          <div className="relative flex aspect-video w-full items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-white p-8 text-neutral-900">
             {asset.public_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={asset.public_url} alt={asset.title} className="max-h-full max-w-full object-contain" />
             ) : (
-              <span className="flex flex-col items-center gap-2 text-[var(--text-dim)]">
+              <span className="flex flex-col items-center gap-2 text-neutral-400">
                 <ImageRawIcon size={32} />
                 <span className="text-[11px] font-semibold uppercase tracking-wide">Missing — no icon yet</span>
               </span>
