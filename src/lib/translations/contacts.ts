@@ -1041,6 +1041,10 @@ export const contactsT: Translations = {
 
   "add.riskItem":               { en: "Add risk item",             zh: "添加风险项",            ar: "إضافة بند مخاطرة" },
   "add.socialAccount":          { en: "Add social account",        zh: "添加社交账号",           ar: "إضافة حساب اجتماعي" },
+  "subsection.otherMessagingApps": { en: "Other apps",             zh: "其他应用",               ar: "تطبيقات أخرى" },
+  "hint.messagingApps":         { en: "Add other apps the factory uses — pick the app, then enter the ID / handle / number.", zh: "添加工厂使用的其他应用 — 选择应用，然后输入 ID / 账号 / 号码。", ar: "أضف التطبيقات الأخرى التي يستخدمها المصنع — اختر التطبيق ثم أدخل المعرّف / الحساب / الرقم." },
+  "placeholder.messagingId":    { en: "ID, handle, or number",     zh: "ID、账号或号码",          ar: "المعرّف أو الحساب أو الرقم" },
+  "add.messagingApp":           { en: "Add messaging app",         zh: "添加聊天应用",           ar: "إضافة تطبيق مراسلة" },
   "btn.new":                    { en: "New",                       zh: "新建",                 ar: "جديد" },
   "create.newCategory":         { en: "Create new category",       zh: "新建品类",              ar: "إنشاء فئة جديدة" },
   "create.newDivision":         { en: "Create new division",       zh: "新建事业部",            ar: "إنشاء قسم جديد" },

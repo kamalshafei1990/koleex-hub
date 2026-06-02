@@ -264,6 +264,7 @@ interface ContactForm {
   gst_number: string;
   cr_number: string;
   /* ── Messaging IDs ── */
+  messaging_channels: { platform: string; value: string }[];   // WeChat is the hero; these are the rest
   whatsapp_business: string;
   wechat_id: string;
   telegram_id: string;
@@ -416,6 +417,13 @@ const SOCIAL_MEDIA_PLATFORMS = [
   "LinkedIn", "Facebook", "Instagram", "Twitter/X", "YouTube", "TikTok", "Pinterest",
   "Threads", "Reddit", "Snapchat", "Weibo", "Douyin", "Xiaohongshu (RED)", "Bilibili",
   "Alibaba", "Made-in-China", "Global Sources", "1688", "Website / Blog", "Other",
+];
+/* Messaging apps for the supplier Messaging IDs repeater (WeChat is the hero, shown separately).
+   Order = most common for China sourcing first. Apps with a dedicated contacts
+   column derive back to it on save so the Supplier 360 channel grid keeps showing them. */
+const MESSAGING_APPS = [
+  "WhatsApp", "Telegram", "QQ", "DingTalk", "Messenger", "Line", "Skype",
+  "Viber", "Signal", "KakaoTalk", "Other",
 ];
 const RELATED_PEOPLE_LABELS = ["Parent", "Father", "Mother", "Brother", "Sister", "Child", "Son", "Daughter", "Spouse", "Friend", "Assistant", "Manager", "Other"];
 
@@ -658,6 +666,7 @@ const EMPTY_FORM: ContactForm = {
   gst_number: "",
   cr_number: "",
   /* Messaging IDs */
+  messaging_channels: [],
   whatsapp_business: "",
   wechat_id: "",
   telegram_id: "",
@@ -1141,6 +1150,15 @@ function contactToForm(c: ContactRow): ContactForm {
     gst_number: c.gst_number || "",
     cr_number: c.cr_number || "",
     /* Messaging IDs */
+    // Messaging repeater: prefer the stored array; otherwise backfill from the
+    // legacy per-app columns so existing suppliers keep their channels.
+    messaging_channels: (Array.isArray(c.messaging_channels) && c.messaging_channels.length
+      ? (c.messaging_channels as { platform?: string; value?: string }[]).map((m) => ({ platform: String(m.platform || ""), value: String(m.value || "") }))
+      : ([
+          ["WhatsApp", c.whatsapp_business], ["Telegram", c.telegram_id], ["QQ", c.qq_id],
+          ["DingTalk", c.dingtalk_id], ["Messenger", c.messenger_id], ["Line", c.line_id], ["Skype", c.skype_id],
+        ] as [string, unknown][]).filter(([, v]) => typeof v === "string" && v.trim()).map(([platform, v]) => ({ platform, value: String(v) }))
+    ).filter((m) => m.platform),
     whatsapp_business: c.whatsapp_business || "",
     wechat_id: c.wechat_id || "",
     telegram_id: c.telegram_id || "",
@@ -1383,22 +1401,25 @@ function formToRow(f: ContactForm): Record<string, unknown> {
     customs_code: f.customs_code || null,
     gst_number: f.gst_number || null,
     cr_number: f.cr_number || null,
-    /* Messaging IDs */
-    whatsapp_business: f.whatsapp_business || null,
+    /* Messaging IDs — WeChat is the hero; the rest live in the messaging_channels
+       repeater. Persist the array AND derive the legacy per-app columns from it
+       so the Supplier 360 channel grid keeps rendering known apps unchanged. */
+    messaging_channels: f.messaging_channels.filter((m) => m.platform && (m.value || "").trim()).map((m) => ({ platform: m.platform, value: m.value.trim() })),
     wechat_id: f.wechat_id || null,
-    telegram_id: f.telegram_id || null,
-    line_id: f.line_id || null,
-    skype_id: f.skype_id || null,
+    whatsapp_business: (f.messaging_channels.find((m) => m.platform === "WhatsApp")?.value || "").trim() || null,
+    telegram_id: (f.messaging_channels.find((m) => m.platform === "Telegram")?.value || "").trim() || null,
+    qq_id: (f.messaging_channels.find((m) => m.platform === "QQ")?.value || "").trim() || null,
+    dingtalk_id: (f.messaging_channels.find((m) => m.platform === "DingTalk")?.value || "").trim() || null,
+    messenger_id: (f.messaging_channels.find((m) => m.platform === "Messenger")?.value || "").trim() || null,
+    line_id: (f.messaging_channels.find((m) => m.platform === "Line")?.value || "").trim() || null,
+    skype_id: (f.messaging_channels.find((m) => m.platform === "Skype")?.value || "").trim() || null,
     wechat_qr: f.wechat_qr || null,
     whatsapp_qr: f.whatsapp_qr || null,
     telegram_qr: f.telegram_qr || null,
     line_qr: f.line_qr || null,
     skype_qr: f.skype_qr || null,
-    qq_id: f.qq_id || null,
     qq_qr: f.qq_qr || null,
-    dingtalk_id: f.dingtalk_id || null,
     dingtalk_qr: f.dingtalk_qr || null,
-    messenger_id: f.messenger_id || null,
     messenger_qr: f.messenger_qr || null,
     /* Segmentation extras */
     sub_industry: f.sub_industry || null,
@@ -6115,7 +6136,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       req(filled(form.division));
       req(filled(form.category));
       req([form.supplier_tel, form.supplier_mobile, form.supplier_email].some((v) => filled(v)));            // a contact
-      req([form.wechat_id, form.whatsapp_business, form.telegram_id, form.qq_id, form.dingtalk_id, form.messenger_id].some((v) => filled(v))); // a messaging channel
+      req(filled(form.wechat_id) || form.messaging_channels.some((m) => filled(m.value))); // a messaging channel (WeChat or any added app)
       req(form.contact_persons.some((p) => (p.name || "").trim().length > 0));                                 // a contact person
 
       // ── Preferred ──
@@ -7725,18 +7746,27 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   qrValue={form.wechat_qr}
                   onQrChange={v => setField("wechat_qr", v)}
                 />
-                <MessagingIdField
-                  label={t("field.whatsappBusiness", "WhatsApp Business")}
-                  icon={<BrandGlyph name="WhatsApp" size={15} />}
-                  idNode={<PhoneField value={form.whatsapp_business} onChange={v => setField("whatsapp_business", v)} placeholder={t("field.whatsappBusiness", "WhatsApp Business")} defaultIso={form.country_code || "CN"} />}
-                  qrValue={form.whatsapp_qr}
-                  onQrChange={v => setField("whatsapp_qr", v)}
-                />
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <MessagingIdField label={t("field.telegram", "Telegram")} icon={<BrandGlyph name="Telegram" size={15} />} idValue={form.telegram_id} onIdChange={v => setField("telegram_id", v)} placeholder="@handle" qrValue={form.telegram_qr} onQrChange={v => setField("telegram_qr", v)} />
-                  <MessagingIdField label={t("field.qq", "QQ")} icon={<BrandGlyph name="QQ" size={15} />} idValue={form.qq_id} onIdChange={v => setField("qq_id", v)} placeholder={t("placeholder.qqId", "QQ number")} qrValue={form.qq_qr} onQrChange={v => setField("qq_qr", v)} />
-                  <MessagingIdField label={t("field.dingtalk", "DingTalk")} icon={<BrandGlyph name="DingTalk" size={15} />} idValue={form.dingtalk_id} onIdChange={v => setField("dingtalk_id", v)} placeholder={t("placeholder.dingtalkId", "DingTalk ID")} qrValue={form.dingtalk_qr} onQrChange={v => setField("dingtalk_qr", v)} />
-                  <MessagingIdField label={t("field.messenger", "Messenger")} icon={<BrandGlyph name="Messenger" size={15} />} idValue={form.messenger_id} onIdChange={v => setField("messenger_id", v)} placeholder={t("placeholder.messenger", "m.me/username")} qrValue={form.messenger_qr} onQrChange={v => setField("messenger_qr", v)} />
+                {/* Other apps — pick the app and add as many as needed (same grammar as Social Media). */}
+                <div className="space-y-2.5 border-t border-[var(--border-color)] pt-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.otherMessagingApps", "Other apps")}</p>
+                  {form.messaging_channels.length === 0 && (
+                    <p className="text-[11px] text-[var(--text-faint)]">{t("hint.messagingApps", "Add other apps the factory uses — pick the app, then enter the ID / handle / number.")}</p>
+                  )}
+                  {form.messaging_channels.map((m, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <RemoveBtn onClick={() => setField("messaging_channels", form.messaging_channels.filter((_, idx) => idx !== i))} />
+                      <div className="w-36 shrink-0 sm:w-44">
+                        <PlatformSelect value={m.platform} onChange={v => { const arr = [...form.messaging_channels]; arr[i] = { ...arr[i], platform: v }; setField("messaging_channels", arr); }} options={MESSAGING_APPS} />
+                      </div>
+                      <input
+                        value={m.value}
+                        onChange={e => { const arr = [...form.messaging_channels]; arr[i] = { ...arr[i], value: e.target.value }; setField("messaging_channels", arr); }}
+                        placeholder={t("placeholder.messagingId", "ID, handle, or number")}
+                        className="min-w-0 flex-1 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
+                      />
+                    </div>
+                  ))}
+                  <AddButton label={t("add.messagingApp", "Add messaging app")} onClick={() => setField("messaging_channels", [...form.messaging_channels, { platform: MESSAGING_APPS.find(a => a !== "Other" && !form.messaging_channels.some(m => m.platform === a)) || "Other", value: "" }])} />
                 </div>
               </div>
             </FormSection>

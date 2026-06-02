@@ -40,6 +40,7 @@ export interface ContactRow {
   addresses: { label: string; street: string; city: string; state: string; zip: string; country: string }[];
   websites: { label: string; url: string }[];
   social_profiles: { platform: string; username: string; url: string; qr_code_url: string }[];
+  messaging_channels?: { platform: string; value: string }[];
   family_members: { relationship: string; title: string; first_name: string; middle_name: string; last_name: string; phone: string; email: string; birthday: string; notes: string; photo_url: string }[];
   related_names: { name: string; relationship: string }[];
   custom_fields: { field_name: string; field_value: string }[];
