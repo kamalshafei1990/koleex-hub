@@ -27,9 +27,12 @@ import type { PageTab } from "@/components/ui/PageHeader";
 import { useTranslation, type Translations } from "@/lib/i18n";
 
 const PRIMARY_TABS_RAW: Array<PageTab & { i18nKey: string }> = [
+  /* Ordered as the natural workflow: browse every supplier → see sourcing
+     coverage (who covers what, main/backup) → drill into tenant-wide
+     intelligence. */
   { key: "/suppliers",          label: "Directory",      icon: "users",         i18nKey: "sup.nav.r.directory" },
-  { key: "/suppliers/sourcing", label: "Command Center", icon: "bullseye-arrow", i18nKey: "sup.nav.r.sourcing" },
   { key: "/suppliers/main",     label: "Main Suppliers", icon: "handshake",     i18nKey: "sup.nav.r.main" },
+  { key: "/suppliers/sourcing", label: "Command Center", icon: "bullseye-arrow", i18nKey: "sup.nav.r.sourcing" },
 ];
 
 const T: Translations = {

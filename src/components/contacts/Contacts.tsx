@@ -4267,46 +4267,31 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <p className="text-sm text-[var(--text-faint)] mt-1">{t("kpi.keyMetrics")}</p>
               </div>
 
-              {/* Sourcing Command Center — prominent entry to the tenant-wide
-                  procurement intelligence workspace. */}
-              <Link
-                href="/suppliers/sourcing"
-                className="group flex items-center justify-between gap-4 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-4 md:p-5 transition-colors hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)]"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)]">
-                    <TargetIcon size={20} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[15px] font-semibold text-[var(--text-primary)]">{t("supplier.commandCenter", "Sourcing Command Center")}</p>
-                    <p className="text-xs text-[var(--text-faint)] mt-0.5">{t("supplier.commandCenterDesc", "Tenant-wide procurement intelligence — ranking, dependencies & recommendations")}</p>
-                  </div>
-                </div>
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] group-hover:border-[var(--border-focus)] transition-colors">
-                  {t("btn.open", "Open")}
-                  <AngleRightIcon size={13} className="rtl:rotate-180" />
-                </span>
-              </Link>
-
-              {/* Main Suppliers — entry to the sourcing-coverage board. */}
-              <Link
-                href="/suppliers/main"
-                className="group flex items-center justify-between gap-4 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-4 md:p-5 transition-colors hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)]"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)]">
-                    <StarIcon size={20} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[15px] font-semibold text-[var(--text-primary)]">{t("supplier.mainSuppliers", "Koleex Main Suppliers")}</p>
-                    <p className="text-xs text-[var(--text-faint)] mt-0.5">{t("supplier.mainSuppliersDesc", "Sourcing coverage map — main/backup suppliers by division, category & subcategory")}</p>
-                  </div>
-                </div>
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] group-hover:border-[var(--border-focus)] transition-colors">
-                  {t("btn.open", "Open")}
-                  <AngleRightIcon size={13} className="rtl:rotate-180" />
-                </span>
-              </Link>
+              {/* Explore — two compact entry points to the deeper sourcing
+                  surfaces. Ordered like the header tabs (coverage → intelligence)
+                  so the nav reads consistently; kept lightweight so they read as
+                  shortcuts, not a second competing nav. */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {[
+                  { href: "/suppliers/main", icon: <StarIcon size={18} />, title: t("supplier.mainSuppliers", "Koleex Main Suppliers"), desc: t("supplier.mainSuppliersDesc", "Sourcing coverage map — main/backup suppliers by division, category & subcategory") },
+                  { href: "/suppliers/sourcing", icon: <TargetIcon size={18} />, title: t("supplier.commandCenter", "Sourcing Command Center"), desc: t("supplier.commandCenterDesc", "Tenant-wide procurement intelligence — ranking, dependencies & recommendations") },
+                ].map((c) => (
+                  <Link
+                    key={c.href}
+                    href={c.href}
+                    className="group flex items-center gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-3.5 transition-colors hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)]"
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)]">
+                      {c.icon}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13.5px] font-semibold text-[var(--text-primary)] truncate">{c.title}</p>
+                      <p className="text-[11px] text-[var(--text-faint)] mt-0.5 line-clamp-2">{c.desc}</p>
+                    </div>
+                    <AngleRightIcon size={14} className="shrink-0 text-[var(--text-ghost)] group-hover:text-[var(--text-secondary)] rtl:rotate-180" />
+                  </Link>
+                ))}
+              </div>
 
               {/* Main KPI Row - 4 cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
