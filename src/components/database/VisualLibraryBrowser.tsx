@@ -39,6 +39,7 @@ export default function VisualLibraryBrowser() {
   const [state, setState] = useState<string>(params.get("state") ?? "");
   const [assetType, setAssetType] = useState("");
   const [view, setView] = useState<"grid" | "list">("grid");
+  const [limit, setLimit] = useState(300);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [openAsset, setOpenAsset] = useState<VisualAsset | null>(null);
   const [showUpload, setShowUpload] = useState(false);
@@ -49,9 +50,18 @@ export default function VisualLibraryBrowser() {
     const myReq = ++reqRef.current;
     setLoading(true);
     try {
-      const res = await fetch("/api/visual-library?pageSize=200&sort=name", { credentials: "include", cache: "no-store" });
-      const json = res.ok ? await res.json() : { assets: [] };
-      if (myReq === reqRef.current) setAll(json.assets ?? []);
+      // Supabase caps each response at 1000 rows — page through until exhausted
+      // so the in-memory set (used for counts + instant search) is complete.
+      const acc: VisualAsset[] = [];
+      for (let page = 1; page <= 40; page++) {
+        const res = await fetch(`/api/visual-library?pageSize=1000&page=${page}&sort=name`, { credentials: "include", cache: "no-store" });
+        if (!res.ok) break;
+        const json = await res.json();
+        const batch: VisualAsset[] = json.assets ?? [];
+        acc.push(...batch);
+        if (batch.length < 1000) break;
+      }
+      if (myReq === reqRef.current) setAll(acc);
     } catch {
       if (myReq === reqRef.current) setAll([]);
     } finally {
@@ -89,6 +99,10 @@ export default function VisualLibraryBrowser() {
       return true;
     });
   }, [all, q, category, assetType, state]);
+
+  // Render in slices so 5,000+ rows never all mount at once.
+  useEffect(() => { setLimit(300); }, [q, category, assetType, state, view]);
+  const visible = useMemo(() => filtered.slice(0, limit), [filtered, limit]);
 
   const toggleSelect = (id: string) =>
     setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -178,13 +192,13 @@ export default function VisualLibraryBrowser() {
           </div>
         ) : view === "grid" ? (
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-9">
-            {filtered.map((a) => (
+            {visible.map((a) => (
               <VisualAssetCard key={a.id} asset={a} selected={selected.has(a.id)} onToggleSelect={() => toggleSelect(a.id)} onOpen={() => setOpenAsset(a)} />
             ))}
           </div>
         ) : (
           <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]">
-            {filtered.map((a, i) => {
+            {visible.map((a, i) => {
               const st = displayState(a);
               return (
                 <button key={a.id} type="button" onClick={() => setOpenAsset(a)}
@@ -204,6 +218,15 @@ export default function VisualLibraryBrowser() {
                 </button>
               );
             })}
+          </div>
+        )}
+
+        {!loading && filtered.length > visible.length && (
+          <div className="flex justify-center pt-1">
+            <button type="button" onClick={() => setLimit((l) => l + 300)}
+              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-2 text-[12.5px] font-medium text-[var(--text-muted)] hover:border-[var(--border-color)] hover:text-[var(--text-primary)]">
+              Show more — {filtered.length - visible.length} of {filtered.length} remaining
+            </button>
           </div>
         )}
       </div>

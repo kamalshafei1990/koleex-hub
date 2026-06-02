@@ -43,7 +43,7 @@ export async function GET(req: Request) {
   const tag = (url.searchParams.get("tag") ?? "").trim().toLowerCase();
   const sort = (url.searchParams.get("sort") ?? "recent").trim();
   const page = Math.max(1, parseInt(url.searchParams.get("page") ?? "1", 10) || 1);
-  const pageSize = Math.min(200, Math.max(1, parseInt(url.searchParams.get("pageSize") ?? "60", 10) || 60));
+  const pageSize = Math.min(8000, Math.max(1, parseInt(url.searchParams.get("pageSize") ?? "60", 10) || 60));
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
