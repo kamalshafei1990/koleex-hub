@@ -947,6 +947,45 @@ function contactDisplayName(c: ContactRow): string {
   return "Unnamed";
 }
 
+/** Why a contact matched the search — the most specific field that contains a
+ *  query term — so a suggestion can say WHERE the hit came from (e.g.
+ *  "Brand: NEXD", "Contact: 王伟", "WeChat: kx-sales"). Returns null when only
+ *  the name/company matched (already shown as the suggestion's title). */
+function searchMatchReason(c: ContactRow, terms: string[]): { label: string; value: string } | null {
+  if (!terms.length) return null;
+  const rec = c as unknown as Record<string, unknown>;
+  const s = (k: string) => { const v = rec[k]; return typeof v === "string" ? v : ""; };
+  const labeled: [string, string][] = [];
+  const add = (label: string, val?: string | null) => { if (val && String(val).trim()) labeled.push([label, String(val).trim()]); };
+  add("Chinese name", s("company_name_cn"));
+  add("Trading name", s("trading_name"));
+  add("Code", s("supplier_code"));
+  add("Email", s("email") || s("supplier_email"));
+  add("Phone", s("phone") || s("supplier_tel") || s("supplier_mobile"));
+  add("WeChat", s("wechat_id"));
+  add("WhatsApp", s("whatsapp_business"));
+  add("Website", s("website"));
+  add("Country", s("country"));
+  add("City", s("city"));
+  add("Division", s("division"));
+  add("Category", s("category"));
+  if (Array.isArray(c.brand_names)) c.brand_names.forEach((b) => add("Brand", b));
+  if (Array.isArray(c.tags)) c.tags.forEach((tg) => add("Tag", tg));
+  const mc = rec.messaging_channels;
+  if (Array.isArray(mc)) (mc as { platform?: string; value?: string }[]).forEach((m) => add(m?.platform || "App", m?.value));
+  if (Array.isArray(c.contact_persons)) {
+    for (const p of c.contact_persons) {
+      add("Contact", p.name); add("Contact email", p.email); add("Contact phone", p.phone);
+      add("Contact WeChat", (p as { wechat_id?: string }).wechat_id);
+    }
+  }
+  for (const [label, val] of labeled) {
+    const lv = val.toLowerCase();
+    if (terms.some((t) => lv.includes(t))) return { label, value: val };
+  }
+  return null;
+}
+
 function contactSortKey(c: ContactRow): string {
   if (c.contact_type === "supplier") {
     const en = c.company_name_en || "";
@@ -3264,6 +3303,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const [view, setView] = useState<ViewMode>("list");
   const [typeTab, setTypeTab] = useState<ContactType | "all">(filterType || "all");
   const [search, setSearch] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);   // controls the suggestions dropdown
   /* Active/Archived status filter — surfaced only in the supplier view. */
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "archived">("all");
   const [form, setForm] = useState<ContactForm>({ ...EMPTY_FORM });
@@ -3464,6 +3504,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     }
     return list.sort((a, b) => contactSortKey(a).localeCompare(contactSortKey(b)));
   }, [contacts, typeTab, filterType, debouncedSearch, statusFilter]);
+
+  /* Typeahead suggestions — the top matches with a "why it matched" hint. */
+  const searchTerms = useMemo(() => debouncedSearch.trim().toLowerCase().split(/\s+/).filter(Boolean), [debouncedSearch]);
+  const suggestions = useMemo(() => (debouncedSearch.trim() ? filtered.slice(0, 8) : []), [filtered, debouncedSearch]);
 
   const grouped = useMemo(() => {
     const map: Record<string, ContactRow[]> = {};
@@ -3993,12 +4037,48 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             placeholder={filterType === "supplier" ? t("searchSuppliers", "Search suppliers — name, 中文名, country, app ID…") : filterType === "customer" ? t("searchCustomers", "Search customers…") : t("searchPlaceholder")}
             value={search}
             onChange={e => setSearch(e.target.value)}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+            onKeyDown={e => { if (e.key === "Enter" && suggestions[0]) { setSearchFocused(false); handleSelectContact(suggestions[0]); } else if (e.key === "Escape") { setSearchFocused(false); } }}
             className="w-full h-9 ps-9 pe-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
           />
           {search && (
             <button onClick={() => setSearch("")} className="absolute end-2 top-1/2 -translate-y-1/2 text-[var(--text-dim)] hover:text-[var(--text-primary)]">
               <CrossIcon size={14} />
             </button>
+          )}
+
+          {/* Smart suggestions — each row names the supplier AND why it matched
+              (brand, contact person, app ID, country…). Click opens that supplier. */}
+          {searchFocused && debouncedSearch.trim() && suggestions.length > 0 && (
+            <div className="absolute z-50 mt-1 start-0 end-0 max-h-[22rem] overflow-y-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+              {suggestions.map(c => {
+                const reason = searchMatchReason(c, searchTerms);
+                const cn = (c as unknown as Record<string, unknown>).company_name_cn;
+                const sub = reason ? `${reason.label}: ${reason.value}` : (typeof cn === "string" && cn.trim() ? cn : (c.country || ""));
+                const initials = contactDisplayName(c).split(/\s+/).map(w => w[0]).slice(0, 2).join("").toUpperCase();
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onMouseDown={e => { e.preventDefault(); setSearchFocused(false); handleSelectContact(c); }}
+                    className="flex w-full items-center gap-2.5 px-3 py-2 text-start hover:bg-[var(--bg-surface)] transition-colors"
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-[var(--bg-surface)] ring-1 ring-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-faint)]">
+                      {c.photo_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={c.photo_url} alt="" className="h-full w-full object-cover" loading="lazy" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                      ) : initials}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13px] font-medium text-[var(--text-primary)]">{contactDisplayName(c)}</span>
+                      {sub ? <span className="block truncate text-[11px] text-[var(--text-faint)]">{sub}</span> : null}
+                    </span>
+                    {reason ? <span className="shrink-0 rounded-full bg-[var(--bg-surface-subtle)] px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide text-[var(--text-ghost)]">{reason.label}</span> : null}
+                  </button>
+                );
+              })}
+            </div>
           )}
         </div>
 
