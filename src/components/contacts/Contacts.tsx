@@ -4132,10 +4132,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleSelectContact(c); } }}
-                    className={`group/row relative w-full flex items-center gap-3 ps-4 pe-4 py-3 text-start cursor-pointer transition-colors border-b border-[var(--border-faint)] contain-layout border-s-2 ${
+                    className={`group/row relative w-full flex items-center gap-3 ps-4 pe-4 py-3 text-start cursor-pointer transition-colors border-b border-[var(--border-faint)] contain-layout ${
                       isSelected
-                        ? "border-s-[var(--accent,#0066FF)] bg-[var(--bg-surface-active)]"
-                        : "border-s-transparent hover:bg-[var(--bg-surface-subtle)]"
+                        ? "bg-[var(--bg-surface-active)]"
+                        : "hover:bg-[var(--bg-surface-subtle)]"
                     }`}
                   >
                     {/* Avatar — stronger container on the active row */}
