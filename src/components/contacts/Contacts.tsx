@@ -986,6 +986,65 @@ function searchMatchReason(c: ContactRow, terms: string[]): { label: string; val
   return null;
 }
 
+/* ── Supplier form validation (blocks save) ─────────────────────────────────
+   Enforces the data-integrity rules from the Suppliers System Report:
+   required fields, email/phone format, name-script consistency, numeric-only
+   messaging IDs, payment-link sanity, and a sane factory-visit date. */
+const RE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const hasArabicChars = (s: string) => /[؀-ۿݐ-ݿࢠ-ࣿ]/.test(s);
+const hasCJKChars = (s: string) => /[㐀-鿿豈-﫿぀-ヿ]/.test(s);
+const phoneDigits = (s: string) => (s || "").replace(/[^\d]/g, "");
+
+function supplierFormErrors(f: ContactForm): string[] {
+  const e: string[] = [];
+  const v = (x?: string | null) => (x || "").trim();
+
+  // E — required fields
+  if (!v(f.company_name_en)) e.push("Company name (English) is required.");
+  if (!v(f.country)) e.push("Country is required.");
+  if (!v(f.division)) e.push("Division is required.");
+  if (!v(f.category)) e.push("Category is required.");
+  if (![f.supplier_tel, f.supplier_mobile, f.supplier_email].some((x) => v(x))) e.push("Add at least one company contact (tel, mobile, or email).");
+  if (!v(f.wechat_id) && !f.messaging_channels.some((m) => v(m.value))) e.push("Add at least one messaging channel (WeChat or another app).");
+  if (!f.contact_persons.some((p) => v(p.name))) e.push("Add at least one contact person.");
+
+  // C — email / phone format
+  if (v(f.supplier_email) && !RE_EMAIL.test(v(f.supplier_email))) e.push("Company email isn't a valid email address.");
+  f.contact_persons.forEach((p) => { if (v(p.email) && !RE_EMAIL.test(v(p.email))) e.push(`Contact "${v(p.name) || "?"}" has an invalid email address.`); });
+  const phoneBad = (x?: string) => { const d = phoneDigits(v(x)); return !!v(x) && (d.length < 6 || d.length > 15); };
+  if (phoneBad(f.supplier_tel)) e.push("Company tel looks invalid (expected 6–15 digits).");
+  if (phoneBad(f.supplier_mobile)) e.push("Company mobile looks invalid (expected 6–15 digits).");
+
+  // A — name-script consistency (Chinese name must not contain Arabic)
+  if (hasArabicChars(v(f.company_name_cn))) e.push("Chinese company name shouldn't contain Arabic text.");
+
+  // I — numeric-only messaging IDs (WhatsApp / QQ are phone/number based)
+  f.messaging_channels.forEach((m) => {
+    const val = v(m.value);
+    if (!val) return;
+    if (m.platform === "QQ" && !/^\d+$/.test(val)) e.push("QQ number must contain digits only.");
+    if (m.platform === "WhatsApp" && !/^[\d+\-\s()]+$/.test(val)) e.push("WhatsApp number must be a phone number (digits only).");
+  });
+  if (v(f.qq_id) && !/^\d+$/.test(v(f.qq_id))) e.push("QQ number must contain digits only.");
+
+  // K — payment link / ID sanity
+  const pay = v(f.wechat_pay_id);
+  if (pay) {
+    if (hasArabicChars(pay)) e.push("WeChat Pay ID/link shouldn't contain Arabic text.");
+    else if (/https?:\/\//i.test(pay)) { try { new URL(pay); } catch { e.push("WeChat Pay link isn't a valid URL."); } }
+  }
+
+  // M — factory-visit date in a sane range
+  if (v(f.factory_visit_date)) {
+    const dt = new Date(f.factory_visit_date);
+    const y = dt.getFullYear();
+    if (isNaN(dt.getTime()) || y < 2000 || y > 2100) e.push("Factory visit date is out of a valid range.");
+  }
+
+  // de-dupe (same message can be pushed by multiple channels)
+  return [...new Set(e)];
+}
+
 function contactSortKey(c: ContactRow): string {
   if (c.contact_type === "supplier") {
     const en = c.company_name_en || "";
@@ -3677,6 +3736,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
   const handleSave = async () => {
     if (!form.first_name && !form.last_name && !form.company && !form.company_name_en) return;
+    // Block save on supplier data-integrity errors (required + format validation).
+    if (filterType === "supplier" || form.contact_type === "supplier") {
+      const errs = supplierFormErrors(form);
+      if (errs.length) { setSaveError(errs.length > 1 ? `${errs[0]} (+${errs.length - 1} more to fix)` : errs[0]); return; }
+    }
     setSaving(true);
     setSaveError(null);
     const row = formToRow(form);
