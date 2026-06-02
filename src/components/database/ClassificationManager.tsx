@@ -4,45 +4,44 @@
    ClassificationManager — a simple, fast 4-column hierarchy manager for the
    KOLEEX product classification:  Divisions → Categories → Subcategories → Types.
 
-   Each column: search · add · list · icon preview + upload · rename · delete ·
-   reorder. No AI, DNA, coverage, health, intelligence — just structure.
-   Apple-settings / Notion-sidebar feel. KOLEEX dark / minimal.
+   Each column: search · add · list · icon · rename · delete · reorder.
+   No AI, DNA, coverage, health or intelligence — just structure.
+
+   Icons: a classification icon is a Visual Library icon (the Visual Library is
+   where "Icons" live). The icon slot is empty by default; clicking it opens a
+   picker that links an existing Visual Library icon — it does not create a
+   separate icon. KOLEEX dark / minimal, Notion-sidebar feel.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
-import { uploadToStorage } from "@/lib/storage-client";
+import { useCallback, useEffect, useState } from "react";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
-import UploadIcon from "@/components/icons/ui/UploadIcon";
 import ArrowUpIcon from "@/components/icons/ui/ArrowUpIcon";
 import ArrowDownIcon from "@/components/icons/ui/ArrowDownIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 
-interface Item { id: string; name: string; slug: string; icon_url: string | null; sort_order: number }
+interface Item { id: string; name: string; slug: string; icon_url: string | null; icon_asset_id?: string | null; sort_order: number }
+interface VlIcon { id: string; title: string; visual_asset_code: string; public_url: string | null }
 
 interface Level {
   key: "divisions" | "categories" | "subcategories" | "types";
-  title: string;
-  listKey: string;       // response array key
-  itemKey: string;       // create response single key
-  parentParam?: string;  // query param for parent filter
-  createParent?: string;  // body field for parent id
-  iconDir: string;
+  title: string; listKey: string; itemKey: string; parentParam?: string; createParent?: string;
 }
 const LEVELS: Level[] = [
-  { key: "divisions", title: "Divisions", listKey: "divisions", itemKey: "division", iconDir: "divisions" },
-  { key: "categories", title: "Categories", listKey: "categories", itemKey: "category", parentParam: "division_id", createParent: "division_id", iconDir: "categories" },
-  { key: "subcategories", title: "Subcategories", listKey: "subcategories", itemKey: "subcategory", parentParam: "category_id", createParent: "category_id", iconDir: "subcategories" },
-  { key: "types", title: "Types", listKey: "types", itemKey: "type", parentParam: "subcategory_id", createParent: "subcategory_id", iconDir: "types" },
+  { key: "divisions", title: "Divisions", listKey: "divisions", itemKey: "division" },
+  { key: "categories", title: "Categories", listKey: "categories", itemKey: "category", parentParam: "division_id", createParent: "division_id" },
+  { key: "subcategories", title: "Subcategories", listKey: "subcategories", itemKey: "subcategory", parentParam: "category_id", createParent: "category_id" },
+  { key: "types", title: "Types", listKey: "types", itemKey: "type", parentParam: "subcategory_id", createParent: "subcategory_id" },
 ];
 
 export default function ClassificationManager() {
-  // selected id at each level (drives the next column)
   const [sel, setSel] = useState<[string | null, string | null, string | null]>([null, null, null]);
+  // shared icon picker: { base, id } of the item being assigned
+  const [picker, setPicker] = useState<{ base: string; id: string; refresh: () => void } | null>(null);
 
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -57,18 +56,33 @@ export default function ClassificationManager() {
             onSelect={(id) => setSel((prev) => {
               const next = [...prev] as typeof prev;
               next[i] = id;
-              for (let j = i + 1; j < next.length; j++) next[j] = null; // clear downstream
+              for (let j = i + 1; j < next.length; j++) next[j] = null;
               return next;
             })}
+            openPicker={(base, id, refresh) => setPicker({ base, id, refresh })}
           />
         );
       })}
+
+      {picker && (
+        <IconPicker
+          onClose={() => setPicker(null)}
+          onPick={async (icon) => {
+            await fetch(`${picker.base}/${picker.id}`, {
+              method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ icon_asset_id: icon?.id ?? null, icon_url: icon?.public_url ?? null }),
+            });
+            picker.refresh(); setPicker(null);
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function ManagerColumn({ level, parentId, selectedId, onSelect }: {
+function ManagerColumn({ level, parentId, selectedId, onSelect, openPicker }: {
   level: Level; parentId: string | null; selectedId: string | null; onSelect: (id: string | null) => void;
+  openPicker: (base: string, id: string, refresh: () => void) => void;
 }) {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
@@ -78,21 +92,19 @@ function ManagerColumn({ level, parentId, selectedId, onSelect }: {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
-  const fileRef = useRef<HTMLInputElement>(null);
-  const uploadTarget = useRef<string | null>(null);
 
-  const base = `/api/visual-registry/${level.key}`;
-  const enabled = parentId !== null; // root column always enabled (parentId="ROOT")
+  const baseUrl = `/api/visual-registry/${level.key}`;
+  const enabled = parentId !== null;
 
   const load = useCallback(async () => {
     if (!enabled) { setItems([]); return; }
     setLoading(true);
-    const url = level.parentParam && parentId !== "ROOT" ? `${base}?${level.parentParam}=${parentId}` : base;
+    const url = level.parentParam && parentId !== "ROOT" ? `${baseUrl}?${level.parentParam}=${parentId}` : baseUrl;
     try {
       const j = await fetch(url, { credentials: "include", cache: "no-store" }).then((r) => r.ok ? r.json() : { [level.listKey]: [] });
       setItems((j[level.listKey] ?? []) as Item[]);
     } finally { setLoading(false); }
-  }, [base, level.parentParam, level.listKey, parentId, enabled]);
+  }, [baseUrl, level.parentParam, level.listKey, parentId, enabled]);
   useEffect(() => { load(); }, [load]);
 
   const create = async () => {
@@ -100,19 +112,19 @@ function ManagerColumn({ level, parentId, selectedId, onSelect }: {
     setBusyId("new");
     const body: Record<string, unknown> = { name };
     if (level.createParent && parentId && parentId !== "ROOT") body[level.createParent] = parentId;
-    await fetch(base, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    await fetch(baseUrl, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     setBusyId(null); setNewName(""); setAdding(false); await load();
   };
   const rename = async (id: string) => {
     const name = editName.trim(); if (!name) { setEditId(null); return; }
     setBusyId(id);
-    await fetch(`${base}/${id}`, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+    await fetch(`${baseUrl}/${id}`, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
     setBusyId(null); setEditId(null); await load();
   };
   const remove = async (id: string) => {
     if (!confirm("Delete this item? (it will be archived)")) return;
     setBusyId(id);
-    await fetch(`${base}/${id}`, { method: "DELETE", credentials: "include" });
+    await fetch(`${baseUrl}/${id}`, { method: "DELETE", credentials: "include" });
     setBusyId(null);
     if (selectedId === id) onSelect(null);
     await load();
@@ -124,35 +136,16 @@ function ManagerColumn({ level, parentId, selectedId, onSelect }: {
     const a = items[idx], b = items[swapIdx];
     setBusyId(id);
     await Promise.all([
-      fetch(`${base}/${a.id}`, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sort_order: b.sort_order }) }),
-      fetch(`${base}/${b.id}`, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sort_order: a.sort_order }) }),
+      fetch(`${baseUrl}/${a.id}`, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sort_order: b.sort_order }) }),
+      fetch(`${baseUrl}/${b.id}`, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sort_order: a.sort_order }) }),
     ]);
     setBusyId(null); await load();
-  };
-  const pickIcon = (id: string) => { uploadTarget.current = id; fileRef.current?.click(); };
-  const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]; const id = uploadTarget.current;
-    e.target.value = "";
-    if (!f || !id) return;
-    const item = items.find((x) => x.id === id);
-    setBusyId(id);
-    try {
-      const ext = (f.name.split(".").pop() ?? "png").toLowerCase();
-      const path = `classification/${level.iconDir}/${item?.slug ?? id}.${ext}`;
-      const up = await uploadToStorage("media", path, f, { upsert: true, contentType: f.type || "image/svg+xml" });
-      if (up.ok) {
-        await fetch(`${base}/${id}`, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ icon_url: up.data.publicUrl }) });
-        await load();
-      }
-    } finally { setBusyId(null); uploadTarget.current = null; }
   };
 
   const filtered = q.trim() ? items.filter((i) => i.name.toLowerCase().includes(q.trim().toLowerCase())) : items;
 
   return (
     <div className="flex h-[68vh] flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
-      <input ref={fileRef} type="file" accept=".svg,.png,.jpg,.jpeg,.webp,image/*" className="hidden" onChange={onFile} />
-      {/* Header */}
       <div className="flex items-center justify-between gap-2 border-b border-[var(--border-subtle)] px-3 py-2.5">
         <span className="text-[12px] font-semibold text-[var(--text-primary)]">{level.title}</span>
         <span className="text-[10.5px] tabular-nums text-[var(--text-dim)]">{enabled ? filtered.length : "—"}</span>
@@ -164,7 +157,6 @@ function ManagerColumn({ level, parentId, selectedId, onSelect }: {
         </div>
       ) : (
         <>
-          {/* Search + add */}
           <div className="flex items-center gap-1.5 border-b border-[var(--border-subtle)] px-2.5 py-2">
             <div className="relative flex-1">
               <SearchIcon size={12} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
@@ -184,7 +176,6 @@ function ManagerColumn({ level, parentId, selectedId, onSelect }: {
             </div>
           )}
 
-          {/* List */}
           <div className="flex-1 overflow-y-auto p-1.5">
             {loading ? (
               <div className="flex justify-center py-10 text-[var(--text-dim)]"><SpinnerIcon size={15} className="animate-spin" /></div>
@@ -196,16 +187,15 @@ function ManagerColumn({ level, parentId, selectedId, onSelect }: {
               return (
                 <div key={it.id}
                   className={`group mb-1 flex items-center gap-2 rounded-lg border px-2 py-1.5 transition-colors ${active ? "border-[var(--accent)]/40 bg-[var(--accent)]/10" : "border-transparent hover:bg-[var(--bg-surface-hover)]"}`}>
-                  {/* Icon preview / upload */}
-                  <button type="button" onClick={() => pickIcon(it.id)} title="Upload icon"
-                    className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-[var(--border-subtle)] bg-white text-neutral-400 hover:border-[var(--border-focus)]">
+                  {/* Icon slot — links a Visual Library icon; empty by default */}
+                  <button type="button" onClick={() => openPicker(baseUrl, it.id, load)} title={it.icon_url ? "Change Visual Library icon" : "Choose icon from Visual Library"}
+                    className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-[var(--border-subtle)] bg-white text-neutral-300 hover:border-[var(--border-focus)]">
                     {busyId === it.id ? <SpinnerIcon size={12} className="animate-spin text-neutral-500" /> : it.icon_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={it.icon_url} alt="" className="h-5 w-5 object-contain" />
-                    ) : <UploadIcon size={12} />}
+                    ) : <ImageRawIcon size={13} />}
                   </button>
 
-                  {/* Name (click to drill, except while editing) */}
                   {isEditing ? (
                     <input autoFocus value={editName} onChange={(e) => setEditName(e.target.value)}
                       onKeyDown={(e) => { if (e.key === "Enter") rename(it.id); if (e.key === "Escape") setEditId(null); }}
@@ -218,7 +208,6 @@ function ManagerColumn({ level, parentId, selectedId, onSelect }: {
                     </button>
                   )}
 
-                  {/* Row actions (hover) */}
                   <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                     <IconBtn title="Move up" disabled={idx === 0 || !!q} onClick={() => move(it.id, -1)}><ArrowUpIcon size={11} /></IconBtn>
                     <IconBtn title="Move down" disabled={idx === filtered.length - 1 || !!q} onClick={() => move(it.id, 1)}><ArrowDownIcon size={11} /></IconBtn>
@@ -227,7 +216,7 @@ function ManagerColumn({ level, parentId, selectedId, onSelect }: {
                   </div>
 
                   {level.key !== "types" && !isEditing && (
-                    <span className={`shrink-0 text-[var(--text-dim)] ${active ? "text-[var(--accent)]" : "opacity-40 group-hover:opacity-100"}`}>›</span>
+                    <span className={`shrink-0 ${active ? "text-[var(--accent)]" : "text-[var(--text-dim)] opacity-40 group-hover:opacity-100"}`}>›</span>
                   )}
                 </div>
               );
@@ -235,6 +224,55 @@ function ManagerColumn({ level, parentId, selectedId, onSelect }: {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+/* Pick / clear a Visual Library icon for a classification node. */
+function IconPicker({ onClose, onPick }: { onClose: () => void; onPick: (icon: VlIcon | null) => void }) {
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState<VlIcon[]>([]);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (q.trim().length < 2) { setResults([]); return; }
+    let alive = true; setLoading(true);
+    const t = setTimeout(() => {
+      fetch(`/api/visual-library?q=${encodeURIComponent(q.trim())}&pageSize=24`, { credentials: "include", cache: "no-store" })
+        .then((r) => r.ok ? r.json() : { assets: [] })
+        .then((j) => { if (alive) setResults((j.assets ?? []).filter((a: VlIcon) => a.public_url)); })
+        .catch(() => {}).finally(() => { if (alive) setLoading(false); });
+    }, 250);
+    return () => { alive = false; clearTimeout(t); };
+  }, [q]);
+  return (
+    <div className="fixed inset-0 z-[140] flex items-start justify-center bg-black/60 pt-20" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-[12px] font-semibold text-[var(--text-primary)]">Choose an icon from the Visual Library</span>
+          <button type="button" onClick={onClose} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]"><CrossIcon size={14} /></button>
+        </div>
+        <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search Visual Library icons…"
+          className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-2 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] placeholder:text-[var(--text-dim)]" />
+        <div className="mt-2 min-h-[120px]">
+          {loading ? <div className="flex justify-center py-6 text-[var(--text-dim)]"><SpinnerIcon size={14} className="animate-spin" /></div>
+            : results.length === 0 ? <p className="py-6 text-center text-[11.5px] text-[var(--text-dim)]">{q.trim().length < 2 ? "Type to search the Visual Library…" : "No icons found."}</p>
+            : (
+              <div className="grid grid-cols-6 gap-1.5">
+                {results.map((a) => (
+                  <button key={a.id} type="button" title={a.title} onClick={() => onPick(a)}
+                    className="flex aspect-square items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-white hover:border-[var(--border-focus)]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={a.public_url!} alt={a.title} className="h-6 w-6 object-contain" loading="lazy" />
+                  </button>
+                ))}
+              </div>
+            )}
+        </div>
+        <div className="mt-3 flex items-center justify-between border-t border-[var(--border-subtle)] pt-2.5">
+          <span className="text-[10.5px] text-[var(--text-dim)]">Icons live in the Visual Library.</span>
+          <button type="button" onClick={() => onPick(null)} className="text-[11.5px] font-medium text-[var(--text-dim)] hover:text-rose-400">Clear icon</button>
+        </div>
+      </div>
     </div>
   );
 }

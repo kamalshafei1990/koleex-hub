@@ -33,3 +33,6 @@ CREATE TRIGGER trg_vtype_updated_at BEFORE UPDATE ON public.visual_types FOR EAC
 ALTER TABLE public.visual_types ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS service_role_full_access ON public.visual_types;
 CREATE POLICY service_role_full_access ON public.visual_types FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+-- Classification icons are Visual Library assets ("Icons") — link, don't re-upload.
+ALTER TABLE public.visual_types ADD COLUMN IF NOT EXISTS icon_asset_id uuid REFERENCES public.visual_assets(id) ON DELETE SET NULL;

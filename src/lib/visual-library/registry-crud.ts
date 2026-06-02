@@ -35,7 +35,7 @@ export const ENTITIES: Record<string, EntityConfig> = {
   },
   types: {
     table: "visual_types", parentKey: "subcategory_id", parentTable: "visual_subcategories",
-    fields: ["description", "icon_url", "approval_state", "sort_order", "active"],
+    fields: ["description", "icon_url", "icon_asset_id", "approval_state", "sort_order", "active"],
     defaultSort: "sort_order",
   },
   systems: {
