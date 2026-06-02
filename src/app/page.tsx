@@ -603,7 +603,7 @@ export default function HomePage() {
               </span>
             </div>
             {favoriteApps.length < 3 ? (
-              <div className="flex gap-2.5 overflow-x-auto scrollbar-none">
+              <div className="flex gap-2.5 overflow-x-auto scrollbar-none py-2 -my-1 px-1 -mx-1">
                 {favoriteApps.map((app) => (
                   <CompactCard key={app.id} app={app} showStar />
                 ))}
@@ -627,7 +627,7 @@ export default function HomePage() {
                 {t("recent")}
               </span>
             </div>
-            <div className="flex gap-2.5 overflow-x-auto scrollbar-none pb-0.5">
+            <div className="flex gap-2.5 overflow-x-auto scrollbar-none py-2 -my-1 px-1 -mx-1 pb-0.5">
               {recentApps.map((app) => (
                 <CompactCard key={app.id} app={app} showStar />
               ))}
