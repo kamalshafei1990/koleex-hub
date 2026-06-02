@@ -4281,6 +4281,26 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </span>
               </Link>
 
+              {/* Main Suppliers — entry to the sourcing-coverage board. */}
+              <Link
+                href="/suppliers/main"
+                className="group flex items-center justify-between gap-4 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-4 md:p-5 transition-colors hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)]"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)]">
+                    <StarIcon size={20} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[15px] font-semibold text-[var(--text-primary)]">{t("supplier.mainSuppliers", "Koleex Main Suppliers")}</p>
+                    <p className="text-xs text-[var(--text-faint)] mt-0.5">{t("supplier.mainSuppliersDesc", "Sourcing coverage map — main/backup suppliers by division, category & subcategory")}</p>
+                  </div>
+                </div>
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] group-hover:border-[var(--border-focus)] transition-colors">
+                  {t("btn.open", "Open")}
+                  <AngleRightIcon size={13} className="rtl:rotate-180" />
+                </span>
+              </Link>
+
               {/* Main KPI Row - 4 cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                 {/* Total Suppliers */}
