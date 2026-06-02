@@ -71,7 +71,7 @@ export async function GET(req: Request) {
     const safe = q.replace(/[%,(){}]/g, " ").trim();
     const term = safe.toLowerCase();
     query = query.or(
-      `title.ilike.%${safe}%,visual_asset_code.ilike.%${safe}%,source_name.ilike.%${safe}%,description.ilike.%${safe}%,slug.ilike.%${safe}%,keywords.cs.{${term}},synonyms.cs.{${term}},search_aliases.cs.{${term}}`,
+      `title.ilike.%${safe}%,visual_asset_code.ilike.%${safe}%,source_name.ilike.%${safe}%,description.ilike.%${safe}%,slug.ilike.%${safe}%,semantic_meaning.ilike.%${safe}%,ai_prompt_description.ilike.%${safe}%,visual_style_description.ilike.%${safe}%,keywords.cs.{${term}},synonyms.cs.{${term}},search_aliases.cs.{${term}}`,
     );
   }
 

@@ -249,7 +249,8 @@ export default function VisualLibraryBrowser() {
       )}
 
       {openAsset && (
-        <VisualAssetDetailDrawer asset={openAsset} onClose={() => setOpenAsset(null)} onChanged={load} />
+        <VisualAssetDetailDrawer asset={openAsset} onClose={() => setOpenAsset(null)} onChanged={load}
+          onOpenAsset={(rid) => { const a = all.find((x) => x.id === rid); if (a) setOpenAsset(a); }} />
       )}
       {showUpload && (
         <VisualLibraryUploadModal onClose={() => setShowUpload(false)} onUploaded={() => { setShowUpload(false); load(); }} />

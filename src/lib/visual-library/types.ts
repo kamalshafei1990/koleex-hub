@@ -37,6 +37,75 @@ export const ASSET_CATEGORIES = [
 ] as const;
 export type AssetCategory = (typeof ASSET_CATEGORIES)[number];
 
+/* ── Semantic Relationships (Phase: Semantic Intelligence) ── */
+
+export const RELATIONSHIP_TYPES = [
+  "similar_to", "alternative_of", "parent_of", "child_of", "used_with", "opposite_of",
+  "represents", "recommended_for", "not_recommended_for", "variation_of",
+  "belongs_to_collection", "semantic_match", "visual_match", "style_match",
+] as const;
+export type RelationshipType = (typeof RELATIONSHIP_TYPES)[number];
+
+export const RELATIONSHIP_STATUSES = ["suggested", "approved", "rejected", "archived"] as const;
+export type RelationshipStatus = (typeof RELATIONSHIP_STATUSES)[number];
+
+/** Human label for each relationship type. */
+export const RELATIONSHIP_LABEL: Record<RelationshipType, string> = {
+  similar_to: "Similar to",
+  alternative_of: "Alternative of",
+  parent_of: "Parent of",
+  child_of: "Child of",
+  used_with: "Used with",
+  opposite_of: "Opposite of",
+  represents: "Represents",
+  recommended_for: "Recommended for",
+  not_recommended_for: "Not recommended for",
+  variation_of: "Variation of",
+  belongs_to_collection: "In collection",
+  semantic_match: "Semantic match",
+  visual_match: "Visual match",
+  style_match: "Style match",
+};
+
+/** Reverse type to auto-create on the target (null = one-way, no reverse). */
+export const REVERSE_TYPE: Record<RelationshipType, RelationshipType | null> = {
+  similar_to: "similar_to",
+  alternative_of: "alternative_of",
+  parent_of: "child_of",
+  child_of: "parent_of",
+  used_with: "used_with",
+  opposite_of: "opposite_of",
+  represents: null,
+  recommended_for: null,
+  not_recommended_for: null,
+  variation_of: null,
+  belongs_to_collection: null,
+  semantic_match: "semantic_match",
+  visual_match: "visual_match",
+  style_match: "style_match",
+};
+
+export interface VisualAssetRelationship {
+  id: string;
+  tenant_id: string;
+  source_asset_id: string;
+  target_asset_id: string;
+  relationship_type: RelationshipType;
+  confidence_score: number;
+  status: RelationshipStatus;
+  notes: string | null;
+  origin: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  /** The asset at the other end (enriched at read-time). */
+  related_asset?: {
+    id: string; title: string; visual_asset_code: string; slug: string | null;
+    category: string | null; svg_path: string | null; storage_bucket: string | null;
+    public_url: string | null; approval_status: string;
+  } | null;
+}
+
 /** A row from public.visual_assets. */
 export interface VisualAsset {
   id: string;
@@ -87,6 +156,11 @@ export interface VisualAsset {
   usage_count: number;
   version: number;
   theme: string | null;
+  // ── Semantic Intelligence (Phase: AI-prep) ──
+  semantic_meaning: string | null;
+  visual_style_description: string | null;
+  ai_prompt_description: string | null;
+  collections: string[];
   /** Derived at read-time from storage_bucket + svg_path (not a column). */
   public_url?: string | null;
 }

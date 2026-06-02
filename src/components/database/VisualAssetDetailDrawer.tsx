@@ -6,11 +6,12 @@
    version, linked systems, and the approval workflow.
    --------------------------------------------------------------------------- */
 
-import { useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import type { VisualAsset } from "@/lib/visual-library/types";
 import { displayState } from "@/lib/visual-library/types";
 import { uploadToStorage } from "@/lib/storage-client";
 import { STATE_PILL } from "@/components/database/VisualAssetCard";
+import SemanticRelationships from "@/components/database/SemanticRelationships";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import BadgeCheckIcon from "@/components/icons/ui/BadgeCheckIcon";
 import ArchiveIcon from "@/components/icons/ui/ArchiveIcon";
@@ -74,6 +75,16 @@ async function downloadRaster(url: string, name: string, ext: "png" | "jpg", siz
   }
 }
 
+function AiField({ label, value, placeholder, onChange }: { label: string; value: string; placeholder: string; onChange: (v: string) => void }) {
+  return (
+    <label className="block py-1.5">
+      <span className="mb-1 block text-[10.5px] font-medium uppercase tracking-wide text-[var(--text-dim)]">{label}</span>
+      <textarea value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} rows={1}
+        className="w-full resize-y rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] placeholder:text-[var(--text-dim)]" />
+    </label>
+  );
+}
+
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   if (value === null || value === undefined || value === "") return null;
   return (
@@ -96,12 +107,30 @@ function Chips({ items }: { items: string[] }) {
 }
 
 export default function VisualAssetDetailDrawer({
-  asset, onClose, onChanged,
-}: { asset: VisualAsset; onClose: () => void; onChanged: () => void }) {
+  asset, onClose, onChanged, onOpenAsset,
+}: { asset: VisualAsset; onClose: () => void; onChanged: () => void; onOpenAsset?: (id: string) => void }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [dlSize, setDlSize] = useState(256);
   const [dlBusy, setDlBusy] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // AI-preparation fields (schema ready; manual now, AI later).
+  const [ai, setAi] = useState({ semantic_meaning: "", visual_style_description: "", ai_prompt_description: "" });
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiDirty, setAiDirty] = useState(false);
+  useEffect(() => {
+    setAi({
+      semantic_meaning: asset.semantic_meaning ?? "",
+      visual_style_description: asset.visual_style_description ?? "",
+      ai_prompt_description: asset.ai_prompt_description ?? "",
+    });
+    setAiDirty(false);
+  }, [asset.id, asset.semantic_meaning, asset.visual_style_description, asset.ai_prompt_description]);
+  const saveAi = async () => {
+    setAiBusy(true);
+    const ok = await patch(asset.id, ai);
+    setAiBusy(false);
+    if (ok) { setAiDirty(false); onChanged(); }
+  };
   const state = displayState(asset);
   const isApproved = asset.approval_status === "approved";
   const isArchived = asset.status === "archived";
@@ -227,7 +256,29 @@ export default function VisualAssetDetailDrawer({
             <div className="py-1"><span className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-dim)]">Linked apps</span><Chips items={asset.linked_apps} /></div>
           )}
 
-          <div className="mt-2 divide-y divide-[var(--border-subtle)] text-[var(--text-dim)]">
+          {/* Intelligence (AI-prep) */}
+          <div className="mt-4 rounded-xl border border-[var(--border-subtle)] p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">Intelligence</span>
+              {aiDirty && (
+                <button type="button" onClick={saveAi} disabled={aiBusy}
+                  className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-inverted)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
+                  {aiBusy ? <SpinnerIcon size={11} className="animate-spin" /> : null} Save
+                </button>
+              )}
+            </div>
+            <AiField label="Semantic meaning" placeholder="e.g. Represents backward navigation"
+              value={ai.semantic_meaning} onChange={(v) => { setAi((s) => ({ ...s, semantic_meaning: v })); setAiDirty(true); }} />
+            <AiField label="Visual style" placeholder="e.g. Minimal monochrome rounded outline icon"
+              value={ai.visual_style_description} onChange={(v) => { setAi((s) => ({ ...s, visual_style_description: v })); setAiDirty(true); }} />
+            <AiField label="AI prompt" placeholder="e.g. Apple-style rounded outline navigation arrow"
+              value={ai.ai_prompt_description} onChange={(v) => { setAi((s) => ({ ...s, ai_prompt_description: v })); setAiDirty(true); }} />
+          </div>
+
+          {/* Semantic relationships */}
+          <SemanticRelationships asset={{ id: asset.id, title: asset.title }} onOpenAsset={onOpenAsset} />
+
+          <div className="mt-4 divide-y divide-[var(--border-subtle)] text-[var(--text-dim)]">
             <Row label="Created" value={asset.created_at ? new Date(asset.created_at).toLocaleDateString() : "—"} />
             {asset.approved_at && <Row label="Approved" value={new Date(asset.approved_at).toLocaleDateString()} />}
           </div>
