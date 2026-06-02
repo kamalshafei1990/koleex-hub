@@ -6,6 +6,8 @@ export const contactsT: Translations = {
      ═══════════════════════════════════════════════════════════════════════════ */
   "title":                { en: "Contacts",              zh: "联系人",               ar: "جهات الاتصال" },
   "newContact":           { en: "New Contact",           zh: "新建联系人",            ar: "جهة اتصال جديدة" },
+  "newSupplier":          { en: "New supplier",          zh: "新建供应商",            ar: "مورّد جديد" },
+  "newCustomer":          { en: "New customer",          zh: "新建客户",              ar: "عميل جديد" },
   "editContact":          { en: "Edit Contact",          zh: "编辑联系人",            ar: "تعديل جهة الاتصال" },
   "back":                 { en: "Back",                  zh: "返回",                 ar: "رجوع" },
   "hub":                  { en: "Hub",                   zh: "中心",                 ar: "المركز" },
@@ -55,6 +57,8 @@ export const contactsT: Translations = {
 
   /* ── Delete Confirmation ── */
   "delete.title":         { en: "Delete Contact",        zh: "删除联系人",            ar: "حذف جهة الاتصال" },
+  "delete.titleSupplier": { en: "Delete supplier",       zh: "删除供应商",            ar: "حذف المورّد" },
+  "delete.titleCustomer": { en: "Delete customer",       zh: "删除客户",              ar: "حذف العميل" },
   "delete.confirm":       { en: "Are you sure you want to delete", zh: "您确定要删除", ar: "هل أنت متأكد أنك تريد حذف" },
   "delete.cannotUndo":    { en: "? This cannot be undone.", zh: "？此操作无法撤销。", ar: "؟ لا يمكن التراجع عن هذا الإجراء." },
 

@@ -3183,7 +3183,7 @@ function CityDropdown({ countryCode, stateCode, value, onChange, label, placehol
    just to open the confirm dialog.
    ═══════════════════════════════════════════════════════════════════════════ */
 type DeleteResult = { ok: boolean; error?: string };
-type PendingDelete = { id: string; name: string; onConfirm: () => Promise<DeleteResult> | DeleteResult | void };
+type PendingDelete = { id: string; name: string; title?: string; onConfirm: () => Promise<DeleteResult> | DeleteResult | void };
 function DeleteConfirmHost({ t }: { t: (key: string, fallback?: string) => string }) {
   const [pending, setPending] = useState<PendingDelete | null>(null);
   const [busy, setBusy] = useState(false);
@@ -3208,7 +3208,7 @@ function DeleteConfirmHost({ t }: { t: (key: string, fallback?: string) => strin
   return (
     <ScrollLockOverlay className="fixed inset-0 z-[60] bg-[var(--bg-overlay)] flex items-center justify-center p-4" onClick={close}>
       <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">{t("delete.title")}</h3>
+        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">{pending.title || t("delete.title")}</h3>
         <p className="text-sm text-[var(--text-subtle)] mb-6">
           {t("delete.confirm")} <strong className="text-[var(--text-primary)]">{pending.name}</strong>{t("delete.cannotUndo")}
         </p>
@@ -3663,8 +3663,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
      onConfirm resolves the delete result so the dialog can surface errors. */
   const requestDelete = (c: ContactRow) => {
     if (typeof window === "undefined") return;
+    const title = c.contact_type === "supplier"
+      ? t("delete.titleSupplier", "Delete supplier")
+      : c.contact_type === "customer"
+        ? t("delete.titleCustomer", "Delete customer")
+        : t("delete.title", "Delete Contact");
     window.dispatchEvent(new CustomEvent("koleex:confirm-delete", {
-      detail: { id: c.id, name: contactDisplayName(c), onConfirm: () => handleDelete(c.id) },
+      detail: { id: c.id, name: contactDisplayName(c), title, onConfirm: () => handleDelete(c.id) },
     }));
   };
 
@@ -3953,6 +3958,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               }
             }}
             className="h-8 w-8 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 flex items-center justify-center transition-colors shrink-0"
+            aria-label={filterType === "supplier" ? t("newSupplier", "New supplier") : filterType === "customer" ? t("newCustomer", "New customer") : t("newContact", "New Contact")}
+            title={filterType === "supplier" ? t("newSupplier", "New supplier") : filterType === "customer" ? t("newCustomer", "New customer") : t("newContact", "New Contact")}
           >
             <PlusIcon size={16} />
           </button>
@@ -7615,7 +7622,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 {form.contact_persons.map((cp, i) => (
                   <div key={i} className="rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] overflow-hidden">
                     <div className="flex items-center gap-2 p-3">
-                      <RemoveBtn onClick={() => setField("contact_persons", form.contact_persons.filter((_, idx) => idx !== i))} />
+                      <RemoveBtn onClick={() => {
+                        setField("contact_persons", form.contact_persons.filter((_, idx) => idx !== i));
+                        // Keep the single-accordion state (band 1000+) pointing at the
+                        // correct row after the array re-indexes — otherwise deleting an
+                        // earlier person leaves a different person's panel expanded.
+                        setExpandedFamily(prev => prev == null ? prev : prev === 1000 + i ? null : (prev > 1000 + i && prev < 2000 ? prev - 1 : prev));
+                      }} />
                       <input
                         value={cp.name}
                         onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], name: e.target.value }; setField("contact_persons", arr); }}

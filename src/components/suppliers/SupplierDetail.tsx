@@ -1343,7 +1343,9 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
 
                 <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2">
                   <BarRow label={t("sd.evaluationScore", "Evaluation score")} pct={overall || 0} tone={overall >= 75 ? "emerald" : overall >= 50 ? "amber" : "rose"} valueText={overall ? `${Math.round(overall)}/100` : "—"} />
-                  {riskScore != null ? <BarRow label={t("sd.riskScore", "Risk score")} pct={riskScore || 0} tone={(riskScore || 0) <= 35 ? "emerald" : (riskScore || 0) <= 65 ? "amber" : "rose"} valueText={`${Math.round(riskScore || 0)}/100`} /> : null}
+                  {/* "Risk score" row removed: data.risk.score is the same internal_evaluation_score
+                      already shown as "Evaluation score" above — rendering it again with inverted
+                      (higher = worse) coloring produced a self-contradictory 88 green / 88 red pair. */}
                   {level ? <BarRow label={t("sd.overallRiskLevel", "Overall risk level")} pct={lev[level] ?? 50} tone={level === "low" ? "emerald" : level === "medium" ? "amber" : "rose"} valueText={t("opt." + level, level)} /> : null}
                   {trust ? <BarRow label={t("sd.trustLevel", "Trust level")} pct={trustLev[trust] ?? 50} tone={trust === "excellent" || trust === "high" ? "emerald" : trust === "medium" ? "amber" : "rose"} valueText={t("opt." + trust, trust)} /> : null}
                   {dep ? <BarRow label={t("sd.dependencyLevel", "Dependency level")} pct={depLev[dep] ?? 50} tone={dep === "low" ? "emerald" : dep === "medium" ? "amber" : "rose"} valueText={t("opt." + dep, dep)} /> : null}
