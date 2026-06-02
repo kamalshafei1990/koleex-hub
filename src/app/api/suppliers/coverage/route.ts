@@ -128,13 +128,26 @@ export async function POST(req: Request) {
   const supplierId = typeof body.supplier_id === "string" ? body.supplier_id : "";
   const divisionSlug = typeof body.division_slug === "string" ? body.division_slug.trim() : "";
   const categorySlug = typeof body.category_slug === "string" ? body.category_slug.trim() : "";
-  const subCode = typeof body.subcategory_code === "string" ? body.subcategory_code.trim() : "";
-  const subLabel = typeof body.subcategory_label === "string" ? body.subcategory_label.trim() : null;
   const role: CoverageRole = (COVERAGE_ROLES as readonly string[]).includes(body.sourcing_role as string) ? (body.sourcing_role as CoverageRole) : "approved";
   const isMain = body.is_main_supplier === true;
 
-  if (!supplierId || !divisionSlug || !categorySlug || !subCode) {
-    return NextResponse.json({ error: "supplier_id, division_slug, category_slug and subcategory_code are required" }, { status: 400 });
+  // Accept one subcategory (subcategory_code/label) OR a batch (subcategories:
+  // [{code,label}]). A single supplier routinely makes products across many
+  // subcategories — even a whole category — so the board assigns in bulk.
+  const subs: { code: string; label: string | null }[] = [];
+  if (Array.isArray(body.subcategories)) {
+    for (const s of body.subcategories as Array<Record<string, unknown>>) {
+      const code = typeof s?.code === "string" ? s.code.trim() : "";
+      if (code) subs.push({ code, label: typeof s?.label === "string" ? s.label.trim() : null });
+    }
+  } else if (typeof body.subcategory_code === "string" && body.subcategory_code.trim()) {
+    subs.push({ code: body.subcategory_code.trim(), label: typeof body.subcategory_label === "string" ? body.subcategory_label.trim() : null });
+  }
+  // De-dupe by code.
+  const uniqueSubs = [...new Map(subs.map((s) => [s.code, s])).values()];
+
+  if (!supplierId || !divisionSlug || !categorySlug || uniqueSubs.length === 0) {
+    return NextResponse.json({ error: "supplier_id, division_slug, category_slug and at least one subcategory are required" }, { status: 400 });
   }
 
   // Verify the supplier exists, belongs to this tenant, and is actually a supplier.
@@ -143,36 +156,38 @@ export async function POST(req: Request) {
   if (supErr) { console.error("[api/suppliers/coverage POST supplier-check]", supErr.message); return NextResponse.json({ error: "Lookup failed" }, { status: 500 }); }
   if (!sup) return NextResponse.json({ error: "Supplier not found in this tenant" }, { status: 404 });
 
+  const now = new Date().toISOString();
+  const payload = uniqueSubs.map((s) => ({
+    tenant_id: tid,
+    supplier_id: supplierId,
+    division_slug: divisionSlug,
+    category_slug: categorySlug,
+    subcategory_code: s.code,
+    subcategory_label: s.label,
+    sourcing_role: role,
+    is_main_supplier: isMain,
+    created_by: auth.account_id ?? null,
+    updated_at: now,
+  }));
+
   const { data, error } = await supabaseServer
     .from("supplier_coverage")
-    .upsert({
-      tenant_id: tid,
-      supplier_id: supplierId,
-      division_slug: divisionSlug,
-      category_slug: categorySlug,
-      subcategory_code: subCode,
-      subcategory_label: subLabel,
-      sourcing_role: role,
-      is_main_supplier: isMain,
-      created_by: auth.account_id ?? null,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: "tenant_id,supplier_id,category_slug,subcategory_code" })
-    .select("id, supplier_id, division_slug, category_slug, subcategory_code, subcategory_label, sourcing_role, sourcing_priority, is_main_supplier")
-    .maybeSingle();
+    .upsert(payload, { onConflict: "tenant_id,supplier_id,category_slug,subcategory_code" })
+    .select("id, supplier_id, division_slug, category_slug, subcategory_code, subcategory_label, sourcing_role, sourcing_priority, is_main_supplier");
 
   if (error || !data) {
     console.error("[api/suppliers/coverage POST]", error?.message);
     return NextResponse.json({ error: "Failed to assign supplier" }, { status: 500 });
   }
 
-  const r = data as CoverageDbRow;
-  const supplierMap = await enrichSuppliers(tid, [r.supplier_id]);
-  const row: CoverageRow = {
+  const supplierMap = await enrichSuppliers(tid, [supplierId]);
+  const rows: CoverageRow[] = (data as CoverageDbRow[]).map((r) => ({
     id: r.id, supplier_id: r.supplier_id, division_slug: r.division_slug, category_slug: r.category_slug,
     subcategory_code: r.subcategory_code, subcategory_label: r.subcategory_label,
     sourcing_role: (COVERAGE_ROLES as readonly string[]).includes(r.sourcing_role) ? (r.sourcing_role as CoverageRole) : "approved",
     sourcing_priority: r.sourcing_priority, is_main_supplier: r.is_main_supplier,
     supplier: supplierMap.get(r.supplier_id) ?? null,
-  };
-  return NextResponse.json({ row }, { status: 201 });
+  }));
+  // Keep `row` for any single-add callers; `rows` is the batch result.
+  return NextResponse.json({ rows, row: rows[0] ?? null }, { status: 201 });
 }

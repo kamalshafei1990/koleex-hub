@@ -46,7 +46,14 @@ const riskDot = (risk: string | null) =>
   risk === "low" ? "bg-emerald-500" : risk === "medium" ? "bg-amber-500" : (risk === "high" || risk === "critical") ? "bg-rose-500" : "";
 
 interface PickerSupplier { id: string; name: string; logo: string | null }
-interface PickerTarget { divisionSlug: string; categorySlug: string; subCode: string; subLabel: string; categoryLabel: string }
+interface PickerSub { code: string; label: string }
+interface PickerTarget {
+  divisionSlug: string;
+  categorySlug: string;
+  categoryLabel: string;
+  subcategories: PickerSub[];   // all subcategories of the category (the choices)
+  presetCode?: string;          // the subcategory the user clicked "Add" on (pre-selected)
+}
 
 export default function KoleexMainSuppliers() {
   const { t } = useTranslation(contactsT);
@@ -94,11 +101,17 @@ export default function KoleexMainSuppliers() {
     if (!res || !res.ok) setRows(prev);
   }, [rows]);
 
-  const onAssigned = useCallback((row: CoverageRow) => {
+  const onAssigned = useCallback((newRows: CoverageRow[]) => {
     setRows((r) => {
-      const i = r.findIndex((x) => x.id === row.id || (x.supplier_id === row.supplier_id && x.category_slug === row.category_slug && x.subcategory_code === row.subcategory_code));
-      if (i >= 0) { const next = r.slice(); next[i] = row; return next; }
-      return [...r, row];
+      const byId = new Map(r.map((x) => [x.id, x]));
+      for (const row of newRows) {
+        // Drop any stale entry with the same (supplier, category, subcategory) key, then set by id.
+        for (const [id, x] of byId) {
+          if (x.supplier_id === row.supplier_id && x.category_slug === row.category_slug && x.subcategory_code === row.subcategory_code) byId.delete(id);
+        }
+        byId.set(row.id, row);
+      }
+      return [...byId.values()];
     });
   }, []);
 
@@ -183,27 +196,37 @@ export default function KoleexMainSuppliers() {
                       }
                       return (
                         <div key={c.slug} className="ps-1">
-                          {/* ── Category header (medium) ── */}
-                          <button
-                            type="button"
-                            onClick={() => setCollapsedCat((s) => { const n = new Set(s); n.has(catKey) ? n.delete(catKey) : n.add(catKey); return n; })}
-                            className="flex w-full items-center gap-2.5 py-2 text-start"
-                          >
-                            <AngleDownIcon className={`h-3.5 w-3.5 shrink-0 text-[var(--text-ghost)] transition-transform ${catCollapsed ? "-rotate-90 rtl:rotate-90" : ""}`} />
-                            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)] shrink-0">
-                              {catLogo ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={catLogo} alt="" className="h-4 w-4 object-contain" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-                              ) : <Building2Icon className="h-4 w-4 text-[var(--text-faint)]" />}
-                            </span>
-                            <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">{c.label}</h3>
-                            <span className="text-[11px] text-[var(--text-faint)]">· {c.subcategories.length} {t("cov.subcategories", "subcategories")}</span>
-                            {catCritical > 0 && (
-                              <span className="ms-auto inline-flex items-center gap-1 text-[11px] font-medium text-rose-500">
-                                <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />{catCritical} {t("cov.atRisk", "at risk")}
+                          {/* ── Category header (medium) — toggle + add-across-category ── */}
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setCollapsedCat((s) => { const n = new Set(s); n.has(catKey) ? n.delete(catKey) : n.add(catKey); return n; })}
+                              className="flex flex-1 min-w-0 items-center gap-2.5 py-2 text-start"
+                            >
+                              <AngleDownIcon className={`h-3.5 w-3.5 shrink-0 text-[var(--text-ghost)] transition-transform ${catCollapsed ? "-rotate-90 rtl:rotate-90" : ""}`} />
+                              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)] shrink-0">
+                                {catLogo ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={catLogo} alt="" className="h-4 w-4 object-contain" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                                ) : <Building2Icon className="h-4 w-4 text-[var(--text-faint)]" />}
                               </span>
-                            )}
-                          </button>
+                              <h3 className="text-[15px] font-semibold text-[var(--text-primary)] truncate">{c.label}</h3>
+                              <span className="shrink-0 text-[11px] text-[var(--text-faint)]">· {c.subcategories.length} {t("cov.subcategories", "subcategories")}</span>
+                              {catCritical > 0 && (
+                                <span className="ms-auto inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-rose-500">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />{catCritical} {t("cov.atRisk", "at risk")}
+                                </span>
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPicker({ divisionSlug: d.id, categorySlug: c.slug, categoryLabel: c.label, subcategories: c.subcategories })}
+                              className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2 py-1 text-[11px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-color)] transition-colors"
+                              title={t("cov.addAcrossCategory", "Add a supplier across this category")}
+                            >
+                              <PlusIcon size={11} /> {t("cov.addSupplier", "Add supplier")}
+                            </button>
+                          </div>
 
                           {!catCollapsed && (
                             <div className="grid grid-cols-1 gap-3 ps-7 @container xl:grid-cols-2">
@@ -216,7 +239,7 @@ export default function KoleexMainSuppliers() {
                                     code={s.code}
                                     rows={list}
                                     t={t}
-                                    onAdd={() => setPicker({ divisionSlug: d.id, categorySlug: c.slug, subCode: s.code, subLabel: s.label, categoryLabel: c.label })}
+                                    onAdd={() => setPicker({ divisionSlug: d.id, categorySlug: c.slug, categoryLabel: c.label, subcategories: c.subcategories, presetCode: s.code })}
                                     onOpen={(id) => router.push(`/suppliers/${id}`)}
                                     onRemove={removeRow}
                                     onChangeRole={changeRole}
@@ -253,7 +276,7 @@ export default function KoleexMainSuppliers() {
       {picker && (
         <SupplierPicker
           target={picker}
-          existingIds={(byNode.get(coverageNodeKey(picker.categorySlug, picker.subCode)) ?? []).map((r) => r.supplier_id)}
+          existingByCode={Object.fromEntries(picker.subcategories.map((s) => [s.code, (byNode.get(coverageNodeKey(picker.categorySlug, s.code)) ?? []).map((r) => r.supplier_id)]))}
           t={t}
           onClose={() => setPicker(null)}
           onAssigned={onAssigned}
@@ -382,11 +405,13 @@ function SupplierChip({ row, t, onOpen, onRemove, onChangeRole }: {
   );
 }
 
-/* ── Searchable supplier picker modal ── */
-function SupplierPicker({ target, existingIds, t, onClose, onAssigned }: {
-  target: PickerTarget; existingIds: string[];
+/* ── Searchable supplier picker — assigns one supplier to one OR MANY
+   subcategories of a category in a single action (a supplier routinely makes
+   products across several subcategories, or an entire category). ── */
+function SupplierPicker({ target, existingByCode, t, onClose, onAssigned }: {
+  target: PickerTarget; existingByCode: Record<string, string[]>;
   t: (k: string, f?: string) => string;
-  onClose: () => void; onAssigned: (row: CoverageRow) => void;
+  onClose: () => void; onAssigned: (rows: CoverageRow[]) => void;
 }) {
   const [all, setAll] = useState<PickerSupplier[]>([]);
   const [q, setQ] = useState("");
@@ -394,7 +419,9 @@ function SupplierPicker({ target, existingIds, t, onClose, onAssigned }: {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const existing = useMemo(() => new Set(existingIds), [existingIds]);
+  // Selected subcategories: pre-select the one clicked (per-sub Add); empty when
+  // opened from the category header (user picks, or taps "All in category").
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(target.presetCode ? [target.presetCode] : []));
 
   useEffect(() => {
     let alive = true;
@@ -415,20 +442,25 @@ function SupplierPicker({ target, existingIds, t, onClose, onAssigned }: {
     return all.filter((s) => !term || s.name.toLowerCase().includes(term));
   }, [all, q]);
 
+  const allSelected = selected.size === target.subcategories.length && target.subcategories.length > 0;
+  const toggleCode = (code: string) => setSelected((p) => { const n = new Set(p); n.has(code) ? n.delete(code) : n.add(code); return n; });
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(target.subcategories.map((s) => s.code)));
+
   const assign = async (sup: PickerSupplier) => {
-    if (existing.has(sup.id) || busyId) return;
+    if (busyId || selected.size === 0) return;
     setBusyId(sup.id); setError(null);
+    const chosen = target.subcategories.filter((s) => selected.has(s.code));
     try {
       const res = await fetch("/api/suppliers/coverage", {
         method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           supplier_id: sup.id, division_slug: target.divisionSlug, category_slug: target.categorySlug,
-          subcategory_code: target.subCode, subcategory_label: target.subLabel, sourcing_role: role,
+          sourcing_role: role, subcategories: chosen.map((s) => ({ code: s.code, label: s.label })),
         }),
       });
       if (!res.ok) throw new Error(String(res.status));
-      const json = (await res.json()) as { row: CoverageRow };
-      onAssigned(json.row);
+      const json = (await res.json()) as { rows?: CoverageRow[] };
+      onAssigned(Array.isArray(json.rows) ? json.rows : []);
       onClose();
     } catch {
       setError(t("cov.assignError", "Couldn't assign. Please try again."));
@@ -438,15 +470,16 @@ function SupplierPicker({ target, existingIds, t, onClose, onAssigned }: {
 
   return (
     <ScrollLockOverlay className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--bg-overlay)] p-4" onClick={onClose}>
-      <div className="flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)]" onClick={(e) => e.stopPropagation()}>
+      <div className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)]" onClick={(e) => e.stopPropagation()}>
         <div className="border-b border-[var(--border-subtle)] p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">{t("cov.addTo", "Add supplier to")} {target.subLabel}</h3>
-              <p className="text-[11px] text-[var(--text-faint)] truncate">{target.categoryLabel}</p>
+              <h3 className="text-[15px] font-semibold text-[var(--text-primary)] truncate">{t("cov.addTo", "Add supplier to")} {target.categoryLabel}</h3>
+              <p className="text-[11px] text-[var(--text-faint)]">{t("cov.pickSubsHint", "Pick the subcategories this supplier covers")}</p>
             </div>
             <button onClick={onClose} aria-label={t("cov.close", "Close")} className="shrink-0 rounded-lg p-1 text-[var(--text-faint)] hover:text-[var(--text-primary)]"><CrossIcon size={16} /></button>
           </div>
+
           {/* role selector */}
           <div className="mt-3 flex flex-wrap gap-1">
             {COVERAGE_ROLES.map((r) => (
@@ -456,6 +489,30 @@ function SupplierPicker({ target, existingIds, t, onClose, onAssigned }: {
               </button>
             ))}
           </div>
+
+          {/* subcategory multi-select */}
+          <div className="mt-3">
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-faint)]">
+                {t("cov.applyTo", "Apply to")} · {selected.size}/{target.subcategories.length}
+              </span>
+              <button type="button" onClick={toggleAll} className="text-[11px] font-medium text-[var(--accent,#0066FF)] hover:underline">
+                {allSelected ? t("cov.clearAll", "Clear") : t("cov.allInCategory", "All in category")}
+              </button>
+            </div>
+            <div className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto">
+              {target.subcategories.map((s) => {
+                const on = selected.has(s.code);
+                return (
+                  <button key={s.code} type="button" onClick={() => toggleCode(s.code)}
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-medium border transition-colors ${on ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent" : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] border-[var(--border-subtle)] hover:text-[var(--text-primary)]"}`}>
+                    {s.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* search */}
           <div className="mt-3 flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2">
             <SearchIcon size={14} className="text-[var(--text-faint)]" />
@@ -465,17 +522,20 @@ function SupplierPicker({ target, existingIds, t, onClose, onAssigned }: {
         </div>
 
         <div className="flex-1 overflow-y-auto p-2">
-          {loading ? (
+          {selected.size === 0 ? (
+            <div className="py-10 text-center text-[12px] text-[var(--text-faint)]">{t("cov.pickSubFirst", "Select at least one subcategory above")}</div>
+          ) : loading ? (
             <div className="py-10 text-center text-[12px] text-[var(--text-faint)]">{t("cov.loading", "Loading…")}</div>
           ) : filtered.length === 0 ? (
             <div className="py-10 text-center text-[12px] text-[var(--text-faint)]">{t("cov.noResults", "No suppliers match.")}</div>
           ) : (
             filtered.map((s) => {
-              const already = existing.has(s.id);
               const initials = s.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+              // How many of the selected subcategories this supplier already covers.
+              const inCount = [...selected].filter((code) => (existingByCode[code] ?? []).includes(s.id)).length;
               return (
-                <button key={s.id} type="button" disabled={already || !!busyId} onClick={() => assign(s)}
-                  className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-start transition-colors ${already ? "opacity-40" : "hover:bg-[var(--bg-surface-subtle)]"}`}>
+                <button key={s.id} type="button" disabled={!!busyId} onClick={() => assign(s)}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-start transition-colors hover:bg-[var(--bg-surface-subtle)] disabled:opacity-60">
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-[var(--bg-surface)] ring-1 ring-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-faint)]">
                     {s.logo ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -483,9 +543,9 @@ function SupplierPicker({ target, existingIds, t, onClose, onAssigned }: {
                     ) : initials}
                   </span>
                   <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text-primary)]">{s.name}</span>
-                  {already ? <span className="text-[10px] text-[var(--text-ghost)]">{t("cov.alreadyAdded", "Added")}</span>
-                    : busyId === s.id ? <span className="text-[10px] text-[var(--text-faint)]">…</span>
-                    : <PlusIcon size={13} className="text-[var(--text-faint)]" />}
+                  {busyId === s.id ? <span className="text-[10px] text-[var(--text-faint)]">…</span>
+                    : inCount > 0 ? <span className="shrink-0 text-[10px] text-[var(--text-ghost)]">{t("cov.coversN", "covers {n}").replace("{n}", String(inCount))}</span>
+                    : <PlusIcon size={13} className="shrink-0 text-[var(--text-faint)]" />}
                 </button>
               );
             })

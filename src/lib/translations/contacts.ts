@@ -1269,6 +1269,15 @@ export const contactsT: Translations = {
   "cov.role.backup": { en: "Backup", zh: "备用", ar: "احتياطي" },
   "cov.role.experimental": { en: "Experimental", zh: "试用", ar: "تجريبي" },
   "cov.role.blocked": { en: "Blocked", zh: "已屏蔽", ar: "محظور" },
+  /* multi-subcategory assignment */
+  "cov.addSupplier": { en: "Add supplier", zh: "添加供应商", ar: "إضافة مورد" },
+  "cov.addAcrossCategory": { en: "Add a supplier across this category", zh: "为整个类别添加供应商", ar: "إضافة مورد عبر هذه الفئة" },
+  "cov.pickSubsHint": { en: "Pick the subcategories this supplier covers", zh: "选择该供应商覆盖的子类别", ar: "اختر الفئات الفرعية التي يغطيها هذا المورد" },
+  "cov.applyTo": { en: "Apply to", zh: "应用于", ar: "تطبيق على" },
+  "cov.allInCategory": { en: "All in category", zh: "全部子类别", ar: "كل الفئة" },
+  "cov.clearAll": { en: "Clear", zh: "清除", ar: "مسح" },
+  "cov.pickSubFirst": { en: "Select at least one subcategory above", zh: "请先在上方选择至少一个子类别", ar: "اختر فئة فرعية واحدة على الأقل أعلاه" },
+  "cov.coversN": { en: "covers {n}", zh: "已覆盖 {n}", ar: "يغطي {n}" },
 
   /* ── Supplier 360 — risk / negotiation / stability labels (audit fill) ── */
   "sd.delete": { en: "Delete", zh: "删除", ar: "حذف" },
