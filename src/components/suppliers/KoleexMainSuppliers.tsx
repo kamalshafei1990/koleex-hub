@@ -1,0 +1,498 @@
+"use client";
+
+/* ---------------------------------------------------------------------------
+   Koleex Main Suppliers — a visual sourcing-coverage board.
+
+   A strategic map (NOT a table): Division → Category → Subcategory → the
+   suppliers that cover it, with sourcing roles + coverage-health intelligence.
+   Reuses the canonical taxonomy (DIVISIONS / CATEGORIES), supplier identities
+   (contacts), logos, and Supplier 360. The only new persistence is the thin
+   supplier_coverage assignment join (see /api/suppliers/coverage).
+   --------------------------------------------------------------------------- */
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useTranslation } from "@/lib/i18n";
+import { contactsT } from "@/lib/translations/contacts";
+import SuppliersHeader from "./SuppliersHeader";
+import { ScrollLockOverlay } from "@/hooks/useScrollLock";
+import { taxonomyLogoUrl } from "@/components/knowledge/product-coding/taxonomy-logo";
+import {
+  buildTaxonomyTree, indexCoverage, computeCoverageHealth, coverageNodeKey,
+  COVERAGE_ROLES, type CoverageRole, type CoverageRow, type CoverageHealthStatus,
+} from "@/lib/suppliers/coverage";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
+import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import Building2Icon from "@/components/icons/ui/Building2Icon";
+
+/* ── role label + tone (monochrome; rose only for blocked) ── */
+function roleLabel(t: (k: string, f?: string) => string, role: CoverageRole): string {
+  return t("cov.role." + role, role.charAt(0).toUpperCase() + role.slice(1));
+}
+const roleTextClass = (role: CoverageRole) =>
+  role === "blocked" ? "text-rose-500"
+  : role === "preferred" ? "text-[var(--text-primary)] font-semibold"
+  : "text-[var(--text-faint)]";
+
+const HEALTH_TONE: Record<CoverageHealthStatus, { dot: string; text: string; ring: string }> = {
+  healthy:  { dot: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400", ring: "ring-emerald-500/25" },
+  warning:  { dot: "bg-amber-500",   text: "text-amber-600 dark:text-amber-400",     ring: "ring-amber-500/25" },
+  critical: { dot: "bg-rose-500",    text: "text-rose-600 dark:text-rose-400",       ring: "ring-rose-500/25" },
+  none:     { dot: "bg-[var(--text-ghost)]", text: "text-[var(--text-faint)]",       ring: "ring-[var(--border-subtle)]" },
+};
+const riskDot = (risk: string | null) =>
+  risk === "low" ? "bg-emerald-500" : risk === "medium" ? "bg-amber-500" : (risk === "high" || risk === "critical") ? "bg-rose-500" : "";
+
+interface PickerSupplier { id: string; name: string; logo: string | null }
+interface PickerTarget { divisionSlug: string; categorySlug: string; subCode: string; subLabel: string; categoryLabel: string }
+
+export default function KoleexMainSuppliers() {
+  const { t } = useTranslation(contactsT);
+  const router = useRouter();
+
+  const [rows, setRows] = useState<CoverageRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+  const [collapsedDiv, setCollapsedDiv] = useState<Set<string>>(new Set());
+  const [collapsedCat, setCollapsedCat] = useState<Set<string>>(new Set());
+  const [picker, setPicker] = useState<PickerTarget | null>(null);
+
+  const tree = useMemo(() => buildTaxonomyTree(), []);
+  const byNode = useMemo(() => indexCoverage(rows), [rows]);
+
+  const load = useCallback(async () => {
+    setLoading(true); setErr(null);
+    try {
+      const res = await fetch("/api/suppliers/coverage", { credentials: "include", cache: "no-store" });
+      if (!res.ok) throw new Error(String(res.status));
+      const json = (await res.json()) as { coverage: CoverageRow[] };
+      setRows(Array.isArray(json.coverage) ? json.coverage : []);
+    } catch {
+      setErr(t("cov.loadError", "Couldn't load the sourcing map. Please retry."));
+    } finally { setLoading(false); }
+  }, [t]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  /* ── mutations (optimistic) ── */
+  const removeRow = useCallback(async (id: string) => {
+    const prev = rows;
+    setRows((r) => r.filter((x) => x.id !== id));
+    const res = await fetch(`/api/suppliers/coverage/${id}`, { method: "DELETE", credentials: "include" }).catch(() => null);
+    if (!res || !res.ok) setRows(prev);
+  }, [rows]);
+
+  const changeRole = useCallback(async (id: string, role: CoverageRole) => {
+    const prev = rows;
+    setRows((r) => r.map((x) => (x.id === id ? { ...x, sourcing_role: role } : x)));
+    const res = await fetch(`/api/suppliers/coverage/${id}`, {
+      method: "PATCH", credentials: "include",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sourcing_role: role }),
+    }).catch(() => null);
+    if (!res || !res.ok) setRows(prev);
+  }, [rows]);
+
+  const onAssigned = useCallback((row: CoverageRow) => {
+    setRows((r) => {
+      const i = r.findIndex((x) => x.id === row.id || (x.supplier_id === row.supplier_id && x.category_slug === row.category_slug && x.subcategory_code === row.subcategory_code));
+      if (i >= 0) { const next = r.slice(); next[i] = row; return next; }
+      return [...r, row];
+    });
+  }, []);
+
+  /* ── portfolio summary across the live taxonomy ── */
+  const summary = useMemo(() => {
+    let subTotal = 0, covered = 0, critical = 0, gaps = 0;
+    const suppliers = new Set<string>();
+    for (const d of tree) {
+      for (const c of d.categories) {
+        for (const s of c.subcategories) {
+          subTotal++;
+          const list = byNode.get(coverageNodeKey(c.slug, s.code)) ?? [];
+          list.forEach((r) => suppliers.add(r.supplier_id));
+          const h = computeCoverageHealth(list);
+          if (h.status === "none") gaps++;
+          else { covered++; if (h.status === "critical") critical++; }
+        }
+      }
+    }
+    return { suppliers: suppliers.size, subTotal, covered, critical, gaps };
+  }, [tree, byNode]);
+
+  const liveDivisions = tree.filter((d) => d.categories.length > 0);
+  const plannedDivisions = tree.filter((d) => d.categories.length === 0);
+
+  return (
+    <div className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6">
+      <SuppliersHeader
+        title={t("cov.title", "Koleex Main Suppliers")}
+        subtitle={t("cov.subtitle", "Sourcing coverage map — who we depend on, by division → category → subcategory")}
+      />
+
+      {/* Portfolio summary */}
+      <section className="mt-6 grid grid-cols-2 gap-3 @container sm:grid-cols-4">
+        <SummaryStat label={t("cov.sumSuppliers", "Suppliers mapped")} value={summary.suppliers} />
+        <SummaryStat label={t("cov.sumCovered", "Subcategories covered")} value={`${summary.covered}/${summary.subTotal}`} />
+        <SummaryStat label={t("cov.sumCritical", "At-risk")} value={summary.critical} tone={summary.critical ? "rose" : "emerald"} hint={t("cov.sumCriticalHint", "sole-source / no approved")} />
+        <SummaryStat label={t("cov.sumGaps", "Coverage gaps")} value={summary.gaps} tone={summary.gaps ? "amber" : "emerald"} hint={t("cov.sumGapsHint", "no supplier yet")} />
+      </section>
+
+      {loading ? (
+        <div className="mt-10 flex items-center justify-center py-20 text-sm text-[var(--text-faint)]">{t("cov.loading", "Loading sourcing map…")}</div>
+      ) : err ? (
+        <div className="mt-10 rounded-xl border border-rose-500/30 bg-rose-500/5 p-5 text-sm text-rose-500">
+          {err}{" "}
+          <button onClick={() => void load()} className="ms-2 underline">{t("cov.retry", "Retry")}</button>
+        </div>
+      ) : (
+        <div className="mt-8 space-y-10">
+          {liveDivisions.map((d) => {
+            const divCollapsed = collapsedDiv.has(d.id);
+            return (
+              <section key={d.id}>
+                {/* ── Division header (sticky, large) ── */}
+                <button
+                  type="button"
+                  onClick={() => setCollapsedDiv((s) => { const n = new Set(s); n.has(d.id) ? n.delete(d.id) : n.add(d.id); return n; })}
+                  className="sticky top-0 z-20 flex w-full items-center gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]/95 px-5 py-4 text-start backdrop-blur"
+                >
+                  <AngleDownIcon className={`h-4 w-4 shrink-0 text-[var(--text-faint)] transition-transform ${divCollapsed ? "-rotate-90 rtl:rotate-90" : ""}`} />
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-xl font-bold tracking-tight text-[var(--text-primary)] truncate">{d.name}</h2>
+                    <p className="text-[12px] text-[var(--text-faint)] truncate">{d.description}</p>
+                  </div>
+                  <span className="shrink-0 text-[11px] font-medium text-[var(--text-faint)]">
+                    {d.categories.length} {t("cov.categories", "categories")}
+                  </span>
+                </button>
+
+                {!divCollapsed && (
+                  <div className="mt-5 space-y-6">
+                    {d.categories.map((c) => {
+                      const catKey = `${d.id}:${c.slug}`;
+                      const catCollapsed = collapsedCat.has(catKey);
+                      const catLogo = taxonomyLogoUrl("categories", c.slug);
+                      // rollup
+                      let catSuppliers = 0, catCritical = 0;
+                      for (const s of c.subcategories) {
+                        const list = byNode.get(coverageNodeKey(c.slug, s.code)) ?? [];
+                        catSuppliers += list.length;
+                        if (computeCoverageHealth(list).status === "critical") catCritical++;
+                      }
+                      return (
+                        <div key={c.slug} className="ps-1">
+                          {/* ── Category header (medium) ── */}
+                          <button
+                            type="button"
+                            onClick={() => setCollapsedCat((s) => { const n = new Set(s); n.has(catKey) ? n.delete(catKey) : n.add(catKey); return n; })}
+                            className="flex w-full items-center gap-2.5 py-2 text-start"
+                          >
+                            <AngleDownIcon className={`h-3.5 w-3.5 shrink-0 text-[var(--text-ghost)] transition-transform ${catCollapsed ? "-rotate-90 rtl:rotate-90" : ""}`} />
+                            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)] shrink-0">
+                              {catLogo ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={catLogo} alt="" className="h-4 w-4 object-contain" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                              ) : <Building2Icon className="h-4 w-4 text-[var(--text-faint)]" />}
+                            </span>
+                            <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">{c.label}</h3>
+                            <span className="text-[11px] text-[var(--text-faint)]">· {c.subcategories.length} {t("cov.subcategories", "subcategories")}</span>
+                            {catCritical > 0 && (
+                              <span className="ms-auto inline-flex items-center gap-1 text-[11px] font-medium text-rose-500">
+                                <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />{catCritical} {t("cov.atRisk", "at risk")}
+                              </span>
+                            )}
+                          </button>
+
+                          {!catCollapsed && (
+                            <div className="grid grid-cols-1 gap-3 ps-7 @container xl:grid-cols-2">
+                              {c.subcategories.map((s) => {
+                                const list = byNode.get(coverageNodeKey(c.slug, s.code)) ?? [];
+                                return (
+                                  <SubcategoryCard
+                                    key={s.code}
+                                    label={s.label}
+                                    code={s.code}
+                                    rows={list}
+                                    t={t}
+                                    onAdd={() => setPicker({ divisionSlug: d.id, categorySlug: c.slug, subCode: s.code, subLabel: s.label, categoryLabel: c.label })}
+                                    onOpen={(id) => router.push(`/suppliers/${id}`)}
+                                    onRemove={removeRow}
+                                    onChangeRole={changeRole}
+                                  />
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            );
+          })}
+
+          {/* Planned divisions — dim, no taxonomy yet */}
+          {plannedDivisions.length > 0 && (
+            <section>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-ghost)] mb-3">{t("cov.planned", "Planned divisions")}</div>
+              <div className="flex flex-wrap gap-2">
+                {plannedDivisions.map((d) => (
+                  <span key={d.id} className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-[var(--border-subtle)] px-3 py-1 text-[11px] text-[var(--text-ghost)]">
+                    {d.name}
+                  </span>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
+      )}
+
+      {picker && (
+        <SupplierPicker
+          target={picker}
+          existingIds={(byNode.get(coverageNodeKey(picker.categorySlug, picker.subCode)) ?? []).map((r) => r.supplier_id)}
+          t={t}
+          onClose={() => setPicker(null)}
+          onAssigned={onAssigned}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ── Portfolio summary stat ── */
+function SummaryStat({ label, value, tone, hint }: { label: string; value: number | string; tone?: "rose" | "amber" | "emerald"; hint?: string }) {
+  const toneText = tone === "rose" ? "text-rose-500" : tone === "amber" ? "text-amber-500" : tone === "emerald" ? "text-emerald-600 dark:text-emerald-400" : "text-[var(--text-primary)]";
+  return (
+    <div className="flex flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-faint)]">{label}</span>
+      <span className={`mt-1 text-2xl font-bold tabular-nums ${toneText}`}>{value}</span>
+      {hint ? <span className="mt-0.5 text-[11px] text-[var(--text-ghost)]">{hint}</span> : null}
+    </div>
+  );
+}
+
+/* ── Subcategory section: coverage health + supplier cards + add ── */
+function SubcategoryCard({ label, code, rows, t, onAdd, onOpen, onRemove, onChangeRole }: {
+  label: string; code: string; rows: CoverageRow[];
+  t: (k: string, f?: string) => string;
+  onAdd: () => void; onOpen: (id: string) => void;
+  onRemove: (id: string) => void; onChangeRole: (id: string, role: CoverageRole) => void;
+}) {
+  const health = computeCoverageHealth(rows);
+  const tone = HEALTH_TONE[health.status];
+  const healthLabel = health.status === "healthy" ? t("cov.healthy", "Good")
+    : health.status === "warning" ? t("cov.warning", "Thin")
+    : health.status === "critical" ? t("cov.critical", "Risk")
+    : t("cov.empty", "Empty");
+
+  return (
+    <div className={`rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 ring-1 ring-inset ${tone.ring}`}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[10px] text-[var(--text-ghost)]">{code}</span>
+            <h4 className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{label}</h4>
+          </div>
+          <div className="mt-0.5 flex items-center gap-1.5">
+            <span className={`h-1.5 w-1.5 rounded-full ${tone.dot}`} />
+            <span className={`text-[11px] font-medium ${tone.text}`}>{healthLabel}</span>
+            {rows.length > 0 && (
+              <span className="text-[11px] text-[var(--text-faint)]">
+                · {health.usable} {t("cov.suppliers", "suppliers")}{health.backups ? ` · ${health.backups} ${t("cov.backups", "backup")}` : ""}
+                {health.soleSource ? ` · ${t("cov.soleSource", "sole source")}` : ""}
+              </span>
+            )}
+          </div>
+        </div>
+        <button
+          type="button" onClick={onAdd}
+          className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2 py-1 text-[11px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-color)] transition-colors"
+        >
+          <PlusIcon size={11} /> {t("cov.add", "Add")}
+        </button>
+      </div>
+
+      {rows.length === 0 ? (
+        <button type="button" onClick={onAdd} className="mt-2.5 w-full rounded-lg border border-dashed border-[var(--border-subtle)] py-2.5 text-center text-[11px] text-[var(--text-ghost)] hover:text-[var(--text-faint)] hover:border-[var(--border-color)] transition-colors">
+          {t("cov.noSuppliers", "No suppliers yet — add coverage")}
+        </button>
+      ) : (
+        <div className="mt-2.5 flex flex-col gap-1.5">
+          {rows.map((r) => (
+            <SupplierChip key={r.id} row={r} t={t} onOpen={onOpen} onRemove={onRemove} onChangeRole={onChangeRole} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Compact supplier card/chip ── */
+function SupplierChip({ row, t, onOpen, onRemove, onChangeRole }: {
+  row: CoverageRow; t: (k: string, f?: string) => string;
+  onOpen: (id: string) => void; onRemove: (id: string) => void; onChangeRole: (id: string, role: CoverageRole) => void;
+}) {
+  const s = row.supplier;
+  const initials = (s?.name ?? "?").split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+  const rDot = riskDot(s?.riskLevel ?? null);
+  return (
+    <div className="group/chip flex items-center gap-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2.5 py-1.5 transition-colors hover:border-[var(--border-color)]">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md bg-[var(--bg-surface)] ring-1 ring-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-faint)]">
+        {s?.logo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={s.logo} alt="" className="h-full w-full object-cover" loading="lazy" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+        ) : initials}
+      </span>
+      <button type="button" onClick={() => s && onOpen(s.id)} className="min-w-0 flex-1 text-start">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[12.5px] font-medium text-[var(--text-primary)] truncate group-hover/chip:text-[var(--accent,#0066FF)]">{s?.name ?? "—"}</span>
+          {rDot && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${rDot}`} title={s?.riskLevel ?? ""} />}
+        </div>
+        <div className="flex items-center gap-1.5">
+          {row.is_main_supplier && <span className="text-[9.5px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">{t("cov.main", "Main")}</span>}
+          {typeof s?.sourcingScore === "number" && <span className="text-[10px] tabular-nums text-[var(--text-ghost)]">{Math.round(s.sourcingScore)}</span>}
+        </div>
+      </button>
+
+      {/* Role select — compact, native, monochrome */}
+      <select
+        value={row.sourcing_role}
+        onChange={(e) => onChangeRole(row.id, e.target.value as CoverageRole)}
+        onClick={(e) => e.stopPropagation()}
+        aria-label={t("cov.role", "Sourcing role")}
+        className={`shrink-0 cursor-pointer rounded-md border border-transparent bg-transparent py-0.5 pe-1 text-[10px] font-semibold uppercase tracking-wide outline-none hover:border-[var(--border-subtle)] ${roleTextClass(row.sourcing_role)}`}
+      >
+        {COVERAGE_ROLES.map((r) => (
+          <option key={r} value={r} className="text-[var(--text-primary)]">{roleLabel(t, r)}</option>
+        ))}
+      </select>
+
+      <button
+        type="button" onClick={() => onRemove(row.id)}
+        aria-label={t("cov.remove", "Remove")}
+        className="shrink-0 rounded-md p-1 text-[var(--text-ghost)] opacity-0 transition-opacity hover:text-rose-500 group-hover/chip:opacity-100"
+      >
+        <CrossIcon size={12} />
+      </button>
+    </div>
+  );
+}
+
+/* ── Searchable supplier picker modal ── */
+function SupplierPicker({ target, existingIds, t, onClose, onAssigned }: {
+  target: PickerTarget; existingIds: string[];
+  t: (k: string, f?: string) => string;
+  onClose: () => void; onAssigned: (row: CoverageRow) => void;
+}) {
+  const [all, setAll] = useState<PickerSupplier[]>([]);
+  const [q, setQ] = useState("");
+  const [role, setRole] = useState<CoverageRole>("approved");
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const existing = useMemo(() => new Set(existingIds), [existingIds]);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch("/api/suppliers", { credentials: "include" });
+        const json = (await res.json()) as { suppliers?: PickerSupplier[] };
+        if (alive) setAll(Array.isArray(json.suppliers) ? json.suppliers : []);
+      } catch { if (alive) setError(t("cov.pickLoadError", "Couldn't load suppliers.")); }
+      finally { if (alive) setLoading(false); }
+    })();
+    return () => { alive = false; };
+  }, [t]);
+
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    return all.filter((s) => !term || s.name.toLowerCase().includes(term));
+  }, [all, q]);
+
+  const assign = async (sup: PickerSupplier) => {
+    if (existing.has(sup.id) || busyId) return;
+    setBusyId(sup.id); setError(null);
+    try {
+      const res = await fetch("/api/suppliers/coverage", {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          supplier_id: sup.id, division_slug: target.divisionSlug, category_slug: target.categorySlug,
+          subcategory_code: target.subCode, subcategory_label: target.subLabel, sourcing_role: role,
+        }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      const json = (await res.json()) as { row: CoverageRow };
+      onAssigned(json.row);
+      onClose();
+    } catch {
+      setError(t("cov.assignError", "Couldn't assign. Please try again."));
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <ScrollLockOverlay className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--bg-overlay)] p-4" onClick={onClose}>
+      <div className="flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)]" onClick={(e) => e.stopPropagation()}>
+        <div className="border-b border-[var(--border-subtle)] p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">{t("cov.addTo", "Add supplier to")} {target.subLabel}</h3>
+              <p className="text-[11px] text-[var(--text-faint)] truncate">{target.categoryLabel}</p>
+            </div>
+            <button onClick={onClose} aria-label={t("cov.close", "Close")} className="shrink-0 rounded-lg p-1 text-[var(--text-faint)] hover:text-[var(--text-primary)]"><CrossIcon size={16} /></button>
+          </div>
+          {/* role selector */}
+          <div className="mt-3 flex flex-wrap gap-1">
+            {COVERAGE_ROLES.map((r) => (
+              <button key={r} type="button" onClick={() => setRole(r)}
+                className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${role === r ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>
+                {roleLabel(t, r)}
+              </button>
+            ))}
+          </div>
+          {/* search */}
+          <div className="mt-3 flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2">
+            <SearchIcon size={14} className="text-[var(--text-faint)]" />
+            <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("cov.searchSuppliers", "Search suppliers…")}
+              className="min-w-0 flex-1 bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-2">
+          {loading ? (
+            <div className="py-10 text-center text-[12px] text-[var(--text-faint)]">{t("cov.loading", "Loading…")}</div>
+          ) : filtered.length === 0 ? (
+            <div className="py-10 text-center text-[12px] text-[var(--text-faint)]">{t("cov.noResults", "No suppliers match.")}</div>
+          ) : (
+            filtered.map((s) => {
+              const already = existing.has(s.id);
+              const initials = s.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+              return (
+                <button key={s.id} type="button" disabled={already || !!busyId} onClick={() => assign(s)}
+                  className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-start transition-colors ${already ? "opacity-40" : "hover:bg-[var(--bg-surface-subtle)]"}`}>
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-[var(--bg-surface)] ring-1 ring-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-faint)]">
+                    {s.logo ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={s.logo} alt="" className="h-full w-full object-cover" loading="lazy" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                    ) : initials}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text-primary)]">{s.name}</span>
+                  {already ? <span className="text-[10px] text-[var(--text-ghost)]">{t("cov.alreadyAdded", "Added")}</span>
+                    : busyId === s.id ? <span className="text-[10px] text-[var(--text-faint)]">…</span>
+                    : <PlusIcon size={13} className="text-[var(--text-faint)]" />}
+                </button>
+              );
+            })
+          )}
+          {error ? <div className="px-2.5 py-2 text-[11px] text-rose-500">{error}</div> : null}
+        </div>
+      </div>
+    </ScrollLockOverlay>
+  );
+}
