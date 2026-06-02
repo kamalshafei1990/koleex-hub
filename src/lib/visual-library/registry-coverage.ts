@@ -58,11 +58,11 @@ async function stylesForScope(tid: string, scope: Scope, scopeId: string): Promi
 export interface ScopeResult { coverage: RegistryCoverage; intelligence: RegistryIntelligence; scope_name: string }
 
 export async function gatherScope(tid: string, scope: Scope, scopeId: string): Promise<ScopeResult | null> {
-  // visual_subcategories has no cover_asset_id column — select it only where present.
-  const cols = scope === "subcategory" ? "id, name, icon_asset_id" : "id, name, icon_asset_id, cover_asset_id";
-  const { data: scopeRow } = await supabaseServer.from(SCOPE_TABLE[scope])
-    .select(cols).eq("id", scopeId).eq("tenant_id", tid).maybeSingle();
-  if (!scopeRow) return null;
+  // visual_subcategories has no cover_asset_id column — select("*") and read defensively.
+  const { data: rawRow } = await supabaseServer.from(SCOPE_TABLE[scope])
+    .select("*").eq("id", scopeId).eq("tenant_id", tid).maybeSingle();
+  if (!rawRow) return null;
+  const scopeRow = rawRow as { id: string; name: string; icon_asset_id?: string | null; cover_asset_id?: string | null };
 
   const { data: links } = await supabaseServer.from("visual_asset_registry_links")
     .select("asset_id, usage_role, product_system_id").eq("tenant_id", tid).eq(SCOPE_COL[scope], scopeId);

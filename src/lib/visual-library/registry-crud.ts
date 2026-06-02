@@ -20,17 +20,22 @@ export interface EntityConfig {
 export const ENTITIES: Record<string, EntityConfig> = {
   divisions: {
     table: "visual_divisions",
-    fields: ["description", "icon_asset_id", "cover_asset_id", "visual_style", "dna_profile_id", "approval_state", "sort_order", "active"],
+    fields: ["description", "icon_url", "icon_asset_id", "cover_asset_id", "visual_style", "dna_profile_id", "approval_state", "sort_order", "active"],
     defaultSort: "sort_order",
   },
   categories: {
     table: "visual_categories", parentKey: "division_id", parentTable: "visual_divisions",
-    fields: ["description", "icon_asset_id", "cover_asset_id", "visual_style", "usage_context", "dna_profile_id", "approval_state", "sort_order", "active"],
+    fields: ["description", "icon_url", "icon_asset_id", "cover_asset_id", "visual_style", "usage_context", "dna_profile_id", "approval_state", "sort_order", "active"],
     defaultSort: "sort_order",
   },
   subcategories: {
     table: "visual_subcategories", parentKey: "category_id", parentTable: "visual_categories",
-    fields: ["description", "icon_asset_id", "visual_style", "machine_type", "operational_context", "dna_profile_id", "usage_rules", "approval_state", "sort_order", "active"],
+    fields: ["description", "icon_url", "icon_asset_id", "visual_style", "machine_type", "operational_context", "dna_profile_id", "usage_rules", "approval_state", "sort_order", "active"],
+    defaultSort: "sort_order",
+  },
+  types: {
+    table: "visual_types", parentKey: "subcategory_id", parentTable: "visual_subcategories",
+    fields: ["description", "icon_url", "approval_state", "sort_order", "active"],
     defaultSort: "sort_order",
   },
   systems: {
@@ -52,7 +57,7 @@ async function uniqueSlug(tenantId: string, table: string, base: string): Promis
 }
 
 export async function listEntity(cfg: EntityConfig, tenantId: string, parentId?: string | null) {
-  let q = supabaseServer.from(cfg.table).select("*").eq("tenant_id", tenantId);
+  let q = supabaseServer.from(cfg.table).select("*").eq("tenant_id", tenantId).eq("active", true);
   if (cfg.parentKey && parentId) q = q.eq(cfg.parentKey, parentId);
   q = q.order(cfg.defaultSort, { ascending: cfg.defaultSort !== "feature_priority" }).order("name", { ascending: true });
   return q;

@@ -1,12 +1,12 @@
 import { Suspense } from "react";
 import PermissionGate from "@/components/layout/PermissionGate";
-import RegistryBrowser from "@/components/database/RegistryBrowser";
+import ClassificationManager from "@/components/database/ClassificationManager";
 
-export default function VisualRegistryPage() {
+export default function ClassificationPage() {
   return (
     <PermissionGate module="Database">
       <Suspense fallback={<div className="py-20 text-center text-[13px] text-[var(--text-dim)]">Loading…</div>}>
-        <RegistryBrowser />
+        <ClassificationManager />
       </Suspense>
     </PermissionGate>
   );
