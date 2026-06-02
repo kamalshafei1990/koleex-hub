@@ -456,3 +456,73 @@ export interface VisualAssetListResponse {
   page: number;
   pageSize: number;
 }
+
+/* ── KOLEEX Visual Division Registry (Phase: Business Visual Infrastructure) ── */
+
+export const REGISTRY_USAGE_ROLES = [
+  "navigation", "feature", "warning", "operation", "dashboard", "machine-control",
+  "onboarding", "production", "analytics", "maintenance", "automation", "instruction",
+  "safety", "status", "product-feature", "machine-animation", "erp-module", "marketing",
+] as const;
+export type RegistryUsageRole = (typeof REGISTRY_USAGE_ROLES)[number];
+
+export const REGISTRY_APPROVAL_STATES = ["draft", "active", "approved", "archived"] as const;
+export type RegistryApprovalState = (typeof REGISTRY_APPROVAL_STATES)[number];
+
+export const PRODUCT_SYSTEM_TYPES = ["feature", "control", "safety", "automation", "energy", "assistant", "mechanical", "sensor"] as const;
+export type ProductSystemType = (typeof PRODUCT_SYSTEM_TYPES)[number];
+
+export interface VisualDivision {
+  id: string; tenant_id?: string; code: string | null; slug: string; name: string; description: string | null;
+  icon_asset_id: string | null; cover_asset_id: string | null; visual_style: string | null;
+  dna_profile_id: string | null; approval_state: RegistryApprovalState; sort_order: number; active: boolean;
+  created_at?: string; updated_at?: string;
+}
+export interface VisualCategory {
+  id: string; tenant_id?: string; division_id: string; code: string | null; slug: string; name: string; description: string | null;
+  icon_asset_id: string | null; cover_asset_id: string | null; visual_style: string | null; usage_context: string | null;
+  dna_profile_id: string | null; sort_order: number; approval_state: RegistryApprovalState; active: boolean;
+  created_at?: string; updated_at?: string;
+}
+export interface VisualSubcategory {
+  id: string; tenant_id?: string; category_id: string; code: string | null; slug: string; name: string; description: string | null;
+  icon_asset_id: string | null; visual_style: string | null; machine_type: string | null; operational_context: string | null;
+  dna_profile_id: string | null; usage_rules: unknown; sort_order: number; approval_state: RegistryApprovalState; active: boolean;
+  created_at?: string; updated_at?: string;
+}
+export interface VisualProductSystem {
+  id: string; tenant_id?: string; subcategory_id: string; code: string | null; slug: string; name: string; description: string | null;
+  system_type: ProductSystemType; visual_style: string | null; icon_asset_id: string | null;
+  feature_priority: number; complexity_level: "low" | "medium" | "high"; ui_relevance: number; machine_relevance: number;
+  active: boolean; created_at?: string; updated_at?: string;
+}
+export interface RegistryLink {
+  id: string; asset_id: string;
+  division_id: string | null; category_id: string | null; subcategory_id: string | null; product_system_id: string | null;
+  usage_role: RegistryUsageRole; priority: number; required: boolean; recommended: boolean; deprecated: boolean; visual_weight: number;
+  // joined labels (read-only convenience)
+  division_name?: string | null; category_name?: string | null; subcategory_name?: string | null; product_system_name?: string | null;
+  created_at?: string;
+}
+
+export interface InheritedDna {
+  profile_id: string | null; source: "subcategory" | "category" | "division" | "none";
+  profile_name: string | null; visual_style: string | null;
+}
+
+export interface CoverageRow { role: RegistryUsageRole; count: number; pct: number }
+export interface RegistryCoverage {
+  scope: "division" | "category" | "subcategory";
+  scope_id: string; scope_name: string;
+  total_assets: number;
+  roles: CoverageRow[];
+  missing_roles: RegistryUsageRole[];
+  systems_total: number; systems_covered: number; systems_missing: string[];
+  coverage_score: number;
+}
+export interface RegistryIntelligence {
+  visual_consistency: number; dna_purity: number; duplicate_exposure: number; style_drift: number;
+  coverage_score: number; readability: number; orphan_assets: number; missing_systems: number;
+  health: number; ui_readiness: number; erp_readiness: number; website_readiness: number; product_page_readiness: number;
+  notes: string[];
+}

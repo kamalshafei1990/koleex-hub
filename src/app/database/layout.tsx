@@ -15,6 +15,7 @@ const ROUTE_META: Record<string, RouteMeta> = {
   "/database/visual-library": { title: "Visual Library", subtitle: "One approved source of truth for every icon, image and visual asset." },
   "/database/collections":    { title: "Collections",    subtitle: "Curated visual systems & icon packs — the KOLEEX design infrastructure." },
   "/database/review":         { title: "Review Board",   subtitle: "Operational approval workflow — review, score and clear assets for production." },
+  "/database/visual-registry": { title: "Visual Registry", subtitle: "Every visual asset mapped to real KOLEEX business structure — divisions, categories, systems." },
 };
 
 function metaFor(pathname: string): RouteMeta {
