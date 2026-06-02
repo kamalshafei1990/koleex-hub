@@ -13,6 +13,7 @@ import { uploadToStorage } from "@/lib/storage-client";
 import { STATE_PILL } from "@/components/database/VisualAssetCard";
 import SemanticRelationships from "@/components/database/SemanticRelationships";
 import AddToCollectionModal from "@/components/database/AddToCollectionModal";
+import UsageGovernance from "@/components/database/UsageGovernance";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import BadgeCheckIcon from "@/components/icons/ui/BadgeCheckIcon";
@@ -310,6 +311,9 @@ export default function VisualAssetDetailDrawer({
               </div>
             )}
           </div>
+
+          {/* Usage governance */}
+          <UsageGovernance entityType="asset" entityId={asset.id} />
 
           {/* Semantic relationships */}
           <SemanticRelationships asset={{ id: asset.id, title: asset.title }} onOpenAsset={onOpenAsset} />

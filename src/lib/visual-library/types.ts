@@ -37,6 +37,49 @@ export const ASSET_CATEGORIES = [
 ] as const;
 export type AssetCategory = (typeof ASSET_CATEGORIES)[number];
 
+/* ── Usage Context & Governance (Phase: Visual Operating System) ── */
+
+export const CONTEXT_TYPES = ["ui", "product", "erp", "marketing", "other"] as const;
+export type ContextType = (typeof CONTEXT_TYPES)[number];
+
+export const CONTEXT_TYPE_LABEL: Record<ContextType, string> = {
+  ui: "UI", product: "Product", erp: "ERP", marketing: "Marketing", other: "Other",
+};
+
+export const RULE_KINDS = ["allowed", "forbidden", "preferred"] as const;
+export type RuleKind = (typeof RULE_KINDS)[number];
+
+export interface UsageContext {
+  id: string;
+  code: string | null;
+  slug: string;
+  name: string;
+  description: string | null;
+  parent_context_id: string | null;
+  context_type: ContextType;
+  icon: string | null;
+  color: string | null;
+  status: string;
+  sort_order: number;
+}
+
+export interface ContextRule {
+  id: string;
+  entity_type: "asset" | "collection";
+  entity_id: string;
+  context_id: string;
+  rule: RuleKind;
+  notes: string | null;
+  created_at: string;
+  context?: UsageContext | null;
+}
+
+export interface GovernanceViolation {
+  kind: "forbidden_context" | "deprecated" | "style_mismatch" | "missing_file";
+  severity: "warning" | "error";
+  message: string;
+}
+
 /* ── Collections / Icon Packs (Phase: Collections Intelligence) ── */
 
 export const COLLECTION_TYPES = [
@@ -86,6 +129,15 @@ export interface VisualCollection {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  // ── Governance (Phase: Visual OS) ──
+  preferred_style: string | null;
+  preferred_stroke: string | null;
+  preferred_corner_radius: string | null;
+  preferred_monochrome: boolean | null;
+  preferred_fill: string | null;
+  design_system_level: string | null;
+  target_modules: string[];
+  target_platforms: string[];
   // Enriched at read-time
   asset_count?: number;
   icon_url?: string | null;
@@ -227,6 +279,12 @@ export interface VisualAsset {
   visual_style_description: string | null;
   ai_prompt_description: string | null;
   collections: string[];
+  // ── AI-prep governance (Phase: Visual OS; schema only) ──
+  ai_usage_priority: number;
+  ai_confidence: number | null;
+  ai_recommended_contexts: string[];
+  ai_rejected_contexts: string[];
+  ai_style_vector: Record<string, unknown>;
   /** Derived at read-time from storage_bucket + svg_path (not a column). */
   public_url?: string | null;
 }

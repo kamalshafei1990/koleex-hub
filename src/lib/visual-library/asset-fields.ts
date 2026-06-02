@@ -23,9 +23,10 @@ const TEXT_FIELDS = new Set<string>([
 ]);
 const ARRAY_FIELDS = new Set<string>([
   "tags", "usage", "keywords", "synonyms", "search_aliases", "linked_modules", "linked_apps",
-  "collections",
+  "collections", "ai_recommended_contexts", "ai_rejected_contexts",
 ]);
 const BOOL_FIELDS = new Set<string>(["is_active"]);
+const NUM_FIELDS = new Set<string>(["ai_usage_priority"]);
 
 /** Build a whitelisted, type-coerced metadata patch from a request body. */
 export function buildAssetPatch(body: Record<string, unknown>): Record<string, unknown> {
@@ -40,6 +41,8 @@ export function buildAssetPatch(body: Record<string, unknown>): Record<string, u
         : [];
     } else if (BOOL_FIELDS.has(k)) {
       row[k] = v === true;
+    } else if (NUM_FIELDS.has(k)) {
+      const n = Number(v); row[k] = Number.isFinite(n) ? Math.round(n) : 0;
     } else if (k === "asset_type") {
       if (typeof v === "string" && v) row[k] = v;
     } else if (k === "style") {

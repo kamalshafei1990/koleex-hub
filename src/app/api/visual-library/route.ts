@@ -42,6 +42,9 @@ export async function GET(req: Request) {
   const style = (url.searchParams.get("style") ?? "").trim();
   const tag = (url.searchParams.get("tag") ?? "").trim().toLowerCase();
   const sort = (url.searchParams.get("sort") ?? "recent").trim();
+  // Context-aware governance filter: ?context=<slug>&rule=allowed|forbidden
+  const context = (url.searchParams.get("context") ?? "").trim();
+  const contextRule = (url.searchParams.get("rule") ?? "allowed").trim();
   const page = Math.max(1, parseInt(url.searchParams.get("page") ?? "1", 10) || 1);
   const pageSize = Math.min(8000, Math.max(1, parseInt(url.searchParams.get("pageSize") ?? "60", 10) || 60));
   const from = (page - 1) * pageSize;
@@ -57,6 +60,19 @@ export async function GET(req: Request) {
     : sort === "name"
     ? query.order("title", { ascending: true })
     : query.order("created_at", { ascending: false });
+
+  // Context-aware governance filter — restrict to assets allowed (or forbidden) in a context.
+  if (context) {
+    const { data: cx } = await supabaseServer.from("visual_usage_contexts")
+      .select("id").eq("tenant_id", auth.tenant_id).eq("slug", context).maybeSingle();
+    if (cx?.id) {
+      const { data: ruleRows } = await supabaseServer.from("visual_context_rules")
+        .select("entity_id").eq("tenant_id", auth.tenant_id).eq("entity_type", "asset")
+        .eq("context_id", cx.id).eq("rule", contextRule === "forbidden" ? "forbidden" : "allowed");
+      const ids = Array.from(new Set((ruleRows ?? []).map((r) => r.entity_id as string)));
+      query = ids.length ? query.in("id", ids) : query.eq("id", "00000000-0000-0000-0000-000000000000");
+    }
+  }
 
   if (category) query = query.eq("category", category);
   if (subcategory) query = query.eq("subcategory", subcategory);

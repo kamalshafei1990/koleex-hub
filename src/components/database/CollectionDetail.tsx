@@ -13,6 +13,8 @@ import {
 } from "@/lib/visual-library/types";
 import VisualAssetDetailDrawer from "@/components/database/VisualAssetDetailDrawer";
 import CollectionModal from "@/components/database/CollectionModal";
+import UsageGovernance from "@/components/database/UsageGovernance";
+import { COLLECTION_STYLES } from "@/lib/visual-library/types";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -162,6 +164,29 @@ export default function CollectionDetail({ cid }: { cid: string }) {
             <IntelBlock label="Categories" rows={intel?.categories} />
             <IntelBlock label="Common meanings" rows={intel?.meanings} />
             <IntelBlock label="Duplicate concepts" rows={intel?.duplicate_concepts} empty="None detected" />
+          </div>
+
+          {/* Style rules */}
+          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
+            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-dim)]">Style rules</h3>
+            <label className="mb-2 block">
+              <span className="mb-1 block text-[10.5px] uppercase tracking-wide text-[var(--text-dim)]">Preferred style</span>
+              <select value={col.preferred_style ?? ""} onChange={(e) => colAction({ preferred_style: e.target.value || null })}
+                className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]">
+                <option value="">—</option>
+                {COLLECTION_STYLES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
+              </select>
+            </label>
+            <label className="flex items-center gap-2 text-[12px] text-[var(--text-muted)]">
+              <input type="checkbox" checked={!!col.preferred_monochrome} onChange={(e) => colAction({ preferred_monochrome: e.target.checked })}
+                className="h-3.5 w-3.5 rounded border-[var(--border-color)] bg-transparent" />
+              Prefer monochrome
+            </label>
+          </div>
+
+          {/* Usage governance (context rules for this collection) */}
+          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
+            <UsageGovernance entityType="collection" entityId={col.id} />
           </div>
         </aside>
       </div>

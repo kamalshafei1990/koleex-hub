@@ -11,7 +11,12 @@ export const COLLECTION_TYPE_SET = new Set<string>(COLLECTION_TYPES);
 export const COLLECTION_STATE_SET = new Set<string>(COLLECTION_STATES);
 export const COLLECTION_ROLE_SET = new Set<string>(COLLECTION_ROLES);
 
-const TEXT_FIELDS = new Set<string>(["code", "name", "description", "category", "style_type", "visibility", "slug"]);
+const TEXT_FIELDS = new Set<string>([
+  "code", "name", "description", "category", "style_type", "visibility", "slug",
+  "preferred_style", "preferred_stroke", "preferred_corner_radius", "preferred_fill", "design_system_level",
+]);
+const ARRAY_FIELDS = new Set<string>(["target_modules", "target_platforms"]);
+const BOOL_FIELDS = new Set<string>(["preferred_monochrome"]);
 
 export function slugify(s: string): string {
   return (s || "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "collection";
@@ -24,6 +29,10 @@ export function buildCollectionPatch(body: Record<string, unknown>): Record<stri
     if (TEXT_FIELDS.has(k)) {
       const t = typeof v === "string" ? v.trim() : "";
       row[k] = t || null;
+    } else if (ARRAY_FIELDS.has(k)) {
+      row[k] = Array.isArray(v) ? Array.from(new Set(v.map((x) => String(x).trim()).filter(Boolean))) : [];
+    } else if (BOOL_FIELDS.has(k)) {
+      row[k] = v === true ? true : v === false ? false : null;
     } else if (k === "collection_type") {
       if (typeof v === "string" && v) row[k] = v;
     } else if (k === "approval_status") {

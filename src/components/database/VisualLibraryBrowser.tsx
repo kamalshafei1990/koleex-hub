@@ -42,6 +42,9 @@ export default function VisualLibraryBrowser() {
   const [assetType, setAssetType] = useState("");
   const [view, setView] = useState<"grid" | "list">("grid");
   const [limit, setLimit] = useState(300);
+  const [contexts, setContexts] = useState<{ slug: string; name: string; context_type: string }[]>([]);
+  const [contextSlug, setContextSlug] = useState("");
+  const [contextIds, setContextIds] = useState<Set<string> | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [openAsset, setOpenAsset] = useState<VisualAsset | null>(null);
   const [showUpload, setShowUpload] = useState(false);
@@ -73,6 +76,22 @@ export default function VisualLibraryBrowser() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
+  // Load usage contexts for the governance filter.
+  useEffect(() => {
+    fetch("/api/visual-library/contexts", { credentials: "include", cache: "no-store" })
+      .then((r) => r.ok ? r.json() : { contexts: [] }).then((j) => setContexts(j.contexts ?? [])).catch(() => {});
+  }, []);
+  // When a context is chosen, fetch the set of assets allowed in it.
+  useEffect(() => {
+    if (!contextSlug) { setContextIds(null); return; }
+    let alive = true;
+    fetch(`/api/visual-library?context=${encodeURIComponent(contextSlug)}&rule=allowed&pageSize=1000&sort=name`, { credentials: "include", cache: "no-store" })
+      .then((r) => r.ok ? r.json() : { assets: [] })
+      .then((j) => { if (alive) setContextIds(new Set((j.assets ?? []).map((a: VisualAsset) => a.id))); })
+      .catch(() => { if (alive) setContextIds(new Set()); });
+    return () => { alive = false; };
+  }, [contextSlug]);
+
   // keep the open drawer's data fresh after edits
   useEffect(() => {
     if (!openAsset) return;
@@ -92,6 +111,7 @@ export default function VisualLibraryBrowser() {
       if (category && a.category !== category) return false;
       if (assetType && a.asset_type !== assetType) return false;
       if (state && displayState(a) !== state) return false;
+      if (contextIds && !contextIds.has(a.id)) return false;
       if (term) {
         const hay = [
           a.title, a.visual_asset_code, a.slug, a.source_name, a.description,
@@ -101,10 +121,10 @@ export default function VisualLibraryBrowser() {
       }
       return true;
     });
-  }, [all, q, category, assetType, state]);
+  }, [all, q, category, assetType, state, contextIds]);
 
   // Render in slices so 5,000+ rows never all mount at once.
-  useEffect(() => { setLimit(300); }, [q, category, assetType, state, view]);
+  useEffect(() => { setLimit(300); }, [q, category, assetType, state, view, contextSlug]);
   const visible = useMemo(() => filtered.slice(0, limit), [filtered, limit]);
 
   const toggleSelect = (id: string) =>
@@ -177,8 +197,14 @@ export default function VisualLibraryBrowser() {
             <option value="">All types</option>
             {ASSET_TYPES.map((t) => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
           </select>
-          {(category || state || assetType || q) && (
-            <button type="button" onClick={() => { setCategory(""); setState(""); setAssetType(""); setQ(""); }}
+          {contexts.length > 0 && (
+            <select className={SELECT} value={contextSlug} onChange={(e) => setContextSlug(e.target.value)} title="Allowed in context">
+              <option value="">Any context</option>
+              {contexts.map((c) => <option key={c.slug} value={c.slug}>✓ {c.name}</option>)}
+            </select>
+          )}
+          {(category || state || assetType || q || contextSlug) && (
+            <button type="button" onClick={() => { setCategory(""); setState(""); setAssetType(""); setQ(""); setContextSlug(""); }}
               className="text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">Clear</button>
           )}
           <span className="ml-auto text-[12px] text-[var(--text-dim)] tabular-nums">{loading ? "…" : `${filtered.length} of ${all.length}`}</span>
