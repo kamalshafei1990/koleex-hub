@@ -2937,28 +2937,31 @@ const SuggestInput = React.memo(function SuggestInput({ label, value, onChange, 
 /* ── Score slider — drag a 0–N value instead of typing a number ─────────────
    Branded range input (blue fill), live readout, and a draggable thumb. Stores
    the value as a string to keep the existing field contract. */
-const ScoreSlider = React.memo(function ScoreSlider({ label, value, onChange, max = 100, isAuto, onUseAuto }: {
+const ScoreSlider = React.memo(function ScoreSlider({ label, value, onChange, max = 100, isAuto, onUseAuto, disabled = false, lockedNote }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   max?: number;
   isAuto?: boolean;
   onUseAuto?: () => void;
+  disabled?: boolean;
+  lockedNote?: string;
 }) {
   const has = value !== "" && value != null;
   const raw = parseInt(value || "", 10);
   const n = Number.isFinite(raw) ? Math.max(0, Math.min(max, raw)) : 0;
   const pct = Math.round((n / max) * 100);
   return (
-    <div>
+    <div className={disabled ? "opacity-70" : undefined}>
       <div className="mb-1.5 flex items-center justify-between">
         <label className="text-xs text-[var(--text-faint)]">{label}</label>
         <div className="flex items-center gap-2">
-          {onUseAuto && (isAuto ? (
+          {!disabled && onUseAuto && (isAuto ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-surface)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-dim)]">✦ Auto</span>
           ) : (
             <button type="button" onClick={onUseAuto} className="text-[10px] font-medium text-[var(--accent,#0066FF)] hover:opacity-80">Use auto</button>
           ))}
+          {disabled && lockedNote ? <span className="text-[10px] font-medium text-[var(--text-dim)]">🔒 {lockedNote}</span> : null}
           <span className="text-sm font-semibold tabular-nums text-[var(--text-primary)]">
             {has ? n : "—"}<span className="text-xs text-[var(--text-dim)]"> / {max}</span>
           </span>
@@ -2970,9 +2973,10 @@ const ScoreSlider = React.memo(function ScoreSlider({ label, value, onChange, ma
         max={max}
         step={1}
         value={n}
-        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        onChange={(e) => { if (!disabled) onChange(e.target.value); }}
         aria-label={label}
-        className="h-2 w-full cursor-pointer appearance-none rounded-full outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#0066FF] [&::-webkit-slider-thumb]:shadow [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-[#0066FF]"
+        className={`h-2 w-full appearance-none rounded-full outline-none ${disabled ? "cursor-not-allowed" : "cursor-pointer"} [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#0066FF] [&::-webkit-slider-thumb]:shadow [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-[#0066FF]`}
         style={{ background: `linear-gradient(to right, #0066FF ${pct}%, var(--bg-surface-active) ${pct}%)` }}
       />
       <div className="mt-1 flex justify-between text-[10px] text-[var(--text-dim)]">
@@ -3363,6 +3367,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const [typeTab, setTypeTab] = useState<ContactType | "all">(filterType || "all");
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);   // controls the suggestions dropdown
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);     // gates sensitive edits (internal score)
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/me", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (alive && j) setIsSuperAdmin(!!j.is_super_admin); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
   /* Active/Archived status filter — surfaced only in the supplier view. */
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "archived">("all");
   const [form, setForm] = useState<ContactForm>({ ...EMPTY_FORM });
@@ -8190,7 +8203,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 {/* Overall */}
                 <div className="space-y-3 border-t border-[var(--border-color)] pt-3">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.overall", "Overall")}</p>
-                  <ScoreSlider label={t("field.internalScore", "Internal score (0–100)")} value={String(sIntel.risk.internal_evaluation_score)} onChange={(v) => { setRiskScoreManual(true); setIntelRisk("internal_evaluation_score", v); }} max={100} isAuto={!riskScoreManual} onUseAuto={() => setRiskScoreManual(false)} />
+                  <ScoreSlider label={t("field.internalScore", "Internal score (0–100)")} value={String(sIntel.risk.internal_evaluation_score)} onChange={(v) => { setRiskScoreManual(true); setIntelRisk("internal_evaluation_score", v); }} max={100} isAuto={!riskScoreManual} onUseAuto={() => setRiskScoreManual(false)} disabled={!isSuperAdmin} lockedNote={t("field.superAdminOnly", "Super admin only")} />
                   <label className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)]"><input type="checkbox" checked={!!sIntel.risk.backup_supplier_exists} onChange={(e) => setIntelRisk("backup_supplier_exists", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.backupExists", "Backup supplier exists")}</label>
                   <Input label={t("field.assessmentNotes", "Assessment notes")} value={String(sIntel.risk.assessment_notes)} onChange={(v) => setIntelRisk("assessment_notes", v)} />
                 </div>
