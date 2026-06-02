@@ -7610,7 +7610,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <FormSection title={t("section.companyName")} icon={<Building2Icon size={14} />} owner={t("owner.procurement")} ownerLabel={t("owner.label")} dept="procurement" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
               <div className="space-y-3">
                 <Input label={t("field.companyNameEn")} value={form.company_name_en} onChange={v => setField("company_name_en", v)} placeholder={t("placeholder.companyNameEn")} icon={<Building2Icon size={14} />} tier="required" />
-                <Input label={t("field.companyNameCn")} tier="optional" value={form.company_name_cn} onChange={v => setField("company_name_cn", v)} placeholder={t("placeholder.companyNameCn")} icon={<LanguagesIcon size={14} />} />
+                <Input label={t("field.companyNameCn")} tier="optional" value={form.company_name_cn} onChange={v => setField("company_name_cn", v.replace(/[؀-ۿݐ-ݿࢠ-ࣿ]/g, ""))} placeholder={t("placeholder.companyNameCn")} icon={<LanguagesIcon size={14} />} />
                 {/* Additional Company Names */}
                 <div>
                   <label className="text-xs text-[var(--text-faint)] mb-2 block">{t("field.additionalNames")}</label>
@@ -7944,7 +7944,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                       </div>
                       <input
                         value={m.value}
-                        onChange={e => { const arr = [...form.messaging_channels]; arr[i] = { ...arr[i], value: e.target.value }; setField("messaging_channels", arr); }}
+                        onChange={e => { let val = e.target.value; if (m.platform === "QQ") val = val.replace(/[^0-9]/g, ""); else if (m.platform === "WhatsApp") val = val.replace(/[^0-9\s()+-]/g, ""); const arr = [...form.messaging_channels]; arr[i] = { ...arr[i], value: val }; setField("messaging_channels", arr); }}
                         placeholder={t("placeholder.messagingId", "ID, handle, or number")}
                         className="min-w-0 flex-1 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
                       />
