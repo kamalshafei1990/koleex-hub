@@ -19,11 +19,12 @@ export async function GET(req: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const subcategories = await Promise.all((data ?? []).map(async (s) => {
-    const [{ count: sysCount }, { count: linkCount }] = await Promise.all([
+    const [{ count: sysCount }, { count: typeCount }, { count: linkCount }] = await Promise.all([
       supabaseServer.from("visual_product_systems").select("id", { count: "exact", head: true }).eq("tenant_id", tid).eq("subcategory_id", s.id as string),
+      supabaseServer.from("visual_types").select("id", { count: "exact", head: true }).eq("tenant_id", tid).eq("subcategory_id", s.id as string).eq("active", true),
       supabaseServer.from("visual_asset_registry_links").select("id", { count: "exact", head: true }).eq("tenant_id", tid).eq("subcategory_id", s.id as string),
     ]);
-    return { ...s, system_count: sysCount ?? 0, asset_link_count: linkCount ?? 0 };
+    return { ...s, system_count: sysCount ?? 0, type_count: typeCount ?? 0, asset_link_count: linkCount ?? 0 };
   }));
   return NextResponse.json({ subcategories });
 }
