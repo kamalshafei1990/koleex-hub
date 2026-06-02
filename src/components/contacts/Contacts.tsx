@@ -4246,7 +4246,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     /* Suppliers: render the full Supplier 360 inline (all intel sections),
        not the legacy base-field panel. */
     if (filterType === "supplier" && selectedContact && view === "detail") {
-      return <SupplierDetail id={selectedContact.id} embedded onEdit={handleEdit} onDelete={() => requestDelete(selectedContact)} />;
+      return <SupplierDetail id={selectedContact.id} embedded onEdit={handleEdit} onDelete={() => requestDelete(selectedContact)} onBack={() => { setSelectedId(null); setView("list"); setMobileShowDetail(false); }} />;
     }
     if (!selectedContact) {
       /* ── Supplier KPI Dashboard ── */

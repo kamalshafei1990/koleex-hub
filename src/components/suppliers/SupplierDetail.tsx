@@ -186,7 +186,7 @@ const StatusPill = ({ value }: { value: string }) =>
     <span className="text-[var(--text-faint)]">—</span>
   );
 
-export default function SupplierDetail({ id, embedded = false, onEdit, onDelete }: { id: string; embedded?: boolean; onEdit?: () => void; onDelete?: () => void }) {
+export default function SupplierDetail({ id, embedded = false, onEdit, onDelete, onBack }: { id: string; embedded?: boolean; onEdit?: () => void; onDelete?: () => void; onBack?: () => void }) {
   const { t } = useTranslation(contactsT);
   const router = useRouter();
   const [data, setData] = useState<Payload | null>(null);
@@ -476,8 +476,16 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
               edge. Not a dashboard table. ─── */}
         <div className="mx-4 md:mx-6 mt-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
           <div className="px-4 sm:px-8 md:px-10 pt-4">
-            {/* Top bar — subtle mode toggle (start) · Edit / Delete (end) */}
+            {/* Top bar — back + mode toggle (start) · Edit / Delete (end) */}
             <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+              {onBack ? (
+                <button type="button" onClick={() => onBack()} aria-label={t("sd.backToOverview", "Back to overview")} title={t("sd.backToOverview", "Back to overview")}
+                  className="flex items-center gap-1.5 shrink-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]">
+                  <ArrowLeftIcon className="h-3.5 w-3.5 rtl:rotate-180" />
+                  <span className="hidden sm:inline">{t("sd.overview", "Overview")}</span>
+                </button>
+              ) : null}
               <div className="inline-flex items-center rounded-lg bg-[var(--bg-surface-subtle)] p-0.5 text-[10.5px] font-medium">
                 <button type="button" onClick={() => setMode(false)} aria-pressed={!execMode}
                   className={`rounded-md px-2 py-0.5 transition-colors ${!execMode ? "bg-[var(--bg-surface)] text-[var(--text-secondary)] shadow-sm" : "text-[var(--text-ghost)] hover:text-[var(--text-faint)]"}`}>
@@ -487,6 +495,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                   className={`rounded-md px-2 py-0.5 transition-colors ${execMode ? "bg-[var(--bg-surface)] text-[var(--text-secondary)] shadow-sm" : "text-[var(--text-ghost)] hover:text-[var(--text-faint)]"}`}>
                   {t("sd.modeExecutive", "Executive")}
                 </button>
+              </div>
               </div>
               <div className="flex items-center gap-1.5">
                 <button onClick={() => (onEdit ? onEdit() : router.push(`/suppliers?selected=${id}`))} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:bg-[var(--bg-surface-hover)] text-[12px] font-medium transition-colors text-[var(--text-primary)]">

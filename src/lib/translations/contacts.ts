@@ -1209,6 +1209,7 @@ export const contactsT: Translations = {
   "rdWhy.operational": { en: "A real order/receipt/bill history is the strongest proof of a working relationship.", zh: "真实的订单/收货/账单历史是合作关系的最有力证明。", ar: "سجل حقيقي للطلبات/الاستلام/الفواتير هو أقوى دليل على علاقة عمل قائمة." },
   "sd.criticalMetrics": { en: "Critical metrics", zh: "关键指标", ar: "المقاييس الحرجة" },
   "sd.lastActivity": { en: "Last activity", zh: "最近动态", ar: "آخر نشاط" },
+  "sd.backToOverview": { en: "Back to overview", zh: "返回概览", ar: "العودة إلى النظرة العامة" },
 
   /* ── Supplier 360 — hero intelligence badges ── */
   "badge.risk.low": { en: "LOW RISK", zh: "低风险", ar: "مخاطر منخفضة" },
