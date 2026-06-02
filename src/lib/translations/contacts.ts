@@ -12,6 +12,8 @@ export const contactsT: Translations = {
   "back":                 { en: "Back",                  zh: "返回",                 ar: "رجوع" },
   "hub":                  { en: "Hub",                   zh: "中心",                 ar: "المركز" },
   "searchPlaceholder":    { en: "Search contacts...",    zh: "搜索联系人...",          ar: "بحث جهات الاتصال..." },
+  "searchSuppliers":      { en: "Search suppliers — name, 中文名, country, app ID…", zh: "搜索供应商 — 名称、中文名、国家、App ID…", ar: "ابحث عن الموردين — الاسم، الاسم الصيني، الدولة، معرّف التطبيق…" },
+  "searchCustomers":      { en: "Search customers…",     zh: "搜索客户…",              ar: "ابحث عن العملاء…" },
   "noContactsFound":      { en: "No contacts found",    zh: "未找到联系人",            ar: "لم يتم العثور على جهات اتصال" },
   "selectContact":        { en: "Select a contact to view details", zh: "选择联系人以查看详情", ar: "اختر جهة اتصال لعرض التفاصيل" },
   "unnamedContact":       { en: "Unnamed Contact",       zh: "未命名联系人",           ar: "جهة اتصال بدون اسم" },

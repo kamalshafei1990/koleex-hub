@@ -3431,43 +3431,35 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       list = list.filter(c => ((c.is_active ?? true) !== false) === wantActive);
     }
     if (debouncedSearch.trim()) {
-      const q = debouncedSearch.toLowerCase();
-      const isShort = q.length <= 2;
+      /* Smart search: builds one haystack per contact from every supplier-related
+         field (incl. the Chinese company name and messaging-app IDs), then
+         requires ALL whitespace-separated terms to match (so "shenzhen sewing"
+         narrows). CJK queries (Chinese / Japanese / Korean) always use substring
+         matching — short CJK terms are meaningful and must not be prefix-gated. */
+      const raw = debouncedSearch.trim().toLowerCase();
+      const hasCJK = /[぀-ヿ㐀-鿿豈-﫿ｦ-ﾟ]/.test(raw);
+      const terms = raw.split(/\s+/).filter(Boolean);
+      const prefixOnly = terms.length === 1 && terms[0].length <= 2 && !hasCJK;
       list = list.filter(c => {
-        const name = contactDisplayName(c).toLowerCase();
-        const firstName = (c.first_name || "").toLowerCase();
-        const lastName = (c.last_name || "").toLowerCase();
-        const company = (c.company || "").toLowerCase();
-        const companyEn = (c.company_name_en || "").toLowerCase();
-        const companyCn = (c.company_name_cn || "");
-        /* Short query (1-2 chars): match start of name / company only */
-        if (isShort) {
-          if (name.startsWith(q)) return true;
-          if (firstName.startsWith(q)) return true;
-          if (lastName.startsWith(q)) return true;
-          if (company.startsWith(q)) return true;
-          if (companyEn.startsWith(q)) return true;
-          if (companyCn.startsWith(q)) return true;
-          return false;
+        const rec = c as unknown as Record<string, unknown>;
+        const s = (k: string) => { const v = rec[k]; return typeof v === "string" ? v : ""; };
+        const parts: string[] = [
+          contactDisplayName(c), s("first_name"), s("last_name"), s("company"),
+          s("company_name_en"), s("company_name_cn"), s("trading_name"), s("supplier_code"),
+          s("email"), s("supplier_email"), s("phone"), s("supplier_tel"), s("supplier_mobile"),
+          s("whatsapp_business"), s("wechat_id"), s("website"),
+          s("country"), s("province"), s("city"), s("division"), s("category"),
+        ];
+        if (Array.isArray(c.brand_names)) parts.push(...c.brand_names);
+        if (Array.isArray(c.tags)) parts.push(...c.tags);
+        const mc = rec.messaging_channels;
+        if (Array.isArray(mc)) parts.push(...mc.map((m) => (m as { value?: string })?.value || ""));
+        if (Array.isArray(c.contact_persons)) {
+          for (const p of c.contact_persons) parts.push(p.name || "", p.email || "", p.phone || "", (p as { wechat_id?: string }).wechat_id || "");
         }
-        /* Longer query: search across all fields */
-        if (name.includes(q)) return true;
-        if (company.includes(q)) return true;
-        if ((c.email || "").toLowerCase().includes(q)) return true;
-        if ((c.phone || "").includes(q)) return true;
-        if (firstName.includes(q)) return true;
-        if (lastName.includes(q)) return true;
-        if (companyEn.includes(q)) return true;
-        if (companyCn.includes(q)) return true;
-        if ((c.supplier_email || "").toLowerCase().includes(q)) return true;
-        if ((c.supplier_tel || "").includes(q)) return true;
-        if ((c.supplier_mobile || "").includes(q)) return true;
-        if ((c.division || "").toLowerCase().includes(q)) return true;
-        if ((c.category || "").toLowerCase().includes(q)) return true;
-        if (c.brand_names?.some(b => b.toLowerCase().includes(q))) return true;
-        if (c.tags?.some(t => t.toLowerCase().includes(q))) return true;
-        if (c.contact_persons?.some(p => (p.name || "").toLowerCase().includes(q) || (p.email || "").toLowerCase().includes(q) || (p.phone || "").includes(q))) return true;
-        return false;
+        const hay = parts.filter(Boolean).join("  ").toLowerCase();
+        if (prefixOnly) return hay.split(/[\s]+/).some((tok) => tok.startsWith(terms[0]));
+        return terms.every((term) => hay.includes(term));
       });
     }
     return list.sort((a, b) => contactSortKey(a).localeCompare(contactSortKey(b)));
@@ -3998,7 +3990,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           <SearchIcon size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
           <input
             type="text"
-            placeholder={t("searchPlaceholder")}
+            placeholder={filterType === "supplier" ? t("searchSuppliers", "Search suppliers — name, 中文名, country, app ID…") : filterType === "customer" ? t("searchCustomers", "Search customers…") : t("searchPlaceholder")}
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full h-9 ps-9 pe-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
