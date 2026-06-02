@@ -12,6 +12,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { compatibilityScore, assetViolations } from "@/lib/visual-library/governance";
+import { logVisualAssetEvent } from "@/lib/visual-library/events";
 import { RULE_KINDS } from "@/lib/visual-library/types";
 
 const RULES = new Set<string>(RULE_KINDS);
@@ -74,6 +75,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     notes: typeof body.notes === "string" ? body.notes : null, created_by: auth.account_id ?? null,
   }, { onConflict: "tenant_id,entity_type,entity_id,context_id,rule", ignoreDuplicates: true });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  await logVisualAssetEvent({ tenantId: auth.tenant_id, assetId: id, actorId: auth.account_id ?? null, eventType: "governance_rule", summary: `Governance rule: ${rule}` });
   return NextResponse.json({ ok: true });
 }
 

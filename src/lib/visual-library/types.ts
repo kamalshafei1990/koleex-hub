@@ -285,8 +285,31 @@ export interface VisualAsset {
   ai_recommended_contexts: string[];
   ai_rejected_contexts: string[];
   ai_style_vector: Record<string, unknown>;
+  // ── Visual family / dependency / usage (Phase: Asset Workspace) ──
+  visual_family: string | null;
+  shape_language: string | null;
+  stroke_family: string | null;
+  corner_radius_family: string | null;
+  parent_asset_id: string | null;
+  derived_from_id: string | null;
+  used_in_modules: string[];
+  used_in_pages: string[];
+  used_in_products: string[];
+  used_in_templates: string[];
+  used_in_dashboards: string[];
+  last_used_at: string | null;
   /** Derived at read-time from storage_bucket + svg_path (not a column). */
   public_url?: string | null;
+}
+
+export interface VisualAssetEvent {
+  id: string;
+  asset_id: string;
+  event_type: string;
+  summary: string | null;
+  actor_name: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
 }
 
 /** Derive the registry display-state. "missing" when no file is attached. */

@@ -20,6 +20,7 @@ const TEXT_FIELDS = new Set<string>([
   "category", "subcategory", "source", "notes", "source_name",
   "slug", "theme",
   "semantic_meaning", "visual_style_description", "ai_prompt_description",
+  "visual_family", "shape_language", "stroke_family", "corner_radius_family",
 ]);
 const ARRAY_FIELDS = new Set<string>([
   "tags", "usage", "keywords", "synonyms", "search_aliases", "linked_modules", "linked_apps",

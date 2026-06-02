@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { validRole } from "@/lib/visual-library/collection-fields";
+import { logVisualAssetEvent } from "@/lib/visual-library/events";
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth(req);
@@ -61,5 +62,6 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     .upsert(rows, { onConflict: "collection_id,asset_id", ignoreDuplicates: true });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   await supabaseServer.from("visual_collections").update({ updated_at: new Date().toISOString() }).in("id", rows.map((r) => r.collection_id));
+  await logVisualAssetEvent({ tenantId: auth.tenant_id, assetId: id, actorId: auth.account_id ?? null, eventType: "collection", summary: `Added to ${rows.length} collection(s)` });
   return NextResponse.json({ ok: true, added: rows.length });
 }

@@ -20,6 +20,7 @@ import {
   isRelationshipType, reverseOf, coerceConfidence, validStatus,
 } from "@/lib/visual-library/relationship-fields";
 import type { RelationshipType } from "@/lib/visual-library/types";
+import { logVisualAssetEvent } from "@/lib/visual-library/events";
 
 function publicUrl(bucket: string | null, path: string | null): string | null {
   if (!path) return null;
@@ -127,6 +128,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     .from("visual_asset_relationships")
     .upsert(rows, { onConflict: "tenant_id,source_asset_id,target_asset_id,relationship_type", ignoreDuplicates: false });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  await logVisualAssetEvent({ tenantId: tid, assetId: id, actorId: auth.account_id ?? null, eventType: "relationship", summary: `Linked: ${relType.replace(/_/g, " ")}` });
 
   return NextResponse.json({ ok: true, created: rows.length });
 }

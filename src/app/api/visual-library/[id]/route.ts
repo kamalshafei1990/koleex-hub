@@ -18,6 +18,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { buildAssetPatch, validateAssetPatch } from "@/lib/visual-library/asset-fields";
+import { logVisualAssetEvent } from "@/lib/visual-library/events";
 
 async function loadOwned(id: string, tenantId: string) {
   const { data } = await supabaseServer
@@ -63,6 +64,11 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     Object.keys(patch).forEach((k) => patch[k] === undefined && delete patch[k]);
     const { error } = await supabaseServer.from("visual_assets").update(patch).eq("id", id).eq("tenant_id", auth.tenant_id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await logVisualAssetEvent({
+      tenantId: auth.tenant_id, assetId: id, actorId: auth.account_id ?? null,
+      eventType: owned.svg_path ? "file_replaced" : "file_attached",
+      summary: owned.svg_path ? `Icon replaced (v${(owned.version ?? 1) + 1})` : "Icon file attached",
+    });
     return NextResponse.json({ ok: true });
   }
 
@@ -109,6 +115,17 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (error) {
     console.error("[api/visual-library PATCH]", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  // Audit log for lifecycle actions (skip the noisy "use" counter + plain edits).
+  const LOGGED: Record<string, string> = {
+    approve: "Approved", unapprove: "Approval removed", submit: "Submitted for review",
+    deprecate: "Deprecated", archive: "Archived", restore: "Restored",
+  };
+  if (action && LOGGED[action]) {
+    await logVisualAssetEvent({
+      tenantId: auth.tenant_id, assetId: id, actorId: auth.account_id ?? null,
+      eventType: action, summary: LOGGED[action],
+    });
   }
   return NextResponse.json({ ok: true });
 }
