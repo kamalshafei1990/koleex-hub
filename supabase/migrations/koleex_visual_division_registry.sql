@@ -180,59 +180,94 @@ ALTER TABLE public.visual_asset_registry_links ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS service_role_full_access ON public.visual_asset_registry_links;
 CREATE POLICY service_role_full_access ON public.visual_asset_registry_links FOR ALL TO service_role USING (true) WITH CHECK (true);
 
--- ── Seed 6 divisions (idempotent per tenant) ──
-INSERT INTO public.visual_divisions (tenant_id, code, slug, name, description, visual_style, approval_state, sort_order)
-SELECT t.id, v.code, v.slug, v.name, v.description, v.visual_style, 'active', v.sort_order
+-- ── Canonical KOLEEX taxonomy (source of truth: Product Data coding system).
+--    Division → Category → Subcategory. Idempotent, per tenant. ──
+
+-- 9 divisions (Garment Machinery live; the rest planned)
+INSERT INTO public.visual_divisions (tenant_id, code, slug, name, description, approval_state, sort_order)
+SELECT t.id, v.code, v.slug, v.name, v.description, v.state, v.sort_order
 FROM public.tenants t
 CROSS JOIN (VALUES
-  ('DIV-GARMENT',   'garment-machinery',  'Garment Machinery',  'Industrial garment & sewing machinery systems.',        'industrial', 1),
-  ('DIV-TEXTILE',   'textile-tech',       'Textile Tech',       'Textile production & processing technology.',           'industrial', 2),
-  ('DIV-SMART',     'smart-devices',      'Smart Devices',      'Connected & intelligent device systems.',               'futuristic', 3),
-  ('DIV-INDUSTRIAL','industrial-systems', 'Industrial Systems', 'Heavy industrial equipment & infrastructure.',          'industrial', 4),
-  ('DIV-AUTOMATION','automation',         'Automation',         'Automation, robotics & intelligent control systems.',   'futuristic', 5),
-  ('DIV-PACKAGING', 'packaging-systems',  'Packaging Systems',  'Packaging, finishing & logistics equipment.',           'industrial', 6)
-) AS v(code, slug, name, description, visual_style, sort_order)
+  ('X', 'garment-machinery',    'Garment Machinery',    'Sewing, cutting, finishing, embroidery — full apparel pipeline.', 'active', 1),
+  ('D', 'digital-devices',      'Digital Devices',      'Compute, displays, peripherals, IoT controllers.',                'draft',  2),
+  ('S', 'smart-living',         'Smart Living',         'Lighting, climate, kitchen, surveillance product lines.',         'draft',  3),
+  ('L', 'lifestyle',            'Lifestyle',            'Personal care, wellness, leisure consumer goods.',                'draft',  4),
+  ('M', 'mobility',             'Mobility',             'EV scooter, e-bike, drive systems — battery + motor axes.',       'draft',  5),
+  ('I', 'industrial-solutions', 'Industrial Solutions', 'Automation, conveyors, robotic arms, vision systems.',            'draft',  6),
+  ('F', 'fabrics',              'Fabrics',              'Textiles, non-wovens, technical fabrics, finishing chemistry.',   'draft',  7),
+  ('E', 'energy',               'Energy',               'Power systems, storage, solar, industrial energy management.',    'draft',  8),
+  ('Md','medical',              'Medical',              'Medical devices, diagnostics, healthcare equipment.',             'draft',  9)
+) AS v(code, slug, name, description, state, sort_order)
 ON CONFLICT (tenant_id, slug) DO NOTHING;
 
--- ── Demo structure under Garment Machinery (idempotent, per tenant) ──
--- Categories
-INSERT INTO public.visual_categories (tenant_id, division_id, code, slug, name, description, visual_style, usage_context, approval_state, sort_order)
-SELECT d.tenant_id, d.id, c.code, c.slug, c.name, c.description, c.visual_style, c.usage_context, 'active', c.sort_order
+-- 11 categories under Garment Machinery
+INSERT INTO public.visual_categories (tenant_id, division_id, code, slug, name, description, approval_state, sort_order)
+SELECT d.tenant_id, d.id, c.code, c.slug, c.name, c.descr, 'active', c.ord
 FROM public.visual_divisions d
 CROSS JOIN (VALUES
-  ('CAT-SEW',  'industrial-sewing-machines', 'Industrial Sewing Machines', 'High-speed industrial sewing systems.', 'industrial', 'production', 1),
-  ('CAT-CUT',  'cutting-machines',           'Cutting Machines',           'Fabric cutting & spreading equipment.', 'industrial', 'production', 2),
-  ('CAT-CTRL', 'control-panels',             'Control Panels',             'Machine control & HMI panels.',         'futuristic', 'machine-control', 3)
-) AS c(code, slug, name, description, visual_style, usage_context, sort_order)
+  ('XPR','fabric-preparation','Fabric Preparation','Spreading, relaxing, inspecting, and rolling fabric before cutting.',1),
+  ('XC','cutting-equipment','Cutting Equipment','Manual, mechanical, and CNC cutting across knife, laser, and drilling.',2),
+  ('XS','industrial-sewing-machines','Industrial Sewing Machines','The core of the garment line — lockstitch, overlock, interlock, and specialty stitch.',3),
+  ('XA','automatic-sewing-systems','Automatic Sewing Systems','Single-purpose automation for pockets, plackets, collars, hems, and buttons.',4),
+  ('XSE','leather-footwear-machinery','Leather & Footwear Machinery','Shoe, bag, and leather goods — including edge binding and tape attaching.',5),
+  ('XE','embroidery-equipment','Embroidery Equipment','Single-head, multi-head, computerized, sequin, and cording machines.',6),
+  ('XP','printing-heat-press-equipment','Printing & Heat Press Equipment','Heat presses, screen, DTG, sublimation, and pneumatic stations.',7),
+  ('XF','finishing-equipment','Finishing Equipment','Irons, boilers, finishing forms, fusing presses, and washing lines.',8),
+  ('XPC','packing-inspection','Packing & Inspection','Quality and packout — needle/metal/X-ray detectors, folders, sealers.',9),
+  ('XD','domestic-sewing-machines','Domestic Sewing Machines','Household lockstitch, overlock, embroidery, and portable units.',10),
+  ('XSP','spare-parts-accessories','Spare Parts & Accessories','Motors, drives, control panels, attachments, and replaceable machine parts.',11)
+) AS c(code, slug, name, descr, ord)
 WHERE d.slug = 'garment-machinery'
 ON CONFLICT (tenant_id, slug) DO NOTHING;
 
--- Subcategories under Industrial Sewing Machines
-INSERT INTO public.visual_subcategories (tenant_id, category_id, code, slug, name, description, visual_style, machine_type, operational_context, approval_state, sort_order)
-SELECT c.tenant_id, c.id, s.code, s.slug, s.name, s.description, s.visual_style, s.machine_type, 'production', 'active', s.sort_order
+-- 77 subcategories (slug auto-derived from label)
+INSERT INTO public.visual_subcategories (tenant_id, category_id, code, slug, name, approval_state, sort_order)
+SELECT c.tenant_id, c.id, s.code,
+  lower(regexp_replace(regexp_replace(s.label, '[^a-zA-Z0-9]+', '-', 'g'), '(^-+|-+$)', '', 'g')),
+  s.label, 'active', s.ord
 FROM public.visual_categories c
-CROSS JOIN (VALUES
-  ('SUB-LOCK',  'lockstitch', 'Lockstitch', 'Single/double needle lockstitch machines.', 'industrial', 'lockstitch', 1),
-  ('SUB-OVER',  'overlock',   'Overlock',   'Edge-finishing overlock machines.',         'industrial', 'overlock',   2),
-  ('SUB-INTER', 'interlock',  'Interlock',  'Coverstitch / interlock machines.',         'industrial', 'interlock',  3),
-  ('SUB-BAR',   'bartack',    'Bartack',    'Bartacking & reinforcement machines.',      'industrial', 'bartack',    4)
-) AS s(code, slug, name, description, visual_style, machine_type, sort_order)
-WHERE c.slug = 'industrial-sewing-machines'
-ON CONFLICT (tenant_id, slug) DO NOTHING;
-
--- Product systems under Lockstitch
-INSERT INTO public.visual_product_systems (tenant_id, subcategory_id, code, slug, name, description, system_type, feature_priority, complexity_level, ui_relevance, machine_relevance)
-SELECT sc.tenant_id, sc.id, p.code, p.slug, p.name, p.description, p.system_type, p.feature_priority, p.complexity_level, p.ui_relevance, p.machine_relevance
-FROM public.visual_subcategories sc
-CROSS JOIN (VALUES
-  ('SYS-TRIM',  'thread-trimming', 'Thread Trimming', 'Automatic thread trimming system.', 'feature',   10, 'medium', 80, 90),
-  ('SYS-FOOT',  'foot-lifter',     'Foot Lifter',     'Automatic presser foot lifter.',    'control',    8, 'low',    70, 85),
-  ('SYS-NEEDLE','needle-position', 'Needle Position', 'Needle up/down positioning.',       'control',    7, 'low',    75, 80),
-  ('SYS-SPEED', 'speed-control',   'Speed Control',   'Variable speed control.',           'control',    9, 'medium', 85, 88),
-  ('SYS-TENS',  'tension-control', 'Tension Control', 'Thread tension management.',        'mechanical', 6, 'medium', 60, 90),
-  ('SYS-BACK',  'auto-backtack',   'Auto Backtack',   'Automatic backtacking.',            'automation', 7, 'medium', 70, 82),
-  ('SYS-AI',    'ai-assistant',    'AI Assistant',    'On-machine AI guidance.',           'assistant', 10, 'high',   90, 60),
-  ('SYS-ENERGY','energy-saver',    'Energy Saver',    'Energy-saving servo system.',       'energy',     5, 'low',    50, 75)
-) AS p(code, slug, name, description, system_type, feature_priority, complexity_level, ui_relevance, machine_relevance)
-WHERE sc.slug = 'lockstitch'
+JOIN (VALUES
+  ('fabric-preparation','XPRS','Spreading Machines',1),('fabric-preparation','XPRR','Fabric Relaxing Machines',2),
+  ('fabric-preparation','XPRI','Fabric Inspection Machines',3),('fabric-preparation','XPRL','Fabric Rolling Machines',4),
+  ('fabric-preparation','XPRT','Fabric Cutting Tables',5),('fabric-preparation','XPRH','Fabric Handling Systems',6),
+  ('cutting-equipment','XCS','Straight Knife Cutting Machines',1),('cutting-equipment','XCR','Round Knife Cutting Machines',2),
+  ('cutting-equipment','XCB','Band Knife Cutting Machines',3),('cutting-equipment','XCE','End Cutters',4),
+  ('cutting-equipment','XCT','Strip Cutting Machines',5),('cutting-equipment','XCP','Tape Cutting Machines',6),
+  ('cutting-equipment','XCC','CNC Cutting Machines',7),('cutting-equipment','XCL','Laser Cutting Machines',8),
+  ('cutting-equipment','XCD','Fabric Drilling Machines',9),
+  ('industrial-sewing-machines','XSL','Lockstitch Machines',1),('industrial-sewing-machines','XSO','Overlock Machines',2),
+  ('industrial-sewing-machines','XSI','Interlock Machines',3),('industrial-sewing-machines','XSC','Chainstitch Machines',4),
+  ('industrial-sewing-machines','XSD','Double Needle Machines',5),('industrial-sewing-machines','XSM','Multi-Needle Machines',6),
+  ('industrial-sewing-machines','XSPA','Pattern Sewing Machines',7),('industrial-sewing-machines','XSH','Heavy Duty Machines',8),
+  ('industrial-sewing-machines','XSS','Special Machines',9),
+  ('automatic-sewing-systems','XAPS','Pocket Setter Machines',1),('automatic-sewing-systems','XAPW','Pocket Welting Machines',2),
+  ('automatic-sewing-systems','XAPP','Placket Sewing Units',3),('automatic-sewing-systems','XASS','Side Seam Units',4),
+  ('automatic-sewing-systems','XACL','Collar Machines',5),('automatic-sewing-systems','XASL','Sleeve Setting Machines',6),
+  ('automatic-sewing-systems','XAHM','Hemming Machines',7),('automatic-sewing-systems','XABT','Bartacking Machines',8),
+  ('automatic-sewing-systems','XABA','Button Attaching Machines',9),('automatic-sewing-systems','XABH','Buttonhole Machines',10),
+  ('leather-footwear-machinery','XSES','Shoe Sewing Machines',1),('leather-footwear-machinery','XSEB','Bag Sewing Machines',2),
+  ('leather-footwear-machinery','XSEL','Leather Sewing Machines',3),('leather-footwear-machinery','XSEE','Edge Binding Machines',4),
+  ('leather-footwear-machinery','XSET','Tape Attaching Machines',5),
+  ('embroidery-equipment','XES','Single Head Embroidery Machines',1),('embroidery-equipment','XEM','Multi Head Embroidery Machines',2),
+  ('embroidery-equipment','XEC','Computerized Embroidery Machines',3),('embroidery-equipment','XEQ','Sequin Embroidery Machines',4),
+  ('embroidery-equipment','XEB','Cording / Beading Machines',5),
+  ('printing-heat-press-equipment','XPH','Heat Press Machines',1),('printing-heat-press-equipment','XPRH','Rotary Heat Press Machines',2),
+  ('printing-heat-press-equipment','XPPH','Pneumatic Heat Press Machines',3),('printing-heat-press-equipment','XPDH','Double Station Heat Press Machines',4),
+  ('printing-heat-press-equipment','XPSP','Screen Printing Machines',5),('printing-heat-press-equipment','XPDT','Digital Textile Printers (DTG)',6),
+  ('printing-heat-press-equipment','XPSU','Sublimation Printers',7),
+  ('finishing-equipment','XFSI','Steam Irons',1),('finishing-equipment','XFSB','Steam Boilers',2),
+  ('finishing-equipment','XFIT','Ironing Tables',3),('finishing-equipment','XFVT','Vacuum Ironing Tables',4),
+  ('finishing-equipment','XFFF','Form Finishing Machines',5),('finishing-equipment','XFCP','Collar & Cuff Press Machines',6),
+  ('finishing-equipment','XFTS','Thread Sucking Machines',7),('finishing-equipment','XFFP','Fusing Press Machines',8),
+  ('finishing-equipment','XFWM','Washing Machines',9),
+  ('packing-inspection','XPCN','Needle Detectors',1),('packing-inspection','XPCM','Metal Detectors',2),
+  ('packing-inspection','XPCI','Fabric Inspection Machines (Final)',3),('packing-inspection','XPCX','X-Ray Inspection Machines',4),
+  ('packing-inspection','XPCF','Folding Machines',5),('packing-inspection','XPCT','Packing Tables',6),
+  ('packing-inspection','XPCC','Carton Sealing Machines',7),
+  ('domestic-sewing-machines','XDL','Household Lockstitch Machines',1),('domestic-sewing-machines','XDO','Household Overlock Machines',2),
+  ('domestic-sewing-machines','XDE','Household Embroidery Machines',3),('domestic-sewing-machines','XDP','Portable Sewing Machines',4),
+  ('spare-parts-accessories','XSPS','Servo Motors',1),('spare-parts-accessories','XSPD','Direct Drive Motors',2),
+  ('spare-parts-accessories','XSPC','Control Panels',3),('spare-parts-accessories','XSPT','Touch Screens',4),
+  ('spare-parts-accessories','XSPP','Machine Parts',5),('spare-parts-accessories','XSPA','Attachments & Folders',6)
+) AS s(cat_slug, code, label, ord) ON c.slug = s.cat_slug
 ON CONFLICT (tenant_id, slug) DO NOTHING;
