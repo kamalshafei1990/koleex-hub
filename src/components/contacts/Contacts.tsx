@@ -333,6 +333,7 @@ interface ContactForm {
   supplier_mobile: string;
   supplier_email: string;
   supplier_website: string;
+  supplier_profile_url: string;
   wechat_official_account: string;
   wechat_sales_group_available: boolean;
   wecom_support_available: boolean;
@@ -734,6 +735,7 @@ const EMPTY_FORM: ContactForm = {
   supplier_mobile: "",
   supplier_email: "",
   supplier_website: "",
+  supplier_profile_url: "",
   wechat_official_account: "",
   wechat_sales_group_available: false,
   wecom_support_available: false,
@@ -1324,6 +1326,7 @@ function contactToForm(c: ContactRow): ContactForm {
     supplier_mobile: c.supplier_mobile || "",
     supplier_email: c.supplier_email || "",
     supplier_website: c.supplier_website || "",
+    supplier_profile_url: (c as unknown as Record<string, unknown>).supplier_profile_url as string || "",
     wechat_official_account: c.wechat_official_account || "",
     wechat_sales_group_available: !!c.wechat_sales_group_available,
     wecom_support_available: !!c.wecom_support_available,
@@ -1568,6 +1571,7 @@ function formToRow(f: ContactForm): Record<string, unknown> {
     supplier_mobile: f.supplier_mobile || null,
     supplier_email: f.supplier_email || null,
     supplier_website: f.supplier_website || null,
+    supplier_profile_url: f.supplier_profile_url || null,
     wechat_official_account: f.wechat_official_account || null,
     wechat_sales_group_available: !!f.wechat_sales_group_available,
     wecom_support_available: !!f.wecom_support_available,
@@ -7676,6 +7680,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <SelectInput label={t("field.source")} tier="optional" value={form.source} onChange={v => setField("source", v)} options={SUPPLIER_SOURCES} icon={<TargetIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
+                  <Input label={t("field.supplierProfileUrl", "Platform profile link")} tier="optional" type="url" value={form.supplier_profile_url} onChange={v => setField("supplier_profile_url", v)} placeholder={t("placeholder.supplierProfileUrl", "Made-in-China / Alibaba / AliExpress profile URL")} icon={<GlobeIcon size={14} />} />
                 </div>
                 {/* Supplier kind is ALSO captured richly in the "Classifications" section below (multi-select taxonomy). */}
               </div>

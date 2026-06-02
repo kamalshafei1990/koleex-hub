@@ -478,6 +478,8 @@ export const contactsT: Translations = {
   "field.contactTel":           { en: "Tel",                       zh: "座机",                 ar: "الهاتف" },
   "field.contactMobile":        { en: "Mobile",                    zh: "手机",                 ar: "الجوال" },
   "field.website":              { en: "Website",                   zh: "网站",                 ar: "الموقع الإلكتروني" },
+  "field.supplierProfileUrl":   { en: "Platform profile link",     zh: "平台主页链接",          ar: "رابط الملف على المنصة" },
+  "placeholder.supplierProfileUrl": { en: "Made-in-China / Alibaba / AliExpress profile URL", zh: "Made-in-China / 阿里巴巴 / 速卖通 主页链接", ar: "رابط الملف على Made-in-China / Alibaba / AliExpress" },
   "field.supplierAddress":      { en: "Address",                   zh: "地址",                 ar: "العنوان" },
   "field.division":             { en: "Division",                  zh: "事业部",               ar: "القسم" },
   "field.category":             { en: "Category",                  zh: "类别",                 ar: "الفئة" },
