@@ -53,6 +53,11 @@
   /* Header */
   --header-bg: rgba(0,0,0,0.80);
   --header-border: rgba(255,255,255,0.08);
+
+  /* Brand accent — the single non-neutral KOLEEX color. Use sparingly for
+     functional highlights (selected state, primary CTA), never decoratively. */
+  --accent: #0066FF;
+  --accent-hover: #0052CC;
 }
 
 [data-theme="light"] {
