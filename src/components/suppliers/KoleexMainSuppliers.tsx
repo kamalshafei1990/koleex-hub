@@ -439,9 +439,9 @@ function SupplierChip({ row, t, onOpen, onRemove, onChangeRole, onViewCatalog }:
         </div>
       </button>
 
-      {/* View catalog — only when a catalog/brochure PDF exists for this supplier.
-         Accent-blue functional affordance so it's easy to spot among the cards. */}
-      {s?.catalogUrl && (
+      {/* Catalog state — accent-blue button when a catalog/brochure PDF exists,
+         otherwise a muted "No catalog" hint so the absence is explicit. */}
+      {s?.catalogUrl ? (
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onViewCatalog({ url: s.catalogUrl!, name: s.catalogName || s.name || t("cov.catalog", "Catalog") }); }}
@@ -451,6 +451,13 @@ function SupplierChip({ row, t, onOpen, onRemove, onChangeRole, onViewCatalog }:
         >
           <FileIcon className="h-3 w-3" /> {t("cov.catalog", "Catalog")}
         </button>
+      ) : (
+        <span
+          title={t("cov.noCatalogHint", "No catalog uploaded yet — add one from Supplier 360 → Media")}
+          className="shrink-0 inline-flex items-center gap-1 rounded-md border border-dashed border-[var(--border-subtle)] px-2 py-1 text-[11px] font-medium text-[var(--text-ghost)]"
+        >
+          <FileIcon className="h-3 w-3" /> {t("cov.noCatalog", "No catalog")}
+        </span>
       )}
 
       {/* Role select — compact, native, monochrome */}

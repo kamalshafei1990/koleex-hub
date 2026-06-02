@@ -1282,6 +1282,8 @@ export const contactsT: Translations = {
   "cov.catalog": { en: "Catalog", zh: "目录", ar: "الكتالوج" },
   "cov.viewCatalog": { en: "View catalog", zh: "查看目录", ar: "عرض الكتالوج" },
   "cov.openInNewTab": { en: "Open in new tab", zh: "在新标签页打开", ar: "فتح في علامة تبويب جديدة" },
+  "cov.noCatalog": { en: "No catalog", zh: "无目录", ar: "لا يوجد كتالوج" },
+  "cov.noCatalogHint": { en: "No catalog uploaded yet — add one from Supplier 360 → Media", zh: "尚未上传目录 — 可在供应商 360 → 媒体中添加", ar: "لم يتم رفع كتالوج بعد — أضف واحدًا من ملف المورد 360 ← الوسائط" },
 
   /* ── Supplier 360 — risk / negotiation / stability labels (audit fill) ── */
   "sd.delete": { en: "Delete", zh: "删除", ar: "حذف" },
