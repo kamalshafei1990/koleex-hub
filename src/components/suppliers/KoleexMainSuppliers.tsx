@@ -439,14 +439,15 @@ function SupplierChip({ row, t, onOpen, onRemove, onChangeRole, onViewCatalog }:
         </div>
       </button>
 
-      {/* View catalog — only when a catalog/brochure PDF exists for this supplier */}
+      {/* View catalog — only when a catalog/brochure PDF exists for this supplier.
+         Accent-blue functional affordance so it's easy to spot among the cards. */}
       {s?.catalogUrl && (
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onViewCatalog({ url: s.catalogUrl!, name: s.catalogName || s.name || t("cov.catalog", "Catalog") }); }}
           aria-label={t("cov.viewCatalog", "View catalog")}
           title={t("cov.viewCatalog", "View catalog")}
-          className="shrink-0 inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-faint)] hover:text-[var(--text-primary)] hover:border-[var(--border-color)] transition-colors"
+          className="shrink-0 inline-flex items-center gap-1 rounded-md border border-[#0066FF]/35 bg-[#0066FF]/10 px-2 py-1 text-[11px] font-semibold text-[#0066FF] hover:bg-[#0066FF]/18 transition-colors"
         >
           <FileIcon className="h-3 w-3" /> {t("cov.catalog", "Catalog")}
         </button>
