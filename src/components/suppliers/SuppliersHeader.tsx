@@ -29,7 +29,7 @@ import { useTranslation, type Translations } from "@/lib/i18n";
 const PRIMARY_TABS_RAW: Array<PageTab & { i18nKey: string }> = [
   { key: "/suppliers",          label: "Directory",      icon: "users",         i18nKey: "sup.nav.r.directory" },
   { key: "/suppliers/sourcing", label: "Command Center", icon: "bullseye-arrow", i18nKey: "sup.nav.r.sourcing" },
-  { key: "/suppliers/main",     label: "Main Suppliers", icon: "star",          i18nKey: "sup.nav.r.main" },
+  { key: "/suppliers/main",     label: "Main Suppliers", icon: "handshake",     i18nKey: "sup.nav.r.main" },
 ];
 
 const T: Translations = {
