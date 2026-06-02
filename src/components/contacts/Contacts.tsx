@@ -88,7 +88,7 @@ import CustomersIcon from "@/components/icons/CustomersIcon";
 import SuppliersIcon from "@/components/icons/SuppliersIcon";
 
 import {
-  checkContactsSetup, fetchContacts, createContact, updateContact, deleteContact,
+  checkContactsSetup, fetchContacts, fetchContactsByType, createContact, updateContact, deleteContact,
   type ContactRow,
 } from "@/lib/contacts-admin";
 import { fetchOpportunities } from "@/lib/crm";
@@ -3359,11 +3359,18 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     setLoading(true);
     const ok = await checkContactsSetup();
     if (!ok) { setSetupNeeded(true); setLoading(false); return; }
-    const data = await fetchContacts(scopeCtx);
+    /* Scope the fetch to the app's contact type when we have one
+       (Suppliers / Customers / …). Without this the Suppliers app
+       downloaded EVERY contact in the tenant (~789 KB of customers,
+       people & companies) just to render ~a dozen suppliers. The
+       type-scoped endpoint returns only what this app renders. */
+    const data = filterType
+      ? await fetchContactsByType(filterType, scopeCtx)
+      : await fetchContacts(scopeCtx);
     // Exclude employees — they are managed via the Employees app now
     setContacts(data.filter(c => c.contact_type !== "employee"));
     setLoading(false);
-  }, [scopeCtx]);
+  }, [scopeCtx, filterType]);
 
   useEffect(() => { loadContacts(); }, [loadContacts]);
 

@@ -552,16 +552,29 @@ export async function fetchUniqueTags(): Promise<string[]> {
 
 // ── Taxonomy logos (stored in media/divisions/ and media/categories/ folders) ──
 
+/* Taxonomy logos are static SVGs that change at most a few times a year, yet
+   they were being re-listed from storage (a ~2s storage API call) on EVERY
+   SupplierDetail / product-page mount, with no caching and no in-flight dedup,
+   and a per-call `?t=` buster that also defeated browser image caching. Route
+   through memoFetch (in-flight dedupe + 60s session cache) and drop the buster
+   so the list runs once per session and the SVGs cache normally. */
 async function fetchTaxonomyLogos(folder: string): Promise<Record<string, string>> {
-  const result = await listStorage(BUCKET, folder, { limit: 500 });
-  const map: Record<string, string> = {};
-  if (!result.ok) return map;
-  for (const file of result.files) {
-    if (file.name === ".emptyFolderPlaceholder") continue;
-    const slug = file.name.replace(/\.[^.]+$/, "");
-    map[slug] = `${result.baseUrl}/${folder}/${file.name}?t=${Date.now()}`;
-  }
-  return map;
+  return memoFetch(`logos:${folder}`, async () => {
+    const result = await listStorage(BUCKET, folder, { limit: 500 });
+    const map: Record<string, string> = {};
+    if (!result.ok) return map;
+    for (const file of result.files) {
+      if (file.name === ".emptyFolderPlaceholder") continue;
+      const slug = file.name.replace(/\.[^.]+$/, "");
+      map[slug] = `${result.baseUrl}/${folder}/${file.name}`;
+    }
+    return map;
+  });
+}
+
+function invalidateTaxonomyLogoCache(folder: string): void {
+  clearSessionKey(`kx:taxo:logos:${folder}`);
+  inflight.delete(`logos:${folder}`);
 }
 
 async function uploadTaxonomyLogo(folder: string, slug: string, file: File): Promise<string | null> {
@@ -569,6 +582,7 @@ async function uploadTaxonomyLogo(folder: string, slug: string, file: File): Pro
   const filePath = `${folder}/${slug}.${ext}`;
   const result = await uploadToStorage(BUCKET, filePath, file, { cacheControl: "3600", upsert: true });
   if (!result.ok) { console.error(`[${folder}Logo] Upload:`, result.error); return null; }
+  invalidateTaxonomyLogoCache(folder);
   return result.data.publicUrl;
 }
 
@@ -579,6 +593,7 @@ async function deleteTaxonomyLogo(folder: string, slug: string): Promise<boolean
   if (!match) return true;
   const rm = await removeFromStorage(BUCKET, [`${folder}/${match.name}`]);
   if (!rm.ok) { console.error(`[${folder}Logo] Delete:`, rm.error); return false; }
+  invalidateTaxonomyLogoCache(folder);
   return true;
 }
 
