@@ -92,6 +92,7 @@ import {
   type ContactRow,
 } from "@/lib/contacts-admin";
 import { fetchOpportunities } from "@/lib/crm";
+import { humanizeError } from "@/lib/ui/humanize-error";
 import { STRATEGIC_STATUS_LABELS, CLASSIFICATION_LABELS, FACTORY_TYPE_LABELS } from "@/lib/suppliers/intelligence";
 import { useScopeContext } from "@/lib/use-scope";
 import type { CrmOpportunityWithRelations } from "@/types/supabase";
@@ -3181,28 +3182,43 @@ function CityDropdown({ countryCode, stateCode, value, onChange, label, placehol
    the whole tree (list + Supplier 360) — which previously caused a ~1.7s lag
    just to open the confirm dialog.
    ═══════════════════════════════════════════════════════════════════════════ */
-type PendingDelete = { id: string; name: string; onConfirm: () => void };
+type DeleteResult = { ok: boolean; error?: string };
+type PendingDelete = { id: string; name: string; onConfirm: () => Promise<DeleteResult> | DeleteResult | void };
 function DeleteConfirmHost({ t }: { t: (key: string, fallback?: string) => string }) {
   const [pending, setPending] = useState<PendingDelete | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
-    const handler = (e: Event) => setPending((e as CustomEvent<PendingDelete>).detail);
+    const handler = (e: Event) => { setErr(null); setBusy(false); setPending((e as CustomEvent<PendingDelete>).detail); };
     window.addEventListener("koleex:confirm-delete", handler as EventListener);
     return () => window.removeEventListener("koleex:confirm-delete", handler as EventListener);
   }, []);
   if (!pending) return null;
+  const close = () => { if (!busy) { setPending(null); setErr(null); } };
+  const confirm = async () => {
+    setBusy(true); setErr(null);
+    try {
+      const r = await pending.onConfirm();
+      if (r && r.ok === false) { setErr(r.error || t("error.deleteFailed", "Couldn't delete. Please try again.")); setBusy(false); return; }
+      setPending(null); setBusy(false);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e)); setBusy(false);
+    }
+  };
   return (
-    <ScrollLockOverlay className="fixed inset-0 z-[60] bg-[var(--bg-overlay)] flex items-center justify-center p-4" onClick={() => setPending(null)}>
+    <ScrollLockOverlay className="fixed inset-0 z-[60] bg-[var(--bg-overlay)] flex items-center justify-center p-4" onClick={close}>
       <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">{t("delete.title")}</h3>
         <p className="text-sm text-[var(--text-subtle)] mb-6">
           {t("delete.confirm")} <strong className="text-[var(--text-primary)]">{pending.name}</strong>{t("delete.cannotUndo")}
         </p>
+        {err ? <div className="mb-4 text-[12px] text-rose-400">{err}</div> : null}
         <div className="flex gap-3 justify-end">
-          <button onClick={() => setPending(null)} className="px-4 py-2 rounded-lg text-sm border border-[var(--border-color)] hover:bg-[var(--bg-surface)] transition-colors">
+          <button onClick={close} disabled={busy} className="px-4 py-2 rounded-lg text-sm border border-[var(--border-color)] hover:bg-[var(--bg-surface)] transition-colors disabled:opacity-50">
             {t("btn.cancel")}
           </button>
-          <button onClick={() => { pending.onConfirm(); setPending(null); }} className="px-4 py-2 rounded-lg text-sm bg-red-600 hover:bg-red-500 text-white transition-colors">
-            {t("btn.delete")}
+          <button onClick={confirm} disabled={busy} className="px-4 py-2 rounded-lg text-sm bg-red-600 hover:bg-red-500 text-white transition-colors disabled:opacity-50">
+            {busy ? t("ts.saving", "Saving…") : t("btn.delete")}
           </button>
         </div>
       </div>
@@ -3567,26 +3583,31 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     const ne = (o: Record<string, unknown>) => { const r: Record<string, unknown> = {}; for (const [k, v] of Object.entries(o)) { if (typeof v === "string") { if (v.trim()) r[k] = v.trim(); } else if (typeof v === "boolean") { if (v) r[k] = true; } else if (v != null) r[k] = v; } return r; };
     const num = (o: Record<string, unknown>, keys: string[]) => { for (const k of keys) if (typeof o[k] === "string") o[k] = Number(o[k]); return o; };
     try {
-      if (sIntel.strategic_status) await j(`/api/suppliers/${id}`, "PATCH", { strategic_status: sIntel.strategic_status, strategic_status_reason: sIntel.strategic_status_reason || null });
-      for (const c of sIntel.classifications) await j(`/api/suppliers/${id}/classifications`, "POST", { classification: c, is_primary: c === sIntel.primary_class });
-      for (const p of form.contact_persons) { if ((p.name || "").trim()) await j(`/api/suppliers/${id}/contacts`, "POST", ne({ full_name: p.name, name_cn: p.name_cn, position: p.position, department: p.department, mobile: p.mobile || p.phone, email: p.email, whatsapp: p.whatsapp, wechat_id: p.wechat_id, telegram: p.telegram, wecom_id: p.wecom_id, line_id: p.line_id, skype_id: p.skype_id, role_category: p.role_category, reliability: p.reliability, preferred_channel: p.preferred_channel, preferred_language: p.preferred_language, timezone: p.timezone, response_speed: p.response_speed, available_hours: p.available_hours, is_primary: p.is_primary, is_decision_maker: p.is_decision_maker, notes: p.notes })); }
+      /* All enrichment endpoints are independent — fire them concurrently
+         instead of awaiting each in series (was a visible multi-second hang
+         on the Save spinner for suppliers with several contacts/items). */
+      const tasks: Promise<unknown>[] = [];
+      if (sIntel.strategic_status) tasks.push(j(`/api/suppliers/${id}`, "PATCH", { strategic_status: sIntel.strategic_status, strategic_status_reason: sIntel.strategic_status_reason || null }));
+      for (const c of sIntel.classifications) tasks.push(j(`/api/suppliers/${id}/classifications`, "POST", { classification: c, is_primary: c === sIntel.primary_class }));
+      for (const p of form.contact_persons) { if ((p.name || "").trim()) tasks.push(j(`/api/suppliers/${id}/contacts`, "POST", ne({ full_name: p.name, name_cn: p.name_cn, position: p.position, department: p.department, mobile: p.mobile || p.phone, email: p.email, whatsapp: p.whatsapp, wechat_id: p.wechat_id, telegram: p.telegram, wecom_id: p.wecom_id, line_id: p.line_id, skype_id: p.skype_id, role_category: p.role_category, reliability: p.reliability, preferred_channel: p.preferred_channel, preferred_language: p.preferred_language, timezone: p.timezone, response_speed: p.response_speed, available_hours: p.available_hours, is_primary: p.is_primary, is_decision_maker: p.is_decision_maker, notes: p.notes }))); }
       const fb = num(ne(sIntel.factory), ["production_lines", "monthly_capacity", "annual_output", "factory_size_sqm", "employee_count", "qc_staff_count", "rd_staff_count", "export_percentage", "lead_time_days"]);
       const fem = sIntel.factory.main_export_markets; if (typeof fem === "string" && fem.trim()) fb.main_export_markets = fem.split(",").map((s) => s.trim()).filter(Boolean);
       const fpc = sIntel.factory.production_categories; if (typeof fpc === "string" && fpc.trim()) fb.production_categories = fpc.split(",").map((s) => s.trim()).filter(Boolean);
       const fsm = sIntel.factory.supported_materials; if (typeof fsm === "string" && fsm.trim()) fb.supported_materials = fsm.split(",").map((s) => s.trim()).filter(Boolean);
       const fps = sIntel.factory.peak_season_months; if (typeof fps === "string" && fps.trim()) fb.peak_season_months = fps.split(",").map((s) => s.trim()).filter(Boolean);
-      if (Object.keys(fb).length) await j(`/api/suppliers/${id}/factory`, "PUT", fb);
+      if (Object.keys(fb).length) tasks.push(j(`/api/suppliers/${id}/factory`, "PUT", fb));
       const rb = num(ne(sIntel.risk), ["internal_evaluation_score"]);
-      if (Object.keys(rb).length) await j(`/api/suppliers/${id}/risk`, "PUT", rb);
+      if (Object.keys(rb).length) tasks.push(j(`/api/suppliers/${id}/risk`, "PUT", rb));
       const nb = num(ne(sIntel.neg), ["negotiation_score"]);
       const npt = sIntel.neg.preferred_tactics; nb.preferred_tactics = typeof npt === "string" && npt.trim() ? npt.split(",").map((s) => s.trim()).filter(Boolean) : [];
       const nlp = sIntel.neg.leverage_points; nb.leverage_points = typeof nlp === "string" && nlp.trim() ? nlp.split(",").map((s) => s.trim()).filter(Boolean) : [];
-      if (Object.keys(nb).length) await j(`/api/suppliers/${id}/negotiations/intel`, "PUT", nb);
+      if (Object.keys(nb).length) tasks.push(j(`/api/suppliers/${id}/negotiations/intel`, "PUT", nb));
       // Sourcing override (supplier-level)
       const sb = num(ne(sIntel.sourcing), ["sourcing_priority", "sourcing_score_override"]);
-      if (Object.keys(sb).length) await j(`/api/suppliers/${id}/sourcing`, "PUT", sb);
+      if (Object.keys(sb).length) tasks.push(j(`/api/suppliers/${id}/sourcing`, "PUT", sb));
       // Risk items register — one POST per item with a title
-      for (const ri of sIntel.riskItems) { if ((ri.title || "").trim()) await j(`/api/suppliers/${id}/risk/items`, "POST", ne({ dimension: ri.dimension, severity: ri.severity, status: ri.status, title: ri.title, description: ri.description, mitigation: ri.mitigation })); }
+      for (const ri of sIntel.riskItems) { if ((ri.title || "").trim()) tasks.push(j(`/api/suppliers/${id}/risk/items`, "POST", ne({ dimension: ri.dimension, severity: ri.severity, status: ri.status, title: ri.title, description: ri.description, mitigation: ri.mitigation }))); }
+      await Promise.all(tasks);
     } catch { /* best-effort */ }
   };
 
@@ -3628,16 +3649,18 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     setSaving(false);
   };
 
-  const handleDelete = async (id: string) => {
-    const { ok } = await deleteContact(id);
+  const handleDelete = async (id: string): Promise<DeleteResult> => {
+    const { ok, error } = await deleteContact(id);
     if (ok) {
       setContacts(prev => prev.filter(c => c.id !== id));
       if (selectedId === id) { setSelectedId(null); setView("list"); setMobileShowDetail(false); }
     }
+    return { ok, error: error ? humanizeError(error) : undefined };
   };
 
   /* Fire the delete confirmation via a window event so the (huge) Contacts
-     tree doesn't re-render just to open the dialog — see DeleteConfirmHost. */
+     tree doesn't re-render just to open the dialog — see DeleteConfirmHost.
+     onConfirm resolves the delete result so the dialog can surface errors. */
   const requestDelete = (c: ContactRow) => {
     if (typeof window === "undefined") return;
     window.dispatchEvent(new CustomEvent("koleex:confirm-delete", {

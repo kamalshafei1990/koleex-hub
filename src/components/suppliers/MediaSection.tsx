@@ -423,15 +423,15 @@ export default function MediaSection({
                     <div className="flex shrink-0 items-center gap-0.5">
                       {url ? (
                         <a href={url} download target="_blank" rel="noopener noreferrer"
-                          className="rounded-md p-1.5 text-[var(--text-faint)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]" title="Download"><DownloadIcon className="h-3.5 w-3.5" /></a>
+                          className="rounded-md p-1.5 text-[var(--text-faint)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]" title={t("ms.download", "Download")}><DownloadIcon className="h-3.5 w-3.5" /></a>
                       ) : null}
                       <button type="button" disabled={busyId === id} onClick={() => patch(m, { verify: !verified })}
                         className={`rounded-md p-1.5 hover:bg-[var(--bg-surface)] disabled:opacity-40 ${verified ? "text-[var(--text-primary)]" : "text-[var(--text-faint)] hover:text-[var(--text-primary)]"}`}
-                        title={verified ? "Un-verify" : "Mark verified"}><BadgeCheckIcon className="h-3.5 w-3.5" /></button>
+                        title={verified ? t("ms.unverify", "Un-verify") : t("ms.markVerified", "Mark verified")}><BadgeCheckIcon className="h-3.5 w-3.5" /></button>
                       <button type="button" disabled={busyId === id} onClick={() => patch(m, { lifecycle_status: str(m, "lifecycle_status") === "archived" ? "active" : "archived" })}
-                        className="rounded-md p-1.5 text-[var(--text-faint)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] disabled:opacity-40" title="Archive / restore"><ArchiveIcon className="h-3.5 w-3.5" /></button>
+                        className="rounded-md p-1.5 text-[var(--text-faint)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] disabled:opacity-40" title={t("ms.archiveRestore", "Archive / restore")}><ArchiveIcon className="h-3.5 w-3.5" /></button>
                       <button type="button" disabled={busyId === id} onClick={() => remove(m)}
-                        className="rounded-md p-1.5 text-[var(--text-faint)] hover:bg-[var(--bg-surface)] hover:text-rose-400 disabled:opacity-40" title="Remove"><TrashIcon className="h-3.5 w-3.5" /></button>
+                        className="rounded-md p-1.5 text-[var(--text-faint)] hover:bg-[var(--bg-surface)] hover:text-rose-400 disabled:opacity-40" title={t("ms.remove", "Remove")}><TrashIcon className="h-3.5 w-3.5" /></button>
                     </div>
                   </div>
                 </div>
@@ -447,59 +447,59 @@ export default function MediaSection({
           <div className="max-h-[88vh] w-full max-w-lg space-y-4 overflow-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2">
               <UploadIcon className="h-4 w-4 text-[var(--text-secondary)]" />
-              <span className="text-[14px] font-semibold text-[var(--text-primary)]">Add evidence asset</span>
+              <span className="text-[14px] font-semibold text-[var(--text-primary)]">{t("ms.addAssetTitle", "Add evidence asset")}</span>
             </div>
-            <Field label="File (image, PDF, video, document)">
+            <Field label={t("ms.fieldFile", "File (image, PDF, video, document)")}>
               <input type="file" accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx" onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 className="block w-full text-[12px] text-[var(--text-secondary)] file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--bg-surface-subtle)] file:px-3 file:py-1.5 file:text-[12px] file:font-medium file:text-[var(--text-primary)]" />
             </Field>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Category">
+              <Field label={t("ms.fieldCategory", "Category")}>
                 <select className={inputCls} value={category} onChange={(e) => setCategory(e.target.value)}>
                   {DOC_CATEGORY_GROUPS.map((g) => (
-                    <optgroup key={g.key} label={g.label}>
-                      {g.categories.map((c) => <option key={c} value={c}>{docCategoryLabel(c)}</option>)}
+                    <optgroup key={g.key} label={t("opt." + g.key, g.label)}>
+                      {g.categories.map((c) => <option key={c} value={c}>{t("opt." + c, docCategoryLabel(c))}</option>)}
                     </optgroup>
                   ))}
                 </select>
               </Field>
-              <Field label="Visibility">
+              <Field label={t("ms.fieldVisibility", "Visibility")}>
                 <select className={inputCls} value={visibility} onChange={(e) => setVisibility(e.target.value)}>
-                  {VISIBILITY_TIERS.map((t) => <option key={t} value={t}>{VISIBILITY_LABELS[t]}</option>)}
+                  {VISIBILITY_TIERS.map((tier) => <option key={tier} value={tier}>{t("ms.vis" + tier.charAt(0).toUpperCase() + tier.slice(1), VISIBILITY_LABELS[tier])}</option>)}
                 </select>
               </Field>
             </div>
-            <Field label="Title (optional)"><input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder={isCert ? "e.g. ISO 9001:2015" : "e.g. 2025 Product Catalog"} /></Field>
+            <Field label={t("ms.fieldTitleOptional", "Title (optional)")}><input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder={isCert ? t("ms.titlePlaceholderCert", "e.g. ISO 9001:2015") : t("ms.titlePlaceholderDoc", "e.g. 2025 Product Catalog")} /></Field>
 
             {isCert ? (
               <div className="space-y-3 rounded-xl bg-[var(--bg-surface-subtle)] p-3">
-                <SectionLabel>Certification intelligence</SectionLabel>
+                <SectionLabel>{t("ms.certIntel", "Certification intelligence")}</SectionLabel>
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Type">
+                  <Field label={t("ms.fieldType", "Type")}>
                     <select className={inputCls} value={certType} onChange={(e) => setCertType(e.target.value)}>
-                      {CERT_TYPE_ORDER.map((k) => <option key={k} value={k}>{CERT_TYPE_LABELS[k]}</option>)}
+                      {CERT_TYPE_ORDER.map((k) => <option key={k} value={k}>{t("opt." + k, CERT_TYPE_LABELS[k])}</option>)}
                     </select>
                   </Field>
-                  <Field label="Issuing authority"><input className={inputCls} value={issuer} onChange={(e) => setIssuer(e.target.value)} placeholder="SGS / TÜV / BV" /></Field>
-                  <Field label="Issue date"><input type="date" className={inputCls} value={issuedDate} onChange={(e) => setIssuedDate(e.target.value)} /></Field>
-                  <Field label="Expiry date"><input type="date" className={inputCls} value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} /></Field>
+                  <Field label={t("ms.fieldIssuer", "Issuing authority")}><input className={inputCls} value={issuer} onChange={(e) => setIssuer(e.target.value)} placeholder={t("ms.issuerPlaceholder", "SGS / TÜV / BV")} /></Field>
+                  <Field label={t("ms.fieldIssueDate", "Issue date")}><input type="date" className={inputCls} value={issuedDate} onChange={(e) => setIssuedDate(e.target.value)} /></Field>
+                  <Field label={t("ms.fieldExpiryDate", "Expiry date")}><input type="date" className={inputCls} value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} /></Field>
                 </div>
-                <Field label="Markets covered (comma-separated)"><input className={inputCls} value={markets} onChange={(e) => setMarkets(e.target.value)} placeholder="EU, USA, Japan" /></Field>
+                <Field label={t("ms.fieldMarkets", "Markets covered (comma-separated)")}><input className={inputCls} value={markets} onChange={(e) => setMarkets(e.target.value)} placeholder={t("ms.marketsPlaceholder", "EU, USA, Japan")} /></Field>
               </div>
             ) : null}
 
-            <Field label="Description (optional)"><textarea className={`${inputCls} min-h-[56px]`} value={description} onChange={(e) => setDescription(e.target.value)} /></Field>
+            <Field label={t("ms.fieldDescriptionOptional", "Description (optional)")}><textarea className={`${inputCls} min-h-[56px]`} value={description} onChange={(e) => setDescription(e.target.value)} /></Field>
 
             {isSensitiveAsset(category, visibility) ? (
-              <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-faint)]"><ShieldCheckIcon className="h-3.5 w-3.5" />Stored privately — served via short-lived signed links only.</div>
+              <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-faint)]"><ShieldCheckIcon className="h-3.5 w-3.5" />{t("ms.privateHint", "Stored privately — served via short-lived signed links only.")}</div>
             ) : null}
             {upErr ? <div className="text-[12px] text-rose-400">{upErr}</div> : null}
             <div className="flex items-center gap-3">
               <button type="button" disabled={busy} onClick={save}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
-                <UploadIcon className="h-3.5 w-3.5" />{busy ? "Uploading…" : "Upload asset"}
+                <UploadIcon className="h-3.5 w-3.5" />{busy ? t("ms.uploading", "Uploading…") : t("ms.uploadAsset", "Upload asset")}
               </button>
-              <button type="button" onClick={() => setOpen(false)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">Cancel</button>
+              <button type="button" onClick={() => setOpen(false)} className="text-[12px] text-[var(--text-faint)] hover:text-[var(--text-secondary)]">{t("ms.cancel", "Cancel")}</button>
             </div>
           </div>
         </div>

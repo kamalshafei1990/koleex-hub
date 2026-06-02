@@ -1344,9 +1344,9 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <BarRow label={t("sd.evaluationScore", "Evaluation score")} pct={overall || 0} tone={overall >= 75 ? "emerald" : overall >= 50 ? "amber" : "rose"} valueText={overall ? `${Math.round(overall)}/100` : "—"} />
                   {riskScore != null ? <BarRow label={t("sd.riskScore", "Risk score")} pct={riskScore || 0} tone={(riskScore || 0) <= 35 ? "emerald" : (riskScore || 0) <= 65 ? "amber" : "rose"} valueText={`${Math.round(riskScore || 0)}/100`} /> : null}
-                  {level ? <BarRow label={t("sd.overallRiskLevel", "Overall risk level")} pct={lev[level] ?? 50} tone={level === "low" ? "emerald" : level === "medium" ? "amber" : "rose"} valueText={level} /> : null}
-                  {trust ? <BarRow label={t("sd.trustLevel", "Trust level")} pct={trustLev[trust] ?? 50} tone={trust === "excellent" || trust === "high" ? "emerald" : trust === "medium" ? "amber" : "rose"} valueText={trust} /> : null}
-                  {dep ? <BarRow label={t("sd.dependencyLevel", "Dependency level")} pct={depLev[dep] ?? 50} tone={dep === "low" ? "emerald" : dep === "medium" ? "amber" : "rose"} valueText={dep} /> : null}
+                  {level ? <BarRow label={t("sd.overallRiskLevel", "Overall risk level")} pct={lev[level] ?? 50} tone={level === "low" ? "emerald" : level === "medium" ? "amber" : "rose"} valueText={t("opt." + level, level)} /> : null}
+                  {trust ? <BarRow label={t("sd.trustLevel", "Trust level")} pct={trustLev[trust] ?? 50} tone={trust === "excellent" || trust === "high" ? "emerald" : trust === "medium" ? "amber" : "rose"} valueText={t("opt." + trust, trust)} /> : null}
+                  {dep ? <BarRow label={t("sd.dependencyLevel", "Dependency level")} pct={depLev[dep] ?? 50} tone={dep === "low" ? "emerald" : dep === "medium" ? "amber" : "rose"} valueText={t("opt." + dep, dep)} /> : null}
                 </div>
                 <div>
                   <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-2.5">{t("sd.stabilityQuality", "Stability & quality")}</div>
@@ -1356,7 +1356,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                       if (!v) return null;
                       const pct = ({ poor: 20, weak: 30, fair: 50, medium: 50, good: 70, strong: 80, high: 80, excellent: 95 } as Record<string, number>)[v] ?? 60;
                       const tone = pct >= 75 ? "emerald" : pct >= 50 ? "amber" : "rose";
-                      return <BarRow key={m.key} label={m.label} pct={pct} tone={tone} valueText={v} />;
+                      return <BarRow key={m.key} label={m.label} pct={pct} tone={tone} valueText={t("opt." + v, v)} />;
                     })}
                   </div>
                 </div>
@@ -1364,7 +1364,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                   <Mini label={t("sd.activeRisks", "Active risks")} value={String(openItems)} tone={openItems ? "amber" : "emerald"} />
                   <Mini label={t("sd.highCritical", "High / critical")} value={String(openHigh)} tone={openHigh ? "rose" : "emerald"} />
                   <Mini label={t("sd.backupAvailable", "Backup available")} value={backup ? t("sd.yes", "Yes") : t("sd.no", "No")} tone={backup ? "emerald" : "rose"} />
-                  <Mini label={t("sd.assessmentNotes", "Notes")} value={str(rp, "assessment_notes") ? "—" : "—"} tone="default" />
+                  <Mini label={t("sd.assessmentNotes", "Notes")} value={str(rp, "assessment_notes") ? t("sd.yes", "Yes") : "—"} tone={str(rp, "assessment_notes") ? "default" : "default"} />
                 </div>
               </div>
             );
@@ -1427,13 +1427,13 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                     const v = str(ni, b.key);
                     if (!v) return null;
                     const pct = lev[v] ?? 50;
-                    return <BarRow key={b.key} label={b.label} pct={pct} tone={pct >= 70 ? "emerald" : pct >= 40 ? "amber" : "rose"} valueText={v} />;
+                    return <BarRow key={b.key} label={b.label} pct={pct} tone={pct >= 70 ? "emerald" : pct >= 40 ? "amber" : "rose"} valueText={t("opt." + v, v)} />;
                   })}
                 </div>
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                  <Mini label={t("sd.negotiationDifficulty", "Difficulty")} value={str(ni, "negotiation_difficulty") || "—"} tone="default" />
-                  <Mini label={t("sd.sampleTurnaround", "Sample turnaround")} value={str(ni, "sample_turnaround_speed") || "—"} tone="default" />
-                  <Mini label={t("sd.contractWillingness", "Contract willingness")} value={str(ni, "contract_willingness") || "—"} tone="default" />
+                  <Mini label={t("sd.negotiationDifficulty", "Difficulty")} value={str(ni, "negotiation_difficulty") ? t("opt." + str(ni, "negotiation_difficulty"), str(ni, "negotiation_difficulty")) : "—"} tone="default" />
+                  <Mini label={t("sd.sampleTurnaround", "Sample turnaround")} value={str(ni, "sample_turnaround_speed") ? t("opt." + str(ni, "sample_turnaround_speed"), str(ni, "sample_turnaround_speed")) : "—"} tone="default" />
+                  <Mini label={t("sd.contractWillingness", "Contract willingness")} value={str(ni, "contract_willingness") ? t("opt." + str(ni, "contract_willingness"), str(ni, "contract_willingness")) : "—"} tone="default" />
                 </div>
                 {(tactics.length || leverage.length) ? (
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

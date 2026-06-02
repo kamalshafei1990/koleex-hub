@@ -149,9 +149,13 @@ export default function SourcingCommandCenter() {
   }, [wlName, selected, query, riskFilter, preferredOnly, sortKey]);
 
   const deleteWatchlist = useCallback(async (id: string) => {
-    await fetch(`/api/suppliers/sourcing/watchlists/${id}`, { method: "DELETE" });
+    // Optimistically remove, but restore on failure so the row doesn't
+    // silently vanish from the UI while still existing on the server.
+    const prev = watchlists;
     setWatchlists((w) => w.filter((x) => x.id !== id));
-  }, []);
+    const res = await fetch(`/api/suppliers/sourcing/watchlists/${id}`, { method: "DELETE" }).catch(() => null);
+    if (!res || !res.ok) setWatchlists(prev);
+  }, [watchlists]);
 
   if (loading) {
     return <div className="flex min-h-[60vh] items-center justify-center text-[var(--text-secondary)]"><SpinnerIcon className="h-5 w-5 animate-spin" /><span className="ml-2 text-sm">{t("scc.loading", "Loading command center…")}</span></div>;
