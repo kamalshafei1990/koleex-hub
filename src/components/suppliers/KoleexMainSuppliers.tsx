@@ -61,6 +61,18 @@ interface PickerTarget {
 }
 interface CatalogTarget { url: string; name: string }
 
+/* Session cache so repeat visits paint instantly (stale-while-revalidate). */
+const COV_CACHE = "kx:sup:coverage";
+const TAX_CACHE = "kx:sup:taxonomy";
+function readCache<T>(key: string): T | null {
+  if (typeof window === "undefined") return null;
+  try { const r = window.sessionStorage.getItem(key); return r ? (JSON.parse(r) as T) : null; } catch { return null; }
+}
+function writeCache(key: string, data: unknown): void {
+  if (typeof window === "undefined") return;
+  try { window.sessionStorage.setItem(key, JSON.stringify(data)); } catch { /* quota — ignore */ }
+}
+
 export default function KoleexMainSuppliers() {
   const { t } = useTranslation(contactsT);
   const router = useRouter();
@@ -77,8 +89,31 @@ export default function KoleexMainSuppliers() {
 
   const byNode = useMemo(() => indexCoverage(rows), [rows]);
 
+  // First paint: collapse every division with no coverage so the board opens
+  // focused on what's mapped (and renders fewer cards). Runs once.
+  const applyCollapseInit = useCallback((cov: CoverageRow[], tax: TaxonomyDivision[]) => {
+    if (didInitCollapse.current || tax.length === 0) return;
+    didInitCollapse.current = true;
+    const covered = new Set(cov.map((r) => r.division_slug));
+    const liveWithCoverage = tax.filter((d) => d.categories.length > 0 && covered.has(d.id));
+    const firstLive = tax.find((x) => x.categories.length > 0)?.id;
+    const toCollapse = new Set(
+      tax.filter((d) => d.categories.length > 0 && (liveWithCoverage.length > 0 ? !covered.has(d.id) : d.id !== firstLive)).map((d) => d.id),
+    );
+    setCollapsedDiv(toCollapse);
+  }, []);
+
   const load = useCallback(async () => {
-    setLoading(true); setErr(null);
+    // Stale-while-revalidate: paint cached data instantly, then refresh.
+    const cachedCov = readCache<CoverageRow[]>(COV_CACHE);
+    const cachedTax = readCache<TaxonomyDivision[]>(TAX_CACHE);
+    const hadCache = Array.isArray(cachedCov) && Array.isArray(cachedTax);
+    if (hadCache) {
+      setRows(cachedCov!); setTree(cachedTax!); applyCollapseInit(cachedCov!, cachedTax!); setLoading(false);
+    } else {
+      setLoading(true);
+    }
+    setErr(null);
     try {
       const [covRes, taxRes] = await Promise.all([
         fetch("/api/suppliers/coverage", { credentials: "include", cache: "no-store" }),
@@ -89,26 +124,18 @@ export default function KoleexMainSuppliers() {
       const taxJson = (await taxRes.json()) as { divisions: TaxonomyDivision[] };
       const cov = Array.isArray(covJson.coverage) ? covJson.coverage : [];
       const tax = Array.isArray(taxJson.divisions) ? taxJson.divisions : [];
-      setRows(cov);
-      setTree(tax);
-      // First load: collapse every division that has no coverage yet, so the
-      // board opens focused on what's actually mapped (and stays fast).
-      if (!didInitCollapse.current) {
-        didInitCollapse.current = true;
-        const covered = new Set(cov.map((r) => r.division_slug));
-        const liveWithCoverage = tax.filter((d) => d.categories.length > 0 && covered.has(d.id));
-        const toCollapse = new Set(
-          tax.filter((d) => d.categories.length > 0 && (liveWithCoverage.length > 0 ? !covered.has(d.id) : d.id !== tax.find((x) => x.categories.length > 0)?.id))
-            .map((d) => d.id),
-        );
-        setCollapsedDiv(toCollapse);
-      }
+      setRows(cov); setTree(tax);
+      writeCache(COV_CACHE, cov); writeCache(TAX_CACHE, tax);
+      applyCollapseInit(cov, tax);
     } catch {
-      setErr(t("cov.loadError", "Couldn't load the sourcing map. Please retry."));
+      if (!hadCache) setErr(t("cov.loadError", "Couldn't load the sourcing map. Please retry."));
     } finally { setLoading(false); }
-  }, [t]);
+  }, [t, applyCollapseInit]);
 
   useEffect(() => { void load(); }, [load]);
+
+  // Keep the coverage cache in sync after optimistic add/remove/role changes.
+  useEffect(() => { if (didInitCollapse.current) writeCache(COV_CACHE, rows); }, [rows]);
 
   /* ── mutations (optimistic) ── */
   const removeRow = useCallback(async (id: string) => {
@@ -282,7 +309,6 @@ export default function KoleexMainSuppliers() {
                                     key={s.key}
                                     label={s.label}
                                     code={s.code}
-                                    slug={s.slug}
                                     rows={list}
                                     t={t}
                                     onAdd={() => setPicker({ divisionSlug: d.id, categorySlug: c.slug, categoryLabel: c.label, subcategories: c.subcategories.map((x) => ({ code: x.key, label: x.label })), presetCode: s.key })}
@@ -348,8 +374,8 @@ function SummaryStat({ label, value, tone, hint }: { label: string; value: numbe
 }
 
 /* ── Subcategory section: coverage health + supplier cards + add ── */
-function SubcategoryCard({ label, code, slug, rows, t, onAdd, onOpen, onRemove, onChangeRole, onViewCatalog }: {
-  label: string; code: string | null; slug: string; rows: CoverageRow[];
+function SubcategoryCard({ label, code, rows, t, onAdd, onOpen, onRemove, onChangeRole, onViewCatalog }: {
+  label: string; code: string | null; rows: CoverageRow[];
   t: (k: string, f?: string) => string;
   onAdd: () => void; onOpen: (id: string) => void;
   onRemove: (id: string) => void; onChangeRole: (id: string, role: CoverageRole) => void;
@@ -357,7 +383,6 @@ function SubcategoryCard({ label, code, slug, rows, t, onAdd, onOpen, onRemove, 
 }) {
   const health = computeCoverageHealth(rows);
   const tone = HEALTH_TONE[health.status];
-  const subLogo = taxonomyLogoUrl("subcategories", slug);
   const healthLabel = health.status === "healthy" ? t("cov.healthy", "Good")
     : health.status === "warning" ? t("cov.warning", "Thin")
     : health.status === "critical" ? t("cov.critical", "Risk")
@@ -368,16 +393,10 @@ function SubcategoryCard({ label, code, slug, rows, t, onAdd, onOpen, onRemove, 
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="flex h-5 w-5 items-center justify-center shrink-0">
-              {subLogo ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={subLogo} alt="" className="h-4 w-4 object-contain opacity-80" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-              ) : null}
-            </span>
             {code ? <span className="font-mono text-[10px] text-[var(--text-ghost)]">{code}</span> : null}
             <h4 className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{label}</h4>
           </div>
-          <div className="mt-0.5 flex items-center gap-1.5 ps-7">
+          <div className="mt-0.5 flex items-center gap-1.5">
             <span className={`h-1.5 w-1.5 rounded-full ${tone.dot}`} />
             <span className={`text-[11px] font-medium ${tone.text}`}>{healthLabel}</span>
             {rows.length > 0 && (
