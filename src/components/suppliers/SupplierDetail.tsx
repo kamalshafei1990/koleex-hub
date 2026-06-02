@@ -469,7 +469,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
       <div className={embedded ? "mx-auto w-full max-w-5xl" : "mx-auto w-full max-w-6xl"}>
         {!embedded && <div className="px-4 sm:px-6 pt-6"><SuppliersHeader title={t("sd.suppliers", "Suppliers")} /></div>}
 
-      <main className="pb-24">
+      <main className="@container pb-24">
         {/* ─── Premium centered supplier identity hero with layered intelligence ───
               A calm, executive identity card — logo + name dominant, intelligence
               supporting underneath, and a soft-pill metric rail fused to the bottom
@@ -528,7 +528,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
               {/* type · location · strategic status · active */}
               <div className="flex flex-wrap items-center justify-center gap-1.5 mt-4">
                 <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)] inline-flex items-center gap-1">
-                  <Building2Icon className="h-3 w-3" /> {str(s, "supplier_type") || t("sd.supplier", "Supplier")}
+                  <Building2Icon className="h-3 w-3" /> {str(s, "supplier_type") ? t("opt." + str(s, "supplier_type"), str(s, "supplier_type")) : t("sd.supplier", "Supplier")}
                 </span>
                 {str(s, "country") ? (
                   <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)] inline-flex items-center gap-1">
@@ -624,18 +624,18 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                   : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]";
                 const badges: { label: string; k: "good" | "warn" | "bad" | "neutral" }[] = [];
                 const lvl = str(rp, "risk_level");
-                if (lvl) badges.push({ label: `${lvl.toUpperCase()} RISK`, k: lvl === "low" ? "good" : lvl === "medium" ? "warn" : "bad" });
+                if (lvl) badges.push({ label: t("badge.risk." + lvl, `${lvl.toUpperCase()} RISK`), k: lvl === "low" ? "good" : lvl === "medium" ? "warn" : "bad" });
                 const trust = str(rp, "trust_level");
-                if (trust) badges.push({ label: trust === "excellent" || trust === "high" ? "TRUSTED" : trust.toUpperCase() + " TRUST", k: trust === "excellent" || trust === "high" ? "good" : trust === "medium" ? "warn" : "bad" });
+                if (trust) badges.push({ label: trust === "excellent" || trust === "high" ? t("badge.trusted", "TRUSTED") : t("badge.trust." + trust, trust.toUpperCase() + " TRUST"), k: trust === "excellent" || trust === "high" ? "good" : trust === "medium" ? "warn" : "bad" });
                 const negScore = num(ni, "negotiation_score");
-                if (negScore) badges.push({ label: negScore >= 70 ? "STRONG NEGOTIATION" : negScore >= 40 ? "MODERATE NEGOTIATION" : "WEAK NEGOTIATION", k: negScore >= 70 ? "good" : negScore >= 40 ? "warn" : "bad" });
+                if (negScore) badges.push({ label: negScore >= 70 ? t("badge.negStrong", "STRONG NEGOTIATION") : negScore >= 40 ? t("badge.negModerate", "MODERATE NEGOTIATION") : t("badge.negWeak", "WEAK NEGOTIATION"), k: negScore >= 70 ? "good" : negScore >= 40 ? "warn" : "bad" });
                 const ready = data.readiness?.score;
-                if (typeof ready === "number") badges.push({ label: `READY ${ready}%`, k: ready >= 80 ? "good" : ready >= 50 ? "warn" : "bad" });
+                if (typeof ready === "number") badges.push({ label: t("badge.ready", "READY {n}%").replace("{n}", String(ready)), k: ready >= 80 ? "good" : ready >= 50 ? "warn" : "bad" });
                 const ss = str(s, "strategic_status");
-                if (ss === "strategic" || ss === "preferred") badges.push({ label: ss === "strategic" ? "TIER-1 SOURCE" : "PREFERRED", k: "good" });
+                if (ss === "strategic" || ss === "preferred") badges.push({ label: ss === "strategic" ? t("badge.tier1", "TIER-1 SOURCE") : t("badge.preferred", "PREFERRED"), k: "good" });
                 const prio = data.sourcing?.priority;
-                if (typeof prio === "number" && prio > 0) badges.push({ label: `PRIORITY ${prio}`, k: "neutral" });
-                if (data.sourcing?.soleSource) badges.push({ label: "SOLE SOURCE", k: "warn" });
+                if (typeof prio === "number" && prio > 0) badges.push({ label: t("badge.priority", "PRIORITY {n}").replace("{n}", String(prio)), k: "neutral" });
+                if (data.sourcing?.soleSource) badges.push({ label: t("badge.soleSource", "SOLE SOURCE"), k: "warn" });
                 if (!badges.length) return null;
                 return (
                   <div className="mt-5 flex flex-wrap items-center justify-center gap-1.5 max-w-2xl">
@@ -729,7 +729,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
           if (!hasAnything) return null;
           return (
             <Sec tone="default" title={t("sd.contactChannels", "Contact & channels")} icon={<PhoneIcon className="h-4 w-4" />}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+              <div className="grid grid-cols-1 @xl:grid-cols-2 gap-x-6 gap-y-3">
                 {mobile ? (
                   <a href={`tel:${mobile}`} className="flex items-center gap-2.5 group">
                     <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] group-hover:text-[var(--accent,#0066FF)] transition-colors"><PhoneIcon className="h-4 w-4" /></span>
@@ -784,7 +784,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                     {t("sd.messaging", "Messaging")}
                   </div>
                   {/* Each platform → its own card; BIG app logo · name + ID · QR */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 @2xl:grid-cols-2 gap-3">
                     {channels.map((c) => (
                       <div key={c.key} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 flex items-center gap-3.5">
                         {/* Prominent app logo */}
@@ -820,7 +820,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                     <PackageIcon className="h-3 w-3" />
                     {t("sd.additionalQrs", "Additional QR codes")}
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 @2xl:grid-cols-2 gap-3">
                     {mediaQrs.map((m: Row, i: number) => {
                       const url = str(m, "file_url", "preview_url");
                       if (!url) return null;
@@ -856,7 +856,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
         {/* ─── Commercial terms (Payment / Currency / MOQ / Lead time / Incoterms) ─── */}
         {terms.length > 0 ? (
           <Sec tone="violet" title={t("sd.commercialTerms", "Commercial terms")} icon={<HandCoinsIcon className="h-4 w-4" />}>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-x-6 gap-y-3">
+            <div className="grid grid-cols-2 @2xl:grid-cols-3 @4xl:grid-cols-5 gap-x-6 gap-y-3">
               {terms.map((tm) => (
                 <Field key={tm.label} label={tm.label} value={tm.value} />
               ))}
@@ -876,7 +876,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
               const dims = data.readiness.dimensions.slice().sort((a, b) => a.fraction - b.fraction);
               const blocked = dims.filter((d) => d.fraction < 0.5).length;
               return (
-                <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-5 md:gap-6 items-center">
+                <div className="grid grid-cols-1 @xl:grid-cols-[auto_1fr] gap-5 @xl:gap-6 items-center">
                   {/* Radial gauge */}
                   <div className="flex items-center gap-4 md:flex-col md:gap-2 md:w-32">
                     <div className="relative h-[88px] w-[88px] shrink-0">
@@ -896,7 +896,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                     </div>
                   </div>
                   {/* Dimension matrix — incomplete first; incomplete dims expand to a WHY layer */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 @2xl:grid-cols-2 gap-2">
                     {dims.map((d) => {
                       const pct = Math.round(d.fraction * 100);
                       const st = d.fraction >= 0.9 ? "complete" : d.fraction >= 0.5 ? "pending" : "blocked";
@@ -980,7 +980,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
         {/* ─── Performance scorecard ─── */}
         {scorecard.hasHistory ? (
           <Sec tone="cyan" title={t("sd.performanceScorecard", "Performance scorecard")} icon={<TrendingUpIcon className="h-4 w-4" />}>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 @2xl:grid-cols-4 gap-3">
               {[
                 { label: t("sd.onTimeDelivery", "On-time delivery"), value: scorecard.onTimePct === null ? "—" : `${scorecard.onTimePct}%`, meter: scorecard.onTimePct },
                 { label: t("sd.avgLeadTime", "Avg lead time"), value: scorecard.avgLeadDays === null ? "—" : `${scorecard.avgLeadDays}`, unit: t("sd.days", "days") },
@@ -1075,7 +1075,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
               </Sec>
 
               <Sec tone="violet" title={t("sd.identityCompliance", "Identity & compliance")} icon={<IdCardIcon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("identity")} onToggle={() => toggleKey("identity")} preview={str(s, "kyc_status") ? `KYC ${str(s, "kyc_status")}` : ""}>
-                <div className="grid grid-cols-1 lg:grid-cols-[1fr_180px] gap-5">
+                <div className="grid grid-cols-1 @3xl:grid-cols-[1fr_180px] gap-5">
                   <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                     <Field label={t("sd.businessRegNo", "Business reg. no.")} value={str(s, "business_registration_number")} mono />
                     <Field label={t("sd.taxId", "Tax ID / VAT")} value={str(s, "tax_id")} mono />
@@ -1139,7 +1139,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                 return (
                   <Sec tone="cyan" title={t("sd.socialMedia", "Social media & marketplaces")} icon={<Share2Icon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("social")} onToggle={() => toggleKey("social")} preview={`${all.length}`}>
                     {/* Same big-logo card grammar as Messaging */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 @2xl:grid-cols-2 gap-3">
                       {all.map((p, i) => {
                         const label = p.platform ?? "";
                         const handle = p.username || p.value || "";
@@ -1213,7 +1213,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                         {t("sd.digitalPay", "Digital payment")}
                       </div>
                       {/* Each payment method → its own card; ID + QR side-by-side */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 @2xl:grid-cols-2 gap-3">
                         {(wcPayId || wcPayQr) ? (
                           <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2.5 flex items-center gap-3">
                             <div className="min-w-0 flex-1">
@@ -1341,7 +1341,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2">
                   <BarRow label={t("sd.evaluationScore", "Evaluation score")} pct={overall || 0} tone={overall >= 75 ? "emerald" : overall >= 50 ? "amber" : "rose"} valueText={overall ? `${Math.round(overall)}/100` : "—"} />
                   {riskScore != null ? <BarRow label={t("sd.riskScore", "Risk score")} pct={riskScore || 0} tone={(riskScore || 0) <= 35 ? "emerald" : (riskScore || 0) <= 65 ? "amber" : "rose"} valueText={`${Math.round(riskScore || 0)}/100`} /> : null}
                   {level ? <BarRow label={t("sd.overallRiskLevel", "Overall risk level")} pct={lev[level] ?? 50} tone={level === "low" ? "emerald" : level === "medium" ? "amber" : "rose"} valueText={t("opt." + level, level)} /> : null}
@@ -1350,7 +1350,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                 </div>
                 <div>
                   <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-2.5">{t("sd.stabilityQuality", "Stability & quality")}</div>
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2">
                     {stability.map((m) => {
                       const v = str(rp, m.key);
                       if (!v) return null;
@@ -1360,7 +1360,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                     })}
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-4">
                   <Mini label={t("sd.activeRisks", "Active risks")} value={String(openItems)} tone={openItems ? "amber" : "emerald"} />
                   <Mini label={t("sd.highCritical", "High / critical")} value={String(openHigh)} tone={openHigh ? "rose" : "emerald"} />
                   <Mini label={t("sd.backupAvailable", "Backup available")} value={backup ? t("sd.yes", "Yes") : t("sd.no", "No")} tone={backup ? "emerald" : "rose"} />
@@ -1422,7 +1422,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                     <div className={`h-full rounded-full ${negToneFill}`} style={{ width: `${Math.max(4, Math.min(100, score || 0))}%` }} />
                   </div>
                 </div>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2">
                   {bars.map((b) => {
                     const v = str(ni, b.key);
                     if (!v) return null;
@@ -1430,13 +1430,13 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
                     return <BarRow key={b.key} label={b.label} pct={pct} tone={pct >= 70 ? "emerald" : pct >= 40 ? "amber" : "rose"} valueText={t("opt." + v, v)} />;
                   })}
                 </div>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 @2xl:grid-cols-3">
                   <Mini label={t("sd.negotiationDifficulty", "Difficulty")} value={str(ni, "negotiation_difficulty") ? t("opt." + str(ni, "negotiation_difficulty"), str(ni, "negotiation_difficulty")) : "—"} tone="default" />
                   <Mini label={t("sd.sampleTurnaround", "Sample turnaround")} value={str(ni, "sample_turnaround_speed") ? t("opt." + str(ni, "sample_turnaround_speed"), str(ni, "sample_turnaround_speed")) : "—"} tone="default" />
                   <Mini label={t("sd.contractWillingness", "Contract willingness")} value={str(ni, "contract_willingness") ? t("opt." + str(ni, "contract_willingness"), str(ni, "contract_willingness")) : "—"} tone="default" />
                 </div>
                 {(tactics.length || leverage.length) ? (
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2">
                     {tactics.length ? (
                       <div>
                         <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-2">{t("neg.tacticsLabel", "Tactics:")}</div>
@@ -1487,7 +1487,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete 
             {data.products.length === 0 ? (
               <EmptyTab label={t("sd.noProducts", "No products are linked to this supplier yet.")} />
             ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-3 @4xl:grid-cols-4">
                 {data.products.map((p, i) => {
                   const pid = str(p, "slug", "id");
                   const card = (

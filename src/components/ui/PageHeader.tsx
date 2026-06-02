@@ -28,7 +28,7 @@ import type { NavGroup } from "@/components/ui/PageNavPopup";
 
 /* Sliding-pill geometry — change in one place. */
 const TAB_WIDTH_LG = 148;
-const TAB_WIDTH_MD = 120;
+const TAB_WIDTH_MD = 132;
 const TRACK_PADDING = 6;
 
 export interface PageTab {

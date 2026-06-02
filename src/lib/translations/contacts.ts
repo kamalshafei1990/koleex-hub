@@ -1206,6 +1206,22 @@ export const contactsT: Translations = {
   "sd.criticalMetrics": { en: "Critical metrics", zh: "关键指标", ar: "المقاييس الحرجة" },
   "sd.lastActivity": { en: "Last activity", zh: "最近动态", ar: "آخر نشاط" },
 
+  /* ── Supplier 360 — hero intelligence badges ── */
+  "badge.risk.low": { en: "LOW RISK", zh: "低风险", ar: "مخاطر منخفضة" },
+  "badge.risk.medium": { en: "MEDIUM RISK", zh: "中等风险", ar: "مخاطر متوسطة" },
+  "badge.risk.high": { en: "HIGH RISK", zh: "高风险", ar: "مخاطر عالية" },
+  "badge.trusted": { en: "TRUSTED", zh: "可信赖", ar: "موثوق" },
+  "badge.trust.medium": { en: "MEDIUM TRUST", zh: "中等信任", ar: "ثقة متوسطة" },
+  "badge.trust.low": { en: "LOW TRUST", zh: "低信任", ar: "ثقة منخفضة" },
+  "badge.negStrong": { en: "STRONG NEGOTIATION", zh: "议价能力强", ar: "تفاوض قوي" },
+  "badge.negModerate": { en: "MODERATE NEGOTIATION", zh: "议价能力中等", ar: "تفاوض متوسط" },
+  "badge.negWeak": { en: "WEAK NEGOTIATION", zh: "议价能力弱", ar: "تفاوض ضعيف" },
+  "badge.ready": { en: "READY {n}%", zh: "就绪 {n}%", ar: "جاهز {n}%" },
+  "badge.tier1": { en: "TIER-1 SOURCE", zh: "一级货源", ar: "مصدر من الفئة الأولى" },
+  "badge.preferred": { en: "PREFERRED", zh: "优选", ar: "مُفضّل" },
+  "badge.priority": { en: "PRIORITY {n}", zh: "优先级 {n}", ar: "أولوية {n}" },
+  "badge.soleSource": { en: "SOLE SOURCE", zh: "唯一货源", ar: "مصدر وحيد" },
+
   /* ── Supplier 360 — risk / negotiation / stability labels (audit fill) ── */
   "sd.delete": { en: "Delete", zh: "删除", ar: "حذف" },
   "sd.commercialTerms": { en: "Commercial terms", zh: "商业条款", ar: "الشروط التجارية" },
@@ -1405,6 +1421,7 @@ export const contactsT: Translations = {
   "sd.timeline": { en: "Timeline", zh: "时间线", ar: "الجدول الزمني" },
   "sd.suppliers": { en: "Suppliers", zh: "供应商", ar: "الموردون" },
   "sd.setStatus": { en: "Set status", zh: "设置状态", ar: "تعيين الحالة" },
+  "sd.statusAll": { en: "All", zh: "全部", ar: "الكل" },
   "sd.active": { en: "Active", zh: "启用", ar: "نشط" },
   "sd.archived": { en: "Archived", zh: "已归档", ar: "مؤرشف" },
   "sd.reasonPlaceholder": { en: "Reason / internal note (optional)", zh: "原因 / 内部备注（可选）", ar: "السبب / ملاحظة داخلية (اختياري)" },

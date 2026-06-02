@@ -3979,9 +3979,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {filterType === "supplier" && (
           <div className="flex gap-1 mt-3">
             {([
-              { k: "all", label: "All" },
-              { k: "active", label: "Active" },
-              { k: "archived", label: "Archived" },
+              { k: "all", label: t("sd.statusAll", "All") },
+              { k: "active", label: t("sd.active", "Active") },
+              { k: "archived", label: t("sd.archived", "Archived") },
             ] as const).map(opt => (
               <button
                 key={opt.k}
