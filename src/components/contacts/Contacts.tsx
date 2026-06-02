@@ -996,6 +996,16 @@ const RE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const hasArabicChars = (s: string) => /[؀-ۿݐ-ݿࢠ-ࣿ]/.test(s);
 const hasCJKChars = (s: string) => /[㐀-鿿豈-﫿぀-ヿ]/.test(s);
 const phoneDigits = (s: string) => (s || "").replace(/[^\d]/g, "");
+/* Live phone sanitizer: keep digits + separators, but cap to a realistic
+   number of digits (E.164 max is 15) so users can't type 30-digit nonsense. */
+function sanPhone(s: string, maxDigits = 15): string {
+  let out = ""; let d = 0;
+  for (const ch of s || "") {
+    if (ch >= "0" && ch <= "9") { if (d >= maxDigits) continue; d++; out += ch; }
+    else if (" ()+-".includes(ch)) out += ch;
+  }
+  return out;
+}
 
 function supplierFormErrors(f: ContactForm): string[] {
   const e: string[] = [];
@@ -2544,7 +2554,8 @@ const PhoneField = React.memo(function PhoneField({ label, value, onChange, plac
           inputMode="tel"
           autoComplete="tel"
           value={number}
-          onChange={e => emit(selCode, e.target.value.replace(/[^\d\s()+\-]/g, ""))}
+          onChange={e => emit(selCode, sanPhone(e.target.value))}
+          maxLength={20}
           placeholder={placeholder || label || "Phone number"}
           className="flex-1 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors"
         />
@@ -6621,8 +6632,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <div className="px-3 pb-3 pt-1 ms-8 space-y-2 border-t border-[var(--border-faint)]">
                     <input value={cp.department} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], department: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.department")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none mt-2" />
                     <div className="grid grid-cols-2 gap-2">
-                      <input type="tel" inputMode="tel" autoComplete="tel" value={cp.phone} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], phone: e.target.value.replace(/[^0-9\s()+-]/g, "") }; setField("contact_persons", arr); }} placeholder={t("field.phone")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
-                      <input type="tel" inputMode="tel" autoComplete="tel" value={cp.mobile} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], mobile: e.target.value.replace(/[^0-9\s()+-]/g, "") }; setField("contact_persons", arr); }} placeholder={t("field.contactMobile")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                      <input type="tel" inputMode="tel" autoComplete="tel" value={cp.phone} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], phone: sanPhone(e.target.value) }; setField("contact_persons", arr); }} placeholder={t("field.phone")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                      <input type="tel" inputMode="tel" autoComplete="tel" value={cp.mobile} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], mobile: sanPhone(e.target.value) }; setField("contact_persons", arr); }} placeholder={t("field.contactMobile")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
                     </div>
                     <input type="email" inputMode="email" autoComplete="email" value={cp.email} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], email: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.email")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
                     <textarea value={cp.notes} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], notes: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.notes")} rows={2} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none resize-none" />
@@ -6725,8 +6736,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <div className="px-3 pb-3 pt-1 ms-8 space-y-2 border-t border-[var(--border-faint)]">
                     <input value={cp.department} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], department: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.department")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none mt-2" />
                     <div className="grid grid-cols-2 gap-2">
-                      <input type="tel" inputMode="tel" autoComplete="tel" value={cp.phone} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], phone: e.target.value.replace(/[^0-9\s()+-]/g, "") }; setField("contact_persons", arr); }} placeholder={t("field.phone")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
-                      <input type="tel" inputMode="tel" autoComplete="tel" value={cp.mobile} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], mobile: e.target.value.replace(/[^0-9\s()+-]/g, "") }; setField("contact_persons", arr); }} placeholder={t("field.contactMobile")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                      <input type="tel" inputMode="tel" autoComplete="tel" value={cp.phone} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], phone: sanPhone(e.target.value) }; setField("contact_persons", arr); }} placeholder={t("field.phone")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                      <input type="tel" inputMode="tel" autoComplete="tel" value={cp.mobile} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], mobile: sanPhone(e.target.value) }; setField("contact_persons", arr); }} placeholder={t("field.contactMobile")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
                     </div>
                     <input type="email" inputMode="email" autoComplete="email" value={cp.email} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], email: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.email")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
                     <textarea value={cp.notes} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], notes: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.notes")} rows={2} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none resize-none" />
@@ -6951,7 +6962,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <div className="px-3 pb-3 pt-1 ms-8 space-y-2 border-t border-[var(--border-faint)]">
                   <div className="grid grid-cols-2 gap-2 mt-2">
                     <input value={f.last_name} onChange={e => updateFamily(i, "last_name", e.target.value)} placeholder={t("field.lastNameField")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
-                    <input type="tel" inputMode="tel" autoComplete="tel" value={f.phone} onChange={e => updateFamily(i, "phone", e.target.value.replace(/[^0-9\s()+-]/g, ""))} placeholder={t("field.phone")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                    <input type="tel" inputMode="tel" autoComplete="tel" value={f.phone} onChange={e => updateFamily(i, "phone", sanPhone(e.target.value))} placeholder={t("field.phone")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
                   </div>
                   <input type="email" inputMode="email" autoComplete="email" value={f.email} onChange={e => updateFamily(i, "email", e.target.value)} placeholder={t("field.email")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
                   <textarea value={f.notes} onChange={e => updateFamily(i, "notes", e.target.value)} placeholder={t("field.notes")} rows={2} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none resize-none" />
@@ -7849,11 +7860,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                           </div>
                         )}
                         <div className="grid grid-cols-2 gap-2">
-                          <input type="tel" inputMode="tel" autoComplete="tel" value={cp.phone} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], phone: e.target.value.replace(/[^0-9\s()+-]/g, "") }; setField("contact_persons", arr); }} placeholder={t("field.phone")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
-                          <input type="tel" inputMode="tel" autoComplete="tel" value={cp.mobile} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], mobile: e.target.value.replace(/[^0-9\s()+-]/g, "") }; setField("contact_persons", arr); }} placeholder={t("field.contactMobile")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                          <input type="tel" inputMode="tel" autoComplete="tel" value={cp.phone} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], phone: sanPhone(e.target.value) }; setField("contact_persons", arr); }} placeholder={t("field.phone")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                          <input type="tel" inputMode="tel" autoComplete="tel" value={cp.mobile} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], mobile: sanPhone(e.target.value) }; setField("contact_persons", arr); }} placeholder={t("field.contactMobile")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
                         </div>
                         <input type="email" inputMode="email" autoComplete="email" value={cp.email} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], email: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.email")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
-                        <input type="tel" inputMode="tel" autoComplete="tel" value={cp.whatsapp ?? ""} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], whatsapp: e.target.value.replace(/[^0-9\s()+-]/g, "") }; setField("contact_persons", arr); }} placeholder={t("field.whatsappBusiness", "WhatsApp")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                        <input type="tel" inputMode="tel" autoComplete="tel" value={cp.whatsapp ?? ""} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], whatsapp: sanPhone(e.target.value) }; setField("contact_persons", arr); }} placeholder={t("field.whatsappBusiness", "WhatsApp")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
                         <MessagingIdField
                           label={t("field.wechat", "WeChat")}
                           icon={<BrandGlyph name="WeChat" size={15} />}
@@ -7944,7 +7955,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                       </div>
                       <input
                         value={m.value}
-                        onChange={e => { let val = e.target.value; if (m.platform === "QQ") val = val.replace(/[^0-9]/g, ""); else if (m.platform === "WhatsApp") val = val.replace(/[^0-9\s()+-]/g, ""); const arr = [...form.messaging_channels]; arr[i] = { ...arr[i], value: val }; setField("messaging_channels", arr); }}
+                        onChange={e => { let val = e.target.value; if (m.platform === "QQ") val = val.replace(/[^0-9]/g, "").slice(0, 12); else if (m.platform === "WhatsApp") val = sanPhone(val); const arr = [...form.messaging_channels]; arr[i] = { ...arr[i], value: val }; setField("messaging_channels", arr); }}
                         placeholder={t("placeholder.messagingId", "ID, handle, or number")}
                         className="min-w-0 flex-1 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
                       />
