@@ -8279,6 +8279,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   icon={<TargetIcon size={14} />}
                 />
               </div>
+              {/* Q — restricted suppliers must carry a clear warning regardless of score/ratings. */}
+              {["blocked", "blacklisted", "suspended", "phasing_out"].includes(sIntel.strategic_status) && (
+                <div className="mt-3 flex items-start gap-2 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2">
+                  <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500" />
+                  <p className="text-[11px] leading-relaxed text-rose-600 dark:text-rose-300">
+                    {t("field.blockedWarning", "This supplier is {status} — do not source from it regardless of its ratings or internal score. Approvals and new orders should be paused.").replace("{status}", (t("opt." + sIntel.strategic_status, STRATEGIC_STATUS_LABELS[sIntel.strategic_status as keyof typeof STRATEGIC_STATUS_LABELS] ?? sIntel.strategic_status)).toLowerCase())}
+                  </p>
+                </div>
+              )}
             </FormSection>
 
             {/* 8. Documents */}

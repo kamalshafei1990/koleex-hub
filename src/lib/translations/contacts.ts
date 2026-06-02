@@ -1165,6 +1165,7 @@ export const contactsT: Translations = {
   "opt.inactive":               { en: "Inactive",     zh: "不活跃",     ar: "غير نشط" },
   "opt.phasing_out":            { en: "Phasing Out",  zh: "逐步淘汰",   ar: "قيد الإيقاف التدريجي" },
   "opt.blocked":                { en: "Blocked",      zh: "已封锁",     ar: "محظور" },
+  "field.blockedWarning":       { en: "This supplier is {status} — do not source from it regardless of its ratings or internal score. Approvals and new orders should be paused.", zh: "该供应商已被{status} — 无论其评分或内部分数如何，都不得向其采购。应暂停审批与新订单。", ar: "هذا المورد {status} — لا تتعامل معه بغضّ النظر عن تقييماته أو درجته الداخلية. يجب إيقاف الاعتمادات والطلبات الجديدة." },
   "opt.blacklisted":            { en: "Blacklisted",  zh: "黑名单",     ar: "القائمة السوداء" },
 
   "opt.manufacturer":           { en: "Manufacturer",        zh: "制造商",        ar: "مُصنِّع" },
