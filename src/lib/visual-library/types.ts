@@ -302,6 +302,46 @@ export interface VisualAsset {
   public_url?: string | null;
 }
 
+/* ── KOLEEX Design DNA (Phase: Brand Visual Intelligence) ── */
+
+export const DNA_PERSONALITIES = [
+  "minimal", "futuristic", "industrial", "luxury", "corporate", "technical",
+  "playful", "dense", "soft", "sharp", "geometric", "neutral",
+] as const;
+export type DnaPersonality = (typeof DNA_PERSONALITIES)[number];
+
+export const DNA_MATCH_STATUSES = ["excellent", "strong", "partial", "weak", "off_brand"] as const;
+export type DnaMatchStatus = (typeof DNA_MATCH_STATUSES)[number];
+
+export interface DnaProfile {
+  id: string; code: string | null; name: string; slug: string;
+  description: string | null; profile_type: string; status: string;
+}
+export interface DnaRule {
+  id: string; profile_id: string; rule_group: string; rule_name: string;
+  rule_type: "required" | "preferred" | "forbidden"; target_value: string | null;
+  tolerance: number | null; weight: number; notes: string | null;
+}
+export interface DnaPattern {
+  id: string; profile_id: string; pattern_name: string; description: string | null;
+  category: string | null; example_asset_ids: string[]; pattern_vector: Record<string, unknown>; approved: boolean;
+}
+export interface DnaPatternMatch { pattern_name: string; score: number }
+
+export interface DnaAnalysis {
+  asset_id: string; profile_id: string;
+  overall_score: number; geometry_score: number; spacing_score: number; corner_score: number;
+  stroke_score: number; minimalism_score: number; futuristic_score: number; industrial_score: number;
+  luxury_score: number; symmetry_score: number; balance_score: number; readability_score: number; consistency_score: number;
+  shape_language: string | null; visual_density: number | null; stroke_family: string | null;
+  corner_family: string | null; geometry_family: string | null; negative_space_ratio: number | null;
+  complexity_level: string | null; visual_weight: string | null; icon_personality: string | null; visual_temperature: string | null;
+  violates_brand_language: boolean; too_complex: boolean; inconsistent_stroke: boolean;
+  weak_balance: boolean; over_detailed: boolean; poor_scalability: boolean;
+  pattern_matches: DnaPatternMatch[];
+  computed_at?: string; reviewed_by?: string | null; review_notes?: string | null;
+}
+
 /* ── Visual Quality Control (Phase: Visual QA) ── */
 
 export const QUALITY_STATUSES = ["excellent", "good", "acceptable", "poor", "rejected"] as const;
