@@ -18,8 +18,11 @@ export const ASSET_STATUS_SET = new Set<string>(ASSET_STATUSES);
 const TEXT_FIELDS = new Set<string>([
   "title", "title_cn", "title_ar", "description",
   "category", "subcategory", "source", "notes", "source_name",
+  "slug", "theme",
 ]);
-const ARRAY_FIELDS = new Set<string>(["tags", "usage"]);
+const ARRAY_FIELDS = new Set<string>([
+  "tags", "usage", "keywords", "synonyms", "search_aliases", "linked_modules", "linked_apps",
+]);
 const BOOL_FIELDS = new Set<string>(["is_active"]);
 
 /** Build a whitelisted, type-coerced metadata patch from a request body. */

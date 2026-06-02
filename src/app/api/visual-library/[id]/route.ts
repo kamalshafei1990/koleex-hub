@@ -22,11 +22,11 @@ import { buildAssetPatch, validateAssetPatch } from "@/lib/visual-library/asset-
 async function loadOwned(id: string, tenantId: string) {
   const { data } = await supabaseServer
     .from("visual_assets")
-    .select("id, tenant_id")
+    .select("id, tenant_id, svg_path, version, usage_count")
     .eq("id", id)
     .eq("tenant_id", tenantId)
     .maybeSingle();
-  return data;
+  return data as { id: string; tenant_id: string; svg_path: string | null; version: number; usage_count: number } | null;
 }
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -46,10 +46,33 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const action = typeof body.action === "string" ? body.action : "";
   let patch: Record<string, unknown> = {};
 
+  // Attaching / replacing a file on an existing entity (turns "Missing" into a real asset).
+  const incomingPath = typeof body.svg_path === "string" ? body.svg_path.trim() : "";
+  if (!action && incomingPath) {
+    patch = {
+      svg_path: incomingPath,
+      file_type: typeof body.file_type === "string" ? body.file_type : "svg",
+      storage_bucket: typeof body.storage_bucket === "string" ? body.storage_bucket : "media",
+      viewbox: typeof body.viewbox === "string" ? body.viewbox : null,
+      file_size: typeof body.file_size === "number" ? body.file_size : null,
+      mime_type: typeof body.mime_type === "string" ? body.mime_type : null,
+      // First file → move out of "missing" into draft; a replacement bumps version.
+      approval_status: owned.svg_path ? undefined : "draft",
+      version: owned.svg_path ? (owned.version ?? 1) + 1 : (owned.version ?? 1),
+    };
+    Object.keys(patch).forEach((k) => patch[k] === undefined && delete patch[k]);
+    const { error } = await supabaseServer.from("visual_assets").update(patch).eq("id", id).eq("tenant_id", auth.tenant_id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
+
   if (action) {
     switch (action) {
       case "approve":
         patch = { approval_status: "approved", approved_by: auth.account_id ?? null, approved_at: new Date().toISOString() };
+        break;
+      case "submit":
+        patch = { approval_status: "pending" };
         break;
       case "unapprove":
         patch = { approval_status: "draft", approved_by: null, approved_at: null };
@@ -62,6 +85,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         break;
       case "restore":
         patch = { status: "active", is_active: true };
+        break;
+      case "use":
+        patch = { usage_count: (owned.usage_count ?? 0) + 1 };
         break;
       default:
         return NextResponse.json({ error: "Unknown action" }, { status: 400 });

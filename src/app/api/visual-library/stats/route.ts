@@ -29,12 +29,14 @@ export async function GET(req: Request) {
   if (deny) return deny;
 
   const tid = auth.tenant_id;
-  const [total, approved, pending, archived] = await Promise.all([
+  const [total, approved, pending, drafts, missing, archived] = await Promise.all([
     countWhere(tid, (q) => q),
     countWhere(tid, (q) => q.eq("approval_status", "approved")),
+    countWhere(tid, (q) => q.eq("approval_status", "pending")),
     countWhere(tid, (q) => q.eq("approval_status", "draft")),
+    countWhere(tid, (q) => q.is("svg_path", null)),
     countWhere(tid, (q) => q.eq("status", "archived")),
   ]);
 
-  return NextResponse.json({ total, approved, pending, archived });
+  return NextResponse.json({ total, approved, pending, drafts, missing, archived });
 }

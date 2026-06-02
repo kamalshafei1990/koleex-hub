@@ -1,30 +1,26 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   VisualLibraryUploadModal — upload a single visual asset.
+   VisualLibraryUploadModal — register a visual entity.
 
-   Flow: pick file → uploadToStorage('media', visual-library/{category}/{file})
-   → POST governed metadata to /api/visual-library. SVGs are normalized
-   client-side (inject fill=currentColor, strip width/height) before upload so
-   they theme correctly in dark mode.
+   Works two ways:
+   · Upload a file now (drag/drop or pick) → normalized SVG → Storage → record.
+   · Or register a "Missing" entity with NO file (leave the file empty) — the
+     icon can be uploaded into the record later.
    --------------------------------------------------------------------------- */
 
-import { useState, type ChangeEvent } from "react";
+import { useMemo, useState, type ChangeEvent, type DragEvent } from "react";
 import { uploadToStorage } from "@/lib/storage-client";
-import { ASSET_TYPES, ASSET_CATEGORIES } from "@/lib/visual-library/types";
+import { ASSET_TYPES } from "@/lib/visual-library/types";
+import { GENERAL_ICON_CATEGORIES, CATEGORY_BY_KEY } from "@/lib/visual-library/taxonomy";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import UploadIcon from "@/components/icons/ui/UploadIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
-/** Normalize an SVG string so it inherits color + scales to its container. */
 function normalizeSvg(raw: string): string {
   let s = raw.replace(/<\?xml[^>]*\?>/i, "").trim();
-  // strip width/height on the root <svg>
   s = s.replace(/(<svg\b[^>]*?)\swidth="[^"]*"/i, "$1").replace(/(<svg\b[^>]*?)\sheight="[^"]*"/i, "$1");
-  // ensure fill=currentColor on the root so all paths inherit it
-  if (!/<svg\b[^>]*\sfill=/i.test(s)) {
-    s = s.replace(/<svg\b/i, '<svg fill="currentColor"');
-  }
+  if (!/<svg\b[^>]*\sfill=/i.test(s)) s = s.replace(/<svg\b/i, '<svg fill="currentColor"');
   return s;
 }
 
@@ -33,60 +29,59 @@ const LABEL = "block text-[11px] font-semibold uppercase tracking-wide text-[var
 
 export default function VisualLibraryUploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded: () => void }) {
   const [file, setFile] = useState<File | null>(null);
+  const [dragging, setDragging] = useState(false);
   const [title, setTitle] = useState("");
-  const [assetType, setAssetType] = useState<string>("icon");
-  const [category, setCategory] = useState<string>("General");
-  const [tags, setTags] = useState("");
+  const [assetType, setAssetType] = useState("icon");
+  const [category, setCategory] = useState("misc");
+  const [subcategory, setSubcategory] = useState("");
+  const [keywords, setKeywords] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const onFile = (e: ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0] ?? null;
+  const subcats = useMemo(() => CATEGORY_BY_KEY[category]?.subcategories ?? [], [category]);
+
+  const takeFile = (f: File | null) => {
     setFile(f);
     if (f && !title) setTitle(f.name.replace(/\.[a-z0-9]+$/i, "").replace(/[-_]+/g, " ").trim());
   };
+  const onPick = (e: ChangeEvent<HTMLInputElement>) => takeFile(e.target.files?.[0] ?? null);
+  const onDrop = (e: DragEvent) => { e.preventDefault(); setDragging(false); takeFile(e.dataTransfer.files?.[0] ?? null); };
 
   const submit = async () => {
-    if (!file) { setError("Please choose a file."); return; }
-    if (!title.trim()) { setError("Please enter a title."); return; }
+    if (!title.trim()) { setError("Please enter a name."); return; }
     setBusy(true); setError(null);
     try {
-      const ext = (file.name.split(".").pop() ?? "bin").toLowerCase();
-      const isSvg = ext === "svg" || file.type === "image/svg+xml";
-      const slug = title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "asset";
-      const rand = Math.random().toString(36).slice(2, 8);
-      const path = `visual-library/${category.toLowerCase().replace(/[^a-z0-9]+/g, "-")}/${slug}-${rand}.${ext}`;
+      const payload: Record<string, unknown> = {
+        title: title.trim(), asset_type: assetType, category, subcategory: subcategory || null,
+        keywords: keywords.split(",").map((t) => t.trim()).filter(Boolean),
+        tags: keywords.split(",").map((t) => t.trim()).filter(Boolean),
+        source: "upload", style: "outline",
+      };
 
-      let uploadBlob: Blob = file;
-      let viewbox: string | null = null;
-      if (isSvg) {
-        const raw = await file.text();
-        const m = raw.match(/viewBox="([^"]+)"/i);
-        viewbox = m ? m[1] : null;
-        uploadBlob = new Blob([normalizeSvg(raw)], { type: "image/svg+xml" });
+      if (file) {
+        const ext = (file.name.split(".").pop() ?? "bin").toLowerCase();
+        const isSvg = ext === "svg" || file.type === "image/svg+xml";
+        const slug = title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "asset";
+        const rand = Math.random().toString(36).slice(2, 8);
+        const path = `visual-library/${category}/${slug}-${rand}.${ext}`;
+        let blob: Blob = file; let viewbox: string | null = null;
+        if (isSvg) {
+          const raw = await file.text();
+          viewbox = (raw.match(/viewBox="([^"]+)"/i) ?? [])[1] ?? null;
+          blob = new Blob([normalizeSvg(raw)], { type: "image/svg+xml" });
+        }
+        const up = await uploadToStorage("media", path, blob, { upsert: true, contentType: isSvg ? "image/svg+xml" : file.type });
+        if (!up.ok) { setError(up.error); setBusy(false); return; }
+        Object.assign(payload, {
+          source_name: file.name.replace(/\.[a-z0-9]+$/i, ""), file_type: ext, storage_bucket: "media",
+          svg_path: up.data.path, viewbox, file_size: file.size, mime_type: isSvg ? "image/svg+xml" : file.type,
+        });
       }
-
-      const up = await uploadToStorage("media", path, uploadBlob, { upsert: true, contentType: isSvg ? "image/svg+xml" : file.type });
-      if (!up.ok) { setError(up.error); setBusy(false); return; }
 
       const res = await fetch("/api/visual-library", {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: title.trim(),
-          asset_type: assetType,
-          category,
-          source_name: file.name.replace(/\.[a-z0-9]+$/i, ""),
-          tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
-          file_type: ext,
-          storage_bucket: "media",
-          svg_path: up.data.path,
-          viewbox,
-          file_size: file.size,
-          mime_type: isSvg ? "image/svg+xml" : file.type,
-          source: "upload",
-          style: "outline",
-        }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
@@ -94,57 +89,57 @@ export default function VisualLibraryUploadModal({ onClose, onUploaded }: { onCl
       }
       onUploaded();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Upload failed");
-      setBusy(false);
+      setError(e instanceof Error ? e.message : "Failed"); setBusy(false);
     }
   };
 
   return (
     <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/60 sm:items-center" onClick={onClose}>
-      <div
-        className="w-full max-w-md rounded-t-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] sm:rounded-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="w-full max-w-md rounded-t-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-4">
-          <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">Upload visual asset</h3>
-          <button type="button" onClick={onClose} aria-label="Close" className="text-[var(--text-dim)] hover:text-[var(--text-primary)]">
-            <CrossIcon size={16} />
-          </button>
+          <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">New visual entity</h3>
+          <button type="button" onClick={onClose} aria-label="Close" className="text-[var(--text-dim)] hover:text-[var(--text-primary)]"><CrossIcon size={16} /></button>
         </div>
 
-        <div className="space-y-4 px-5 py-4">
+        <div className="max-h-[70vh] space-y-4 overflow-y-auto px-5 py-4">
           <div>
-            <span className={LABEL}>File (SVG, PNG, JPG)</span>
-            <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-3 text-[13px] text-[var(--text-muted)] hover:border-[var(--border-focus)]">
-              <UploadIcon size={16} className="text-[var(--text-dim)]" />
-              <span className="truncate">{file ? file.name : "Choose a file…"}</span>
-              <input type="file" accept=".svg,.png,.jpg,.jpeg,.webp,image/*" className="hidden" onChange={onFile} />
+            <span className={LABEL}>Icon file <span className="font-normal normal-case text-[var(--text-dim)]">— optional, can add later</span></span>
+            <label
+              onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={onDrop}
+              className={`flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed px-3 py-5 text-center text-[12.5px] transition-colors ${
+                dragging ? "border-[var(--accent)] bg-[var(--bg-surface-hover)]" : "border-[var(--border-color)] bg-[var(--bg-surface)] hover:border-[var(--border-focus)]"
+              }`}>
+              <UploadIcon size={18} className="text-[var(--text-dim)]" />
+              <span className="text-[var(--text-muted)]">{file ? file.name : "Drag & drop, or click to choose (SVG/PNG/JPG)"}</span>
+              <input type="file" accept=".svg,.png,.jpg,.jpeg,.webp,image/*" className="hidden" onChange={onPick} />
             </label>
           </div>
 
-          <div>
-            <span className={LABEL}>Title</span>
-            <input className={INPUT} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Auto thread trimmer" />
-          </div>
+          <div><span className={LABEL}>Name</span><input className={INPUT} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Search" /></div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <span className={LABEL}>Type</span>
+            <div><span className={LABEL}>Type</span>
               <select className={INPUT} value={assetType} onChange={(e) => setAssetType(e.target.value)}>
                 {ASSET_TYPES.map((t) => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
               </select>
             </div>
-            <div>
-              <span className={LABEL}>Category</span>
-              <select className={INPUT} value={category} onChange={(e) => setCategory(e.target.value)}>
-                {ASSET_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            <div><span className={LABEL}>Category</span>
+              <select className={INPUT} value={category} onChange={(e) => { setCategory(e.target.value); setSubcategory(""); }}>
+                {GENERAL_ICON_CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
               </select>
             </div>
           </div>
 
-          <div>
-            <span className={LABEL}>Tags (comma separated)</span>
-            <input className={INPUT} value={tags} onChange={(e) => setTags(e.target.value)} placeholder="thread, trimmer, automation" />
+          <div className="grid grid-cols-2 gap-3">
+            <div><span className={LABEL}>Subcategory</span>
+              <select className={INPUT} value={subcategory} onChange={(e) => setSubcategory(e.target.value)}>
+                <option value="">—</option>
+                {subcats.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div><span className={LABEL}>Keywords</span><input className={INPUT} value={keywords} onChange={(e) => setKeywords(e.target.value)} placeholder="find, lookup" /></div>
           </div>
 
           {error && <p className="text-[12px] text-rose-400">{error}</p>}
@@ -152,14 +147,10 @@ export default function VisualLibraryUploadModal({ onClose, onUploaded }: { onCl
 
         <div className="flex items-center justify-end gap-2 border-t border-[var(--border-subtle)] px-5 py-4">
           <button type="button" onClick={onClose} className="rounded-lg border border-[var(--border-subtle)] px-4 py-2 text-[13px] text-[var(--text-muted)] hover:text-[var(--text-primary)]">Cancel</button>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={busy}
-            className="inline-flex items-center gap-2 rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[13px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50"
-          >
+          <button type="button" onClick={submit} disabled={busy}
+            className="inline-flex items-center gap-2 rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[13px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
             {busy && <SpinnerIcon size={14} className="animate-spin" />}
-            {busy ? "Uploading…" : "Upload"}
+            {busy ? "Saving…" : file ? "Upload & create" : "Create entity"}
           </button>
         </div>
       </div>

@@ -1,179 +1,213 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   VisualLibraryBrowser — the Visual Library browser.
+   VisualLibraryBrowser — the General Icons Registry browser.
 
-   Search + filters (category, type, approval) + responsive card grid +
-   bulk select/approve/archive + upload + detail drawer. Reads the URL's
-   ?q / ?approval_status so deep links from the dashboard land filtered.
+   Category sidebar (20 categories) + search + state/type filters + grid/list
+   toggle + bulk select/approve/archive + upload + detail drawer. The dataset
+   is small (hundreds), so it loads once and filters/searches CLIENT-SIDE for
+   instant, snappy interaction (search-first UX).
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import type { VisualAsset } from "@/lib/visual-library/types";
-import { ASSET_TYPES, ASSET_CATEGORIES } from "@/lib/visual-library/types";
-import VisualAssetCard from "@/components/database/VisualAssetCard";
+import type { VisualAsset, DisplayState } from "@/lib/visual-library/types";
+import { displayState } from "@/lib/visual-library/types";
+import { ASSET_TYPES } from "@/lib/visual-library/types";
+import { GENERAL_ICON_CATEGORIES } from "@/lib/visual-library/taxonomy";
+import VisualAssetCard, { STATE_PILL } from "@/components/database/VisualAssetCard";
 import VisualAssetDetailDrawer from "@/components/database/VisualAssetDetailDrawer";
 import VisualLibraryUploadModal from "@/components/database/VisualLibraryUploadModal";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
-import FilterIcon from "@/components/icons/ui/FilterIcon";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
 import BadgeCheckIcon from "@/components/icons/ui/BadgeCheckIcon";
 import ArchiveIcon from "@/components/icons/ui/ArchiveIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
+import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
+import ListIcon from "@/components/icons/ui/ListIcon";
 
 const SELECT = "rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
+const STATES: DisplayState[] = ["missing", "draft", "pending", "approved", "deprecated", "archived"];
 
 export default function VisualLibraryBrowser() {
   const params = useSearchParams();
-  const [q, setQ] = useState(params.get("q") ?? "");
-  const [debouncedQ, setDebouncedQ] = useState(q);
-  const [category, setCategory] = useState("");
-  const [assetType, setAssetType] = useState("");
-  const [approval, setApproval] = useState(params.get("approval_status") ?? "");
-
-  const [assets, setAssets] = useState<VisualAsset[]>([]);
-  const [total, setTotal] = useState(0);
+  const [all, setAll] = useState<VisualAsset[]>([]);
   const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState(params.get("q") ?? "");
+  const [category, setCategory] = useState("");
+  const [state, setState] = useState<string>(params.get("state") ?? "");
+  const [assetType, setAssetType] = useState("");
+  const [view, setView] = useState<"grid" | "list">("grid");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [openAsset, setOpenAsset] = useState<VisualAsset | null>(null);
   const [showUpload, setShowUpload] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
 
-  // debounce search
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedQ(q), 250);
-    return () => clearTimeout(t);
-  }, [q]);
-
   const reqRef = useRef(0);
   const load = useCallback(async () => {
     const myReq = ++reqRef.current;
     setLoading(true);
-    const sp = new URLSearchParams();
-    if (debouncedQ) sp.set("q", debouncedQ);
-    if (category) sp.set("category", category);
-    if (assetType) sp.set("asset_type", assetType);
-    if (approval) sp.set("approval_status", approval);
-    sp.set("pageSize", "120");
     try {
-      const res = await fetch(`/api/visual-library?${sp.toString()}`, { credentials: "include", cache: "no-store" });
-      const json = res.ok ? await res.json() : { assets: [], total: 0 };
-      if (myReq === reqRef.current) {
-        setAssets(json.assets ?? []);
-        setTotal(json.total ?? 0);
-      }
+      const res = await fetch("/api/visual-library?pageSize=200&sort=name", { credentials: "include", cache: "no-store" });
+      const json = res.ok ? await res.json() : { assets: [] };
+      if (myReq === reqRef.current) setAll(json.assets ?? []);
     } catch {
-      if (myReq === reqRef.current) { setAssets([]); setTotal(0); }
+      if (myReq === reqRef.current) setAll([]);
     } finally {
       if (myReq === reqRef.current) setLoading(false);
     }
-  }, [debouncedQ, category, assetType, approval]);
-
+  }, []);
   useEffect(() => { load(); }, [load]);
 
-  const toggleSelect = (id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
+  // keep the open drawer's data fresh after edits
+  useEffect(() => {
+    if (!openAsset) return;
+    const fresh = all.find((a) => a.id === openAsset.id);
+    if (fresh && fresh !== openAsset) setOpenAsset(fresh);
+  }, [all]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const categoryCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const a of all) m[a.category ?? "misc"] = (m[a.category ?? "misc"] ?? 0) + 1;
+    return m;
+  }, [all]);
+
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    return all.filter((a) => {
+      if (category && a.category !== category) return false;
+      if (assetType && a.asset_type !== assetType) return false;
+      if (state && displayState(a) !== state) return false;
+      if (term) {
+        const hay = [
+          a.title, a.visual_asset_code, a.slug, a.source_name, a.description,
+          ...(a.keywords ?? []), ...(a.synonyms ?? []), ...(a.search_aliases ?? []), ...(a.tags ?? []),
+        ].filter(Boolean).join(" ").toLowerCase();
+        if (!hay.includes(term)) return false;
+      }
+      return true;
     });
-  };
+  }, [all, q, category, assetType, state]);
+
+  const toggleSelect = (id: string) =>
+    setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const clearSelection = () => setSelected(new Set());
 
   const bulkAction = async (action: "approve" | "archive") => {
     if (selected.size === 0) return;
     setBulkBusy(true);
-    await Promise.all(
-      Array.from(selected).map((id) =>
-        fetch(`/api/visual-library/${id}`, {
-          method: "PATCH", credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action }),
-        }).catch(() => null),
-      ),
-    );
+    await Promise.all(Array.from(selected).map((id) =>
+      fetch(`/api/visual-library/${id}`, {
+        method: "PATCH", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      }).catch(() => null)));
     setBulkBusy(false);
     clearSelection();
     load();
   };
 
-  const hasFilters = !!(category || assetType || approval);
-
   return (
-    <div className="space-y-4">
-      {/* Toolbar */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-1 items-center gap-2">
-          <div className="flex flex-1 items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 py-2.5 focus-within:border-[var(--border-focus)] sm:max-w-md">
-            <FilterIcon size={14} className="shrink-0 text-[var(--text-dim)]" />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search by name, code, tag…"
-              className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--text-dim)]"
-            />
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowUpload(true)}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3.5 py-2 text-[12.5px] font-semibold text-[var(--text-inverted)] hover:opacity-90"
-        >
-          <PlusIcon size={14} /> Upload asset
-        </button>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2">
-        <select className={SELECT} value={category} onChange={(e) => setCategory(e.target.value)}>
-          <option value="">All categories</option>
-          {ASSET_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <select className={SELECT} value={assetType} onChange={(e) => setAssetType(e.target.value)}>
-          <option value="">All types</option>
-          {ASSET_TYPES.map((t) => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
-        </select>
-        <select className={SELECT} value={approval} onChange={(e) => setApproval(e.target.value)}>
-          <option value="">All approval</option>
-          <option value="approved">Approved</option>
-          <option value="draft">Pending (draft)</option>
-          <option value="deprecated">Deprecated</option>
-          <option value="archived">Archived</option>
-        </select>
-        {hasFilters && (
-          <button type="button" onClick={() => { setCategory(""); setAssetType(""); setApproval(""); }}
-            className="text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">Clear</button>
-        )}
-        <span className="ml-auto text-[12px] text-[var(--text-dim)] tabular-nums">{loading ? "…" : `${total} asset${total === 1 ? "" : "s"}`}</span>
-      </div>
-
-      {/* Grid */}
-      {loading ? (
-        <div className="flex items-center justify-center py-20 text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>
-      ) : assets.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] py-16 text-center">
-          <ImageRawIcon size={32} className="text-[var(--text-dim)]" />
-          <p className="mt-3 text-[13px] font-medium text-[var(--text-muted)]">No assets yet</p>
-          <p className="mt-1 max-w-xs text-[12px] text-[var(--text-dim)]">
-            {hasFilters || debouncedQ ? "Nothing matches these filters." : "Upload your first visual asset to start the library."}
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {assets.map((a) => (
-            <VisualAssetCard
-              key={a.id}
-              asset={a}
-              selected={selected.has(a.id)}
-              onToggleSelect={() => toggleSelect(a.id)}
-              onOpen={() => setOpenAsset(a)}
-            />
+    <div className="flex gap-5">
+      {/* Category sidebar (desktop) */}
+      <aside className="hidden w-52 shrink-0 lg:block">
+        <div className="sticky top-2 space-y-0.5">
+          <SidebarItem label="All categories" count={all.length} active={category === ""} onClick={() => setCategory("")} />
+          {GENERAL_ICON_CATEGORIES.map((c) => (
+            <SidebarItem key={c.key} label={c.label} count={categoryCounts[c.key] ?? 0} active={category === c.key} onClick={() => setCategory(c.key)} />
           ))}
         </div>
-      )}
+      </aside>
 
-      {/* Bulk action bar */}
+      <div className="min-w-0 flex-1 space-y-4">
+        {/* Toolbar */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex flex-1 items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 py-2.5 focus-within:border-[var(--border-focus)]">
+            <SearchIcon size={14} className="shrink-0 text-[var(--text-dim)]" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, code, keyword, synonym…"
+              className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--text-dim)]" />
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-0.5">
+              <button type="button" onClick={() => setView("grid")} aria-label="Grid view"
+                className={`flex h-7 w-7 items-center justify-center rounded-md ${view === "grid" ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "text-[var(--text-dim)]"}`}>
+                <LayoutGridIcon size={13} />
+              </button>
+              <button type="button" onClick={() => setView("list")} aria-label="List view"
+                className={`flex h-7 w-7 items-center justify-center rounded-md ${view === "list" ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "text-[var(--text-dim)]"}`}>
+                <ListIcon size={13} />
+              </button>
+            </div>
+            <button type="button" onClick={() => setShowUpload(true)}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3.5 py-2 text-[12.5px] font-semibold text-[var(--text-inverted)] hover:opacity-90">
+              <PlusIcon size={14} /> New entity
+            </button>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="flex flex-wrap items-center gap-2">
+          <select className={`${SELECT} lg:hidden`} value={category} onChange={(e) => setCategory(e.target.value)}>
+            <option value="">All categories</option>
+            {GENERAL_ICON_CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+          </select>
+          <select className={SELECT} value={state} onChange={(e) => setState(e.target.value)}>
+            <option value="">All states</option>
+            {STATES.map((s) => <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}
+          </select>
+          <select className={SELECT} value={assetType} onChange={(e) => setAssetType(e.target.value)}>
+            <option value="">All types</option>
+            {ASSET_TYPES.map((t) => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
+          </select>
+          {(category || state || assetType || q) && (
+            <button type="button" onClick={() => { setCategory(""); setState(""); setAssetType(""); setQ(""); }}
+              className="text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">Clear</button>
+          )}
+          <span className="ml-auto text-[12px] text-[var(--text-dim)] tabular-nums">{loading ? "…" : `${filtered.length} of ${all.length}`}</span>
+        </div>
+
+        {/* Results */}
+        {loading ? (
+          <div className="flex items-center justify-center py-20 text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] py-16 text-center">
+            <ImageRawIcon size={32} className="text-[var(--text-dim)]" />
+            <p className="mt-3 text-[13px] font-medium text-[var(--text-muted)]">Nothing matches</p>
+            <p className="mt-1 text-[12px] text-[var(--text-dim)]">Try a different category, state, or search term.</p>
+          </div>
+        ) : view === "grid" ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {filtered.map((a) => (
+              <VisualAssetCard key={a.id} asset={a} selected={selected.has(a.id)} onToggleSelect={() => toggleSelect(a.id)} onOpen={() => setOpenAsset(a)} />
+            ))}
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]">
+            {filtered.map((a, i) => {
+              const st = displayState(a);
+              return (
+                <button key={a.id} type="button" onClick={() => setOpenAsset(a)}
+                  className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[var(--bg-surface-hover)] ${i > 0 ? "border-t border-[var(--border-subtle)]" : ""}`}>
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)]">
+                    {a.public_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={a.public_url} alt="" className="h-5 w-5 object-contain" loading="lazy" />
+                    ) : <ImageRawIcon size={14} className="text-[var(--text-dim)]" />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13px] font-medium text-[var(--text-primary)]">{a.title}</span>
+                    <span className="block truncate font-mono text-[10.5px] text-[var(--text-dim)]">{a.visual_asset_code}</span>
+                  </span>
+                  <span className="hidden shrink-0 text-[11px] text-[var(--text-dim)] sm:block">{a.category}</span>
+                  <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${STATE_PILL[st] ?? STATE_PILL.draft}`}>{st}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {selected.size > 0 && (
         <div className="fixed inset-x-0 bottom-4 z-[110] mx-auto flex w-[calc(100%-2rem)] max-w-lg items-center gap-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] px-4 py-3 shadow-lg">
           <span className="text-[12.5px] font-medium text-[var(--text-primary)] tabular-nums">{selected.size} selected</span>
@@ -192,15 +226,23 @@ export default function VisualLibraryBrowser() {
       )}
 
       {openAsset && (
-        <VisualAssetDetailDrawer
-          asset={openAsset}
-          onClose={() => setOpenAsset(null)}
-          onChanged={() => { setOpenAsset(null); load(); }}
-        />
+        <VisualAssetDetailDrawer asset={openAsset} onClose={() => setOpenAsset(null)} onChanged={load} />
       )}
       {showUpload && (
         <VisualLibraryUploadModal onClose={() => setShowUpload(false)} onUploaded={() => { setShowUpload(false); load(); }} />
       )}
     </div>
+  );
+}
+
+function SidebarItem({ label, count, active, onClick }: { label: string; count: number; active: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick}
+      className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-1.5 text-[12.5px] transition-colors ${
+        active ? "bg-[var(--bg-surface)] font-semibold text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
+      }`}>
+      <span className="truncate">{label}</span>
+      <span className="shrink-0 text-[10.5px] tabular-nums text-[var(--text-dim)]">{count}</span>
+    </button>
   );
 }

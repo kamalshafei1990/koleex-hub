@@ -20,8 +20,12 @@ export const ASSET_STYLES = [
 ] as const;
 export type AssetStyle = (typeof ASSET_STYLES)[number];
 
-export const APPROVAL_STATUSES = ["draft", "approved", "deprecated", "archived"] as const;
+export const APPROVAL_STATUSES = ["draft", "pending", "approved", "deprecated", "archived"] as const;
 export type ApprovalStatus = (typeof APPROVAL_STATUSES)[number];
+
+/** The state shown in the registry UI. "missing" is DERIVED (no file yet). */
+export const DISPLAY_STATES = ["missing", "draft", "pending", "approved", "deprecated", "archived"] as const;
+export type DisplayState = (typeof DISPLAY_STATES)[number];
 
 export const ASSET_STATUSES = ["active", "inactive", "archived"] as const;
 export type AssetStatus = (typeof ASSET_STATUSES)[number];
@@ -73,8 +77,25 @@ export interface VisualAsset {
   approved_at: string | null;
   created_at: string;
   updated_at: string;
+  // ── Vocabulary registry (Phase 2A) ──
+  slug: string | null;
+  keywords: string[];
+  synonyms: string[];
+  search_aliases: string[];
+  linked_modules: string[];
+  linked_apps: string[];
+  usage_count: number;
+  version: number;
+  theme: string | null;
   /** Derived at read-time from storage_bucket + svg_path (not a column). */
   public_url?: string | null;
+}
+
+/** Derive the registry display-state. "missing" when no file is attached. */
+export function displayState(a: Pick<VisualAsset, "svg_path" | "status" | "approval_status">): DisplayState {
+  if (a.status === "archived") return "archived";
+  if (!a.svg_path) return "missing";
+  return a.approval_status;
 }
 
 export interface VisualAssetListResponse {
