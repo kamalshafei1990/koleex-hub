@@ -34,6 +34,46 @@ async function patch(id: string, body: Record<string, unknown>): Promise<boolean
   return res.ok;
 }
 
+function triggerDownload(href: string, filename: string) {
+  const a = document.createElement("a");
+  a.href = href; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+/** Download the original SVG file. */
+async function downloadSvg(url: string, name: string) {
+  const res = await fetch(url);
+  const blob = await res.blob();
+  const obj = URL.createObjectURL(blob);
+  triggerDownload(obj, `${name}.svg`);
+  setTimeout(() => URL.revokeObjectURL(obj), 1000);
+}
+
+/** Rasterize the SVG to PNG/JPG at a given pixel size, client-side. */
+async function downloadRaster(url: string, name: string, ext: "png" | "jpg", size: number) {
+  const res = await fetch(url);
+  let svg = await res.text();
+  // Give the SVG an explicit pixel size so the browser rasterizes it crisply.
+  svg = svg.replace(/<svg\b/i, `<svg width="${size}" height="${size}"`);
+  const svgUrl = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+  try {
+    const img = new Image();
+    await new Promise<void>((resolve, reject) => { img.onload = () => resolve(); img.onerror = reject; img.src = svgUrl; });
+    const canvas = document.createElement("canvas");
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    if (ext === "jpg") { ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, size, size); }
+    ctx.drawImage(img, 0, 0, size, size);
+    await new Promise<void>((resolve) => canvas.toBlob((b) => {
+      if (b) { const obj = URL.createObjectURL(b); triggerDownload(obj, `${name}.${ext}`); setTimeout(() => URL.revokeObjectURL(obj), 1000); }
+      resolve();
+    }, ext === "jpg" ? "image/jpeg" : "image/png", 0.92));
+  } finally {
+    URL.revokeObjectURL(svgUrl);
+  }
+}
+
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   if (value === null || value === undefined || value === "") return null;
   return (
@@ -59,6 +99,8 @@ export default function VisualAssetDetailDrawer({
   asset, onClose, onChanged,
 }: { asset: VisualAsset; onClose: () => void; onChanged: () => void }) {
   const [busy, setBusy] = useState<string | null>(null);
+  const [dlSize, setDlSize] = useState(256);
+  const [dlBusy, setDlBusy] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const state = displayState(asset);
   const isApproved = asset.approval_status === "approved";
@@ -127,6 +169,36 @@ export default function VisualAssetDetailDrawer({
           <div className="mt-3">
             <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${STATE_PILL[state] ?? STATE_PILL.draft}`}>{state}</span>
           </div>
+
+          {/* Download */}
+          {asset.public_url && (
+            <div className="mt-4 rounded-xl border border-[var(--border-subtle)] p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">Download</span>
+                <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-dim)]">
+                  Size
+                  <select value={dlSize} onChange={(e) => setDlSize(Number(e.target.value))}
+                    className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] px-1.5 py-1 text-[11px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]">
+                    {[64, 128, 256, 512, 1024].map((s) => <option key={s} value={s}>{s}px</option>)}
+                  </select>
+                </label>
+              </div>
+              <div className="mt-2.5 grid grid-cols-3 gap-2">
+                {([
+                  { key: "svg", label: "SVG", fn: () => downloadSvg(asset.public_url!, asset.slug ?? asset.id), note: "vector" },
+                  { key: "png", label: "PNG", fn: () => downloadRaster(asset.public_url!, asset.slug ?? asset.id, "png", dlSize), note: "transparent" },
+                  { key: "jpg", label: "JPG", fn: () => downloadRaster(asset.public_url!, asset.slug ?? asset.id, "jpg", dlSize), note: "white bg" },
+                ] as const).map((opt) => (
+                  <button key={opt.key} type="button" disabled={!!dlBusy}
+                    onClick={async () => { setDlBusy(opt.key); try { await opt.fn(); patch(asset.id, { action: "use" }); } finally { setDlBusy(null); } }}
+                    className="flex flex-col items-center gap-0.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-2 text-[12px] font-semibold text-[var(--text-primary)] transition-colors hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] disabled:opacity-50">
+                    {dlBusy === opt.key ? <SpinnerIcon size={14} className="animate-spin" /> : <span>{opt.label}</span>}
+                    <span className="text-[9px] font-normal text-[var(--text-dim)]">{opt.note}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="mt-3 divide-y divide-[var(--border-subtle)]">
             <Row label="Slug" value={<span className="font-mono text-[11.5px]">{asset.slug}</span>} />
