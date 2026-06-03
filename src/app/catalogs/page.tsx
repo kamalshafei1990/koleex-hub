@@ -243,6 +243,20 @@ function normalizeText(s?: string | null): string {
     .replace(/[\u0300-\u036f\u064b-\u0652]/g, ""); // Latin + Arabic combining marks
 }
 
+/* Split normalized text into words for prefix matching. */
+function searchWords(norm: string): string[] {
+  return norm.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+}
+
+/* A token matches if the text \u2014 or any of its words \u2014 starts with it.
+   Chinese/Japanese have no word spacing, so for CJK tokens we fall back to a
+   substring match (every character is meaningful). This stops a stray single
+   Latin letter from matching the middle of a word (e.g. "l" \u2192 "cataLog"). */
+function tokenHits(norm: string, words: string[], tok: string): boolean {
+  if (/[\u3040-\u30ff\u3400-\u9fff]/.test(tok)) return norm.includes(tok);
+  return norm.startsWith(tok) || words.some(w => w.startsWith(tok));
+}
+
 const FILE_TYPE_CONFIG: Record<string, { label: string; color: string; bgFrom: string; bgTo: string; icon: typeof DocumentIcon }> = {
   pdf: { label: "PDF", color: "text-red-400", bgFrom: "from-red-950", bgTo: "to-red-900/60", icon: DocumentIcon },
   jpg: { label: "JPG", color: "text-emerald-400", bgFrom: "from-emerald-950", bgTo: "to-emerald-900/60", icon: PictureIcon },
@@ -1963,11 +1977,13 @@ export default function CatalogsPage() {
           c.file_name, c.division_name, c.category_name, c.created_by_name,
           c.year != null ? String(c.year) : "", c.file_type, ...(c.tags || []),
         ].filter(Boolean).join(" | "));
+        const titleWords = searchWords(title);
+        const restWords = searchWords(rest);
         let score = 0;
         const ok = tokens.every(tok => {
           if (title.startsWith(tok)) { score += 4; return true; }
-          if (title.includes(tok)) { score += 3; return true; }
-          if (rest.includes(tok)) { score += 1; return true; }
+          if (tokenHits(title, titleWords, tok)) { score += 3; return true; }
+          if (tokenHits(rest, restWords, tok)) { score += 1; return true; }
           return false;
         });
         if (ok) scores.set(c.id, score);
@@ -2029,17 +2045,18 @@ export default function CatalogsPage() {
      labels keep their script and matching runs through normalizeText(). */
   type SearchSug = {
     type: "title" | "supplier" | "division" | "category" | "tag" | "year";
-    label: string; norm: string; icon?: ReactNode; apply: () => void;
+    label: string; norm: string; words: string[]; count: number; icon?: ReactNode; apply: () => void;
   };
   const allSearchItems = useMemo<SearchSug[]>(() => {
     const items: SearchSug[] = [];
     const seen = new Set<string>();
-    const push = (it: SearchSug) => {
+    const push = (it: Omit<SearchSug, "words">) => {
       const k = `${it.type}|${it.norm}`;
-      if (it.norm && !seen.has(k)) { seen.add(k); items.push(it); }
+      if (it.norm && !seen.has(k)) { seen.add(k); items.push({ ...it, words: searchWords(it.norm) }); }
     };
     catalogSuppliers.forEach(s => push({
       type: "supplier", label: s.name, norm: normalizeText(s.name),
+      count: catalogs.filter(c => c.contact_id === s.id).length,
       icon: <Building2Icon className="h-3.5 w-3.5" />,
       apply: () => { setFilterSupplier(s.id); setSearch(""); },
     }));
@@ -2047,6 +2064,7 @@ export default function CatalogsPage() {
       const DivIcon = getDivisionIcon(d.slug); const logo = divLogos[d.slug];
       push({
         type: "division", label: d.name, norm: normalizeText(d.name),
+        count: catalogs.filter(c => c.division_slug === d.slug).length,
         icon: DivIcon ? <DivIcon className="h-3.5 w-3.5" /> : logo ? <img src={logo} alt="" className="h-3.5 w-3.5 object-contain" /> : undefined,
         apply: () => { setFilterDivision(d.slug); setSearch(""); },
       });
@@ -2057,22 +2075,25 @@ export default function CatalogsPage() {
       const logo = catLogos[slug];
       push({
         type: "category", label: name, norm: normalizeText(name),
+        count: catalogs.filter(c => c.category_slug === slug).length,
         icon: logo ? <img src={logo} alt="" className="h-3.5 w-3.5 object-contain" /> : undefined,
         apply: () => setSearch(name),
       });
     });
     catalogTags.forEach(tg => push({
       type: "tag", label: tg, norm: normalizeText(tg),
+      count: catalogs.filter(c => (c.tags || []).includes(tg)).length,
       icon: <HashtagIcon className="h-3.5 w-3.5" />,
       apply: () => { setFilterTag(tg); setSearch(""); },
     }));
     catalogYears.forEach(y => push({
       type: "year", label: String(y), norm: String(y),
+      count: catalogs.filter(c => String(c.year ?? "") === String(y)).length,
       apply: () => { setFilterYear(String(y)); setSearch(""); },
     }));
     catalogs.forEach(c => {
-      if (c.title) push({ type: "title", label: c.title, norm: normalizeText(c.title), icon: <FileIcon className="h-3.5 w-3.5" />, apply: () => setSearch(c.title) });
-      if (c.title_cn) push({ type: "title", label: c.title_cn, norm: normalizeText(c.title_cn), icon: <FileIcon className="h-3.5 w-3.5" />, apply: () => setSearch(c.title_cn!) });
+      if (c.title) push({ type: "title", label: c.title, norm: normalizeText(c.title), count: 0, icon: <FileIcon className="h-3.5 w-3.5" />, apply: () => setSearch(c.title) });
+      if (c.title_cn) push({ type: "title", label: c.title_cn, norm: normalizeText(c.title_cn), count: 0, icon: <FileIcon className="h-3.5 w-3.5" />, apply: () => setSearch(c.title_cn!) });
     });
     return items;
   }, [catalogSuppliers, catalogDivisions, catalogTags, catalogYears, catalogs, divLogos, catLogos]);
@@ -2083,8 +2104,9 @@ export default function CatalogsPage() {
     if (!tokens.length) return [];
     const scored: { it: SearchSug; score: number }[] = [];
     for (const it of allSearchItems) {
-      if (!tokens.every(tk => it.norm.includes(tk))) continue;
-      const score = it.norm.startsWith(q) ? 2 : it.norm.includes(q) ? 1 : 0;
+      // Every token must hit a word-start (substring for CJK) somewhere in the label.
+      if (!tokens.every(tk => tokenHits(it.norm, it.words, tk))) continue;
+      const score = it.norm.startsWith(q) ? 3 : it.words.some(w => w.startsWith(q)) ? 2 : 1;
       scored.push({ it, score });
     }
     scored.sort((a, b) => b.score - a.score || a.it.label.length - b.it.label.length);
@@ -2334,16 +2356,19 @@ export default function CatalogsPage() {
             )}
 
             {/* Autocomplete dropdown */}
-            {searchFocused && (search.trim() ? searchSuggestions.length > 0 : searchKeywords.length > 0) && (
+            {searchFocused && (search.trim() ? true : searchKeywords.length > 0) && (
               <div className="absolute z-40 left-0 right-0 top-full mt-1.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-xl shadow-black/40 py-1.5 max-h-[320px] overflow-auto">
                 {search.trim() ? (
-                  searchSuggestions.map((s, i) => (
+                  searchSuggestions.length === 0 ? (
+                    <p className="px-3 py-3 text-[12px] text-[var(--text-dim)] text-center">{t("cat.sug.none")}</p>
+                  ) : searchSuggestions.map((s, i) => (
                     <button key={`${s.type}-${s.label}`} type="button"
                       onMouseEnter={() => setSugIndex(i)}
                       onClick={() => { s.apply(); setSearchFocused(false); setSugIndex(-1); }}
                       className={`w-full px-3 py-2 flex items-center gap-2.5 text-left transition-colors ${i === sugIndex ? "bg-[var(--bg-surface-hover)]" : "hover:bg-[var(--bg-surface-hover)]"}`}>
                       <span className="shrink-0 w-4 h-4 flex items-center justify-center text-[var(--text-dim)]">{s.icon || <SearchIcon className="h-3.5 w-3.5" />}</span>
                       <span className="flex-1 truncate text-[12px] text-[var(--text-primary)]">{s.label}</span>
+                      {s.count > 0 && <span className="shrink-0 text-[10px] tabular-nums text-[var(--text-dim)]">{s.count}</span>}
                       <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-[var(--text-dim)] px-1.5 py-0.5 rounded bg-[var(--bg-surface)]">{t(`cat.sug.${s.type}`)}</span>
                     </button>
                   ))
