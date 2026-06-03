@@ -74,7 +74,7 @@ const T: Translations = {
   "cat.insights.mostDownloaded": { en: "Most downloaded", zh: "最常下载", ar: "الأكثر تنزيلاً" },
   "cat.insights.noData":  { en: "No activity yet", zh: "暂无活动", ar: "لا يوجد نشاط بعد" },
   "cat.insights.noDivision": { en: "Unassigned", zh: "未分配", ar: "غير محدد" },
-  "cat.search":           { en: "Search catalogs…", zh: "搜索目录…", ar: "ابحث في الكتالوجات…" },
+  "cat.search":           { en: "Search title, supplier, tag, year…", zh: "搜索标题、供应商、标签、年份…", ar: "ابحث بالعنوان أو المورّد أو الوسم أو السنة…" },
   "cat.allSuppliers":     { en: "All Suppliers", zh: "所有供应商", ar: "كل الموردين" },
   "cat.allDivisions":     { en: "All Divisions", zh: "所有部门", ar: "كل الأقسام" },
   "cat.allTypes":         { en: "All Types", zh: "所有类型", ar: "كل الأنواع" },
@@ -224,6 +224,15 @@ function fmtDate(iso?: string | null): string {
   try {
     return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
   } catch { return ""; }
+}
+
+/* Lowercase + strip diacritics so "Café" matches "cafe" and Arabic harakat
+   are ignored. Chinese/Latin/digits pass through unchanged. */
+function normalizeText(s?: string | null): string {
+  return (s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f\u064b-\u0652]/g, ""); // Latin + Arabic combining marks
 }
 
 const FILE_TYPE_CONFIG: Record<string, { label: string; color: string; bgFrom: string; bgTo: string; icon: typeof DocumentIcon }> = {
@@ -1928,23 +1937,45 @@ export default function CatalogsPage() {
 
   const filtered = useMemo(() => {
     let result = [...catalogs];
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      result = result.filter(c =>
-        c.title.toLowerCase().includes(q) ||
-        c.title_cn?.includes(q) ||
-        c.company_name_en?.toLowerCase().includes(q) ||
-        c.company_name_cn?.includes(q) ||
-        c.contact_name?.toLowerCase().includes(q) ||
-        c.file_name.toLowerCase().includes(q)
-      );
+
+    // ── Smart search ──
+    // Multi-keyword (every token must match), diacritic-insensitive, spanning
+    // every meaningful field. Results are ranked by relevance (title / prefix
+    // hits first) when a query is present.
+    const tokens = normalizeText(search).split(/\s+/).filter(Boolean);
+    const scores = new Map<string, number>();
+    if (tokens.length) {
+      result = result.filter(c => {
+        const title = normalizeText(`${c.title} ${c.title_cn || ""}`);
+        const rest = normalizeText([
+          c.description, c.company_name_en, c.company_name_cn, c.contact_name,
+          c.file_name, c.division_name, c.category_name, c.created_by_name,
+          c.year != null ? String(c.year) : "", c.file_type, ...(c.tags || []),
+        ].filter(Boolean).join(" | "));
+        let score = 0;
+        const ok = tokens.every(tok => {
+          if (title.startsWith(tok)) { score += 4; return true; }
+          if (title.includes(tok)) { score += 3; return true; }
+          if (rest.includes(tok)) { score += 1; return true; }
+          return false;
+        });
+        if (ok) scores.set(c.id, score);
+        return ok;
+      });
     }
+
     if (filterSupplier !== "all") result = result.filter(c => c.contact_id === filterSupplier);
     if (filterDivision !== "all") result = result.filter(c => c.division_slug === filterDivision);
     if (filterType !== "all") result = result.filter(c => c.file_type === filterType);
     if (filterYear !== "all") result = result.filter(c => String(c.year ?? "") === filterYear);
     if (filterTag !== "all") result = result.filter(c => (c.tags || []).includes(filterTag));
+
     result.sort((a, b) => {
+      // When searching, the most relevant matches lead.
+      if (tokens.length) {
+        const d = (scores.get(b.id) || 0) - (scores.get(a.id) || 0);
+        if (d !== 0) return d;
+      }
       if (sortBy === "name") return a.title.localeCompare(b.title);
       if (sortBy === "size") return (b.file_size || 0) - (a.file_size || 0);
       if (sortBy === "year") return (b.year ?? 0) - (a.year ?? 0);
