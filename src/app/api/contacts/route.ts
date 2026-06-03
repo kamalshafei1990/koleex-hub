@@ -63,7 +63,26 @@ export async function GET(req: Request) {
     );
   }
 
-  return NextResponse.json({ contacts: data ?? [] }, {
+  /* PERF: the contacts table stores images/documents as base64 inline, so a
+     full select of every row is tens of MB. The directory list only needs the
+     avatar (photo_url/logo_url) + text fields for rows and search. Strip the
+     heavy blob columns from the LIST payload; the detail/edit views fetch the
+     full record on demand via GET /api/contacts/[id]. */
+  const HEAVY_FIELDS = [
+    "business_card_front", "business_card_back", "business_license_image",
+    "documents", "catalogues", "attachments", "visa_documents",
+    "contact_persons", "bank_accounts", "resume_lines", "emergency_contacts", "family_members",
+    "wechat_qr", "whatsapp_qr", "telegram_qr", "line_qr", "skype_qr", "qq_qr",
+    "dingtalk_qr", "messenger_qr", "wechat_pay_qr", "alipay_qr", "website_qr", "ecatalog_qr",
+    "quality_issues",
+  ];
+  const slim = (data ?? []).map((row) => {
+    const r = row as Record<string, unknown>;
+    for (const k of HEAVY_FIELDS) if (k in r) r[k] = null;
+    return r;
+  });
+
+  return NextResponse.json({ contacts: slim }, {
     headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300" },
   });
 }

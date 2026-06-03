@@ -3531,6 +3531,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const [triedSave, setTriedSave] = useState(false);
   // Distinguishes "fill required fields" (validation) from a real server error.
   const [saveErrorIsValidation, setSaveErrorIsValidation] = useState(false);
+  // True while the full record (images/docs) is being fetched for an edit —
+  // Save is blocked until it loads so we never overwrite unloaded images.
+  const [formHydrating, setFormHydrating] = useState(false);
   const [rlsCopied, setRlsCopied] = useState(false);
   /* Customer premium tab — used by both form and detail views for customers */
   const [customerTab, setCustomerTab] = useState<CustomerTab>("overview");
@@ -3707,6 +3710,22 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   }, [contacts, filterType]);
 
   /* ── Handlers ── */
+  /* The list API returns rows WITHOUT the heavy base64 image/document fields
+     (for speed). Detail + edit need the full record, so fetch it on demand
+     and splice it back into the in-memory list. Returns the full row. */
+  const hydrateContact = useCallback(async (id: string): Promise<ContactRow | null> => {
+    try {
+      const res = await fetch(`/api/contacts/${id}`, { credentials: "include", cache: "no-store" });
+      if (!res.ok) return null;
+      const j = (await res.json()) as { contact?: ContactRow };
+      const full = j.contact ?? null;
+      if (full) setContacts((prev) => prev.map((c) => (c.id === id ? full : c)));
+      return full;
+    } catch {
+      return null;
+    }
+  }, []);
+
   const handleSelectContact = useCallback((c: ContactRow) => {
     /* On the Customers app, route to the dedicated /customers/[id]
        profile page. /suppliers, /companies, /people, /contacts keep
@@ -3723,7 +3742,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     setView("detail");
     setMobileShowDetail(true);
     setEditingId(null);
-  }, [filterType, router]);
+    void hydrateContact(c.id); // pull full record (images/docs) for the detail view
+  }, [filterType, router, hydrateContact]);
 
   const handleAdd = useCallback((type: ContactType, entityType?: "person" | "company") => {
     // New suppliers default to the Garment Machinery division so the
@@ -3756,6 +3776,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     setEditingId(c.id);
     setSupplierDept(null);
     setSupplierSectionAudit({});
+    /* The list row is "slim" (no base64 images/docs). Pull the full record and
+       rebuild the form from it, so editing + saving never wipes images that
+       weren't loaded. */
+    setFormHydrating(true);
+    void hydrateContact(c.id).then((full) => { if (full) setForm(contactToForm(full)); setFormHydrating(false); });
     /* Load section-level attribution for suppliers (who edited each dept). */
     if (c.contact_type === "supplier") {
       fetch(`/api/suppliers/${c.id}/section-audit`, { credentials: "include" })
@@ -3766,7 +3791,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     setView("form");
     setMobileShowDetail(true);
     setExpandedFamily(null);
-  }, []);
+  }, [hydrateContact]);
 
   const handleEdit = useCallback(() => {
     if (!selectedContact) return;
@@ -3811,6 +3836,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
   const handleSave = async () => {
     if (!form.first_name && !form.last_name && !form.company && !form.company_name_en) return;
+    // Don't save while the full record (images/docs) is still loading — would
+    // overwrite unloaded image fields with blanks.
+    if (formHydrating) { setSaveErrorIsValidation(false); setSaveError(t("loading", "Loading…")); return; }
     // Block save on supplier data-integrity errors (required + format validation).
     if (filterType === "supplier" || form.contact_type === "supplier") {
       const errs = supplierFormErrors(form);
@@ -6449,7 +6477,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </button>
             <button
               onClick={handleSave}
-              disabled={saving || (!form.first_name && !form.last_name && !form.company && !form.company_name_en)}
+              disabled={saving || formHydrating || (!form.first_name && !form.last_name && !form.company && !form.company_name_en)}
               className="flex items-center gap-1 md:gap-1.5 px-2.5 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm bg-[var(--bg-inverted)] text-[var(--text-inverted)] font-medium hover:bg-[var(--bg-inverted-hover)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               {saving ? <div className="w-3.5 h-3.5 md:w-4 md:h-4 border-2 border-[var(--border-focus)] border-t-black rounded-full animate-spin" /> : <DiskIcon size={14} />}
