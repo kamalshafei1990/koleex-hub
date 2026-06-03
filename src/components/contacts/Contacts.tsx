@@ -531,6 +531,96 @@ const SUPPORT_TIERS = ["Basic", "Standard", "Premium", "Enterprise"];
 
 const CONTAINER_PREFERENCES = ["20ft", "40ft", "40HQ", "LCL", "FCL"];
 
+/* Editable presets for combo fields (Input list=). The user can pick one OR
+   type their own value — these are only suggestions, never a hard constraint. */
+const LEAD_TIME_OPTS = ["In stock", "7 days", "10 days", "15 days", "20 days", "30 days", "45 days", "60 days", "90 days", "120 days"];
+const MOQ_OPTS = ["1", "10", "20", "50", "100", "200", "500", "1000", "2000", "5000", "Negotiable"];
+/* Time zone presets carry the city/area alongside the GMT offset so the field
+   "mentions the area with the time" while staying free-text editable. */
+const TIMEZONE_OPTS = [
+  "Asia/Shanghai (GMT+8) · Shanghai / Beijing",
+  "Asia/Shenzhen (GMT+8) · Shenzhen / Guangzhou",
+  "Asia/Hong_Kong (GMT+8) · Hong Kong",
+  "Asia/Taipei (GMT+8) · Taipei",
+  "Asia/Tokyo (GMT+9) · Tokyo / Osaka",
+  "Asia/Seoul (GMT+9) · Seoul",
+  "Asia/Bangkok (GMT+7) · Bangkok",
+  "Asia/Ho_Chi_Minh (GMT+7) · Ho Chi Minh",
+  "Asia/Kolkata (GMT+5:30) · Mumbai / Delhi",
+  "Asia/Karachi (GMT+5) · Karachi",
+  "Asia/Dubai (GMT+4) · Dubai / Abu Dhabi",
+  "Asia/Riyadh (GMT+3) · Riyadh / Jeddah",
+  "Europe/Istanbul (GMT+3) · Istanbul",
+  "Africa/Cairo (GMT+2) · Cairo",
+  "Europe/Paris (GMT+1) · Paris / Berlin / Milan",
+  "Europe/London (GMT+0) · London",
+  "America/New_York (GMT-5) · New York",
+  "America/Chicago (GMT-6) · Chicago",
+  "America/Los_Angeles (GMT-8) · Los Angeles",
+];
+
+/* Tiny helper: a hidden <datalist> so an <Input list={id}> becomes an editable
+   dropdown (pick a preset or type a custom value). */
+function ComboOptions({ id, options }: { id: string; options: string[] }) {
+  return <datalist id={id}>{options.map(o => <option key={o} value={o} />)}</datalist>;
+}
+
+/* Multi-value reason field: a status can carry more than one reason. Stored as
+   a single " · "-joined string (no schema change) and shown as removable chips
+   with an editable add box (pick a common reason or type your own). */
+function MultiReasonField({ value, onChange, options, label, placeholder, icon, datalistId }: {
+  value: string; onChange: (v: string) => void; options: string[];
+  label: string; placeholder?: string; icon?: React.ReactNode; datalistId: string;
+}) {
+  const reasons = React.useMemo(
+    () => (value ? value.split(/\s*·\s*|\n/).map(s => s.trim()).filter(Boolean) : []),
+    [value],
+  );
+  const [draft, setDraft] = React.useState("");
+  const add = (raw: string) => {
+    const v = raw.trim();
+    if (!v || reasons.includes(v)) { setDraft(""); return; }
+    onChange([...reasons, v].join(" · "));
+    setDraft("");
+  };
+  const removeAt = (i: number) => onChange(reasons.filter((_, idx) => idx !== i).join(" · "));
+  return (
+    <div>
+      <label className="text-xs text-[var(--text-faint)] mb-1 flex items-center gap-1">{label}</label>
+      {reasons.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-1.5">
+          {reasons.map((r, i) => (
+            <span key={i} className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-surface)] border border-[var(--border-color)] px-2 py-1 text-xs text-[var(--text-primary)]">
+              {r}
+              <button type="button" onClick={() => removeAt(i)} className="text-[var(--text-ghost)] hover:text-rose-500" aria-label="Remove reason">
+                <CrossIcon size={11} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="relative flex gap-1.5">
+        <div className="relative flex-1">
+          {icon && <span className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)]">{icon}</span>}
+          <input
+            list={datalistId}
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); add(draft); } }}
+            onBlur={() => add(draft)}
+            placeholder={placeholder}
+            className={`w-full h-10 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors ${icon ? "ps-9 pe-3" : "px-3"}`}
+          />
+          <datalist id={datalistId}>{options.map(o => <option key={o} value={o} />)}</datalist>
+        </div>
+        <button type="button" onClick={() => add(draft)} disabled={!draft.trim()} className="shrink-0 px-3 h-10 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40 transition-colors">
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* Common reasons behind a supplier's strategic status — suggestions only; the
    field still accepts free text. */
 const STATUS_REASON_SUGGESTIONS = [
@@ -7956,7 +8046,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 {/* Business hours + time zone */}
                 <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] p-3 space-y-2.5">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("field.businessHours", "Business hours & time zone")}</p>
-                  <Input label={t("field.timeZone", "Time zone / area")} tier="optional" value={form.business_timezone} onChange={v => setField("business_timezone", v)} placeholder={t("placeholder.timeZone", "e.g. Asia/Shanghai (GMT+8)")} icon={<GlobeIcon size={14} />} />
+                  <Input label={t("field.timeZone", "Time zone / area")} tier="optional" value={form.business_timezone} onChange={v => setField("business_timezone", v)} placeholder={t("placeholder.timeZone", "e.g. Asia/Shanghai (GMT+8)")} icon={<GlobeIcon size={14} />} list="sup-timezone-opts" />
+                  <ComboOptions id="sup-timezone-opts" options={TIMEZONE_OPTS} />
                   <div className="grid grid-cols-2 gap-2.5">
                     <Input label={t("field.hoursFrom", "Open from")} tier="optional" type="time" value={form.business_hours_start} onChange={v => setField("business_hours_start", v)} />
                     <Input label={t("field.hoursTo", "Open until")} tier="optional" type="time" value={form.business_hours_end} onChange={v => setField("business_hours_end", v)} />
@@ -8256,10 +8347,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <SelectInput label={t("field.incoterms", "Incoterms")} help="supplier.incoterms" tier="preferred" value={form.incoterms} onChange={v => setField("incoterms", v)} options={INCOTERMS} icon={<ShipIcon size={14} />} selectLabel={t("detail.select")} />
-                  <Input label={t("field.leadTime", "Lead Time")} help="supplier.lead_time" tier="preferred" value={form.lead_time} onChange={v => setField("lead_time", v)} placeholder="e.g. 30 days" icon={<TimerIcon size={14} />} />
+                  <><Input label={t("field.leadTime", "Lead Time")} help="supplier.lead_time" tier="preferred" value={form.lead_time} onChange={v => setField("lead_time", v)} placeholder="e.g. 30 days" icon={<TimerIcon size={14} />} list="sup-leadtime-opts" /><ComboOptions id="sup-leadtime-opts" options={LEAD_TIME_OPTS} /></>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <Input label={t("field.moq", "MOQ")} help="supplier.moq" tier="preferred" value={form.moq} onChange={v => setField("moq", v)} placeholder="Minimum order qty" icon={<PackageIcon size={14} />} />
+                  <><Input label={t("field.moq", "MOQ")} help="supplier.moq" tier="preferred" value={form.moq} onChange={v => setField("moq", v)} placeholder="Minimum order qty" icon={<PackageIcon size={14} />} list="sup-moq-opts" /><ComboOptions id="sup-moq-opts" options={MOQ_OPTS} /></>
                   <SelectInput label={t("field.containerPreference", "Container Preference")} help="supplier.container_preference" tier="optional" value={form.container_preference} onChange={v => setField("container_preference", v)} options={CONTAINER_PREFERENCES} icon={<BoxesIcon size={14} />} selectLabel={t("detail.select")} />
                 </div>
                 <Input label={t("field.portOfEntry", "Port of Loading / Entry")} help="supplier.port_of_entry" tier="optional" value={form.port_of_entry} onChange={v => setField("port_of_entry", v)} placeholder="Shanghai / Ningbo / Jebel Ali" icon={<ShipIcon size={14} />} />
@@ -8517,13 +8608,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <FormSection title={t("section.strategicStatus", "Strategic Status")} icon={<TargetIcon size={14} />} owner={t("owner.management")} ownerLabel={t("owner.label")} dept="commercial" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
               <div className="grid grid-cols-2 gap-3">
                 <SelectInput label={t("field.strategicStatus", "Strategic status")} tier="preferred" value={sIntel.strategic_status} onChange={(v) => setSIntel((p) => ({ ...p, strategic_status: v }))} options={Object.keys(STRATEGIC_STATUS_LABELS)} renderLabel={(o) => t("opt." + o, STRATEGIC_STATUS_LABELS[o as keyof typeof STRATEGIC_STATUS_LABELS] ?? o)} icon={<TargetIcon size={14} />} selectLabel={t("detail.select")} />
-                <SuggestInput
+                <MultiReasonField
                   label={t("field.statusReason", "Status reason")}
                   value={sIntel.strategic_status_reason}
                   onChange={(v) => setSIntel((p) => ({ ...p, strategic_status_reason: v }))}
                   placeholder={t("placeholder.statusReason", "Pick a common reason or type your own")}
                   options={STATUS_REASON_SUGGESTIONS.map((s, i) => t(`sreason.${i}`, s))}
                   icon={<TargetIcon size={14} />}
+                  datalistId="sup-status-reason-opts"
                 />
               </div>
               {/* Q — restricted suppliers must carry a clear warning regardless of score/ratings. */}
