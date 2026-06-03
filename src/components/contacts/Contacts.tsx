@@ -345,6 +345,8 @@ interface ContactForm {
   business_hours_end: string;
   wechat_official_account: string;
   wechat_sales_group_available: boolean;
+  wechat_group_name: string;
+  wechat_group_members: string;
   wecom_support_available: boolean;
   supplier_address: string;
   supplier_address_cn: string;
@@ -846,6 +848,8 @@ const EMPTY_FORM: ContactForm = {
   business_hours_end: "",
   wechat_official_account: "",
   wechat_sales_group_available: false,
+  wechat_group_name: "",
+  wechat_group_members: "",
   wecom_support_available: false,
   supplier_address: "",
   supplier_address_cn: "",
@@ -1486,6 +1490,8 @@ function contactToForm(c: ContactRow): ContactForm {
     business_hours_end: (c as unknown as Record<string, unknown>).business_hours_end as string || "",
     wechat_official_account: c.wechat_official_account || "",
     wechat_sales_group_available: !!c.wechat_sales_group_available,
+    wechat_group_name: (c as unknown as Record<string, unknown>).wechat_group_name as string || "",
+    wechat_group_members: (c as unknown as Record<string, unknown>).wechat_group_members as string || "",
     wecom_support_available: !!c.wecom_support_available,
     supplier_address: c.supplier_address || "",
     supplier_address_cn: (c as unknown as Record<string, unknown>).supplier_address_cn as string || "",
@@ -1743,6 +1749,8 @@ function formToRow(f: ContactForm): Record<string, unknown> {
     business_hours_end: f.business_hours_end || null,
     wechat_official_account: f.wechat_official_account || null,
     wechat_sales_group_available: !!f.wechat_sales_group_available,
+    wechat_group_name: f.wechat_group_name || null,
+    wechat_group_members: f.wechat_group_members || null,
     wecom_support_available: !!f.wecom_support_available,
     supplier_address: f.supplier_address || null,
     supplier_address_cn: f.supplier_address_cn || null,
@@ -1906,6 +1914,54 @@ const Input = React.memo(function Input({ label, value, onChange, type = "text",
           className={`w-full h-10 rounded-lg bg-[var(--bg-surface)] border text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none transition-colors ${icon ? "ps-9 pe-3" : "px-3"} ${invalid ? "border-rose-500 ring-1 ring-rose-500/30 focus:border-rose-500" : "border-[var(--border-color)] focus:border-[var(--border-focus)]"}`}
         />
       </div>
+    </div>
+  );
+});
+
+/* ── Clock time picker (brand-styled, replaces the native <input type=time>) ──
+   Stores "HH:MM" (24h) so the saved value format is unchanged. Opens a compact
+   monochrome popover with hour + minute columns. */
+const TimeField = React.memo(function TimeField({ label, value, onChange, tier }: {
+  label: string; value: string; onChange: (v: string) => void; tier?: FieldTier;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [open]);
+  const [hh, mm] = (value || "").split(":");
+  const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+  const mins = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, "0"));
+  const set = (h: string, m: string) => onChange(`${h}:${m}`);
+  const cell = (active: boolean) =>
+    `text-xs py-1.5 rounded-md transition-colors ${active ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]"}`;
+  return (
+    <div ref={ref} className="relative">
+      <label className="text-xs text-[var(--text-faint)] mb-1 flex items-center gap-1">{label}<FieldMark tier={tier} /></label>
+      <button type="button" onClick={() => setOpen(o => !o)}
+        className="w-full h-10 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] hover:border-[var(--border-focus)] flex items-center gap-2 px-3 text-sm transition-colors">
+        <ClockIcon size={14} className="text-[var(--text-ghost)]" />
+        <span className={value ? "text-[var(--text-primary)]" : "text-[var(--text-ghost)]"}>{value || "--:--"}</span>
+      </button>
+      {open && (
+        <div className="absolute z-30 mt-1 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] shadow-lg p-2 flex gap-2">
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] uppercase tracking-wider text-[var(--text-dim)] mb-1 px-1">{"Hour"}</p>
+            <div className="max-h-40 overflow-y-auto grid grid-cols-3 gap-1 pe-1">
+              {hours.map(h => <button key={h} type="button" onClick={() => set(h, mm || "00")} className={cell(h === hh)}>{h}</button>)}
+            </div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] uppercase tracking-wider text-[var(--text-dim)] mb-1 px-1">{"Min"}</p>
+            <div className="max-h-40 overflow-y-auto grid grid-cols-3 gap-1 pe-1">
+              {mins.map(m => <button key={m} type="button" onClick={() => set(hh || "00", m)} className={cell(m === mm)}>{m}</button>)}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 });
@@ -3538,6 +3594,24 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
   /* ── State ── */
   const [contacts, setContacts] = useState<ContactRow[]>([]);
+  /* Saved accounts/employees — used to pick WeChat group members. Fetched once;
+     cheap (allowlisted columns, no blobs). */
+  const [accountNames, setAccountNames] = useState<string[]>([]);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/accounts", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => {
+        if (!alive || !j?.accounts) return;
+        const names = (j.accounts as { username?: string | null; login_email?: string | null }[])
+          .map(a => (a.username || a.login_email || "").trim())
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b));
+        setAccountNames([...new Set(names)]);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<ViewMode>("list");
   const [typeTab, setTypeTab] = useState<ContactType | "all">(filterType || "all");
@@ -8053,8 +8127,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <Input label={t("field.timeZone", "Time zone / area")} tier="optional" value={form.business_timezone} onChange={v => setField("business_timezone", v)} placeholder={t("placeholder.timeZone", "e.g. Asia/Shanghai (GMT+8)")} icon={<GlobeIcon size={14} />} list="sup-timezone-opts" />
                   <ComboOptions id="sup-timezone-opts" options={TIMEZONE_OPTS} />
                   <div className="grid grid-cols-2 gap-2.5">
-                    <Input label={t("field.hoursFrom", "Open from")} tier="optional" type="time" value={form.business_hours_start} onChange={v => setField("business_hours_start", v)} />
-                    <Input label={t("field.hoursTo", "Open until")} tier="optional" type="time" value={form.business_hours_end} onChange={v => setField("business_hours_end", v)} />
+                    <TimeField label={t("field.hoursFrom", "Open from")} tier="optional" value={form.business_hours_start} onChange={v => setField("business_hours_start", v)} />
+                    <TimeField label={t("field.hoursTo", "Open until")} tier="optional" value={form.business_hours_end} onChange={v => setField("business_hours_end", v)} />
                   </div>
                 </div>
                 {/* Address — structured like a standard postal address:
@@ -8719,6 +8793,26 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <Input label={t("field.wechatOfficialAccount", "WeChat Official Account")} value={form.wechat_official_account} onChange={v => setField("wechat_official_account", v)} placeholder={t("placeholder.wechatOfficial", "Official Account name / ID")} icon={<BrandGlyph name="WeChat" size={14} />} />
                 <div className="flex flex-wrap gap-4 text-sm text-[var(--text-muted)] pt-0.5">
                   <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!form.wechat_sales_group_available} onChange={e => setField("wechat_sales_group_available", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.wechatGroupAvailable", "WeChat group available")}</label>
+                  {form.wechat_sales_group_available && (
+                    <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] p-3 space-y-2.5 mt-1">
+                      <Input
+                        label={t("field.wechatGroupName", "WeChat group name")}
+                        value={form.wechat_group_name}
+                        onChange={v => setField("wechat_group_name", v)}
+                        placeholder={t("placeholder.wechatGroupName", "e.g. Koleex × Supplier — Sales")}
+                        icon={<BrandGlyph name="WeChat" size={14} />}
+                      />
+                      <MultiReasonField
+                        label={t("field.wechatGroupMembers", "Group members (from your team)")}
+                        value={form.wechat_group_members}
+                        onChange={v => setField("wechat_group_members", v)}
+                        placeholder={accountNames.length ? t("placeholder.wechatMembers", "Pick a teammate or type a name") : t("placeholder.wechatMembersEmpty", "Type a name")}
+                        options={accountNames}
+                        icon={<UsersIcon size={14} />}
+                        datalistId="sup-wechat-members-opts"
+                      />
+                    </div>
+                  )}
                   <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!form.wecom_support_available} onChange={e => setField("wecom_support_available", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.wecomSupport", "WeCom support")}</label>
                 </div>
                 {form.social_profiles.length === 0 && (
