@@ -330,6 +330,34 @@ async function generatePdfThumbnail(file: File): Promise<Blob | null> {
   return Promise.race([generate(), timeout]);
 }
 
+/* Render the first page of a PDF *at a URL* to a JPEG blob — used to lazily
+   backfill a cover for catalogs that were created without one (e.g. synced
+   from a supplier before covers existed). pdf.js fetches the URL itself
+   (Supabase public bucket allows CORS). */
+async function pdfUrlFirstPageBlob(url: string): Promise<Blob | null> {
+  try {
+    await ensurePdfJs();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pdfjsLib = (window as any).pdfjsLib;
+    const pdf = await pdfjsLib.getDocument({ url }).promise;
+    const page = await pdf.getPage(1);
+    const viewport = page.getViewport({ scale: 0.75 });
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    return await new Promise<Blob | null>((r) => canvas.toBlob((b) => r(b), "image/jpeg", 0.85));
+  } catch (e) {
+    console.error("[pdf-url-cover]", e);
+    return null;
+  }
+}
+/* Cover backfill attempts are once-per-session per catalog id (avoid refetching
+   a large PDF if a card remounts before the PATCH lands). */
+const coverBackfillTried = new Set<string>();
+
 /* ═══════════════════════════════════════
    ── Quick Add Supplier / Company Modal ──
    ═══════════════════════════════════════ */
@@ -1614,9 +1642,45 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
 }) {
   const ft = FILE_TYPE_CONFIG[catalog.file_type] || DEFAULT_FT;
   const Icon = ft.icon;
-  const coverUrl = catalog.cover_url || (isImageFile(catalog.file_type) ? catalog.file_url : null);
   const [coverErr, setCoverErr] = useState(false);
+  const [lazyCover, setLazyCover] = useState<string | null>(null);
   const { t } = useTranslation(T);
+
+  /* If a PDF catalog has no cover yet (e.g. synced from a supplier before
+     covers existed), render its first page on view and persist it so it sticks. */
+  useEffect(() => {
+    if (catalog.file_type !== "pdf" || catalog.cover_url || !catalog.file_url) return;
+    if (coverBackfillTried.has(catalog.id)) return;
+    coverBackfillTried.add(catalog.id);
+    let alive = true;
+    (async () => {
+      const blob = await pdfUrlFirstPageBlob(catalog.file_url);
+      if (!blob || !alive) return;
+      setLazyCover(URL.createObjectURL(blob));
+      try {
+        const fd = new FormData();
+        fd.append("file", blob, `${catalog.id}.cover.jpg`);
+        fd.append("bucket", "media");
+        fd.append("path", `catalog-covers/${catalog.id}.jpg`);
+        fd.append("contentType", "image/jpeg");
+        fd.append("upsert", "true");
+        const up = await fetch("/api/storage/upload", { method: "POST", body: fd });
+        if (up.ok) {
+          const j = await up.json();
+          if (j.publicUrl) {
+            await fetch(`/api/catalogs/${catalog.id}`, {
+              method: "PATCH", credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ cover_url: j.publicUrl, cover_path: j.path }),
+            });
+          }
+        }
+      } catch { /* best-effort persist */ }
+    })();
+    return () => { alive = false; };
+  }, [catalog.id, catalog.file_type, catalog.cover_url, catalog.file_url]);
+
+  const coverUrl = catalog.cover_url || lazyCover || (isImageFile(catalog.file_type) ? catalog.file_url : null);
 
   const handleDownload = () => {
     onDownload();
@@ -1770,9 +1834,45 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
 }) {
   const ft = FILE_TYPE_CONFIG[catalog.file_type] || DEFAULT_FT;
   const Icon = ft.icon;
-  const coverUrl = catalog.cover_url || (isImageFile(catalog.file_type) ? catalog.file_url : null);
   const [coverErr, setCoverErr] = useState(false);
+  const [lazyCover, setLazyCover] = useState<string | null>(null);
   const { t } = useTranslation(T);
+
+  /* If a PDF catalog has no cover yet (e.g. synced from a supplier before
+     covers existed), render its first page on view and persist it so it sticks. */
+  useEffect(() => {
+    if (catalog.file_type !== "pdf" || catalog.cover_url || !catalog.file_url) return;
+    if (coverBackfillTried.has(catalog.id)) return;
+    coverBackfillTried.add(catalog.id);
+    let alive = true;
+    (async () => {
+      const blob = await pdfUrlFirstPageBlob(catalog.file_url);
+      if (!blob || !alive) return;
+      setLazyCover(URL.createObjectURL(blob));
+      try {
+        const fd = new FormData();
+        fd.append("file", blob, `${catalog.id}.cover.jpg`);
+        fd.append("bucket", "media");
+        fd.append("path", `catalog-covers/${catalog.id}.jpg`);
+        fd.append("contentType", "image/jpeg");
+        fd.append("upsert", "true");
+        const up = await fetch("/api/storage/upload", { method: "POST", body: fd });
+        if (up.ok) {
+          const j = await up.json();
+          if (j.publicUrl) {
+            await fetch(`/api/catalogs/${catalog.id}`, {
+              method: "PATCH", credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ cover_url: j.publicUrl, cover_path: j.path }),
+            });
+          }
+        }
+      } catch { /* best-effort persist */ }
+    })();
+    return () => { alive = false; };
+  }, [catalog.id, catalog.file_type, catalog.cover_url, catalog.file_url]);
+
+  const coverUrl = catalog.cover_url || lazyCover || (isImageFile(catalog.file_type) ? catalog.file_url : null);
 
   const handleDownload = () => {
     onDownload();
