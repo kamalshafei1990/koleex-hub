@@ -876,6 +876,16 @@ function CatalogModal({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { t } = useTranslation(T);
 
+  /* Lock the background page scroll while the upload/edit modal is open, so
+     scrolling inside the modal doesn't bleed into (and jump) the grid behind
+     it. Restores the previous overflow on close. */
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [open]);
+
   // Populate form
   useEffect(() => {
     if (open) {
@@ -1844,7 +1854,9 @@ function PreviewModal({ catalog, onClose, onDownload }: { catalog: CatalogEntry 
     if (!catalog) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = prev; };
   }, [catalog, onClose]);
   if (!catalog) return null;
 

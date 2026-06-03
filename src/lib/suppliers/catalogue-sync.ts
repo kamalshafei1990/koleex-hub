@@ -86,6 +86,8 @@ type CatalogueItem = {
   type?: string;
   uploaded_at?: string;
   storage_path?: string;
+  cover_url?: string;
+  cover_path?: string;
 };
 
 type ContactLike = {
@@ -163,6 +165,8 @@ export async function syncContactCatalogues(
       file_url: it.url,
       file_type: fileType,
       file_size: fileSize,
+      cover_url: it.cover_url || (fileType !== "pdf" ? it.url : null),
+      cover_path: it.cover_path || null,
       created_by_name: "Supplier sync",
     });
   }

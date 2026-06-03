@@ -56,10 +56,11 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const deny = await requireModuleAccess(auth, "Suppliers");
   if (deny) return deny;
 
-  // Load the row (tenant-scoped) so we know which storage files to remove.
+  // Load the row (tenant-scoped) so we know which storage files to remove and
+  // which supplier (if any) mirrors this catalogue.
   const { data: row } = await supabaseServer
     .from("catalogs")
-    .select("file_path, cover_path")
+    .select("file_path, cover_path, contact_id, file_url")
     .eq("id", id)
     .eq("tenant_id", auth.tenant_id)
     .maybeSingle();
@@ -83,5 +84,25 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     console.error("[api/catalogs DELETE]", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  /* Two-way sync: if this catalog was mirrored from a supplier, also remove the
+     matching entry from that supplier's contacts.catalogues so deleting here
+     deletes it there too. Matched by file_url. Best-effort. */
+  const contactId = (row as { contact_id?: string | null } | null)?.contact_id;
+  const fileUrl = (row as { file_url?: string | null } | null)?.file_url;
+  if (contactId && fileUrl) {
+    try {
+      const { data: c } = await supabaseServer
+        .from("contacts").select("catalogues").eq("id", contactId).eq("tenant_id", auth.tenant_id).maybeSingle();
+      const arr = (c as { catalogues?: unknown } | null)?.catalogues;
+      if (Array.isArray(arr)) {
+        const next = arr.filter((it) => !(it && typeof it === "object" && (it as { url?: string }).url === fileUrl));
+        if (next.length !== arr.length) {
+          await supabaseServer.from("contacts").update({ catalogues: next }).eq("id", contactId).eq("tenant_id", auth.tenant_id);
+        }
+      }
+    } catch (e) { console.error("[api/catalogs DELETE] supplier mirror", e); }
+  }
+
   return NextResponse.json({ ok: true });
 }

@@ -353,7 +353,7 @@ interface ContactForm {
   supplier_postal_code: string;
   division: string;
   category: string;
-  catalogues: { name: string; url: string; type: string; uploaded_at: string }[];
+  catalogues: { name: string; url: string; type: string; uploaded_at: string; cover_url?: string; cover_path?: string; storage_path?: string }[];
   documents: { doc_name: string; name: string; url: string; type: string; uploaded_at: string }[];
   contact_persons: { name: string; name_cn?: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string; whatsapp?: string; wechat_id?: string; wechat_qr?: string; role_category?: string; is_decision_maker?: boolean; is_primary?: boolean; telegram?: string; wecom_id?: string; line_id?: string; skype_id?: string; preferred_channel?: string; preferred_language?: string; timezone?: string; available_hours?: string; reliability?: string; response_speed?: string; id_image?: string }[];
   bank_accounts: { bank_name: string; account_name: string; account_number: string; swift_code: string; iban: string; branch: string; currency: string; info_image?: string }[];
@@ -1233,26 +1233,27 @@ async function readFileAsDataURL(file: File): Promise<string> {
     serverless function's ~4.5 MB limit (413) and broke every save. Documents
     now live in Storage; only the small URL is kept on the row. Falls back to
     inline base64 if the upload fails, so the feature never silently breaks. */
-async function uploadFileToStorage(file: File): Promise<string> {
+/** Upload a Blob/File to the media bucket; returns its public URL + storage path
+    (or null on failure). Used for both the catalogue file and its cover. */
+async function uploadToMediaStorage(blob: Blob, name: string): Promise<{ url: string; path: string } | null> {
   try {
-    const safe = (file.name || "file")
-      .normalize("NFKD")
-      .replace(/[^\w.\-]+/g, "_")
-      .replace(/_+/g, "_")
-      .slice(0, 80);
+    const safe = (name || "file").normalize("NFKD").replace(/[^\w.\-]+/g, "_").replace(/_+/g, "_").slice(0, 80);
     const fd = new FormData();
-    fd.append("file", file);
+    fd.append("file", blob, safe);
     fd.append("bucket", "media");
     fd.append("path", `supplier-catalogues/${Date.now()}_${safe}`);
-    fd.append("contentType", file.type || "application/octet-stream");
+    const ct = (blob as File).type || "application/octet-stream";
+    fd.append("contentType", ct);
     const res = await fetch("/api/storage/upload", { method: "POST", body: fd });
-    if (!res.ok) throw new Error(`upload ${res.status}`);
-    const json = (await res.json()) as { publicUrl?: string };
-    if (!json.publicUrl) throw new Error("no url");
-    return json.publicUrl;
-  } catch {
-    return readFileAsDataURL(file);
-  }
+    if (!res.ok) return null;
+    const json = (await res.json()) as { publicUrl?: string; path?: string };
+    return json.publicUrl && json.path ? { url: json.publicUrl, path: json.path } : null;
+  } catch { return null; }
+}
+
+async function uploadFileToStorage(file: File): Promise<string> {
+  const up = await uploadToMediaStorage(file, file.name);
+  return up ? up.url : readFileAsDataURL(file);
 }
 
 /** Convert a base64 data URL to a Blob URL that browsers can open/download */
@@ -8503,15 +8504,37 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <span className="text-xs text-[var(--text-faint)]">{t("photo.uploadCatalogue")}</span>
                   <input type="file" accept=".pdf,image/*" className="hidden" onChange={e => {
                     const file = e.target.files?.[0];
-                    if (file) {
-                      const isPdf = file.type === "application/pdf";
+                    if (!file) return;
+                    const isPdf = file.type === "application/pdf";
+                    const existing = form.catalogues;
+                    (async () => {
                       // Always upload to Storage (not inline base64) so the catalogue
-                      // gets an http URL that syncs to the Catalogs app — for images too.
-                      const handler = uploadFileToStorage(file);
-                      handler.then(url => {
-                        setField("catalogues", [...form.catalogues, { name: file.name, url, type: isPdf ? "PDF" : file.type.split("/").pop()?.toUpperCase() || "IMAGE", uploaded_at: new Date().toISOString() }]);
-                      });
-                    }
+                      // gets an http URL that syncs to the Catalogs app — images too.
+                      const up = await uploadToMediaStorage(file, file.name);
+                      const url = up ? up.url : await readFileAsDataURL(file);
+                      const item: (typeof existing)[number] = {
+                        name: file.name,
+                        url,
+                        type: isPdf ? "PDF" : (file.type.split("/").pop()?.toUpperCase() || "IMAGE"),
+                        uploaded_at: new Date().toISOString(),
+                        ...(up?.path ? { storage_path: up.path } : {}),
+                      };
+                      if (isPdf) {
+                        // Render the PDF's first page as the cover so the Catalogs app
+                        // (and detail views) show a real cover, not a generic tile.
+                        try {
+                          const { pdfFirstPageCover } = await import("@/lib/pdf-cover");
+                          const cover = await pdfFirstPageCover(file);
+                          if (cover) {
+                            const cu = await uploadToMediaStorage(cover, `${file.name}.cover.jpg`);
+                            if (cu) { item.cover_url = cu.url; item.cover_path = cu.path; }
+                          }
+                        } catch { /* cover is best-effort */ }
+                      } else if (up) {
+                        item.cover_url = up.url; // image is its own cover
+                      }
+                      setField("catalogues", [...existing, item]);
+                    })();
                   }} />
                 </label>
               </div>
