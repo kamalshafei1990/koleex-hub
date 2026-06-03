@@ -1131,6 +1131,34 @@ async function readFileAsDataURL(file: File): Promise<string> {
   });
 }
 
+/** Upload a file (PDF / large document) to Supabase Storage and return its
+    public URL. Storing big files inline as base64 in a JSONB column bloated
+    one contact row to 40 MB, which made GET /api/contacts/[id] exceed the
+    serverless function's ~4.5 MB limit (413) and broke every save. Documents
+    now live in Storage; only the small URL is kept on the row. Falls back to
+    inline base64 if the upload fails, so the feature never silently breaks. */
+async function uploadFileToStorage(file: File): Promise<string> {
+  try {
+    const safe = (file.name || "file")
+      .normalize("NFKD")
+      .replace(/[^\w.\-]+/g, "_")
+      .replace(/_+/g, "_")
+      .slice(0, 80);
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("bucket", "media");
+    fd.append("path", `supplier-catalogues/${Date.now()}_${safe}`);
+    fd.append("contentType", file.type || "application/octet-stream");
+    const res = await fetch("/api/storage/upload", { method: "POST", body: fd });
+    if (!res.ok) throw new Error(`upload ${res.status}`);
+    const json = (await res.json()) as { publicUrl?: string };
+    if (!json.publicUrl) throw new Error("no url");
+    return json.publicUrl;
+  } catch {
+    return readFileAsDataURL(file);
+  }
+}
+
 /** Convert a base64 data URL to a Blob URL that browsers can open/download */
 function dataURLtoBlobURL(dataURL: string): string {
   try {
@@ -6523,17 +6551,23 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <CrossIcon size={14} />
               </button>
             </div>
-            <div className="mt-3 flex items-center gap-2 ms-6">
-              <p className="text-xs text-[var(--text-faint)] flex-1">
-                {t("error.rlsHint")}
-              </p>
-              <button
-                onClick={() => { navigator.clipboard.writeText(RLS_FIX_SQL); setRlsCopied(true); setTimeout(() => setRlsCopied(false), 2000); }}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-[var(--bg-surface-hover)] hover:bg-[var(--bg-surface-active)] text-[var(--text-secondary)] shrink-0 transition-colors"
-              >
-                {rlsCopied ? <><CheckIcon size={12} className="text-green-400" /> {t("btn.copied")}</> : <><CopyIcon size={12} /> {t("btn.copyFixSql")}</>}
-              </button>
-            </div>
+            {/* Only surface the RLS / "copy fix SQL" hint for genuine permission
+                errors — showing it for every server error (e.g. a timeout or a
+                payload-too-large) misled the user into chasing a non-existent
+                RLS problem. */}
+            {!saveErrorIsValidation && /permission|policy|row-level|\brls\b|not authoriz|forbidden|\b401\b|\b403\b|42501/i.test(saveError) && (
+              <div className="mt-3 flex items-center gap-2 ms-6">
+                <p className="text-xs text-[var(--text-faint)] flex-1">
+                  {t("error.rlsHint")}
+                </p>
+                <button
+                  onClick={() => { navigator.clipboard.writeText(RLS_FIX_SQL); setRlsCopied(true); setTimeout(() => setRlsCopied(false), 2000); }}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-[var(--bg-surface-hover)] hover:bg-[var(--bg-surface-active)] text-[var(--text-secondary)] shrink-0 transition-colors"
+                >
+                  {rlsCopied ? <><CheckIcon size={12} className="text-green-400" /> {t("btn.copied")}</> : <><CopyIcon size={12} /> {t("btn.copyFixSql")}</>}
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -7324,7 +7358,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 const file = e.target.files?.[0];
                 if (file) {
                   const isImage = file.type.startsWith("image/");
-                  const handler = isImage ? compressImage(file, 1200, 0.8) : readFileAsDataURL(file);
+                  const handler = isImage ? compressImage(file, 1200, 0.8) : uploadFileToStorage(file);
                   handler.then(url => {
                     setField("attachments", [...form.attachments, {
                       name: file.name,
@@ -8294,7 +8328,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     const file = e.target.files?.[0];
                     if (file) {
                       const isPdf = file.type === "application/pdf";
-                      const handler = isPdf ? readFileAsDataURL(file) : compressImage(file, 1200, 0.8);
+                      const handler = isPdf ? uploadFileToStorage(file) : compressImage(file, 1200, 0.8);
                       handler.then(url => {
                         setField("catalogues", [...form.catalogues, { name: file.name, url, type: isPdf ? "PDF" : file.type.split("/").pop()?.toUpperCase() || "IMAGE", uploaded_at: new Date().toISOString() }]);
                       });
@@ -8536,7 +8570,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                               const file = e.target.files?.[0];
                               if (file) {
                                 const isPdf = file.type === "application/pdf";
-                                const handler = isPdf ? readFileAsDataURL(file) : compressImage(file, 1200, 0.8);
+                                const handler = isPdf ? uploadFileToStorage(file) : compressImage(file, 1200, 0.8);
                                 handler.then(url => {
                                   const arr = [...form.documents];
                                   arr[i] = { ...arr[i], name: file.name, url, type: isPdf ? "PDF" : file.type.split("/").pop()?.toUpperCase() || "FILE", uploaded_at: new Date().toISOString() };
