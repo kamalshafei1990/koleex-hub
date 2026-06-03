@@ -100,6 +100,12 @@ const T: Translations = {
   "modal.tags":           { en: "Tags", zh: "标签", ar: "الوسوم" },
   "modal.tagsPlaceholder":{ en: "comma, separated, tags", zh: "用逗号分隔的标签", ar: "وسوم مفصولة بفواصل" },
   "modal.replaceCover":   { en: "Set cover", zh: "设置封面", ar: "تعيين الغلاف" },
+  "modal.multiHint":      { en: "drag or select multiple", zh: "可拖拽或多选", ar: "اسحب أو اختر عدة ملفات" },
+  "modal.batchCount":     { en: "{n} files selected", zh: "已选择 {n} 个文件", ar: "تم تحديد {n} ملف" },
+  "modal.addMore":        { en: "Add more", zh: "添加更多", ar: "إضافة المزيد" },
+  "modal.batchTitleNote": { en: "Each file becomes a catalog (title = filename). The fields below apply to all of them.", zh: "每个文件将创建一个目录（标题为文件名）。以下字段将应用于全部。", ar: "كل ملف يصبح كتالوجًا (العنوان = اسم الملف). تنطبق الحقول أدناه على الجميع." },
+  "modal.uploadBatch":    { en: "Upload {n}", zh: "上传 {n} 个", ar: "رفع {n}" },
+  "modal.uploadingN":     { en: "Uploading {i}/{n}…", zh: "上传中 {i}/{n}…", ar: "جارٍ الرفع {i}/{n}…" },
   "cat.allYears":         { en: "All Years", zh: "所有年份", ar: "كل السنوات" },
   "cat.allTags":          { en: "All Tags", zh: "所有标签", ar: "كل الوسوم" },
   "cat.sortNewest":       { en: "Newest", zh: "最新", ar: "الأحدث" },
@@ -112,6 +118,7 @@ const T: Translations = {
   "cat.clearSel":         { en: "Clear", zh: "清除", ar: "مسح" },
   "cat.selectAll":        { en: "Select all", zh: "全选", ar: "تحديد الكل" },
   "preview.none":         { en: "Preview not available for this file type.", zh: "此文件类型无法预览。", ar: "المعاينة غير متاحة لهذا النوع من الملفات." },
+  "cat.loadMore":         { en: "Load more ({n})", zh: "加载更多（{n}）", ar: "تحميل المزيد ({n})" },
   "modal.descPlaceholder":{ en: "Optional notes about this catalog", zh: "关于此目录的可选备注", ar: "ملاحظات اختيارية حول هذا الكتالوج" },
   "modal.saveChanges":    { en: "Save Changes", zh: "保存更改", ar: "حفظ التغييرات" },
   "modal.uploadBtn":      { en: "Upload", zh: "上传", ar: "رفع" },
@@ -751,6 +758,8 @@ function CatalogModal({
   const [validUntil, setValidUntil] = useState("");
   const [tagsInput, setTagsInput] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [batchFiles, setBatchFiles] = useState<File[]>([]);
+  const [dragOver, setDragOver] = useState(false);
   const [thumbnailBlob, setThumbnailBlob] = useState<Blob | null>(null);
   const [thumbPreview, setThumbPreview] = useState<string | null>(null);
   const [generatingThumb, setGeneratingThumb] = useState(false);
@@ -794,6 +803,8 @@ function CatalogModal({
         setThumbPreview(null);
       }
       setFile(null);
+      setBatchFiles([]);
+      setDragOver(false);
       setThumbnailBlob(null);
       setGeneratingThumb(false);
       setError("");
@@ -836,22 +847,37 @@ function CatalogModal({
     return categories.filter(c => c.division_id === div.id);
   }, [divisionSlug, divisions, categories]);
 
+  const ALLOWED_EXT = ["pdf", "jpg", "jpeg", "png", "psd", "cdr"];
+  const validateFile = (f: File): string | null => {
+    const ext = f.name.split(".").pop()?.toLowerCase() || "";
+    if (!ALLOWED_EXT.includes(ext)) return t("err.unsupported");
+    if (f.size > 500 * 1024 * 1024) return t("err.tooLarge").replace("{mb}", String(Math.ceil(f.size / 1024 / 1024)));
+    return null;
+  };
+
   const handleFileSelect = async (files: FileList | null) => {
     if (!files?.length) return;
-    const f = files[0];
-    const allowed = ["pdf", "jpg", "jpeg", "png", "psd", "cdr"];
-    const ext = f.name.split(".").pop()?.toLowerCase() || "";
-    if (!allowed.includes(ext)) {
-      setError(t("err.unsupported"));
+    const arr = Array.from(files);
+
+    // Multiple files (only in add mode) → batch upload, one catalog per file.
+    if (arr.length > 1 && !editEntry) {
+      const valid = arr.filter(f => !validateFile(f));
+      const rejected = arr.length - valid.length;
+      if (!valid.length) { setError(t("err.unsupported")); return; }
+      setFile(null); setThumbnailBlob(null); setThumbPreview(null);
+      setBatchFiles(valid);
+      setError(rejected > 0 ? t("err.unsupported") : "");
       return;
     }
-    if (f.size > 500 * 1024 * 1024) {
-      setError(t("err.tooLarge").replace("{mb}", String(Math.ceil(f.size / 1024 / 1024))));
-      return;
-    }
+
+    const f = arr[0];
+    const v = validateFile(f);
+    if (v) { setError(v); return; }
+    setBatchFiles([]);
     setFile(f);
     setError("");
     if (!title) setTitle(f.name.replace(/\.[^.]+$/, ""));
+    const ext = f.name.split(".").pop()?.toLowerCase() || "";
 
     // Auto-generate cover
     if (isImageFile(ext)) {
@@ -903,7 +929,63 @@ function CatalogModal({
     }
   };
 
+  // Generate a cover Blob for a file (PDF first page or downscaled image).
+  const coverBlobFor = async (f: File): Promise<Blob | null> => {
+    const ext = f.name.split(".").pop()?.toLowerCase() || "";
+    if (isImageFile(ext)) return imageToCoverBlob(f, 1200);
+    if (ext === "pdf") return generatePdfThumbnail(f);
+    return null;
+  };
+
   const handleSave = async () => {
+    const contact = localContacts.find(c => c.id === contactId);
+    const div = divisions.find(d => d.slug === divisionSlug);
+    const cat = categories.find(c => c.slug === categorySlug);
+    const yearVal = year.trim() ? (parseInt(year.trim(), 10) || null) : null;
+    const validVal = validUntil || null;
+    const tagList = tagsInput.split(",").map(s => s.trim()).filter(Boolean);
+
+    // ── Batch upload: one catalog per file, shared metadata ──
+    if (!editEntry && batchFiles.length > 1) {
+      setSaving(true); setError("");
+      let done = 0; const failed: string[] = [];
+      for (const f of batchFiles) {
+        setProgress(t("modal.uploadingN").replace("{i}", String(done + 1)).replace("{n}", String(batchFiles.length)));
+        setUploadPct(0);
+        try {
+          const cover = await coverBlobFor(f);
+          const uploaded = await uploadCatalogFile(f, (pct) => setUploadPct(pct));
+          if (!uploaded) { failed.push(f.name); continue; }
+          const ft = getFileType(f.name);
+          let coverUrl: string | null = isImageFile(ft) ? uploaded.url : null;
+          let coverPath: string | null = null;
+          if (cover) {
+            const cr = await uploadCatalogCover(uploaded.id, new window.File([cover], "cover.jpg", { type: "image/jpeg" }));
+            if (cr) { coverUrl = cr.url; coverPath = cr.path; }
+          }
+          await createCatalog({
+            title: f.name.replace(/\.[^.]+$/, ""), title_cn: null,
+            description: description.trim() || null,
+            contact_id: contactId || null, contact_name: contact?.display_name || null,
+            company_name_en: contact?.company_name_en || null, company_name_cn: contact?.company_name_cn || null,
+            contact_type: contact?.contact_type || null,
+            division_slug: divisionSlug || null, division_name: div?.name || null,
+            category_slug: categorySlug || null, category_name: cat?.name || null,
+            file_name: f.name, file_path: uploaded.path, file_url: uploaded.url,
+            file_type: ft, file_size: f.size, cover_url: coverUrl, cover_path: coverPath,
+            tags: tagList, year: yearVal, valid_until: validVal,
+          });
+          if (contactId) await syncCatalogToContact(contactId, { name: f.name, url: uploaded.url, type: ft });
+          done++;
+        } catch (e) { console.error(e); failed.push(f.name); }
+      }
+      setProgress(""); setSaving(false);
+      if (failed.length) { setError(t("err.uploadFailed") + ` (${failed.length})`); }
+      onSave();
+      if (!failed.length) onClose();
+      return;
+    }
+
     if (!editEntry && !file) { setError(t("err.selectFile")); return; }
     if (!title.trim()) { setError(t("err.titleRequired")); return; }
 
@@ -912,15 +994,6 @@ function CatalogModal({
     setProgress(t("modal.uploadingFile"));
 
     try {
-      // Resolve from localContacts so a just-created supplier/company connects
-      // (it may not yet exist in the parent `contacts` prop).
-      const contact = localContacts.find(c => c.id === contactId);
-      const div = divisions.find(d => d.slug === divisionSlug);
-      const cat = categories.find(c => c.slug === categorySlug);
-      const yearVal = year.trim() ? (parseInt(year.trim(), 10) || null) : null;
-      const validVal = validUntil || null;
-      const tagList = tagsInput.split(",").map(s => s.trim()).filter(Boolean);
-
       if (editEntry) {
         let fileUrl = editEntry.file_url;
         let filePath = editEntry.file_path;
@@ -1085,13 +1158,33 @@ function CatalogModal({
           )}
 
           {/* File upload + auto thumbnail preview */}
-          <div>
+          <div
+            onDragOver={(e) => { if (!editEntry) { e.preventDefault(); setDragOver(true); } }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => { e.preventDefault(); setDragOver(false); if (!editEntry) handleFileSelect(e.dataTransfer.files); }}>
             <label className={lbl}>{t("modal.file")} *</label>
-            <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.psd,.cdr" className="hidden"
+            <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.psd,.cdr" multiple={!editEntry} className="hidden"
               onChange={(e) => { handleFileSelect(e.target.files); e.target.value = ""; }} />
             <input ref={coverRef} type="file" accept="image/*" className="hidden"
               onChange={(e) => { handleCoverSelect(e.target.files); e.target.value = ""; }} />
-            {file || editEntry ? (
+            {batchFiles.length > 0 ? (
+              <div className="rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-2">
+                <div className="flex items-center justify-between px-1 pb-2">
+                  <span className="text-[12px] font-semibold text-[var(--text-primary)]">{t("modal.batchCount").replace("{n}", String(batchFiles.length))}</span>
+                  <button onClick={() => fileRef.current?.click()} className="h-7 px-2.5 rounded-lg bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] inline-flex items-center gap-1"><PlusIcon className="h-3 w-3" /> {t("modal.addMore")}</button>
+                </div>
+                <div className="max-h-[180px] overflow-y-auto space-y-1">
+                  {batchFiles.map((bf, i) => (
+                    <div key={i} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)]">
+                      {(() => { const Icon = (FILE_TYPE_CONFIG[getFileType(bf.name)]?.icon) || FileIcon; return <Icon className="h-3.5 w-3.5 shrink-0 text-[var(--text-dim)]" />; })()}
+                      <span className="flex-1 min-w-0 truncate text-[12px] text-[var(--text-primary)]">{bf.name}</span>
+                      <span className="text-[10px] text-[var(--text-dim)] shrink-0">{formatFileSize(bf.size)}</span>
+                      <button onClick={() => setBatchFiles(p => p.filter((_, idx) => idx !== i))} className="h-5 w-5 shrink-0 flex items-center justify-center rounded text-[var(--text-dim)] hover:text-red-400"><CrossIcon className="h-3 w-3" /></button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : file || editEntry ? (
               <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
                 {/* Thumbnail preview */}
                 <div className="shrink-0 w-12 h-16 rounded-lg overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface-bright)] flex items-center justify-center">
@@ -1125,27 +1218,31 @@ function CatalogModal({
               </div>
             ) : (
               <button onClick={() => fileRef.current?.click()}
-                className="w-full py-8 rounded-xl border-2 border-dashed border-[var(--border-subtle)] hover:border-blue-500/40 bg-[var(--bg-surface)] flex flex-col items-center gap-2 transition-all cursor-pointer group">
-                <UploadIcon className="h-6 w-6 text-[var(--text-dim)] group-hover:text-blue-400 transition-colors" />
+                className={`w-full py-8 rounded-xl border-2 border-dashed bg-[var(--bg-surface)] flex flex-col items-center gap-2 transition-all cursor-pointer group ${dragOver ? "border-blue-500 bg-blue-500/5" : "border-[var(--border-subtle)] hover:border-blue-500/40"}`}>
+                <UploadIcon className={`h-6 w-6 transition-colors ${dragOver ? "text-blue-400" : "text-[var(--text-dim)] group-hover:text-blue-400"}`} />
                 <span className="text-[12px] text-[var(--text-dim)] group-hover:text-[var(--text-secondary)]">
                   {t("modal.fileDrop")}
                 </span>
-                <span className="text-[10px] text-[var(--text-dim)]">PDF, JPG, PNG, PSD, CDR</span>
+                <span className="text-[10px] text-[var(--text-dim)]">PDF, JPG, PNG, PSD, CDR · {t("modal.multiHint")}</span>
               </button>
             )}
           </div>
 
-          {/* Title — English + Chinese */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label className={lbl}>{t("modal.titleEn")} *</label>
-              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("modal.titlePlaceholder")} className={inp} />
+          {/* Title — English + Chinese (single upload only; batch uses filenames) */}
+          {batchFiles.length === 0 ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className={lbl}>{t("modal.titleEn")} *</label>
+                <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("modal.titlePlaceholder")} className={inp} />
+              </div>
+              <div>
+                <label className={lbl}>{t("modal.titleCn")}</label>
+                <input type="text" value={titleCn} onChange={(e) => setTitleCn(e.target.value)} placeholder={t("modal.titleCnPlaceholder")} className={inp} />
+              </div>
             </div>
-            <div>
-              <label className={lbl}>{t("modal.titleCn")}</label>
-              <input type="text" value={titleCn} onChange={(e) => setTitleCn(e.target.value)} placeholder={t("modal.titleCnPlaceholder")} className={inp} />
-            </div>
-          </div>
+          ) : (
+            <p className="text-[11px] text-[var(--text-dim)] -mt-1">{t("modal.batchTitleNote")}</p>
+          )}
 
           {/* Supplier / Company */}
           <div ref={dropdownRef} className="relative">
@@ -1321,10 +1418,10 @@ function CatalogModal({
               className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">
               {t("common.cancel")}
             </button>
-            <button onClick={handleSave} disabled={saving || (!file && !editEntry) || !title.trim()}
+            <button onClick={handleSave} disabled={saving || (batchFiles.length > 0 ? false : (!file && !editEntry) || !title.trim())}
               className="h-10 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-40">
               {saving && <SpinnerIcon className="h-4 w-4 animate-spin" />}
-              {saving ? (progress || t("modal.uploading")) : editEntry ? t("modal.saveChanges") : t("modal.uploadBtn")}
+              {saving ? (progress || t("modal.uploading")) : editEntry ? t("modal.saveChanges") : batchFiles.length > 0 ? t("modal.uploadBatch").replace("{n}", String(batchFiles.length)) : t("modal.uploadBtn")}
             </button>
           </div>
         </div>
@@ -1404,6 +1501,7 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
   const ft = FILE_TYPE_CONFIG[catalog.file_type] || DEFAULT_FT;
   const Icon = ft.icon;
   const coverUrl = catalog.cover_url || (isImageFile(catalog.file_type) ? catalog.file_url : null);
+  const [coverErr, setCoverErr] = useState(false);
   const { t } = useTranslation(T);
 
   const handleDownload = () => {
@@ -1426,8 +1524,8 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
       </button>
       {/* Cover area */}
       <div className="relative aspect-[3/4] overflow-hidden">
-        {coverUrl ? (
-          <img src={coverUrl} alt={catalog.title} loading="lazy" decoding="async"
+        {coverUrl && !coverErr ? (
+          <img src={coverUrl} alt={catalog.title} loading="lazy" decoding="async" onError={() => setCoverErr(true)}
             className="w-full h-full object-contain bg-white transition-transform duration-300 group-hover:scale-[1.02]" />
         ) : (
           <div className={`w-full h-full bg-gradient-to-br ${ft.bgFrom} ${ft.bgTo} flex flex-col items-center justify-center gap-3 p-4`}>
@@ -1544,6 +1642,7 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
   const ft = FILE_TYPE_CONFIG[catalog.file_type] || DEFAULT_FT;
   const Icon = ft.icon;
   const coverUrl = catalog.cover_url || (isImageFile(catalog.file_type) ? catalog.file_url : null);
+  const [coverErr, setCoverErr] = useState(false);
   const { t } = useTranslation(T);
 
   const handleDownload = () => {
@@ -1564,8 +1663,8 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
         <CheckIcon className="h-3 w-3" />
       </button>
       <div className="shrink-0 w-12 h-16 rounded-lg overflow-hidden border border-[var(--border-subtle)]">
-        {coverUrl ? (
-          <img src={coverUrl} alt="" loading="lazy" decoding="async" className="w-full h-full object-contain bg-white" />
+        {coverUrl && !coverErr ? (
+          <img src={coverUrl} alt="" loading="lazy" decoding="async" onError={() => setCoverErr(true)} className="w-full h-full object-contain bg-white" />
         ) : (
           <div className={`w-full h-full bg-gradient-to-br ${ft.bgFrom} ${ft.bgTo} flex items-center justify-center`}>
             <Icon className={`h-5 w-5 ${ft.color} opacity-60`} />
@@ -1696,6 +1795,7 @@ export default function CatalogsPage() {
   const [filterYear, setFilterYear] = useState("all");
   const [filterTag, setFilterTag] = useState("all");
   const [sortBy, setSortBy] = useState<"newest" | "name" | "size" | "year">("newest");
+  const [visibleCount, setVisibleCount] = useState(24);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [previewCatalog, setPreviewCatalog] = useState<CatalogEntry | null>(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
@@ -1730,6 +1830,9 @@ export default function CatalogsPage() {
   }, []);
 
   useEffect(() => { loadAll(); }, [loadAll]);
+
+  // Reset how many cards are shown when the filter/sort context changes.
+  useEffect(() => { setVisibleCount(24); }, [search, filterSupplier, filterDivision, filterType, filterYear, filterTag, sortBy]);
 
   const filtered = useMemo(() => {
     let result = [...catalogs];
@@ -1991,7 +2094,7 @@ export default function CatalogsPage() {
           </div>
         ) : viewMode === "grid" ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
-            {filtered.map(catalog => (
+            {filtered.slice(0, visibleCount).map(catalog => (
               <CatalogCard key={catalog.id} catalog={catalog} divLogos={divLogos} catLogos={catLogos}
                 selected={selected.has(catalog.id)} onToggleSelect={() => toggleSelect(catalog.id)}
                 onPreview={() => handlePreview(catalog)}
@@ -2001,13 +2104,23 @@ export default function CatalogsPage() {
           </div>
         ) : (
           <div className="flex flex-col gap-2">
-            {filtered.map(catalog => (
+            {filtered.slice(0, visibleCount).map(catalog => (
               <CatalogRow key={catalog.id} catalog={catalog} divLogos={divLogos} catLogos={catLogos}
                 selected={selected.has(catalog.id)} onToggleSelect={() => toggleSelect(catalog.id)}
                 onPreview={() => handlePreview(catalog)}
                 onEdit={() => setUploadModal({ open: true, editEntry: catalog })}
                 onDelete={() => setDeleteModal({ open: true, catalog })} />
             ))}
+          </div>
+        )}
+
+        {/* Load more */}
+        {!loading && filtered.length > visibleCount && (
+          <div className="mt-6 flex justify-center">
+            <button onClick={() => setVisibleCount(c => c + 24)}
+              className="h-10 px-5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--text-dim)] transition-colors">
+              {t("cat.loadMore").replace("{n}", String(filtered.length - visibleCount))}
+            </button>
           </div>
         )}
 
