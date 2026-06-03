@@ -313,6 +313,7 @@ interface ContactForm {
   brand_names: string[];
   moq: string;
   lead_time: string;
+  backup_supplier_name: string;
   total_purchases: string;
   origin_country: string;
   origin_country_code: string;
@@ -814,6 +815,7 @@ const EMPTY_FORM: ContactForm = {
   brand_names: [],
   moq: "",
   lead_time: "",
+  backup_supplier_name: "",
   total_purchases: "",
   origin_country: "",
   origin_country_code: "",
@@ -1453,6 +1455,7 @@ function contactToForm(c: ContactRow): ContactForm {
     brand_names: Array.isArray(c.brand_names) ? c.brand_names : [],
     moq: c.moq || "",
     lead_time: c.lead_time || "",
+    backup_supplier_name: (c as unknown as Record<string, unknown>).backup_supplier_name as string || "",
     total_purchases: c.total_purchases || "",
     origin_country: c.origin_country || "",
     origin_country_code: c.origin_country_code || "",
@@ -1711,6 +1714,7 @@ function formToRow(f: ContactForm): Record<string, unknown> {
     brand_names: f.brand_names.length > 0 ? f.brand_names : null,
     moq: f.moq || null,
     lead_time: f.lead_time || null,
+    backup_supplier_name: f.backup_supplier_name || null,
     total_purchases: f.total_purchases || null,
     origin_country: f.origin_country || null,
     origin_country_code: f.origin_country_code || null,
@@ -8530,6 +8534,33 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.overall", "Overall")}</p>
                   <ScoreSlider label={t("field.internalScore", "Internal score (0–100)")} value={String(sIntel.risk.internal_evaluation_score)} onChange={(v) => { setRiskScoreManual(true); setIntelRisk("internal_evaluation_score", v); }} max={100} isAuto={!riskScoreManual} onUseAuto={() => setRiskScoreManual(false)} disabled={!isSuperAdmin} lockedNote={t("field.superAdminOnly", "Super admin only")} />
                   <label className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)]"><input type="checkbox" checked={!!sIntel.risk.backup_supplier_exists} onChange={(e) => setIntelRisk("backup_supplier_exists", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.backupExists", "Backup supplier exists")}</label>
+                  {sIntel.risk.backup_supplier_exists && (() => {
+                    const base = contacts
+                      .filter(c => c.contact_type === "supplier" && c.id !== editingId)
+                      .map(c => c.display_name || c.company_name_en || c.company_name_cn || "")
+                      .filter(Boolean)
+                      .sort((a, b) => a.localeCompare(b));
+                    // Keep a previously-saved name visible even if that supplier
+                    // isn't in the currently-loaded list.
+                    const opts = form.backup_supplier_name && !base.includes(form.backup_supplier_name)
+                      ? [form.backup_supplier_name, ...base]
+                      : base;
+                    return (
+                      <>
+                        <SelectInput
+                          label={t("field.backupSupplier", "Which supplier is the backup?")}
+                          value={form.backup_supplier_name}
+                          onChange={v => setField("backup_supplier_name", v)}
+                          options={opts}
+                          icon={<TruckIcon size={14} />}
+                          selectLabel={t("detail.select")}
+                        />
+                        {form.backup_supplier_name && !opts.includes(form.backup_supplier_name) && (
+                          <p className="text-[11px] text-[var(--text-faint)] -mt-1">{t("field.backupSupplierFreeText", "Saved: {name}").replace("{name}", form.backup_supplier_name)}</p>
+                        )}
+                      </>
+                    );
+                  })()}
                   <Input label={t("field.assessmentNotes", "Assessment notes")} value={String(sIntel.risk.assessment_notes)} onChange={(v) => setIntelRisk("assessment_notes", v)} />
                 </div>
                 {/* Risk items register — specific issues by dimension (operational,
