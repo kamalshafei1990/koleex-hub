@@ -249,123 +249,119 @@ function QuickAddContactModal({
 
   if (!open) return null;
 
-  const inp = "w-full h-11 px-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all appearance-none";
-  const sinp = inp.replace("h-11", "h-9") + " text-[12px]";
-  const lbl = "block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5";
-  const sectionTitle = "text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)] mb-3";
+  const inp = "w-full h-10 px-3.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all appearance-none";
+  const lbl = "block text-[11px] font-medium text-[var(--text-dim)] mb-1.5";
+  const sectionTitle = "text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]";
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-start justify-center p-4 pt-[5vh] overflow-y-auto">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-[560px] bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl mb-8">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)]">
+      <div className="relative flex max-h-[88vh] w-full max-w-[600px] flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] shadow-2xl">
+        {/* Header (fixed) */}
+        <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-subtle)] px-6 py-4">
           <div className="flex items-center gap-2.5">
             <Building2Icon className="h-4 w-4 text-[var(--text-dim)]" />
             <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">Add New Supplier / Company</h2>
           </div>
-          <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">
+          <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--text-dim)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] transition-colors">
             <CrossIcon className="h-4 w-4" />
           </button>
         </div>
-        <div className="px-6 py-5 space-y-6">
-          {error && <div className="px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-[12px] text-red-400">{error}</div>}
+
+        {/* Body (scrolls) */}
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+          {error && <div className="mb-5 rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-2.5 text-[12px] text-red-400">{error}</div>}
 
           {/* Type toggle */}
-          <div>
+          <div className="mb-6">
             <label className={lbl}>Type</label>
-            <div className="flex gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <button onClick={() => setContactType("supplier")}
-                className={`flex-1 h-10 rounded-xl text-[12px] font-semibold border transition-all ${contactType === "supplier" ? "bg-blue-500/15 border-blue-500/30 text-blue-400" : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-secondary)]"}`}>
+                className={`h-10 rounded-lg text-[12px] font-semibold border transition-all ${contactType === "supplier" ? "bg-blue-500/15 border-blue-500/30 text-blue-400" : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-secondary)]"}`}>
                 Supplier
               </button>
               <button onClick={() => setContactType("company")}
-                className={`flex-1 h-10 rounded-xl text-[12px] font-semibold border transition-all ${contactType === "company" ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400" : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-secondary)]"}`}>
+                className={`h-10 rounded-lg text-[12px] font-semibold border transition-all ${contactType === "company" ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400" : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-secondary)]"}`}>
                 Company
               </button>
             </div>
           </div>
 
           {/* ── Company profile ── */}
-          <div>
-            <p className={sectionTitle}>Company Profile</p>
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={lbl}>Company Name (English) *</label>
-                  <input type="text" value={nameEn} onChange={(e) => setNameEn(e.target.value)} placeholder="e.g. Delta Engineering Ltd" className={inp} autoFocus />
-                </div>
-                <div>
-                  <label className={lbl}>Company Name (Chinese)</label>
-                  <input type="text" value={nameCn} onChange={(e) => setNameCn(e.target.value)} placeholder="达美工程有限公司" className={inp} />
-                </div>
+          <p className={sectionTitle + " mb-3"}>Company Profile</p>
+          <div className="mb-6 space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className={lbl}>Company Name (English) <span className="text-red-400">*</span></label>
+                <input type="text" value={nameEn} onChange={(e) => setNameEn(e.target.value)} placeholder="e.g. Delta Engineering Ltd" className={inp} autoFocus />
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className={lbl}>Type</label>
-                  <select value={supplierType} onChange={(e) => setSupplierType(e.target.value)} className={inp}>
-                    <option value="">Select…</option>
-                    {QA_SUPPLIER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className={lbl}>Industry</label>
-                  <input type="text" value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="e.g. Sewing" className={inp} />
-                </div>
-                <div>
-                  <label className={lbl}>Source</label>
-                  <select value={source} onChange={(e) => setSource(e.target.value)} className={inp}>
-                    <option value="">Select…</option>
-                    {QA_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
+              <div>
+                <label className={lbl}>Company Name (Chinese)</label>
+                <input type="text" value={nameCn} onChange={(e) => setNameCn(e.target.value)} placeholder="达美工程有限公司" className={inp} />
               </div>
             </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className={lbl}>Type</label>
+                <select value={supplierType} onChange={(e) => setSupplierType(e.target.value)} className={inp}>
+                  <option value="">Select type…</option>
+                  {QA_SUPPLIER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={lbl}>Source</label>
+                <select value={source} onChange={(e) => setSource(e.target.value)} className={inp}>
+                  <option value="">Select source…</option>
+                  {QA_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className={lbl}>Industry</label>
+              <input type="text" value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="e.g. Industrial Sewing Machines" className={inp} />
+            </div>
           </div>
+
+          <div className="mb-6 border-t border-[var(--border-subtle)]" />
 
           {/* ── Contact details ── */}
-          <div>
-            <p className={sectionTitle}>Contact Details</p>
-            <div className="space-y-3">
-              <div className="grid grid-cols-3 gap-3">
-                <div><label className={lbl}>Telephone</label><input type="text" value={tel} onChange={(e) => setTel(e.target.value)} placeholder="+86 …" className={inp} /></div>
-                <div><label className={lbl}>Mobile</label><input type="text" value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="+86 …" className={inp} /></div>
-                <div><label className={lbl}>Email</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="info@…" className={inp} /></div>
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div><label className={lbl}>Website</label><input type="text" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://…" className={inp} /></div>
-                <div><label className={lbl}>Country</label><input type="text" value={country} onChange={(e) => setCountry(e.target.value)} placeholder="e.g. China" className={inp} /></div>
-                <div><label className={lbl}>Address</label><input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Full address" className={inp} /></div>
-              </div>
-            </div>
+          <p className={sectionTitle + " mb-3"}>Contact Details</p>
+          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div><label className={lbl}>Telephone</label><input type="text" value={tel} onChange={(e) => setTel(e.target.value)} placeholder="+86 755 …" className={inp} /></div>
+            <div><label className={lbl}>Mobile</label><input type="text" value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="+86 138 …" className={inp} /></div>
+            <div><label className={lbl}>Email</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="sales@company.com" className={inp} /></div>
+            <div><label className={lbl}>Website</label><input type="text" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://…" className={inp} /></div>
+            <div><label className={lbl}>Country</label><input type="text" value={country} onChange={(e) => setCountry(e.target.value)} placeholder="e.g. China" className={inp} /></div>
+            <div><label className={lbl}>Address</label><input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Full address" className={inp} /></div>
           </div>
 
+          <div className="mb-6 border-t border-[var(--border-subtle)]" />
+
           {/* ── Contact persons ── */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <p className={sectionTitle + " mb-0"}>Contact Person</p>
-              <button type="button" onClick={addPerson} className="h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center gap-1.5 transition-colors">
-                <PlusIcon className="h-3 w-3" /> Add Person
-              </button>
-            </div>
+          <div className="mb-2 flex items-center justify-between">
+            <p className={sectionTitle}>Contact Person</p>
+            <button type="button" onClick={addPerson} className="flex h-8 items-center gap-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-3 text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
+              <PlusIcon className="h-3 w-3" /> Add Person
+            </button>
+          </div>
+          <div className="mb-6">
             {persons.length === 0 ? (
-              <p className="text-[12px] text-[var(--text-dim)] text-center py-3 border border-dashed border-[var(--border-subtle)] rounded-xl">No contact person added yet</p>
+              <p className="rounded-lg border border-dashed border-[var(--border-subtle)] py-3 text-center text-[12px] text-[var(--text-dim)]">No contact person added yet</p>
             ) : (
               <div className="space-y-3">
                 {persons.map((p, i) => (
-                  <div key={i} className="p-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] space-y-2.5">
-                    <div className="flex items-center justify-between">
+                  <div key={i} className="rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-4">
+                    <div className="mb-3 flex items-center justify-between">
                       <span className="text-[11px] font-semibold text-[var(--text-dim)]">Person {i + 1}</span>
-                      <button type="button" onClick={() => removePerson(i)} className="h-6 w-6 rounded flex items-center justify-center text-[var(--text-dim)] hover:text-red-400 transition-colors"><TrashIcon className="h-3 w-3" /></button>
+                      <button type="button" onClick={() => removePerson(i)} className="flex h-6 w-6 items-center justify-center rounded text-[var(--text-dim)] hover:text-red-400 transition-colors"><TrashIcon className="h-3.5 w-3.5" /></button>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <input value={p.name} onChange={(e) => updatePerson(i, "name", e.target.value)} placeholder="Name" className={sinp} />
-                      <input value={p.position} onChange={(e) => updatePerson(i, "position", e.target.value)} placeholder="Position" className={sinp} />
-                      <input value={p.department} onChange={(e) => updatePerson(i, "department", e.target.value)} placeholder="Department" className={sinp} />
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <input value={p.phone} onChange={(e) => updatePerson(i, "phone", e.target.value)} placeholder="Phone" className={sinp} />
-                      <input value={p.mobile} onChange={(e) => updatePerson(i, "mobile", e.target.value)} placeholder="Mobile" className={sinp} />
-                      <input value={p.email} onChange={(e) => updatePerson(i, "email", e.target.value)} placeholder="Email" className={sinp} />
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div><label className={lbl}>Name</label><input value={p.name} onChange={(e) => updatePerson(i, "name", e.target.value)} placeholder="Full name" className={inp} /></div>
+                      <div><label className={lbl}>Position</label><input value={p.position} onChange={(e) => updatePerson(i, "position", e.target.value)} placeholder="e.g. Sales Manager" className={inp} /></div>
+                      <div><label className={lbl}>Department</label><input value={p.department} onChange={(e) => updatePerson(i, "department", e.target.value)} placeholder="e.g. Sales" className={inp} /></div>
+                      <div><label className={lbl}>Phone</label><input value={p.phone} onChange={(e) => updatePerson(i, "phone", e.target.value)} placeholder="Phone" className={inp} /></div>
+                      <div><label className={lbl}>Mobile</label><input value={p.mobile} onChange={(e) => updatePerson(i, "mobile", e.target.value)} placeholder="Mobile" className={inp} /></div>
+                      <div><label className={lbl}>Email</label><input value={p.email} onChange={(e) => updatePerson(i, "email", e.target.value)} placeholder="Email" className={inp} /></div>
                     </div>
                   </div>
                 ))}
@@ -373,23 +369,25 @@ function QuickAddContactModal({
             )}
           </div>
 
+          <div className="mb-6 border-t border-[var(--border-subtle)]" />
+
           {/* ── Messaging IDs ── */}
-          <div>
-            <p className={sectionTitle}>Messaging IDs</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className={lbl}>WeChat ID</label><input type="text" value={wechatId} onChange={(e) => setWechatId(e.target.value)} placeholder="wxid_…" className={inp} /></div>
-              <div><label className={lbl}>WeChat Official</label><input type="text" value={wechatOfficial} onChange={(e) => setWechatOfficial(e.target.value)} placeholder="Official account" className={inp} /></div>
-              <div><label className={lbl}>WhatsApp</label><input type="text" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+86 …" className={inp} /></div>
-              <div><label className={lbl}>Telegram</label><input type="text" value={telegram} onChange={(e) => setTelegram(e.target.value)} placeholder="@handle" className={inp} /></div>
-              <div><label className={lbl}>Line ID</label><input type="text" value={lineId} onChange={(e) => setLineId(e.target.value)} placeholder="line id" className={inp} /></div>
-              <div><label className={lbl}>QQ</label><input type="text" value={qqId} onChange={(e) => setQqId(e.target.value)} placeholder="QQ number" className={inp} /></div>
-            </div>
+          <p className={sectionTitle + " mb-3"}>Messaging IDs</p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div><label className={lbl}>WeChat ID</label><input type="text" value={wechatId} onChange={(e) => setWechatId(e.target.value)} placeholder="wxid_…" className={inp} /></div>
+            <div><label className={lbl}>WeChat Official</label><input type="text" value={wechatOfficial} onChange={(e) => setWechatOfficial(e.target.value)} placeholder="Official account" className={inp} /></div>
+            <div><label className={lbl}>WhatsApp</label><input type="text" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+86 …" className={inp} /></div>
+            <div><label className={lbl}>Telegram</label><input type="text" value={telegram} onChange={(e) => setTelegram(e.target.value)} placeholder="@handle" className={inp} /></div>
+            <div><label className={lbl}>Line ID</label><input type="text" value={lineId} onChange={(e) => setLineId(e.target.value)} placeholder="line id" className={inp} /></div>
+            <div><label className={lbl}>QQ</label><input type="text" value={qqId} onChange={(e) => setQqId(e.target.value)} placeholder="QQ number" className={inp} /></div>
           </div>
         </div>
-        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--border-subtle)] sticky bottom-0 bg-[var(--bg-primary)] rounded-b-2xl">
-          <button onClick={onClose} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">Cancel</button>
+
+        {/* Footer (fixed) */}
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[var(--border-subtle)] px-6 py-4">
+          <button onClick={onClose} className="h-10 px-5 rounded-lg text-[13px] font-medium text-[var(--text-dim)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] transition-colors">Cancel</button>
           <button onClick={handleSave} disabled={saving || !nameEn.trim()}
-            className="h-10 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-40">
+            className="flex h-10 items-center gap-2 rounded-lg bg-[var(--bg-inverted)] px-6 text-[13px] font-semibold text-[var(--text-inverted)] hover:opacity-90 transition-all disabled:opacity-40">
             {saving && <SpinnerIcon className="h-4 w-4 animate-spin" />}
             {saving ? "Creating..." : "Create"}
           </button>
