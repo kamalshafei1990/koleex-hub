@@ -338,6 +338,31 @@ async function compressImage(file: File, maxWidth = 600, quality = 0.85): Promis
   });
 }
 
+/* Downscale an image File to a small JPEG cover Blob so card grids load
+   fast (image catalogs otherwise use the full-resolution original). */
+async function imageToCoverBlob(file: File, maxWidth = 1200, quality = 0.82): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxWidth / img.width);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { resolve(null); return; }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((b) => resolve(b), "image/jpeg", quality);
+      };
+      img.onerror = () => resolve(null);
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  });
+}
+
 /* Text input with a leading icon. */
 function IconInput({ icon, value, onChange, placeholder, type = "text" }: {
   icon: ReactNode; value: string; onChange: (v: string) => void; placeholder?: string; type?: string;
@@ -831,7 +856,12 @@ function CatalogModal({
     // Auto-generate cover
     if (isImageFile(ext)) {
       setThumbPreview(URL.createObjectURL(f));
-      setThumbnailBlob(null); // image files use themselves as cover
+      // Downscale to a lightweight cover so the grid stays fast — falls back
+      // to the original image only if downscaling fails.
+      setGeneratingThumb(true);
+      const coverBlob = await imageToCoverBlob(f, 1200);
+      setThumbnailBlob(coverBlob);
+      setGeneratingThumb(false);
     } else if (ext === "pdf") {
       setGeneratingThumb(true);
       setThumbPreview(null);
@@ -1397,7 +1427,7 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
       {/* Cover area */}
       <div className="relative aspect-[3/4] overflow-hidden">
         {coverUrl ? (
-          <img src={coverUrl} alt={catalog.title}
+          <img src={coverUrl} alt={catalog.title} loading="lazy" decoding="async"
             className="w-full h-full object-contain bg-white transition-transform duration-300 group-hover:scale-[1.02]" />
         ) : (
           <div className={`w-full h-full bg-gradient-to-br ${ft.bgFrom} ${ft.bgTo} flex flex-col items-center justify-center gap-3 p-4`}>
@@ -1535,7 +1565,7 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
       </button>
       <div className="shrink-0 w-12 h-16 rounded-lg overflow-hidden border border-[var(--border-subtle)]">
         {coverUrl ? (
-          <img src={coverUrl} alt="" className="w-full h-full object-contain bg-white" />
+          <img src={coverUrl} alt="" loading="lazy" decoding="async" className="w-full h-full object-contain bg-white" />
         ) : (
           <div className={`w-full h-full bg-gradient-to-br ${ft.bgFrom} ${ft.bgTo} flex items-center justify-center`}>
             <Icon className={`h-5 w-5 ${ft.color} opacity-60`} />
