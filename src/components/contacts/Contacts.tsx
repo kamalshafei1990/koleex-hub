@@ -4043,6 +4043,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     // Don't save while the full record (images/docs) is still loading — would
     // overwrite unloaded image fields with blanks.
     if (formHydrating) { setSaveErrorIsValidation(false); setSaveError(t("loading", "Loading…")); return; }
+    // If we're editing but the full record never loaded (hydrate failed), saving
+    // would diff against nothing and overwrite un-loaded image/doc fields with
+    // blanks. Block it and ask the user to reopen instead of losing data.
+    if (editingId && !editOriginalRef.current) {
+      setSaveErrorIsValidation(false);
+      setSaveError(t("error.reopenToSave", "Couldn't load the full record. Please close and reopen this record, then save again."));
+      return;
+    }
     // Block save on supplier data-integrity errors (required + format validation).
     if (filterType === "supplier" || form.contact_type === "supplier") {
       const errs = supplierFormErrors(form);
@@ -8497,7 +8505,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     const file = e.target.files?.[0];
                     if (file) {
                       const isPdf = file.type === "application/pdf";
-                      const handler = isPdf ? uploadFileToStorage(file) : compressImage(file, 1200, 0.8);
+                      // Always upload to Storage (not inline base64) so the catalogue
+                      // gets an http URL that syncs to the Catalogs app — for images too.
+                      const handler = uploadFileToStorage(file);
                       handler.then(url => {
                         setField("catalogues", [...form.catalogues, { name: file.name, url, type: isPdf ? "PDF" : file.type.split("/").pop()?.toUpperCase() || "IMAGE", uploaded_at: new Date().toISOString() }]);
                       });
@@ -8608,7 +8618,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.overall", "Overall")}</p>
                   <ScoreSlider label={t("field.internalScore", "Internal score (0–100)")} value={String(sIntel.risk.internal_evaluation_score)} onChange={(v) => { setRiskScoreManual(true); setIntelRisk("internal_evaluation_score", v); }} max={100} isAuto={!riskScoreManual} onUseAuto={() => setRiskScoreManual(false)} disabled={!isSuperAdmin} lockedNote={t("field.superAdminOnly", "Super admin only")} />
                   <label className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)]"><input type="checkbox" checked={!!sIntel.risk.backup_supplier_exists} onChange={(e) => setIntelRisk("backup_supplier_exists", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.backupExists", "Backup supplier exists")}</label>
-                  {sIntel.risk.backup_supplier_exists && (() => {
+                  {(() => {
                     const base = contacts
                       .filter(c => c.contact_type === "supplier" && c.id !== editingId)
                       .map(c => c.display_name || c.company_name_en || c.company_name_cn || "")

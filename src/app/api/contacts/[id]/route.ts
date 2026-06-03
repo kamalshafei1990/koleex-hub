@@ -146,5 +146,18 @@ export async function DELETE(
     console.error("[api/contacts/[id] DELETE]", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  /* Don't leave the Catalogs app showing catalogues attached to a supplier
+     that no longer exists. Remove any catalogs rows that were synced from this
+     supplier (best-effort — failure here doesn't undo the contact delete). */
+  if (existing.contact_type === "supplier") {
+    const { error: cErr } = await supabaseServer
+      .from("catalogs")
+      .delete()
+      .eq("tenant_id", auth.tenant_id)
+      .eq("contact_id", id);
+    if (cErr) console.error("[api/contacts/[id] DELETE] catalogs cleanup", cErr.message);
+  }
+
   return NextResponse.json({ ok: true });
 }
