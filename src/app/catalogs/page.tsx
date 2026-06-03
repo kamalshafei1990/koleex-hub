@@ -35,6 +35,7 @@ import TagsIcon from "@/components/icons/ui/TagsIcon";
 import HashtagIcon from "@/components/icons/ui/HashtagIcon";
 import ScanLineIcon from "@/components/icons/ui/ScanLineIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
+import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 import ZoomInIcon from "@/components/icons/ui/ZoomInIcon";
 import ZoomOutIcon from "@/components/icons/ui/ZoomOutIcon";
 import BrandGlyph from "@/components/icons/brands/BrandGlyph";
@@ -106,6 +107,8 @@ const T: Translations = {
   "modal.batchTitleNote": { en: "Each file becomes a catalog (title = filename). The fields below apply to all of them.", zh: "每个文件将创建一个目录（标题为文件名）。以下字段将应用于全部。", ar: "كل ملف يصبح كتالوجًا (العنوان = اسم الملف). تنطبق الحقول أدناه على الجميع." },
   "modal.uploadBatch":    { en: "Upload {n}", zh: "上传 {n} 个", ar: "رفع {n}" },
   "modal.uploadingN":     { en: "Uploading {i}/{n}…", zh: "上传中 {i}/{n}…", ar: "جارٍ الرفع {i}/{n}…" },
+  "modal.dupWarn":        { en: "A catalog with this file name already exists — you can still upload it.", zh: "已存在同名文件的目录——仍可上传。", ar: "يوجد كتالوج بنفس اسم الملف — لا يزال بإمكانك رفعه." },
+  "modal.dupWarnN":       { en: "{n} of these files already exist — they'll be added as duplicates.", zh: "其中 {n} 个文件已存在——将作为副本添加。", ar: "{n} من هذه الملفات موجودة بالفعل — ستُضاف كنسخ مكررة." },
   "cat.allYears":         { en: "All Years", zh: "所有年份", ar: "كل السنوات" },
   "cat.allTags":          { en: "All Tags", zh: "所有标签", ar: "كل الوسوم" },
   "cat.sortNewest":       { en: "Newest", zh: "最新", ar: "الأحدث" },
@@ -736,7 +739,7 @@ function QuickAddContactModal({
    ── Upload / Edit Modal ──
    ═══════════════════════════════ */
 function CatalogModal({
-  open, onClose, editEntry, contacts, divisions, categories, divLogos, catLogos, onSave,
+  open, onClose, editEntry, contacts, divisions, categories, divLogos, catLogos, existing, onSave,
 }: {
   open: boolean;
   onClose: () => void;
@@ -746,6 +749,7 @@ function CatalogModal({
   categories: CategoryRow[];
   divLogos: Record<string, string>;
   catLogos: Record<string, string>;
+  existing: { id: string; file_name: string }[];
   onSave: () => void;
 }) {
   const [title, setTitle] = useState("");
@@ -759,6 +763,7 @@ function CatalogModal({
   const [tagsInput, setTagsInput] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [batchFiles, setBatchFiles] = useState<File[]>([]);
+  const [dupWarn, setDupWarn] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [thumbnailBlob, setThumbnailBlob] = useState<Blob | null>(null);
   const [thumbPreview, setThumbPreview] = useState<string | null>(null);
@@ -804,6 +809,7 @@ function CatalogModal({
       }
       setFile(null);
       setBatchFiles([]);
+      setDupWarn("");
       setDragOver(false);
       setThumbnailBlob(null);
       setGeneratingThumb(false);
@@ -859,6 +865,8 @@ function CatalogModal({
     if (!files?.length) return;
     const arr = Array.from(files);
 
+    const existingNames = new Set(existing.filter(e => e.id !== editEntry?.id).map(e => e.file_name));
+
     // Multiple files (only in add mode) → batch upload, one catalog per file.
     if (arr.length > 1 && !editEntry) {
       const valid = arr.filter(f => !validateFile(f));
@@ -867,6 +875,8 @@ function CatalogModal({
       setFile(null); setThumbnailBlob(null); setThumbPreview(null);
       setBatchFiles(valid);
       setError(rejected > 0 ? t("err.unsupported") : "");
+      const dupes = valid.filter(f => existingNames.has(f.name)).length;
+      setDupWarn(dupes > 0 ? t("modal.dupWarnN").replace("{n}", String(dupes)) : "");
       return;
     }
 
@@ -876,6 +886,7 @@ function CatalogModal({
     setBatchFiles([]);
     setFile(f);
     setError("");
+    setDupWarn(existingNames.has(f.name) ? t("modal.dupWarn") : "");
     if (!title) setTitle(f.name.replace(/\.[^.]+$/, ""));
     const ext = f.name.split(".").pop()?.toLowerCase() || "";
 
@@ -1154,6 +1165,11 @@ function CatalogModal({
           {error && (
             <div className="px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-[12px] text-red-400">
               {error}
+            </div>
+          )}
+          {dupWarn && !error && (
+            <div className="px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[12px] text-amber-500 flex items-center gap-2">
+              <ExclamationIcon className="h-3.5 w-3.5 shrink-0" /> {dupWarn}
             </div>
           )}
 
@@ -1563,11 +1579,14 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
 
       {/* Info */}
       <div className="p-3.5 flex flex-col gap-1.5">
-        <h3 className="text-[13px] font-semibold text-[var(--text-primary)] leading-tight line-clamp-2">
+        <h3 className="text-[13px] font-semibold text-[var(--text-primary)] leading-tight line-clamp-2" title={catalog.description || catalog.title}>
           {catalog.title}
         </h3>
         {catalog.title_cn && (
           <p className="text-[11px] text-[var(--text-dim)] leading-tight line-clamp-1 -mt-0.5">{catalog.title_cn}</p>
+        )}
+        {catalog.description && (
+          <p className="text-[11px] text-[var(--text-secondary)] leading-snug line-clamp-2">{catalog.description}</p>
         )}
         {(catalog.company_name_en || catalog.contact_name) && (
           <div className="flex flex-col">
@@ -1745,6 +1764,7 @@ function PreviewModal({ catalog, onClose }: { catalog: CatalogEntry | null; onCl
             {catalog.title_cn ? `${catalog.title_cn} · ` : ""}
             {catalog.created_by_name ? `${t("cat.uploadedBy")} ${catalog.created_by_name}` : fmtDate(catalog.created_at)}
           </p>
+          {catalog.description && <p className="text-[11px] text-white/40 truncate">{catalog.description}</p>}
         </div>
         {isImg && (
           <div className="flex items-center gap-1 mr-1">
@@ -2142,6 +2162,7 @@ export default function CatalogsPage() {
         categories={categories}
         divLogos={divLogos}
         catLogos={catLogos}
+        existing={catalogs.map(c => ({ id: c.id, file_name: c.file_name }))}
         onSave={loadAll}
       />
 
