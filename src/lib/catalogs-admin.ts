@@ -24,6 +24,7 @@ const CONFIG_PATH = "config/catalogs.json";
 export interface CatalogEntry {
   id: string;
   title: string;
+  title_cn: string | null;
   description: string | null;
   contact_id: string | null;
   contact_name: string | null;

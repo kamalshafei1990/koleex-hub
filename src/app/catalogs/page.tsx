@@ -64,6 +64,9 @@ const T: Translations = {
   "modal.genCover":       { en: "Generating cover preview...", zh: "正在生成封面预览…", ar: "جارٍ إنشاء معاينة الغلاف…" },
   "modal.titleField":     { en: "Title", zh: "标题", ar: "العنوان" },
   "modal.titlePlaceholder": { en: "Catalog title", zh: "目录标题", ar: "عنوان الكتالوج" },
+  "modal.titleEn":        { en: "Title (English)", zh: "标题（英文）", ar: "العنوان (بالإنجليزية)" },
+  "modal.titleCn":        { en: "Title (Chinese)", zh: "标题（中文）", ar: "العنوان (بالصينية)" },
+  "modal.titleCnPlaceholder": { en: "Catalog title in Chinese", zh: "中文目录标题", ar: "عنوان الكتالوج بالصينية" },
   "modal.supplierCompany":{ en: "Supplier / Company", zh: "供应商 / 公司", ar: "المورد / الشركة" },
   "modal.searchContacts": { en: "Search suppliers or companies…", zh: "搜索供应商或公司…", ar: "ابحث عن موردين أو شركات…" },
   "modal.noContacts":     { en: "No suppliers or companies found.", zh: "未找到供应商或公司。", ar: "لم يتم العثور على موردين أو شركات." },
@@ -519,6 +522,7 @@ function CatalogModal({
   onSave: () => void;
 }) {
   const [title, setTitle] = useState("");
+  const [titleCn, setTitleCn] = useState("");
   const [description, setDescription] = useState("");
   const [contactId, setContactId] = useState<string>("");
   const [divisionSlug, setDivisionSlug] = useState<string>("");
@@ -544,6 +548,7 @@ function CatalogModal({
     if (open) {
       if (editEntry) {
         setTitle(editEntry.title);
+        setTitleCn(editEntry.title_cn || "");
         setDescription(editEntry.description || "");
         setContactId(editEntry.contact_id || "");
         setDivisionSlug(editEntry.division_slug || "");
@@ -551,6 +556,7 @@ function CatalogModal({
         setThumbPreview(editEntry.cover_url || (isImageFile(editEntry.file_type) ? editEntry.file_url : null));
       } else {
         setTitle("");
+        setTitleCn("");
         setDescription("");
         setContactId("");
         setDivisionSlug("");
@@ -706,6 +712,7 @@ function CatalogModal({
         const savePromises: Promise<unknown>[] = [
           updateCatalog(editEntry.id, {
             title: title.trim(),
+            title_cn: titleCn.trim() || null,
             description: description.trim() || null,
             contact_id: contactId || null,
             contact_name: contact?.display_name || null,
@@ -758,6 +765,7 @@ function CatalogModal({
         const savePromises: Promise<unknown>[] = [
           createCatalog({
             title: title.trim(),
+            title_cn: titleCn.trim() || null,
             description: description.trim() || null,
             contact_id: contactId || null,
             contact_name: contact?.display_name || null,
@@ -867,10 +875,16 @@ function CatalogModal({
             )}
           </div>
 
-          {/* Title */}
-          <div>
-            <label className={lbl}>{t("modal.titleField")} *</label>
-            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("modal.titlePlaceholder")} className={inp} />
+          {/* Title — English + Chinese */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className={lbl}>{t("modal.titleEn")} *</label>
+              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("modal.titlePlaceholder")} className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>{t("modal.titleCn")}</label>
+              <input type="text" value={titleCn} onChange={(e) => setTitleCn(e.target.value)} placeholder={t("modal.titleCnPlaceholder")} className={inp} />
+            </div>
           </div>
 
           {/* Supplier / Company */}
@@ -1166,6 +1180,9 @@ function CatalogCard({ catalog, divLogos, catLogos, onPreview, onEdit, onDelete 
         <h3 className="text-[13px] font-semibold text-[var(--text-primary)] leading-tight line-clamp-2">
           {catalog.title}
         </h3>
+        {catalog.title_cn && (
+          <p className="text-[11px] text-[var(--text-dim)] leading-tight line-clamp-1 -mt-0.5">{catalog.title_cn}</p>
+        )}
         {(catalog.company_name_en || catalog.contact_name) && (
           <div className="flex flex-col">
             <p className="text-[11px] text-[var(--text-secondary)] truncate">
@@ -1247,7 +1264,10 @@ function CatalogRow({ catalog, divLogos, catLogos, onPreview, onEdit, onDelete }
         )}
       </div>
       <div className="flex-1 min-w-0">
-        <h3 className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{catalog.title}</h3>
+        <h3 className="text-[13px] font-semibold text-[var(--text-primary)] truncate">
+          {catalog.title}
+          {catalog.title_cn && <span className="text-[var(--text-dim)] font-normal"> · {catalog.title_cn}</span>}
+        </h3>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           {(catalog.company_name_en || catalog.contact_name) && (
             <span className="text-[11px] text-[var(--text-secondary)] truncate max-w-[200px]">
@@ -1335,6 +1355,7 @@ export default function CatalogsPage() {
       const q = search.toLowerCase();
       result = result.filter(c =>
         c.title.toLowerCase().includes(q) ||
+        c.title_cn?.includes(q) ||
         c.company_name_en?.toLowerCase().includes(q) ||
         c.company_name_cn?.includes(q) ||
         c.contact_name?.toLowerCase().includes(q) ||
