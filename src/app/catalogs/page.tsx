@@ -75,6 +75,14 @@ const T: Translations = {
   "cat.insights.noData":  { en: "No activity yet", zh: "暂无活动", ar: "لا يوجد نشاط بعد" },
   "cat.insights.noDivision": { en: "Unassigned", zh: "未分配", ar: "غير محدد" },
   "cat.search":           { en: "Search title, supplier, tag, year…", zh: "搜索标题、供应商、标签、年份…", ar: "ابحث بالعنوان أو المورّد أو الوسم أو السنة…" },
+  "cat.sug.keywords":     { en: "Quick keywords", zh: "快捷关键词", ar: "كلمات مفتاحية سريعة" },
+  "cat.sug.title":        { en: "Title", zh: "标题", ar: "العنوان" },
+  "cat.sug.supplier":     { en: "Supplier", zh: "供应商", ar: "المورّد" },
+  "cat.sug.division":     { en: "Division", zh: "部门", ar: "القسم" },
+  "cat.sug.category":     { en: "Category", zh: "类别", ar: "الفئة" },
+  "cat.sug.tag":          { en: "Tag", zh: "标签", ar: "وسم" },
+  "cat.sug.year":         { en: "Year", zh: "年份", ar: "السنة" },
+  "cat.sug.none":         { en: "No matches", zh: "无匹配", ar: "لا توجد نتائج" },
   "cat.allSuppliers":     { en: "All Suppliers", zh: "所有供应商", ar: "كل الموردين" },
   "cat.allDivisions":     { en: "All Divisions", zh: "所有部门", ar: "كل الأقسام" },
   "cat.allTypes":         { en: "All Types", zh: "所有类型", ar: "كل الأنواع" },
@@ -1889,6 +1897,9 @@ export default function CatalogsPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   const [search, setSearch] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [sugIndex, setSugIndex] = useState(-1);
+  const searchBoxRef = useRef<HTMLDivElement>(null);
   const [filterSupplier, setFilterSupplier] = useState("all");
   const [filterDivision, setFilterDivision] = useState("all");
   const [filterType, setFilterType] = useState("all");
@@ -2010,6 +2021,91 @@ export default function CatalogsPage() {
     () => [...new Set(catalogs.flatMap(c => c.tags || []))].sort((a, b) => a.localeCompare(b)),
     [catalogs],
   );
+
+  /* ── Search autocomplete corpus ──
+     Every searchable entity (title, supplier, division, category, tag, year)
+     becomes a suggestion. Picking one applies the smartest action: a structured
+     entity sets its filter, free text fills the query. Works for CN/AR because
+     labels keep their script and matching runs through normalizeText(). */
+  type SearchSug = {
+    type: "title" | "supplier" | "division" | "category" | "tag" | "year";
+    label: string; norm: string; icon?: ReactNode; apply: () => void;
+  };
+  const allSearchItems = useMemo<SearchSug[]>(() => {
+    const items: SearchSug[] = [];
+    const seen = new Set<string>();
+    const push = (it: SearchSug) => {
+      const k = `${it.type}|${it.norm}`;
+      if (it.norm && !seen.has(k)) { seen.add(k); items.push(it); }
+    };
+    catalogSuppliers.forEach(s => push({
+      type: "supplier", label: s.name, norm: normalizeText(s.name),
+      icon: <Building2Icon className="h-3.5 w-3.5" />,
+      apply: () => { setFilterSupplier(s.id); setSearch(""); },
+    }));
+    catalogDivisions.forEach(d => {
+      const DivIcon = getDivisionIcon(d.slug); const logo = divLogos[d.slug];
+      push({
+        type: "division", label: d.name, norm: normalizeText(d.name),
+        icon: DivIcon ? <DivIcon className="h-3.5 w-3.5" /> : logo ? <img src={logo} alt="" className="h-3.5 w-3.5 object-contain" /> : undefined,
+        apply: () => { setFilterDivision(d.slug); setSearch(""); },
+      });
+    });
+    const catMap = new Map<string, string>();
+    catalogs.forEach(c => { if (c.category_name && c.category_slug) catMap.set(c.category_slug, c.category_name); });
+    catMap.forEach((name, slug) => {
+      const logo = catLogos[slug];
+      push({
+        type: "category", label: name, norm: normalizeText(name),
+        icon: logo ? <img src={logo} alt="" className="h-3.5 w-3.5 object-contain" /> : undefined,
+        apply: () => setSearch(name),
+      });
+    });
+    catalogTags.forEach(tg => push({
+      type: "tag", label: tg, norm: normalizeText(tg),
+      icon: <HashtagIcon className="h-3.5 w-3.5" />,
+      apply: () => { setFilterTag(tg); setSearch(""); },
+    }));
+    catalogYears.forEach(y => push({
+      type: "year", label: String(y), norm: String(y),
+      apply: () => { setFilterYear(String(y)); setSearch(""); },
+    }));
+    catalogs.forEach(c => {
+      if (c.title) push({ type: "title", label: c.title, norm: normalizeText(c.title), icon: <FileIcon className="h-3.5 w-3.5" />, apply: () => setSearch(c.title) });
+      if (c.title_cn) push({ type: "title", label: c.title_cn, norm: normalizeText(c.title_cn), icon: <FileIcon className="h-3.5 w-3.5" />, apply: () => setSearch(c.title_cn!) });
+    });
+    return items;
+  }, [catalogSuppliers, catalogDivisions, catalogTags, catalogYears, catalogs, divLogos, catLogos]);
+
+  const searchSuggestions = useMemo<SearchSug[]>(() => {
+    const q = normalizeText(search);
+    const tokens = q.split(/\s+/).filter(Boolean);
+    if (!tokens.length) return [];
+    const scored: { it: SearchSug; score: number }[] = [];
+    for (const it of allSearchItems) {
+      if (!tokens.every(tk => it.norm.includes(tk))) continue;
+      const score = it.norm.startsWith(q) ? 2 : it.norm.includes(q) ? 1 : 0;
+      scored.push({ it, score });
+    }
+    scored.sort((a, b) => b.score - a.score || a.it.label.length - b.it.label.length);
+    return scored.slice(0, 8).map(s => s.it);
+  }, [allSearchItems, search]);
+
+  // Keyword chips shown when the box is focused but empty.
+  const searchKeywords = useMemo<SearchSug[]>(() => [
+    ...allSearchItems.filter(i => i.type === "tag").slice(0, 6),
+    ...allSearchItems.filter(i => i.type === "division").slice(0, 4),
+    ...allSearchItems.filter(i => i.type === "year").slice(0, 3),
+  ], [allSearchItems]);
+
+  useEffect(() => {
+    if (!searchFocused) return;
+    const onDown = (e: MouseEvent) => {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target as Node)) setSearchFocused(false);
+    };
+    window.addEventListener("mousedown", onDown);
+    return () => window.removeEventListener("mousedown", onDown);
+  }, [searchFocused]);
 
   // Engagement insights, computed from the loaded catalogs + their counters.
   const insights = useMemo(() => {
@@ -2217,10 +2313,57 @@ export default function CatalogsPage() {
 
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-3 mb-6">
-          <div className="relative flex-1 min-w-[200px] max-w-sm">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)]" />
-            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("cat.search")}
-              className="w-full h-9 pl-9 pr-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-blue-500/50 transition-colors" />
+          <div ref={searchBoxRef} className="relative flex-1 min-w-[200px] max-w-sm">
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)] z-10" />
+            <input type="text" value={search}
+              onChange={(e) => { setSearch(e.target.value); setSugIndex(-1); setSearchFocused(true); }}
+              onFocus={() => setSearchFocused(true)}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowDown") { e.preventDefault(); setSearchFocused(true); setSugIndex(i => Math.min(i + 1, searchSuggestions.length - 1)); }
+                else if (e.key === "ArrowUp") { e.preventDefault(); setSugIndex(i => Math.max(i - 1, -1)); }
+                else if (e.key === "Enter") { if (sugIndex >= 0 && searchSuggestions[sugIndex]) { searchSuggestions[sugIndex].apply(); setSearchFocused(false); setSugIndex(-1); } else setSearchFocused(false); }
+                else if (e.key === "Escape") { setSearchFocused(false); setSugIndex(-1); }
+              }}
+              placeholder={t("cat.search")} role="combobox" aria-expanded={searchFocused} aria-autocomplete="list"
+              className="w-full h-9 pl-9 pr-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-blue-500/50 transition-colors" />
+            {search && (
+              <button onClick={() => { setSearch(""); setSugIndex(-1); }} aria-label="Clear"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 h-5 w-5 flex items-center justify-center rounded text-[var(--text-dim)] hover:text-[var(--text-primary)]">
+                <CrossIcon className="h-3 w-3" />
+              </button>
+            )}
+
+            {/* Autocomplete dropdown */}
+            {searchFocused && (search.trim() ? searchSuggestions.length > 0 : searchKeywords.length > 0) && (
+              <div className="absolute z-40 left-0 right-0 top-full mt-1.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-xl shadow-black/40 py-1.5 max-h-[320px] overflow-auto">
+                {search.trim() ? (
+                  searchSuggestions.map((s, i) => (
+                    <button key={`${s.type}-${s.label}`} type="button"
+                      onMouseEnter={() => setSugIndex(i)}
+                      onClick={() => { s.apply(); setSearchFocused(false); setSugIndex(-1); }}
+                      className={`w-full px-3 py-2 flex items-center gap-2.5 text-left transition-colors ${i === sugIndex ? "bg-[var(--bg-surface-hover)]" : "hover:bg-[var(--bg-surface-hover)]"}`}>
+                      <span className="shrink-0 w-4 h-4 flex items-center justify-center text-[var(--text-dim)]">{s.icon || <SearchIcon className="h-3.5 w-3.5" />}</span>
+                      <span className="flex-1 truncate text-[12px] text-[var(--text-primary)]">{s.label}</span>
+                      <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-[var(--text-dim)] px-1.5 py-0.5 rounded bg-[var(--bg-surface)]">{t(`cat.sug.${s.type}`)}</span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="px-3 py-1.5">
+                    <p className="text-[9px] font-semibold uppercase tracking-wide text-[var(--text-dim)] mb-2">{t("cat.sug.keywords")}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {searchKeywords.map(s => (
+                        <button key={`${s.type}-${s.label}`} type="button"
+                          onClick={() => { s.apply(); setSearchFocused(false); }}
+                          className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--text-dim)] transition-colors">
+                          {s.icon && <span className="w-3.5 h-3.5 flex items-center justify-center text-[var(--text-dim)]">{s.icon}</span>}
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {catalogSuppliers.length > 0 && (
