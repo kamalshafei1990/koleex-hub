@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
 import Link from "next/link";
 import FileIcon from "@/components/icons/ui/FileIcon";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
@@ -21,6 +21,20 @@ import Building2Icon from "@/components/icons/ui/Building2Icon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
 import ListIcon from "@/components/icons/ui/ListIcon";
+import PhoneIcon from "@/components/icons/ui/PhoneIcon";
+import SmartphoneIcon from "@/components/icons/ui/SmartphoneIcon";
+import AtSignIcon from "@/components/icons/ui/AtSignIcon";
+import GlobeIcon from "@/components/icons/ui/GlobeIcon";
+import MapPinIcon from "@/components/icons/ui/MapPinIcon";
+import MapPinnedIcon from "@/components/icons/ui/MapPinnedIcon";
+import UsersIcon from "@/components/icons/ui/UsersIcon";
+import UserIcon from "@/components/icons/ui/UserIcon";
+import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
+import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
+import TagsIcon from "@/components/icons/ui/TagsIcon";
+import HashtagIcon from "@/components/icons/ui/HashtagIcon";
+import ScanLineIcon from "@/components/icons/ui/ScanLineIcon";
+import BrandGlyph from "@/components/icons/brands/BrandGlyph";
 import {
   fetchCatalogs, createCatalog, updateCatalog, deleteCatalog,
   uploadCatalogFile, uploadCatalogCover, replaceCatalogFile,
@@ -126,6 +140,7 @@ const T: Translations = {
   "quick.telegram":       { en: "Telegram", zh: "Telegram", ar: "تيليجرام" },
   "quick.line":           { en: "Line ID", zh: "Line 账号", ar: "معرف Line" },
   "quick.qq":             { en: "QQ", zh: "QQ", ar: "QQ" },
+  "quick.qr":             { en: "QR", zh: "二维码", ar: "رمز" },
   "quick.creating":       { en: "Creating...", zh: "创建中…", ar: "جارٍ الإنشاء…" },
   "quick.create":         { en: "Create", zh: "创建", ar: "إنشاء" },
   "err.nameEnRequired":   { en: "Company name (English) is required.", zh: "公司名称（英文）为必填项。", ar: "اسم الشركة (بالإنجليزية) مطلوب." },
@@ -236,9 +251,119 @@ async function generatePdfThumbnail(file: File): Promise<Blob | null> {
 /* ═══════════════════════════════════════
    ── Quick Add Supplier / Company Modal ──
    ═══════════════════════════════════════ */
-interface QuickPerson { name: string; position: string; department: string; phone: string; mobile: string; email: string }
+interface QuickPerson {
+  name: string; position: string; department: string;
+  phoneCode: string; phone: string; mobileCode: string; mobile: string;
+  email: string; wechat: string; whatsapp: string;
+}
 const QA_SUPPLIER_TYPES = ["Manufacturer", "Distributor", "Wholesaler", "Agent", "Trading Company", "Service Provider", "OEM", "ODM", "Other"];
 const QA_SOURCES = ["Alibaba", "Made-in-China", "Global Sources", "Exhibition / Trade Show", "Referral", "Website", "LinkedIn", "Partner", "Agent", "Other"];
+
+/* International dialing codes (most-used first for a China-sourcing workflow). */
+const DIAL_CODES: { c: string; f: string; n: string }[] = [
+  { c: "+86", f: "🇨🇳", n: "China" }, { c: "+852", f: "🇭🇰", n: "Hong Kong" },
+  { c: "+886", f: "🇹🇼", n: "Taiwan" }, { c: "+1", f: "🇺🇸", n: "USA / Canada" },
+  { c: "+44", f: "🇬🇧", n: "United Kingdom" }, { c: "+971", f: "🇦🇪", n: "UAE" },
+  { c: "+966", f: "🇸🇦", n: "Saudi Arabia" }, { c: "+20", f: "🇪🇬", n: "Egypt" },
+  { c: "+90", f: "🇹🇷", n: "Turkey" }, { c: "+49", f: "🇩🇪", n: "Germany" },
+  { c: "+33", f: "🇫🇷", n: "France" }, { c: "+39", f: "🇮🇹", n: "Italy" },
+  { c: "+34", f: "🇪🇸", n: "Spain" }, { c: "+31", f: "🇳🇱", n: "Netherlands" },
+  { c: "+7", f: "🇷🇺", n: "Russia" }, { c: "+91", f: "🇮🇳", n: "India" },
+  { c: "+92", f: "🇵🇰", n: "Pakistan" }, { c: "+880", f: "🇧🇩", n: "Bangladesh" },
+  { c: "+84", f: "🇻🇳", n: "Vietnam" }, { c: "+66", f: "🇹🇭", n: "Thailand" },
+  { c: "+62", f: "🇮🇩", n: "Indonesia" }, { c: "+60", f: "🇲🇾", n: "Malaysia" },
+  { c: "+63", f: "🇵🇭", n: "Philippines" }, { c: "+81", f: "🇯🇵", n: "Japan" },
+  { c: "+82", f: "🇰🇷", n: "South Korea" }, { c: "+61", f: "🇦🇺", n: "Australia" },
+  { c: "+55", f: "🇧🇷", n: "Brazil" }, { c: "+27", f: "🇿🇦", n: "South Africa" },
+  { c: "+234", f: "🇳🇬", n: "Nigeria" }, { c: "+98", f: "🇮🇷", n: "Iran" },
+  { c: "+964", f: "🇮🇶", n: "Iraq" }, { c: "+962", f: "🇯🇴", n: "Jordan" },
+];
+
+/* Strip anything that isn't a phone-number character. */
+const phoneClean = (v: string) => v.replace(/[^\d\s()\-]/g, "");
+/* Join a dial code with a number (empty number → empty string). */
+const joinPhone = (code: string, num: string) => (num.trim() ? `${code} ${num.trim()}` : "");
+
+/* Compress an image to a small base64 JPEG data URL — same approach the
+   Contacts app uses for QR codes (no storage round-trip needed). */
+async function compressImage(file: File, maxWidth = 600, quality = 0.85): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxWidth / img.width);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { reject(new Error("no canvas context")); return; }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = reject;
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+/* Text input with a leading icon. */
+function IconInput({ icon, value, onChange, placeholder, type = "text" }: {
+  icon: ReactNode; value: string; onChange: (v: string) => void; placeholder?: string; type?: string;
+}) {
+  return (
+    <div className="relative">
+      <span className="absolute left-3 top-1/2 -translate-y-1/2 flex text-[var(--text-dim)] pointer-events-none">{icon}</span>
+      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
+        className="w-full h-10 pl-9 pr-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all" />
+    </div>
+  );
+}
+
+/* Phone input = country-code dropdown + number field that only accepts digits. */
+function PhoneField({ code, number, onCode, onNumber, placeholder }: {
+  code: string; number: string; onCode: (v: string) => void; onNumber: (v: string) => void; placeholder: string;
+}) {
+  return (
+    <div className="flex gap-1.5">
+      <select value={code} onChange={(e) => onCode(e.target.value)}
+        className="h-10 w-[78px] shrink-0 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] px-1.5 outline-none focus:border-blue-500/50 appearance-none cursor-pointer">
+        {DIAL_CODES.map((d) => <option key={d.c} value={d.c} title={d.n}>{d.f} {d.c}</option>)}
+      </select>
+      <input type="tel" inputMode="tel" value={number} onChange={(e) => onNumber(phoneClean(e.target.value))} placeholder={placeholder}
+        className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all" />
+    </div>
+  );
+}
+
+/* QR-code uploader — compresses the chosen image to a base64 thumbnail. */
+function QrUpload({ value, onChange, hint }: { value: string; onChange: (v: string) => void; hint: string }) {
+  const ref = useRef<HTMLInputElement>(null);
+  if (value) {
+    return (
+      <div className="relative h-[72px] w-[72px] shrink-0">
+        <img src={value} alt="QR" className="h-full w-full rounded-lg border border-[var(--border-subtle)] object-cover bg-white" />
+        <button type="button" onClick={() => onChange("")} aria-label="Remove QR"
+          className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center shadow">
+          <CrossIcon className="h-3 w-3" />
+        </button>
+      </div>
+    );
+  }
+  return (
+    <>
+      <input ref={ref} type="file" accept="image/*" className="hidden"
+        onChange={async (e) => { const f = e.target.files?.[0]; if (f) onChange(await compressImage(f, 600, 0.85)); e.target.value = ""; }} />
+      <button type="button" onClick={() => ref.current?.click()} title={hint}
+        className="h-[72px] w-[72px] shrink-0 rounded-lg border border-dashed border-[var(--border-subtle)] flex flex-col items-center justify-center gap-1 text-[var(--text-dim)] hover:border-blue-500/40 hover:text-blue-400 transition-colors">
+        <ScanLineIcon className="h-4 w-4" />
+        <span className="text-[9px] leading-none">{hint}</span>
+      </button>
+    </>
+  );
+}
 
 function QuickAddContactModal({
   open, onClose, onCreated,
@@ -255,7 +380,9 @@ function QuickAddContactModal({
   const [industry, setIndustry] = useState("");
   const [source, setSource] = useState("");
   // Contact details
+  const [telCode, setTelCode] = useState("+86");
   const [tel, setTel] = useState("");
+  const [mobileCode, setMobileCode] = useState("+86");
   const [mobile, setMobile] = useState("");
   const [email, setEmail] = useState("");
   const [website, setWebsite] = useState("");
@@ -265,8 +392,10 @@ function QuickAddContactModal({
   const [persons, setPersons] = useState<QuickPerson[]>([]);
   // Messaging IDs
   const [wechatId, setWechatId] = useState("");
+  const [wechatQr, setWechatQr] = useState("");
   const [wechatOfficial, setWechatOfficial] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
+  const [whatsappQr, setWhatsappQr] = useState("");
   const [telegram, setTelegram] = useState("");
   const [lineId, setLineId] = useState("");
   const [qqId, setQqId] = useState("");
@@ -279,14 +408,15 @@ function QuickAddContactModal({
     if (open) {
       setContactType("supplier");
       setNameEn(""); setNameCn(""); setSupplierType(""); setIndustry(""); setSource("");
-      setTel(""); setMobile(""); setEmail(""); setWebsite(""); setCountry(""); setAddress("");
+      setTelCode("+86"); setTel(""); setMobileCode("+86"); setMobile("");
+      setEmail(""); setWebsite(""); setCountry(""); setAddress("");
       setPersons([]);
-      setWechatId(""); setWechatOfficial(""); setWhatsapp(""); setTelegram(""); setLineId(""); setQqId("");
+      setWechatId(""); setWechatQr(""); setWechatOfficial(""); setWhatsapp(""); setWhatsappQr(""); setTelegram(""); setLineId(""); setQqId("");
       setError("");
     }
   }, [open]);
 
-  const addPerson = () => setPersons(p => [...p, { name: "", position: "", department: "", phone: "", mobile: "", email: "" }]);
+  const addPerson = () => setPersons(p => [...p, { name: "", position: "", department: "", phoneCode: "+86", phone: "", mobileCode: "+86", mobile: "", email: "", wechat: "", whatsapp: "" }]);
   const updatePerson = (i: number, k: keyof QuickPerson, v: string) => setPersons(p => p.map((x, idx) => idx === i ? { ...x, [k]: v } : x));
   const removePerson = (i: number) => setPersons(p => p.filter((_, idx) => idx !== i));
 
@@ -308,18 +438,29 @@ function QuickAddContactModal({
       industry: industry.trim() || null,
       source: source || null,
       // Contact details
-      supplier_tel: tel.trim() || null,
-      supplier_mobile: mobile.trim() || null,
+      supplier_tel: joinPhone(telCode, tel) || null,
+      supplier_mobile: joinPhone(mobileCode, mobile) || null,
       supplier_email: email.trim() || null,
       supplier_website: website.trim() || null,
       supplier_address: address.trim() || null,
       country: country.trim() || null,
       // Contact persons (same shape as the Suppliers app)
-      contact_persons: persons.filter(p => p.name.trim()),
+      contact_persons: persons.filter(p => p.name.trim()).map(p => ({
+        name: p.name.trim(),
+        position: p.position.trim(),
+        department: p.department.trim(),
+        phone: joinPhone(p.phoneCode, p.phone),
+        mobile: joinPhone(p.mobileCode, p.mobile),
+        email: p.email.trim(),
+        wechat_id: p.wechat.trim(),
+        whatsapp: p.whatsapp.trim(),
+      })),
       // Messaging IDs
       wechat_id: wechatId.trim() || null,
+      wechat_qr: wechatQr || null,
       wechat_official_account: wechatOfficial.trim() || null,
       whatsapp_business: whatsapp.trim() || null,
+      whatsapp_qr: whatsappQr || null,
       telegram_id: telegram.trim() || null,
       line_id: lineId.trim() || null,
       qq_id: qqId.trim() || null,
@@ -396,7 +537,7 @@ function QuickAddContactModal({
           </div>
 
           {/* ── Company profile ── */}
-          <p className={sectionTitle + " mb-3"}>{t("quick.companyProfile")}</p>
+          <div className="mb-3 flex items-center gap-2"><Building2Icon className="h-3.5 w-3.5 text-[var(--text-dim)]" /><p className={sectionTitle}>{t("quick.companyProfile")}</p></div>
           <div className="mb-6 space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
@@ -433,21 +574,21 @@ function QuickAddContactModal({
           <div className="mb-6 border-t border-[var(--border-subtle)]" />
 
           {/* ── Contact details ── */}
-          <p className={sectionTitle + " mb-3"}>{t("quick.contactDetails")}</p>
+          <div className="mb-3 flex items-center gap-2"><PhoneIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" /><p className={sectionTitle}>{t("quick.contactDetails")}</p></div>
           <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div><label className={lbl}>{t("quick.telephone")}</label><input type="text" value={tel} onChange={(e) => setTel(e.target.value)} placeholder="+86 755 …" className={inp} /></div>
-            <div><label className={lbl}>{t("quick.mobile")}</label><input type="text" value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="+86 138 …" className={inp} /></div>
-            <div><label className={lbl}>{t("quick.email")}</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="sales@company.com" className={inp} /></div>
-            <div><label className={lbl}>{t("quick.website")}</label><input type="text" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://…" className={inp} /></div>
-            <div><label className={lbl}>{t("quick.country")}</label><input type="text" value={country} onChange={(e) => setCountry(e.target.value)} placeholder="e.g. China" className={inp} /></div>
-            <div><label className={lbl}>{t("quick.address")}</label><input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Full address" className={inp} /></div>
+            <div><label className={lbl}>{t("quick.telephone")}</label><PhoneField code={telCode} number={tel} onCode={setTelCode} onNumber={setTel} placeholder="755 0000 0000" /></div>
+            <div><label className={lbl}>{t("quick.mobile")}</label><PhoneField code={mobileCode} number={mobile} onCode={setMobileCode} onNumber={setMobile} placeholder="138 0000 0000" /></div>
+            <div><label className={lbl}>{t("quick.email")}</label><IconInput icon={<AtSignIcon className="h-3.5 w-3.5" />} type="email" value={email} onChange={setEmail} placeholder="sales@company.com" /></div>
+            <div><label className={lbl}>{t("quick.website")}</label><IconInput icon={<GlobeIcon className="h-3.5 w-3.5" />} value={website} onChange={setWebsite} placeholder="https://…" /></div>
+            <div><label className={lbl}>{t("quick.country")}</label><IconInput icon={<MapPinIcon className="h-3.5 w-3.5" />} value={country} onChange={setCountry} placeholder="e.g. China" /></div>
+            <div><label className={lbl}>{t("quick.address")}</label><IconInput icon={<MapPinnedIcon className="h-3.5 w-3.5" />} value={address} onChange={setAddress} placeholder="Full address" /></div>
           </div>
 
           <div className="mb-6 border-t border-[var(--border-subtle)]" />
 
           {/* ── Contact persons ── */}
           <div className="mb-2 flex items-center justify-between">
-            <p className={sectionTitle}>{t("quick.contactPerson")}</p>
+            <div className="flex items-center gap-2"><UsersIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" /><p className={sectionTitle}>{t("quick.contactPerson")}</p></div>
             <button type="button" onClick={addPerson} className="flex h-8 items-center gap-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-3 text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
               <PlusIcon className="h-3 w-3" /> {t("quick.addPerson")}
             </button>
@@ -460,16 +601,18 @@ function QuickAddContactModal({
                 {persons.map((p, i) => (
                   <div key={i} className="rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-4">
                     <div className="mb-3 flex items-center justify-between">
-                      <span className="text-[11px] font-semibold text-[var(--text-dim)]">{t("quick.person")} {i + 1}</span>
+                      <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text-dim)]"><UserIcon className="h-3.5 w-3.5" /> {t("quick.person")} {i + 1}</span>
                       <button type="button" onClick={() => removePerson(i)} className="flex h-6 w-6 items-center justify-center rounded text-[var(--text-dim)] hover:text-red-400 transition-colors"><TrashIcon className="h-3.5 w-3.5" /></button>
                     </div>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div><label className={lbl}>{t("quick.name")}</label><input value={p.name} onChange={(e) => updatePerson(i, "name", e.target.value)} placeholder={t("quick.fullName")} className={inp} /></div>
-                      <div><label className={lbl}>{t("quick.position")}</label><input value={p.position} onChange={(e) => updatePerson(i, "position", e.target.value)} placeholder="e.g. Sales Manager" className={inp} /></div>
-                      <div><label className={lbl}>{t("quick.department")}</label><input value={p.department} onChange={(e) => updatePerson(i, "department", e.target.value)} placeholder="e.g. Sales" className={inp} /></div>
-                      <div><label className={lbl}>{t("quick.telephone")}</label><input value={p.phone} onChange={(e) => updatePerson(i, "phone", e.target.value)} placeholder={t("quick.telephone")} className={inp} /></div>
-                      <div><label className={lbl}>{t("quick.mobile")}</label><input value={p.mobile} onChange={(e) => updatePerson(i, "mobile", e.target.value)} placeholder={t("quick.mobile")} className={inp} /></div>
-                      <div><label className={lbl}>{t("quick.email")}</label><input value={p.email} onChange={(e) => updatePerson(i, "email", e.target.value)} placeholder={t("quick.email")} className={inp} /></div>
+                      <div><label className={lbl}>{t("quick.name")}</label><IconInput icon={<UserIcon className="h-3.5 w-3.5" />} value={p.name} onChange={(v) => updatePerson(i, "name", v)} placeholder={t("quick.fullName")} /></div>
+                      <div><label className={lbl}>{t("quick.position")}</label><IconInput icon={<BriefcaseIcon className="h-3.5 w-3.5" />} value={p.position} onChange={(v) => updatePerson(i, "position", v)} placeholder="e.g. Sales Manager" /></div>
+                      <div><label className={lbl}>{t("quick.department")}</label><IconInput icon={<TagsIcon className="h-3.5 w-3.5" />} value={p.department} onChange={(v) => updatePerson(i, "department", v)} placeholder="e.g. Sales" /></div>
+                      <div><label className={lbl}>{t("quick.email")}</label><IconInput icon={<AtSignIcon className="h-3.5 w-3.5" />} type="email" value={p.email} onChange={(v) => updatePerson(i, "email", v)} placeholder="name@company.com" /></div>
+                      <div><label className={lbl}>{t("quick.telephone")}</label><PhoneField code={p.phoneCode} number={p.phone} onCode={(v) => updatePerson(i, "phoneCode", v)} onNumber={(v) => updatePerson(i, "phone", v)} placeholder="755 0000 0000" /></div>
+                      <div><label className={lbl}>{t("quick.mobile")}</label><PhoneField code={p.mobileCode} number={p.mobile} onCode={(v) => updatePerson(i, "mobileCode", v)} onNumber={(v) => updatePerson(i, "mobile", v)} placeholder="138 0000 0000" /></div>
+                      <div><label className={lbl}>{t("quick.wechat")}</label><IconInput icon={<BrandGlyph name="wechat" size={15} />} value={p.wechat} onChange={(v) => updatePerson(i, "wechat", v)} placeholder="wxid_…" /></div>
+                      <div><label className={lbl}>{t("quick.whatsapp")}</label><IconInput icon={<BrandGlyph name="whatsapp" size={15} />} value={p.whatsapp} onChange={(v) => updatePerson(i, "whatsapp", v)} placeholder="+86 …" /></div>
                     </div>
                   </div>
                 ))}
@@ -480,14 +623,31 @@ function QuickAddContactModal({
           <div className="mb-6 border-t border-[var(--border-subtle)]" />
 
           {/* ── Messaging IDs ── */}
-          <p className={sectionTitle + " mb-3"}>{t("quick.messaging")}</p>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div><label className={lbl}>{t("quick.wechat")}</label><input type="text" value={wechatId} onChange={(e) => setWechatId(e.target.value)} placeholder="wxid_…" className={inp} /></div>
-            <div><label className={lbl}>{t("quick.wechatOfficial")}</label><input type="text" value={wechatOfficial} onChange={(e) => setWechatOfficial(e.target.value)} placeholder="Official account" className={inp} /></div>
-            <div><label className={lbl}>{t("quick.whatsapp")}</label><input type="text" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+86 …" className={inp} /></div>
-            <div><label className={lbl}>{t("quick.telegram")}</label><input type="text" value={telegram} onChange={(e) => setTelegram(e.target.value)} placeholder="@handle" className={inp} /></div>
-            <div><label className={lbl}>{t("quick.line")}</label><input type="text" value={lineId} onChange={(e) => setLineId(e.target.value)} placeholder="line id" className={inp} /></div>
-            <div><label className={lbl}>{t("quick.qq")}</label><input type="text" value={qqId} onChange={(e) => setQqId(e.target.value)} placeholder="QQ number" className={inp} /></div>
+          <div className="mb-3 flex items-center gap-2"><MessageSquareIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" /><p className={sectionTitle}>{t("quick.messaging")}</p></div>
+          <div className="space-y-4">
+            {/* WeChat — ID + QR */}
+            <div>
+              <label className={lbl}>{t("quick.wechat")}</label>
+              <div className="flex items-start gap-3">
+                <div className="flex-1"><IconInput icon={<BrandGlyph name="wechat" size={15} />} value={wechatId} onChange={setWechatId} placeholder="wxid_…" /></div>
+                <QrUpload value={wechatQr} onChange={setWechatQr} hint={t("quick.qr")} />
+              </div>
+            </div>
+            {/* WhatsApp — number + QR */}
+            <div>
+              <label className={lbl}>{t("quick.whatsapp")}</label>
+              <div className="flex items-start gap-3">
+                <div className="flex-1"><IconInput icon={<BrandGlyph name="whatsapp" size={15} />} value={whatsapp} onChange={setWhatsapp} placeholder="+86 …" /></div>
+                <QrUpload value={whatsappQr} onChange={setWhatsappQr} hint={t("quick.qr")} />
+              </div>
+            </div>
+            {/* Remaining IDs */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div><label className={lbl}>{t("quick.wechatOfficial")}</label><IconInput icon={<BrandGlyph name="wechat" size={15} />} value={wechatOfficial} onChange={setWechatOfficial} placeholder="Official account" /></div>
+              <div><label className={lbl}>{t("quick.telegram")}</label><IconInput icon={<BrandGlyph name="telegram" size={15} />} value={telegram} onChange={setTelegram} placeholder="@handle" /></div>
+              <div><label className={lbl}>{t("quick.line")}</label><IconInput icon={<BrandGlyph name="line" size={15} />} value={lineId} onChange={setLineId} placeholder="line id" /></div>
+              <div><label className={lbl}>{t("quick.qq")}</label><IconInput icon={<BrandGlyph name="qq" size={15} />} value={qqId} onChange={setQqId} placeholder="QQ number" /></div>
+            </div>
           </div>
         </div>
 
