@@ -129,6 +129,10 @@ async function generatePdfThumbnail(file: File): Promise<Blob | null> {
 /* ═══════════════════════════════════════
    ── Quick Add Supplier / Company Modal ──
    ═══════════════════════════════════════ */
+interface QuickPerson { name: string; position: string; department: string; phone: string; mobile: string; email: string }
+const QA_SUPPLIER_TYPES = ["Manufacturer", "Distributor", "Wholesaler", "Agent", "Trading Company", "Service Provider", "OEM", "ODM", "Other"];
+const QA_SOURCES = ["Alibaba", "Made-in-China", "Global Sources", "Exhibition / Trade Show", "Referral", "Website", "LinkedIn", "Partner", "Agent", "Other"];
+
 function QuickAddContactModal({
   open, onClose, onCreated,
 }: {
@@ -137,25 +141,46 @@ function QuickAddContactModal({
   onCreated: (contact: ContactOption) => void;
 }) {
   const [contactType, setContactType] = useState<"supplier" | "company">("supplier");
+  // Company profile
   const [nameEn, setNameEn] = useState("");
   const [nameCn, setNameCn] = useState("");
-  const [phone, setPhone] = useState("");
+  const [supplierType, setSupplierType] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [source, setSource] = useState("");
+  // Contact details
+  const [tel, setTel] = useState("");
+  const [mobile, setMobile] = useState("");
   const [email, setEmail] = useState("");
+  const [website, setWebsite] = useState("");
   const [country, setCountry] = useState("");
+  const [address, setAddress] = useState("");
+  // Contact persons
+  const [persons, setPersons] = useState<QuickPerson[]>([]);
+  // Messaging IDs
+  const [wechatId, setWechatId] = useState("");
+  const [wechatOfficial, setWechatOfficial] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [telegram, setTelegram] = useState("");
+  const [lineId, setLineId] = useState("");
+  const [qqId, setQqId] = useState("");
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (open) {
       setContactType("supplier");
-      setNameEn("");
-      setNameCn("");
-      setPhone("");
-      setEmail("");
-      setCountry("");
+      setNameEn(""); setNameCn(""); setSupplierType(""); setIndustry(""); setSource("");
+      setTel(""); setMobile(""); setEmail(""); setWebsite(""); setCountry(""); setAddress("");
+      setPersons([]);
+      setWechatId(""); setWechatOfficial(""); setWhatsapp(""); setTelegram(""); setLineId(""); setQqId("");
       setError("");
     }
   }, [open]);
+
+  const addPerson = () => setPersons(p => [...p, { name: "", position: "", department: "", phone: "", mobile: "", email: "" }]);
+  const updatePerson = (i: number, k: keyof QuickPerson, v: string) => setPersons(p => p.map((x, idx) => idx === i ? { ...x, [k]: v } : x));
+  const removePerson = (i: number) => setPersons(p => p.filter((_, idx) => idx !== i));
 
   const handleSave = async () => {
     if (!nameEn.trim()) { setError("Company name (English) is required."); return; }
@@ -165,37 +190,39 @@ function QuickAddContactModal({
     const obj: Record<string, unknown> = {
       contact_type: contactType,
       entity_type: "company",
+      // Company profile
       company_name_en: nameEn.trim(),
       company_name_cn: nameCn.trim() || null,
       display_name: nameEn.trim(),
       full_name: nameEn.trim(),
       company: nameEn.trim(),
-      supplier_tel: phone.trim() || null,
+      supplier_type: supplierType || null,
+      industry: industry.trim() || null,
+      source: source || null,
+      // Contact details
+      supplier_tel: tel.trim() || null,
+      supplier_mobile: mobile.trim() || null,
       supplier_email: email.trim() || null,
+      supplier_website: website.trim() || null,
+      supplier_address: address.trim() || null,
       country: country.trim() || null,
+      // Contact persons (same shape as the Suppliers app)
+      contact_persons: persons.filter(p => p.name.trim()),
+      // Messaging IDs
+      wechat_id: wechatId.trim() || null,
+      wechat_official_account: wechatOfficial.trim() || null,
+      whatsapp_business: whatsapp.trim() || null,
+      telegram_id: telegram.trim() || null,
+      line_id: lineId.trim() || null,
+      qq_id: qqId.trim() || null,
       is_active: true,
-      tags: [],
-      phones: [],
-      emails: email.trim() ? [{ label: "Work", email: email.trim() }] : [],
-      addresses: [],
-      websites: [],
-      social_profiles: [],
-      family_members: [],
-      related_names: [],
-      custom_fields: [],
-      shipping_addresses: [],
-      attachments: [],
-      product_categories: [],
-      brand_names: [],
-      certifications: [],
-      catalogues: [],
-      documents: [],
-      contact_persons: [],
-      bank_accounts: [],
-      additional_company_names: [],
-      resume_lines: [],
-      emergency_contacts: [],
-      visa_documents: [],
+      // Required array defaults
+      tags: [], phones: [], emails: email.trim() ? [{ label: "Work", email: email.trim() }] : [],
+      addresses: [], websites: website.trim() ? [{ label: "Website", url: website.trim() }] : [],
+      social_profiles: [], family_members: [], related_names: [], custom_fields: [],
+      shipping_addresses: [], attachments: [], product_categories: [], brand_names: [],
+      certifications: [], catalogues: [], documents: [], bank_accounts: [],
+      additional_company_names: [], resume_lines: [], emergency_contacts: [], visa_documents: [],
       rating: 0,
     };
 
@@ -222,13 +249,15 @@ function QuickAddContactModal({
 
   if (!open) return null;
 
-  const inp = "w-full h-11 px-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all";
+  const inp = "w-full h-11 px-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all appearance-none";
+  const sinp = inp.replace("h-11", "h-9") + " text-[12px]";
   const lbl = "block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5";
+  const sectionTitle = "text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)] mb-3";
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[70] flex items-start justify-center p-4 pt-[5vh] overflow-y-auto">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-[440px] bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl">
+      <div className="relative w-full max-w-[560px] bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl mb-8">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2.5">
             <Building2Icon className="h-4 w-4 text-[var(--text-dim)]" />
@@ -238,7 +267,7 @@ function QuickAddContactModal({
             <CrossIcon className="h-4 w-4" />
           </button>
         </div>
-        <div className="px-6 py-5 space-y-4">
+        <div className="px-6 py-5 space-y-6">
           {error && <div className="px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-[12px] text-red-400">{error}</div>}
 
           {/* Type toggle */}
@@ -256,42 +285,108 @@ function QuickAddContactModal({
             </div>
           </div>
 
-          {/* Company name EN */}
+          {/* ── Company profile ── */}
           <div>
-            <label className={lbl}>Company Name (English) *</label>
-            <input type="text" value={nameEn} onChange={(e) => setNameEn(e.target.value)}
-              placeholder="e.g. Delta Engineering Ltd" className={inp} autoFocus />
-          </div>
-
-          {/* Company name CN */}
-          <div>
-            <label className={lbl}>Company Name (Chinese)</label>
-            <input type="text" value={nameCn} onChange={(e) => setNameCn(e.target.value)}
-              placeholder="e.g. 达美工程有限公司" className={inp} />
-          </div>
-
-          {/* Phone & Email */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={lbl}>Phone</label>
-              <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)}
-                placeholder="+86 ..." className={inp} />
+            <p className={sectionTitle}>Company Profile</p>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={lbl}>Company Name (English) *</label>
+                  <input type="text" value={nameEn} onChange={(e) => setNameEn(e.target.value)} placeholder="e.g. Delta Engineering Ltd" className={inp} autoFocus />
+                </div>
+                <div>
+                  <label className={lbl}>Company Name (Chinese)</label>
+                  <input type="text" value={nameCn} onChange={(e) => setNameCn(e.target.value)} placeholder="达美工程有限公司" className={inp} />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className={lbl}>Type</label>
+                  <select value={supplierType} onChange={(e) => setSupplierType(e.target.value)} className={inp}>
+                    <option value="">Select…</option>
+                    {QA_SUPPLIER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={lbl}>Industry</label>
+                  <input type="text" value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="e.g. Sewing" className={inp} />
+                </div>
+                <div>
+                  <label className={lbl}>Source</label>
+                  <select value={source} onChange={(e) => setSource(e.target.value)} className={inp}>
+                    <option value="">Select…</option>
+                    {QA_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+              </div>
             </div>
-            <div>
-              <label className={lbl}>Email</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                placeholder="info@..." className={inp} />
+          </div>
+
+          {/* ── Contact details ── */}
+          <div>
+            <p className={sectionTitle}>Contact Details</p>
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-3">
+                <div><label className={lbl}>Telephone</label><input type="text" value={tel} onChange={(e) => setTel(e.target.value)} placeholder="+86 …" className={inp} /></div>
+                <div><label className={lbl}>Mobile</label><input type="text" value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="+86 …" className={inp} /></div>
+                <div><label className={lbl}>Email</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="info@…" className={inp} /></div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div><label className={lbl}>Website</label><input type="text" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://…" className={inp} /></div>
+                <div><label className={lbl}>Country</label><input type="text" value={country} onChange={(e) => setCountry(e.target.value)} placeholder="e.g. China" className={inp} /></div>
+                <div><label className={lbl}>Address</label><input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Full address" className={inp} /></div>
+              </div>
             </div>
           </div>
 
-          {/* Country */}
+          {/* ── Contact persons ── */}
           <div>
-            <label className={lbl}>Country</label>
-            <input type="text" value={country} onChange={(e) => setCountry(e.target.value)}
-              placeholder="e.g. China" className={inp} />
+            <div className="flex items-center justify-between mb-3">
+              <p className={sectionTitle + " mb-0"}>Contact Person</p>
+              <button type="button" onClick={addPerson} className="h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center gap-1.5 transition-colors">
+                <PlusIcon className="h-3 w-3" /> Add Person
+              </button>
+            </div>
+            {persons.length === 0 ? (
+              <p className="text-[12px] text-[var(--text-dim)] text-center py-3 border border-dashed border-[var(--border-subtle)] rounded-xl">No contact person added yet</p>
+            ) : (
+              <div className="space-y-3">
+                {persons.map((p, i) => (
+                  <div key={i} className="p-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-[var(--text-dim)]">Person {i + 1}</span>
+                      <button type="button" onClick={() => removePerson(i)} className="h-6 w-6 rounded flex items-center justify-center text-[var(--text-dim)] hover:text-red-400 transition-colors"><TrashIcon className="h-3 w-3" /></button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <input value={p.name} onChange={(e) => updatePerson(i, "name", e.target.value)} placeholder="Name" className={sinp} />
+                      <input value={p.position} onChange={(e) => updatePerson(i, "position", e.target.value)} placeholder="Position" className={sinp} />
+                      <input value={p.department} onChange={(e) => updatePerson(i, "department", e.target.value)} placeholder="Department" className={sinp} />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <input value={p.phone} onChange={(e) => updatePerson(i, "phone", e.target.value)} placeholder="Phone" className={sinp} />
+                      <input value={p.mobile} onChange={(e) => updatePerson(i, "mobile", e.target.value)} placeholder="Mobile" className={sinp} />
+                      <input value={p.email} onChange={(e) => updatePerson(i, "email", e.target.value)} placeholder="Email" className={sinp} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ── Messaging IDs ── */}
+          <div>
+            <p className={sectionTitle}>Messaging IDs</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className={lbl}>WeChat ID</label><input type="text" value={wechatId} onChange={(e) => setWechatId(e.target.value)} placeholder="wxid_…" className={inp} /></div>
+              <div><label className={lbl}>WeChat Official</label><input type="text" value={wechatOfficial} onChange={(e) => setWechatOfficial(e.target.value)} placeholder="Official account" className={inp} /></div>
+              <div><label className={lbl}>WhatsApp</label><input type="text" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+86 …" className={inp} /></div>
+              <div><label className={lbl}>Telegram</label><input type="text" value={telegram} onChange={(e) => setTelegram(e.target.value)} placeholder="@handle" className={inp} /></div>
+              <div><label className={lbl}>Line ID</label><input type="text" value={lineId} onChange={(e) => setLineId(e.target.value)} placeholder="line id" className={inp} /></div>
+              <div><label className={lbl}>QQ</label><input type="text" value={qqId} onChange={(e) => setQqId(e.target.value)} placeholder="QQ number" className={inp} /></div>
+            </div>
           </div>
         </div>
-        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--border-subtle)]">
+        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--border-subtle)] sticky bottom-0 bg-[var(--bg-primary)] rounded-b-2xl">
           <button onClick={onClose} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">Cancel</button>
           <button onClick={handleSave} disabled={saving || !nameEn.trim()}
             className="h-10 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-40">
@@ -463,7 +558,9 @@ function CatalogModal({
     setProgress("Uploading file...");
 
     try {
-      const contact = contacts.find(c => c.id === contactId);
+      // Resolve from localContacts so a just-created supplier/company connects
+      // (it may not yet exist in the parent `contacts` prop).
+      const contact = localContacts.find(c => c.id === contactId);
       const div = divisions.find(d => d.slug === divisionSlug);
       const cat = categories.find(c => c.slug === categorySlug);
 
@@ -1184,7 +1281,7 @@ export default function CatalogsPage() {
 
         {/* Header */}
         <div className="flex flex-wrap items-center gap-3 mb-1">
-          <Link href="/products" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
+          <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors" aria-label="Back to home">
             <ArrowLeftIcon className="h-4 w-4" />
           </Link>
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
