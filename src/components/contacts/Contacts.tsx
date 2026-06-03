@@ -15,6 +15,7 @@ import PhoneIcon from "@/components/icons/ui/PhoneIcon";
 import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
 import MapPinIcon from "@/components/icons/ui/MapPinIcon";
 import GlobeIcon from "@/components/icons/ui/GlobeIcon";
+import CatalogsIcon from "@/components/icons/CatalogsIcon";
 import CalendarRawIcon from "@/components/icons/ui/CalendarRawIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import Building2Icon from "@/components/icons/ui/Building2Icon";
@@ -320,6 +321,7 @@ interface ContactForm {
   reliability_score: string;
   quality_notes: string;
   last_quality_issue: string;
+  quality_issues: { date: string; note: string }[];
   sample_status: string;
   factory_visit_date: string;
   /* ── Sidebar mini-intelligence (read-only, already on the contacts row) ── */
@@ -333,11 +335,18 @@ interface ContactForm {
   supplier_mobile: string;
   supplier_email: string;
   supplier_website: string;
+  supplier_website_qr: string;
   supplier_profile_url: string;
+  ecatalog_url: string;
+  ecatalog_qr: string;
+  business_timezone: string;
+  business_hours_start: string;
+  business_hours_end: string;
   wechat_official_account: string;
   wechat_sales_group_available: boolean;
   wecom_support_available: boolean;
   supplier_address: string;
+  supplier_address_cn: string;
   supplier_postal_code: string;
   division: string;
   category: string;
@@ -723,6 +732,7 @@ const EMPTY_FORM: ContactForm = {
   reliability_score: "",
   quality_notes: "",
   last_quality_issue: "",
+  quality_issues: [],
   sample_status: "",
   factory_visit_date: "",
   strategic_status: "",
@@ -735,11 +745,18 @@ const EMPTY_FORM: ContactForm = {
   supplier_mobile: "",
   supplier_email: "",
   supplier_website: "",
+  supplier_website_qr: "",
   supplier_profile_url: "",
+  ecatalog_url: "",
+  ecatalog_qr: "",
+  business_timezone: "",
+  business_hours_start: "",
+  business_hours_end: "",
   wechat_official_account: "",
   wechat_sales_group_available: false,
   wecom_support_available: false,
   supplier_address: "",
+  supplier_address_cn: "",
   supplier_postal_code: "",
   division: "",
   category: "",
@@ -1326,6 +1343,7 @@ function contactToForm(c: ContactRow): ContactForm {
     reliability_score: c.reliability_score || "",
     quality_notes: c.quality_notes || "",
     last_quality_issue: c.last_quality_issue || "",
+    quality_issues: Array.isArray((c as unknown as Record<string, unknown>).quality_issues) ? ((c as unknown as Record<string, unknown>).quality_issues as { date: string; note: string }[]) : [],
     sample_status: c.sample_status || "",
     factory_visit_date: c.factory_visit_date || "",
     strategic_status: c.strategic_status || "",
@@ -1338,11 +1356,18 @@ function contactToForm(c: ContactRow): ContactForm {
     supplier_mobile: c.supplier_mobile || "",
     supplier_email: c.supplier_email || "",
     supplier_website: c.supplier_website || "",
+    supplier_website_qr: (c as unknown as Record<string, unknown>).website_qr as string || "",
     supplier_profile_url: (c as unknown as Record<string, unknown>).supplier_profile_url as string || "",
+    ecatalog_url: (c as unknown as Record<string, unknown>).ecatalog_url as string || "",
+    ecatalog_qr: (c as unknown as Record<string, unknown>).ecatalog_qr as string || "",
+    business_timezone: (c as unknown as Record<string, unknown>).business_timezone as string || "",
+    business_hours_start: (c as unknown as Record<string, unknown>).business_hours_start as string || "",
+    business_hours_end: (c as unknown as Record<string, unknown>).business_hours_end as string || "",
     wechat_official_account: c.wechat_official_account || "",
     wechat_sales_group_available: !!c.wechat_sales_group_available,
     wecom_support_available: !!c.wecom_support_available,
     supplier_address: c.supplier_address || "",
+    supplier_address_cn: (c as unknown as Record<string, unknown>).supplier_address_cn as string || "",
     supplier_postal_code: c.supplier_postal_code || "",
     division: c.division || "",
     category: c.category || "",
@@ -1576,6 +1601,7 @@ function formToRow(f: ContactForm): Record<string, unknown> {
     reliability_score: f.reliability_score || null,
     quality_notes: f.quality_notes || null,
     last_quality_issue: f.last_quality_issue || null,
+    quality_issues: f.quality_issues.filter((q) => (q.date || "").trim() || (q.note || "").trim()),
     sample_status: f.sample_status || null,
     factory_visit_date: f.factory_visit_date || null,
     /* Supplier Redesign */
@@ -1586,11 +1612,18 @@ function formToRow(f: ContactForm): Record<string, unknown> {
     supplier_mobile: f.supplier_mobile || null,
     supplier_email: f.supplier_email || null,
     supplier_website: f.supplier_website || null,
+    website_qr: f.supplier_website_qr || null,
     supplier_profile_url: f.supplier_profile_url || null,
+    ecatalog_url: f.ecatalog_url || null,
+    ecatalog_qr: f.ecatalog_qr || null,
+    business_timezone: f.business_timezone || null,
+    business_hours_start: f.business_hours_start || null,
+    business_hours_end: f.business_hours_end || null,
     wechat_official_account: f.wechat_official_account || null,
     wechat_sales_group_available: !!f.wechat_sales_group_available,
     wecom_support_available: !!f.wecom_support_available,
     supplier_address: f.supplier_address || null,
+    supplier_address_cn: f.supplier_address_cn || null,
     supplier_postal_code: f.supplier_postal_code || null,
     division: f.division || null,
     category: f.category || null,
@@ -7810,11 +7843,40 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <PhoneField label={t("field.contactMobile")} value={form.supplier_mobile} onChange={v => setField("supplier_mobile", v)} placeholder={t("field.contactMobile")} defaultIso={form.country_code || "CN"} />
                 </div>
                 <Input label={t("field.contactEmail")} type="email" value={form.supplier_email} onChange={v => setField("supplier_email", v)} placeholder="company@example.com" icon={<EnvelopeIcon size={14} />} />
-                <Input label={t("field.website")} tier="optional" type="url" value={form.supplier_website} onChange={v => setField("supplier_website", v)} placeholder="https://www.example.com" icon={<GlobeIcon size={14} />} />
+                {/* Website + optional QR (some suppliers share their site as a QR code) */}
+                <MessagingIdField
+                  label={t("field.website")}
+                  icon={<GlobeIcon size={16} />}
+                  idValue={form.supplier_website}
+                  onIdChange={v => setField("supplier_website", v)}
+                  placeholder="https://www.example.com"
+                  qrValue={form.supplier_website_qr}
+                  onQrChange={v => setField("supplier_website_qr", v)}
+                />
+                {/* E-catalog link + optional QR */}
+                <MessagingIdField
+                  label={t("field.ecatalog", "E-catalog")}
+                  icon={<CatalogsIcon size={16} />}
+                  idValue={form.ecatalog_url}
+                  onIdChange={v => setField("ecatalog_url", v)}
+                  placeholder={t("placeholder.ecatalog", "E-catalog link (or scan QR)")}
+                  qrValue={form.ecatalog_qr}
+                  onQrChange={v => setField("ecatalog_qr", v)}
+                />
+                {/* Business hours + time zone */}
+                <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] p-3 space-y-2.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("field.businessHours", "Business hours & time zone")}</p>
+                  <Input label={t("field.timeZone", "Time zone / area")} tier="optional" value={form.business_timezone} onChange={v => setField("business_timezone", v)} placeholder={t("placeholder.timeZone", "e.g. Asia/Shanghai (GMT+8)")} icon={<GlobeIcon size={14} />} />
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <Input label={t("field.hoursFrom", "Open from")} tier="optional" type="time" value={form.business_hours_start} onChange={v => setField("business_hours_start", v)} />
+                    <Input label={t("field.hoursTo", "Open until")} tier="optional" type="time" value={form.business_hours_end} onChange={v => setField("business_hours_end", v)} />
+                  </div>
+                </div>
                 {/* Address — structured like a standard postal address:
                     street line → country → province/state → city + postal code. */}
                 <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] p-3 space-y-2.5">
-                  <Input label={t("field.streetAddress", "Street address")} tier="preferred" value={form.supplier_address} onChange={v => setField("supplier_address", v)} placeholder={t("placeholder.street", "Street, building, unit…")} icon={<MapPinIcon size={14} />} autoComplete="street-address" />
+                  <Input label={t("field.streetAddressEn", "Street address (English)")} tier="preferred" value={form.supplier_address} onChange={v => setField("supplier_address", v)} placeholder={t("placeholder.street", "Street, building, unit…")} icon={<MapPinIcon size={14} />} autoComplete="street-address" />
+                  <Input label={t("field.streetAddressCn", "Street address (Chinese)")} tier="optional" value={form.supplier_address_cn} onChange={v => setField("supplier_address_cn", v)} placeholder={t("placeholder.streetCn", "街道、楼宇、单元…")} icon={<MapPinIcon size={14} />} />
                   <CountryDropdown value={form.country_code} displayValue={form.country} onChange={handleCountryChange} label={t("field.country")} placeholder={t("field.searchCountry")} noResults={t("detail.noCountries")} />
                   {form.country_code && hasStates && (
                     <ProvinceDropdown countryCode={form.country_code} value={form.province_code} displayValue={form.province} onChange={handleProvinceChange} label={t("field.provinceState")} placeholder={t("field.searchProvince")} noResults={t("detail.noProvinces")} />
@@ -8232,6 +8294,22 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.lastQualityIssueDate")}</label>
                   <DateField value={form.last_quality_issue} onChange={v => setField("last_quality_issue", v)} />
                 </div>
+                {/* Quality issues log — add multiple dated issues, like the Risk list */}
+                <div>
+                  <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.qualityIssues", "Quality issues log")}</label>
+                  <div className="space-y-2">
+                    {form.quality_issues.map((q, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <div className="w-36 shrink-0">
+                          <DateField value={q.date} onChange={v => setField("quality_issues", form.quality_issues.map((x, j) => j === i ? { ...x, date: v } : x))} />
+                        </div>
+                        <input value={q.note} onChange={e => setField("quality_issues", form.quality_issues.map((x, j) => j === i ? { ...x, note: e.target.value } : x))} placeholder={t("placeholder.qualityIssueNote", "What happened?")} className="flex-1 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
+                        <button type="button" onClick={() => setField("quality_issues", form.quality_issues.filter((_, j) => j !== i))} aria-label="Remove" className="shrink-0 h-10 w-9 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-red-400 hover:bg-red-400/10 transition-colors"><TrashIcon size={14} /></button>
+                      </div>
+                    ))}
+                    <AddButton label={t("add.qualityIssue", "Add quality issue")} onClick={() => setField("quality_issues", [...form.quality_issues, { date: "", note: "" }])} />
+                  </div>
+                </div>
                 <div>
                   <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.qualityObs")}</label>
                   <textarea value={form.quality_notes} onChange={e => setField("quality_notes", e.target.value)} placeholder={t("placeholder.qualityObs")} rows={3} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none resize-none focus:border-[var(--border-focus)]" />
@@ -8352,7 +8430,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   value={sIntel.strategic_status_reason}
                   onChange={(v) => setSIntel((p) => ({ ...p, strategic_status_reason: v }))}
                   placeholder={t("placeholder.statusReason", "Pick a common reason or type your own")}
-                  options={STATUS_REASON_SUGGESTIONS}
+                  options={STATUS_REASON_SUGGESTIONS.map((s, i) => t(`sreason.${i}`, s))}
                   icon={<TargetIcon size={14} />}
                 />
               </div>
