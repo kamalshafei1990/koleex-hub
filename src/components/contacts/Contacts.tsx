@@ -3529,6 +3529,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const [saveError, setSaveError] = useState<string | null>(null);
   // Set true after a blocked save attempt so required fields highlight in red.
   const [triedSave, setTriedSave] = useState(false);
+  // Distinguishes "fill required fields" (validation) from a real server error.
+  const [saveErrorIsValidation, setSaveErrorIsValidation] = useState(false);
   const [rlsCopied, setRlsCopied] = useState(false);
   /* Customer premium tab — used by both form and detail views for customers */
   const [customerTab, setCustomerTab] = useState<CustomerTab>("overview");
@@ -3814,12 +3816,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       const errs = supplierFormErrors(form);
       if (errs.length) {
         setTriedSave(true);
+        setSaveErrorIsValidation(true);
         // List everything that needs fixing so the operator knows exactly what to complete.
         setSaveError(errs.map((m, i) => `${i + 1}. ${m}`).join("\n"));
         return;
       }
     }
     setTriedSave(false);
+    setSaveErrorIsValidation(false);
     setSaving(true);
     setSaveError(null);
     const row = formToRow(form);
@@ -6460,7 +6464,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <div className="flex items-start gap-2">
               <TriangleWarningIcon size={16} className="text-red-400 shrink-0 mt-0.5" />
               <div className="flex-1">
-                <p className="text-sm text-red-400 font-medium">{t("error.fixToSave", "Please complete the highlighted fields before saving")}</p>
+                <p className="text-sm text-red-400 font-medium">{saveErrorIsValidation ? t("error.fixToSave", "Please complete the highlighted fields before saving") : t("error.saveFailed")}</p>
                 <p className="text-xs text-red-400/70 mt-0.5 whitespace-pre-line">{saveError}</p>
               </div>
               <button onClick={() => setSaveError(null)} className="text-red-400/50 hover:text-red-400 shrink-0">
@@ -7876,7 +7880,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     street line → country → province/state → city + postal code. */}
                 <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] p-3 space-y-2.5">
                   <Input label={t("field.streetAddressEn", "Street address (English)")} tier="preferred" value={form.supplier_address} onChange={v => setField("supplier_address", v)} placeholder={t("placeholder.street", "Street, building, unit…")} icon={<MapPinIcon size={14} />} autoComplete="street-address" />
-                  <Input label={t("field.streetAddressCn", "Street address (Chinese)")} tier="optional" value={form.supplier_address_cn} onChange={v => setField("supplier_address_cn", v)} placeholder={t("placeholder.streetCn", "街道、楼宇、单元…")} icon={<MapPinIcon size={14} />} />
+                  <Input label={t("field.streetAddressCn", "Street address (Chinese)")} tier="preferred" value={form.supplier_address_cn} onChange={v => setField("supplier_address_cn", v)} placeholder={t("placeholder.streetCn", "街道、楼宇、单元…")} icon={<MapPinIcon size={14} />} />
                   <div className={triedSave && !form.country.trim() ? "rounded-lg ring-1 ring-rose-500/60" : undefined}>
                     <CountryDropdown value={form.country_code} displayValue={form.country} onChange={handleCountryChange} label={t("field.country")} placeholder={t("field.searchCountry")} noResults={t("detail.noCountries")} />
                   </div>
