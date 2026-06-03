@@ -7715,7 +7715,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
+                  <div className={triedSave && !form.division.trim() ? "rounded-lg ring-1 ring-rose-500/60" : undefined}>
                     <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.division")}<FieldMark tier="required" /></label>
                     <TaxonomySelect
                       value={form.division}
@@ -7731,7 +7731,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                       createLabel={t("create.newDivision", "Create new division")}
                     />
                   </div>
-                  <div>
+                  <div className={triedSave && !form.category.trim() ? "rounded-lg ring-1 ring-rose-500/60" : undefined}>
                     <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.category")}<FieldMark tier="required" /></label>
                     <TaxonomySelect value={form.category} onChange={v => setField("category", v)} options={categoryOptions} placeholder={form.division ? t("field.category") : t("placeholder.pickDivisionFirst", "Pick a division first")} createLabel={t("create.newCategory", "Create new category")} />
                   </div>
@@ -7877,7 +7877,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] p-3 space-y-2.5">
                   <Input label={t("field.streetAddressEn", "Street address (English)")} tier="preferred" value={form.supplier_address} onChange={v => setField("supplier_address", v)} placeholder={t("placeholder.street", "Street, building, unit…")} icon={<MapPinIcon size={14} />} autoComplete="street-address" />
                   <Input label={t("field.streetAddressCn", "Street address (Chinese)")} tier="optional" value={form.supplier_address_cn} onChange={v => setField("supplier_address_cn", v)} placeholder={t("placeholder.streetCn", "街道、楼宇、单元…")} icon={<MapPinIcon size={14} />} />
-                  <CountryDropdown value={form.country_code} displayValue={form.country} onChange={handleCountryChange} label={t("field.country")} placeholder={t("field.searchCountry")} noResults={t("detail.noCountries")} />
+                  <div className={triedSave && !form.country.trim() ? "rounded-lg ring-1 ring-rose-500/60" : undefined}>
+                    <CountryDropdown value={form.country_code} displayValue={form.country} onChange={handleCountryChange} label={t("field.country")} placeholder={t("field.searchCountry")} noResults={t("detail.noCountries")} />
+                  </div>
                   {form.country_code && hasStates && (
                     <ProvinceDropdown countryCode={form.country_code} value={form.province_code} displayValue={form.province} onChange={handleProvinceChange} label={t("field.provinceState")} placeholder={t("field.searchProvince")} noResults={t("detail.noProvinces")} />
                   )}
