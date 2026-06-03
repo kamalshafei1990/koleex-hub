@@ -781,7 +781,7 @@ function IconSelect({ value, onChange, placeholder, disabled, options }: {
         <AngleDownIcon className={`h-3.5 w-3.5 text-[var(--text-dim)] shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && !disabled && (
-        <div className="absolute z-30 mt-1 w-full max-h-60 overflow-auto rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-xl shadow-black/30 py-1">
+        <div className="absolute z-30 mt-1 w-full max-h-60 overflow-auto rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-xl shadow-black/40 py-1">
           <button type="button" onClick={() => { onChange(""); setOpen(false); }}
             className="w-full px-3.5 py-2 text-left text-[13px] text-[var(--text-dim)] hover:bg-[var(--bg-surface-hover)] transition-colors flex items-center gap-2">
             {placeholder}
