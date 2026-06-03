@@ -45,6 +45,8 @@ export interface CatalogEntry {
   year?: number | null;
   valid_until?: string | null;
   page_count?: number | null;
+  view_count?: number | null;
+  download_count?: number | null;
   created_by?: string | null;
   created_by_name?: string | null;
   created_at: string;
@@ -237,6 +239,25 @@ export async function deleteCatalog(id: string): Promise<boolean> {
   } catch (err) {
     console.error("[Catalogs] Delete:", err);
     return false;
+  }
+}
+
+// ── Track a usage metric (view / download) — fire-and-forget ──
+
+export async function trackCatalog(
+  id: string,
+  metric: "view" | "download",
+): Promise<void> {
+  try {
+    await fetch(`/api/catalogs/${id}/track`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ metric }),
+      keepalive: true,
+    });
+  } catch {
+    /* non-critical — never block the UI on a counter */
   }
 }
 

@@ -38,11 +38,13 @@ import CheckIcon from "@/components/icons/ui/CheckIcon";
 import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 import ZoomInIcon from "@/components/icons/ui/ZoomInIcon";
 import ZoomOutIcon from "@/components/icons/ui/ZoomOutIcon";
+import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
 import BrandGlyph from "@/components/icons/brands/BrandGlyph";
 import {
   fetchCatalogs, createCatalog, updateCatalog, deleteCatalog,
   uploadCatalogFile, uploadCatalogCover, replaceCatalogFile,
   fetchCatalogContacts, syncCatalogToContact, removeCatalogFromContact,
+  trackCatalog,
 } from "@/lib/catalogs-admin";
 import { createContact } from "@/lib/contacts-admin";
 import CatalogsIcon from "@/components/icons/CatalogsIcon";
@@ -62,6 +64,16 @@ const T: Translations = {
   "cat.stat.catalogs":    { en: "catalogs", zh: "目录", ar: "كتالوج" },
   "cat.stat.suppliers":   { en: "suppliers", zh: "供应商", ar: "موردون" },
   "cat.stat.total":       { en: "total", zh: "总计", ar: "الإجمالي" },
+  "cat.stat.views":       { en: "views", zh: "查看", ar: "مشاهدات" },
+  "cat.stat.downloads":   { en: "downloads", zh: "下载", ar: "تنزيلات" },
+  "cat.insights":         { en: "Insights", zh: "洞察", ar: "تحليلات" },
+  "cat.insights.engagement": { en: "Engagement", zh: "互动", ar: "التفاعل" },
+  "cat.insights.recent":  { en: "Added last 30 days", zh: "近30天新增", ar: "أُضيف آخر 30 يوم" },
+  "cat.insights.byDivision": { en: "By division", zh: "按部门", ar: "حسب القسم" },
+  "cat.insights.mostViewed": { en: "Most viewed", zh: "最常查看", ar: "الأكثر مشاهدة" },
+  "cat.insights.mostDownloaded": { en: "Most downloaded", zh: "最常下载", ar: "الأكثر تنزيلاً" },
+  "cat.insights.noData":  { en: "No activity yet", zh: "暂无活动", ar: "لا يوجد نشاط بعد" },
+  "cat.insights.noDivision": { en: "Unassigned", zh: "未分配", ar: "غير محدد" },
   "cat.search":           { en: "Search catalogs…", zh: "搜索目录…", ar: "ابحث في الكتالوجات…" },
   "cat.allSuppliers":     { en: "All Suppliers", zh: "所有供应商", ar: "كل الموردين" },
   "cat.allDivisions":     { en: "All Divisions", zh: "所有部门", ar: "كل الأقسام" },
@@ -1504,7 +1516,7 @@ function DeleteModal({ open, onClose, catalog, onConfirm, deleting }: {
 /* ═══════════════════════════
    ── Catalog Card ──
    ═══════════════════════════ */
-function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, onPreview, onEdit, onDelete }: {
+function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, onPreview, onEdit, onDelete, onDownload }: {
   catalog: CatalogEntry;
   divLogos: Record<string, string>;
   catLogos: Record<string, string>;
@@ -1513,6 +1525,7 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
   onPreview: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onDownload: () => void;
 }) {
   const ft = FILE_TYPE_CONFIG[catalog.file_type] || DEFAULT_FT;
   const Icon = ft.icon;
@@ -1521,6 +1534,7 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
   const { t } = useTranslation(T);
 
   const handleDownload = () => {
+    onDownload();
     const a = document.createElement("a");
     a.href = catalog.file_url;
     a.download = catalog.file_name;
@@ -1640,6 +1654,16 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
           <span>{formatFileSize(catalog.file_size)}</span>
           <span className="truncate">{catalog.year ? `${catalog.year} · ` : ""}{fmtDate(catalog.created_at)}</span>
         </div>
+        {((catalog.view_count ?? 0) > 0 || (catalog.download_count ?? 0) > 0) && (
+          <div className="flex items-center gap-3 text-[10px] text-[var(--text-dim)]">
+            <span className="inline-flex items-center gap-1" title={t("cat.stat.views")}>
+              <EyeIcon className="h-2.5 w-2.5" /> {catalog.view_count ?? 0}
+            </span>
+            <span className="inline-flex items-center gap-1" title={t("cat.stat.downloads")}>
+              <DownloadIcon className="h-2.5 w-2.5" /> {catalog.download_count ?? 0}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1648,7 +1672,7 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
 /* ═══════════════════════════
    ── List Row ──
    ═══════════════════════════ */
-function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onPreview, onEdit, onDelete }: {
+function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onPreview, onEdit, onDelete, onDownload }: {
   catalog: CatalogEntry;
   divLogos: Record<string, string>;
   catLogos: Record<string, string>;
@@ -1657,6 +1681,7 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
   onPreview: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onDownload: () => void;
 }) {
   const ft = FILE_TYPE_CONFIG[catalog.file_type] || DEFAULT_FT;
   const Icon = ft.icon;
@@ -1665,6 +1690,7 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
   const { t } = useTranslation(T);
 
   const handleDownload = () => {
+    onDownload();
     const a = document.createElement("a");
     a.href = catalog.file_url;
     a.download = catalog.file_name;
@@ -1720,7 +1746,7 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
             </span>
           )}
         </div>
-        <p className="text-[10px] text-[var(--text-dim)] mt-0.5">{ft.label} &middot; {formatFileSize(catalog.file_size)}{catalog.year ? ` · ${catalog.year}` : ""} &middot; {fmtDate(catalog.created_at)}{catalog.created_by_name ? ` · ${t("cat.uploadedBy")} ${catalog.created_by_name}` : ""}</p>
+        <p className="text-[10px] text-[var(--text-dim)] mt-0.5">{ft.label} &middot; {formatFileSize(catalog.file_size)}{catalog.year ? ` · ${catalog.year}` : ""} &middot; {fmtDate(catalog.created_at)}{catalog.created_by_name ? ` · ${t("cat.uploadedBy")} ${catalog.created_by_name}` : ""}{(catalog.view_count ?? 0) > 0 ? ` · ${catalog.view_count} ${t("cat.stat.views")}` : ""}{(catalog.download_count ?? 0) > 0 ? ` · ${catalog.download_count} ${t("cat.stat.downloads")}` : ""}</p>
       </div>
       <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
         <button onClick={onPreview} title={t("card.preview")} className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><EyeIcon className="h-3.5 w-3.5" /></button>
@@ -1735,7 +1761,7 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
 /* ═══════════════════════════
    ── In-app Preview Viewer ──
    ═══════════════════════════ */
-function PreviewModal({ catalog, onClose }: { catalog: CatalogEntry | null; onClose: () => void }) {
+function PreviewModal({ catalog, onClose, onDownload }: { catalog: CatalogEntry | null; onClose: () => void; onDownload: (id: string) => void }) {
   const [zoom, setZoom] = useState(1);
   const { t } = useTranslation(T);
   useEffect(() => { setZoom(1); }, [catalog?.id]);
@@ -1750,6 +1776,7 @@ function PreviewModal({ catalog, onClose }: { catalog: CatalogEntry | null; onCl
   const isPdf = catalog.file_type === "pdf";
   const isImg = isImageFile(catalog.file_type);
   const download = () => {
+    onDownload(catalog.id);
     const a = document.createElement("a");
     a.href = catalog.file_url; a.download = catalog.file_name; a.target = "_blank"; a.rel = "noopener noreferrer";
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
@@ -1819,6 +1846,7 @@ export default function CatalogsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [previewCatalog, setPreviewCatalog] = useState<CatalogEntry | null>(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [showInsights, setShowInsights] = useState(false);
 
   const [uploadModal, setUploadModal] = useState<{ open: boolean; editEntry: CatalogEntry | null }>({ open: false, editEntry: null });
   const [deleteModal, setDeleteModal] = useState<{ open: boolean; catalog: CatalogEntry | null }>({ open: false, catalog: null });
@@ -1908,10 +1936,40 @@ export default function CatalogsPage() {
     [catalogs],
   );
 
-  const handlePreview = (catalog: CatalogEntry) => setPreviewCatalog(catalog);
+  // Engagement insights, computed from the loaded catalogs + their counters.
+  const insights = useMemo(() => {
+    const totalViews = catalogs.reduce((s, c) => s + (c.view_count ?? 0), 0);
+    const totalDownloads = catalogs.reduce((s, c) => s + (c.download_count ?? 0), 0);
+    const cutoff = Date.now() - 30 * 864e5;
+    const recent = catalogs.filter(c => new Date(c.created_at).getTime() >= cutoff).length;
+
+    const divMap = new Map<string, number>();
+    catalogs.forEach(c => {
+      const key = c.division_name || t("cat.insights.noDivision");
+      divMap.set(key, (divMap.get(key) ?? 0) + 1);
+    });
+    const byDivision = [...divMap.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 5);
+
+    const mostViewed = [...catalogs].filter(c => (c.view_count ?? 0) > 0).sort((a, b) => (b.view_count ?? 0) - (a.view_count ?? 0)).slice(0, 5);
+    const mostDownloaded = [...catalogs].filter(c => (c.download_count ?? 0) > 0).sort((a, b) => (b.download_count ?? 0) - (a.download_count ?? 0)).slice(0, 5);
+    return { totalViews, totalDownloads, recent, byDivision, mostViewed, mostDownloaded };
+  }, [catalogs, t]);
+
+  // Record a usage metric: optimistic local bump + fire-and-forget server write.
+  const bumpMetric = useCallback((id: string, metric: "view" | "download") => {
+    const field = metric === "view" ? "view_count" : "download_count";
+    setCatalogs(prev => prev.map(c => c.id === id ? { ...c, [field]: (c[field] ?? 0) + 1 } : c));
+    void trackCatalog(id, metric);
+  }, []);
+
+  const handlePreview = (catalog: CatalogEntry) => {
+    setPreviewCatalog(catalog);
+    bumpMetric(catalog.id, "view");
+  };
 
   const handleBulkDownload = () => {
     filtered.filter(c => selected.has(c.id)).forEach((c, i) => {
+      bumpMetric(c.id, "download");
       setTimeout(() => {
         const a = document.createElement("a");
         a.href = c.file_url; a.download = c.file_name; a.target = "_blank"; a.rel = "noopener noreferrer";
@@ -1980,7 +2038,107 @@ export default function CatalogsPage() {
             <span className="text-[16px] font-bold text-[var(--text-primary)] tabular-nums">{formatFileSize(totalSize)}</span>
             <span className="text-[11px] text-[var(--text-dim)]">{t("cat.stat.total")}</span>
           </div>
+          {(insights.totalViews > 0 || insights.totalDownloads > 0) && (
+            <>
+              <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+                <EyeIcon className="h-3 w-3 text-[var(--text-dim)]" />
+                <span className="text-[16px] font-bold text-[var(--text-primary)] tabular-nums">{insights.totalViews}</span>
+                <span className="text-[11px] text-[var(--text-dim)]">{t("cat.stat.views")}</span>
+              </div>
+              <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+                <DownloadIcon className="h-3 w-3 text-[var(--text-dim)]" />
+                <span className="text-[16px] font-bold text-[var(--text-primary)] tabular-nums">{insights.totalDownloads}</span>
+                <span className="text-[11px] text-[var(--text-dim)]">{t("cat.stat.downloads")}</span>
+              </div>
+            </>
+          )}
+          {catalogs.length > 0 && (
+            <button onClick={() => setShowInsights(v => !v)}
+              className={`flex items-center gap-2 h-9 px-4 rounded-lg border text-[12px] font-medium transition-colors ${showInsights ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent" : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"}`}>
+              <BarChart3Icon className="h-3.5 w-3.5" /> {t("cat.insights")}
+              <AngleDownIcon className={`h-3 w-3 transition-transform ${showInsights ? "rotate-180" : ""}`} />
+            </button>
+          )}
         </div>
+
+        {/* Insights panel */}
+        {showInsights && catalogs.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+            {/* Engagement */}
+            <div className="rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-dim)] mb-3">{t("cat.insights.engagement")}</p>
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <div>
+                  <p className="text-[20px] font-bold text-[var(--text-primary)] tabular-nums leading-none">{insights.totalViews}</p>
+                  <p className="text-[10px] text-[var(--text-dim)] mt-1">{t("cat.stat.views")}</p>
+                </div>
+                <div>
+                  <p className="text-[20px] font-bold text-[var(--text-primary)] tabular-nums leading-none">{insights.totalDownloads}</p>
+                  <p className="text-[10px] text-[var(--text-dim)] mt-1">{t("cat.stat.downloads")}</p>
+                </div>
+                <div>
+                  <p className="text-[20px] font-bold text-blue-500 tabular-nums leading-none">{insights.recent}</p>
+                  <p className="text-[10px] text-[var(--text-dim)] mt-1">{t("cat.insights.recent")}</p>
+                </div>
+              </div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-dim)] mb-2 mt-4">{t("cat.insights.byDivision")}</p>
+              {insights.byDivision.length === 0 ? (
+                <p className="text-[11px] text-[var(--text-dim)]">{t("cat.insights.noData")}</p>
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  {insights.byDivision.map(d => {
+                    const pct = Math.round((d.count / catalogs.length) * 100);
+                    return (
+                      <div key={d.name} className="flex items-center gap-2">
+                        <span className="text-[11px] text-[var(--text-secondary)] truncate w-24 shrink-0">{d.name}</span>
+                        <div className="flex-1 h-1.5 rounded-full bg-[var(--bg-surface-bright)] overflow-hidden">
+                          <div className="h-full bg-[var(--text-dim)] rounded-full" style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="text-[11px] tabular-nums text-[var(--text-dim)] w-6 text-right shrink-0">{d.count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Most viewed */}
+            <div className="rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-dim)] mb-3 flex items-center gap-1.5"><EyeIcon className="h-3 w-3" /> {t("cat.insights.mostViewed")}</p>
+              {insights.mostViewed.length === 0 ? (
+                <p className="text-[11px] text-[var(--text-dim)]">{t("cat.insights.noData")}</p>
+              ) : (
+                <ol className="flex flex-col gap-2">
+                  {insights.mostViewed.map((c, i) => (
+                    <li key={c.id} className="flex items-center gap-2">
+                      <span className="text-[11px] tabular-nums text-[var(--text-dim)] w-4 shrink-0">{i + 1}</span>
+                      <button onClick={() => handlePreview(c)} className="text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] truncate flex-1 text-left transition-colors">{c.title}</button>
+                      <span className="text-[11px] font-semibold tabular-nums text-[var(--text-primary)] shrink-0">{c.view_count ?? 0}</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+
+            {/* Most downloaded */}
+            <div className="rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-dim)] mb-3 flex items-center gap-1.5"><DownloadIcon className="h-3 w-3" /> {t("cat.insights.mostDownloaded")}</p>
+              {insights.mostDownloaded.length === 0 ? (
+                <p className="text-[11px] text-[var(--text-dim)]">{t("cat.insights.noData")}</p>
+              ) : (
+                <ol className="flex flex-col gap-2">
+                  {insights.mostDownloaded.map((c, i) => (
+                    <li key={c.id} className="flex items-center gap-2">
+                      <span className="text-[11px] tabular-nums text-[var(--text-dim)] w-4 shrink-0">{i + 1}</span>
+                      <button onClick={() => handlePreview(c)} className="text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] truncate flex-1 text-left transition-colors">{c.title}</button>
+                      <span className="text-[11px] font-semibold tabular-nums text-[var(--text-primary)] shrink-0">{c.download_count ?? 0}</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-3 mb-6">
@@ -2118,6 +2276,7 @@ export default function CatalogsPage() {
               <CatalogCard key={catalog.id} catalog={catalog} divLogos={divLogos} catLogos={catLogos}
                 selected={selected.has(catalog.id)} onToggleSelect={() => toggleSelect(catalog.id)}
                 onPreview={() => handlePreview(catalog)}
+                onDownload={() => bumpMetric(catalog.id, "download")}
                 onEdit={() => setUploadModal({ open: true, editEntry: catalog })}
                 onDelete={() => setDeleteModal({ open: true, catalog })} />
             ))}
@@ -2128,6 +2287,7 @@ export default function CatalogsPage() {
               <CatalogRow key={catalog.id} catalog={catalog} divLogos={divLogos} catLogos={catLogos}
                 selected={selected.has(catalog.id)} onToggleSelect={() => toggleSelect(catalog.id)}
                 onPreview={() => handlePreview(catalog)}
+                onDownload={() => bumpMetric(catalog.id, "download")}
                 onEdit={() => setUploadModal({ open: true, editEntry: catalog })}
                 onDelete={() => setDeleteModal({ open: true, catalog })} />
             ))}
@@ -2174,7 +2334,7 @@ export default function CatalogsPage() {
         deleting={deleting}
       />
 
-      <PreviewModal catalog={previewCatalog} onClose={() => setPreviewCatalog(null)} />
+      <PreviewModal catalog={previewCatalog} onClose={() => setPreviewCatalog(null)} onDownload={(id) => bumpMetric(id, "download")} />
     </div>
   );
 }
