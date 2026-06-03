@@ -1726,9 +1726,9 @@ const FieldMark = ({ tier }: { tier?: FieldTier }) =>
     : tier === "optional" ? <span className="ms-1.5 align-middle text-[9px] font-medium uppercase tracking-wide text-[var(--text-ghost)]">optional</span>
     : null;
 
-const Input = React.memo(function Input({ label, value, onChange, type = "text", placeholder, icon, inputMode, autoComplete, list, tier, help }: {
+const Input = React.memo(function Input({ label, value, onChange, type = "text", placeholder, icon, inputMode, autoComplete, list, tier, help, invalid }: {
   label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string; icon?: React.ReactNode;
-  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"]; autoComplete?: string; list?: string; tier?: FieldTier; help?: string;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"]; autoComplete?: string; list?: string; tier?: FieldTier; help?: string; invalid?: boolean;
 }) {
   /* Sensible defaults so each field gets the right mobile keyboard + browser
      autofill even when the caller only passes `type`. */
@@ -1747,7 +1747,8 @@ const Input = React.memo(function Input({ label, value, onChange, type = "text",
           value={value}
           onChange={e => onChange(e.target.value)}
           placeholder={placeholder || label}
-          className={`w-full h-10 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors ${icon ? "ps-9 pe-3" : "px-3"}`}
+          aria-invalid={invalid || undefined}
+          className={`w-full h-10 rounded-lg bg-[var(--bg-surface)] border text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none transition-colors ${icon ? "ps-9 pe-3" : "px-3"} ${invalid ? "border-rose-500 ring-1 ring-rose-500/30 focus:border-rose-500" : "border-[var(--border-color)] focus:border-[var(--border-focus)]"}`}
         />
       </div>
     </div>
@@ -3493,6 +3494,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const [expandedResumeLine, setExpandedResumeLine] = useState<number | null>(null);
   const [mobileShowDetail, setMobileShowDetail] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Set true after a blocked save attempt so required fields highlight in red.
+  const [triedSave, setTriedSave] = useState(false);
   const [rlsCopied, setRlsCopied] = useState(false);
   /* Customer premium tab — used by both form and detail views for customers */
   const [customerTab, setCustomerTab] = useState<CustomerTab>("overview");
@@ -3690,7 +3693,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const handleAdd = useCallback((type: ContactType, entityType?: "person" | "company") => {
     // New suppliers default to the Garment Machinery division so the
     // category dropdown is populated out of the box.
-    setForm({ ...EMPTY_FORM, contact_type: type, entity_type: entityType || "", division: type === "supplier" ? "Garment Machinery" : "" });
+    setForm({ ...EMPTY_FORM, contact_type: type, entity_type: entityType || "", division: type === "supplier" ? "Garment Machinery" : "", currency: type === "supplier" ? "CNY" : "" });
+    setTriedSave(false);
+    setSaveError(null);
     setSIntel(EMPTY_SINTEL);
     setRiskScoreManual(false);
     setNegScoreManual(false);
@@ -3711,6 +3716,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const openEditFor = useCallback((c: ContactRow) => {
     setSelectedId(c.id);
     setForm(contactToForm(c));
+    setTriedSave(false);
+    setSaveError(null);
     setEditingId(c.id);
     setSupplierDept(null);
     setSupplierSectionAudit({});
@@ -3772,8 +3779,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     // Block save on supplier data-integrity errors (required + format validation).
     if (filterType === "supplier" || form.contact_type === "supplier") {
       const errs = supplierFormErrors(form);
-      if (errs.length) { setSaveError(errs.length > 1 ? `${errs[0]} (+${errs.length - 1} more to fix)` : errs[0]); return; }
+      if (errs.length) {
+        setTriedSave(true);
+        // List everything that needs fixing so the operator knows exactly what to complete.
+        setSaveError(errs.map((m, i) => `${i + 1}. ${m}`).join("\n"));
+        return;
+      }
     }
+    setTriedSave(false);
     setSaving(true);
     setSaveError(null);
     const row = formToRow(form);
@@ -6414,8 +6427,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <div className="flex items-start gap-2">
               <TriangleWarningIcon size={16} className="text-red-400 shrink-0 mt-0.5" />
               <div className="flex-1">
-                <p className="text-sm text-red-400 font-medium">{t("error.saveFailed")}</p>
-                <p className="text-xs text-red-400/70 mt-0.5">{saveError}</p>
+                <p className="text-sm text-red-400 font-medium">{t("error.fixToSave", "Please complete the highlighted fields before saving")}</p>
+                <p className="text-xs text-red-400/70 mt-0.5 whitespace-pre-line">{saveError}</p>
               </div>
               <button onClick={() => setSaveError(null)} className="text-red-400/50 hover:text-red-400 shrink-0">
                 <CrossIcon size={14} />
@@ -7625,7 +7638,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             {/* 1. Company Name — Most important, identity of the supplier */}
             <FormSection title={t("section.companyName")} icon={<Building2Icon size={14} />} owner={t("owner.procurement")} ownerLabel={t("owner.label")} dept="procurement" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
               <div className="space-y-3">
-                <Input label={t("field.companyNameEn")} value={form.company_name_en} onChange={v => setField("company_name_en", v)} placeholder={t("placeholder.companyNameEn")} icon={<Building2Icon size={14} />} tier="required" />
+                <Input label={t("field.companyNameEn")} value={form.company_name_en} onChange={v => setField("company_name_en", v)} placeholder={t("placeholder.companyNameEn")} icon={<Building2Icon size={14} />} tier="required" invalid={triedSave && !form.company_name_en.trim()} />
                 <Input label={t("field.companyNameCn")} tier="optional" value={form.company_name_cn} onChange={v => setField("company_name_cn", v.replace(/[؀-ۿݐ-ݿࢠ-ࣿ]/g, ""))} placeholder={t("placeholder.companyNameCn")} icon={<LanguagesIcon size={14} />} />
                 {/* Additional Company Names */}
                 <div>
