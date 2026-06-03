@@ -35,6 +35,110 @@ import {
   fetchDivisionLogos, fetchCategoryLogos,
 } from "@/lib/products-admin";
 import type { DivisionRow, CategoryRow } from "@/types/supabase";
+import { useTranslation, type Translations } from "@/lib/i18n";
+
+/* ── i18n — full catalog app translation (en / zh / ar) ── */
+const T: Translations = {
+  "cat.title":            { en: "Catalogs", zh: "产品目录", ar: "الكتالوجات" },
+  "cat.subtitle":         { en: "Manage supplier and company catalogs", zh: "管理供应商和公司目录", ar: "إدارة كتالوجات الموردين والشركات" },
+  "cat.stat.catalogs":    { en: "catalogs", zh: "目录", ar: "كتالوج" },
+  "cat.stat.suppliers":   { en: "suppliers", zh: "供应商", ar: "موردون" },
+  "cat.stat.total":       { en: "total", zh: "总计", ar: "الإجمالي" },
+  "cat.search":           { en: "Search catalogs…", zh: "搜索目录…", ar: "ابحث في الكتالوجات…" },
+  "cat.allSuppliers":     { en: "All Suppliers", zh: "所有供应商", ar: "كل الموردين" },
+  "cat.allDivisions":     { en: "All Divisions", zh: "所有部门", ar: "كل الأقسام" },
+  "cat.allTypes":         { en: "All Types", zh: "所有类型", ar: "كل الأنواع" },
+  "cat.upload":           { en: "Upload Catalog", zh: "上传目录", ar: "رفع كتالوج" },
+  "cat.emptyTitle":       { en: "No catalogs yet", zh: "暂无目录", ar: "لا توجد كتالوجات بعد" },
+  "cat.emptyDesc":        { en: "Upload your first supplier catalog to get started.", zh: "上传您的第一个供应商目录以开始。", ar: "ارفع أول كتالوج مورد للبدء." },
+  "cat.noMatch":          { en: "No catalogs match your filters.", zh: "没有符合筛选条件的目录。", ar: "لا توجد كتالوجات تطابق عوامل التصفية." },
+  "nav.products":         { en: "Products", zh: "产品", ar: "المنتجات" },
+  "nav.suppliers":        { en: "Suppliers", zh: "供应商", ar: "الموردون" },
+  "nav.contacts":         { en: "Contacts", zh: "联系人", ar: "جهات الاتصال" },
+
+  "modal.editTitle":      { en: "Edit Catalog", zh: "编辑目录", ar: "تعديل الكتالوج" },
+  "modal.uploadTitle":    { en: "Upload Catalog", zh: "上传目录", ar: "رفع كتالوج" },
+  "modal.file":           { en: "Catalog File", zh: "目录文件", ar: "ملف الكتالوج" },
+  "modal.fileDrop":       { en: "Click to upload or drag file here", zh: "点击上传或将文件拖到此处", ar: "انقر للرفع أو اسحب الملف هنا" },
+  "modal.replace":        { en: "Replace", zh: "替换", ar: "استبدال" },
+  "modal.genCover":       { en: "Generating cover preview...", zh: "正在生成封面预览…", ar: "جارٍ إنشاء معاينة الغلاف…" },
+  "modal.titleField":     { en: "Title", zh: "标题", ar: "العنوان" },
+  "modal.titlePlaceholder": { en: "Catalog title", zh: "目录标题", ar: "عنوان الكتالوج" },
+  "modal.supplierCompany":{ en: "Supplier / Company", zh: "供应商 / 公司", ar: "المورد / الشركة" },
+  "modal.searchContacts": { en: "Search suppliers or companies…", zh: "搜索供应商或公司…", ar: "ابحث عن موردين أو شركات…" },
+  "modal.noContacts":     { en: "No suppliers or companies found.", zh: "未找到供应商或公司。", ar: "لم يتم العثور على موردين أو شركات." },
+  "modal.noMatchFound":   { en: "No match found.", zh: "未找到匹配项。", ar: "لا توجد نتائج مطابقة." },
+  "modal.addNew":         { en: "Add new supplier / company", zh: "添加新供应商 / 公司", ar: "إضافة مورد / شركة جديدة" },
+  "modal.division":       { en: "Division", zh: "部门", ar: "القسم" },
+  "modal.selectDivision": { en: "Select division", zh: "选择部门", ar: "اختر القسم" },
+  "modal.category":       { en: "Category", zh: "类别", ar: "الفئة" },
+  "modal.selectCategory": { en: "Select category", zh: "选择类别", ar: "اختر الفئة" },
+  "modal.description":    { en: "Description", zh: "描述", ar: "الوصف" },
+  "modal.optional":       { en: "(optional)", zh: "（可选）", ar: "(اختياري)" },
+  "modal.descPlaceholder":{ en: "Optional notes about this catalog", zh: "关于此目录的可选备注", ar: "ملاحظات اختيارية حول هذا الكتالوج" },
+  "modal.saveChanges":    { en: "Save Changes", zh: "保存更改", ar: "حفظ التغييرات" },
+  "modal.uploadBtn":      { en: "Upload", zh: "上传", ar: "رفع" },
+  "modal.uploading":      { en: "Uploading...", zh: "上传中…", ar: "جارٍ الرفع…" },
+  "modal.uploadingFile":  { en: "Uploading file...", zh: "正在上传文件…", ar: "جارٍ رفع الملف…" },
+  "modal.uploadingPct":   { en: "Uploading... {n}%", zh: "上传中… {n}%", ar: "جارٍ الرفع… {n}٪" },
+  "modal.saving":         { en: "Saving...", zh: "保存中…", ar: "جارٍ الحفظ…" },
+
+  "err.selectFile":       { en: "Please select a file to upload.", zh: "请选择要上传的文件。", ar: "يرجى اختيار ملف للرفع." },
+  "err.titleRequired":    { en: "Title is required.", zh: "标题为必填项。", ar: "العنوان مطلوب." },
+  "err.uploadFailed":     { en: "Failed to upload file.", zh: "文件上传失败。", ar: "فشل رفع الملف." },
+  "err.somethingWrong":   { en: "Something went wrong.", zh: "出现错误。", ar: "حدث خطأ ما." },
+  "err.unsupported":      { en: "Unsupported file type. Use PDF, JPG, PNG, PSD, or CDR.", zh: "不支持的文件类型。请使用 PDF、JPG、PNG、PSD 或 CDR。", ar: "نوع ملف غير مدعوم. استخدم PDF أو JPG أو PNG أو PSD أو CDR." },
+  "err.tooLarge":         { en: "File is too large ({mb} MB). Maximum is 500 MB per file.", zh: "文件过大（{mb} MB）。每个文件最大 500 MB。", ar: "الملف كبير جدًا ({mb} ميجابايت). الحد الأقصى 500 ميجابايت لكل ملف." },
+
+  "quick.title":          { en: "Add New Supplier / Company", zh: "添加新供应商 / 公司", ar: "إضافة مورد / شركة جديدة" },
+  "quick.type":           { en: "Type", zh: "类型", ar: "النوع" },
+  "quick.supplier":       { en: "Supplier", zh: "供应商", ar: "مورد" },
+  "quick.company":        { en: "Company", zh: "公司", ar: "شركة" },
+  "quick.companyProfile": { en: "Company Profile", zh: "公司资料", ar: "ملف الشركة" },
+  "quick.nameEn":         { en: "Company Name (English)", zh: "公司名称（英文）", ar: "اسم الشركة (بالإنجليزية)" },
+  "quick.nameCn":         { en: "Company Name (Chinese)", zh: "公司名称（中文）", ar: "اسم الشركة (بالصينية)" },
+  "quick.selectType":     { en: "Select type…", zh: "选择类型…", ar: "اختر النوع…" },
+  "quick.source":         { en: "Source", zh: "来源", ar: "المصدر" },
+  "quick.selectSource":   { en: "Select source…", zh: "选择来源…", ar: "اختر المصدر…" },
+  "quick.industry":       { en: "Industry", zh: "行业", ar: "الصناعة" },
+  "quick.contactDetails": { en: "Contact Details", zh: "联系方式", ar: "تفاصيل الاتصال" },
+  "quick.telephone":      { en: "Telephone", zh: "电话", ar: "الهاتف" },
+  "quick.mobile":         { en: "Mobile", zh: "手机", ar: "الجوال" },
+  "quick.email":          { en: "Email", zh: "邮箱", ar: "البريد الإلكتروني" },
+  "quick.website":        { en: "Website", zh: "网站", ar: "الموقع الإلكتروني" },
+  "quick.country":        { en: "Country", zh: "国家", ar: "الدولة" },
+  "quick.address":        { en: "Address", zh: "地址", ar: "العنوان" },
+  "quick.contactPerson":  { en: "Contact Person", zh: "联系人", ar: "الشخص المسؤول" },
+  "quick.addPerson":      { en: "Add Person", zh: "添加联系人", ar: "إضافة شخص" },
+  "quick.noPerson":       { en: "No contact person added yet", zh: "尚未添加联系人", ar: "لم تتم إضافة شخص مسؤول بعد" },
+  "quick.person":         { en: "Person", zh: "联系人", ar: "شخص" },
+  "quick.name":           { en: "Name", zh: "姓名", ar: "الاسم" },
+  "quick.fullName":       { en: "Full name", zh: "全名", ar: "الاسم الكامل" },
+  "quick.position":       { en: "Position", zh: "职位", ar: "المنصب" },
+  "quick.department":     { en: "Department", zh: "部门", ar: "القسم" },
+  "quick.messaging":      { en: "Messaging IDs", zh: "即时通讯账号", ar: "معرّفات المراسلة" },
+  "quick.wechat":         { en: "WeChat ID", zh: "微信号", ar: "معرف WeChat" },
+  "quick.wechatOfficial": { en: "WeChat Official", zh: "微信公众号", ar: "حساب WeChat الرسمي" },
+  "quick.whatsapp":       { en: "WhatsApp", zh: "WhatsApp", ar: "واتساب" },
+  "quick.telegram":       { en: "Telegram", zh: "Telegram", ar: "تيليجرام" },
+  "quick.line":           { en: "Line ID", zh: "Line 账号", ar: "معرف Line" },
+  "quick.qq":             { en: "QQ", zh: "QQ", ar: "QQ" },
+  "quick.creating":       { en: "Creating...", zh: "创建中…", ar: "جارٍ الإنشاء…" },
+  "quick.create":         { en: "Create", zh: "创建", ar: "إنشاء" },
+  "err.nameEnRequired":   { en: "Company name (English) is required.", zh: "公司名称（英文）为必填项。", ar: "اسم الشركة (بالإنجليزية) مطلوب." },
+  "err.createFailed":     { en: "Failed to create.", zh: "创建失败。", ar: "فشل الإنشاء." },
+
+  "del.title":            { en: "Delete Catalog", zh: "删除目录", ar: "حذف الكتالوج" },
+  "del.confirm":          { en: "Delete “{title}”? The file will be permanently removed.", zh: "删除“{title}”？文件将被永久删除。", ar: "حذف “{title}”؟ سيتم حذف الملف نهائيًا." },
+  "del.delete":           { en: "Delete", zh: "删除", ar: "حذف" },
+  "del.deleting":         { en: "Deleting...", zh: "删除中…", ar: "جارٍ الحذف…" },
+
+  "common.cancel":        { en: "Cancel", zh: "取消", ar: "إلغاء" },
+  "card.preview":         { en: "Preview", zh: "预览", ar: "معاينة" },
+  "card.download":        { en: "Download", zh: "下载", ar: "تنزيل" },
+  "card.edit":            { en: "Edit", zh: "编辑", ar: "تعديل" },
+  "card.delete":          { en: "Delete", zh: "删除", ar: "حذف" },
+};
 
 /* ── Helpers ── */
 function getFileType(fileName: string): string {
@@ -166,6 +270,7 @@ function QuickAddContactModal({
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const { t } = useTranslation(T);
 
   useEffect(() => {
     if (open) {
@@ -183,7 +288,7 @@ function QuickAddContactModal({
   const removePerson = (i: number) => setPersons(p => p.filter((_, idx) => idx !== i));
 
   const handleSave = async () => {
-    if (!nameEn.trim()) { setError("Company name (English) is required."); return; }
+    if (!nameEn.trim()) { setError(t("err.nameEnRequired")); return; }
     setSaving(true);
     setError("");
 
@@ -230,7 +335,7 @@ function QuickAddContactModal({
     setSaving(false);
 
     if (err || !data) {
-      setError(err || "Failed to create.");
+      setError(err || t("err.createFailed"));
       return;
     }
 
@@ -261,7 +366,7 @@ function QuickAddContactModal({
         <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-subtle)] px-6 py-4">
           <div className="flex items-center gap-2.5">
             <Building2Icon className="h-4 w-4 text-[var(--text-dim)]" />
-            <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">Add New Supplier / Company</h2>
+            <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">{t("quick.title")}</h2>
           </div>
           <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--text-dim)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] transition-colors">
             <CrossIcon className="h-4 w-4" />
@@ -274,50 +379,50 @@ function QuickAddContactModal({
 
           {/* Type toggle */}
           <div className="mb-6">
-            <label className={lbl}>Type</label>
+            <label className={lbl}>{t("quick.type")}</label>
             <div className="grid grid-cols-2 gap-2">
               <button onClick={() => setContactType("supplier")}
                 className={`h-10 rounded-lg text-[12px] font-semibold border transition-all ${contactType === "supplier" ? "bg-blue-500/15 border-blue-500/30 text-blue-400" : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-secondary)]"}`}>
-                Supplier
+                {t("quick.supplier")}
               </button>
               <button onClick={() => setContactType("company")}
                 className={`h-10 rounded-lg text-[12px] font-semibold border transition-all ${contactType === "company" ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400" : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-secondary)]"}`}>
-                Company
+                {t("quick.company")}
               </button>
             </div>
           </div>
 
           {/* ── Company profile ── */}
-          <p className={sectionTitle + " mb-3"}>Company Profile</p>
+          <p className={sectionTitle + " mb-3"}>{t("quick.companyProfile")}</p>
           <div className="mb-6 space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label className={lbl}>Company Name (English) <span className="text-red-400">*</span></label>
+                <label className={lbl}>{t("quick.nameEn")} <span className="text-red-400">*</span></label>
                 <input type="text" value={nameEn} onChange={(e) => setNameEn(e.target.value)} placeholder="e.g. Delta Engineering Ltd" className={inp} autoFocus />
               </div>
               <div>
-                <label className={lbl}>Company Name (Chinese)</label>
+                <label className={lbl}>{t("quick.nameCn")}</label>
                 <input type="text" value={nameCn} onChange={(e) => setNameCn(e.target.value)} placeholder="达美工程有限公司" className={inp} />
               </div>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label className={lbl}>Type</label>
+                <label className={lbl}>{t("quick.type")}</label>
                 <select value={supplierType} onChange={(e) => setSupplierType(e.target.value)} className={inp}>
-                  <option value="">Select type…</option>
-                  {QA_SUPPLIER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  <option value="">{t("quick.selectType")}</option>
+                  {QA_SUPPLIER_TYPES.map(o => <option key={o} value={o}>{o}</option>)}
                 </select>
               </div>
               <div>
-                <label className={lbl}>Source</label>
+                <label className={lbl}>{t("quick.source")}</label>
                 <select value={source} onChange={(e) => setSource(e.target.value)} className={inp}>
-                  <option value="">Select source…</option>
+                  <option value="">{t("quick.selectSource")}</option>
                   {QA_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
             </div>
             <div>
-              <label className={lbl}>Industry</label>
+              <label className={lbl}>{t("quick.industry")}</label>
               <input type="text" value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="e.g. Industrial Sewing Machines" className={inp} />
             </div>
           </div>
@@ -325,43 +430,43 @@ function QuickAddContactModal({
           <div className="mb-6 border-t border-[var(--border-subtle)]" />
 
           {/* ── Contact details ── */}
-          <p className={sectionTitle + " mb-3"}>Contact Details</p>
+          <p className={sectionTitle + " mb-3"}>{t("quick.contactDetails")}</p>
           <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div><label className={lbl}>Telephone</label><input type="text" value={tel} onChange={(e) => setTel(e.target.value)} placeholder="+86 755 …" className={inp} /></div>
-            <div><label className={lbl}>Mobile</label><input type="text" value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="+86 138 …" className={inp} /></div>
-            <div><label className={lbl}>Email</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="sales@company.com" className={inp} /></div>
-            <div><label className={lbl}>Website</label><input type="text" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://…" className={inp} /></div>
-            <div><label className={lbl}>Country</label><input type="text" value={country} onChange={(e) => setCountry(e.target.value)} placeholder="e.g. China" className={inp} /></div>
-            <div><label className={lbl}>Address</label><input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Full address" className={inp} /></div>
+            <div><label className={lbl}>{t("quick.telephone")}</label><input type="text" value={tel} onChange={(e) => setTel(e.target.value)} placeholder="+86 755 …" className={inp} /></div>
+            <div><label className={lbl}>{t("quick.mobile")}</label><input type="text" value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="+86 138 …" className={inp} /></div>
+            <div><label className={lbl}>{t("quick.email")}</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="sales@company.com" className={inp} /></div>
+            <div><label className={lbl}>{t("quick.website")}</label><input type="text" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://…" className={inp} /></div>
+            <div><label className={lbl}>{t("quick.country")}</label><input type="text" value={country} onChange={(e) => setCountry(e.target.value)} placeholder="e.g. China" className={inp} /></div>
+            <div><label className={lbl}>{t("quick.address")}</label><input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Full address" className={inp} /></div>
           </div>
 
           <div className="mb-6 border-t border-[var(--border-subtle)]" />
 
           {/* ── Contact persons ── */}
           <div className="mb-2 flex items-center justify-between">
-            <p className={sectionTitle}>Contact Person</p>
+            <p className={sectionTitle}>{t("quick.contactPerson")}</p>
             <button type="button" onClick={addPerson} className="flex h-8 items-center gap-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-3 text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
-              <PlusIcon className="h-3 w-3" /> Add Person
+              <PlusIcon className="h-3 w-3" /> {t("quick.addPerson")}
             </button>
           </div>
           <div className="mb-6">
             {persons.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-[var(--border-subtle)] py-3 text-center text-[12px] text-[var(--text-dim)]">No contact person added yet</p>
+              <p className="rounded-lg border border-dashed border-[var(--border-subtle)] py-3 text-center text-[12px] text-[var(--text-dim)]">{t("quick.noPerson")}</p>
             ) : (
               <div className="space-y-3">
                 {persons.map((p, i) => (
                   <div key={i} className="rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-4">
                     <div className="mb-3 flex items-center justify-between">
-                      <span className="text-[11px] font-semibold text-[var(--text-dim)]">Person {i + 1}</span>
+                      <span className="text-[11px] font-semibold text-[var(--text-dim)]">{t("quick.person")} {i + 1}</span>
                       <button type="button" onClick={() => removePerson(i)} className="flex h-6 w-6 items-center justify-center rounded text-[var(--text-dim)] hover:text-red-400 transition-colors"><TrashIcon className="h-3.5 w-3.5" /></button>
                     </div>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div><label className={lbl}>Name</label><input value={p.name} onChange={(e) => updatePerson(i, "name", e.target.value)} placeholder="Full name" className={inp} /></div>
-                      <div><label className={lbl}>Position</label><input value={p.position} onChange={(e) => updatePerson(i, "position", e.target.value)} placeholder="e.g. Sales Manager" className={inp} /></div>
-                      <div><label className={lbl}>Department</label><input value={p.department} onChange={(e) => updatePerson(i, "department", e.target.value)} placeholder="e.g. Sales" className={inp} /></div>
-                      <div><label className={lbl}>Phone</label><input value={p.phone} onChange={(e) => updatePerson(i, "phone", e.target.value)} placeholder="Phone" className={inp} /></div>
-                      <div><label className={lbl}>Mobile</label><input value={p.mobile} onChange={(e) => updatePerson(i, "mobile", e.target.value)} placeholder="Mobile" className={inp} /></div>
-                      <div><label className={lbl}>Email</label><input value={p.email} onChange={(e) => updatePerson(i, "email", e.target.value)} placeholder="Email" className={inp} /></div>
+                      <div><label className={lbl}>{t("quick.name")}</label><input value={p.name} onChange={(e) => updatePerson(i, "name", e.target.value)} placeholder={t("quick.fullName")} className={inp} /></div>
+                      <div><label className={lbl}>{t("quick.position")}</label><input value={p.position} onChange={(e) => updatePerson(i, "position", e.target.value)} placeholder="e.g. Sales Manager" className={inp} /></div>
+                      <div><label className={lbl}>{t("quick.department")}</label><input value={p.department} onChange={(e) => updatePerson(i, "department", e.target.value)} placeholder="e.g. Sales" className={inp} /></div>
+                      <div><label className={lbl}>{t("quick.telephone")}</label><input value={p.phone} onChange={(e) => updatePerson(i, "phone", e.target.value)} placeholder={t("quick.telephone")} className={inp} /></div>
+                      <div><label className={lbl}>{t("quick.mobile")}</label><input value={p.mobile} onChange={(e) => updatePerson(i, "mobile", e.target.value)} placeholder={t("quick.mobile")} className={inp} /></div>
+                      <div><label className={lbl}>{t("quick.email")}</label><input value={p.email} onChange={(e) => updatePerson(i, "email", e.target.value)} placeholder={t("quick.email")} className={inp} /></div>
                     </div>
                   </div>
                 ))}
@@ -372,24 +477,24 @@ function QuickAddContactModal({
           <div className="mb-6 border-t border-[var(--border-subtle)]" />
 
           {/* ── Messaging IDs ── */}
-          <p className={sectionTitle + " mb-3"}>Messaging IDs</p>
+          <p className={sectionTitle + " mb-3"}>{t("quick.messaging")}</p>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div><label className={lbl}>WeChat ID</label><input type="text" value={wechatId} onChange={(e) => setWechatId(e.target.value)} placeholder="wxid_…" className={inp} /></div>
-            <div><label className={lbl}>WeChat Official</label><input type="text" value={wechatOfficial} onChange={(e) => setWechatOfficial(e.target.value)} placeholder="Official account" className={inp} /></div>
-            <div><label className={lbl}>WhatsApp</label><input type="text" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+86 …" className={inp} /></div>
-            <div><label className={lbl}>Telegram</label><input type="text" value={telegram} onChange={(e) => setTelegram(e.target.value)} placeholder="@handle" className={inp} /></div>
-            <div><label className={lbl}>Line ID</label><input type="text" value={lineId} onChange={(e) => setLineId(e.target.value)} placeholder="line id" className={inp} /></div>
-            <div><label className={lbl}>QQ</label><input type="text" value={qqId} onChange={(e) => setQqId(e.target.value)} placeholder="QQ number" className={inp} /></div>
+            <div><label className={lbl}>{t("quick.wechat")}</label><input type="text" value={wechatId} onChange={(e) => setWechatId(e.target.value)} placeholder="wxid_…" className={inp} /></div>
+            <div><label className={lbl}>{t("quick.wechatOfficial")}</label><input type="text" value={wechatOfficial} onChange={(e) => setWechatOfficial(e.target.value)} placeholder="Official account" className={inp} /></div>
+            <div><label className={lbl}>{t("quick.whatsapp")}</label><input type="text" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+86 …" className={inp} /></div>
+            <div><label className={lbl}>{t("quick.telegram")}</label><input type="text" value={telegram} onChange={(e) => setTelegram(e.target.value)} placeholder="@handle" className={inp} /></div>
+            <div><label className={lbl}>{t("quick.line")}</label><input type="text" value={lineId} onChange={(e) => setLineId(e.target.value)} placeholder="line id" className={inp} /></div>
+            <div><label className={lbl}>{t("quick.qq")}</label><input type="text" value={qqId} onChange={(e) => setQqId(e.target.value)} placeholder="QQ number" className={inp} /></div>
           </div>
         </div>
 
         {/* Footer (fixed) */}
         <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[var(--border-subtle)] px-6 py-4">
-          <button onClick={onClose} className="h-10 px-5 rounded-lg text-[13px] font-medium text-[var(--text-dim)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] transition-colors">Cancel</button>
+          <button onClick={onClose} className="h-10 px-5 rounded-lg text-[13px] font-medium text-[var(--text-dim)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] transition-colors">{t("common.cancel")}</button>
           <button onClick={handleSave} disabled={saving || !nameEn.trim()}
             className="flex h-10 items-center gap-2 rounded-lg bg-[var(--bg-inverted)] px-6 text-[13px] font-semibold text-[var(--text-inverted)] hover:opacity-90 transition-all disabled:opacity-40">
             {saving && <SpinnerIcon className="h-4 w-4 animate-spin" />}
-            {saving ? "Creating..." : "Create"}
+            {saving ? t("quick.creating") : t("quick.create")}
           </button>
         </div>
       </div>
@@ -432,6 +537,7 @@ function CatalogModal({
   const [localContacts, setLocalContacts] = useState<ContactOption[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const { t } = useTranslation(T);
 
   // Populate form
   useEffect(() => {
@@ -500,11 +606,11 @@ function CatalogModal({
     const allowed = ["pdf", "jpg", "jpeg", "png", "psd", "cdr"];
     const ext = f.name.split(".").pop()?.toLowerCase() || "";
     if (!allowed.includes(ext)) {
-      setError("Unsupported file type. Use PDF, JPG, PNG, PSD, or CDR.");
+      setError(t("err.unsupported"));
       return;
     }
     if (f.size > 500 * 1024 * 1024) {
-      setError("File is too large (" + Math.ceil(f.size / 1024 / 1024) + " MB). Maximum is 500 MB per file.");
+      setError(t("err.tooLarge").replace("{mb}", String(Math.ceil(f.size / 1024 / 1024))));
       return;
     }
     setFile(f);
@@ -548,12 +654,12 @@ function CatalogModal({
   };
 
   const handleSave = async () => {
-    if (!editEntry && !file) { setError("Please select a file to upload."); return; }
-    if (!title.trim()) { setError("Title is required."); return; }
+    if (!editEntry && !file) { setError(t("err.selectFile")); return; }
+    if (!title.trim()) { setError(t("err.titleRequired")); return; }
 
     setSaving(true);
     setError("");
-    setProgress("Uploading file...");
+    setProgress(t("modal.uploadingFile"));
 
     try {
       // Resolve from localContacts so a just-created supplier/company connects
@@ -570,8 +676,8 @@ function CatalogModal({
         let fileSize = editEntry.file_size;
 
         if (file) {
-          const result = await replaceCatalogFile(editEntry.file_path, file, (pct) => { setUploadPct(pct); setProgress(`Uploading... ${pct}%`); });
-          if (!result) { setError("Failed to upload file."); setSaving(false); setProgress(""); return; }
+          const result = await replaceCatalogFile(editEntry.file_path, file, (pct) => { setUploadPct(pct); setProgress(t("modal.uploadingPct").replace("{n}", String(pct))); });
+          if (!result) { setError(t("err.uploadFailed")); setSaving(false); setProgress(""); return; }
           fileUrl = result.url;
           filePath = result.path;
           fileName = file.name;
@@ -580,7 +686,7 @@ function CatalogModal({
         }
 
         // Auto cover + save + sync all in parallel
-        setProgress("Saving...");
+        setProgress(t("modal.saving"));
         let coverUrl = editEntry.cover_url;
         let coverPath = editEntry.cover_path;
 
@@ -627,14 +733,14 @@ function CatalogModal({
         }
         await Promise.all(savePromises);
       } else {
-        const uploaded = await uploadCatalogFile(file!, (pct) => { setUploadPct(pct); setProgress(`Uploading... ${pct}%`); });
+        const uploaded = await uploadCatalogFile(file!, (pct) => { setUploadPct(pct); setProgress(t("modal.uploadingPct").replace("{n}", String(pct))); });
         if (!uploaded) {
-          setError("Failed to upload file.");
+          setError(t("err.uploadFailed"));
           setSaving(false); setProgress(""); return;
         }
 
         const ft = getFileType(file!.name);
-        setProgress("Saving...");
+        setProgress(t("modal.saving"));
 
         // Upload cover first (if generated), then create catalog with cover URL included
         let coverUrl: string | null = isImageFile(ft) ? uploaded.url : null;
@@ -684,7 +790,7 @@ function CatalogModal({
       onClose();
     } catch (err) {
       console.error(err);
-      setError("Something went wrong.");
+      setError(t("err.somethingWrong"));
       setSaving(false);
     }
   };
@@ -703,7 +809,7 @@ function CatalogModal({
           <div className="flex items-center gap-2.5">
             <CatalogsIcon size={16} className="text-[var(--text-dim)]" />
             <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">
-              {editEntry ? "Edit Catalog" : "Upload Catalog"}
+              {editEntry ? t("modal.editTitle") : t("modal.uploadTitle")}
             </h2>
           </div>
           <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">
@@ -720,7 +826,7 @@ function CatalogModal({
 
           {/* File upload + auto thumbnail preview */}
           <div>
-            <label className={lbl}>Catalog File *</label>
+            <label className={lbl}>{t("modal.file")} *</label>
             <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.psd,.cdr" className="hidden"
               onChange={(e) => { handleFileSelect(e.target.files); e.target.value = ""; }} />
             {file || editEntry ? (
@@ -742,11 +848,11 @@ function CatalogModal({
                   <p className="text-[10px] text-[var(--text-dim)]">
                     {formatFileSize(file?.size || editEntry?.file_size || 0)} &middot; {(FILE_TYPE_CONFIG[getFileType(file?.name || editEntry?.file_name || "")]?.label) || "FILE"}
                   </p>
-                  {generatingThumb && <p className="text-[10px] text-blue-400/70 mt-0.5">Generating cover preview...</p>}
+                  {generatingThumb && <p className="text-[10px] text-blue-400/70 mt-0.5">{t("modal.genCover")}</p>}
                 </div>
                 <button onClick={() => fileRef.current?.click()}
                   className="h-8 px-3 rounded-lg bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
-                  Replace
+                  {t("modal.replace")}
                 </button>
               </div>
             ) : (
@@ -754,7 +860,7 @@ function CatalogModal({
                 className="w-full py-8 rounded-xl border-2 border-dashed border-[var(--border-subtle)] hover:border-blue-500/40 bg-[var(--bg-surface)] flex flex-col items-center gap-2 transition-all cursor-pointer group">
                 <UploadIcon className="h-6 w-6 text-[var(--text-dim)] group-hover:text-blue-400 transition-colors" />
                 <span className="text-[12px] text-[var(--text-dim)] group-hover:text-[var(--text-secondary)]">
-                  Click to upload or drag file here
+                  {t("modal.fileDrop")}
                 </span>
                 <span className="text-[10px] text-[var(--text-dim)]">PDF, JPG, PNG, PSD, CDR</span>
               </button>
@@ -763,13 +869,13 @@ function CatalogModal({
 
           {/* Title */}
           <div>
-            <label className={lbl}>Title *</label>
-            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Catalog title" className={inp} />
+            <label className={lbl}>{t("modal.titleField")} *</label>
+            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("modal.titlePlaceholder")} className={inp} />
           </div>
 
           {/* Supplier / Company */}
           <div ref={dropdownRef} className="relative">
-            <label className={lbl}>Supplier / Company</label>
+            <label className={lbl}>{t("modal.supplierCompany")}</label>
             {selectedContact ? (
               <div className="flex items-center gap-3 h-11 px-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
                 {selectedContact.photo_url ? (
@@ -800,14 +906,14 @@ function CatalogModal({
                 <input type="text" value={contactSearch}
                   onChange={(e) => { setContactSearch(e.target.value); setShowContactDropdown(true); }}
                   onFocus={() => setShowContactDropdown(true)}
-                  placeholder="Search suppliers or companies…"
+                  placeholder={t("modal.searchContacts")}
                   className={inp + " pl-9"} />
               </div>
             )}
             {showContactDropdown && !selectedContact && (
               <div className="absolute z-[60] left-0 right-0 top-full mt-1 max-h-[260px] overflow-y-auto rounded-xl bg-[#1a1a1a] border border-[#333] shadow-2xl shadow-black/50">
                 {filteredContacts.length === 0 && !contactSearch ? (
-                  <div className="px-4 py-6 text-center text-[11px] text-zinc-500">No suppliers or companies found.</div>
+                  <div className="px-4 py-6 text-center text-[11px] text-zinc-500">{t("modal.noContacts")}</div>
                 ) : (
                   <>
                     {filteredContacts.map(c => (
@@ -834,7 +940,7 @@ function CatalogModal({
                       </button>
                     ))}
                     {contactSearch && filteredContacts.length === 0 && (
-                      <div className="px-4 py-4 text-center text-[11px] text-zinc-500">No match found.</div>
+                      <div className="px-4 py-4 text-center text-[11px] text-zinc-500">{t("modal.noMatchFound")}</div>
                     )}
                   </>
                 )}
@@ -844,7 +950,7 @@ function CatalogModal({
                   <div className="shrink-0 w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
                     <PlusIcon className="h-3.5 w-3.5 text-blue-400" />
                   </div>
-                  <span className="text-[12px] font-medium text-blue-400">Add new supplier / company</span>
+                  <span className="text-[12px] font-medium text-blue-400">{t("modal.addNew")}</span>
                 </button>
               </div>
             )}
@@ -853,11 +959,11 @@ function CatalogModal({
           {/* Division & Category with icons */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={lbl}>Division</label>
+              <label className={lbl}>{t("modal.division")}</label>
               <div className="relative">
                 <select value={divisionSlug} onChange={(e) => { setDivisionSlug(e.target.value); setCategorySlug(""); }}
                   className={inp + " appearance-none pr-9 cursor-pointer"}>
-                  <option value="">Select division</option>
+                  <option value="">{t("modal.selectDivision")}</option>
                   {divisions.map(d => <option key={d.id} value={d.slug}>{d.name}</option>)}
                 </select>
                 <AngleDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)] pointer-events-none" />
@@ -875,11 +981,11 @@ function CatalogModal({
               })()}
             </div>
             <div>
-              <label className={lbl}>Category</label>
+              <label className={lbl}>{t("modal.category")}</label>
               <div className="relative">
                 <select value={categorySlug} onChange={(e) => setCategorySlug(e.target.value)}
                   className={inp + " appearance-none pr-9 cursor-pointer"} disabled={!divisionSlug}>
-                  <option value="">Select category</option>
+                  <option value="">{t("modal.selectCategory")}</option>
                   {filteredCategories.map(c => <option key={c.id} value={c.slug}>{c.name}</option>)}
                 </select>
                 <AngleDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)] pointer-events-none" />
@@ -895,9 +1001,9 @@ function CatalogModal({
 
           {/* Description */}
           <div>
-            <label className={lbl}>Description <span className="font-normal normal-case">(optional)</span></label>
+            <label className={lbl}>{t("modal.description")} <span className="font-normal normal-case">{t("modal.optional")}</span></label>
             <textarea value={description} onChange={(e) => setDescription(e.target.value)}
-              placeholder="Optional notes about this catalog"
+              placeholder={t("modal.descPlaceholder")}
               rows={2} className={inp + " h-auto py-3 resize-none"} />
           </div>
         </div>
@@ -918,12 +1024,12 @@ function CatalogModal({
           <div className="flex items-center justify-end gap-2">
             <button onClick={onClose}
               className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">
-              Cancel
+              {t("common.cancel")}
             </button>
             <button onClick={handleSave} disabled={saving || (!file && !editEntry) || !title.trim()}
               className="h-10 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-40">
               {saving && <SpinnerIcon className="h-4 w-4 animate-spin" />}
-              {saving ? (progress || "Uploading...") : editEntry ? "Save Changes" : "Upload"}
+              {saving ? (progress || t("modal.uploading")) : editEntry ? t("modal.saveChanges") : t("modal.uploadBtn")}
             </button>
           </div>
         </div>
@@ -953,31 +1059,32 @@ function DeleteModal({ open, onClose, catalog, onConfirm, deleting }: {
   onConfirm: () => void;
   deleting: boolean;
 }) {
+  const { t } = useTranslation(T);
   if (!open || !catalog) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-[400px] bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl">
         <div className="px-6 py-5">
-          <h2 className="text-[15px] font-semibold text-[var(--text-primary)] mb-2">Delete Catalog</h2>
+          <h2 className="text-[15px] font-semibold text-[var(--text-primary)] mb-2">{t("del.title")}</h2>
           <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">
-            Delete &ldquo;{catalog.title}&rdquo;? The file will be permanently removed.
+            {t("del.confirm").replace("{title}", catalog.title)}
           </p>
         </div>
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--border-subtle)]">
           <button onClick={onClose}
             className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">
-            Cancel
+            {t("common.cancel")}
           </button>
           <button onClick={onConfirm} disabled={deleting}
             className="h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold hover:bg-red-500/30 transition-all disabled:opacity-40 relative overflow-hidden whitespace-nowrap">
             <span className={`inline-flex items-center gap-2 transition-opacity duration-150 ${deleting ? "opacity-0" : "opacity-100"}`}>
               <TrashIcon className="h-3.5 w-3.5 shrink-0" />
-              <span>Delete</span>
+              <span>{t("del.delete")}</span>
             </span>
             <span className={`absolute inset-0 inline-flex items-center justify-center gap-2 transition-opacity duration-150 ${deleting ? "opacity-100" : "opacity-0"}`}>
               <SpinnerIcon className="h-4 w-4 animate-spin shrink-0" />
-              <span>Deleting...</span>
+              <span>{t("del.deleting")}</span>
             </span>
           </button>
         </div>
@@ -1000,6 +1107,7 @@ function CatalogCard({ catalog, divLogos, catLogos, onPreview, onEdit, onDelete 
   const ft = FILE_TYPE_CONFIG[catalog.file_type] || DEFAULT_FT;
   const Icon = ft.icon;
   const coverUrl = catalog.cover_url || (isImageFile(catalog.file_type) ? catalog.file_url : null);
+  const { t } = useTranslation(T);
 
   const handleDownload = () => {
     const a = document.createElement("a");
@@ -1034,19 +1142,19 @@ function CatalogCard({ catalog, divLogos, catLogos, onPreview, onEdit, onDelete 
 
         {/* Hover overlay */}
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-          <button onClick={onPreview} title="Preview"
+          <button onClick={onPreview} title={t("card.preview")}
             className="h-10 w-10 rounded-xl bg-white/20 backdrop-blur-md border border-white/20 text-white flex items-center justify-center hover:bg-white/30 transition-colors">
             <EyeIcon className="h-4.5 w-4.5" />
           </button>
-          <button onClick={handleDownload} title="Download"
+          <button onClick={handleDownload} title={t("card.download")}
             className="h-10 w-10 rounded-xl bg-white/20 backdrop-blur-md border border-white/20 text-white flex items-center justify-center hover:bg-white/30 transition-colors">
             <DownloadIcon className="h-4.5 w-4.5" />
           </button>
-          <button onClick={onEdit} title="Edit"
+          <button onClick={onEdit} title={t("card.edit")}
             className="h-10 w-10 rounded-xl bg-white/20 backdrop-blur-md border border-white/20 text-white flex items-center justify-center hover:bg-white/30 transition-colors">
             <PencilIcon className="h-4 w-4" />
           </button>
-          <button onClick={onDelete} title="Delete"
+          <button onClick={onDelete} title={t("card.delete")}
             className="h-10 w-10 rounded-xl bg-red-500/30 backdrop-blur-md border border-red-500/30 text-red-300 flex items-center justify-center hover:bg-red-500/40 transition-colors">
             <TrashIcon className="h-4 w-4" />
           </button>
@@ -1114,6 +1222,7 @@ function CatalogRow({ catalog, divLogos, catLogos, onPreview, onEdit, onDelete }
   const ft = FILE_TYPE_CONFIG[catalog.file_type] || DEFAULT_FT;
   const Icon = ft.icon;
   const coverUrl = catalog.cover_url || (isImageFile(catalog.file_type) ? catalog.file_url : null);
+  const { t } = useTranslation(T);
 
   const handleDownload = () => {
     const a = document.createElement("a");
@@ -1167,10 +1276,10 @@ function CatalogRow({ catalog, divLogos, catLogos, onPreview, onEdit, onDelete }
         <p className="text-[10px] text-[var(--text-dim)] mt-0.5">{ft.label} &middot; {formatFileSize(catalog.file_size)}</p>
       </div>
       <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button onClick={onPreview} title="Preview" className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><EyeIcon className="h-3.5 w-3.5" /></button>
-        <button onClick={handleDownload} title="Download" className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><DownloadIcon className="h-3.5 w-3.5" /></button>
-        <button onClick={onEdit} title="Edit" className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><PencilIcon className="h-3.5 w-3.5" /></button>
-        <button onClick={onDelete} title="Delete" className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-red-400 hover:bg-red-400/[0.06] transition-colors"><TrashIcon className="h-3.5 w-3.5" /></button>
+        <button onClick={onPreview} title={t("card.preview")} className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><EyeIcon className="h-3.5 w-3.5" /></button>
+        <button onClick={handleDownload} title={t("card.download")} className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><DownloadIcon className="h-3.5 w-3.5" /></button>
+        <button onClick={onEdit} title={t("card.edit")} className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><PencilIcon className="h-3.5 w-3.5" /></button>
+        <button onClick={onDelete} title={t("card.delete")} className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-red-400 hover:bg-red-400/[0.06] transition-colors"><TrashIcon className="h-3.5 w-3.5" /></button>
       </div>
     </div>
   );
@@ -1197,6 +1306,7 @@ export default function CatalogsPage() {
   const [uploadModal, setUploadModal] = useState<{ open: boolean; editEntry: CatalogEntry | null }>({ open: false, editEntry: null });
   const [deleteModal, setDeleteModal] = useState<{ open: boolean; catalog: CatalogEntry | null }>({ open: false, catalog: null });
   const [deleting, setDeleting] = useState(false);
+  const { t } = useTranslation(T);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -1286,26 +1396,26 @@ export default function CatalogsPage() {
             <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
               <CatalogsIcon size={16} />
             </div>
-            <h1 className="text-xl md:text-[22px] font-bold tracking-tight">Catalogs</h1>
+            <h1 className="text-xl md:text-[22px] font-bold tracking-tight">{t("cat.title")}</h1>
           </div>
         </div>
-        <p className="text-[12px] md:text-[13px] text-[var(--text-dim)] mb-6 md:mb-8 ml-11">Manage supplier and company catalogs</p>
+        <p className="text-[12px] md:text-[13px] text-[var(--text-dim)] mb-6 md:mb-8 ml-11">{t("cat.subtitle")}</p>
 
         {/* Stats */}
         <div className="flex flex-wrap gap-2 mb-5">
           <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
             <CatalogsIcon size={12} className="text-[var(--text-dim)]" />
             <span className="text-[16px] font-bold text-[var(--text-primary)] tabular-nums">{catalogs.length}</span>
-            <span className="text-[11px] text-[var(--text-dim)]">catalogs</span>
+            <span className="text-[11px] text-[var(--text-dim)]">{t("cat.stat.catalogs")}</span>
           </div>
           <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
             <Building2Icon className="h-3 w-3 text-[var(--text-dim)]" />
             <span className="text-[16px] font-bold text-[var(--text-primary)] tabular-nums">{catalogSuppliers.length}</span>
-            <span className="text-[11px] text-[var(--text-dim)]">suppliers</span>
+            <span className="text-[11px] text-[var(--text-dim)]">{t("cat.stat.suppliers")}</span>
           </div>
           <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
             <span className="text-[16px] font-bold text-[var(--text-primary)] tabular-nums">{formatFileSize(totalSize)}</span>
-            <span className="text-[11px] text-[var(--text-dim)]">total</span>
+            <span className="text-[11px] text-[var(--text-dim)]">{t("cat.stat.total")}</span>
           </div>
         </div>
 
@@ -1313,7 +1423,7 @@ export default function CatalogsPage() {
         <div className="flex flex-wrap items-center gap-3 mb-6">
           <div className="relative flex-1 min-w-[200px] max-w-sm">
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)]" />
-            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search catalogs…"
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("cat.search")}
               className="w-full h-9 pl-9 pr-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-blue-500/50 transition-colors" />
           </div>
 
@@ -1321,7 +1431,7 @@ export default function CatalogsPage() {
             <div className="relative">
               <select value={filterSupplier} onChange={(e) => setFilterSupplier(e.target.value)}
                 className="h-9 pl-3 pr-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] appearance-none cursor-pointer outline-none focus:border-blue-500/50">
-                <option value="all">All Suppliers</option>
+                <option value="all">{t("cat.allSuppliers")}</option>
                 {catalogSuppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
               <AngleDownIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-dim)] pointer-events-none" />
@@ -1332,7 +1442,7 @@ export default function CatalogsPage() {
             <div className="relative">
               <select value={filterDivision} onChange={(e) => setFilterDivision(e.target.value)}
                 className="h-9 pl-3 pr-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] appearance-none cursor-pointer outline-none focus:border-blue-500/50">
-                <option value="all">All Divisions</option>
+                <option value="all">{t("cat.allDivisions")}</option>
                 {catalogDivisions.map(d => <option key={d.slug} value={d.slug}>{d.name}</option>)}
               </select>
               <AngleDownIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-dim)] pointer-events-none" />
@@ -1343,7 +1453,7 @@ export default function CatalogsPage() {
             <div className="relative">
               <select value={filterType} onChange={(e) => setFilterType(e.target.value)}
                 className="h-9 pl-3 pr-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] appearance-none cursor-pointer outline-none focus:border-blue-500/50">
-                <option value="all">All Types</option>
+                <option value="all">{t("cat.allTypes")}</option>
                 {catalogTypes.map(t => <option key={t} value={t}>{(FILE_TYPE_CONFIG[t]?.label || t).toUpperCase()}</option>)}
               </select>
               <AngleDownIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-dim)] pointer-events-none" />
@@ -1361,7 +1471,7 @@ export default function CatalogsPage() {
 
           <button onClick={() => setUploadModal({ open: true, editEntry: null })}
             className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-colors shrink-0 ml-auto">
-            <PlusIcon className="h-3.5 w-3.5" /> Upload Catalog
+            <PlusIcon className="h-3.5 w-3.5" /> {t("cat.upload")}
           </button>
         </div>
 
@@ -1373,16 +1483,16 @@ export default function CatalogsPage() {
             <div className="w-16 h-16 rounded-2xl bg-[var(--bg-surface)] flex items-center justify-center mb-4">
               <CatalogsIcon size={28} className="text-[var(--text-dim)]" />
             </div>
-            <h3 className="text-[15px] font-semibold text-[var(--text-secondary)] mb-1">No catalogs yet</h3>
-            <p className="text-[12px] text-[var(--text-dim)] mb-5">Upload your first supplier catalog to get started.</p>
+            <h3 className="text-[15px] font-semibold text-[var(--text-secondary)] mb-1">{t("cat.emptyTitle")}</h3>
+            <p className="text-[12px] text-[var(--text-dim)] mb-5">{t("cat.emptyDesc")}</p>
             <button onClick={() => setUploadModal({ open: true, editEntry: null })}
               className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-colors">
-              <UploadIcon className="h-4 w-4" /> Upload Catalog
+              <UploadIcon className="h-4 w-4" /> {t("cat.upload")}
             </button>
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16 border border-dashed border-[var(--border-subtle)] rounded-xl">
-            <p className="text-[13px] text-[var(--text-dim)]">No catalogs match your filters.</p>
+            <p className="text-[13px] text-[var(--text-dim)]">{t("cat.noMatch")}</p>
           </div>
         ) : viewMode === "grid" ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
@@ -1406,9 +1516,9 @@ export default function CatalogsPage() {
 
         {/* Bottom nav */}
         <div className="mt-8 flex flex-wrap gap-2">
-          <Link href="/products" className="h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-dim)] hover:text-[var(--text-secondary)] flex items-center gap-1.5 transition-colors">Products</Link>
-          <Link href="/suppliers" className="h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-dim)] hover:text-[var(--text-secondary)] flex items-center gap-1.5 transition-colors">Suppliers</Link>
-          <Link href="/contacts" className="h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-dim)] hover:text-[var(--text-secondary)] flex items-center gap-1.5 transition-colors">Contacts</Link>
+          <Link href="/products" className="h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-dim)] hover:text-[var(--text-secondary)] flex items-center gap-1.5 transition-colors">{t("nav.products")}</Link>
+          <Link href="/suppliers" className="h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-dim)] hover:text-[var(--text-secondary)] flex items-center gap-1.5 transition-colors">{t("nav.suppliers")}</Link>
+          <Link href="/contacts" className="h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-dim)] hover:text-[var(--text-secondary)] flex items-center gap-1.5 transition-colors">{t("nav.contacts")}</Link>
         </div>
       </div>
 
