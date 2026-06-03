@@ -172,6 +172,8 @@ const T: Translations = {
   "del.deleting":         { en: "Deleting...", zh: "删除中…", ar: "جارٍ الحذف…" },
 
   "common.cancel":        { en: "Cancel", zh: "取消", ar: "إلغاء" },
+  "common.close":         { en: "Close", zh: "关闭", ar: "إغلاق" },
+  "cat.uploadedBy":       { en: "Uploaded by", zh: "上传者", ar: "رفع بواسطة" },
   "card.preview":         { en: "Preview", zh: "预览", ar: "معاينة" },
   "card.download":        { en: "Download", zh: "下载", ar: "تنزيل" },
   "card.edit":            { en: "Edit", zh: "编辑", ar: "تعديل" },
@@ -1482,6 +1484,11 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
             ))}
           </div>
         )}
+        {catalog.created_by_name && (
+          <p className="flex items-center gap-1 text-[10px] text-[var(--text-dim)] truncate mt-0.5">
+            <UserIcon className="h-2.5 w-2.5 shrink-0" /> {t("cat.uploadedBy")} {catalog.created_by_name}
+          </p>
+        )}
         <div className="flex items-center justify-between gap-2 mt-0.5 text-[10px] text-[var(--text-dim)]">
           <span>{formatFileSize(catalog.file_size)}</span>
           <span className="truncate">{catalog.year ? `${catalog.year} · ` : ""}{fmtDate(catalog.created_at)}</span>
@@ -1565,7 +1572,7 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
             </span>
           )}
         </div>
-        <p className="text-[10px] text-[var(--text-dim)] mt-0.5">{ft.label} &middot; {formatFileSize(catalog.file_size)}{catalog.year ? ` · ${catalog.year}` : ""} &middot; {fmtDate(catalog.created_at)}</p>
+        <p className="text-[10px] text-[var(--text-dim)] mt-0.5">{ft.label} &middot; {formatFileSize(catalog.file_size)}{catalog.year ? ` · ${catalog.year}` : ""} &middot; {fmtDate(catalog.created_at)}{catalog.created_by_name ? ` · ${t("cat.uploadedBy")} ${catalog.created_by_name}` : ""}</p>
       </div>
       <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
         <button onClick={onPreview} title={t("card.preview")} className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><EyeIcon className="h-3.5 w-3.5" /></button>
@@ -1601,21 +1608,24 @@ function PreviewModal({ catalog, onClose }: { catalog: CatalogEntry | null; onCl
   };
 
   return (
-    <div className="fixed inset-0 z-[80] flex flex-col bg-black/90 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[120] flex flex-col bg-black/90 backdrop-blur-sm">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 text-white shrink-0">
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-semibold truncate">{catalog.title}</p>
-          {catalog.title_cn && <p className="text-[11px] text-white/50 truncate">{catalog.title_cn}</p>}
+          <p className="text-[11px] text-white/50 truncate">
+            {catalog.title_cn ? `${catalog.title_cn} · ` : ""}
+            {catalog.created_by_name ? `${t("cat.uploadedBy")} ${catalog.created_by_name}` : fmtDate(catalog.created_at)}
+          </p>
         </div>
         {isImg && (
           <div className="flex items-center gap-1 mr-1">
-            <button onClick={() => setZoom(z => Math.max(0.25, z - 0.25))} className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"><ZoomOutIcon className="h-4 w-4" /></button>
+            <button onClick={() => setZoom(z => Math.max(0.25, z - 0.25))} className="h-9 w-9 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"><ZoomOutIcon className="h-4 w-4" /></button>
             <span className="text-[11px] tabular-nums w-10 text-center">{Math.round(zoom * 100)}%</span>
-            <button onClick={() => setZoom(z => Math.min(4, z + 0.25))} className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"><ZoomInIcon className="h-4 w-4" /></button>
+            <button onClick={() => setZoom(z => Math.min(4, z + 0.25))} className="h-9 w-9 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"><ZoomInIcon className="h-4 w-4" /></button>
           </div>
         )}
-        <button onClick={download} title={t("card.download")} className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"><DownloadIcon className="h-4 w-4" /></button>
-        <button onClick={onClose} aria-label="Close" className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"><CrossIcon className="h-4 w-4" /></button>
+        <button onClick={download} title={t("card.download")} className="h-9 w-9 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center hover:bg-white/20 transition-colors"><DownloadIcon className="h-4 w-4" /></button>
+        <button onClick={onClose} aria-label="Close" title={t("common.cancel")} className="h-9 px-3 rounded-lg bg-white/15 border border-white/20 flex items-center gap-1.5 text-[12px] font-medium hover:bg-red-500/30 hover:border-red-500/40 transition-colors"><CrossIcon className="h-4 w-4" /> {t("common.close")}</button>
       </div>
       <div className="flex-1 overflow-auto flex items-center justify-center p-2 md:p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
         {isPdf ? (
