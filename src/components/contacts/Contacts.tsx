@@ -4157,9 +4157,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     className="flex w-full items-center gap-2.5 px-3 py-2 text-start hover:bg-[var(--bg-surface)] transition-colors"
                   >
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-[var(--bg-surface)] ring-1 ring-[var(--border-subtle)] text-[10px] font-semibold text-[var(--text-faint)]">
-                      {c.photo_url ? (
+                      {(c.photo_url || c.logo_url) ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={c.photo_url} alt="" className="h-full w-full object-cover" loading="lazy" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                        <img src={(c.photo_url || c.logo_url) as string} alt="" className="h-full w-full object-cover" loading="lazy" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
                       ) : initials}
                     </span>
                     <span className="min-w-0 flex-1">
@@ -4332,8 +4332,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   >
                     {/* Avatar — stronger container on the active row */}
                     <div className={`w-10 h-10 ${c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && c.entity_type === "company") ? "rounded-lg" : "rounded-full"} ${isSelected ? "bg-[var(--bg-surface)] ring-1 ring-[var(--border-color)]" : "bg-[var(--bg-surface-hover)]"} flex items-center justify-center text-sm font-semibold text-[var(--text-muted)] shrink-0 overflow-hidden transition-shadow`}>
-                      {c.photo_url ? (
-                        <img src={c.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                      {(c.photo_url || c.logo_url) ? (
+                        <img src={(c.photo_url || c.logo_url) as string} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                       ) : c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && c.entity_type === "company") ? (
                         <Building2Icon size={16} className="text-[var(--text-dim)]" />
                       ) : (
@@ -4841,8 +4841,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {/* Header card */}
         <div className="px-4 md:px-6 py-6 md:py-8 text-center border-b border-[var(--border-color)]">
           <div className={`w-24 h-24 ${c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && c.entity_type === "company") ? "rounded-2xl" : "rounded-full"} bg-[var(--bg-surface-hover)] flex items-center justify-center text-2xl font-bold text-[var(--text-subtle)] mx-auto mb-4 overflow-hidden`}>
-            {c.photo_url ? (
-              <img src={c.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
+            {(c.photo_url || c.logo_url) ? (
+              <img src={(c.photo_url || c.logo_url) as string} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
             ) : c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && c.entity_type === "company") ? (
               <Building2Icon size={32} className="text-[var(--text-ghost)]" />
             ) : (

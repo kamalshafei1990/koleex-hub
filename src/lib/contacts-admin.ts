@@ -12,6 +12,7 @@ export interface ContactRow {
   contact_type: string;
   entity_type: string | null;
   photo_url: string | null;
+  logo_url: string | null;
   title: string | null;
   first_name: string | null;
   middle_name: string | null;
