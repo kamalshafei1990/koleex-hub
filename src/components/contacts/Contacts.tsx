@@ -1152,7 +1152,9 @@ function contactToForm(c: ContactRow): ContactForm {
   return {
     contact_type: (c.contact_type as ContactType) || "people",
     entity_type: (c.entity_type as "person" | "company" | "") || "",
-    photo_url: c.photo_url || "",
+    // Older suppliers stored the company logo in logo_url; surface it so the
+    // edit form shows the existing logo instead of an empty "Add Logo" box.
+    photo_url: c.photo_url || c.logo_url || "",
     title: c.title || "",
     first_name: c.first_name || "",
     middle_name: c.middle_name || "",
@@ -1397,6 +1399,9 @@ function formToRow(f: ContactForm): Record<string, unknown> {
     contact_type: f.contact_type,
     entity_type: f.entity_type || (f.contact_type === "company" ? "company" : "person"),
     photo_url: f.photo_url || null,
+    // Keep logo_url in sync so the directory list (which reads logo_url too)
+    // and the detail card always agree — including when a logo is removed.
+    logo_url: f.photo_url || null,
     title: f.title || null,
     first_name: f.first_name || null,
     middle_name: f.middle_name || null,
