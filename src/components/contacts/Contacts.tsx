@@ -3534,6 +3534,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   // True while the full record (images/docs) is being fetched for an edit —
   // Save is blocked until it loads so we never overwrite unloaded images.
   const [formHydrating, setFormHydrating] = useState(false);
+  // The full DB row as loaded for editing — used to send ONLY changed columns
+  // on save (the row holds multi-MB base64 images; rewriting all of them every
+  // save is what made saving slow/time out).
+  const editOriginalRef = useRef<Record<string, unknown> | null>(null);
   const [rlsCopied, setRlsCopied] = useState(false);
   /* Customer premium tab — used by both form and detail views for customers */
   const [customerTab, setCustomerTab] = useState<CustomerTab>("overview");
@@ -3780,7 +3784,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
        rebuild the form from it, so editing + saving never wipes images that
        weren't loaded. */
     setFormHydrating(true);
-    void hydrateContact(c.id).then((full) => { if (full) setForm(contactToForm(full)); setFormHydrating(false); });
+    editOriginalRef.current = null;
+    void hydrateContact(c.id).then((full) => {
+      if (full) { setForm(contactToForm(full)); editOriginalRef.current = full as unknown as Record<string, unknown>; }
+      setFormHydrating(false);
+    });
     /* Load section-level attribution for suppliers (who edited each dept). */
     if (c.contact_type === "supplier") {
       fetch(`/api/suppliers/${c.id}/section-audit`, { credentials: "include" })
@@ -3855,9 +3863,25 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     setSaving(true);
     setSaveError(null);
     const row = formToRow(form);
+    /* On edit, send ONLY changed columns. The row carries multi-MB base64
+       images; rewriting all of them on every save made the UPDATE slow enough
+       to exceed the serverless timeout. Diffing against the loaded record means
+       a metadata-only edit sends a tiny patch and saves instantly. */
+    let patch: Record<string, unknown> = row as Record<string, unknown>;
+    if (editingId && editOriginalRef.current) {
+      const orig = editOriginalRef.current;
+      const diff: Record<string, unknown> = {};
+      for (const k of Object.keys(row as Record<string, unknown>)) {
+        if (JSON.stringify((row as Record<string, unknown>)[k]) !== JSON.stringify(orig[k] ?? null)) {
+          diff[k] = (row as Record<string, unknown>)[k];
+        }
+      }
+      patch = diff;
+    }
     try {
       if (editingId) {
-        const { ok, error } = await updateContact(editingId, row);
+        if (Object.keys(patch).length === 0) { setSaving(false); setView("detail"); return; }
+        const { ok, error } = await updateContact(editingId, patch);
         if (ok) {
           await loadContacts();
           setView("detail");
