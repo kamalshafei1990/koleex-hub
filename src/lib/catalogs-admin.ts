@@ -261,63 +261,82 @@ export async function fetchCatalogContacts(): Promise<
     photo_url: string | null;
   }[]
 > {
-  const { data, error } = await supabase
-    .from("contacts")
-    .select(
-      "id, display_name, full_name, company, company_name_en, company_name_cn, contact_type, division, category, photo_url",
-    )
-    .in("contact_type", ["supplier", "company"])
-    .order("company_name_en", { ascending: true });
-  if (error) {
-    console.error("[Catalogs] Fetch contacts:", error.message);
-    return [];
-  }
-  return ((data as Record<string, unknown>[]) || []).map((c) => ({
-    id: c.id as string,
-    display_name:
-      (c.company_name_en as string) ||
-      (c.display_name as string) ||
-      (c.full_name as string) ||
-      (c.company as string) ||
-      "Unknown",
-    company_name_en: (c.company_name_en as string) || null,
-    company_name_cn: (c.company_name_cn as string) || null,
-    contact_type: (c.contact_type as string) || "supplier",
-    division: (c.division as string) || null,
-    category: (c.category as string) || null,
-    photo_url: (c.photo_url as string) || null,
-  }));
+  // Read through the server API (service-role, tenant-scoped) — the contacts
+  // table is RLS-locked, so a direct client query returns nothing. Fetch
+  // suppliers + companies in parallel (each respects its own module gate).
+  const fetchType = async (type: string): Promise<Record<string, unknown>[]> => {
+    try {
+      const res = await fetch(`/api/contacts?type=${type}`, { credentials: "include", cache: "no-store" });
+      if (!res.ok) return [];
+      const j = (await res.json()) as { contacts?: Record<string, unknown>[] };
+      return j.contacts ?? [];
+    } catch (err) {
+      console.error("[Catalogs] Fetch contacts:", err);
+      return [];
+    }
+  };
+
+  const [suppliers, companies] = await Promise.all([fetchType("supplier"), fetchType("company")]);
+  const rows = [...suppliers, ...companies];
+
+  return rows
+    .map((c) => ({
+      id: c.id as string,
+      display_name:
+        (c.company_name_en as string) ||
+        (c.display_name as string) ||
+        (c.full_name as string) ||
+        (c.company as string) ||
+        (c.first_name as string) ||
+        "Unknown",
+      company_name_en: (c.company_name_en as string) || null,
+      company_name_cn: (c.company_name_cn as string) || null,
+      contact_type: (c.contact_type as string) || "supplier",
+      division: (c.division as string) || null,
+      category: (c.category as string) || null,
+      photo_url: (c.photo_url as string) || null,
+    }))
+    .sort((a, b) => a.display_name.localeCompare(b.display_name));
 }
 
 // ── Sync catalog to contact's catalogues array ──
+
+type CatalogueEntry = { name: string; url: string; type: string; uploaded_at: string };
+
+/* Read a contact's current catalogues via the server API (RLS-safe). */
+async function fetchContactCatalogues(contactId: string): Promise<CatalogueEntry[]> {
+  try {
+    const res = await fetch(`/api/contacts/${contactId}`, { credentials: "include", cache: "no-store" });
+    if (!res.ok) return [];
+    const j = (await res.json()) as { contact?: { catalogues?: CatalogueEntry[] } };
+    return Array.isArray(j.contact?.catalogues) ? (j.contact!.catalogues as CatalogueEntry[]) : [];
+  } catch (err) {
+    console.error("[Catalogs] Read contact catalogues:", err);
+    return [];
+  }
+}
+
+async function patchContactCatalogues(contactId: string, catalogues: CatalogueEntry[]): Promise<void> {
+  try {
+    await fetch(`/api/contacts/${contactId}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ catalogues }),
+    });
+  } catch (err) {
+    console.error("[Catalogs] Write contact catalogues:", err);
+  }
+}
 
 export async function syncCatalogToContact(
   contactId: string,
   catalog: { name: string; url: string; type: string },
 ): Promise<void> {
-  try {
-    const { data } = await supabase
-      .from("contacts")
-      .select("catalogues")
-      .eq("id", contactId)
-      .single();
-    const existing: { name: string; url: string; type: string; uploaded_at: string }[] =
-      Array.isArray(data?.catalogues) ? data.catalogues : [];
-    // Remove any entry with same URL (update) then add new
-    const filtered = existing.filter((c) => c.url !== catalog.url);
-    filtered.push({
-      name: catalog.name,
-      url: catalog.url,
-      type: catalog.type,
-      uploaded_at: new Date().toISOString(),
-    });
-    await supabase
-      .from("contacts")
-      .update({ catalogues: filtered })
-      .eq("id", contactId);
-  } catch (err) {
-    console.error("[Catalogs] Sync to contact:", err);
-  }
+  const existing = await fetchContactCatalogues(contactId);
+  const filtered = existing.filter((c) => c.url !== catalog.url);
+  filtered.push({ name: catalog.name, url: catalog.url, type: catalog.type, uploaded_at: new Date().toISOString() });
+  await patchContactCatalogues(contactId, filtered);
 }
 
 // ── Remove catalog from contact's catalogues array ──
@@ -326,20 +345,7 @@ export async function removeCatalogFromContact(
   contactId: string,
   fileUrl: string,
 ): Promise<void> {
-  try {
-    const { data } = await supabase
-      .from("contacts")
-      .select("catalogues")
-      .eq("id", contactId)
-      .single();
-    const existing: { name: string; url: string; type: string; uploaded_at: string }[] =
-      Array.isArray(data?.catalogues) ? data.catalogues : [];
-    const filtered = existing.filter((c) => c.url !== fileUrl);
-    await supabase
-      .from("contacts")
-      .update({ catalogues: filtered })
-      .eq("id", contactId);
-  } catch (err) {
-    console.error("[Catalogs] Remove from contact:", err);
-  }
+  const existing = await fetchContactCatalogues(contactId);
+  const filtered = existing.filter((c) => c.url !== fileUrl);
+  await patchContactCatalogues(contactId, filtered);
 }

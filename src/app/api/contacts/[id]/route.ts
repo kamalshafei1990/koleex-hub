@@ -29,6 +29,26 @@ async function fetchExisting(
   return (data as { id: string; contact_type: string | null } | null) ?? null;
 }
 
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+
+  let q = supabaseServer.from("contacts").select("*").eq("id", id);
+  if (auth.tenant_id) q = q.eq("tenant_id", auth.tenant_id);
+  const { data, error } = await q.maybeSingle();
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!data) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const deny = await requireModuleAccess(auth, moduleForType((data as { contact_type?: string }).contact_type));
+  if (deny) return deny;
+
+  return NextResponse.json({ contact: data });
+}
+
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
