@@ -33,6 +33,53 @@ function slugify(s: string): string {
     .slice(0, 80);
 }
 
+/* Match the Catalogs app's getFileType(): lowercase extension, jpeg→jpg.
+   The grid keys FILE_TYPE_CONFIG and the inline preview ("isPdf") off this
+   lowercase value — an uppercase "PDF" broke the PDF preview + cover tile. */
+function fileTypeFromName(name: string | undefined, url: string): string {
+  const src = name && name.includes(".") ? name : url.split("?")[0];
+  const ext = src.split(".").pop()?.toLowerCase() || "";
+  if (ext === "jpeg") return "jpg";
+  return ext || "pdf";
+}
+
+/* Resolve the real canonical division/category slug by name so the catalog
+   editor's dropdowns pre-select correctly. Falls back to a slugified name
+   when the supplier's free-text value isn't a known division/category. */
+async function resolveSlugs(
+  divisionName: string | null,
+  categoryName: string | null,
+): Promise<{ divisionSlug: string | null; categorySlug: string | null }> {
+  let divisionSlug = divisionName ? slugify(divisionName) : null;
+  let categorySlug = categoryName ? slugify(categoryName) : null;
+  try {
+    if (divisionName) {
+      const { data } = await supabaseServer
+        .from("divisions").select("slug").ilike("name", divisionName).maybeSingle();
+      if (data?.slug) divisionSlug = data.slug as string;
+    }
+    if (categoryName) {
+      const { data } = await supabaseServer
+        .from("categories").select("slug").ilike("name", categoryName).maybeSingle();
+      if (data?.slug) categorySlug = data.slug as string;
+    }
+  } catch { /* best-effort — keep slugified fallback */ }
+  return { divisionSlug, categorySlug };
+}
+
+/* Best-effort size of a Storage object (so the card shows a real size, not 0 B). */
+async function storageSize(path: string | null): Promise<number | null> {
+  if (!path) return null;
+  try {
+    const slash = path.lastIndexOf("/");
+    const dir = slash >= 0 ? path.slice(0, slash) : "";
+    const name = slash >= 0 ? path.slice(slash + 1) : path;
+    const { data } = await supabaseServer.storage.from("media").list(dir, { search: name, limit: 1 });
+    const meta = data?.[0]?.metadata as { size?: number } | undefined;
+    return typeof meta?.size === "number" ? meta.size : null;
+  } catch { return null; }
+}
+
 type CatalogueItem = {
   name?: string;
   url?: string;
@@ -90,15 +137,15 @@ export async function syncContactCatalogues(
     null;
   const divisionName = contact.division || null;
   const categoryName = contact.category || null;
+  const { divisionSlug, categorySlug } = await resolveSlugs(divisionName, categoryName);
 
   const rows: Record<string, unknown>[] = [];
   for (const it of items) {
     if (!it.url || have.has(it.url)) continue;
-    const isPdf =
-      (it.type || "").toUpperCase() === "PDF" ||
-      it.url.toLowerCase().split("?")[0].endsWith(".pdf");
     const m = it.url.match(/\/storage\/v1\/object\/public\/[^/]+\/(.+)$/);
     const filePath = it.storage_path || (m ? decodeURIComponent(m[1]) : null);
+    const fileType = fileTypeFromName(it.name, it.url);
+    const fileSize = await storageSize(filePath);
     rows.push({
       tenant_id: tenantId,
       title: (it.name || "Catalogue").replace(/\.[^.]+$/, "").trim() || "Catalogue",
@@ -107,14 +154,15 @@ export async function syncContactCatalogues(
       company_name_en: companyEn,
       company_name_cn: companyCn,
       contact_type: "supplier",
-      division_slug: divisionName ? slugify(divisionName) : null,
+      division_slug: divisionSlug,
       division_name: divisionName,
-      category_slug: categoryName ? slugify(categoryName) : null,
+      category_slug: categorySlug,
       category_name: categoryName,
       file_name: it.name || null,
       file_path: filePath,
       file_url: it.url,
-      file_type: isPdf ? "PDF" : (it.type || "IMAGE").toUpperCase(),
+      file_type: fileType,
+      file_size: fileSize,
       created_by_name: "Supplier sync",
     });
   }
