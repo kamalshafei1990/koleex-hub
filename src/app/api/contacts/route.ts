@@ -137,6 +137,12 @@ export async function POST(req: Request) {
 
   // Seed the supplier operational timeline at birth (unified history layer).
   if (data && (data as { contact_type?: string }).contact_type === "supplier") {
+    /* Mirror any catalogues uploaded during creation into the Catalogs app. */
+    try {
+      const { syncContactCatalogues } = await import("@/lib/suppliers/catalogue-sync");
+      await syncContactCatalogues(auth.tenant_id, data as never);
+    } catch (e) { console.error("[api/contacts POST] catalogue sync", e); }
+
     try {
       const { logSupplierEvent } = await import("@/lib/suppliers/timeline");
       await logSupplierEvent({

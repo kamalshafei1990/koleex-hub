@@ -88,6 +88,22 @@ export async function PATCH(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  /* Mirror catalogue changes into the Catalogs app so a catalogue uploaded
+     from the supplier form shows up there too. Only when catalogues changed. */
+  if (existing.contact_type === "supplier" && "catalogues" in patch) {
+    try {
+      const { data: full } = await supabaseServer
+        .from("contacts")
+        .select("id, contact_type, display_name, first_name, last_name, company_name, company_name_en, company_name_cn, division, category, catalogues")
+        .eq("id", id)
+        .maybeSingle();
+      if (full) {
+        const { syncContactCatalogues } = await import("@/lib/suppliers/catalogue-sync");
+        await syncContactCatalogues(auth.tenant_id, full as never);
+      }
+    } catch (e) { console.error("[api/contacts/[id] PATCH] catalogue sync", e); }
+  }
+
   /* Section-level attribution: stamp which department(s) this edit touched
      so the supplier form can show "Updated by <name> · <date>". */
   if (existing.contact_type === "supplier") {
