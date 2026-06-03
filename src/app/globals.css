@@ -353,3 +353,18 @@ body {
   background: rgba(255, 255, 255, 0.06);
   outline: none;
 }
+
+/* Native date/time pickers — make the calendar/clock indicator follow the
+   active theme so it stays visible (was near-invisible/dark in dark mode). */
+input[type="time"],
+input[type="date"],
+input[type="datetime-local"],
+input[type="month"] {
+  color-scheme: light dark;
+}
+.dark input[type="time"],
+.dark input[type="date"],
+.dark input[type="datetime-local"],
+.dark input[type="month"] {
+  color-scheme: dark;
+}
