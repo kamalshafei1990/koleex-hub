@@ -109,7 +109,7 @@ const T: Translations = {
   "modal.description":    { en: "Description", zh: "描述", ar: "الوصف" },
   "modal.optional":       { en: "(optional)", zh: "（可选）", ar: "(اختياري)" },
   "modal.year":           { en: "Year", zh: "年份", ar: "السنة" },
-  "modal.validUntil":     { en: "Valid until", zh: "有效期至", ar: "صالح حتى" },
+  "modal.selectYear":     { en: "Select year", zh: "选择年份", ar: "اختر السنة" },
   "modal.tags":           { en: "Tags", zh: "标签", ar: "الوسوم" },
   "modal.tagsPlaceholder":{ en: "comma, separated, tags", zh: "用逗号分隔的标签", ar: "وسوم مفصولة بفواصل" },
   "modal.replaceCover":   { en: "Set cover", zh: "设置封面", ar: "تعيين الغلاف" },
@@ -748,6 +748,59 @@ function QuickAddContactModal({
 }
 
 /* ═══════════════════════════════
+   ── Icon dropdown (native <select> can't render logos) ──
+   ═══════════════════════════════ */
+type IconOption = { value: string; label: string; icon?: ReactNode };
+function IconSelect({ value, onChange, placeholder, disabled, options }: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  disabled?: boolean;
+  options: IconOption[];
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    window.addEventListener("mousedown", onDown);
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => { window.removeEventListener("mousedown", onDown); window.removeEventListener("keydown", onKey); };
+  }, [open]);
+
+  const selected = options.find(o => o.value === value);
+  const trigger = "w-full h-11 px-4 rounded-xl bg-[var(--bg-surface)] border text-[13px] text-left flex items-center gap-2 outline-none transition-all";
+
+  return (
+    <div className="relative" ref={ref}>
+      <button type="button" disabled={disabled} onClick={() => setOpen(o => !o)}
+        className={`${trigger} ${open ? "border-blue-500/50 ring-1 ring-blue-500/20" : "border-[var(--border-subtle)]"} ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:border-[var(--text-dim)]"}`}>
+        {selected?.icon && <span className="shrink-0 flex items-center justify-center w-4 h-4">{selected.icon}</span>}
+        <span className={`flex-1 truncate ${selected ? "text-[var(--text-primary)]" : "text-[var(--text-dim)]"}`}>{selected?.label || placeholder}</span>
+        <AngleDownIcon className={`h-3.5 w-3.5 text-[var(--text-dim)] shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && !disabled && (
+        <div className="absolute z-30 mt-1 w-full max-h-60 overflow-auto rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-xl shadow-black/30 py-1">
+          <button type="button" onClick={() => { onChange(""); setOpen(false); }}
+            className="w-full px-3.5 py-2 text-left text-[13px] text-[var(--text-dim)] hover:bg-[var(--bg-surface-hover)] transition-colors flex items-center gap-2">
+            {placeholder}
+          </button>
+          {options.map(o => (
+            <button key={o.value} type="button" onClick={() => { onChange(o.value); setOpen(false); }}
+              className={`w-full px-3.5 py-2 text-left text-[13px] hover:bg-[var(--bg-surface-hover)] transition-colors flex items-center gap-2 ${value === o.value ? "text-[var(--text-primary)] bg-[var(--bg-surface-hover)]" : "text-[var(--text-secondary)]"}`}>
+              {o.icon ? <span className="shrink-0 flex items-center justify-center w-4 h-4">{o.icon}</span> : <span className="w-4 h-4 shrink-0" />}
+              <span className="flex-1 truncate">{o.label}</span>
+              {value === o.value && <CheckIcon className="h-3.5 w-3.5 text-blue-500 shrink-0" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════
    ── Upload / Edit Modal ──
    ═══════════════════════════════ */
 function CatalogModal({
@@ -771,7 +824,6 @@ function CatalogModal({
   const [divisionSlug, setDivisionSlug] = useState<string>("");
   const [categorySlug, setCategorySlug] = useState<string>("");
   const [year, setYear] = useState("");
-  const [validUntil, setValidUntil] = useState("");
   const [tagsInput, setTagsInput] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [batchFiles, setBatchFiles] = useState<File[]>([]);
@@ -804,7 +856,6 @@ function CatalogModal({
         setDivisionSlug(editEntry.division_slug || "");
         setCategorySlug(editEntry.category_slug || "");
         setYear(editEntry.year ? String(editEntry.year) : "");
-        setValidUntil(editEntry.valid_until || "");
         setTagsInput((editEntry.tags || []).join(", "));
         setThumbPreview(editEntry.cover_url || (isImageFile(editEntry.file_type) ? editEntry.file_url : null));
       } else {
@@ -815,7 +866,6 @@ function CatalogModal({
         setDivisionSlug("");
         setCategorySlug("");
         setYear("");
-        setValidUntil("");
         setTagsInput("");
         setThumbPreview(null);
       }
@@ -864,6 +914,35 @@ function CatalogModal({
     if (!div) return [];
     return categories.filter(c => c.division_id === div.id);
   }, [divisionSlug, divisions, categories]);
+
+  // Dropdown options carrying each division/category's own logo.
+  const divisionOptions = useMemo<IconOption[]>(() => divisions.map(d => {
+    const DivIcon = getDivisionIcon(d.slug);
+    const logo = divLogos[d.slug];
+    return {
+      value: d.slug,
+      label: d.name,
+      icon: DivIcon ? <DivIcon className="w-4 h-4 text-[var(--text-dim)]" />
+        : logo ? <img src={logo} alt="" className="w-4 h-4 object-contain" /> : undefined,
+    };
+  }), [divisions, divLogos]);
+
+  const categoryOptions = useMemo<IconOption[]>(() => filteredCategories.map(c => {
+    const logo = catLogos[c.slug];
+    return {
+      value: c.slug,
+      label: c.name,
+      icon: logo ? <img src={logo} alt="" className="w-4 h-4 object-contain" /> : undefined,
+    };
+  }), [filteredCategories, catLogos]);
+
+  // Year dropdown: next year down through the last 16 years.
+  const yearOptions = useMemo<IconOption[]>(() => {
+    const now = new Date().getFullYear();
+    const list: IconOption[] = [];
+    for (let y = now + 1; y >= now - 15; y--) list.push({ value: String(y), label: String(y) });
+    return list;
+  }, []);
 
   const ALLOWED_EXT = ["pdf", "jpg", "jpeg", "png", "psd", "cdr"];
   const validateFile = (f: File): string | null => {
@@ -965,7 +1044,6 @@ function CatalogModal({
     const div = divisions.find(d => d.slug === divisionSlug);
     const cat = categories.find(c => c.slug === categorySlug);
     const yearVal = year.trim() ? (parseInt(year.trim(), 10) || null) : null;
-    const validVal = validUntil || null;
     const tagList = tagsInput.split(",").map(s => s.trim()).filter(Boolean);
 
     // ── Batch upload: one catalog per file, shared metadata ──
@@ -996,7 +1074,7 @@ function CatalogModal({
             category_slug: categorySlug || null, category_name: cat?.name || null,
             file_name: f.name, file_path: uploaded.path, file_url: uploaded.url,
             file_type: ft, file_size: f.size, cover_url: coverUrl, cover_path: coverPath,
-            tags: tagList, year: yearVal, valid_until: validVal,
+            tags: tagList, year: yearVal,
           });
           if (contactId) await syncCatalogToContact(contactId, { name: f.name, url: uploaded.url, type: ft });
           done++;
@@ -1074,7 +1152,6 @@ function CatalogModal({
             cover_url: coverUrl,
             cover_path: coverPath,
             year: yearVal,
-            valid_until: validVal,
             tags: tagList,
           }),
         ];
@@ -1131,7 +1208,6 @@ function CatalogModal({
             cover_path: coverPath,
             tags: tagList,
             year: yearVal,
-            valid_until: validVal,
           }),
         ];
         if (contactId) {
@@ -1355,60 +1431,28 @@ function CatalogModal({
             )}
           </div>
 
-          {/* Division & Category with icons */}
+          {/* Division & Category — logo dropdowns */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={lbl}>{t("modal.division")}</label>
-              <div className="relative">
-                <select value={divisionSlug} onChange={(e) => { setDivisionSlug(e.target.value); setCategorySlug(""); }}
-                  className={inp + " appearance-none pr-9 cursor-pointer"}>
-                  <option value="">{t("modal.selectDivision")}</option>
-                  {divisions.map(d => <option key={d.id} value={d.slug}>{d.name}</option>)}
-                </select>
-                <AngleDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)] pointer-events-none" />
-              </div>
-              {divisionSlug && (() => {
-                const DivIcon = getDivisionIcon(divisionSlug);
-                const logo = divLogos[divisionSlug];
-                if (!DivIcon && !logo) return null;
-                return (
-                  <div className="flex items-center gap-2 mt-1.5 px-1">
-                    {DivIcon ? <DivIcon className="w-4 h-4 text-[var(--text-dim)]" /> : <img src={logo} alt="" className="w-4 h-4 object-contain" />}
-                    <span className="text-[10px] text-[var(--text-dim)]">{divisions.find(d => d.slug === divisionSlug)?.name}</span>
-                  </div>
-                );
-              })()}
+              <IconSelect value={divisionSlug} placeholder={t("modal.selectDivision")}
+                options={divisionOptions}
+                onChange={(v) => { setDivisionSlug(v); setCategorySlug(""); }} />
             </div>
             <div>
               <label className={lbl}>{t("modal.category")}</label>
-              <div className="relative">
-                <select value={categorySlug} onChange={(e) => setCategorySlug(e.target.value)}
-                  className={inp + " appearance-none pr-9 cursor-pointer"} disabled={!divisionSlug}>
-                  <option value="">{t("modal.selectCategory")}</option>
-                  {filteredCategories.map(c => <option key={c.id} value={c.slug}>{c.name}</option>)}
-                </select>
-                <AngleDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)] pointer-events-none" />
-              </div>
-              {categorySlug && catLogos[categorySlug] && (
-                <div className="flex items-center gap-2 mt-1.5 px-1">
-                  <img src={catLogos[categorySlug]} alt="" className="w-4 h-4 object-contain" />
-                  <span className="text-[10px] text-[var(--text-dim)]">{categories.find(c => c.slug === categorySlug)?.name}</span>
-                </div>
-              )}
+              <IconSelect value={categorySlug} placeholder={t("modal.selectCategory")}
+                options={categoryOptions} disabled={!divisionSlug}
+                onChange={setCategorySlug} />
             </div>
           </div>
 
-          {/* Year + Valid until */}
+          {/* Year */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={lbl}>{t("modal.year")} <span className="font-normal normal-case">{t("modal.optional")}</span></label>
-              <input type="number" inputMode="numeric" min={1990} max={2100} value={year}
-                onChange={(e) => setYear(e.target.value.replace(/[^\d]/g, "").slice(0, 4))}
-                placeholder="2025" className={inp} />
-            </div>
-            <div>
-              <label className={lbl}>{t("modal.validUntil")} <span className="font-normal normal-case">{t("modal.optional")}</span></label>
-              <input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className={inp} />
+              <IconSelect value={year} placeholder={t("modal.selectYear")}
+                options={yearOptions} onChange={setYear} />
             </div>
           </div>
 
