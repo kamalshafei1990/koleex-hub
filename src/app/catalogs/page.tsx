@@ -552,17 +552,23 @@ function QuickAddContactModal({
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className={lbl}>{t("quick.type")}</label>
-                <select value={supplierType} onChange={(e) => setSupplierType(e.target.value)} className={inp}>
-                  <option value="">{t("quick.selectType")}</option>
-                  {QA_SUPPLIER_TYPES.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
+                <div className="relative">
+                  <select value={supplierType} onChange={(e) => setSupplierType(e.target.value)} className={inp + " pr-9 cursor-pointer"}>
+                    <option value="">{t("quick.selectType")}</option>
+                    {QA_SUPPLIER_TYPES.map(o => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                  <AngleDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)] pointer-events-none" />
+                </div>
               </div>
               <div>
                 <label className={lbl}>{t("quick.source")}</label>
-                <select value={source} onChange={(e) => setSource(e.target.value)} className={inp}>
-                  <option value="">{t("quick.selectSource")}</option>
-                  {QA_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
+                <div className="relative">
+                  <select value={source} onChange={(e) => setSource(e.target.value)} className={inp + " pr-9 cursor-pointer"}>
+                    <option value="">{t("quick.selectSource")}</option>
+                    {QA_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <AngleDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)] pointer-events-none" />
+                </div>
               </div>
             </div>
             <div>
