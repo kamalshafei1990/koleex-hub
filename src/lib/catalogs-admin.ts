@@ -1,11 +1,11 @@
 /* ---------------------------------------------------------------------------
    Catalogs Admin — Manage supplier/company catalogs.
-   Metadata stored as JSON in Supabase Storage (config/catalogs.json).
-   Files stored in media/catalogs/{id}.{ext}
+   Metadata lives in the tenant-scoped `catalogs` table via /api/catalogs
+   (RLS-locked, service-role server access — no race conditions, per-tenant).
+   File bytes stored in media/catalogs/{id}.{ext}
    Covers stored in media/catalogs/covers/{id}.{ext}
    --------------------------------------------------------------------------- */
 
-import { supabaseAdmin as supabase } from "./supabase-admin";
 import {
   uploadToStorage,
   removeFromStorage,
@@ -14,7 +14,6 @@ import {
 import * as tus from "tus-js-client";
 
 const BUCKET = "media";
-const CONFIG_PATH = "config/catalogs.json";
 
 /* Env reads are INSIDE uploadResumable (see below) rather than at
    module load, so importing this file never triggers a crash when
@@ -43,37 +42,27 @@ export interface CatalogEntry {
   cover_url: string | null;
   cover_path: string | null;
   tags: string[];
+  year?: number | null;
+  valid_until?: string | null;
+  page_count?: number | null;
+  created_by?: string | null;
+  created_by_name?: string | null;
   created_at: string;
   updated_at: string;
 }
 
-// ── Fetch all catalogs ──
+// ── Fetch all catalogs (tenant-scoped, via server API) ──
 
 export async function fetchCatalogs(): Promise<CatalogEntry[]> {
-  // Public bucket — fetch via public URL so this works without auth.
   try {
-    const resp = await fetch(publicUrl(BUCKET, CONFIG_PATH), { cache: "no-store" });
+    const resp = await fetch("/api/catalogs", { credentials: "include", cache: "no-store" });
     if (!resp.ok) return [];
-    return (await resp.json()) as CatalogEntry[];
-  } catch {
+    const j = (await resp.json()) as { catalogs?: CatalogEntry[] };
+    return j.catalogs ?? [];
+  } catch (err) {
+    console.error("[Catalogs] Fetch:", err);
     return [];
   }
-}
-
-// ── Save catalogs (overwrite JSON) ──
-
-async function saveCatalogs(entries: CatalogEntry[]): Promise<boolean> {
-  const blob = new Blob([JSON.stringify(entries, null, 2)], { type: "application/json" });
-  const result = await uploadToStorage(BUCKET, CONFIG_PATH, blob, {
-    cacheControl: "0",
-    upsert: true,
-    contentType: "application/json",
-  });
-  if (!result.ok) {
-    console.error("[Catalogs] Save:", result.error);
-    return false;
-  }
-  return true;
 }
 
 // ── Resumable upload via TUS (bypasses 50MB limit) ──
@@ -192,32 +181,28 @@ export async function replaceCatalogFile(
   return { url: publicUrl(BUCKET, filePath), path: filePath };
 }
 
-// ── Delete catalog files from storage ──
-
-async function deleteCatalogFiles(
-  filePath: string,
-  coverPath?: string | null,
-): Promise<void> {
-  const paths = [filePath];
-  if (coverPath) paths.push(coverPath);
-  await removeFromStorage(BUCKET, paths);
-}
-
-// ── Create catalog entry ──
+// ── Create catalog entry (server API → catalogs table) ──
 
 export async function createCatalog(
   entry: Omit<CatalogEntry, "id" | "created_at" | "updated_at">,
 ): Promise<CatalogEntry | null> {
-  const entries = await fetchCatalogs();
-  const newEntry: CatalogEntry = {
-    ...entry,
-    id: crypto.randomUUID(),
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
-  entries.unshift(newEntry); // newest first
-  const ok = await saveCatalogs(entries);
-  return ok ? newEntry : null;
+  try {
+    const res = await fetch("/api/catalogs", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(entry),
+    });
+    if (!res.ok) {
+      console.error("[Catalogs] Create:", (await res.json().catch(() => ({}))) as unknown);
+      return null;
+    }
+    const j = (await res.json()) as { catalog?: CatalogEntry };
+    return j.catalog ?? null;
+  } catch (err) {
+    console.error("[Catalogs] Create:", err);
+    return null;
+  }
 }
 
 // ── Update catalog entry ──
@@ -226,26 +211,33 @@ export async function updateCatalog(
   id: string,
   updates: Partial<CatalogEntry>,
 ): Promise<boolean> {
-  const entries = await fetchCatalogs();
-  const idx = entries.findIndex((e) => e.id === id);
-  if (idx < 0) return false;
-  entries[idx] = {
-    ...entries[idx],
-    ...updates,
-    updated_at: new Date().toISOString(),
-  };
-  return saveCatalogs(entries);
+  try {
+    const res = await fetch(`/api/catalogs/${id}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    });
+    return res.ok;
+  } catch (err) {
+    console.error("[Catalogs] Update:", err);
+    return false;
+  }
 }
 
-// ── Delete catalog entry + files ──
+// ── Delete catalog entry + files (server removes storage objects) ──
 
 export async function deleteCatalog(id: string): Promise<boolean> {
-  const entries = await fetchCatalogs();
-  const entry = entries.find((e) => e.id === id);
-  if (!entry) return false;
-  await deleteCatalogFiles(entry.file_path, entry.cover_path);
-  const filtered = entries.filter((e) => e.id !== id);
-  return saveCatalogs(filtered);
+  try {
+    const res = await fetch(`/api/catalogs/${id}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    return res.ok;
+  } catch (err) {
+    console.error("[Catalogs] Delete:", err);
+    return false;
+  }
 }
 
 // ── Fetch suppliers & companies for picker ──

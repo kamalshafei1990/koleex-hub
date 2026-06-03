@@ -34,6 +34,9 @@ import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
 import TagsIcon from "@/components/icons/ui/TagsIcon";
 import HashtagIcon from "@/components/icons/ui/HashtagIcon";
 import ScanLineIcon from "@/components/icons/ui/ScanLineIcon";
+import CheckIcon from "@/components/icons/ui/CheckIcon";
+import ZoomInIcon from "@/components/icons/ui/ZoomInIcon";
+import ZoomOutIcon from "@/components/icons/ui/ZoomOutIcon";
 import BrandGlyph from "@/components/icons/brands/BrandGlyph";
 import {
   fetchCatalogs, createCatalog, updateCatalog, deleteCatalog,
@@ -92,6 +95,23 @@ const T: Translations = {
   "modal.selectCategory": { en: "Select category", zh: "选择类别", ar: "اختر الفئة" },
   "modal.description":    { en: "Description", zh: "描述", ar: "الوصف" },
   "modal.optional":       { en: "(optional)", zh: "（可选）", ar: "(اختياري)" },
+  "modal.year":           { en: "Year", zh: "年份", ar: "السنة" },
+  "modal.validUntil":     { en: "Valid until", zh: "有效期至", ar: "صالح حتى" },
+  "modal.tags":           { en: "Tags", zh: "标签", ar: "الوسوم" },
+  "modal.tagsPlaceholder":{ en: "comma, separated, tags", zh: "用逗号分隔的标签", ar: "وسوم مفصولة بفواصل" },
+  "modal.replaceCover":   { en: "Set cover", zh: "设置封面", ar: "تعيين الغلاف" },
+  "cat.allYears":         { en: "All Years", zh: "所有年份", ar: "كل السنوات" },
+  "cat.allTags":          { en: "All Tags", zh: "所有标签", ar: "كل الوسوم" },
+  "cat.sortNewest":       { en: "Newest", zh: "最新", ar: "الأحدث" },
+  "cat.sortName":         { en: "Name", zh: "名称", ar: "الاسم" },
+  "cat.sortSize":         { en: "Size", zh: "大小", ar: "الحجم" },
+  "cat.sortYear":         { en: "Year", zh: "年份", ar: "السنة" },
+  "cat.selected":         { en: "selected", zh: "已选", ar: "محدد" },
+  "cat.deleteSelected":   { en: "Delete", zh: "删除", ar: "حذف" },
+  "cat.downloadSelected": { en: "Download", zh: "下载", ar: "تنزيل" },
+  "cat.clearSel":         { en: "Clear", zh: "清除", ar: "مسح" },
+  "cat.selectAll":        { en: "Select all", zh: "全选", ar: "تحديد الكل" },
+  "preview.none":         { en: "Preview not available for this file type.", zh: "此文件类型无法预览。", ar: "المعاينة غير متاحة لهذا النوع من الملفات." },
   "modal.descPlaceholder":{ en: "Optional notes about this catalog", zh: "关于此目录的可选备注", ar: "ملاحظات اختيارية حول هذا الكتالوج" },
   "modal.saveChanges":    { en: "Save Changes", zh: "保存更改", ar: "حفظ التغييرات" },
   "modal.uploadBtn":      { en: "Upload", zh: "上传", ar: "رفع" },
@@ -173,6 +193,13 @@ function formatFileSize(bytes: number): string {
 
 function isImageFile(type: string): boolean {
   return ["jpg", "jpeg", "png"].includes(type);
+}
+
+function fmtDate(iso?: string | null): string {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  } catch { return ""; }
 }
 
 const FILE_TYPE_CONFIG: Record<string, { label: string; color: string; bgFrom: string; bgTo: string; icon: typeof DocumentIcon }> = {
@@ -693,6 +720,9 @@ function CatalogModal({
   const [contactId, setContactId] = useState<string>("");
   const [divisionSlug, setDivisionSlug] = useState<string>("");
   const [categorySlug, setCategorySlug] = useState<string>("");
+  const [year, setYear] = useState("");
+  const [validUntil, setValidUntil] = useState("");
+  const [tagsInput, setTagsInput] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [thumbnailBlob, setThumbnailBlob] = useState<Blob | null>(null);
   const [thumbPreview, setThumbPreview] = useState<string | null>(null);
@@ -706,6 +736,7 @@ function CatalogModal({
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [localContacts, setLocalContacts] = useState<ContactOption[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+  const coverRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { t } = useTranslation(T);
 
@@ -719,6 +750,9 @@ function CatalogModal({
         setContactId(editEntry.contact_id || "");
         setDivisionSlug(editEntry.division_slug || "");
         setCategorySlug(editEntry.category_slug || "");
+        setYear(editEntry.year ? String(editEntry.year) : "");
+        setValidUntil(editEntry.valid_until || "");
+        setTagsInput((editEntry.tags || []).join(", "));
         setThumbPreview(editEntry.cover_url || (isImageFile(editEntry.file_type) ? editEntry.file_url : null));
       } else {
         setTitle("");
@@ -727,6 +761,9 @@ function CatalogModal({
         setContactId("");
         setDivisionSlug("");
         setCategorySlug("");
+        setYear("");
+        setValidUntil("");
+        setTagsInput("");
         setThumbPreview(null);
       }
       setFile(null);
@@ -811,6 +848,15 @@ function CatalogModal({
     }
   };
 
+  const handleCoverSelect = (files: FileList | null) => {
+    const f = files?.[0];
+    if (!f) return;
+    if (!f.type.startsWith("image/")) { setError(t("err.unsupported")); return; }
+    setThumbnailBlob(f);
+    setThumbPreview(URL.createObjectURL(f));
+    setError("");
+  };
+
   const handleContactSelect = (c: ContactOption) => {
     setContactId(c.id);
     setContactSearch("");
@@ -839,6 +885,9 @@ function CatalogModal({
       const contact = localContacts.find(c => c.id === contactId);
       const div = divisions.find(d => d.slug === divisionSlug);
       const cat = categories.find(c => c.slug === categorySlug);
+      const yearVal = year.trim() ? (parseInt(year.trim(), 10) || null) : null;
+      const validVal = validUntil || null;
+      const tagList = tagsInput.split(",").map(s => s.trim()).filter(Boolean);
 
       if (editEntry) {
         let fileUrl = editEntry.file_url;
@@ -862,7 +911,7 @@ function CatalogModal({
         let coverUrl = editEntry.cover_url;
         let coverPath = editEntry.cover_path;
 
-        const coverPromise = (file && thumbnailBlob)
+        const coverPromise = thumbnailBlob
           ? uploadCatalogCover(editEntry.id, new window.File([thumbnailBlob], "cover.jpg", { type: "image/jpeg" }))
           : Promise.resolve(null);
 
@@ -896,6 +945,9 @@ function CatalogModal({
             file_size: fileSize,
             cover_url: coverUrl,
             cover_path: coverPath,
+            year: yearVal,
+            valid_until: validVal,
+            tags: tagList,
           }),
         ];
         if (contactId) {
@@ -949,7 +1001,9 @@ function CatalogModal({
             file_size: file!.size,
             cover_url: coverUrl,
             cover_path: coverPath,
-            tags: [],
+            tags: tagList,
+            year: yearVal,
+            valid_until: validVal,
           }),
         ];
         if (contactId) {
@@ -1003,6 +1057,8 @@ function CatalogModal({
             <label className={lbl}>{t("modal.file")} *</label>
             <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.psd,.cdr" className="hidden"
               onChange={(e) => { handleFileSelect(e.target.files); e.target.value = ""; }} />
+            <input ref={coverRef} type="file" accept="image/*" className="hidden"
+              onChange={(e) => { handleCoverSelect(e.target.files); e.target.value = ""; }} />
             {file || editEntry ? (
               <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
                 {/* Thumbnail preview */}
@@ -1024,10 +1080,16 @@ function CatalogModal({
                   </p>
                   {generatingThumb && <p className="text-[10px] text-blue-400/70 mt-0.5">{t("modal.genCover")}</p>}
                 </div>
-                <button onClick={() => fileRef.current?.click()}
-                  className="h-8 px-3 rounded-lg bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
-                  {t("modal.replace")}
-                </button>
+                <div className="flex flex-col gap-1.5 shrink-0">
+                  <button onClick={() => fileRef.current?.click()}
+                    className="h-8 px-3 rounded-lg bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
+                    {t("modal.replace")}
+                  </button>
+                  <button onClick={() => coverRef.current?.click()}
+                    className="h-8 px-3 rounded-lg bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors inline-flex items-center gap-1.5">
+                    <PictureIcon className="h-3 w-3" /> {t("modal.replaceCover")}
+                  </button>
+                </div>
               </div>
             ) : (
               <button onClick={() => fileRef.current?.click()}
@@ -1179,6 +1241,27 @@ function CatalogModal({
             </div>
           </div>
 
+          {/* Year + Valid until */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={lbl}>{t("modal.year")} <span className="font-normal normal-case">{t("modal.optional")}</span></label>
+              <input type="number" inputMode="numeric" min={1990} max={2100} value={year}
+                onChange={(e) => setYear(e.target.value.replace(/[^\d]/g, "").slice(0, 4))}
+                placeholder="2025" className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>{t("modal.validUntil")} <span className="font-normal normal-case">{t("modal.optional")}</span></label>
+              <input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className={inp} />
+            </div>
+          </div>
+
+          {/* Tags */}
+          <div>
+            <label className={lbl}>{t("modal.tags")} <span className="font-normal normal-case">{t("modal.optional")}</span></label>
+            <input type="text" value={tagsInput} onChange={(e) => setTagsInput(e.target.value)}
+              placeholder={t("modal.tagsPlaceholder")} className={inp} />
+          </div>
+
           {/* Description */}
           <div>
             <label className={lbl}>{t("modal.description")} <span className="font-normal normal-case">{t("modal.optional")}</span></label>
@@ -1276,10 +1359,12 @@ function DeleteModal({ open, onClose, catalog, onConfirm, deleting }: {
 /* ═══════════════════════════
    ── Catalog Card ──
    ═══════════════════════════ */
-function CatalogCard({ catalog, divLogos, catLogos, onPreview, onEdit, onDelete }: {
+function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, onPreview, onEdit, onDelete }: {
   catalog: CatalogEntry;
   divLogos: Record<string, string>;
   catLogos: Record<string, string>;
+  selected: boolean;
+  onToggleSelect: () => void;
   onPreview: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -1301,7 +1386,12 @@ function CatalogCard({ catalog, divLogos, catLogos, onPreview, onEdit, onDelete 
   };
 
   return (
-    <div className="group relative flex flex-col rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] overflow-hidden hover:border-[var(--text-dim)] transition-all hover:shadow-lg hover:shadow-black/20 hover:-translate-y-0.5">
+    <div className={`group relative flex flex-col rounded-2xl bg-[var(--bg-surface)] border overflow-hidden transition-all hover:shadow-lg hover:shadow-black/20 hover:-translate-y-0.5 ${selected ? "border-blue-500 ring-1 ring-blue-500/40" : "border-[var(--border-subtle)] hover:border-[var(--text-dim)]"}`}>
+      {/* Selection checkbox */}
+      <button onClick={onToggleSelect} aria-label="Select"
+        className={`absolute top-2.5 left-2.5 z-10 h-6 w-6 rounded-md border flex items-center justify-center transition-all ${selected ? "bg-blue-500 border-blue-500 text-white opacity-100" : "bg-black/40 backdrop-blur-md border-white/40 text-transparent opacity-0 group-hover:opacity-100"}`}>
+        <CheckIcon className="h-3.5 w-3.5" />
+      </button>
       {/* Cover area */}
       <div className="relative aspect-[3/4] overflow-hidden">
         {coverUrl ? (
@@ -1385,7 +1475,17 @@ function CatalogCard({ catalog, divLogos, catLogos, onPreview, onEdit, onDelete 
           </div>
         )}
 
-        <p className="text-[10px] text-[var(--text-dim)] mt-0.5">{formatFileSize(catalog.file_size)}</p>
+        {catalog.tags && catalog.tags.length > 0 && (
+          <div className="flex items-center gap-1 flex-wrap mt-0.5">
+            {catalog.tags.slice(0, 3).map(tag => (
+              <span key={tag} className="inline-flex items-center h-4 px-1.5 rounded bg-[var(--bg-surface-bright)] text-[9px] text-[var(--text-dim)]">{tag}</span>
+            ))}
+          </div>
+        )}
+        <div className="flex items-center justify-between gap-2 mt-0.5 text-[10px] text-[var(--text-dim)]">
+          <span>{formatFileSize(catalog.file_size)}</span>
+          <span className="truncate">{catalog.year ? `${catalog.year} · ` : ""}{fmtDate(catalog.created_at)}</span>
+        </div>
       </div>
     </div>
   );
@@ -1394,10 +1494,12 @@ function CatalogCard({ catalog, divLogos, catLogos, onPreview, onEdit, onDelete 
 /* ═══════════════════════════
    ── List Row ──
    ═══════════════════════════ */
-function CatalogRow({ catalog, divLogos, catLogos, onPreview, onEdit, onDelete }: {
+function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onPreview, onEdit, onDelete }: {
   catalog: CatalogEntry;
   divLogos: Record<string, string>;
   catLogos: Record<string, string>;
+  selected: boolean;
+  onToggleSelect: () => void;
   onPreview: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -1419,7 +1521,11 @@ function CatalogRow({ catalog, divLogos, catLogos, onPreview, onEdit, onDelete }
   };
 
   return (
-    <div className="group flex items-center gap-4 px-4 py-3.5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--text-dim)] transition-all">
+    <div className={`group flex items-center gap-4 px-4 py-3.5 rounded-xl bg-[var(--bg-surface)] border transition-all ${selected ? "border-blue-500 ring-1 ring-blue-500/40" : "border-[var(--border-subtle)] hover:border-[var(--text-dim)]"}`}>
+      <button onClick={onToggleSelect} aria-label="Select"
+        className={`shrink-0 h-5 w-5 rounded border flex items-center justify-center transition-colors ${selected ? "bg-blue-500 border-blue-500 text-white" : "border-[var(--border-subtle)] text-transparent hover:border-[var(--text-dim)]"}`}>
+        <CheckIcon className="h-3 w-3" />
+      </button>
       <div className="shrink-0 w-12 h-16 rounded-lg overflow-hidden border border-[var(--border-subtle)]">
         {coverUrl ? (
           <img src={coverUrl} alt="" className="w-full h-full object-contain bg-white" />
@@ -1459,13 +1565,72 @@ function CatalogRow({ catalog, divLogos, catLogos, onPreview, onEdit, onDelete }
             </span>
           )}
         </div>
-        <p className="text-[10px] text-[var(--text-dim)] mt-0.5">{ft.label} &middot; {formatFileSize(catalog.file_size)}</p>
+        <p className="text-[10px] text-[var(--text-dim)] mt-0.5">{ft.label} &middot; {formatFileSize(catalog.file_size)}{catalog.year ? ` · ${catalog.year}` : ""} &middot; {fmtDate(catalog.created_at)}</p>
       </div>
       <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
         <button onClick={onPreview} title={t("card.preview")} className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><EyeIcon className="h-3.5 w-3.5" /></button>
         <button onClick={handleDownload} title={t("card.download")} className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><DownloadIcon className="h-3.5 w-3.5" /></button>
         <button onClick={onEdit} title={t("card.edit")} className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><PencilIcon className="h-3.5 w-3.5" /></button>
         <button onClick={onDelete} title={t("card.delete")} className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-red-400 hover:bg-red-400/[0.06] transition-colors"><TrashIcon className="h-3.5 w-3.5" /></button>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════
+   ── In-app Preview Viewer ──
+   ═══════════════════════════ */
+function PreviewModal({ catalog, onClose }: { catalog: CatalogEntry | null; onClose: () => void }) {
+  const [zoom, setZoom] = useState(1);
+  const { t } = useTranslation(T);
+  useEffect(() => { setZoom(1); }, [catalog?.id]);
+  useEffect(() => {
+    if (!catalog) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [catalog, onClose]);
+  if (!catalog) return null;
+
+  const isPdf = catalog.file_type === "pdf";
+  const isImg = isImageFile(catalog.file_type);
+  const download = () => {
+    const a = document.createElement("a");
+    a.href = catalog.file_url; a.download = catalog.file_name; a.target = "_blank"; a.rel = "noopener noreferrer";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[80] flex flex-col bg-black/90 backdrop-blur-sm">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 text-white shrink-0">
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-semibold truncate">{catalog.title}</p>
+          {catalog.title_cn && <p className="text-[11px] text-white/50 truncate">{catalog.title_cn}</p>}
+        </div>
+        {isImg && (
+          <div className="flex items-center gap-1 mr-1">
+            <button onClick={() => setZoom(z => Math.max(0.25, z - 0.25))} className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"><ZoomOutIcon className="h-4 w-4" /></button>
+            <span className="text-[11px] tabular-nums w-10 text-center">{Math.round(zoom * 100)}%</span>
+            <button onClick={() => setZoom(z => Math.min(4, z + 0.25))} className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"><ZoomInIcon className="h-4 w-4" /></button>
+          </div>
+        )}
+        <button onClick={download} title={t("card.download")} className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"><DownloadIcon className="h-4 w-4" /></button>
+        <button onClick={onClose} aria-label="Close" className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"><CrossIcon className="h-4 w-4" /></button>
+      </div>
+      <div className="flex-1 overflow-auto flex items-center justify-center p-2 md:p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+        {isPdf ? (
+          <iframe src={catalog.file_url} title={catalog.title} className="w-full h-full rounded-lg bg-white" />
+        ) : isImg ? (
+          <img src={catalog.file_url} alt={catalog.title} style={{ transform: `scale(${zoom})` }} className="max-w-full max-h-full object-contain transition-transform duration-150 origin-center" />
+        ) : (
+          <div className="flex flex-col items-center gap-4 text-white/70">
+            {(() => { const Icon = (FILE_TYPE_CONFIG[catalog.file_type]?.icon) || FileIcon; return <Icon className="h-16 w-16 opacity-50" />; })()}
+            <p className="text-[13px]">{t("preview.none")}</p>
+            <button onClick={download} className="h-10 px-5 rounded-xl bg-white/15 border border-white/20 text-[13px] font-semibold flex items-center gap-2 hover:bg-white/25 transition-colors">
+              <DownloadIcon className="h-4 w-4" /> {t("card.download")}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1488,11 +1653,22 @@ export default function CatalogsPage() {
   const [filterSupplier, setFilterSupplier] = useState("all");
   const [filterDivision, setFilterDivision] = useState("all");
   const [filterType, setFilterType] = useState("all");
+  const [filterYear, setFilterYear] = useState("all");
+  const [filterTag, setFilterTag] = useState("all");
+  const [sortBy, setSortBy] = useState<"newest" | "name" | "size" | "year">("newest");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [previewCatalog, setPreviewCatalog] = useState<CatalogEntry | null>(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const [uploadModal, setUploadModal] = useState<{ open: boolean; editEntry: CatalogEntry | null }>({ open: false, editEntry: null });
   const [deleteModal, setDeleteModal] = useState<{ open: boolean; catalog: CatalogEntry | null }>({ open: false, catalog: null });
   const [deleting, setDeleting] = useState(false);
   const { t } = useTranslation(T);
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelected(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }, []);
+  const clearSelection = useCallback(() => setSelected(new Set()), []);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -1531,8 +1707,16 @@ export default function CatalogsPage() {
     if (filterSupplier !== "all") result = result.filter(c => c.contact_id === filterSupplier);
     if (filterDivision !== "all") result = result.filter(c => c.division_slug === filterDivision);
     if (filterType !== "all") result = result.filter(c => c.file_type === filterType);
+    if (filterYear !== "all") result = result.filter(c => String(c.year ?? "") === filterYear);
+    if (filterTag !== "all") result = result.filter(c => (c.tags || []).includes(filterTag));
+    result.sort((a, b) => {
+      if (sortBy === "name") return a.title.localeCompare(b.title);
+      if (sortBy === "size") return (b.file_size || 0) - (a.file_size || 0);
+      if (sortBy === "year") return (b.year ?? 0) - (a.year ?? 0);
+      return (b.created_at || "").localeCompare(a.created_at || ""); // newest
+    });
     return result;
-  }, [catalogs, search, filterSupplier, filterDivision, filterType]);
+  }, [catalogs, search, filterSupplier, filterDivision, filterType, filterYear, filterTag, sortBy]);
 
   const catalogSuppliers = useMemo(() => {
     const map = new Map<string, { id: string; name: string }>();
@@ -1552,8 +1736,37 @@ export default function CatalogsPage() {
 
   const totalSize = useMemo(() => catalogs.reduce((s, c) => s + c.file_size, 0), [catalogs]);
 
-  const handlePreview = (catalog: CatalogEntry) => {
-    window.open(catalog.file_url, "_blank", "noopener,noreferrer");
+  const catalogYears = useMemo(
+    () => [...new Set(catalogs.map(c => c.year).filter((y): y is number => !!y))].sort((a, b) => b - a),
+    [catalogs],
+  );
+  const catalogTags = useMemo(
+    () => [...new Set(catalogs.flatMap(c => c.tags || []))].sort((a, b) => a.localeCompare(b)),
+    [catalogs],
+  );
+
+  const handlePreview = (catalog: CatalogEntry) => setPreviewCatalog(catalog);
+
+  const handleBulkDownload = () => {
+    filtered.filter(c => selected.has(c.id)).forEach((c, i) => {
+      setTimeout(() => {
+        const a = document.createElement("a");
+        a.href = c.file_url; a.download = c.file_name; a.target = "_blank"; a.rel = "noopener noreferrer";
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      }, i * 400);
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    setBulkDeleting(true);
+    const targets = catalogs.filter(c => selected.has(c.id));
+    await Promise.all(targets.map(async (c) => {
+      await deleteCatalog(c.id);
+      if (c.contact_id) await removeCatalogFromContact(c.contact_id, c.file_url);
+    }));
+    setBulkDeleting(false);
+    clearSelection();
+    loadAll();
   };
 
   const handleDelete = async () => {
@@ -1647,6 +1860,39 @@ export default function CatalogsPage() {
             </div>
           )}
 
+          {catalogYears.length > 0 && (
+            <div className="relative">
+              <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)}
+                className="h-9 pl-3 pr-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] appearance-none cursor-pointer outline-none focus:border-blue-500/50">
+                <option value="all">{t("cat.allYears")}</option>
+                {catalogYears.map(y => <option key={y} value={String(y)}>{y}</option>)}
+              </select>
+              <AngleDownIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-dim)] pointer-events-none" />
+            </div>
+          )}
+
+          {catalogTags.length > 0 && (
+            <div className="relative">
+              <select value={filterTag} onChange={(e) => setFilterTag(e.target.value)}
+                className="h-9 pl-3 pr-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] appearance-none cursor-pointer outline-none focus:border-blue-500/50">
+                <option value="all">{t("cat.allTags")}</option>
+                {catalogTags.map(tg => <option key={tg} value={tg}>{tg}</option>)}
+              </select>
+              <AngleDownIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-dim)] pointer-events-none" />
+            </div>
+          )}
+
+          <div className="relative">
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              className="h-9 pl-3 pr-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] appearance-none cursor-pointer outline-none focus:border-blue-500/50">
+              <option value="newest">{t("cat.sortNewest")}</option>
+              <option value="name">{t("cat.sortName")}</option>
+              <option value="size">{t("cat.sortSize")}</option>
+              <option value="year">{t("cat.sortYear")}</option>
+            </select>
+            <AngleDownIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-dim)] pointer-events-none" />
+          </div>
+
           <div className="flex items-center h-9 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] overflow-hidden">
             <button onClick={() => setViewMode("grid")} className={`h-full px-2.5 flex items-center justify-center transition-colors ${viewMode === "grid" ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"}`}>
               <LayoutGridIcon className="h-3.5 w-3.5" />
@@ -1661,6 +1907,28 @@ export default function CatalogsPage() {
             <PlusIcon className="h-3.5 w-3.5" /> {t("cat.upload")}
           </button>
         </div>
+
+        {/* Bulk action bar */}
+        {selected.size > 0 && (
+          <div className="flex flex-wrap items-center gap-2 mb-4 px-3 py-2 rounded-xl bg-blue-500/10 border border-blue-500/30">
+            <span className="text-[12px] font-semibold text-blue-400">{selected.size} {t("cat.selected")}</span>
+            <div className="flex-1" />
+            <button onClick={() => setSelected(new Set(filtered.map(c => c.id)))}
+              className="h-8 px-3 rounded-lg text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">{t("cat.selectAll")}</button>
+            <button onClick={handleBulkDownload}
+              className="h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] inline-flex items-center gap-1.5 transition-colors">
+              <DownloadIcon className="h-3.5 w-3.5" /> {t("cat.downloadSelected")}
+            </button>
+            <button onClick={handleBulkDelete} disabled={bulkDeleting}
+              className="h-8 px-3 rounded-lg bg-red-500/15 border border-red-500/30 text-red-400 text-[12px] font-semibold inline-flex items-center gap-1.5 hover:bg-red-500/25 transition-colors disabled:opacity-50">
+              {bulkDeleting ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <TrashIcon className="h-3.5 w-3.5" />} {t("cat.deleteSelected")}
+            </button>
+            <button onClick={clearSelection}
+              className="h-8 px-3 rounded-lg text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors inline-flex items-center gap-1.5">
+              <CrossIcon className="h-3.5 w-3.5" /> {t("cat.clearSel")}
+            </button>
+          </div>
+        )}
 
         {/* Content */}
         {loading ? (
@@ -1685,6 +1953,7 @@ export default function CatalogsPage() {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
             {filtered.map(catalog => (
               <CatalogCard key={catalog.id} catalog={catalog} divLogos={divLogos} catLogos={catLogos}
+                selected={selected.has(catalog.id)} onToggleSelect={() => toggleSelect(catalog.id)}
                 onPreview={() => handlePreview(catalog)}
                 onEdit={() => setUploadModal({ open: true, editEntry: catalog })}
                 onDelete={() => setDeleteModal({ open: true, catalog })} />
@@ -1694,6 +1963,7 @@ export default function CatalogsPage() {
           <div className="flex flex-col gap-2">
             {filtered.map(catalog => (
               <CatalogRow key={catalog.id} catalog={catalog} divLogos={divLogos} catLogos={catLogos}
+                selected={selected.has(catalog.id)} onToggleSelect={() => toggleSelect(catalog.id)}
                 onPreview={() => handlePreview(catalog)}
                 onEdit={() => setUploadModal({ open: true, editEntry: catalog })}
                 onDelete={() => setDeleteModal({ open: true, catalog })} />
@@ -1729,6 +1999,8 @@ export default function CatalogsPage() {
         onConfirm={handleDelete}
         deleting={deleting}
       />
+
+      <PreviewModal catalog={previewCatalog} onClose={() => setPreviewCatalog(null)} />
     </div>
   );
 }
