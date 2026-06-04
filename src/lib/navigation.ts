@@ -106,6 +106,14 @@ export interface AppDef {
    * `newSince` and `updatedSince` are fresh, NEW wins.
    */
   updatedSince?: string;
+
+  /**
+   * Persistent "Ready to use" status badge. Unlike newSince / updatedSince,
+   * this never expires — set it on an app whose build is complete and verified
+   * so users know it's production-ready. NEW / UPDATED (when fresh) take
+   * visual priority over the ready badge.
+   */
+  ready?: boolean;
 }
 
 /** How long (in ms) a NEW / UPDATED badge stays visible. Single
@@ -121,7 +129,7 @@ export const APP_BADGE_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 export function getAppBadge(
   app: AppDef,
   now: number = Date.now(),
-): "new" | "updated" | null {
+): "new" | "updated" | "ready" | null {
   const fresh = (iso: string | undefined): boolean => {
     if (!iso) return false;
     const t = Date.parse(iso);
@@ -130,6 +138,7 @@ export function getAppBadge(
   };
   if (fresh(app.newSince)) return "new";
   if (fresh(app.updatedSince)) return "updated";
+  if (app.ready) return "ready";
   return null;
 }
 
@@ -160,7 +169,7 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "inventory",        tKey: "app.inventory",        name: "Inventory",         icon: InventoryIcon, route: "/inventory",        active: true,  newSince: "2026-05-17" },
   { id: "purchase",         tKey: "app.purchase",         name: "Purchases",         icon: PurchaseIcon,  route: "/purchase",         active: true,  newSince: "2026-05-26" },
   { id: "landed-cost",      tKey: "app.landed-cost",      name: "Landed Cost",       icon: LandedCostIcon, route: "/landed-cost",     active: true  },
-  { id: "catalogs",         tKey: "app.catalogs",         name: "Catalogs",          icon: CatalogsIcon,  route: "/catalogs",         active: true  },
+  { id: "catalogs",         tKey: "app.catalogs",         name: "Catalogs",          icon: CatalogsIcon,  route: "/catalogs",         active: true,  ready: true },
   { id: "documents",        tKey: "app.documents",        name: "Documents",         icon: DocumentsIcon, route: "/documents",        active: false },
 
   /* ── Commercial ── */

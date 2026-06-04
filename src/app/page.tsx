@@ -421,15 +421,17 @@ export default function HomePage() {
 
         {badge && (
           <span
-            className={`absolute top-2 start-2 px-1.5 py-0.5 rounded-md text-[9px] font-extrabold tracking-wider uppercase pointer-events-none select-none ${
+            className={`absolute top-2 start-2 px-1.5 py-0.5 rounded-md text-[9px] font-extrabold tracking-wider uppercase pointer-events-none select-none whitespace-nowrap ${
               badge === "new"
                 ? "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-400/40"
-                : "bg-sky-500/20 text-sky-300 ring-1 ring-sky-400/40"
+                : badge === "updated"
+                  ? "bg-sky-500/20 text-sky-300 ring-1 ring-sky-400/40"
+                  : "bg-[#0066FF]/20 text-[#3385FF] ring-1 ring-[#0066FF]/40"
             }`}
-            aria-label={badge === "new" ? "New app" : "Updated app"}
-            title={badge === "new" ? "New app" : "Recently updated"}
+            aria-label={badge === "new" ? "New app" : badge === "updated" ? "Updated app" : "Ready to use"}
+            title={badge === "new" ? "New app" : badge === "updated" ? "Recently updated" : "Ready to use"}
           >
-            {badge === "new" ? "NEW" : "UPDATED"}
+            {badge === "new" ? "NEW" : badge === "updated" ? "UPDATED" : "Ready to use"}
           </span>
         )}
         <span className={`transition-all duration-200 ${
