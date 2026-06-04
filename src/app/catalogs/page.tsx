@@ -141,6 +141,9 @@ const T: Translations = {
   "cat.clearSel":         { en: "Clear", zh: "清除", ar: "مسح" },
   "cat.selectAll":        { en: "Select all", zh: "全选", ar: "تحديد الكل" },
   "preview.none":         { en: "Preview not available for this file type.", zh: "此文件类型无法预览。", ar: "المعاينة غير متاحة لهذا النوع من الملفات." },
+  "preview.pdfError":     { en: "Couldn't display this PDF here.", zh: "无法在此处显示此 PDF。", ar: "تعذّر عرض ملف PDF هنا." },
+  "preview.openTab":      { en: "Open in new tab", zh: "在新标签页打开", ar: "فتح في علامة تبويب جديدة" },
+  "common.loading":       { en: "Loading…", zh: "加载中…", ar: "جارٍ التحميل…" },
   "cat.loadMore":         { en: "Load more ({n})", zh: "加载更多（{n}）", ar: "تحميل المزيد ({n})" },
   "modal.descPlaceholder":{ en: "Optional notes about this catalog", zh: "关于此目录的可选备注", ar: "ملاحظات اختيارية حول هذا الكتالوج" },
   "modal.saveChanges":    { en: "Save Changes", zh: "保存更改", ar: "حفظ التغييرات" },
@@ -1946,6 +1949,102 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
 /* ═══════════════════════════
    ── In-app Preview Viewer ──
    ═══════════════════════════ */
+/* In-app PDF viewer (pdf.js) — renders identically in every browser instead of
+   delegating to each browser's native <iframe> PDF plugin (which looked
+   different in Chrome vs Safari and went blank on unreachable/cross-origin
+   files). Single-page with prev/next + zoom; lazy per-page so huge PDFs stay
+   light (pdf.js uses HTTP range requests). Falls back to Open/Download if the
+   file can't be loaded (e.g. an external URL that blocks embedding). */
+function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void }) {
+  const { t } = useTranslation(T);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pdfRef = useRef<any>(null);
+  const [numPages, setNumPages] = useState(0);
+  const [pageNum, setPageNum] = useState(1);
+  const [scale, setScale] = useState(1.1);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+
+  useEffect(() => {
+    let alive = true;
+    setStatus("loading"); setPageNum(1); pdfRef.current = null;
+    (async () => {
+      try {
+        await ensurePdfJs();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const pdfjsLib = (window as any).pdfjsLib;
+        const pdf = await pdfjsLib.getDocument({ url }).promise;
+        if (!alive) return;
+        pdfRef.current = pdf;
+        setNumPages(pdf.numPages);
+        setStatus("ready");
+      } catch (e) {
+        console.error("[PdfViewer load]", e);
+        if (alive) setStatus("error");
+      }
+    })();
+    return () => { alive = false; };
+  }, [url]);
+
+  useEffect(() => {
+    if (status !== "ready" || !pdfRef.current) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const page = await pdfRef.current.getPage(pageNum);
+        if (cancelled) return;
+        const viewport = page.getViewport({ scale });
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        await page.render({ canvasContext: ctx, viewport }).promise;
+      } catch (e) { console.error("[PdfViewer render]", e); }
+    })();
+    return () => { cancelled = true; };
+  }, [status, pageNum, scale]);
+
+  if (status === "error") {
+    return (
+      <div className="flex flex-col items-center gap-4 text-white/70">
+        <FileIcon className="h-16 w-16 opacity-50" />
+        <p className="text-[13px]">{t("preview.pdfError", "Couldn't display this PDF here.")}</p>
+        <div className="flex items-center gap-2">
+          <a href={url} target="_blank" rel="noopener noreferrer" className="h-10 px-5 rounded-xl bg-white/15 border border-white/20 text-[13px] font-semibold flex items-center gap-2 hover:bg-white/25 transition-colors">
+            {t("preview.openTab", "Open in new tab")}
+          </a>
+          <button onClick={onDownload} className="h-10 px-5 rounded-xl bg-white/15 border border-white/20 text-[13px] font-semibold flex items-center gap-2 hover:bg-white/25 transition-colors">
+            <DownloadIcon className="h-4 w-4" /> {t("card.download")}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full w-full flex-col items-center gap-3">
+      <div className="shrink-0 flex items-center gap-1.5 text-white text-[12px]">
+        <button onClick={() => setPageNum(p => Math.max(1, p - 1))} disabled={pageNum <= 1}
+          className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white/10 disabled:opacity-30 transition-colors">‹</button>
+        <span className="tabular-nums min-w-[72px] text-center">{numPages ? `${pageNum} / ${numPages}` : "…"}</span>
+        <button onClick={() => setPageNum(p => Math.min(numPages, p + 1))} disabled={pageNum >= numPages}
+          className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white/10 disabled:opacity-30 transition-colors">›</button>
+        <span className="mx-2 h-4 w-px bg-white/15" />
+        <button onClick={() => setScale(s => Math.max(0.5, +(s - 0.2).toFixed(2)))} className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"><ZoomOutIcon className="h-4 w-4" /></button>
+        <span className="tabular-nums w-10 text-center">{Math.round(scale * 100)}%</span>
+        <button onClick={() => setScale(s => Math.min(3, +(s + 0.2).toFixed(2)))} className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"><ZoomInIcon className="h-4 w-4" /></button>
+      </div>
+      <div className="flex-1 overflow-auto w-full flex justify-center py-2">
+        {status === "loading"
+          ? <div className="flex items-center justify-center text-white/60 text-[13px] h-full">{t("common.loading", "Loading…")}</div>
+          : <canvas ref={canvasRef} className="bg-white rounded shadow-2xl max-w-none" />}
+      </div>
+    </div>
+  );
+}
+
 function PreviewModal({ catalog, onClose, onDownload }: { catalog: CatalogEntry | null; onClose: () => void; onDownload: (id: string) => void }) {
   const [zoom, setZoom] = useState(1);
   const { t } = useTranslation(T);
@@ -1992,7 +2091,7 @@ function PreviewModal({ catalog, onClose, onDownload }: { catalog: CatalogEntry 
       </div>
       <div className="flex-1 overflow-auto flex items-center justify-center p-2 md:p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
         {isPdf ? (
-          <iframe src={catalog.file_url} title={catalog.title} className="w-full h-full rounded-lg bg-white" />
+          <PdfViewer url={catalog.file_url} onDownload={download} />
         ) : isImg ? (
           <img src={catalog.file_url} alt={catalog.title} style={{ transform: `scale(${zoom})` }} className="max-w-full max-h-full object-contain transition-transform duration-150 origin-center" />
         ) : (
