@@ -2245,6 +2245,19 @@ const DEPT_TONE: Record<string, { dot: string; chipIdle: string; chipActive: str
   general:     { dot: "bg-slate-400",   chipIdle: "border-slate-500/40 text-slate-300 hover:bg-slate-500/10",     chipActive: "bg-slate-500 text-white border-slate-500",     badge: "border-slate-500/40 text-slate-300" },
 };
 
+/* ── Form group label ──
+   A quiet band header that visually groups the supplier form's many sections
+   (Identity, Communication, Commercial, …). Call sites hide it while a
+   department filter is active (so it never orphans above zero sections). */
+function FormGroupLabel({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 pt-4 first:pt-0">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-faint)] whitespace-nowrap">{label}</span>
+      <span className="h-px flex-1 bg-[var(--border-color)]" />
+    </div>
+  );
+}
+
 /* ── Form section wrapper ──
    `owner` (optional) shows which department / role is responsible for filling
    this section — a supplier record spans Procurement, Finance, Compliance, QC…
@@ -7934,6 +7947,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {/* ══ SUPPLIER FORM SECTIONS (ordered by priority) ══ */}
         {form.contact_type === "supplier" && (
           <>
+            {!supplierDept && <FormGroupLabel label={t("supgroup.identity", "Identity & profile")} />}
             {/* 1. Company Name — Most important, identity of the supplier */}
             <FormSection title={t("section.companyName")} icon={<Building2Icon size={14} />} owner={t("owner.procurement")} ownerLabel={t("owner.label")} dept="procurement" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
               <div className="space-y-3">
@@ -8100,6 +8114,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
+            {!supplierDept && <FormGroupLabel label={t("supgroup.communication", "Contacts & communication")} />}
             {/* 2. Contact Details — How to reach the supplier */}
             <FormSection title={t("section.contactDetails")} icon={<PhoneIcon size={14} />} owner={t("owner.procurement")} ownerLabel={t("owner.label")} dept="procurement" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
               <div className="space-y-3">
@@ -8372,6 +8387,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
+            {!supplierDept && <FormGroupLabel label={t("supgroup.legal", "Legal & compliance")} />}
             {/* Legal Identity — registration & company profile */}
             <FormSection title={t("section.legalIdentity", "Legal Identity")} icon={<Building2Icon size={14} />} owner={t("owner.compliance")} ownerLabel={t("owner.label")} dept="legal" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
               <div className="space-y-3">
@@ -8414,6 +8430,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
+            {!supplierDept && <FormGroupLabel label={t("supgroup.commercial", "Commercial & logistics")} />}
             {/* Payment — terms + currency + bank accounts + mobile payment (WeChat Pay / Alipay) */}
             <FormSection title={t("section.paymentInfo", "Payment Information")} icon={<LandmarkIcon size={14} />} owner={t("owner.finance")} ownerLabel={t("owner.label")} dept="finance" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
               <div className="space-y-4">
@@ -8500,6 +8517,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
+            {!supplierDept && <FormGroupLabel label={t("supgroup.production", "Production & quality")} />}
             {/* Factory */}
             <FormSection title={t("section.factory", "Factory")} icon={<FactoryIcon size={14} />} owner={t("owner.sourcingQuality")} ownerLabel={t("owner.label")} dept="quality" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
               <div className="space-y-3">
@@ -8667,6 +8685,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
+            {!supplierDept && <FormGroupLabel label={t("supgroup.intelligence", "Intelligence")} />}
             {/* Risk */}
             <FormSection title={t("section.risk", "Risk")} icon={<TriangleWarningIcon size={14} />} owner={t("owner.risk")} ownerLabel={t("owner.label")} dept="commercial" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
               <div className="space-y-4">
@@ -8826,6 +8845,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               )}
             </FormSection>
 
+            {!supplierDept && <FormGroupLabel label={t("supgroup.records", "Records & notes")} />}
             {/* 8. Documents */}
             <FormSection title={t("section.documents")} icon={<PaperclipIcon size={14} />} owner={t("owner.compliance")} ownerLabel={t("owner.label")} dept="legal" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
               <div className="space-y-2">

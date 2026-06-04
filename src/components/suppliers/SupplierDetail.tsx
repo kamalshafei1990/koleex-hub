@@ -708,6 +708,8 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
           })()}
         </div>
 
+        <GroupLabel>{t("sd.groupOverview", "Overview")}</GroupLabel>
+
         {/* ─── Contact channels (Part B of hero) — calls, messaging, QR codes in one shell ─── */}
         {(() => {
           const phone = str(s, "supplier_tel", "phone");
