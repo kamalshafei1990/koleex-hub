@@ -470,12 +470,11 @@ const LANGUAGES = [
   "Italian", "Dutch", "Thai", "Vietnamese", "Indonesian", "Malay", "Tagalog",
 ];
 
-const SUPPLIER_TYPES = [
-  "Manufacturer", "Distributor", "Wholesaler", "Agent", "Trading Company",
-  "Service Provider", "Freelancer", "OEM", "ODM",
-  "Spare Parts", "Machinery", "Electronics", "Packaging", "Textile", "Chemical", "Logistics",
-  "Other",
-];
+/* Supplier "type" is no longer a standalone field — it is the PRIMARY
+   classification (see the Classifications section + supplier_classifications
+   table). The legacy contacts.supplier_type column is kept in sync by the
+   /api/suppliers/[id]/classifications mirror, so no SUPPLIER_TYPES list is
+   needed here anymore. */
 const SUPPLIER_SOURCES = [
   "Alibaba", "Made-in-China", "Global Sources", "Exhibition / Trade Show",
   "Referral", "Website", "LinkedIn", "Cold Call", "Partner", "Agent", "Other",
@@ -8003,15 +8002,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     <TaxonomySelect value={form.category} onChange={v => setField("category", v)} options={categoryOptions} placeholder={form.division ? t("field.category") : t("placeholder.pickDivisionFirst", "Pick a division first")} createLabel={t("create.newCategory", "Create new category")} />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <SelectInput label={t("field.supplierType", "Supplier Type")} tier="optional" value={form.supplier_type} onChange={v => setField("supplier_type", v)} options={SUPPLIER_TYPES} icon={<BriefcaseIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <SelectInput label={t("field.industry")} tier="optional" value={form.industry} onChange={v => setField("industry", v)} options={INDUSTRIES} icon={<FactoryIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
                   <SelectInput label={t("field.source")} tier="optional" value={form.source} onChange={v => setField("source", v)} options={SUPPLIER_SOURCES} icon={<TargetIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
-                  <Input label={t("field.supplierProfileUrl", "Platform profile link")} tier="optional" type="url" value={form.supplier_profile_url} onChange={v => setField("supplier_profile_url", v)} placeholder={t("placeholder.supplierProfileUrl", "Made-in-China / Alibaba / AliExpress profile URL")} icon={<GlobeIcon size={14} />} />
                 </div>
-                {/* Supplier kind is ALSO captured richly in the "Classifications" section below (multi-select taxonomy). */}
+                <Input label={t("field.supplierProfileUrl", "Platform profile link")} tier="optional" type="url" value={form.supplier_profile_url} onChange={v => setField("supplier_profile_url", v)} placeholder={t("placeholder.supplierProfileUrl", "Made-in-China / Alibaba / AliExpress profile URL")} icon={<GlobeIcon size={14} />} />
+                {/* Supplier "type" is no longer a separate field — it's the PRIMARY
+                    classification (star one in the Classifications section below).
+                    On save it mirrors into contacts.supplier_type, so Purchase, the
+                    supplier list, seed scripts and readiness keep working unchanged. */}
               </div>
             </FormSection>
 
@@ -8291,6 +8290,37 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   qrValue={form.wechat_qr}
                   onQrChange={v => setField("wechat_qr", v)}
                 />
+                {/* Company-level WeChat presence — official account, sales group, WeCom.
+                    (Per-contact WeChat IDs live in Contact Persons; WeChat Pay lives in Payment —
+                    they're different concepts, so they stay in their own sections.) */}
+                <div className="space-y-2.5 border-t border-[var(--border-color)] pt-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.wechatPresence", "WeChat presence")}</p>
+                  <Input label={t("field.wechatOfficialAccount", "WeChat Official Account")} value={form.wechat_official_account} onChange={v => setField("wechat_official_account", v)} placeholder={t("placeholder.wechatOfficial", "Official Account name / ID")} icon={<BrandGlyph name="WeChat" size={14} />} />
+                  <div className="flex flex-wrap gap-4 text-sm text-[var(--text-muted)] pt-0.5">
+                    <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!form.wechat_sales_group_available} onChange={e => setField("wechat_sales_group_available", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.wechatGroupAvailable", "WeChat group available")}</label>
+                    {form.wechat_sales_group_available && (
+                      <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] p-3 space-y-2.5 mt-1">
+                        <Input
+                          label={t("field.wechatGroupName", "WeChat group name")}
+                          value={form.wechat_group_name}
+                          onChange={v => setField("wechat_group_name", v)}
+                          placeholder={t("placeholder.wechatGroupName", "e.g. Koleex × Supplier — Sales")}
+                          icon={<BrandGlyph name="WeChat" size={14} />}
+                        />
+                        <MultiReasonField
+                          label={t("field.wechatGroupMembers", "Group members (from your team)")}
+                          value={form.wechat_group_members}
+                          onChange={v => setField("wechat_group_members", v)}
+                          placeholder={accountNames.length ? t("placeholder.wechatMembers", "Pick a teammate or type a name") : t("placeholder.wechatMembersEmpty", "Type a name")}
+                          options={accountNames}
+                          icon={<UsersIcon size={14} />}
+                          datalistId="sup-wechat-members-opts"
+                        />
+                      </div>
+                    )}
+                    <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!form.wecom_support_available} onChange={e => setField("wecom_support_available", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.wecomSupport", "WeCom support")}</label>
+                  </div>
+                </div>
                 {/* Other apps — pick the app and add as many as needed (same grammar as Social Media). */}
                 <div className="space-y-2.5 border-t border-[var(--border-color)] pt-3">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.otherMessagingApps", "Other apps")}</p>
@@ -8316,37 +8346,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
-            {/* Social Media — company-level WeChat / WeCom presence + social pages.
-                Grouped with the other comms sections (Contact, Contact Persons,
-                Messaging IDs) instead of being stranded near the end of the form. */}
+            {/* Social profiles & marketplaces — LinkedIn / Facebook / Alibaba etc.
+                (Company WeChat presence now lives in the Messaging IDs section so all
+                WeChat info is in one place.) Grouped with the other comms sections. */}
             <FormSection title={t("section.socialMedia", "Social Media")} icon={<Share2Icon size={14} />} owner={t("owner.marketing")} ownerLabel={t("owner.label")} dept="general" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
               <div className="space-y-2.5">
-                {/* Structured WeChat / WeCom presence (distinct from per-contact WeChat IDs). */}
-                <Input label={t("field.wechatOfficialAccount", "WeChat Official Account")} value={form.wechat_official_account} onChange={v => setField("wechat_official_account", v)} placeholder={t("placeholder.wechatOfficial", "Official Account name / ID")} icon={<BrandGlyph name="WeChat" size={14} />} />
-                <div className="flex flex-wrap gap-4 text-sm text-[var(--text-muted)] pt-0.5">
-                  <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!form.wechat_sales_group_available} onChange={e => setField("wechat_sales_group_available", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.wechatGroupAvailable", "WeChat group available")}</label>
-                  {form.wechat_sales_group_available && (
-                    <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] p-3 space-y-2.5 mt-1">
-                      <Input
-                        label={t("field.wechatGroupName", "WeChat group name")}
-                        value={form.wechat_group_name}
-                        onChange={v => setField("wechat_group_name", v)}
-                        placeholder={t("placeholder.wechatGroupName", "e.g. Koleex × Supplier — Sales")}
-                        icon={<BrandGlyph name="WeChat" size={14} />}
-                      />
-                      <MultiReasonField
-                        label={t("field.wechatGroupMembers", "Group members (from your team)")}
-                        value={form.wechat_group_members}
-                        onChange={v => setField("wechat_group_members", v)}
-                        placeholder={accountNames.length ? t("placeholder.wechatMembers", "Pick a teammate or type a name") : t("placeholder.wechatMembersEmpty", "Type a name")}
-                        options={accountNames}
-                        icon={<UsersIcon size={14} />}
-                        datalistId="sup-wechat-members-opts"
-                      />
-                    </div>
-                  )}
-                  <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!form.wecom_support_available} onChange={e => setField("wecom_support_available", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.wecomSupport", "WeCom support")}</label>
-                </div>
                 {form.social_profiles.length === 0 && (
                   <p className="text-[11px] text-[var(--text-faint)]">{t("hint.socialMedia", "Add the factory's social pages — paste a link, page, or @account.")}</p>
                 )}
