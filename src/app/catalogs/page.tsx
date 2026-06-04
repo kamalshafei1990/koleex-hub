@@ -2091,7 +2091,7 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
   const rootRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const baseWidthRef = useRef(0);
-  const pendingScrollRef = useRef<{ left: number; top: number } | null>(null);
+  const pendingZoomRef = useRef<{ cxNatural: number; cyNatural: number; vx: number; vy: number } | null>(null);
   const panRef = useRef<{ x: number; y: number; l: number; t: number } | null>(null);
   const [isPanning, setIsPanning] = useState(false);
 
@@ -2135,44 +2135,53 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
   useEffect(() => {
     const dpr = typeof window !== "undefined" ? Math.min(window.devicePixelRatio || 1, 2) : 1;
     const target = Math.min(4, +(scale * dpr).toFixed(2));
-    const id = setTimeout(() => setQuality(q => (target > q + 0.15 ? target : q)), 200);
+    const id = setTimeout(() => setQuality(q => (Math.abs(target - q) > 0.15 ? target : q)), 200);
     return () => clearTimeout(id);
   }, [scale]);
 
-  // After a zoom resizes the stage, restore the scroll offset that keeps the
-  // anchor (cursor, or viewport centre) fixed — applied before paint.
+  // After a zoom resizes/recenters the stage, scroll so the captured natural
+  // point lands back under the cursor (or viewport centre). Reads the real
+  // post-layout stage rect, so centering/margins can't cause drift.
   useLayoutEffect(() => {
-    const p = pendingScrollRef.current; const root = scrollRef.current;
-    if (p && root) { root.scrollLeft = Math.max(0, p.left); root.scrollTop = Math.max(0, p.top); pendingScrollRef.current = null; }
+    const z = pendingZoomRef.current; const root = scrollRef.current; const stage = stageRef.current;
+    if (z && root && stage) {
+      const rr = root.getBoundingClientRect();
+      const sr = stage.getBoundingClientRect();
+      const pointVX = (sr.left - rr.left) + z.cxNatural * scale;
+      const pointVY = (sr.top - rr.top) + z.cyNatural * scale;
+      root.scrollLeft = Math.max(0, root.scrollLeft + (pointVX - z.vx));
+      root.scrollTop = Math.max(0, root.scrollTop + (pointVY - z.vy));
+      pendingZoomRef.current = null;
+    }
   }, [scale]);
 
   const clampZoom = useCallback((z: number) => Math.max(0.3, Math.min(4, +z.toFixed(3))), []);
+  // Capture the natural (unscaled) point under the anchor before zooming.
+  const captureAnchor = useCallback((vx: number, vy: number, prev: number) => {
+    const root = scrollRef.current, stage = stageRef.current;
+    if (!root || !stage) return;
+    const rr = root.getBoundingClientRect(), sr = stage.getBoundingClientRect();
+    pendingZoomRef.current = { cxNatural: (vx - (sr.left - rr.left)) / prev, cyNatural: (vy - (sr.top - rr.top)) / prev, vx, vy };
+  }, []);
   const zoomBy = useCallback((factor: number, clientX?: number, clientY?: number) => {
     const root = scrollRef.current;
     setScale(prev => {
       const next = clampZoom(prev * factor);
       if (root && next !== prev) {
-        const rect = root.getBoundingClientRect();
-        const ox = clientX != null ? clientX - rect.left : root.clientWidth / 2;
-        const oy = clientY != null ? clientY - rect.top : root.clientHeight / 2;
-        const ratio = next / prev;
-        pendingScrollRef.current = { left: (root.scrollLeft + ox) * ratio - ox, top: (root.scrollTop + oy) * ratio - oy };
+        const rr = root.getBoundingClientRect();
+        captureAnchor(clientX != null ? clientX - rr.left : root.clientWidth / 2, clientY != null ? clientY - rr.top : root.clientHeight / 2, prev);
       }
       return next;
     });
-  }, [clampZoom]);
+  }, [clampZoom, captureAnchor]);
   const zoomTo = useCallback((value: number) => {
     const root = scrollRef.current;
     setScale(prev => {
       const next = clampZoom(value);
-      if (root && next !== prev) {
-        const ox = root.clientWidth / 2, oy = root.clientHeight / 2;
-        const ratio = next / prev;
-        pendingScrollRef.current = { left: (root.scrollLeft + ox) * ratio - ox, top: (root.scrollTop + oy) * ratio - oy };
-      }
+      if (root && next !== prev) captureAnchor(root.clientWidth / 2, root.clientHeight / 2, prev);
       return next;
     });
-  }, [clampZoom]);
+  }, [clampZoom, captureAnchor]);
 
   /* Manual zoom anchored at the cursor: Ctrl/⌘ + wheel and trackpad pinch
      (delivered as ctrlKey wheel), plus +/- / 0 keys. Native non-passive listener
@@ -2219,10 +2228,10 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
     if (!document.fullscreenElement) el.requestFullscreen?.().catch(() => {});
     else document.exitFullscreen?.().catch(() => {});
   };
-  const printDoc = () => {
-    const w = window.open(url, "_blank");
-    try { w?.addEventListener?.("load", () => { try { w.focus(); w.print(); } catch { /* noop */ } }); } catch { /* noop */ }
-  };
+  // Cross-origin (Supabase) PDFs can't be driven via window.print() from here —
+  // browsers block it and the load event never fires. Open in a new tab and let
+  // the native viewer's own Print control handle it reliably.
+  const printDoc = () => { window.open(url, "_blank", "noopener,noreferrer"); };
 
   // Hand-drag panning (like Preview): grab the page and drag to move when the
   // content is larger than the viewport.
@@ -2276,8 +2285,8 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
         <div className={grp}>
           <button className={btn} onClick={() => goTo(activePage - 1)} disabled={activePage <= 1} title={t("preview.prevPage", "Previous page")}><AngleLeftIcon className="h-4 w-4 rtl:rotate-180" /></button>
           <input value={pageInput} onChange={(e) => setPageInput(e.target.value.replace(/[^0-9]/g, ""))}
-            onKeyDown={(e) => { if (e.key === "Enter") goTo(parseInt(pageInput, 10) || 1); }}
-            onBlur={() => goTo(parseInt(pageInput, 10) || 1)} inputMode="numeric" aria-label={t("preview.page", "Page")}
+            onKeyDown={(e) => { if (e.key === "Enter") { const n = parseInt(pageInput, 10); if (Number.isFinite(n)) goTo(n); else setPageInput(String(activePage)); } }}
+            onBlur={() => { const n = parseInt(pageInput, 10); if (Number.isFinite(n)) goTo(n); else setPageInput(String(activePage)); }} inputMode="numeric" aria-label={t("preview.page", "Page")}
             className="h-7 w-10 rounded-md bg-black/30 border border-white/15 text-center text-[12px] text-white tabular-nums outline-none focus:border-white/40" />
           <span className="text-[12px] text-white/50 tabular-nums px-1">/ {numPages || "…"}</span>
           <button className={btn} onClick={() => goTo(activePage + 1)} disabled={activePage >= numPages} title={t("preview.nextPage", "Next page")}><AngleRightIcon className="h-4 w-4 rtl:rotate-180" /></button>
@@ -2309,7 +2318,7 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
           </div>
         )}
         <div ref={scrollRef}
-          onPointerDown={onPanDown} onPointerMove={onPanMove} onPointerUp={endPan} onPointerLeave={endPan}
+          onPointerDown={onPanDown} onPointerMove={onPanMove} onPointerUp={endPan} onPointerLeave={endPan} onPointerCancel={endPan} onLostPointerCapture={endPan}
           className={`flex-1 overflow-auto ${isPanning ? "cursor-grabbing select-none" : "cursor-grab"}`}>
           {status === "loading" && <div className="text-white/60 text-[13px] py-10 text-center">{t("common.loading", "Loading…")}</div>}
           {/* Sizer reserves the scaled footprint; the stage is rendered at natural
