@@ -1957,77 +1957,129 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
 /* ═══════════════════════════
    ── In-app Preview Viewer ──
    ═══════════════════════════ */
-/* In-app PDF viewer (pdf.js) — renders identically in every browser instead of
-   delegating to each browser's native <iframe> PDF plugin (which looked
-   different in Chrome vs Safari and went blank on unreachable/cross-origin
-   files). Single-page with prev/next + zoom; lazy per-page so huge PDFs stay
-   light (pdf.js uses HTTP range requests). Falls back to Open/Download if the
-   file can't be loaded (e.g. an external URL that blocks embedding). */
+/* In-app PDF viewer (pdf.js) — consistent in every browser (vs the native
+   <iframe> plugin that looked different per browser and went blank on
+   unreachable files). Page-thumbnail sidebar + continuous scroll + zoom. Pages
+   render lazily as they enter view (HTTP range requests keep big PDFs light),
+   each render is cancellable, and the doc is destroyed on close. Falls back to
+   Open/Download if the file can't be loaded. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type PdfDoc = any;
+
+function PdfPageCanvas({ pdf, pageNumber, scale, onActive }: {
+  pdf: PdfDoc; pageNumber: number; scale: number; onActive: (n: number) => void;
+}) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [visible, setVisible] = useState(pageNumber <= 2);
+  const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
+  useEffect(() => {
+    const el = wrapRef.current; if (!el) return;
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting) setVisible(true);
+        if (e.isIntersecting && e.intersectionRatio >= 0.5) onActive(pageNumber);
+      }
+    }, { rootMargin: "400px 0px", threshold: [0.01, 0.5] });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [pageNumber, onActive]);
+  useEffect(() => {
+    if (!visible || !pdf) return;
+    let cancelled = false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let task: any = null;
+    (async () => {
+      try {
+        const page = await pdf.getPage(pageNumber);
+        if (cancelled) return;
+        const viewport = page.getViewport({ scale });
+        setDims({ w: viewport.width, h: viewport.height });
+        const canvas = canvasRef.current; if (!canvas) return;
+        const ctx = canvas.getContext("2d"); if (!ctx) return;
+        canvas.width = viewport.width; canvas.height = viewport.height;
+        task = page.render({ canvasContext: ctx, viewport });
+        await task.promise;
+      } catch (e) { const n = (e as { name?: string } | null)?.name; if (n !== "RenderingCancelledException") console.error("[PdfPage]", e); }
+    })();
+    return () => { cancelled = true; try { task?.cancel?.(); } catch { /* noop */ } };
+  }, [visible, pdf, pageNumber, scale]);
+  return (
+    <div ref={wrapRef} data-page={pageNumber} style={{ minHeight: dims ? dims.h : 420 }} className="w-full flex justify-center">
+      <canvas ref={canvasRef} className="bg-white rounded shadow-2xl max-w-full h-auto" />
+    </div>
+  );
+}
+
+function PdfThumb({ pdf, pageNumber, active, onClick }: { pdf: PdfDoc; pageNumber: number; active: boolean; onClick: () => void }) {
+  const wrapRef = useRef<HTMLButtonElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [visible, setVisible] = useState(pageNumber <= 6);
+  useEffect(() => {
+    const el = wrapRef.current; if (!el) return;
+    const io = new IntersectionObserver((entries) => { if (entries.some(e => e.isIntersecting)) setVisible(true); }, { rootMargin: "300px 0px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  useEffect(() => {
+    if (!visible || !pdf) return;
+    let cancelled = false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let task: any = null;
+    (async () => {
+      try {
+        const page = await pdf.getPage(pageNumber);
+        if (cancelled) return;
+        const viewport = page.getViewport({ scale: 0.22 });
+        const canvas = canvasRef.current; if (!canvas) return;
+        const ctx = canvas.getContext("2d"); if (!ctx) return;
+        canvas.width = viewport.width; canvas.height = viewport.height;
+        task = page.render({ canvasContext: ctx, viewport });
+        await task.promise;
+      } catch (e) { const n = (e as { name?: string } | null)?.name; if (n !== "RenderingCancelledException") console.error("[PdfThumb]", e); }
+    })();
+    return () => { cancelled = true; try { task?.cancel?.(); } catch { /* noop */ } };
+  }, [visible, pdf, pageNumber]);
+  return (
+    <button ref={wrapRef} onClick={onClick} title={`Page ${pageNumber}`}
+      className={`relative block w-full rounded-md overflow-hidden border transition-colors ${active ? "border-blue-500 ring-1 ring-blue-500/50" : "border-white/15 hover:border-white/40"}`}>
+      <canvas ref={canvasRef} className="block w-full bg-white" style={{ minHeight: 60 }} />
+      <span className="absolute bottom-0.5 end-0.5 text-[9px] px-1 rounded bg-black/60 text-white tabular-nums">{pageNumber}</span>
+    </button>
+  );
+}
+
 function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void }) {
   const { t } = useTranslation(T);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pdfRef = useRef<any>(null);
+  const [pdf, setPdf] = useState<PdfDoc>(null);
   const [numPages, setNumPages] = useState(0);
-  const [pageNum, setPageNum] = useState(1);
   const [scale, setScale] = useState(1.1);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [activePage, setActivePage] = useState(1);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let alive = true;
-    setStatus("loading"); setPageNum(1); pdfRef.current = null;
+    let doc: PdfDoc = null;
+    setStatus("loading"); setPdf(null); setNumPages(0); setActivePage(1);
     (async () => {
       try {
         await ensurePdfJs();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const pdfjsLib = (window as any).pdfjsLib;
-        const pdf = await pdfjsLib.getDocument({ url }).promise;
-        if (!alive) return;
-        pdfRef.current = pdf;
-        setNumPages(pdf.numPages);
-        setStatus("ready");
-      } catch (e) {
-        console.error("[PdfViewer load]", e);
-        if (alive) setStatus("error");
-      }
+        const lib = (window as any).pdfjsLib;
+        doc = await lib.getDocument({ url }).promise;
+        if (!alive) { try { doc.destroy?.(); } catch { /* noop */ } return; }
+        setPdf(doc); setNumPages(doc.numPages); setStatus("ready");
+      } catch (e) { console.error("[PdfViewer load]", e); if (alive) setStatus("error"); }
     })();
-    return () => {
-      alive = false;
-      // Free the pdf.js worker transport + page caches when the viewer closes
-      // or the url changes — otherwise large PDFs leak on rapid open/close.
-      try { pdfRef.current?.destroy?.(); } catch { /* noop */ }
-      pdfRef.current = null;
-    };
+    return () => { alive = false; try { doc?.destroy?.(); } catch { /* noop */ } };
   }, [url]);
 
-  useEffect(() => {
-    if (status !== "ready" || !pdfRef.current) return;
-    let cancelled = false;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let renderTask: any = null;
-    (async () => {
-      try {
-        const page = await pdfRef.current.getPage(pageNum);
-        if (cancelled) return;
-        const viewport = page.getViewport({ scale });
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        renderTask = page.render({ canvasContext: ctx, viewport });
-        await renderTask.promise;
-      } catch (e) {
-        // RenderingCancelledException is expected when we cancel on re-render.
-        const name = (e as { name?: string } | null)?.name;
-        if (name !== "RenderingCancelledException") console.error("[PdfViewer render]", e);
-      }
-    })();
-    // Cancel the in-flight render before the next one — pdf.js throws if two
-    // renders hit the same canvas concurrently (caused torn/blank pages).
-    return () => { cancelled = true; try { renderTask?.cancel?.(); } catch { /* noop */ } };
-  }, [status, pageNum, scale]);
+  const scrollToPage = useCallback((n: number) => {
+    const root = scrollRef.current; if (!root) return;
+    const el = root.querySelector(`[data-page="${n}"]`) as HTMLElement | null;
+    if (el) root.scrollTo({ top: el.offsetTop - 8, behavior: "smooth" });
+  }, []);
 
   if (status === "error") {
     return (
@@ -2047,22 +2099,28 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
   }
 
   return (
-    <div className="flex h-full w-full flex-col items-center gap-3">
-      <div className="shrink-0 flex items-center gap-1.5 text-white text-[12px]">
-        <button onClick={() => setPageNum(p => Math.max(1, p - 1))} disabled={pageNum <= 1}
-          className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white/10 disabled:opacity-30 transition-colors">‹</button>
-        <span className="tabular-nums min-w-[72px] text-center">{numPages ? `${pageNum} / ${numPages}` : "…"}</span>
-        <button onClick={() => setPageNum(p => Math.min(numPages, p + 1))} disabled={pageNum >= numPages}
-          className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white/10 disabled:opacity-30 transition-colors">›</button>
+    <div className="flex h-full w-full flex-col">
+      <div className="shrink-0 flex items-center justify-center gap-1.5 pb-2 text-white text-[12px]">
+        <span className="tabular-nums min-w-[64px] text-center">{numPages ? `${activePage} / ${numPages}` : "…"}</span>
         <span className="mx-2 h-4 w-px bg-white/15" />
-        <button onClick={() => setScale(s => Math.max(0.5, +(s - 0.2).toFixed(2)))} className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"><ZoomOutIcon className="h-4 w-4" /></button>
+        <button onClick={() => setScale(s => Math.max(0.5, +(s - 0.2).toFixed(2)))} title={t("card.zoomOut", "Zoom out")} className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"><ZoomOutIcon className="h-4 w-4" /></button>
         <span className="tabular-nums w-10 text-center">{Math.round(scale * 100)}%</span>
-        <button onClick={() => setScale(s => Math.min(3, +(s + 0.2).toFixed(2)))} className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"><ZoomInIcon className="h-4 w-4" /></button>
+        <button onClick={() => setScale(s => Math.min(3, +(s + 0.2).toFixed(2)))} title={t("card.zoomIn", "Zoom in")} className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"><ZoomInIcon className="h-4 w-4" /></button>
       </div>
-      <div className="flex-1 overflow-auto w-full flex justify-center py-2">
-        {status === "loading"
-          ? <div className="flex items-center justify-center text-white/60 text-[13px] h-full">{t("common.loading", "Loading…")}</div>
-          : <canvas ref={canvasRef} className="bg-white rounded shadow-2xl max-w-none" />}
+      <div className="flex-1 min-h-0 flex gap-3">
+        {pdf && numPages > 1 && (
+          <div className="hidden sm:block w-[120px] shrink-0 overflow-y-auto space-y-2 pr-1">
+            {Array.from({ length: numPages }, (_, i) => (
+              <PdfThumb key={i} pdf={pdf} pageNumber={i + 1} active={activePage === i + 1} onClick={() => scrollToPage(i + 1)} />
+            ))}
+          </div>
+        )}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto flex flex-col items-center gap-4 py-1">
+          {status === "loading" && <div className="text-white/60 text-[13px] py-10">{t("common.loading", "Loading…")}</div>}
+          {pdf && Array.from({ length: numPages }, (_, i) => (
+            <PdfPageCanvas key={i} pdf={pdf} pageNumber={i + 1} scale={scale} onActive={setActivePage} />
+          ))}
+        </div>
       </div>
     </div>
   );
