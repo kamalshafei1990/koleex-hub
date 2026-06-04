@@ -2019,8 +2019,10 @@ function PdfPageCanvas({ pdf, pageNumber, scale, rotation, onActive }: {
     return () => { cancelled = true; try { task?.cancel?.(); } catch { /* noop */ } };
   }, [visible, pdf, pageNumber, scale, rotation]);
   return (
-    <div ref={wrapRef} data-page={pageNumber} style={{ minHeight: dims ? dims.h : 420 }} className="w-full flex justify-center">
-      <canvas ref={canvasRef} className="bg-white rounded shadow-2xl max-w-full h-auto" />
+    <div ref={wrapRef} data-page={pageNumber} style={{ minHeight: dims ? dims.h : 420 }} className="flex justify-center">
+      {/* Display the canvas at its exact rendered pixels (no width cap) so the
+          aspect ratio is always correct; the scroll area handles overflow. */}
+      <canvas ref={canvasRef} className="block bg-white rounded shadow-2xl" />
     </div>
   );
 }
@@ -2128,7 +2130,10 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
   const scrollToPage = useCallback((n: number) => {
     const root = scrollRef.current; if (!root) return;
     const el = root.querySelector(`[data-page="${n}"]`) as HTMLElement | null;
-    if (el) root.scrollTo({ top: el.offsetTop - 8, behavior: "smooth" });
+    if (!el) return;
+    // Rect-based so it works regardless of nesting/positioned ancestors.
+    const top = root.scrollTop + el.getBoundingClientRect().top - root.getBoundingClientRect().top - 8;
+    root.scrollTo({ top, behavior: "smooth" });
   }, []);
   const goTo = useCallback((n: number) => {
     const c = Math.min(numPages || 1, Math.max(1, n || 1));
@@ -2209,11 +2214,13 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
             ))}
           </div>
         )}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto flex flex-col items-center gap-4 py-1">
-          {status === "loading" && <div className="text-white/60 text-[13px] py-10">{t("common.loading", "Loading…")}</div>}
-          {pdf && Array.from({ length: numPages }, (_, i) => (
-            <PdfPageCanvas key={i} pdf={pdf} pageNumber={i + 1} scale={scale} rotation={rotation} onActive={setActivePage} />
-          ))}
+        <div ref={scrollRef} className="flex-1 overflow-auto">
+          <div className="min-w-min flex flex-col items-center gap-4 py-1 px-2">
+            {status === "loading" && <div className="text-white/60 text-[13px] py-10">{t("common.loading", "Loading…")}</div>}
+            {pdf && Array.from({ length: numPages }, (_, i) => (
+              <PdfPageCanvas key={i} pdf={pdf} pageNumber={i + 1} scale={scale} rotation={rotation} onActive={setActivePage} />
+            ))}
+          </div>
         </div>
       </div>
     </div>
