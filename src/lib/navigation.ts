@@ -108,17 +108,19 @@ export interface AppDef {
   updatedSince?: string;
 
   /**
-   * Persistent "Ready to use" status badge. Unlike newSince / updatedSince,
-   * this never expires — set it on an app whose build is complete and verified
-   * so users know it's production-ready. NEW / UPDATED (when fresh) take
-   * visual priority over the ready badge.
+   * ISO-date (YYYY-MM-DD) marking when an app was verified production-ready.
+   * Shows a "Ready to use" badge on the tile for one month from that date,
+   * then auto-disappears. NEW / UPDATED (when fresh) take visual priority.
    */
-  ready?: boolean;
+  ready?: string;
 }
 
 /** How long (in ms) a NEW / UPDATED badge stays visible. Single
  *  constant so the rule doesn't drift between call sites. */
 export const APP_BADGE_TTL_MS = 3 * 24 * 60 * 60 * 1000;
+
+/** "Ready to use" badge stays visible for one month, then auto-expires. */
+export const READY_BADGE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 /** Return the badge kind to render on an app tile, or null.
  *  - "new"     → app.newSince within the TTL window
@@ -130,15 +132,15 @@ export function getAppBadge(
   app: AppDef,
   now: number = Date.now(),
 ): "new" | "updated" | "ready" | null {
-  const fresh = (iso: string | undefined): boolean => {
+  const fresh = (iso: string | undefined, ttl: number = APP_BADGE_TTL_MS): boolean => {
     if (!iso) return false;
     const t = Date.parse(iso);
     if (Number.isNaN(t)) return false;
-    return now - t <= APP_BADGE_TTL_MS && now - t >= 0;
+    return now - t <= ttl && now - t >= 0;
   };
   if (fresh(app.newSince)) return "new";
   if (fresh(app.updatedSince)) return "updated";
-  if (app.ready) return "ready";
+  if (fresh(app.ready, READY_BADGE_TTL_MS)) return "ready";
   return null;
 }
 
@@ -169,7 +171,7 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "inventory",        tKey: "app.inventory",        name: "Inventory",         icon: InventoryIcon, route: "/inventory",        active: true,  newSince: "2026-05-17" },
   { id: "purchase",         tKey: "app.purchase",         name: "Purchases",         icon: PurchaseIcon,  route: "/purchase",         active: true,  newSince: "2026-05-26" },
   { id: "landed-cost",      tKey: "app.landed-cost",      name: "Landed Cost",       icon: LandedCostIcon, route: "/landed-cost",     active: true  },
-  { id: "catalogs",         tKey: "app.catalogs",         name: "Catalogs",          icon: CatalogsIcon,  route: "/catalogs",         active: true,  ready: true },
+  { id: "catalogs",         tKey: "app.catalogs",         name: "Catalogs",          icon: CatalogsIcon,  route: "/catalogs",         active: true,  ready: "2026-06-04" },
   { id: "documents",        tKey: "app.documents",        name: "Documents",         icon: DocumentsIcon, route: "/documents",        active: false },
 
   /* ── Commercial ── */
