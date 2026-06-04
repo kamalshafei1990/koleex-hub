@@ -8316,6 +8316,58 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
+            {/* Social Media — company-level WeChat / WeCom presence + social pages.
+                Grouped with the other comms sections (Contact, Contact Persons,
+                Messaging IDs) instead of being stranded near the end of the form. */}
+            <FormSection title={t("section.socialMedia", "Social Media")} icon={<Share2Icon size={14} />} owner={t("owner.marketing")} ownerLabel={t("owner.label")} dept="general" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
+              <div className="space-y-2.5">
+                {/* Structured WeChat / WeCom presence (distinct from per-contact WeChat IDs). */}
+                <Input label={t("field.wechatOfficialAccount", "WeChat Official Account")} value={form.wechat_official_account} onChange={v => setField("wechat_official_account", v)} placeholder={t("placeholder.wechatOfficial", "Official Account name / ID")} icon={<BrandGlyph name="WeChat" size={14} />} />
+                <div className="flex flex-wrap gap-4 text-sm text-[var(--text-muted)] pt-0.5">
+                  <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!form.wechat_sales_group_available} onChange={e => setField("wechat_sales_group_available", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.wechatGroupAvailable", "WeChat group available")}</label>
+                  {form.wechat_sales_group_available && (
+                    <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] p-3 space-y-2.5 mt-1">
+                      <Input
+                        label={t("field.wechatGroupName", "WeChat group name")}
+                        value={form.wechat_group_name}
+                        onChange={v => setField("wechat_group_name", v)}
+                        placeholder={t("placeholder.wechatGroupName", "e.g. Koleex × Supplier — Sales")}
+                        icon={<BrandGlyph name="WeChat" size={14} />}
+                      />
+                      <MultiReasonField
+                        label={t("field.wechatGroupMembers", "Group members (from your team)")}
+                        value={form.wechat_group_members}
+                        onChange={v => setField("wechat_group_members", v)}
+                        placeholder={accountNames.length ? t("placeholder.wechatMembers", "Pick a teammate or type a name") : t("placeholder.wechatMembersEmpty", "Type a name")}
+                        options={accountNames}
+                        icon={<UsersIcon size={14} />}
+                        datalistId="sup-wechat-members-opts"
+                      />
+                    </div>
+                  )}
+                  <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!form.wecom_support_available} onChange={e => setField("wecom_support_available", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.wecomSupport", "WeCom support")}</label>
+                </div>
+                {form.social_profiles.length === 0 && (
+                  <p className="text-[11px] text-[var(--text-faint)]">{t("hint.socialMedia", "Add the factory's social pages — paste a link, page, or @account.")}</p>
+                )}
+                {form.social_profiles.map((s, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <RemoveBtn onClick={() => removeSocial(i)} />
+                    <div className="w-36 shrink-0 sm:w-44">
+                      <PlatformSelect value={s.platform} onChange={v => updateSocial(i, "platform", v)} options={SOCIAL_MEDIA_PLATFORMS} />
+                    </div>
+                    <input
+                      value={s.url}
+                      onChange={e => updateSocial(i, "url", e.target.value)}
+                      placeholder={t("placeholder.socialLink", "Link, page, or @account")}
+                      className="min-w-0 flex-1 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
+                    />
+                  </div>
+                ))}
+                <AddButton label={t("add.socialAccount", "Add social account")} onClick={() => setField("social_profiles", [...form.social_profiles, { platform: "LinkedIn", username: "", url: "", qr_code_url: "" }])} />
+              </div>
+            </FormSection>
+
             {/* Legal Identity — registration & company profile */}
             <FormSection title={t("section.legalIdentity", "Legal Identity")} icon={<Building2Icon size={14} />} owner={t("owner.compliance")} ownerLabel={t("owner.label")} dept="legal" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
               <div className="space-y-3">
@@ -8693,17 +8745,6 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   ))}
                   <AddButton label={t("add.riskItem", "Add risk item")} onClick={addRiskItem} />
                 </div>
-                {/* Sourcing override — manual priority/score + notes (the computed
-                    sourcing score on the 360 page respects the override). */}
-                <div className="space-y-3 border-t border-[var(--border-color)] pt-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.sourcing", "Sourcing")}</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Input label={t("field.sourcingPriority", "Sourcing priority (#)")} value={sIntel.sourcing.sourcing_priority} onChange={(v) => setIntelSourcing("sourcing_priority", v)} inputMode="numeric" placeholder="e.g. 1" />
-                    <Input label={t("field.sourcingScoreOverride", "Sourcing score override (0–100)")} value={sIntel.sourcing.sourcing_score_override} onChange={(v) => setIntelSourcing("sourcing_score_override", v)} inputMode="numeric" placeholder="0–100" />
-                  </div>
-                  <Input label={t("field.sourcingNotes", "Sourcing notes")} value={sIntel.sourcing.sourcing_notes} onChange={(v) => setIntelSourcing("sourcing_notes", v)} />
-                  <Input label={t("field.diversificationNote", "Diversification note")} value={sIntel.sourcing.diversification_note} onChange={(v) => setIntelSourcing("diversification_note", v)} />
-                </div>
               </div>
             </FormSection>
 
@@ -8739,6 +8780,20 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <ScoreSlider label={t("field.negotiationScore", "Negotiation score (0–100)")} value={sIntel.neg.negotiation_score} onChange={(v) => { setNegScoreManual(true); setIntelNeg("negotiation_score", v); }} max={100} isAuto={!negScoreManual} onUseAuto={() => setNegScoreManual(false)} />
                   <Input label={t("field.internalNotes", "Internal notes")} tier="optional" value={sIntel.neg.internal_notes} onChange={(v) => setIntelNeg("internal_notes", v)} />
                 </div>
+              </div>
+            </FormSection>
+
+            {/* Sourcing — manual priority / score override + diversification.
+                Moved out of Risk so it stands as its own commercial-intelligence
+                section (mirrors the 360° detail view, which has a dedicated Sourcing block). */}
+            <FormSection title={t("section.sourcing", "Sourcing")} icon={<TargetIcon size={14} />} owner={t("owner.commercial")} ownerLabel={t("owner.label")} dept="commercial" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Input label={t("field.sourcingPriority", "Sourcing priority (#)")} value={sIntel.sourcing.sourcing_priority} onChange={(v) => setIntelSourcing("sourcing_priority", v)} inputMode="numeric" placeholder="e.g. 1" />
+                  <Input label={t("field.sourcingScoreOverride", "Sourcing score override (0–100)")} value={sIntel.sourcing.sourcing_score_override} onChange={(v) => setIntelSourcing("sourcing_score_override", v)} inputMode="numeric" placeholder="0–100" />
+                </div>
+                <Input label={t("field.sourcingNotes", "Sourcing notes")} value={sIntel.sourcing.sourcing_notes} onChange={(v) => setIntelSourcing("sourcing_notes", v)} />
+                <Input label={t("field.diversificationNote", "Diversification note")} value={sIntel.sourcing.diversification_note} onChange={(v) => setIntelSourcing("diversification_note", v)} />
               </div>
             </FormSection>
 
@@ -8815,57 +8870,6 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   </div>
                 ))}
                 <AddButton label={t("add.document")} onClick={() => setField("documents", [...form.documents, { doc_name: "", name: "", url: "", type: "", uploaded_at: "" }])} />
-              </div>
-            </FormSection>
-
-            {/* Social Media — add as many accounts as needed; each is a
-                platform + a link, page, or @account name. */}
-            <FormSection title={t("section.socialMedia", "Social Media")} icon={<Share2Icon size={14} />} owner={t("owner.marketing")} ownerLabel={t("owner.label")} dept="general" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
-              <div className="space-y-2.5">
-                {/* Structured WeChat / WeCom presence (distinct from per-contact WeChat IDs). */}
-                <Input label={t("field.wechatOfficialAccount", "WeChat Official Account")} value={form.wechat_official_account} onChange={v => setField("wechat_official_account", v)} placeholder={t("placeholder.wechatOfficial", "Official Account name / ID")} icon={<BrandGlyph name="WeChat" size={14} />} />
-                <div className="flex flex-wrap gap-4 text-sm text-[var(--text-muted)] pt-0.5">
-                  <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!form.wechat_sales_group_available} onChange={e => setField("wechat_sales_group_available", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.wechatGroupAvailable", "WeChat group available")}</label>
-                  {form.wechat_sales_group_available && (
-                    <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] p-3 space-y-2.5 mt-1">
-                      <Input
-                        label={t("field.wechatGroupName", "WeChat group name")}
-                        value={form.wechat_group_name}
-                        onChange={v => setField("wechat_group_name", v)}
-                        placeholder={t("placeholder.wechatGroupName", "e.g. Koleex × Supplier — Sales")}
-                        icon={<BrandGlyph name="WeChat" size={14} />}
-                      />
-                      <MultiReasonField
-                        label={t("field.wechatGroupMembers", "Group members (from your team)")}
-                        value={form.wechat_group_members}
-                        onChange={v => setField("wechat_group_members", v)}
-                        placeholder={accountNames.length ? t("placeholder.wechatMembers", "Pick a teammate or type a name") : t("placeholder.wechatMembersEmpty", "Type a name")}
-                        options={accountNames}
-                        icon={<UsersIcon size={14} />}
-                        datalistId="sup-wechat-members-opts"
-                      />
-                    </div>
-                  )}
-                  <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!form.wecom_support_available} onChange={e => setField("wecom_support_available", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.wecomSupport", "WeCom support")}</label>
-                </div>
-                {form.social_profiles.length === 0 && (
-                  <p className="text-[11px] text-[var(--text-faint)]">{t("hint.socialMedia", "Add the factory's social pages — paste a link, page, or @account.")}</p>
-                )}
-                {form.social_profiles.map((s, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <RemoveBtn onClick={() => removeSocial(i)} />
-                    <div className="w-36 shrink-0 sm:w-44">
-                      <PlatformSelect value={s.platform} onChange={v => updateSocial(i, "platform", v)} options={SOCIAL_MEDIA_PLATFORMS} />
-                    </div>
-                    <input
-                      value={s.url}
-                      onChange={e => updateSocial(i, "url", e.target.value)}
-                      placeholder={t("placeholder.socialLink", "Link, page, or @account")}
-                      className="min-w-0 flex-1 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
-                    />
-                  </div>
-                ))}
-                <AddButton label={t("add.socialAccount", "Add social account")} onClick={() => setField("social_profiles", [...form.social_profiles, { platform: "LinkedIn", username: "", url: "", qr_code_url: "" }])} />
               </div>
             </FormSection>
 
