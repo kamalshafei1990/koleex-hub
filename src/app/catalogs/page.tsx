@@ -2092,6 +2092,8 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
   const stageRef = useRef<HTMLDivElement>(null);
   const baseWidthRef = useRef(0);
   const pendingScrollRef = useRef<{ left: number; top: number } | null>(null);
+  const panRef = useRef<{ x: number; y: number; l: number; t: number } | null>(null);
+  const [isPanning, setIsPanning] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -2222,6 +2224,31 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
     try { w?.addEventListener?.("load", () => { try { w.focus(); w.print(); } catch { /* noop */ } }); } catch { /* noop */ }
   };
 
+  // Hand-drag panning (like Preview): grab the page and drag to move when the
+  // content is larger than the viewport.
+  const canPan = () => {
+    const r = scrollRef.current;
+    return !!r && (r.scrollWidth > r.clientWidth + 1 || r.scrollHeight > r.clientHeight + 1);
+  };
+  const onPanDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    const root = scrollRef.current; if (!root || !canPan()) return;
+    panRef.current = { x: e.clientX, y: e.clientY, l: root.scrollLeft, t: root.scrollTop };
+    setIsPanning(true);
+    try { root.setPointerCapture(e.pointerId); } catch { /* noop */ }
+  };
+  const onPanMove = (e: React.PointerEvent) => {
+    const p = panRef.current; const root = scrollRef.current;
+    if (!p || !root) return;
+    root.scrollLeft = p.l - (e.clientX - p.x);
+    root.scrollTop = p.t - (e.clientY - p.y);
+  };
+  const endPan = (e: React.PointerEvent) => {
+    if (!panRef.current) return;
+    panRef.current = null; setIsPanning(false);
+    try { scrollRef.current?.releasePointerCapture(e.pointerId); } catch { /* noop */ }
+  };
+
   if (status === "error") {
     return (
       <div className="flex flex-col items-center gap-4 text-white/70">
@@ -2281,7 +2308,9 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
             ))}
           </div>
         )}
-        <div ref={scrollRef} className="flex-1 overflow-auto">
+        <div ref={scrollRef}
+          onPointerDown={onPanDown} onPointerMove={onPanMove} onPointerUp={endPan} onPointerLeave={endPan}
+          className={`flex-1 overflow-auto ${isPanning ? "cursor-grabbing select-none" : "cursor-grab"}`}>
           {status === "loading" && <div className="text-white/60 text-[13px] py-10 text-center">{t("common.loading", "Loading…")}</div>}
           {/* Sizer reserves the scaled footprint; the stage is rendered at natural
               size and scaled with one GPU transform (instant zoom, no per-page work). */}
