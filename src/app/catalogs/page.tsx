@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
+import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
 import Link from "next/link";
 import FileIcon from "@/components/icons/ui/FileIcon";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
@@ -1980,17 +1980,15 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type PdfDoc = any;
 
-function PdfPageCanvas({ pdf, pageNumber, zoom, rotation, onActive }: {
-  pdf: PdfDoc; pageNumber: number; zoom: number; rotation: number; onActive: (n: number) => void;
+const PdfPageCanvas = React.memo(function PdfPageCanvas({ pdf, pageNumber, quality, rotation, onActive }: {
+  pdf: PdfDoc; pageNumber: number; quality: number; rotation: number; onActive: (n: number) => void;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const taskRef = useRef<any>(null);
-  const renderedScaleRef = useRef(0);
   const [visible, setVisible] = useState(pageNumber <= 2);
   const [base, setBase] = useState<{ w: number; h: number } | null>(null);
-  const dpr = typeof window !== "undefined" ? Math.min(window.devicePixelRatio || 1, 2) : 1;
 
   useEffect(() => {
     const el = wrapRef.current; if (!el) return;
@@ -2004,52 +2002,40 @@ function PdfPageCanvas({ pdf, pageNumber, zoom, rotation, onActive }: {
     return () => io.disconnect();
   }, [pageNumber, onActive]);
 
-  /* Rasterize the page ONCE to a crisp bitmap; zoom is then applied purely via
-     CSS width/height (GPU-fast, instant) so dragging the zoom never re-renders.
-     We only re-rasterize on rotation, or — debounced — when the user settles on
-     a deeper zoom than the current bitmap is sharp for. */
-  const renderAt = useCallback(async (renderScale: number) => {
-    if (!pdf) return;
-    try { taskRef.current?.cancel?.(); } catch { /* noop */ }
-    try {
-      const page = await pdf.getPage(pageNumber);
-      const b1 = page.getViewport({ scale: 1, rotation });
-      setBase({ w: b1.width, h: b1.height });
-      const vp = page.getViewport({ scale: renderScale, rotation });
-      const canvas = canvasRef.current; if (!canvas) return;
-      const ctx = canvas.getContext("2d"); if (!ctx) return;
-      canvas.width = vp.width; canvas.height = vp.height;
-      const task = page.render({ canvasContext: ctx, viewport: vp });
-      taskRef.current = task;
-      await task.promise;
-      renderedScaleRef.current = renderScale;
-    } catch (e) { const n = (e as { name?: string } | null)?.name; if (n !== "RenderingCancelledException") console.error("[PdfPage]", e); }
-  }, [pdf, pageNumber, rotation]);
-
+  /* The page is rasterized at `quality` (a render scale that the parent bumps,
+     debounced, only after the user settles on a zoom). Its CSS size is FIXED at
+     the page's natural points — the parent applies the live zoom via a single
+     GPU transform, so this component does NOT re-render while zooming. */
   useEffect(() => {
     if (!visible || !pdf) return;
-    renderedScaleRef.current = 0;
-    renderAt(Math.max(1.3, dpr * 1.3));
-  }, [visible, pdf, pageNumber, rotation, renderAt, dpr]);
-
-  useEffect(() => {
-    if (!visible || !pdf) return;
-    const target = Math.min(4, +(zoom * dpr).toFixed(2));
-    if (target <= renderedScaleRef.current + 0.15) return; // already sharp enough
-    const id = setTimeout(() => renderAt(target), 220);
-    return () => clearTimeout(id);
-  }, [zoom, visible, pdf, renderAt, dpr]);
+    let alive = true;
+    (async () => {
+      try { taskRef.current?.cancel?.(); } catch { /* noop */ }
+      try {
+        const page = await pdf.getPage(pageNumber);
+        if (!alive) return;
+        const b1 = page.getViewport({ scale: 1, rotation });
+        setBase({ w: b1.width, h: b1.height });
+        const vp = page.getViewport({ scale: quality, rotation });
+        const canvas = canvasRef.current; if (!canvas) return;
+        const ctx = canvas.getContext("2d"); if (!ctx) return;
+        canvas.width = vp.width; canvas.height = vp.height;
+        const task = page.render({ canvasContext: ctx, viewport: vp });
+        taskRef.current = task;
+        await task.promise;
+      } catch (e) { const n = (e as { name?: string } | null)?.name; if (n !== "RenderingCancelledException") console.error("[PdfPage]", e); }
+    })();
+    return () => { alive = false; };
+  }, [visible, pdf, pageNumber, rotation, quality]);
 
   useEffect(() => () => { try { taskRef.current?.cancel?.(); } catch { /* noop */ } }, []);
 
   return (
-    <div ref={wrapRef} data-page={pageNumber} style={{ minHeight: base ? base.h * zoom : 420 }} className="flex justify-center">
-      {/* Canvas is rasterized once; CSS width/height scale it for zoom (instant,
-          ratio-exact since both axes scale by the same factor). */}
-      <canvas ref={canvasRef} style={base ? { width: base.w * zoom, height: base.h * zoom } : undefined} className="block bg-white rounded shadow-2xl" />
+    <div ref={wrapRef} data-page={pageNumber} style={{ minHeight: base ? base.h : 420 }} className="flex justify-center">
+      <canvas ref={canvasRef} style={base ? { width: base.w, height: base.h } : undefined} className="block bg-white rounded shadow-2xl" />
     </div>
   );
-}
+});
 
 function PdfThumb({ pdf, pageNumber, active, onClick }: { pdf: PdfDoc; pageNumber: number; active: boolean; onClick: () => void }) {
   const wrapRef = useRef<HTMLButtonElement>(null);
@@ -2099,9 +2085,13 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
   const [activePage, setActivePage] = useState(1);
   const [pageInput, setPageInput] = useState("1");
   const [fullscreen, setFullscreen] = useState(false);
+  const [quality, setQuality] = useState(1.3);
+  const [stageSize, setStageSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
   const scrollRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
   const baseWidthRef = useRef(0);
+  const pendingScrollRef = useRef<{ left: number; top: number } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -2128,30 +2118,81 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
     return () => document.removeEventListener("fullscreenchange", onFs);
   }, []);
 
-  /* Manual zoom: Ctrl/⌘ + mouse-wheel and trackpad pinch (browsers deliver pinch
-     as a wheel event with ctrlKey=true), plus +/- / 0 keys. The wheel listener is
-     attached natively with passive:false so preventDefault works (React's onWheel
-     is passive and can't stop the page from zooming). */
+  // Track the pages' natural (unscaled) size so the scroll area reserves the
+  // correct space for the GPU-scaled stage at any zoom.
+  useEffect(() => {
+    const el = stageRef.current; if (!el) return;
+    const measure = () => setStageSize({ w: el.scrollWidth, h: el.scrollHeight });
+    const ro = new ResizeObserver(measure);
+    ro.observe(el); measure();
+    return () => ro.disconnect();
+  }, [pdf, numPages, rotation, status]);
+
+  // Re-rasterize pages sharper a beat after the user settles on a zoom (so the
+  // live zoom stays fluid — it's just a CSS transform — yet ends up crisp).
+  useEffect(() => {
+    const dpr = typeof window !== "undefined" ? Math.min(window.devicePixelRatio || 1, 2) : 1;
+    const target = Math.min(4, +(scale * dpr).toFixed(2));
+    const id = setTimeout(() => setQuality(q => (target > q + 0.15 ? target : q)), 200);
+    return () => clearTimeout(id);
+  }, [scale]);
+
+  // After a zoom resizes the stage, restore the scroll offset that keeps the
+  // anchor (cursor, or viewport centre) fixed — applied before paint.
+  useLayoutEffect(() => {
+    const p = pendingScrollRef.current; const root = scrollRef.current;
+    if (p && root) { root.scrollLeft = Math.max(0, p.left); root.scrollTop = Math.max(0, p.top); pendingScrollRef.current = null; }
+  }, [scale]);
+
+  const clampZoom = useCallback((z: number) => Math.max(0.3, Math.min(4, +z.toFixed(3))), []);
+  const zoomBy = useCallback((factor: number, clientX?: number, clientY?: number) => {
+    const root = scrollRef.current;
+    setScale(prev => {
+      const next = clampZoom(prev * factor);
+      if (root && next !== prev) {
+        const rect = root.getBoundingClientRect();
+        const ox = clientX != null ? clientX - rect.left : root.clientWidth / 2;
+        const oy = clientY != null ? clientY - rect.top : root.clientHeight / 2;
+        const ratio = next / prev;
+        pendingScrollRef.current = { left: (root.scrollLeft + ox) * ratio - ox, top: (root.scrollTop + oy) * ratio - oy };
+      }
+      return next;
+    });
+  }, [clampZoom]);
+  const zoomTo = useCallback((value: number) => {
+    const root = scrollRef.current;
+    setScale(prev => {
+      const next = clampZoom(value);
+      if (root && next !== prev) {
+        const ox = root.clientWidth / 2, oy = root.clientHeight / 2;
+        const ratio = next / prev;
+        pendingScrollRef.current = { left: (root.scrollLeft + ox) * ratio - ox, top: (root.scrollTop + oy) * ratio - oy };
+      }
+      return next;
+    });
+  }, [clampZoom]);
+
+  /* Manual zoom anchored at the cursor: Ctrl/⌘ + wheel and trackpad pinch
+     (delivered as ctrlKey wheel), plus +/- / 0 keys. Native non-passive listener
+     so preventDefault stops the browser's own page zoom. */
   useEffect(() => {
     const el = scrollRef.current; if (!el) return;
-    const clampZoom = (z: number) => Math.max(0.3, Math.min(4, +z.toFixed(3)));
     const onWheel = (e: WheelEvent) => {
       if (!(e.ctrlKey || e.metaKey)) return;
       e.preventDefault();
-      // Multiplicative (proportional) zoom feels smooth like a native viewer.
-      setScale(s => clampZoom(s * Math.exp(-e.deltaY * 0.0015)));
+      zoomBy(Math.exp(-e.deltaY * 0.0015), e.clientX, e.clientY);
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
-      if (e.key === "+" || e.key === "=") { e.preventDefault(); setScale(s => clampZoom(s * 1.2)); }
-      else if (e.key === "-" || e.key === "_") { e.preventDefault(); setScale(s => clampZoom(s / 1.2)); }
-      else if (e.key === "0") { e.preventDefault(); setScale(1); }
+      if (e.key === "+" || e.key === "=") { e.preventDefault(); zoomBy(1.2); }
+      else if (e.key === "-" || e.key === "_") { e.preventDefault(); zoomBy(1 / 1.2); }
+      else if (e.key === "0") { e.preventDefault(); zoomTo(1); }
     };
     window.addEventListener("keydown", onKey);
     return () => { el.removeEventListener("wheel", onWheel); window.removeEventListener("keydown", onKey); };
-  }, [status]);
+  }, [status, zoomBy, zoomTo]);
 
   const scrollToPage = useCallback((n: number) => {
     const root = scrollRef.current; if (!root) return;
@@ -2168,8 +2209,8 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
   const fitWidth = () => {
     const root = scrollRef.current; const bw = baseWidthRef.current;
     if (!root || !bw) return;
-    const avail = root.clientWidth - (numPages > 1 ? 24 : 24);
-    setScale(Math.max(0.3, Math.min(3, +(avail / bw).toFixed(2))));
+    const avail = root.clientWidth - 24;
+    zoomTo(Math.max(0.3, Math.min(4, +(avail / bw).toFixed(3))));
   };
   const toggleFullscreen = () => {
     const el = rootRef.current; if (!el) return;
@@ -2215,12 +2256,12 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
           <button className={btn} onClick={() => goTo(activePage + 1)} disabled={activePage >= numPages} title={t("preview.nextPage", "Next page")}><AngleRightIcon className="h-4 w-4 rtl:rotate-180" /></button>
         </div>
         <div className={grp}>
-          <button className={btn} onClick={() => setScale(s => Math.max(0.3, +(s / 1.2).toFixed(3)))} title={t("card.zoomOut", "Zoom out")}><ZoomOutIcon className="h-4 w-4" /></button>
+          <button className={btn} onClick={() => zoomBy(1 / 1.2)} title={t("card.zoomOut", "Zoom out")}><ZoomOutIcon className="h-4 w-4" /></button>
           <span className="text-[12px] text-white/80 tabular-nums w-11 text-center">{Math.round(scale * 100)}%</span>
-          <button className={btn} onClick={() => setScale(s => Math.min(4, +(s * 1.2).toFixed(3)))} title={t("card.zoomIn", "Zoom in")}><ZoomInIcon className="h-4 w-4" /></button>
+          <button className={btn} onClick={() => zoomBy(1.2)} title={t("card.zoomIn", "Zoom in")}><ZoomInIcon className="h-4 w-4" /></button>
           <span className="mx-0.5 h-4 w-px bg-white/15" />
           <button className={btn} onClick={fitWidth} title={t("preview.fitWidth", "Fit width")}><span className="text-[11px] font-medium px-0.5">{t("preview.fit", "Fit")}</span></button>
-          <button className={btn} onClick={() => setScale(1)} title={t("preview.actualSize", "Actual size")}><span className="text-[11px] font-medium px-0.5">100%</span></button>
+          <button className={btn} onClick={() => zoomTo(1)} title={t("preview.actualSize", "Actual size")}><span className="text-[11px] font-medium px-0.5">100%</span></button>
           <button className={btn} onClick={() => setRotation(r => (r + 90) % 360)} title={t("preview.rotate", "Rotate")}>
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7" /><polyline points="21 3 21 9 15 9" /></svg>
           </button>
@@ -2241,11 +2282,17 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
           </div>
         )}
         <div ref={scrollRef} className="flex-1 overflow-auto">
-          <div className="min-w-min flex flex-col items-center gap-4 py-1 px-2">
-            {status === "loading" && <div className="text-white/60 text-[13px] py-10">{t("common.loading", "Loading…")}</div>}
-            {pdf && Array.from({ length: numPages }, (_, i) => (
-              <PdfPageCanvas key={i} pdf={pdf} pageNumber={i + 1} zoom={scale} rotation={rotation} onActive={setActivePage} />
-            ))}
+          {status === "loading" && <div className="text-white/60 text-[13px] py-10 text-center">{t("common.loading", "Loading…")}</div>}
+          {/* Sizer reserves the scaled footprint; the stage is rendered at natural
+              size and scaled with one GPU transform (instant zoom, no per-page work). */}
+          <div style={stageSize.w ? { width: stageSize.w * scale, height: stageSize.h * scale } : undefined} className="relative mx-auto">
+            <div ref={stageRef}
+              style={{ transform: `scale(${scale})`, transformOrigin: "0 0", ...(stageSize.w ? { position: "absolute", top: 0, left: 0 } : {}) }}
+              className="w-max flex flex-col items-center gap-4 py-1 px-2">
+              {pdf && Array.from({ length: numPages }, (_, i) => (
+                <PdfPageCanvas key={i} pdf={pdf} pageNumber={i + 1} quality={quality} rotation={rotation} onActive={setActivePage} />
+              ))}
+            </div>
           </div>
         </div>
       </div>
