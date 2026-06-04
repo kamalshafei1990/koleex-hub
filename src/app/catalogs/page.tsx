@@ -1656,31 +1656,35 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
     if (coverBackfillTried.has(catalog.id)) return;
     coverBackfillTried.add(catalog.id);
     let alive = true;
+    let objUrl: string | null = null;
     (async () => {
-      const blob = await pdfUrlFirstPageBlob(catalog.file_url);
-      if (!blob || !alive) return;
-      setLazyCover(URL.createObjectURL(blob));
       try {
+        const blob = await pdfUrlFirstPageBlob(catalog.file_url);
+        if (!blob) { coverBackfillTried.delete(catalog.id); return; } // allow a later retry
+        if (!alive) return;
+        objUrl = URL.createObjectURL(blob);
+        setLazyCover(objUrl);
         const fd = new FormData();
         fd.append("file", blob, `${catalog.id}.cover.jpg`);
         fd.append("bucket", "media");
-        fd.append("path", `catalog-covers/${catalog.id}.jpg`);
+        fd.append("path", `catalogs/covers/${catalog.id}.jpg`);
         fd.append("contentType", "image/jpeg");
         fd.append("upsert", "true");
         const up = await fetch("/api/storage/upload", { method: "POST", body: fd });
-        if (up.ok) {
-          const j = await up.json();
-          if (j.publicUrl) {
-            await fetch(`/api/catalogs/${catalog.id}`, {
-              method: "PATCH", credentials: "include",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ cover_url: j.publicUrl, cover_path: j.path }),
-            });
-          }
+        if (!up.ok) throw new Error(`upload ${up.status}`);
+        const j = await up.json();
+        if (j.publicUrl) {
+          await fetch(`/api/catalogs/${catalog.id}`, {
+            method: "PATCH", credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cover_url: j.publicUrl, cover_path: j.path }),
+          });
         }
-      } catch { /* best-effort persist */ }
+      } catch {
+        coverBackfillTried.delete(catalog.id); // transient failure — allow retry on a later mount
+      }
     })();
-    return () => { alive = false; };
+    return () => { alive = false; if (objUrl) URL.revokeObjectURL(objUrl); };
   }, [catalog.id, catalog.file_type, catalog.cover_url, catalog.file_url]);
 
   const coverUrl = catalog.cover_url || lazyCover || (isImageFile(catalog.file_type) ? catalog.file_url : null);
@@ -1848,31 +1852,35 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
     if (coverBackfillTried.has(catalog.id)) return;
     coverBackfillTried.add(catalog.id);
     let alive = true;
+    let objUrl: string | null = null;
     (async () => {
-      const blob = await pdfUrlFirstPageBlob(catalog.file_url);
-      if (!blob || !alive) return;
-      setLazyCover(URL.createObjectURL(blob));
       try {
+        const blob = await pdfUrlFirstPageBlob(catalog.file_url);
+        if (!blob) { coverBackfillTried.delete(catalog.id); return; } // allow a later retry
+        if (!alive) return;
+        objUrl = URL.createObjectURL(blob);
+        setLazyCover(objUrl);
         const fd = new FormData();
         fd.append("file", blob, `${catalog.id}.cover.jpg`);
         fd.append("bucket", "media");
-        fd.append("path", `catalog-covers/${catalog.id}.jpg`);
+        fd.append("path", `catalogs/covers/${catalog.id}.jpg`);
         fd.append("contentType", "image/jpeg");
         fd.append("upsert", "true");
         const up = await fetch("/api/storage/upload", { method: "POST", body: fd });
-        if (up.ok) {
-          const j = await up.json();
-          if (j.publicUrl) {
-            await fetch(`/api/catalogs/${catalog.id}`, {
-              method: "PATCH", credentials: "include",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ cover_url: j.publicUrl, cover_path: j.path }),
-            });
-          }
+        if (!up.ok) throw new Error(`upload ${up.status}`);
+        const j = await up.json();
+        if (j.publicUrl) {
+          await fetch(`/api/catalogs/${catalog.id}`, {
+            method: "PATCH", credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cover_url: j.publicUrl, cover_path: j.path }),
+          });
         }
-      } catch { /* best-effort persist */ }
+      } catch {
+        coverBackfillTried.delete(catalog.id); // transient failure — allow retry on a later mount
+      }
     })();
-    return () => { alive = false; };
+    return () => { alive = false; if (objUrl) URL.revokeObjectURL(objUrl); };
   }, [catalog.id, catalog.file_type, catalog.cover_url, catalog.file_url]);
 
   const coverUrl = catalog.cover_url || lazyCover || (isImageFile(catalog.file_type) ? catalog.file_url : null);
@@ -1983,12 +1991,20 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
         if (alive) setStatus("error");
       }
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+      // Free the pdf.js worker transport + page caches when the viewer closes
+      // or the url changes — otherwise large PDFs leak on rapid open/close.
+      try { pdfRef.current?.destroy?.(); } catch { /* noop */ }
+      pdfRef.current = null;
+    };
   }, [url]);
 
   useEffect(() => {
     if (status !== "ready" || !pdfRef.current) return;
     let cancelled = false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let renderTask: any = null;
     (async () => {
       try {
         const page = await pdfRef.current.getPage(pageNum);
@@ -2000,10 +2016,17 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
         if (!ctx) return;
         canvas.width = viewport.width;
         canvas.height = viewport.height;
-        await page.render({ canvasContext: ctx, viewport }).promise;
-      } catch (e) { console.error("[PdfViewer render]", e); }
+        renderTask = page.render({ canvasContext: ctx, viewport });
+        await renderTask.promise;
+      } catch (e) {
+        // RenderingCancelledException is expected when we cancel on re-render.
+        const name = (e as { name?: string } | null)?.name;
+        if (name !== "RenderingCancelledException") console.error("[PdfViewer render]", e);
+      }
     })();
-    return () => { cancelled = true; };
+    // Cancel the in-flight render before the next one — pdf.js throws if two
+    // renders hit the same canvas concurrently (caused torn/blank pages).
+    return () => { cancelled = true; try { renderTask?.cancel?.(); } catch { /* noop */ } };
   }, [status, pageNum, scale]);
 
   if (status === "error") {
@@ -2136,6 +2159,9 @@ export default function CatalogsPage() {
   const [previewCatalog, setPreviewCatalog] = useState<CatalogEntry | null>(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showInsights, setShowInsights] = useState(false);
+  /* Render-stable "now" so the insights memo stays idempotent (calling Date.now()
+     directly during render is flagged impure by the React compiler). */
+  const [nowTs] = useState(() => Date.now());
 
   const [uploadModal, setUploadModal] = useState<{ open: boolean; editEntry: CatalogEntry | null }>({ open: false, editEntry: null });
   const [deleteModal, setDeleteModal] = useState<{ open: boolean; catalog: CatalogEntry | null }>({ open: false, catalog: null });
@@ -2344,7 +2370,7 @@ export default function CatalogsPage() {
   const insights = useMemo(() => {
     const totalViews = catalogs.reduce((s, c) => s + (c.view_count ?? 0), 0);
     const totalDownloads = catalogs.reduce((s, c) => s + (c.download_count ?? 0), 0);
-    const cutoff = Date.now() - 30 * 864e5;
+    const cutoff = nowTs - 30 * 864e5;
     const recent = catalogs.filter(c => new Date(c.created_at).getTime() >= cutoff).length;
 
     const divMap = new Map<string, number>();
@@ -2357,7 +2383,7 @@ export default function CatalogsPage() {
     const mostViewed = [...catalogs].filter(c => (c.view_count ?? 0) > 0).sort((a, b) => (b.view_count ?? 0) - (a.view_count ?? 0)).slice(0, 5);
     const mostDownloaded = [...catalogs].filter(c => (c.download_count ?? 0) > 0).sort((a, b) => (b.download_count ?? 0) - (a.download_count ?? 0)).slice(0, 5);
     return { totalViews, totalDownloads, recent, byDivision, mostViewed, mostDownloaded };
-  }, [catalogs, t]);
+  }, [catalogs, t, nowTs]);
 
   // Record a usage metric: optimistic local bump + fire-and-forget server write.
   const bumpMetric = useCallback((id: string, metric: "view" | "download") => {
@@ -2385,10 +2411,9 @@ export default function CatalogsPage() {
   const handleBulkDelete = async () => {
     setBulkDeleting(true);
     const targets = catalogs.filter(c => selected.has(c.id));
-    await Promise.all(targets.map(async (c) => {
-      await deleteCatalog(c.id);
-      if (c.contact_id) await removeCatalogFromContact(c.contact_id, c.file_url);
-    }));
+    // Server DELETE removes the supplier-mirror entry too (two-way sync), so no
+    // client-side removeCatalogFromContact here — that double-removed and raced.
+    await Promise.all(targets.map((c) => deleteCatalog(c.id)));
     setBulkDeleting(false);
     clearSelection();
     loadAll();
@@ -2398,13 +2423,11 @@ export default function CatalogsPage() {
     if (!deleteModal.catalog) return;
     setDeleting(true);
     const cat = deleteModal.catalog;
-    await deleteCatalog(cat.id);
-    // Remove from supplier/company contact
-    if (cat.contact_id) {
-      removeCatalogFromContact(cat.contact_id, cat.file_url);
-    }
+    await deleteCatalog(cat.id); // server also removes the supplier mirror
     setDeleting(false);
     setDeleteModal({ open: false, catalog: null });
+    // Drop the deleted id from any active selection so the bulk bar isn't stale.
+    setSelected(prev => { if (!prev.has(cat.id)) return prev; const n = new Set(prev); n.delete(cat.id); return n; });
     loadAll();
   };
 
