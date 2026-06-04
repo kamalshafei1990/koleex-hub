@@ -1980,13 +1980,18 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type PdfDoc = any;
 
-function PdfPageCanvas({ pdf, pageNumber, scale, rotation, onActive }: {
-  pdf: PdfDoc; pageNumber: number; scale: number; rotation: number; onActive: (n: number) => void;
+function PdfPageCanvas({ pdf, pageNumber, zoom, rotation, onActive }: {
+  pdf: PdfDoc; pageNumber: number; zoom: number; rotation: number; onActive: (n: number) => void;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const taskRef = useRef<any>(null);
+  const renderedScaleRef = useRef(0);
   const [visible, setVisible] = useState(pageNumber <= 2);
-  const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
+  const [base, setBase] = useState<{ w: number; h: number } | null>(null);
+  const dpr = typeof window !== "undefined" ? Math.min(window.devicePixelRatio || 1, 2) : 1;
+
   useEffect(() => {
     const el = wrapRef.current; if (!el) return;
     const io = new IntersectionObserver((entries) => {
@@ -1994,35 +1999,54 @@ function PdfPageCanvas({ pdf, pageNumber, scale, rotation, onActive }: {
         if (e.isIntersecting) setVisible(true);
         if (e.isIntersecting && e.intersectionRatio >= 0.5) onActive(pageNumber);
       }
-    }, { rootMargin: "400px 0px", threshold: [0.01, 0.5] });
+    }, { rootMargin: "600px 0px", threshold: [0.01, 0.5] });
     io.observe(el);
     return () => io.disconnect();
   }, [pageNumber, onActive]);
+
+  /* Rasterize the page ONCE to a crisp bitmap; zoom is then applied purely via
+     CSS width/height (GPU-fast, instant) so dragging the zoom never re-renders.
+     We only re-rasterize on rotation, or — debounced — when the user settles on
+     a deeper zoom than the current bitmap is sharp for. */
+  const renderAt = useCallback(async (renderScale: number) => {
+    if (!pdf) return;
+    try { taskRef.current?.cancel?.(); } catch { /* noop */ }
+    try {
+      const page = await pdf.getPage(pageNumber);
+      const b1 = page.getViewport({ scale: 1, rotation });
+      setBase({ w: b1.width, h: b1.height });
+      const vp = page.getViewport({ scale: renderScale, rotation });
+      const canvas = canvasRef.current; if (!canvas) return;
+      const ctx = canvas.getContext("2d"); if (!ctx) return;
+      canvas.width = vp.width; canvas.height = vp.height;
+      const task = page.render({ canvasContext: ctx, viewport: vp });
+      taskRef.current = task;
+      await task.promise;
+      renderedScaleRef.current = renderScale;
+    } catch (e) { const n = (e as { name?: string } | null)?.name; if (n !== "RenderingCancelledException") console.error("[PdfPage]", e); }
+  }, [pdf, pageNumber, rotation]);
+
   useEffect(() => {
     if (!visible || !pdf) return;
-    let cancelled = false;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let task: any = null;
-    (async () => {
-      try {
-        const page = await pdf.getPage(pageNumber);
-        if (cancelled) return;
-        const viewport = page.getViewport({ scale, rotation });
-        setDims({ w: viewport.width, h: viewport.height });
-        const canvas = canvasRef.current; if (!canvas) return;
-        const ctx = canvas.getContext("2d"); if (!ctx) return;
-        canvas.width = viewport.width; canvas.height = viewport.height;
-        task = page.render({ canvasContext: ctx, viewport });
-        await task.promise;
-      } catch (e) { const n = (e as { name?: string } | null)?.name; if (n !== "RenderingCancelledException") console.error("[PdfPage]", e); }
-    })();
-    return () => { cancelled = true; try { task?.cancel?.(); } catch { /* noop */ } };
-  }, [visible, pdf, pageNumber, scale, rotation]);
+    renderedScaleRef.current = 0;
+    renderAt(Math.max(1.3, dpr * 1.3));
+  }, [visible, pdf, pageNumber, rotation, renderAt, dpr]);
+
+  useEffect(() => {
+    if (!visible || !pdf) return;
+    const target = Math.min(4, +(zoom * dpr).toFixed(2));
+    if (target <= renderedScaleRef.current + 0.15) return; // already sharp enough
+    const id = setTimeout(() => renderAt(target), 220);
+    return () => clearTimeout(id);
+  }, [zoom, visible, pdf, renderAt, dpr]);
+
+  useEffect(() => () => { try { taskRef.current?.cancel?.(); } catch { /* noop */ } }, []);
+
   return (
-    <div ref={wrapRef} data-page={pageNumber} style={{ minHeight: dims ? dims.h : 420 }} className="flex justify-center">
-      {/* Display the canvas at its exact rendered pixels (no width cap) so the
-          aspect ratio is always correct; the scroll area handles overflow. */}
-      <canvas ref={canvasRef} className="block bg-white rounded shadow-2xl" />
+    <div ref={wrapRef} data-page={pageNumber} style={{ minHeight: base ? base.h * zoom : 420 }} className="flex justify-center">
+      {/* Canvas is rasterized once; CSS width/height scale it for zoom (instant,
+          ratio-exact since both axes scale by the same factor). */}
+      <canvas ref={canvasRef} style={base ? { width: base.w * zoom, height: base.h * zoom } : undefined} className="block bg-white rounded shadow-2xl" />
     </div>
   );
 }
@@ -2110,17 +2134,19 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
      is passive and can't stop the page from zooming). */
   useEffect(() => {
     const el = scrollRef.current; if (!el) return;
+    const clampZoom = (z: number) => Math.max(0.3, Math.min(4, +z.toFixed(3)));
     const onWheel = (e: WheelEvent) => {
       if (!(e.ctrlKey || e.metaKey)) return;
       e.preventDefault();
-      setScale(s => Math.max(0.3, Math.min(4, +(s - e.deltaY * 0.0025).toFixed(2))));
+      // Multiplicative (proportional) zoom feels smooth like a native viewer.
+      setScale(s => clampZoom(s * Math.exp(-e.deltaY * 0.0015)));
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
-      if (e.key === "+" || e.key === "=") { e.preventDefault(); setScale(s => Math.min(4, +(s + 0.2).toFixed(2))); }
-      else if (e.key === "-" || e.key === "_") { e.preventDefault(); setScale(s => Math.max(0.3, +(s - 0.2).toFixed(2))); }
+      if (e.key === "+" || e.key === "=") { e.preventDefault(); setScale(s => clampZoom(s * 1.2)); }
+      else if (e.key === "-" || e.key === "_") { e.preventDefault(); setScale(s => clampZoom(s / 1.2)); }
       else if (e.key === "0") { e.preventDefault(); setScale(1); }
     };
     window.addEventListener("keydown", onKey);
@@ -2189,9 +2215,9 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
           <button className={btn} onClick={() => goTo(activePage + 1)} disabled={activePage >= numPages} title={t("preview.nextPage", "Next page")}><AngleRightIcon className="h-4 w-4 rtl:rotate-180" /></button>
         </div>
         <div className={grp}>
-          <button className={btn} onClick={() => setScale(s => Math.max(0.4, +(s - 0.2).toFixed(2)))} title={t("card.zoomOut", "Zoom out")}><ZoomOutIcon className="h-4 w-4" /></button>
+          <button className={btn} onClick={() => setScale(s => Math.max(0.3, +(s / 1.2).toFixed(3)))} title={t("card.zoomOut", "Zoom out")}><ZoomOutIcon className="h-4 w-4" /></button>
           <span className="text-[12px] text-white/80 tabular-nums w-11 text-center">{Math.round(scale * 100)}%</span>
-          <button className={btn} onClick={() => setScale(s => Math.min(3, +(s + 0.2).toFixed(2)))} title={t("card.zoomIn", "Zoom in")}><ZoomInIcon className="h-4 w-4" /></button>
+          <button className={btn} onClick={() => setScale(s => Math.min(4, +(s * 1.2).toFixed(3)))} title={t("card.zoomIn", "Zoom in")}><ZoomInIcon className="h-4 w-4" /></button>
           <span className="mx-0.5 h-4 w-px bg-white/15" />
           <button className={btn} onClick={fitWidth} title={t("preview.fitWidth", "Fit width")}><span className="text-[11px] font-medium px-0.5">{t("preview.fit", "Fit")}</span></button>
           <button className={btn} onClick={() => setScale(1)} title={t("preview.actualSize", "Actual size")}><span className="text-[11px] font-medium px-0.5">100%</span></button>
@@ -2218,7 +2244,7 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
           <div className="min-w-min flex flex-col items-center gap-4 py-1 px-2">
             {status === "loading" && <div className="text-white/60 text-[13px] py-10">{t("common.loading", "Loading…")}</div>}
             {pdf && Array.from({ length: numPages }, (_, i) => (
-              <PdfPageCanvas key={i} pdf={pdf} pageNumber={i + 1} scale={scale} rotation={rotation} onActive={setActivePage} />
+              <PdfPageCanvas key={i} pdf={pdf} pageNumber={i + 1} zoom={scale} rotation={rotation} onActive={setActivePage} />
             ))}
           </div>
         </div>
