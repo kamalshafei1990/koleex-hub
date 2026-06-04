@@ -38,6 +38,11 @@ import CheckIcon from "@/components/icons/ui/CheckIcon";
 import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 import ZoomInIcon from "@/components/icons/ui/ZoomInIcon";
 import ZoomOutIcon from "@/components/icons/ui/ZoomOutIcon";
+import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
+import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
+import Maximize2Icon from "@/components/icons/ui/Maximize2Icon";
+import PrinterIcon from "@/components/icons/ui/PrinterIcon";
+import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
 import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
 import BrandGlyph from "@/components/icons/brands/BrandGlyph";
 import {
@@ -144,6 +149,15 @@ const T: Translations = {
   "preview.pdfError":     { en: "Couldn't display this PDF here.", zh: "无法在此处显示此 PDF。", ar: "تعذّر عرض ملف PDF هنا." },
   "preview.openTab":      { en: "Open in new tab", zh: "在新标签页打开", ar: "فتح في علامة تبويب جديدة" },
   "common.loading":       { en: "Loading…", zh: "加载中…", ar: "جارٍ التحميل…" },
+  "preview.prevPage":     { en: "Previous page", zh: "上一页", ar: "الصفحة السابقة" },
+  "preview.nextPage":     { en: "Next page", zh: "下一页", ar: "الصفحة التالية" },
+  "preview.page":         { en: "Page", zh: "页", ar: "صفحة" },
+  "preview.fit":          { en: "Fit", zh: "适合", ar: "ملاءمة" },
+  "preview.fitWidth":     { en: "Fit width", zh: "适合宽度", ar: "ملاءمة العرض" },
+  "preview.actualSize":   { en: "Actual size", zh: "实际大小", ar: "الحجم الفعلي" },
+  "preview.rotate":       { en: "Rotate", zh: "旋转", ar: "تدوير" },
+  "preview.print":        { en: "Print", zh: "打印", ar: "طباعة" },
+  "preview.fullscreen":   { en: "Fullscreen", zh: "全屏", ar: "ملء الشاشة" },
   "cat.loadMore":         { en: "Load more ({n})", zh: "加载更多（{n}）", ar: "تحميل المزيد ({n})" },
   "modal.descPlaceholder":{ en: "Optional notes about this catalog", zh: "关于此目录的可选备注", ar: "ملاحظات اختيارية حول هذا الكتالوج" },
   "modal.saveChanges":    { en: "Save Changes", zh: "保存更改", ar: "حفظ التغييرات" },
@@ -1966,8 +1980,8 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type PdfDoc = any;
 
-function PdfPageCanvas({ pdf, pageNumber, scale, onActive }: {
-  pdf: PdfDoc; pageNumber: number; scale: number; onActive: (n: number) => void;
+function PdfPageCanvas({ pdf, pageNumber, scale, rotation, onActive }: {
+  pdf: PdfDoc; pageNumber: number; scale: number; rotation: number; onActive: (n: number) => void;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -1993,7 +2007,7 @@ function PdfPageCanvas({ pdf, pageNumber, scale, onActive }: {
       try {
         const page = await pdf.getPage(pageNumber);
         if (cancelled) return;
-        const viewport = page.getViewport({ scale });
+        const viewport = page.getViewport({ scale, rotation });
         setDims({ w: viewport.width, h: viewport.height });
         const canvas = canvasRef.current; if (!canvas) return;
         const ctx = canvas.getContext("2d"); if (!ctx) return;
@@ -2003,7 +2017,7 @@ function PdfPageCanvas({ pdf, pageNumber, scale, onActive }: {
       } catch (e) { const n = (e as { name?: string } | null)?.name; if (n !== "RenderingCancelledException") console.error("[PdfPage]", e); }
     })();
     return () => { cancelled = true; try { task?.cancel?.(); } catch { /* noop */ } };
-  }, [visible, pdf, pageNumber, scale]);
+  }, [visible, pdf, pageNumber, scale, rotation]);
   return (
     <div ref={wrapRef} data-page={pageNumber} style={{ minHeight: dims ? dims.h : 420 }} className="w-full flex justify-center">
       <canvas ref={canvasRef} className="bg-white rounded shadow-2xl max-w-full h-auto" />
@@ -2054,14 +2068,19 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
   const [pdf, setPdf] = useState<PdfDoc>(null);
   const [numPages, setNumPages] = useState(0);
   const [scale, setScale] = useState(1.1);
+  const [rotation, setRotation] = useState(0);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [activePage, setActivePage] = useState(1);
+  const [pageInput, setPageInput] = useState("1");
+  const [fullscreen, setFullscreen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const baseWidthRef = useRef(0);
 
   useEffect(() => {
     let alive = true;
     let doc: PdfDoc = null;
-    setStatus("loading"); setPdf(null); setNumPages(0); setActivePage(1);
+    setStatus("loading"); setPdf(null); setNumPages(0); setActivePage(1); setRotation(0);
     (async () => {
       try {
         await ensurePdfJs();
@@ -2069,17 +2088,44 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
         const lib = (window as any).pdfjsLib;
         doc = await lib.getDocument({ url }).promise;
         if (!alive) { try { doc.destroy?.(); } catch { /* noop */ } return; }
+        try { const p1 = await doc.getPage(1); baseWidthRef.current = p1.getViewport({ scale: 1 }).width; } catch { /* noop */ }
         setPdf(doc); setNumPages(doc.numPages); setStatus("ready");
       } catch (e) { console.error("[PdfViewer load]", e); if (alive) setStatus("error"); }
     })();
     return () => { alive = false; try { doc?.destroy?.(); } catch { /* noop */ } };
   }, [url]);
 
+  useEffect(() => { setPageInput(String(activePage)); }, [activePage]);
+  useEffect(() => {
+    const onFs = () => setFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onFs);
+    return () => document.removeEventListener("fullscreenchange", onFs);
+  }, []);
+
   const scrollToPage = useCallback((n: number) => {
     const root = scrollRef.current; if (!root) return;
     const el = root.querySelector(`[data-page="${n}"]`) as HTMLElement | null;
     if (el) root.scrollTo({ top: el.offsetTop - 8, behavior: "smooth" });
   }, []);
+  const goTo = useCallback((n: number) => {
+    const c = Math.min(numPages || 1, Math.max(1, n || 1));
+    setActivePage(c); scrollToPage(c);
+  }, [numPages, scrollToPage]);
+  const fitWidth = () => {
+    const root = scrollRef.current; const bw = baseWidthRef.current;
+    if (!root || !bw) return;
+    const avail = root.clientWidth - (numPages > 1 ? 24 : 24);
+    setScale(Math.max(0.3, Math.min(3, +(avail / bw).toFixed(2))));
+  };
+  const toggleFullscreen = () => {
+    const el = rootRef.current; if (!el) return;
+    if (!document.fullscreenElement) el.requestFullscreen?.().catch(() => {});
+    else document.exitFullscreen?.().catch(() => {});
+  };
+  const printDoc = () => {
+    const w = window.open(url, "_blank");
+    try { w?.addEventListener?.("load", () => { try { w.focus(); w.print(); } catch { /* noop */ } }); } catch { /* noop */ }
+  };
 
   if (status === "error") {
     return (
@@ -2098,27 +2144,52 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
     );
   }
 
+  const btn = "h-8 min-w-8 px-2 rounded-lg flex items-center justify-center gap-1 text-white/90 hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent transition-colors";
+  const grp = "flex items-center gap-0.5 rounded-xl bg-white/[0.06] border border-white/10 px-1 py-1";
+
   return (
-    <div className="flex h-full w-full flex-col">
-      <div className="shrink-0 flex items-center justify-center gap-1.5 pb-2 text-white text-[12px]">
-        <span className="tabular-nums min-w-[64px] text-center">{numPages ? `${activePage} / ${numPages}` : "…"}</span>
-        <span className="mx-2 h-4 w-px bg-white/15" />
-        <button onClick={() => setScale(s => Math.max(0.5, +(s - 0.2).toFixed(2)))} title={t("card.zoomOut", "Zoom out")} className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"><ZoomOutIcon className="h-4 w-4" /></button>
-        <span className="tabular-nums w-10 text-center">{Math.round(scale * 100)}%</span>
-        <button onClick={() => setScale(s => Math.min(3, +(s + 0.2).toFixed(2)))} title={t("card.zoomIn", "Zoom in")} className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"><ZoomInIcon className="h-4 w-4" /></button>
+    <div ref={rootRef} className="flex h-full w-full flex-col bg-black/30">
+      {/* Toolbar — full PDF controls */}
+      <div className="shrink-0 flex flex-wrap items-center justify-center gap-2 pb-3">
+        <div className={grp}>
+          <button className={btn} onClick={() => goTo(activePage - 1)} disabled={activePage <= 1} title={t("preview.prevPage", "Previous page")}><AngleLeftIcon className="h-4 w-4 rtl:rotate-180" /></button>
+          <input value={pageInput} onChange={(e) => setPageInput(e.target.value.replace(/[^0-9]/g, ""))}
+            onKeyDown={(e) => { if (e.key === "Enter") goTo(parseInt(pageInput, 10) || 1); }}
+            onBlur={() => goTo(parseInt(pageInput, 10) || 1)} inputMode="numeric" aria-label={t("preview.page", "Page")}
+            className="h-7 w-10 rounded-md bg-black/30 border border-white/15 text-center text-[12px] text-white tabular-nums outline-none focus:border-white/40" />
+          <span className="text-[12px] text-white/50 tabular-nums px-1">/ {numPages || "…"}</span>
+          <button className={btn} onClick={() => goTo(activePage + 1)} disabled={activePage >= numPages} title={t("preview.nextPage", "Next page")}><AngleRightIcon className="h-4 w-4 rtl:rotate-180" /></button>
+        </div>
+        <div className={grp}>
+          <button className={btn} onClick={() => setScale(s => Math.max(0.4, +(s - 0.2).toFixed(2)))} title={t("card.zoomOut", "Zoom out")}><ZoomOutIcon className="h-4 w-4" /></button>
+          <span className="text-[12px] text-white/80 tabular-nums w-11 text-center">{Math.round(scale * 100)}%</span>
+          <button className={btn} onClick={() => setScale(s => Math.min(3, +(s + 0.2).toFixed(2)))} title={t("card.zoomIn", "Zoom in")}><ZoomInIcon className="h-4 w-4" /></button>
+          <span className="mx-0.5 h-4 w-px bg-white/15" />
+          <button className={btn} onClick={fitWidth} title={t("preview.fitWidth", "Fit width")}><span className="text-[11px] font-medium px-0.5">{t("preview.fit", "Fit")}</span></button>
+          <button className={btn} onClick={() => setScale(1)} title={t("preview.actualSize", "Actual size")}><span className="text-[11px] font-medium px-0.5">100%</span></button>
+          <button className={btn} onClick={() => setRotation(r => (r + 90) % 360)} title={t("preview.rotate", "Rotate")}>
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7" /><polyline points="21 3 21 9 15 9" /></svg>
+          </button>
+        </div>
+        <div className={grp}>
+          <a className={btn} href={url} target="_blank" rel="noopener noreferrer" title={t("preview.openTab", "Open in new tab")}><ExternalLinkIcon className="h-4 w-4" /></a>
+          <button className={btn} onClick={printDoc} title={t("preview.print", "Print")}><PrinterIcon className="h-4 w-4" /></button>
+          <button className={btn} onClick={onDownload} title={t("card.download", "Download")}><DownloadIcon className="h-4 w-4" /></button>
+          <button className={`${btn} ${fullscreen ? "bg-white/15" : ""}`} onClick={toggleFullscreen} title={t("preview.fullscreen", "Fullscreen")}><Maximize2Icon className="h-4 w-4" /></button>
+        </div>
       </div>
       <div className="flex-1 min-h-0 flex gap-3">
         {pdf && numPages > 1 && (
           <div className="hidden sm:block w-[120px] shrink-0 overflow-y-auto space-y-2 pr-1">
             {Array.from({ length: numPages }, (_, i) => (
-              <PdfThumb key={i} pdf={pdf} pageNumber={i + 1} active={activePage === i + 1} onClick={() => scrollToPage(i + 1)} />
+              <PdfThumb key={i} pdf={pdf} pageNumber={i + 1} active={activePage === i + 1} onClick={() => goTo(i + 1)} />
             ))}
           </div>
         )}
         <div ref={scrollRef} className="flex-1 overflow-y-auto flex flex-col items-center gap-4 py-1">
           {status === "loading" && <div className="text-white/60 text-[13px] py-10">{t("common.loading", "Loading…")}</div>}
           {pdf && Array.from({ length: numPages }, (_, i) => (
-            <PdfPageCanvas key={i} pdf={pdf} pageNumber={i + 1} scale={scale} onActive={setActivePage} />
+            <PdfPageCanvas key={i} pdf={pdf} pageNumber={i + 1} scale={scale} rotation={rotation} onActive={setActivePage} />
           ))}
         </div>
       </div>
