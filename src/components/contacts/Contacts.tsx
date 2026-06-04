@@ -8517,7 +8517,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
-            {!supplierDept && <FormGroupLabel label={t("supgroup.production", "Production & quality")} />}
+            {!supplierDept && <FormGroupLabel label={t("supgroup.production", "Products & production")} />}
             {/* Factory */}
             <FormSection title={t("section.factory", "Factory")} icon={<FactoryIcon size={14} />} owner={t("owner.sourcingQuality")} ownerLabel={t("owner.label")} dept="quality" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
               <div className="space-y-3">

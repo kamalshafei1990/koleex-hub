@@ -1043,7 +1043,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
 
         {/* ═══ Everything below is one continuous page — no hidden tabs ═══ */}
 
-        <GroupLabel>{t("sd.groupProfile", "Profile & operations")}</GroupLabel>
+        <GroupLabel>{t("sd.groupProfile", "Operations")}</GroupLabel>
 
         {/* ─── Stacked Contacts-style sections (Sec + Field 2-col grid) ─── */}
         {(() => {
@@ -1300,7 +1300,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
           <ContactsSection supplierId={id} contactPersons={data.contactPersons} qrCodes={data.qrCodes ?? []} onSaved={() => load({ silent: true })} />
         </Section>
 
-        <GroupLabel>{t("sd.groupCommercial", "Commercial intelligence")}</GroupLabel>
+        <GroupLabel>{t("sd.groupCommercial", "Intelligence")}</GroupLabel>
 
         {/* Risk — one shell: hero overall bar + visual summary + intelligence editor */}
         <div id="risk" className="scroll-mt-16">
@@ -1491,7 +1491,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
           />
         </Section>
 
-        <GroupLabel>{t("sd.groupRecords", "Records & documents")}</GroupLabel>
+        <GroupLabel>{t("sd.groupRecords", "Records")}</GroupLabel>
 
         {/* Products supplied */}
         <Section id="products" noBorder>
