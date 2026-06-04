@@ -2155,7 +2155,7 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
     }
   }, [scale]);
 
-  const clampZoom = useCallback((z: number) => Math.max(0.3, Math.min(4, +z.toFixed(3))), []);
+  const clampZoom = useCallback((z: number) => { const v = +(+z).toFixed(3); return Number.isFinite(v) ? Math.max(0.3, Math.min(4, v)) : 1; }, []);
   // Capture the natural (unscaled) point under the anchor before zooming.
   const captureAnchor = useCallback((vx: number, vy: number, prev: number) => {
     const root = scrollRef.current, stage = stageRef.current;
@@ -2323,7 +2323,7 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
           {status === "loading" && <div className="text-white/60 text-[13px] py-10 text-center">{t("common.loading", "Loading…")}</div>}
           {/* Sizer reserves the scaled footprint; the stage is rendered at natural
               size and scaled with one GPU transform (instant zoom, no per-page work). */}
-          <div style={stageSize.w ? { width: stageSize.w * scale, height: stageSize.h * scale } : undefined} className="relative mx-auto">
+          <div style={(stageSize.w && Number.isFinite(stageSize.w * scale)) ? { width: stageSize.w * scale, height: stageSize.h * scale } : undefined} className="relative mx-auto">
             <div ref={stageRef}
               style={{ transform: `scale(${scale})`, transformOrigin: "0 0", ...(stageSize.w ? { position: "absolute", top: 0, left: 0 } : {}) }}
               className="w-max flex flex-col items-center gap-4 py-1 px-2">
