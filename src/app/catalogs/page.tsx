@@ -1302,11 +1302,11 @@ function CatalogModal({
   const lbl = "block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[5vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-[560px] bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl mb-8">
+      <div className="relative flex max-h-[88vh] w-full max-w-[560px] flex-col overflow-hidden bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)]">
+        <div className="shrink-0 flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2.5">
             <CatalogsIcon size={16} className="text-[var(--text-dim)]" />
             <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">
@@ -1318,7 +1318,7 @@ function CatalogModal({
           </button>
         </div>
 
-        <div className="px-6 py-5 space-y-5">
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           {error && (
             <div className="px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-[12px] text-red-400">
               {error}
@@ -1542,7 +1542,7 @@ function CatalogModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-[var(--border-subtle)]">
+        <div className="shrink-0 px-6 py-4 border-t border-[var(--border-subtle)]">
           {saving && uploadPct > 0 && uploadPct < 100 && (
             <div className="mb-3">
               <div className="flex items-center justify-between mb-1.5">
