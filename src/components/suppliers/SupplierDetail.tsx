@@ -1053,11 +1053,11 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
             <div id="overview" className="scroll-mt-16">
               <Sec title={t("sd.companyProfile", "Company profile")} icon={<Building2Icon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("companyProfile")} onToggle={() => toggleKey("companyProfile")} preview={[str(s, "company_type"), str(s, "year_established")].filter(Boolean).join(" · ")}>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                  <Field label={t("sd.legalName", "Legal name")} value={str(s, "legal_name", "company_name")} span2 />
+                  <Field label={t("sd.legalName", "Legal name")} value={str(s, "legal_name", "company_name", "company_name_en")} span2 />
                   <Field label={t("sd.tradingName", "Trading name")} value={str(s, "trading_name")} />
                   <Field label={t("sd.yearEstablished", "Year established")} value={str(s, "year_established")} />
                   <Field label={t("sd.companyTypeField", "Company type")} value={str(s, "company_type")} />
-                  <Field label={t("sd.employees", "Employees")} value={str(s, "employee_count_range")} />
+                  <Field label={t("sd.employees", "Employees")} value={str(s, "employee_count_range", "employee_count")} />
                   <Field label={t("sd.annualRevenue", "Annual revenue")} value={str(s, "annual_revenue_range")} />
                   <Field label={t("sd.industry", "Industry")} value={[str(s, "industry"), str(s, "sub_industry")].filter(Boolean).join(" · ")} />
                 </div>
@@ -1109,9 +1109,9 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
                 </div>
               </Sec>
 
-              <Sec tone="amber" title={t("sd.logisticsTrade", "Logistics & trade")} icon={<ShipIcon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("logistics")} onToggle={() => toggleKey("logistics")} preview={[str(s, "incoterms"), str(s, "port_of_entry")].filter(Boolean).join(" · ")}>
+              <Sec tone="amber" title={t("sd.logisticsTrade", "Logistics & trade")} icon={<ShipIcon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("logistics")} onToggle={() => toggleKey("logistics")} preview={[str(s, "port_of_entry"), str(s, "container_preference")].filter(Boolean).join(" · ")}>
+                {/* Incoterms intentionally lives only in Commercial terms (single source). */}
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                  <Field label={t("sd.incoterms", "Incoterms")} value={str(s, "incoterms")} />
                   <Field label={t("sd.portOfEntry", "Port")} value={str(s, "port_of_entry")} />
                   <Field label={t("sd.carriers", "Preferred carriers")} value={lst("preferred_carriers")} span2 />
                   <Field label={t("sd.container", "Container")} value={str(s, "container_preference")} />
@@ -1189,10 +1189,10 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
               </Sec>
 
               <Sec tone="violet" title={t("sd.banking", "Banking & payment")} icon={<LandmarkIcon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("banking")} onToggle={() => toggleKey("banking")} preview={str(s, "preferred_payment_method") || str(s, "payment_terms")}>
+                {/* Payment terms + currency live in Commercial terms (single source);
+                    this card focuses on HOW to pay — method + bank accounts. */}
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                  <Field label={t("sd.paymentTerms", "Payment terms")} value={str(s, "payment_terms")} span2 />
-                  <Field label={t("sd.preferredMethod", "Method")} value={str(s, "preferred_payment_method")} />
-                  <Field label={t("sd.currency", "Currency")} value={str(s, "currency")} />
+                  <Field label={t("sd.preferredMethod", "Method")} value={str(s, "preferred_payment_method")} span2 />
                 </div>
                 {banks.length > 0 ? (
                   <div className="mt-3 space-y-2">

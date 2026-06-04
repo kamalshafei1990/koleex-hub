@@ -267,7 +267,7 @@ export default function FactorySection({
                 <div className="grid grid-cols-2 gap-x-6 gap-y-4 rounded-2xl bg-[var(--bg-surface-subtle)] p-5 sm:grid-cols-4">
                   <Metric label={t("fs.monthlyCapacity", "Monthly capacity")} value={fmtNum(f.monthly_capacity)} unit={str(f, "capacity_unit")} />
                   <Metric label={t("fs.annualOutput", "Annual output")} value={fmtNum(f.annual_output)} unit={str(f, "output_unit")} />
-                  <Metric label={t("fs.leadTime", "Lead time")} value={fmtNum(f.lead_time_days)} unit={t("fs.daysUnit", "days")} />
+                  <Metric label={t("fs.productionLeadTime", "Production lead time")} value={fmtNum(f.lead_time_days)} unit={t("fs.daysUnit", "days")} />
                   <Metric label={t("fs.exportShare", "Export share")} value={f.export_percentage != null ? String(f.export_percentage) : ""} unit="%" />
                 </div>
               </div>
@@ -325,7 +325,7 @@ export default function FactorySection({
           <Field label={t("fs.qcStaff", "QC staff")}><input type="number" min={0} className={inputCls} value={d.qc_staff_count} onChange={(e) => set("qc_staff_count", e.target.value)} /></Field>
           <Field label={t("fs.rdStaff", "R&D staff")}><input type="number" min={0} className={inputCls} value={d.rd_staff_count} onChange={(e) => set("rd_staff_count", e.target.value)} /></Field>
           <Field label={t("fs.factoryAreaSqm", "Factory area (m²)")}><input type="number" min={0} className={inputCls} value={d.factory_size_sqm} onChange={(e) => set("factory_size_sqm", e.target.value)} /></Field>
-          <Field label={t("fs.leadTimeDays", "Lead time (days)")}><input type="number" min={0} className={inputCls} value={d.lead_time_days} onChange={(e) => set("lead_time_days", e.target.value)} /></Field>
+          <Field label={t("fs.productionLeadTimeDays", "Production lead time (days)")}><input type="number" min={0} className={inputCls} value={d.lead_time_days} onChange={(e) => set("lead_time_days", e.target.value)} /></Field>
           <Field label={t("fs.exportSharePct", "Export share (%)")}><input type="number" min={0} max={100} className={inputCls} value={d.export_percentage} onChange={(e) => set("export_percentage", e.target.value)} /></Field>
           <Field label={t("fs.monthlyCapacity", "Monthly capacity")}><input type="number" min={0} className={inputCls} value={d.monthly_capacity} onChange={(e) => set("monthly_capacity", e.target.value)} /></Field>
           <Field label={t("fs.capacityUnit", "Capacity unit")}><input className={inputCls} value={d.capacity_unit} onChange={(e) => set("capacity_unit", e.target.value)} placeholder={t("fs.capacityUnitPlaceholder", "units/mo")} /></Field>
