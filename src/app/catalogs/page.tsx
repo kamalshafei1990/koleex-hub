@@ -2102,6 +2102,29 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
     return () => document.removeEventListener("fullscreenchange", onFs);
   }, []);
 
+  /* Manual zoom: Ctrl/⌘ + mouse-wheel and trackpad pinch (browsers deliver pinch
+     as a wheel event with ctrlKey=true), plus +/- / 0 keys. The wheel listener is
+     attached natively with passive:false so preventDefault works (React's onWheel
+     is passive and can't stop the page from zooming). */
+  useEffect(() => {
+    const el = scrollRef.current; if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      setScale(s => Math.max(0.3, Math.min(4, +(s - e.deltaY * 0.0025).toFixed(2))));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (e.key === "+" || e.key === "=") { e.preventDefault(); setScale(s => Math.min(4, +(s + 0.2).toFixed(2))); }
+      else if (e.key === "-" || e.key === "_") { e.preventDefault(); setScale(s => Math.max(0.3, +(s - 0.2).toFixed(2))); }
+      else if (e.key === "0") { e.preventDefault(); setScale(1); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => { el.removeEventListener("wheel", onWheel); window.removeEventListener("keydown", onKey); };
+  }, [status]);
+
   const scrollToPage = useCallback((n: number) => {
     const root = scrollRef.current; if (!root) return;
     const el = root.querySelector(`[data-page="${n}"]`) as HTMLElement | null;
