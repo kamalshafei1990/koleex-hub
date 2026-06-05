@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import MessageSquarePlusIcon from "@/components/icons/ui/MessageSquarePlusIcon";
+import TargetIcon from "@/components/icons/ui/TargetIcon";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import {
   ISSUE_TYPES,
@@ -24,6 +25,7 @@ import {
   type IssueType,
   type Severity,
 } from "@/lib/qa/types";
+import { useInspector, type PickedComponent } from "@/lib/qa/inspector";
 
 interface Env {
   route: string;
@@ -88,8 +90,22 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [selected, setSelected] = useState<PickedComponent | null>(null);
+  const [inspecting, setInspecting] = useState(false);
   const envRef = useRef<Env | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const inspector = useInspector();
+
+  // Enter inspect mode: hide the modal panel (state is preserved — the
+  // component stays mounted), let the global inspector overlay take over, and
+  // capture the picked component when the user clicks one (or Esc cancels).
+  const pickComponent = useCallback(() => {
+    setInspecting(true);
+    inspector.start((c) => {
+      setInspecting(false);
+      if (c) setSelected(c);
+    });
+  }, [inspector]);
 
   // Capture environment once on open.
   if (!envRef.current && typeof window !== "undefined") {
@@ -170,6 +186,12 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
           screen_size: env.screenSize,
           language: env.language,
           timezone: env.timezone,
+          // Phase-2 component inspection metadata (null when not selected).
+          component_name: selected?.component ?? null,
+          component_module: selected?.module ?? null,
+          component_section: selected?.section ?? null,
+          component_record_id: selected?.recordId ?? null,
+          component_rect: selected?.rect ?? null,
         }),
       });
       const j = await res.json().catch(() => ({}));
@@ -185,6 +207,10 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
 
   const field = "w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none focus:border-white placeholder:text-[var(--text-ghost)]";
   const label = "block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-1";
+
+  // While inspecting, hide the panel entirely (state preserved) so the global
+  // inspector overlay is unobstructed. The panel returns on pick / Esc.
+  if (inspecting) return null;
 
   return (
     <div className="fixed inset-0 z-[200] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
@@ -212,6 +238,36 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                 <span className="rounded-md bg-[var(--bg-surface)] px-1.5 py-0.5 font-medium text-[var(--text-secondary)]">{env.appModule}</span>
                 <span className="truncate rounded-md bg-[var(--bg-surface)] px-1.5 py-0.5 font-mono">{env.route}</span>
               </div>
+
+              {/* Component inspector — pick a specific UI component for this report. */}
+              {selected ? (
+                <div className="flex items-start gap-2 rounded-lg border border-[var(--accent)]/40 bg-[var(--accent)]/[0.06] px-3 py-2">
+                  <span className="mt-0.5 text-[var(--accent)]"><TargetIcon size={14} /></span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[12.5px] font-semibold text-[var(--text-primary)]">
+                      {selected.component}
+                      {selected.fallback ? <span className="ml-1 text-[10px] font-normal text-[var(--text-ghost)]">(untagged)</span> : null}
+                    </div>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[10.5px] text-[var(--text-dim)]">
+                      {selected.module ? <span>{selected.module}</span> : null}
+                      {selected.section ? <span>· {selected.section}</span> : null}
+                      {selected.recordId ? <span>· #{selected.recordId}</span> : null}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button type="button" onClick={pickComponent} className="rounded-md px-2 py-1 text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">Re-select</button>
+                    <button type="button" onClick={() => setSelected(null)} className="rounded-md px-2 py-1 text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">Clear</button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={pickComponent}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-[var(--border-color)] py-2 text-[12px] font-medium text-[var(--text-dim)] transition-colors hover:border-white hover:text-[var(--text-primary)]"
+                >
+                  <TargetIcon size={14} /> Select specific item / component
+                </button>
+              )}
 
               {/* Type + Severity */}
               <div className="grid grid-cols-2 gap-3">

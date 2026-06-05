@@ -77,6 +77,21 @@ export async function POST(req: Request) {
     language: clampStr(body.language, 20),
     timezone: clampStr(body.timezone, 60),
     status: "new" as IssueStatus,
+    // Phase-2 component inspection metadata.
+    component_name: clampStr(body.component_name, 120),
+    component_module: clampStr(body.component_module, 80),
+    component_section: clampStr(body.component_section, 120),
+    component_record_id: clampStr(body.component_record_id, 120),
+    component_rect:
+      body.component_rect && typeof body.component_rect === "object" && !Array.isArray(body.component_rect)
+        ? body.component_rect
+        : null,
+    // Future-ready fields (accepted if a client sends them; UI not wired yet).
+    component_path: clampStr(body.component_path, 300),
+    data_entity: clampStr(body.data_entity, 80),
+    db_table: clampStr(body.db_table, 80),
+    repro_steps: clampStr(body.repro_steps, 6000),
+    session_id: clampStr(body.session_id, 80),
   };
 
   const { data, error } = await supabaseServer

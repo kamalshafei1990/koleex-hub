@@ -99,6 +99,17 @@ export interface QaReport {
   developer_notes: string | null;
   resolution_summary: string | null;
   fixed_commit: string | null;
+  /* Phase-2 component inspection metadata. */
+  component_name: string | null;
+  component_module: string | null;
+  component_section: string | null;
+  component_record_id: string | null;
+  component_rect: { top: number; left: number; width: number; height: number } | null;
+  component_path: string | null;
+  data_entity: string | null;
+  db_table: string | null;
+  repro_steps: string | null;
+  session_id: string | null;
   created_at: string;
   updated_at: string;
   resolved_at: string | null;

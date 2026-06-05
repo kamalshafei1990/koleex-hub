@@ -15,6 +15,7 @@ import Sidebar from "./Sidebar";
 import FloatingPanel from "./FloatingPanel";
 import ViewAsBanner from "./ViewAsBanner";
 import ReportIssueButton from "@/components/qa/ReportIssueButton";
+import { QAInspectorProvider } from "@/lib/qa/inspector";
 import {
   SidebarProvider,
   useSidebar,
@@ -58,7 +59,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   const viewingAs = !!bootstrap?.viewingAs;
 
   return (
-    <>
+    <QAInspectorProvider>
       <MainHeader />
       {/* Persistent banner shown when a Super Admin is "viewing as"
           another user. Sits below MainHeader (fixed, top-14) and is
@@ -89,7 +90,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       <FloatingPanel />
       {/* Global QA issue reporter (floating button + modal). */}
       <ReportIssueButton />
-    </>
+    </QAInspectorProvider>
   );
 }
 

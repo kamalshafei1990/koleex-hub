@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { IMG } from "@/lib/cdn";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
@@ -1059,6 +1060,7 @@ export default function ProductList() {
                 <Link
                   key={p.id}
                   href={`${baseRoute}/${p.slug || p.id}`}
+                  {...kxInspectAttrs({ component: "ProductCard", module: "Product Data", section: "Catalog", recordId: p.slug || p.id })}
                   className="group relative bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] overflow-hidden transition-all duration-300 hover:border-[var(--border-focus)] hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-12px_rgba(0,0,0,0.35)]"
                 >
                   {/* Image — calm, clean. Background matches the

@@ -95,6 +95,7 @@ import {
 import { fetchOpportunities } from "@/lib/crm";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { STRATEGIC_STATUS_LABELS, CLASSIFICATION_LABELS, FACTORY_TYPE_LABELS, strategicStatusTone } from "@/lib/suppliers/intelligence";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { useScopeContext } from "@/lib/use-scope";
 import type { CrmOpportunityWithRelations } from "@/types/supabase";
 import { Country, State, City } from "country-state-city";
@@ -4669,6 +4670,12 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleSelectContact(c); } }}
+                    {...kxInspectAttrs({
+                      component: filterType === "supplier" ? "SupplierRow" : filterType === "customer" ? "CustomerRow" : "ContactRow",
+                      module: filterType === "supplier" ? "Suppliers" : filterType === "customer" ? "Customers" : "Contacts",
+                      section: "Directory list",
+                      recordId: c.id,
+                    })}
                     className={`group/row relative w-full flex items-center gap-3 ps-4 pe-4 py-3 text-start cursor-pointer transition-colors border-b border-[var(--border-faint)] contain-layout ${
                       isSelected
                         ? "bg-[var(--bg-surface-active)]"

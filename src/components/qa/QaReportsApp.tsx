@@ -10,6 +10,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import TargetIcon from "@/components/icons/ui/TargetIcon";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import {
   SEVERITIES,
@@ -209,6 +210,9 @@ function ReportDetail({ report, onUpdated }: { report: QaReport; onUpdated: (r: 
       `Type: ${ISSUE_TYPE_LABEL[report.issue_type]} · Severity: ${SEVERITY_LABEL[report.severity]}`,
       `Route: ${report.route ?? "—"}`,
       `Page: ${report.page_title ?? "—"}`,
+      report.component_name
+        ? `Component: ${report.component_name}${report.component_module ? " · module " + report.component_module : ""}${report.component_section ? " · section " + report.component_section : ""}${report.component_record_id ? " · record #" + report.component_record_id : ""}`
+        : "Component: (whole page — no specific component selected)",
       "",
       `What happened:\n${report.description ?? "—"}`,
       "",
@@ -237,9 +241,21 @@ function ReportDetail({ report, onUpdated }: { report: QaReport; onUpdated: (r: 
         <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${SEVERITY_TONE[report.severity]}`}>{SEVERITY_LABEL[report.severity]}</span>
         <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${STATUS_TONE[report.status]}`}>{STATUS_LABEL[report.status]}</span>
         <span className="text-[11px] text-[var(--text-dim)]">{ISSUE_TYPE_LABEL[report.issue_type]}</span>
-        <button type="button" onClick={copyDebugPrompt} className="ms-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11.5px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)]">
-          {copied ? "Copied ✓" : "Copy Debug Prompt"}
-        </button>
+        <div className="ms-auto flex items-center gap-2">
+          {report.route ? (
+            <a
+              href={report.route}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11.5px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)]"
+            >
+              Open Route ↗
+            </a>
+          ) : null}
+          <button type="button" onClick={copyDebugPrompt} className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11.5px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)]">
+            {copied ? "Copied ✓" : "Copy Debug Prompt"}
+          </button>
+        </div>
       </div>
 
       <h2 className="text-[16px] font-bold text-[var(--text-primary)]">{report.title}</h2>
@@ -250,6 +266,33 @@ function ReportDetail({ report, onUpdated }: { report: QaReport; onUpdated: (r: 
         <span><b className="text-[var(--text-secondary)]">Reporter:</b> {report.reporter_name ?? "—"}</span>
         <span><b className="text-[var(--text-secondary)]">Filed:</b> {fmt(report.created_at)}</span>
       </div>
+
+      {/* Inspected component (Phase-2) — breadcrumbs module → section → component → record. */}
+      {report.component_name && (
+        <div className="rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/[0.05] px-3.5 py-3">
+          <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)]">
+            <TargetIcon size={12} className="text-[var(--accent)]" /> Inspected component
+          </div>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[12.5px]">
+            {report.component_module && (
+              <>
+                <span className="text-[var(--text-secondary)]">{report.component_module}</span>
+                <span className="text-[var(--text-ghost)]">→</span>
+              </>
+            )}
+            {report.component_section && (
+              <>
+                <span className="text-[var(--text-secondary)]">{report.component_section}</span>
+                <span className="text-[var(--text-ghost)]">→</span>
+              </>
+            )}
+            <span className="font-semibold text-[var(--text-primary)]">{report.component_name}</span>
+            {report.component_record_id && (
+              <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--text-secondary)]">#{report.component_record_id}</span>
+            )}
+          </div>
+        </div>
+      )}
 
       {report.screenshot_url && (
         <a href={report.screenshot_url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-[var(--border-color)]">
