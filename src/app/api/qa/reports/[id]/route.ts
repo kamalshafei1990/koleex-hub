@@ -3,8 +3,17 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { STATUS_VALUES, PRIORITY_VALUES, RESOLVED_STATUSES, type IssueStatus } from "@/lib/qa/types";
+import {
+  STATUS_VALUES,
+  PRIORITY_VALUES,
+  RESOLVED_STATUSES,
+  STATUS_LABEL,
+  PRIORITY_LABEL,
+  type IssueStatus,
+  type Priority,
+} from "@/lib/qa/types";
 import { logActivity, type ActivityInput } from "@/lib/qa/activity";
+import { notifyIssue, type NotifyTarget } from "@/lib/qa/notify";
 
 const BUCKET = "qa-screenshots";
 
@@ -240,6 +249,76 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         actor_name: auth.username ?? null,
       })),
     );
+  }
+
+  /* ── Notifications (best-effort) ──────────────────────────────────────
+     Derived from the final patch diff so ordering between branches never
+     matters. notifyIssue suppresses the actor and dedupes per recipient. */
+  {
+    const actor = auth.username ?? "Someone";
+    const title = (cur.title as string) ?? "an issue";
+    const reporterId = (cur.reporter_id as string | null) ?? null;
+    const effectiveAssignee = ("assigned_to" in patch
+      ? (patch.assigned_to as string | null)
+      : (cur.assigned_to as string | null)) ?? null;
+    const targets: NotifyTarget[] = [];
+
+    if (body.action === "reopen") {
+      const reason = (patch.reopen_reason as string | null) || null;
+      const msg = `${actor} reopened "${title}"${reason ? `: ${reason}` : ""}`;
+      targets.push({ recipientId: effectiveAssignee, type: "qa_issue_reopened", title: "Issue reopened", body: msg });
+      targets.push({ recipientId: reporterId, type: "qa_issue_reopened", title: "Issue reopened", body: msg });
+    } else if (patch.status && patch.status !== cur.status) {
+      const newStatus = patch.status as IssueStatus;
+      const type =
+        newStatus === "verified" ? "qa_issue_verified"
+        : newStatus === "closed" ? "qa_issue_closed"
+        : newStatus === "duplicate" ? "qa_issue_duplicate_marked"
+        : "qa_status_changed";
+      const msg = `${actor} moved "${title}" to ${STATUS_LABEL[newStatus] ?? newStatus}`;
+      const ntitle = `Status: ${STATUS_LABEL[newStatus] ?? newStatus}`;
+      targets.push({ recipientId: reporterId, type, title: ntitle, body: msg });
+      targets.push({ recipientId: effectiveAssignee, type, title: ntitle, body: msg });
+    }
+
+    if (patch.priority && patch.priority !== cur.priority) {
+      const np = patch.priority as Priority;
+      targets.push({
+        recipientId: effectiveAssignee,
+        type: "qa_priority_changed",
+        title: `Priority: ${PRIORITY_LABEL[np] ?? np}`,
+        body: `${actor} set "${title}" priority to ${PRIORITY_LABEL[np] ?? np}`,
+        alert: np === "urgent",
+      });
+    }
+
+    // New assignee (assigned or reassigned) — only when it actually changed.
+    if ("assigned_to" in patch && patch.assigned_to) {
+      const reassigned = !!(cur.assigned_to as string | null);
+      targets.push({
+        recipientId: patch.assigned_to as string,
+        type: reassigned ? "qa_issue_reassigned" : "qa_issue_assigned",
+        title: reassigned ? "Issue reassigned to you" : "Issue assigned to you",
+        body: `${actor} assigned you "${title}"`,
+      });
+    }
+
+    // Duplicate marked → tell the reporter.
+    if ("duplicate_of_issue_id" in patch && patch.duplicate_of_issue_id) {
+      targets.push({
+        recipientId: reporterId,
+        type: "qa_issue_duplicate_marked",
+        title: "Marked as duplicate",
+        body: `${actor} marked "${title}" as a duplicate`,
+      });
+    }
+
+    if (targets.length > 0) {
+      await notifyIssue(
+        { tenantId: auth.tenant_id, issueId: id, actorId: auth.account_id, actorName: auth.username ?? null },
+        targets,
+      );
+    }
   }
 
   const row = data as Record<string, unknown>;

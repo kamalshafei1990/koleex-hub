@@ -4,16 +4,24 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { logActivity } from "@/lib/qa/activity";
+import { notifyIssue, parseMentions, resolveMentionedAccounts } from "@/lib/qa/notify";
 
-/* Confirm the issue exists in the caller's tenant. Returns the row or null. */
-async function issueInTenant(tenantId: string, issueId: string): Promise<boolean> {
+interface IssueParticipants {
+  id: string;
+  title: string;
+  reporter_id: string | null;
+  assigned_to: string | null;
+}
+
+/* Fetch the issue (tenant-scoped) with the people who should be notified. */
+async function loadIssue(tenantId: string, issueId: string): Promise<IssueParticipants | null> {
   const { data } = await supabaseServer
     .from("qa_issue_reports")
-    .select("id")
+    .select("id, title, reporter_id, assigned_to")
     .eq("tenant_id", tenantId)
     .eq("id", issueId)
     .maybeSingle();
-  return !!data;
+  return (data as IssueParticipants | null) ?? null;
 }
 
 function roleLabel(auth: { is_super_admin: boolean; user_type: string | null }): string | null {
@@ -28,7 +36,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   if (!auth.is_super_admin) return NextResponse.json({ error: "Not authorised." }, { status: 403 });
 
   const { id } = await ctx.params;
-  if (!(await issueInTenant(auth.tenant_id, id))) {
+  if (!(await loadIssue(auth.tenant_id, id))) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
   const { data, error } = await supabaseServer
@@ -49,7 +57,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   if (!auth.is_super_admin) return NextResponse.json({ error: "Not authorised." }, { status: 403 });
 
   const { id } = await ctx.params;
-  if (!(await issueInTenant(auth.tenant_id, id))) {
+  const issue = await loadIssue(auth.tenant_id, id);
+  if (!issue) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 
@@ -92,6 +101,36 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     activity_type: "comment_added",
     metadata: { is_internal_note: row.is_internal_note },
   });
+
+  /* Notify: mentioned users (most specific → listed first so they win the
+     per-recipient dedupe), then the reporter and assignee. The actor is
+     suppressed inside notifyIssue. */
+  const mentionedUsernames = parseMentions(message);
+  const mentioned = await resolveMentionedAccounts(auth.tenant_id, mentionedUsernames);
+  const actor = auth.username ?? "Someone";
+  await notifyIssue(
+    { tenantId: auth.tenant_id, issueId: id, actorId: auth.account_id, actorName: auth.username ?? null },
+    [
+      ...mentioned.map((u) => ({
+        recipientId: u.id,
+        type: "qa_issue_mentioned" as const,
+        title: "You were mentioned",
+        body: `${actor} mentioned you on "${issue.title}"`,
+      })),
+      {
+        recipientId: issue.reporter_id,
+        type: "qa_comment_added" as const,
+        title: "New comment",
+        body: `${actor} commented on "${issue.title}"`,
+      },
+      {
+        recipientId: issue.assigned_to,
+        type: "qa_comment_added" as const,
+        title: "New comment",
+        body: `${actor} commented on "${issue.title}"`,
+      },
+    ],
+  );
 
   return NextResponse.json({ comment: data }, { status: 201 });
 }

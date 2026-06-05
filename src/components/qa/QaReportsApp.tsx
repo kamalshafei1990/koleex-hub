@@ -152,6 +152,16 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
 
   useEffect(() => { void load(); }, [load]);
 
+  /* Deep-link from a notification: /database/issues?issue=<id> auto-selects
+     the row in the split panel. Read once on mount (same pattern the
+     inventory pages use for ?create=1) — the notification click navigates
+     here fresh, so the param is present at mount. */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const p = new URLSearchParams(window.location.search).get("issue");
+    if (p) setSelectedId(p);
+  }, []);
+
   // Assignee directory for the picker (loaded once).
   useEffect(() => {
     let alive = true;
