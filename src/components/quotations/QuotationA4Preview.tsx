@@ -232,6 +232,13 @@ const inputResetStyle: React.CSSProperties = {
   margin: 0,
 };
 
+/* Quick-pick palette for section-header bands. Mostly deep tones (white text)
+   plus the Koleex blue accent and white; the custom picker covers anything else. */
+const SECTION_COLOR_PRESETS = [
+  "#000000", "#1A1A1A", "#2E2E2E", "#444444", "#0066FF", "#0052CC",
+  "#0D2B4E", "#14532D", "#7F1D1D", "#92400E", "#4C1D95", "#FFFFFF",
+];
+
 /* Pick readable title text (near-black or white) for a given section-band
    colour, using perceived luminance — so a header stays legible whatever
    colour the user chooses. */
@@ -339,6 +346,13 @@ export default function QuotationA4Preview({
      can hit B / I / U / colour / size without losing their text
      selection. */
   const [focusedItemIdx, setFocusedItemIdx] = useState<number | null>(null);
+  /* Which section-header row currently has its colour popover open. */
+  const [colorPopIdx, setColorPopIdx] = useState<number | null>(null);
+  /* Set a section header's band colour (by row index). Goes through
+     setCurrent (not updateItem) so the Invoice-doc parent is unaffected. */
+  const setHeaderColor = useCallback((rowIdx: number, color: string) => {
+    setCurrent((prev) => prev ? { ...prev, items: prev.items.map((it, i) => i === rowIdx ? { ...it, headerColor: color } : it) } : prev);
+  }, [setCurrent]);
 
   /* `document.execCommand` is deprecated in spec but every browser
      (Chrome, Safari, Firefox, Edge) still supports the formatting
@@ -990,10 +1004,17 @@ export default function QuotationA4Preview({
                         .pq-sec-ctrl:hover:not(:disabled){background:rgba(255,255,255,0.22);border-color:rgba(255,255,255,0.5);color:#fff;}
                         .pq-sec-ctrl:disabled{opacity:.3;cursor:not-allowed;}
                         .pq-sec-ctrl--danger:hover:not(:disabled){background:rgba(239,68,68,0.3);border-color:rgba(239,68,68,0.7);color:#fff;}
-                        .pq-sec-color{width:24px;height:24px;padding:0;border:1px solid rgba(255,255,255,0.45);border-radius:6px;background:transparent;cursor:pointer;}
+                        .pq-sec-swatch{width:24px;height:24px;padding:0;border:2px solid rgba(255,255,255,0.7);border-radius:6px;cursor:pointer;box-shadow:0 0 0 1px rgba(0,0,0,0.35);}
+                        .pq-color-pop{position:absolute;top:calc(100% + 8px);right:0;z-index:50;width:168px;background:#1A1A1A;border:1px solid #2D2D2D;border-radius:10px;padding:10px;box-shadow:0 12px 34px rgba(0,0,0,0.55);}
+                        .pq-color-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;}
+                        .pq-color-sw{width:20px;height:20px;border-radius:5px;border:1px solid rgba(255,255,255,0.25);cursor:pointer;padding:0;transition:transform .1s ease;}
+                        .pq-color-sw:hover{transform:scale(1.14);border-color:rgba(255,255,255,0.7);}
+                        .pq-color-sw[data-active="1"]{box-shadow:0 0 0 2px #1A1A1A,0 0 0 4px #0066FF;}
+                        .pq-color-custom{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:9px;padding-top:9px;border-top:1px solid #2D2D2D;font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:rgba(255,255,255,0.6);}
+                        .pq-sec-color{width:30px;height:22px;padding:0;border:1px solid rgba(255,255,255,0.4);border-radius:5px;background:transparent;cursor:pointer;}
                         .pq-sec-color::-webkit-color-swatch-wrapper{padding:0;}
-                        .pq-sec-color::-webkit-color-swatch{border:none;border-radius:5px;}
-                        .pq-sec-color::-moz-color-swatch{border:none;border-radius:5px;}
+                        .pq-sec-color::-webkit-color-swatch{border:none;border-radius:4px;}
+                        .pq-sec-color::-moz-color-swatch{border:none;border-radius:4px;}
                       `}</style>
                       <div style={{ position: "relative", background: headBg, padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s ease" }}>
                         <div
@@ -1028,16 +1049,46 @@ export default function QuotationA4Preview({
                           className="no-print pq-sec-pill"
                           style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)" }}
                         >
-                          <input
-                            type="color"
-                            className="pq-sec-color"
-                            title="Section colour"
-                            value={headBg}
-                            onChange={(e) => {
-                              const color = e.target.value;
-                              setCurrent((prev) => prev ? { ...prev, items: prev.items.map((it, i) => i === idx ? { ...it, headerColor: color } : it) } : prev);
-                            }}
-                          />
+                          {/* Colour: a swatch button opens a popover with a quick-pick
+                              palette + a custom picker — more than one way to choose. */}
+                          <div style={{ position: "relative" }}>
+                            <button
+                              type="button"
+                              className="pq-sec-swatch"
+                              title="Section colour"
+                              style={{ background: headBg }}
+                              onClick={() => setColorPopIdx(colorPopIdx === idx ? null : idx)}
+                            />
+                            {colorPopIdx === idx && (
+                              <>
+                                <div onClick={() => setColorPopIdx(null)} style={{ position: "fixed", inset: 0, zIndex: 49 }} />
+                                <div className="pq-color-pop">
+                                  <div className="pq-color-grid">
+                                    {SECTION_COLOR_PRESETS.map((c) => (
+                                      <button
+                                        key={c}
+                                        type="button"
+                                        className="pq-color-sw"
+                                        data-active={headBg.toLowerCase() === c.toLowerCase() ? "1" : "0"}
+                                        title={c}
+                                        style={{ background: c }}
+                                        onClick={() => { setHeaderColor(idx, c); setColorPopIdx(null); }}
+                                      />
+                                    ))}
+                                  </div>
+                                  <label className="pq-color-custom">
+                                    <span>Custom</span>
+                                    <input
+                                      type="color"
+                                      className="pq-sec-color"
+                                      value={headBg}
+                                      onChange={(e) => setHeaderColor(idx, e.target.value)}
+                                    />
+                                  </label>
+                                </div>
+                              </>
+                            )}
+                          </div>
                           <button type="button" className="pq-sec-ctrl" title="Move section up" disabled={idx === 0} onClick={() => moveItem(idx, -1)}><ArrowUpIcon size={13} /></button>
                           <button type="button" className="pq-sec-ctrl" title="Move section down" disabled={idx === current.items.length - 1} onClick={() => moveItem(idx, 1)}><ArrowDownIcon size={13} /></button>
                           <button type="button" className="pq-sec-ctrl pq-sec-ctrl--danger" title="Remove section header" disabled={current.items.length <= 1} onClick={() => removeItem(idx)}><TrashIcon size={12} /></button>
