@@ -757,6 +757,102 @@ export function useInventoryShortcuts({ isActive = true }: { isActive?: boolean 
   }, [isActive, isTypingTarget]);
 }
 
+/* ─── Keyboard shortcuts legend (report GEN-8) ────────────────
+   The R/S/T/A/F shortcuts existed but were undiscoverable and unlabelled.
+   This renders a small always-visible "Shortcuts" pill (bottom-left on
+   desktop) plus a legend panel that opens on click or by pressing "?".
+   Mounted once in the inventory layout so it covers every inventory route.
+   Hidden on touch (the shortcuts need a physical keyboard). */
+const INVENTORY_SHORTCUTS: Array<{ keyLabel: string; label: string; desc: string }> = [
+  { keyLabel: "R", label: "Receive", desc: "Goods in — start a receive movement" },
+  { keyLabel: "S", label: "Ship",    desc: "Goods out — start a ship movement" },
+  { keyLabel: "T", label: "Transfer", desc: "Move stock between warehouses" },
+  { keyLabel: "A", label: "Adjust",  desc: "Manual stock adjustment" },
+  { keyLabel: "F", label: "Find",    desc: "Open global inventory search" },
+  { keyLabel: "?", label: "Help",    desc: "Show / hide this shortcuts list" },
+];
+
+export function InventoryShortcutsLegend() {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = e.target;
+      if (el instanceof HTMLElement) {
+        const tag = el.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable) return;
+      }
+      if (e.key === "?" || (e.key === "/" && e.shiftKey)) {
+        e.preventDefault();
+        setOpen((o) => !o);
+      } else if (e.key === "Escape") {
+        setOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  return (
+    <div className="hidden md:block">
+      {/* Trigger pill */}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="fixed bottom-4 left-4 z-40 inline-flex items-center gap-1.5 rounded-full border border-[var(--border-color)] bg-[var(--bg-secondary)]/95 px-3 py-1.5 text-[11.5px] font-medium text-[var(--text-dim)] shadow-lg backdrop-blur-md transition-colors hover:text-[var(--text-primary)]"
+        title="Keyboard shortcuts (press ?)"
+        aria-expanded={open}
+      >
+        <kbd className="rounded border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] font-bold">?</kbd>
+        Shortcuts
+      </button>
+
+      {open && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setOpen(false)}
+            aria-hidden
+          />
+          <div
+            role="dialog"
+            aria-label="Keyboard shortcuts"
+            className="fixed bottom-16 left-4 z-50 w-[300px] overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-2xl"
+          >
+            <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-3.5 py-2.5">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">
+                Keyboard shortcuts
+              </span>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <ul className="divide-y divide-[var(--border-faint)]">
+              {INVENTORY_SHORTCUTS.map((s) => (
+                <li key={s.keyLabel} className="flex items-center gap-3 px-3.5 py-2">
+                  <kbd className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[12px] font-bold text-[var(--text-primary)]">
+                    {s.keyLabel}
+                  </kbd>
+                  <div className="min-w-0">
+                    <div className="text-[12.5px] font-semibold text-[var(--text-primary)]">{s.label}</div>
+                    <div className="truncate text-[11px] text-[var(--text-dim)]">{s.desc}</div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ─── Section eyebrow + hairline (shared) ─────────────────── */
 
 export function SectionEyebrow({ children }: { children: ReactNode }) {

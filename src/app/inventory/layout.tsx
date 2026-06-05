@@ -27,6 +27,7 @@
 
 import { usePathname } from "next/navigation";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
+import { InventoryShortcutsLegend } from "@/components/inventory/InventoryUx";
 
 interface RouteMeta { title: string; subtitle?: string }
 
@@ -61,6 +62,8 @@ export default function InventoryLayout({ children }: { children: React.ReactNod
         <InventoryHeader title={meta.title} subtitle={meta.subtitle} />
         {children}
       </div>
+      {/* GEN-8 — discoverable keyboard-shortcuts legend (desktop). */}
+      <InventoryShortcutsLegend />
     </div>
   );
 }
