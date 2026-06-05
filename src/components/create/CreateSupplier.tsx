@@ -36,6 +36,8 @@ export default function CreateSupplier() {
 
   async function save() {
     if (!name.trim()) { setError("Company name is required."); return; }
+    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) { setError("Email isn't a valid address (e.g. name@company.com)."); return; }
+    if (phone.trim() && phone.replace(/[^\d]/g, "").length < 6) { setError("Phone looks too short — enter a valid number."); return; }
     setError(null); setBusy(true);
     try {
       const r = await fetch("/api/contacts", {

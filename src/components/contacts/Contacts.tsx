@@ -1141,7 +1141,13 @@ function supplierFormErrors(f: ContactForm): string[] {
   if (phoneBad(f.supplier_mobile)) e.push("Company mobile looks invalid (expected 6–15 digits).");
 
   // A — name-script consistency (Chinese name must not contain Arabic)
-  if (hasArabicChars(v(f.company_name_cn))) e.push("Chinese company name shouldn't contain Arabic text.");
+  {
+    const cnName = v(f.company_name_cn);
+    if (cnName) {
+      if (hasArabicChars(cnName)) e.push("Chinese company name shouldn't contain Arabic text.");
+      else if (!hasCJKChars(cnName)) e.push("Chinese company name must use Chinese characters (e.g. 深圳精密机械).");
+    }
+  }
 
   // I — numeric-only messaging IDs (WhatsApp / QQ are phone/number based)
   f.messaging_channels.forEach((m) => {
@@ -7923,7 +7929,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {isCustomer && showTab("activity") && (
           <FormSection title={t("section.messagingIds", "Messaging IDs")} icon={<MessageSquareIcon size={14} />}>
             <div className="space-y-3">
-              <Input label={t("field.whatsappBusiness", "WhatsApp Business")} value={form.whatsapp_business} onChange={v => setField("whatsapp_business", v)} placeholder="+971 …" icon={<PhoneIcon size={14} />} />
+              <Input label={t("field.whatsappBusiness", "WhatsApp Business")} value={form.whatsapp_business} onChange={v => setField("whatsapp_business", sanPhone(v))} placeholder="+971 …" icon={<PhoneIcon size={14} />} inputMode="tel" />
               <div className="grid grid-cols-2 gap-3">
                 <Input label={t("field.wechatId", "WeChat ID")} value={form.wechat_id} onChange={v => setField("wechat_id", v)} placeholder="@handle" icon={<MessageSquareIcon size={14} />} />
                 <Input label={t("field.telegramId", "Telegram ID")} value={form.telegram_id} onChange={v => setField("telegram_id", v)} placeholder="@handle" icon={<MessageSquareIcon size={14} />} />
@@ -7957,7 +7963,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <FormSection title={t("section.companyName")} icon={<Building2Icon size={14} />} owner={t("owner.procurement")} ownerLabel={t("owner.label")} dept="procurement" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
               <div className="space-y-3">
                 <Input label={t("field.companyNameEn")} value={form.company_name_en} onChange={v => setField("company_name_en", v)} placeholder={t("placeholder.companyNameEn")} icon={<Building2Icon size={14} />} tier="required" invalid={triedSave && !form.company_name_en.trim()} />
-                <Input label={t("field.companyNameCn")} tier="optional" value={form.company_name_cn} onChange={v => setField("company_name_cn", v.replace(/[؀-ۿݐ-ݿࢠ-ࣿ]/g, ""))} placeholder={t("placeholder.companyNameCn")} icon={<LanguagesIcon size={14} />} />
+                <Input label={t("field.companyNameCn")} tier="optional" value={form.company_name_cn} onChange={v => setField("company_name_cn", v.replace(/[؀-ۿݐ-ݿࢠ-ࣿ]/g, ""))} placeholder={t("placeholder.companyNameCn")} icon={<LanguagesIcon size={14} />} invalid={!!form.company_name_cn.trim() && !hasCJKChars(form.company_name_cn)} />
                 {/* Additional Company Names */}
                 <div>
                   <label className="text-xs text-[var(--text-faint)] mb-2 block">{t("field.additionalNames")}</label>
@@ -8042,7 +8048,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <PhoneField label={t("field.contactTel")} value={form.supplier_tel} onChange={v => setField("supplier_tel", v)} placeholder={t("field.contactTel")} defaultIso={form.country_code || "CN"} />
                   <PhoneField label={t("field.contactMobile")} value={form.supplier_mobile} onChange={v => setField("supplier_mobile", v)} placeholder={t("field.contactMobile")} defaultIso={form.country_code || "CN"} />
                 </div>
-                <Input label={t("field.contactEmail")} type="email" value={form.supplier_email} onChange={v => setField("supplier_email", v)} placeholder="company@example.com" icon={<EnvelopeIcon size={14} />} />
+                <Input label={t("field.contactEmail")} type="email" value={form.supplier_email} onChange={v => setField("supplier_email", v)} placeholder="company@example.com" icon={<EnvelopeIcon size={14} />} invalid={!!form.supplier_email.trim() && !RE_EMAIL.test(form.supplier_email.trim())} />
                 {/* Website + optional QR (some suppliers share their site as a QR code) */}
                 <MessagingIdField
                   label={t("field.website")}
