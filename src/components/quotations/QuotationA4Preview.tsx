@@ -1118,7 +1118,7 @@ export default function QuotationA4Preview({
               }
 
               return (
-                <tr key={idx} style={{ height: "auto", position: "relative" }}>
+                <tr key={idx} className="pq-row" style={{ height: "auto", position: "relative" }}>
                   {/* The NO. cell carries an explicit height: 112 so
                       the row's <tr> is guaranteed to be at least 112
                       px tall — that's what anchors the row action
@@ -1260,7 +1260,7 @@ export default function QuotationA4Preview({
                         was letting children spill past the wrapper
                         on shorter rows). */}
                     <div
-                      className="no-print"
+                      className="no-print pq-row-actions"
                       style={{
                         position: "absolute",
                         top: "50%",
@@ -1299,8 +1299,7 @@ export default function QuotationA4Preview({
                         borderRadius: 10,
                         padding: 4,
                         boxShadow: "0 6px 20px rgba(0,0,0,0.45)",
-                        overflow: "hidden",
-                        zIndex: 2,
+                        zIndex: 3,
                       }}
                     >
                       <RowActionBtn
@@ -1336,7 +1335,7 @@ export default function QuotationA4Preview({
                         vertical-centre anchor, same shadow. Sits 8 px
                         to the right of the cluster. */}
                     <div
-                      className="quot-row-notes no-print"
+                      className="quot-row-notes no-print pq-row-note"
                       style={{
                         position: "absolute",
                         top: "50%",
@@ -5153,6 +5152,25 @@ function ShipmentDetailsCard({
       <style>{`
         @media screen and (max-width: 767px) {
           .pq-shipment-grid { grid-template-columns: auto 1fr !important; }
+        }
+        /* Row controls + internal-note panel sit in the dark margin OUTSIDE
+           the A4 page. Keep that margin clean: hide them at rest and reveal
+           only the hovered / focused row's controls — so the editor shows one
+           tidy control set at a time instead of a cluttered stack down the side. */
+        .pq-row-actions, .pq-row-note {
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.14s ease;
+        }
+        .pq-row:hover .pq-row-actions,
+        .pq-row:hover .pq-row-note,
+        .pq-row:focus-within .pq-row-actions,
+        .pq-row:focus-within .pq-row-note {
+          opacity: 1;
+          pointer-events: auto;
+        }
+        @media print {
+          .pq-row-actions, .pq-row-note { display: none !important; }
         }
         .pq-detail-cell[contenteditable="true"]:empty::before {
           content: "—";
