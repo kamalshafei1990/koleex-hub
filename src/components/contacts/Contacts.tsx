@@ -2252,11 +2252,10 @@ const DEPT_TONE: Record<string, { dot: string; chipIdle: string; chipActive: str
    (Identity, Communication, Commercial, …). Call sites hide it while a
    department filter is active (so it never orphans above zero sections). */
 function FormGroupLabel({ label }: { label: string }) {
+  // Matches the Supplier 360 page's GroupLabel band so the add/edit form and
+  // the detail page read with the same hierarchy.
   return (
-    <div className="flex items-center gap-3 pt-4 first:pt-0">
-      <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-faint)] whitespace-nowrap">{label}</span>
-      <span className="h-px flex-1 bg-[var(--border-color)]" />
-    </div>
+    <div className="mx-4 md:mx-6 mt-6 mb-1 text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--text-faint)] first:mt-2">{label}</div>
   );
 }
 
@@ -2273,12 +2272,15 @@ const FormSection = React.memo(function FormSection({ title, icon, children, own
   const audit = dept && auditMap ? auditMap[dept] : undefined;
   let auditDate = "";
   if (audit) { try { auditDate = new Date(audit.at).toLocaleDateString(); } catch { auditDate = ""; } }
+  /* Card grammar mirrors the Supplier 360 page's `Sec` component: a rounded,
+     bordered panel with a tinted icon chip + title header, then a padded body —
+     so the add/edit form and the detail page look like one system. */
   return (
-    <div className="border-b border-[var(--border-color)] px-4 md:px-6 py-4 md:py-5">
-      <div className="flex items-center justify-between gap-2 mb-1">
-        <div className="flex items-center gap-2 min-w-0">
-          {icon && <span className="text-[var(--text-dim)]">{icon}</span>}
-          <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider truncate">{title}</h3>
+    <div className="mx-4 md:mx-6 my-3 overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/30 px-4 md:px-5 py-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          {icon && <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]">{icon}</span>}
+          <h3 className="truncate text-[13px] font-semibold tracking-tight text-[var(--text-primary)]">{title}</h3>
         </div>
         {owner && (
           <span
@@ -2290,14 +2292,15 @@ const FormSection = React.memo(function FormSection({ title, icon, children, own
           </span>
         )}
       </div>
-      {audit && (
-        <div className="mb-4 flex items-center gap-1.5 text-[10px] text-[var(--text-ghost)]">
-          <ClockIcon size={10} />
-          <span>{updatedByLabel ?? "Updated by"} <span className="font-medium text-[var(--text-dim)]">{audit.name}</span>{auditDate ? ` · ${auditDate}` : ""}</span>
-        </div>
-      )}
-      {!audit && <div className="mb-3" />}
-      {children}
+      <div className="px-4 md:px-5 py-4">
+        {audit && (
+          <div className="mb-3 flex items-center gap-1.5 text-[10px] text-[var(--text-ghost)]">
+            <ClockIcon size={10} />
+            <span>{updatedByLabel ?? "Updated by"} <span className="font-medium text-[var(--text-dim)]">{audit.name}</span>{auditDate ? ` · ${auditDate}` : ""}</span>
+          </div>
+        )}
+        {children}
+      </div>
     </div>
   );
 });
