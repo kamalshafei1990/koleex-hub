@@ -24,7 +24,7 @@ function buildLinkPatch(body: Record<string, unknown>): Record<string, unknown> 
   if (typeof body.sourcing_role === "string" && ROLES.has(body.sourcing_role)) row.sourcing_role = body.sourcing_role;
   if ("sourcing_priority" in body) row.sourcing_priority = body.sourcing_priority === "" || body.sourcing_priority == null ? null : Math.round(Number(body.sourcing_priority));
   if ("lead_time_days" in body) row.lead_time_days = body.lead_time_days === "" || body.lead_time_days == null ? null : Math.round(Number(body.lead_time_days));
-  for (const k of ["target_price", "moq", "risk_notes", "notes"]) {
+  for (const k of ["target_price", "moq", "capacity", "capacity_unit", "risk_notes", "notes"]) {
     if (k in body) row[k] = typeof body[k] === "string" && (body[k] as string).trim() ? (body[k] as string).trim() : null;
   }
   if ("quality_level" in body) row.quality_level = typeof body.quality_level === "string" && QUALITY.has(body.quality_level) ? body.quality_level : null;

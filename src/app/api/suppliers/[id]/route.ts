@@ -234,7 +234,7 @@ export async function GET(
         .eq("tenant_id", tid).eq("supplier_id", id).limit(1)),
     safe(() =>
       supabaseServer.from("supplier_product_links")
-        .select("id, product_id, sourcing_role, sourcing_priority, target_price, quality_level, lead_time_days, moq, risk_notes, notes, products(product_name, category_slug)")
+        .select("id, product_id, sourcing_role, sourcing_priority, target_price, quality_level, lead_time_days, moq, capacity, capacity_unit, risk_notes, notes, products(product_name, category_slug)")
         .eq("tenant_id", tid).eq("supplier_id", id).not("sourcing_role", "is", null)
         .order("sourcing_priority", { ascending: true, nullsFirst: false }).limit(200)),
     safe(() =>

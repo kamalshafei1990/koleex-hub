@@ -102,6 +102,7 @@ export default function SourcingSection({
   const [selProduct, setSelProduct] = useState<Row | null>(null);
   const [aRole, setARole] = useState("preferred");
   const [aLead, setALead] = useState(""); const [aMoq, setAMoq] = useState(""); const [aPrice, setAPrice] = useState(""); const [aQuality, setAQuality] = useState("");
+  const [aCapacity, setACapacity] = useState(""); const [aCapacityUnit, setACapacityUnit] = useState("units / month");
   const [aBusy, setABusy] = useState(false); const [aErr, setAErr] = useState<string | null>(null);
   useEffect(() => { if (!addOpen || products.length) return;
     fetch("/api/products", { credentials: "include" }).then((r) => r.json()).then((j) => setProducts(Array.isArray(j.products) ? j.products : [])).catch(() => {}); }, [addOpen, products.length]);
@@ -114,9 +115,9 @@ export default function SourcingSection({
     setABusy(true); setAErr(null);
     try {
       const r = await fetch(`/api/suppliers/${supplierId}/sourcing/links`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product_id: str(selProduct, "id"), sourcing_role: aRole, lead_time_days: aLead, moq: aMoq, target_price: aPrice, quality_level: aQuality }) });
+        body: JSON.stringify({ product_id: str(selProduct, "id"), sourcing_role: aRole, lead_time_days: aLead, moq: aMoq, target_price: aPrice, quality_level: aQuality, capacity: aCapacity, capacity_unit: aCapacity ? aCapacityUnit : "" }) });
       if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`)); }
-      setAddOpen(false); setSelProduct(null); setPq(""); setALead(""); setAMoq(""); setAPrice(""); setAQuality(""); await onSaved();
+      setAddOpen(false); setSelProduct(null); setPq(""); setALead(""); setAMoq(""); setAPrice(""); setAQuality(""); setACapacity(""); await onSaved();
     } catch (e) { setAErr(e instanceof Error ? e.message : String(e)); } finally { setABusy(false); }
   };
   const setRole = async (link: Row, role: string) => {
@@ -202,7 +203,7 @@ export default function SourcingSection({
             {links.map((l) => {
               const id = str(l, "id");
               const prod = (l.products as Row | null) ?? {};
-              const terms = [str(l, "lead_time_days") && t("srcg.leadTerm", "{n}d lead").replace("{n}", str(l, "lead_time_days")), str(l, "moq") && t("srcg.moqTerm", "MOQ {n}").replace("{n}", str(l, "moq")), str(l, "target_price") && `≤ ${str(l, "target_price")}`, str(l, "quality_level") && t("srcg.qualityTerm", "{q} quality").replace("{q}", str(l, "quality_level"))].filter(Boolean) as string[];
+              const terms = [str(l, "lead_time_days") && t("srcg.leadTerm", "{n}d lead").replace("{n}", str(l, "lead_time_days")), str(l, "moq") && t("srcg.moqTerm", "MOQ {n}").replace("{n}", str(l, "moq")), str(l, "capacity") && `${str(l, "capacity")}${str(l, "capacity_unit") ? " " + str(l, "capacity_unit") : ""}`, str(l, "target_price") && `≤ ${str(l, "target_price")}`, str(l, "quality_level") && t("srcg.qualityTerm", "{q} quality").replace("{q}", str(l, "quality_level"))].filter(Boolean) as string[];
               return (
                 <div key={id} className="rounded-xl bg-[var(--bg-surface-subtle)] p-3">
                   <div className="flex items-start justify-between gap-2">
@@ -287,6 +288,12 @@ export default function SourcingSection({
               <Field label={t("srcg.qualityLabel", "Quality")}><select className={inputCls} value={aQuality} onChange={(e) => setAQuality(e.target.value)}>{QUALITY.map((q) => <option key={q} value={q}>{q ? q[0].toUpperCase() + q.slice(1) : "—"}</option>)}</select></Field>
               <Field label={t("srcg.leadTimeLabel", "Lead time (days)")}><input type="number" className={inputCls} value={aLead} onChange={(e) => setALead(e.target.value)} /></Field>
               <Field label={t("srcg.moqLabel", "MOQ")}><input className={inputCls} value={aMoq} onChange={(e) => setAMoq(e.target.value)} /></Field>
+              <Field label={t("srcg.capacityLabel", "Capacity (per product)")}><input className={inputCls} value={aCapacity} onChange={(e) => setACapacity(e.target.value)} placeholder="e.g. 5000" inputMode="decimal" /></Field>
+              <Field label={t("srcg.capacityUnitLabel", "Capacity unit")}>
+                <select className={inputCls} value={aCapacityUnit} onChange={(e) => setACapacityUnit(e.target.value)}>
+                  {["units / month", "units / week", "units / day", "units / year", "pcs / month", "tons / month", "containers / month"].map((u) => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </Field>
             </div>
             <Field label={t("srcg.targetPriceLabel", "Target price")}><input className={inputCls} value={aPrice} onChange={(e) => setAPrice(e.target.value)} placeholder={t("srcg.targetPricePlaceholder", "e.g. ≤ $420/unit")} /></Field>
             {aErr ? <div className="text-[12px] text-rose-400">{aErr}</div> : null}
