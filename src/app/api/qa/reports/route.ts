@@ -7,11 +7,13 @@ import {
   ISSUE_TYPE_VALUES,
   SEVERITY_VALUES,
   STATUS_VALUES,
+  PRIORITY_VALUES,
   moduleForRoute,
   type IssueType,
   type Severity,
   type IssueStatus,
 } from "@/lib/qa/types";
+import { logActivity } from "@/lib/qa/activity";
 
 const BUCKET = "qa-screenshots";
 
@@ -103,6 +105,17 @@ export async function POST(req: Request) {
     console.error("[api/qa/reports POST]", error.message);
     return NextResponse.json({ error: "Couldn't save the report." }, { status: 500 });
   }
+
+  // Seed the activity timeline with the creation event (best-effort).
+  await logActivity({
+    tenant_id: auth.tenant_id,
+    issue_id: data.id,
+    actor_id: auth.account_id,
+    actor_name: auth.username ?? null,
+    activity_type: "created",
+    new_value: title,
+  });
+
   return NextResponse.json({ id: data.id }, { status: 201 });
 }
 
@@ -115,10 +128,18 @@ export async function GET(req: Request) {
   }
 
   const url = new URL(req.url);
-  const module = url.searchParams.get("module");
-  const severity = url.searchParams.get("severity");
-  const status = url.searchParams.get("status");
-  const q = (url.searchParams.get("q") ?? "").trim();
+  const p = url.searchParams;
+  const module = p.get("module");
+  const severity = p.get("severity");
+  const status = p.get("status");
+  const priority = p.get("priority");
+  const assignee = p.get("assignee");           // account id | "unassigned"
+  const reporter = p.get("reporter");           // reporter account id
+  const claudeReady = p.get("claude_ready");    // "1" | "0"
+  const duplicate = p.get("duplicate");         // "1" (only duplicates) | "0" (exclude)
+  const from = p.get("from");                   // ISO date (created_at >=)
+  const to = p.get("to");                       // ISO date (created_at <=)
+  const q = (p.get("q") ?? "").trim();
 
   let query = supabaseServer
     .from("qa_issue_reports")
@@ -130,6 +151,16 @@ export async function GET(req: Request) {
   if (module) query = query.eq("app_module", module);
   if (severity && (SEVERITY_VALUES as string[]).includes(severity)) query = query.eq("severity", severity);
   if (status && (STATUS_VALUES as string[]).includes(status)) query = query.eq("status", status);
+  if (priority && (PRIORITY_VALUES as string[]).includes(priority)) query = query.eq("priority", priority);
+  if (assignee === "unassigned") query = query.is("assigned_to", null);
+  else if (assignee) query = query.eq("assigned_to", assignee);
+  if (reporter) query = query.eq("reporter_id", reporter);
+  if (claudeReady === "1") query = query.eq("claude_ready", true);
+  else if (claudeReady === "0") query = query.eq("claude_ready", false);
+  if (duplicate === "1") query = query.not("duplicate_of_issue_id", "is", null);
+  else if (duplicate === "0") query = query.is("duplicate_of_issue_id", null);
+  if (from) query = query.gte("created_at", from);
+  if (to) query = query.lte("created_at", to);
   if (q) {
     const s = q.replace(/[%_]/g, "\\$&");
     query = query.or(`title.ilike.%${s}%,description.ilike.%${s}%`);
@@ -142,20 +173,56 @@ export async function GET(req: Request) {
   }
 
   const rows = (data ?? []) as Array<Record<string, unknown>>;
+  const ids = rows.map((r) => r.id as string);
+
+  // Hydrate assignee display names (one round-trip).
+  const assigneeIds = Array.from(
+    new Set(rows.map((r) => r.assigned_to as string | null).filter(Boolean) as string[]),
+  );
+  const nameById: Record<string, string> = {};
+  if (assigneeIds.length > 0) {
+    const { data: accts } = await supabaseServer
+      .from("accounts")
+      .select("id, username, login_email")
+      .eq("tenant_id", auth.tenant_id)
+      .in("id", assigneeIds);
+    for (const a of (accts ?? []) as Array<{ id: string; username: string | null; login_email: string | null }>) {
+      nameById[a.id] = a.username || a.login_email || "—";
+    }
+  }
+
+  // Hydrate comment counts (one round-trip, counted in JS).
+  const commentCount: Record<string, number> = {};
+  if (ids.length > 0) {
+    const { data: cmts } = await supabaseServer
+      .from("qa_issue_comments")
+      .select("issue_id")
+      .eq("tenant_id", auth.tenant_id)
+      .in("issue_id", ids);
+    for (const c of (cmts ?? []) as Array<{ issue_id: string }>) {
+      commentCount[c.issue_id] = (commentCount[c.issue_id] ?? 0) + 1;
+    }
+  }
+
   const reports = await Promise.all(
     rows.map(async (r) => ({
       ...r,
       screenshot_url: await signScreenshot(auth.tenant_id, r.screenshot_url as string | null),
+      assigned_to_name: r.assigned_to ? nameById[r.assigned_to as string] ?? null : null,
+      comment_count: commentCount[r.id as string] ?? 0,
     })),
   );
 
-  // Module facet list for the filter dropdown.
+  // Facets for filter dropdowns.
   const modules = Array.from(
     new Set(rows.map((r) => r.app_module as string | null).filter(Boolean) as string[]),
   ).sort();
+  const assignees = assigneeIds
+    .map((id) => ({ id, name: nameById[id] ?? "—" }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   return NextResponse.json(
-    { reports, modules },
+    { reports, modules, assignees },
     { headers: { "Cache-Control": "private, no-store" } },
   );
 }

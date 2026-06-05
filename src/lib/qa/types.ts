@@ -18,15 +18,20 @@ export type IssueType =
 
 export type Severity = "low" | "medium" | "high" | "critical";
 
+/** Operational urgency (workflow), distinct from severity (impact). */
+export type Priority = "low" | "normal" | "high" | "urgent";
+
 export type IssueStatus =
   | "new"
   | "triaged"
   | "in_progress"
   | "fixed"
+  | "verified"
   | "rejected"
   | "duplicate"
   | "needs_more_info"
-  | "closed";
+  | "closed"
+  | "reopened";
 
 export const ISSUE_TYPES: { value: IssueType; label: string }[] = [
   { value: "bug", label: "Bug" },
@@ -52,9 +57,30 @@ export const STATUSES: { value: IssueStatus; label: string }[] = [
   { value: "triaged", label: "Triaged" },
   { value: "in_progress", label: "In Progress" },
   { value: "fixed", label: "Fixed" },
+  { value: "verified", label: "Verified" },
   { value: "rejected", label: "Rejected" },
   { value: "duplicate", label: "Duplicate" },
   { value: "needs_more_info", label: "Needs More Info" },
+  { value: "closed", label: "Closed" },
+  { value: "reopened", label: "Reopened" },
+];
+
+export const PRIORITIES: { value: Priority; label: string }[] = [
+  { value: "low", label: "Low" },
+  { value: "normal", label: "Normal" },
+  { value: "high", label: "High" },
+  { value: "urgent", label: "Urgent" },
+];
+
+/** Terminal-ish states that stamp resolved_at and can be reopened. */
+export const RESOLVED_STATUSES: IssueStatus[] = ["fixed", "verified", "rejected", "duplicate", "closed"];
+
+/** Linear happy-path lifecycle, used for the workflow stepper UI. */
+export const WORKFLOW_STEPS: { value: IssueStatus; label: string }[] = [
+  { value: "new", label: "Open" },
+  { value: "in_progress", label: "In Progress" },
+  { value: "fixed", label: "Fixed" },
+  { value: "verified", label: "Verified" },
   { value: "closed", label: "Closed" },
 ];
 
@@ -67,10 +93,17 @@ export const SEVERITY_LABEL: Record<Severity, string> = Object.fromEntries(
 export const STATUS_LABEL: Record<IssueStatus, string> = Object.fromEntries(
   STATUSES.map((t) => [t.value, t.label]),
 ) as Record<IssueStatus, string>;
+export const PRIORITY_LABEL: Record<Priority, string> = Object.fromEntries(
+  PRIORITIES.map((t) => [t.value, t.label]),
+) as Record<Priority, string>;
 
 export const ISSUE_TYPE_VALUES = ISSUE_TYPES.map((t) => t.value);
 export const SEVERITY_VALUES = SEVERITIES.map((t) => t.value);
 export const STATUS_VALUES = STATUSES.map((t) => t.value);
+export const PRIORITY_VALUES = PRIORITIES.map((t) => t.value);
+
+/** Sort weight for the priority queue (urgent first). */
+export const PRIORITY_RANK: Record<Priority, number> = { urgent: 0, high: 1, normal: 2, low: 3 };
 
 export interface QaReport {
   id: string;
@@ -99,6 +132,20 @@ export interface QaReport {
   developer_notes: string | null;
   resolution_summary: string | null;
   fixed_commit: string | null;
+  /* Phase-3 workflow & ticketing. */
+  priority: Priority;
+  assigned_at: string | null;
+  assigned_by: string | null;
+  duplicate_of_issue_id: string | null;
+  reopened_at: string | null;
+  reopen_reason: string | null;
+  reopen_count: number;
+  /** Generated column — true when the row carries everything the AI pipeline needs. */
+  claude_ready: boolean;
+  /** Hydrated by the API (denormalised, not a column): display name of the assignee. */
+  assigned_to_name?: string | null;
+  /** Hydrated by the API: comment count for list badges. */
+  comment_count?: number;
   /* Phase-2 component inspection metadata. */
   component_name: string | null;
   component_module: string | null;
@@ -148,6 +195,104 @@ const ROUTE_MODULE_RULES: { prefix: string; module: string }[] = [
   { prefix: "/create", module: "Create" },
   { prefix: "/qa", module: "QA" },
 ];
+
+/* ─────────────────────────── Phase-3 entities ─────────────────────────── */
+
+/** A single message in an issue's discussion thread. */
+export interface QaComment {
+  id: string;
+  tenant_id: string;
+  issue_id: string;
+  user_id: string | null;
+  user_name: string | null;
+  user_role: string | null;
+  message: string;
+  is_internal_note: boolean;
+  attachments: unknown[];
+  created_at: string;
+  edited_at: string | null;
+}
+
+export type ActivityType =
+  | "created"
+  | "status_changed"
+  | "assigned"
+  | "unassigned"
+  | "priority_changed"
+  | "reopened"
+  | "resolved"
+  | "comment_added"
+  | "duplicate_marked"
+  | "commit_added";
+
+/** One append-only entry in an issue's activity timeline. */
+export interface QaActivity {
+  id: string;
+  tenant_id: string;
+  issue_id: string;
+  actor_id: string | null;
+  actor_name: string | null;
+  activity_type: ActivityType;
+  old_value: string | null;
+  new_value: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export const ACTIVITY_LABEL: Record<ActivityType, string> = {
+  created: "filed the issue",
+  status_changed: "changed status",
+  assigned: "assigned",
+  unassigned: "unassigned",
+  priority_changed: "changed priority",
+  reopened: "reopened",
+  resolved: "resolved",
+  comment_added: "commented",
+  duplicate_marked: "marked as duplicate",
+  commit_added: "linked a fix commit",
+};
+
+/** A pickable assignee (developer/tester) for the assignment dropdown. */
+export interface QaAssignee {
+  id: string;
+  name: string;
+  email: string | null;
+  avatar_url: string | null;
+}
+
+/** Predefined saved views for the queue (client-side filter presets). */
+export type SavedViewId =
+  | "all"
+  | "my_issues"
+  | "urgent"
+  | "waiting_verification"
+  | "ready_for_claude"
+  | "recently_reopened";
+
+export const SAVED_VIEWS: { id: SavedViewId; label: string }[] = [
+  { id: "all", label: "All Issues" },
+  { id: "my_issues", label: "My Issues" },
+  { id: "urgent", label: "Urgent" },
+  { id: "waiting_verification", label: "Waiting Verification" },
+  { id: "ready_for_claude", label: "Ready for Claude" },
+  { id: "recently_reopened", label: "Recently Reopened" },
+];
+
+/**
+ * Compute Claude-readiness on the client (mirror of the DB generated column).
+ * A report is ready when it carries a screenshot, pinned component metadata,
+ * a description, and an expected result.
+ */
+export function isClaudeReady(r: Pick<QaReport,
+  "screenshot_url" | "component_name" | "description" | "expected_result" | "claude_ready">): boolean {
+  if (typeof r.claude_ready === "boolean") return r.claude_ready;
+  return Boolean(
+    r.screenshot_url &&
+    r.component_name &&
+    r.description && r.description.trim() &&
+    r.expected_result && r.expected_result.trim(),
+  );
+}
 
 export function moduleForRoute(route: string | null | undefined): string {
   if (!route) return "Hub";
