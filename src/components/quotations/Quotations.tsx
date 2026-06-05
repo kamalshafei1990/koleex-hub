@@ -917,6 +917,17 @@ export default function Quotations() {
      whether a click was registered or whether the save succeeded. */
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveError, setSaveError] = useState<string>("");
+  /* Unsaved-changes guard. `baselineRef` holds a JSON snapshot of the quote
+     as it was last loaded / saved; the working copy is "dirty" once it
+     diverges. Drives both the in-app exit confirm modal and the native
+     beforeunload prompt (tab close / refresh). */
+  const baselineRef = useRef<string>("");
+  const markSaved = useCallback((q: Quotation | null) => {
+    baselineRef.current = q ? JSON.stringify(q) : "";
+  }, []);
+  /* When set, the "unsaved changes" modal is open and this callback runs
+     once the user chooses to leave (after an optional save). */
+  const [exitPromptOpen, setExitPromptOpen] = useState(false);
   const fileInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
   /* "+ From catalog" picker. Owned by the parent so the modal can
      stay mounted across A4-page renders without each page mounting
@@ -982,8 +993,9 @@ export default function Quotations() {
       updatedAt: new Date().toISOString(),
     };
     setCurrent(q);
+    markSaved(q);            // a pristine new quote isn't "dirty" until edited
     setView("editor");
-  }, []);
+  }, [markSaved]);
 
   /* ── Open existing ──
      The list endpoint strips `items` from the doc payload to keep the
@@ -992,7 +1004,9 @@ export default function Quotations() {
      otherwise the items table renders as a single empty placeholder. */
   const handleOpen = useCallback(async (q: Quotation) => {
     // Optimistic mount so the editor opens immediately with header data…
-    setCurrent({ ...q, items: q.items.map((i) => ({ ...i })) });
+    const optimistic = { ...q, items: q.items.map((i) => ({ ...i })) };
+    setCurrent(optimistic);
+    markSaved(optimistic);   // baseline = loaded state (not dirty yet)
     setView("editor");
     // …then hydrate the full doc (with items) from the detail endpoint.
     if (q.id.length === 36) {
@@ -1006,11 +1020,13 @@ export default function Quotations() {
         const hydrated = fromRow(full);
         setCurrent((prev) => {
           if (prev?.id && prev.id !== requestedId) return prev;
-          return { ...hydrated, items: hydrated.items.map((i) => ({ ...i })) };
+          const next = { ...hydrated, items: hydrated.items.map((i) => ({ ...i })) };
+          markSaved(next);   // re-baseline to the fully-hydrated doc
+          return next;
         });
       }
     }
-  }, []);
+  }, [markSaved]);
 
   /* ── Delete from list ── */
   /* Track which row's Duplicate button is in flight so the icon can
@@ -1060,6 +1076,7 @@ export default function Quotations() {
            always wants to tweak the customer name / address right
            after duplicating, so the extra click would be friction. */
         setCurrent(next);
+        markSaved(next);     // the duplicate is persisted → not dirty yet
         setView("editor");
       } catch (e) {
         alert(`Duplicate failed: ${humanizeError(e)}`);
@@ -1127,12 +1144,14 @@ export default function Quotations() {
         const saved = await saveQuotationRemote(intent);
         if (saved) {
           setCurrent(saved);
+          markSaved(saved);   // clears the dirty flag — editor matches server
           const list = await loadQuotationsRemote({ fresh: true });
           setQuotations(list);
           setSaveState("saved");
           // Reset the "Saved ✓" flash after 2.5 s so the button returns
           // to its idle label.
           setTimeout(() => setSaveState("idle"), 2500);
+          return true;
         } else {
           // saveQuotationRemote returns null when the POST returned non-OK.
           // upsertDoc swallows the error so we have no detail; surface a
@@ -1140,14 +1159,16 @@ export default function Quotations() {
           setSaveState("error");
           setSaveError("Save failed. Please retry — if it keeps failing, refresh the page.");
           setTimeout(() => setSaveState("idle"), 4000);
+          return false;
         }
       } catch (e) {
         setSaveState("error");
         setSaveError(humanizeError(e));
         setTimeout(() => setSaveState("idle"), 4000);
+        return false;
       }
     },
-    [current]
+    [current, markSaved]
   );
 
   /* ── Convert current to invoice. Uses the server-side helper which
@@ -1706,6 +1727,46 @@ export default function Quotations() {
       })()
     : 0;
 
+  /* ── Unsaved-changes guard ──────────────────────────────────────
+     `dirty` = the working copy diverged from the last loaded/saved
+     snapshot. Drives the native tab-close prompt + the styled in-app
+     confirm modal shown when the operator presses Back. */
+  const dirty =
+    view === "editor" && current
+      ? JSON.stringify(current) !== baselineRef.current
+      : false;
+
+  useEffect(() => {
+    if (!dirty) return;
+    /* Browser-native "Leave site?" prompt for tab close / refresh /
+       hard navigation. The dialog chrome is browser-controlled (can't be
+       themed) — the styled modal below covers the in-app Back button. */
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirty]);
+
+  const leaveEditor = useCallback(() => {
+    setExitPromptOpen(false);
+    baselineRef.current = "";
+    setView("list");
+  }, []);
+
+  /* Back button → if there are unsaved edits, ask first; otherwise leave. */
+  const requestExit = useCallback(() => {
+    if (dirty) setExitPromptOpen(true);
+    else setView("list");
+  }, [dirty]);
+
+  const saveAndExit = useCallback(async () => {
+    const ok = await handleSave("draft");
+    if (ok) leaveEditor();
+    // On failure the modal stays open; the Save-state pill shows why.
+  }, [handleSave, leaveEditor]);
+
   /* ── Sorted list ── */
   const sortedQuotations = [...quotations].sort(
     (a, b) =>
@@ -1905,7 +1966,7 @@ export default function Quotations() {
         }}
       >
         <button
-          onClick={() => setView("list")}
+          onClick={requestExit}
           className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 hover:text-[var(--text-primary)] bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
         >
           <ArrowLeftIcon size={15} />
@@ -2114,6 +2175,54 @@ export default function Quotations() {
         onClose={() => setCustomerPickerOpen(false)}
         onPick={applyCustomerPick}
       />
+
+      {/* Unsaved-changes confirm — shown when the operator presses Back with
+          pending edits. Styled to the Hub design system (dark surface, single
+          blue CTA, calm ghost / discard actions). */}
+      {exitPromptOpen && (
+        <div
+          onClick={() => setExitPromptOpen(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 16 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("quot.unsavedTitle", "Unsaved changes")}
+            style={{ width: "100%", maxWidth: 420, background: "var(--bg-secondary, #1f2937)", color: "var(--text-primary, #e5e7eb)", border: "1px solid var(--border-color, #374151)", borderRadius: 14, boxShadow: "0 24px 70px rgba(0,0,0,0.6)", overflow: "hidden" }}
+          >
+            <style>{`
+              .qz-btn{height:38px;padding:0 16px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid transparent;transition:background .15s ease,border-color .15s ease,color .15s ease,opacity .15s ease;font-family:inherit;}
+              .qz-btn:disabled{opacity:.55;cursor:not-allowed;}
+              .qz-btn--ghost{background:transparent;border-color:var(--border-color,#374151);color:var(--text-secondary,#cbd5e1);}
+              .qz-btn--ghost:hover{background:rgba(255,255,255,0.06);color:var(--text-primary,#fff);}
+              .qz-btn--danger{background:transparent;color:#f87171;}
+              .qz-btn--danger:hover{background:rgba(239,68,68,0.12);}
+              .qz-btn--primary{background:#0066FF;color:#fff;box-shadow:0 6px 18px rgba(0,102,255,0.35);}
+              .qz-btn--primary:hover:not(:disabled){background:#0052CC;}
+            `}</style>
+            <div style={{ padding: "20px 22px 6px" }}>
+              <div style={{ fontSize: 16, fontWeight: 600, letterSpacing: "0.01em" }}>
+                {t("quot.unsavedTitle", "Unsaved changes")}
+              </div>
+              <p style={{ marginTop: 8, fontSize: 13.5, lineHeight: 1.55, color: "var(--text-secondary, #9ca3af)" }}>
+                {t("quot.unsavedBody", "You have unsaved changes in this quotation. Do you want to save them before leaving?")}
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center", padding: "14px 22px 18px", flexWrap: "wrap" }}>
+              <button type="button" className="qz-btn qz-btn--ghost" onClick={() => setExitPromptOpen(false)}>
+                {t("btn.cancel", "Cancel")}
+              </button>
+              <button type="button" className="qz-btn qz-btn--danger" onClick={leaveEditor}>
+                {t("quot.discardLeave", "Discard & leave")}
+              </button>
+              <button type="button" className="qz-btn qz-btn--primary" disabled={saveState === "saving"} onClick={saveAndExit}>
+                {saveState === "saving" ? t("quot.saving", "Saving…") : t("quot.saveLeave", "Save & leave")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
