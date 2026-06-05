@@ -368,3 +368,50 @@ input[type="month"] {
 .dark input[type="month"] {
   color-scheme: dark;
 }
+[data-theme="dark"] input[type="time"],
+[data-theme="dark"] input[type="date"],
+[data-theme="dark"] input[type="datetime-local"],
+[data-theme="dark"] input[type="month"] {
+  color-scheme: dark;
+}
+
+/* ── Native <select> dropdowns (report GEN-5) ──────────────────────────────
+   Symptoms reported: option text was white-on-white in dark mode, the selected
+   item had no clear highlight, and long lists looked unscrollable. The popup is
+   drawn by the OS, so `color-scheme` is what makes it honor the active theme
+   (this is the real white-on-white fix). `option` background/colour is honoured
+   by Chromium and is a safe fallback elsewhere. Native popups scroll on their
+   own once they exceed the screen — the perceived "no scroll" was the
+   unreadable contrast, which the theme fix resolves. */
+select {
+  color-scheme: light dark;
+}
+[data-theme="dark"] select { color-scheme: dark; }
+[data-theme="light"] select { color-scheme: light; }
+
+select option,
+select optgroup {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-weight: 400;
+}
+select option:checked,
+select option[selected] {
+  background-color: var(--accent);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* ── Arabic / RTL typography (report GEN-5) ────────────────────────────────
+   Inter ships thin Arabic coverage, so Arabic rendered faint and cramped.
+   Fall back to a stronger system Arabic stack and add a little weight so
+   labels and option text read clearly. */
+[dir="rtl"],
+:lang(ar) {
+  font-family: 'Helvetica Neue', 'Geeza Pro', 'Noto Naskh Arabic',
+    'Segoe UI', Tahoma, Arial, sans-serif;
+}
+[dir="rtl"] select option,
+:lang(ar) select option {
+  font-weight: 500;
+}
