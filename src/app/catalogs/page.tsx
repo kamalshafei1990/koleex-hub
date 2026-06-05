@@ -1322,7 +1322,7 @@ function CatalogModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative flex max-h-[88vh] w-full max-w-[560px] flex-col overflow-hidden bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl">
+      <div {...kxInspectAttrs({ component: "CatalogUploadModal", module: "Catalogs", section: "Upload" })} className="relative flex max-h-[88vh] w-full max-w-[560px] flex-col overflow-hidden bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl">
         {/* Header */}
         <div className="shrink-0 flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2.5">
@@ -1916,7 +1916,7 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
   };
 
   return (
-    <div className={`group flex items-center gap-4 px-4 py-3.5 rounded-xl bg-[var(--bg-surface)] border transition-all ${selected ? "border-blue-500 ring-1 ring-blue-500/40" : "border-[var(--border-subtle)] hover:border-[var(--text-dim)]"}`}>
+    <div {...kxInspectAttrs({ component: "CatalogRow", module: "Catalogs", section: "Main List", recordId: catalog.id })} className={`group flex items-center gap-4 px-4 py-3.5 rounded-xl bg-[var(--bg-surface)] border transition-all ${selected ? "border-blue-500 ring-1 ring-blue-500/40" : "border-[var(--border-subtle)] hover:border-[var(--text-dim)]"}`}>
       <button onClick={onToggleSelect} aria-label="Select"
         className={`shrink-0 h-5 w-5 rounded border flex items-center justify-center transition-colors ${selected ? "bg-blue-500 border-blue-500 text-white" : "border-[var(--border-subtle)] text-transparent hover:border-[var(--text-dim)]"}`}>
         <CheckIcon className="h-3 w-3" />
@@ -2366,8 +2366,8 @@ function PreviewModal({ catalog, onClose, onDownload }: { catalog: CatalogEntry 
   };
 
   return (
-    <div className="fixed inset-0 z-[120] flex flex-col bg-black/90 backdrop-blur-sm">
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 text-white shrink-0">
+    <div className="fixed inset-0 z-[120] flex flex-col bg-black/90 backdrop-blur-sm" {...kxInspectAttrs({ component: "CatalogPreviewViewer", module: "Catalogs", section: "Preview", recordId: catalog.id })}>
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 text-white shrink-0" {...kxInspectAttrs({ component: "CatalogPreviewHeader", module: "Catalogs", section: "Preview" })}>
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-semibold truncate">{catalog.title}</p>
           <p className="text-[11px] text-white/50 truncate">
@@ -2764,7 +2764,7 @@ export default function CatalogsPage() {
 
         {/* Insights panel */}
         {showInsights && catalogs.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+          <div {...kxInspectAttrs({ component: "CatalogInsightsPanel", module: "Catalogs", section: "Insights" })} className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
             {/* Engagement */}
             <div className="rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-4">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-dim)] mb-3">{t("cat.insights.engagement")}</p>
@@ -2842,8 +2842,8 @@ export default function CatalogsPage() {
         )}
 
         {/* Toolbar */}
-        <div className="flex flex-wrap items-center gap-3 mb-6">
-          <div ref={searchBoxRef} className="relative flex-1 min-w-[200px] max-w-sm">
+        <div {...kxInspectAttrs({ component: "CatalogFiltersBar", module: "Catalogs", section: "Filters" })} className="flex flex-wrap items-center gap-3 mb-6">
+          <div ref={searchBoxRef} {...kxInspectAttrs({ component: "CatalogSearchBar", module: "Catalogs", section: "Search" })} className="relative flex-1 min-w-[200px] max-w-sm">
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)] z-10" />
             <input type="text" value={search}
               onChange={(e) => { setSearch(e.target.value); setSugIndex(-1); setSearchFocused(true); }}
