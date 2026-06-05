@@ -33,6 +33,7 @@ interface ContactSupplierRow {
   company_name_en: string | null;
   display_name: string | null;
   photo_url: string | null;
+  logo_url: string | null;
 }
 
 export async function GET() {
@@ -51,7 +52,7 @@ export async function GET() {
 
   const { data, error } = await supabaseServer
     .from("contacts")
-    .select("id, company_name_en, display_name, photo_url")
+    .select("id, company_name_en, display_name, photo_url, logo_url")
     .eq("contact_type", "supplier")
     .eq("tenant_id", auth.tenant_id)
     .order("company_name_en", { ascending: true });
@@ -70,7 +71,10 @@ export async function GET() {
     .map((r) => ({
       id: r.id,
       name: (r.company_name_en || r.display_name || "").trim(),
-      logo: r.photo_url || null,
+      /* Supplier (company) logos live in logo_url for ~all rows; only a couple
+         use photo_url. Prefer photo_url, fall back to logo_url — matching the
+         supplier directory avatar logic — so the picker shows real logos. */
+      logo: r.photo_url || r.logo_url || null,
     }))
     .filter((r) => r.name);
 
