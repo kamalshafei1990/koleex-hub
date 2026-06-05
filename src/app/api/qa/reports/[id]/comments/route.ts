@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { logActivity } from "@/lib/qa/activity";
-import { notifyIssue, parseMentions, resolveMentionedAccounts } from "@/lib/qa/notify";
+import { notifyIssue, parseMentions, resolveMentionedAccounts, reporterIssueLink, type NotifyTarget } from "@/lib/qa/notify";
 
 interface IssueParticipants {
   id: string;
@@ -115,7 +115,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const mentionedUsernames = parseMentions(message);
   const mentioned = await resolveMentionedAccounts(auth.tenant_id, mentionedUsernames);
   const actor = auth.username ?? "Someone";
-  const targets = [
+  const targets: NotifyTarget[] = [
     ...mentioned.map((u) => ({
       recipientId: u.id,
       type: "qa_issue_mentioned" as const,
@@ -135,6 +135,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       type: "qa_comment_added" as const,
       title: "New comment",
       body: `${actor} commented on "${issue.title}"`,
+      link: reporterIssueLink(id), // reporter → safe read-only view
     });
   }
   await notifyIssue(

@@ -39,9 +39,14 @@ export type QaNotificationType =
 /** Alert-tier events get the red "Alert" badge; everything else is a "Task". */
 const ALERT_TYPES = new Set<QaNotificationType>(["qa_issue_reopened"]);
 
-/** Deep-link that the QA console reads via ?issue= to auto-select the row. */
+/** Admin deep-link — the QA console reads ?issue= to auto-select the row. */
 export function issueLink(issueId: string): string {
   return `/database/issues?issue=${issueId}`;
+}
+
+/** Reporter-safe deep-link — the restricted, read-only issue view. */
+export function reporterIssueLink(issueId: string): string {
+  return `/qa/report/${issueId}`;
 }
 
 export interface NotifyTarget {
@@ -51,6 +56,9 @@ export interface NotifyTarget {
   body: string;
   /** Force the alert tier (e.g. urgent priority). */
   alert?: boolean;
+  /** Per-recipient destination. Defaults to the admin console link.
+   *  Reporter-directed notifications pass the reporter-safe link. */
+  link?: string;
 }
 
 export interface NotifyContext {
@@ -81,7 +89,6 @@ export async function notifyIssue(ctx: NotifyContext, targets: NotifyTarget[]): 
   }
   if (byRecipient.size === 0) return;
 
-  const link = issueLink(ctx.issueId);
   const rows = Array.from(byRecipient.entries()).map(([recipientId, t]) => ({
     tenant_id: ctx.tenantId,
     recipient_account_id: recipientId,
@@ -89,7 +96,7 @@ export async function notifyIssue(ctx: NotifyContext, targets: NotifyTarget[]): 
     category: t.alert || ALERT_TYPES.has(t.type) ? "alert" : "task",
     subject: t.title.slice(0, 200),
     body: t.body.slice(0, 1000),
-    link,
+    link: t.link ?? issueLink(ctx.issueId),
     metadata: {
       qa_type: t.type,
       entity_type: "qa_issue",

@@ -1,0 +1,296 @@
+"use client";
+
+/* ---------------------------------------------------------------------------
+   ReporterIssueView — the reporter-safe, read-only view of one QA issue
+   (/qa/report/[id]).
+
+   This is NOT the admin console. A reporter sees their own issue's status,
+   details, public discussion and resolution, and can post a public reply.
+   There are no workflow controls, no internal notes, and no developer
+   metadata — the API guarantees that server-side; this component only
+   renders what it receives.
+   --------------------------------------------------------------------------- */
+
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { humanizeError } from "@/lib/ui/humanize-error";
+import {
+  SEVERITY_LABEL,
+  STATUS_LABEL,
+  PRIORITY_LABEL,
+  ISSUE_TYPE_LABEL,
+  ACTIVITY_LABEL,
+  type IssueStatus,
+  type Severity,
+  type Priority,
+  type IssueType,
+  type ActivityType,
+} from "@/lib/qa/types";
+
+interface SafeIssue {
+  id: string;
+  title: string;
+  description: string | null;
+  expected_result: string | null;
+  suggested_solution: string | null;
+  issue_type: IssueType;
+  severity: Severity;
+  priority: Priority;
+  status: IssueStatus;
+  app_module: string | null;
+  route: string | null;
+  page_title: string | null;
+  screenshot_url: string | null;
+  resolution_summary: string | null;
+  fixed_commit: string | null;
+  assigned_to_name: string | null;
+  reopen_count: number;
+  created_at: string;
+  updated_at: string;
+  resolved_at: string | null;
+  is_admin_view: boolean;
+}
+interface SafeComment {
+  id: string;
+  user_name: string | null;
+  user_role: string | null;
+  message: string;
+  created_at: string;
+  edited_at: string | null;
+}
+interface SafeActivity {
+  id: string;
+  actor_name: string | null;
+  activity_type: ActivityType;
+  old_value: string | null;
+  new_value: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
+const SEVERITY_TONE: Record<string, string> = {
+  low: "bg-[var(--bg-surface)] text-[var(--text-dim)]",
+  medium: "bg-blue-500/12 text-blue-600 dark:text-blue-300",
+  high: "bg-amber-500/15 text-amber-600 dark:text-amber-300",
+  critical: "bg-rose-500/15 text-rose-600 dark:text-rose-300",
+};
+const STATUS_TONE: Record<string, string> = {
+  new: "bg-blue-500/12 text-blue-600 dark:text-blue-300",
+  triaged: "bg-[var(--bg-surface)] text-[var(--text-secondary)]",
+  in_progress: "bg-amber-500/15 text-amber-600 dark:text-amber-300",
+  fixed: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300",
+  verified: "bg-emerald-500/20 text-emerald-700 dark:text-emerald-200",
+  rejected: "bg-rose-500/15 text-rose-600 dark:text-rose-300",
+  duplicate: "bg-[var(--bg-surface)] text-[var(--text-dim)]",
+  needs_more_info: "bg-amber-500/12 text-amber-600 dark:text-amber-300",
+  closed: "bg-[var(--bg-surface)] text-[var(--text-dim)]",
+  reopened: "bg-blue-500/15 text-blue-600 dark:text-blue-300",
+};
+
+function fmt(iso: string | null): string {
+  if (!iso) return "—";
+  try { return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }); } catch { return iso; }
+}
+function rel(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso).getTime();
+  if (Number.isNaN(d)) return "";
+  const s = Math.round((Date.now() - d) / 1000);
+  if (s < 60) return "just now";
+  const m = Math.round(s / 60); if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60); if (h < 24) return `${h}h ago`;
+  const day = Math.round(h / 24); if (day < 30) return `${day}d ago`;
+  try { return new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" }); } catch { return ""; }
+}
+function initials(name: string | null | undefined): string {
+  if (!name) return "?";
+  return name.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("") || "?";
+}
+
+export default function ReporterIssueView({ issueId }: { issueId: string }) {
+  const [issue, setIssue] = useState<SafeIssue | null>(null);
+  const [comments, setComments] = useState<SafeComment[]>([]);
+  const [activity, setActivity] = useState<SafeActivity[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [text, setText] = useState("");
+  const [posting, setPosting] = useState(false);
+  const [postErr, setPostErr] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(null); setNotFound(false);
+    try {
+      const res = await fetch(`/api/qa/my-issues/${issueId}`, { credentials: "include", cache: "no-store" });
+      if (res.status === 404) { setNotFound(true); setLoading(false); return; }
+      const j = await res.json();
+      if (!res.ok) throw new Error(humanizeError(j.error ?? `HTTP ${res.status}`));
+      setIssue(j.issue);
+      setComments(j.comments ?? []);
+      setActivity(j.activity ?? []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't load this issue.");
+    } finally { setLoading(false); }
+  }, [issueId]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  async function postReply() {
+    const message = text.trim();
+    if (!message) return;
+    setPosting(true); setPostErr(null);
+    try {
+      const res = await fetch(`/api/qa/my-issues/${issueId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ message }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(humanizeError(j.error ?? `HTTP ${res.status}`));
+      if (j.comment) setComments((prev) => [...prev, j.comment as SafeComment]);
+      setText("");
+    } catch (e) {
+      setPostErr(e instanceof Error ? e.message : "Couldn't post your reply.");
+    } finally { setPosting(false); }
+  }
+
+  const shell = "mx-auto max-w-[760px] px-4 py-8 sm:px-6";
+
+  if (loading) {
+    return <div className={shell}><div className="py-24 text-center text-[13px] text-[var(--text-dim)]">Loading…</div></div>;
+  }
+
+  // Deleted issue OR not yours — same graceful fallback, no existence leak.
+  if (notFound || !issue) {
+    return (
+      <div className={shell}>
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-6 py-16 text-center">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--bg-surface)] text-[20px] text-[var(--text-dim)]">⌀</div>
+          <h1 className="text-[16px] font-bold text-[var(--text-primary)]">This issue is unavailable</h1>
+          <p className="mt-1.5 max-w-sm text-[13px] text-[var(--text-dim)]">
+            This issue no longer exists or was deleted — or it isn’t one you reported. Any notification about it stays readable in your bell.
+          </p>
+          <Link href="/" className="mt-5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-4 py-2 text-[12.5px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+            Back to Hub
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const label = "block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-1";
+  const box = "rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap break-words";
+
+  return (
+    <div className={shell}>
+      {issue.is_admin_view && (
+        <div className="mb-3 flex items-center justify-between rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/[0.06] px-3 py-2 text-[12px] text-[var(--text-secondary)]">
+          <span>You’re viewing the reporter experience as an admin.</span>
+          <Link href={`/database/issues?issue=${issue.id}`} className="font-semibold text-[var(--accent)] hover:underline">Open in QA Console →</Link>
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="mb-1 flex flex-wrap items-center gap-1.5">
+        <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${SEVERITY_TONE[issue.severity]}`}>{SEVERITY_LABEL[issue.severity]}</span>
+        <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${STATUS_TONE[issue.status]}`}>{STATUS_LABEL[issue.status]}</span>
+        <span className="text-[11px] text-[var(--text-dim)]">{ISSUE_TYPE_LABEL[issue.issue_type]} · {PRIORITY_LABEL[issue.priority]} priority</span>
+      </div>
+      <h1 className="text-[18px] font-bold text-[var(--text-primary)]">{issue.title}</h1>
+      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[var(--text-dim)]">
+        {issue.app_module && <span><b className="text-[var(--text-secondary)]">Module:</b> {issue.app_module}</span>}
+        <span><b className="text-[var(--text-secondary)]">Filed:</b> {fmt(issue.created_at)}</span>
+        {issue.assigned_to_name && <span><b className="text-[var(--text-secondary)]">Owner:</b> {issue.assigned_to_name}</span>}
+        {issue.reopen_count > 0 && <span>Reopened ×{issue.reopen_count}</span>}
+      </div>
+
+      {/* Resolution banner */}
+      {(issue.resolution_summary || issue.status === "fixed" || issue.status === "verified" || issue.status === "closed") && (
+        <div className="mt-4 rounded-xl border border-emerald-500/25 bg-emerald-500/[0.06] px-3.5 py-3">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-300">Resolution</div>
+          <p className="mt-1 whitespace-pre-wrap break-words text-[13px] text-[var(--text-secondary)]">
+            {issue.resolution_summary || "This issue has been addressed by the team."}
+          </p>
+          {issue.fixed_commit && <p className="mt-1 font-mono text-[11px] text-[var(--text-dim)]">Fix: {issue.fixed_commit}</p>}
+        </div>
+      )}
+
+      {issue.screenshot_url && (
+        <a href={issue.screenshot_url} target="_blank" rel="noreferrer" className="mt-4 block overflow-hidden rounded-lg border border-[var(--border-color)]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={issue.screenshot_url} alt="screenshot" className="max-h-80 w-full bg-[var(--bg-surface-subtle)] object-contain" />
+        </a>
+      )}
+
+      <div className="mt-4 space-y-3">
+        <div><div className={label}>What happened</div><div className={box}>{issue.description || "—"}</div></div>
+        <div><div className={label}>Expected result</div><div className={box}>{issue.expected_result || "—"}</div></div>
+        {issue.suggested_solution && <div><div className={label}>Your suggestion</div><div className={box}>{issue.suggested_solution}</div></div>}
+      </div>
+
+      {/* Public discussion */}
+      <div className="mt-5 space-y-2 rounded-xl border border-[var(--border-subtle)] p-3">
+        <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Discussion{comments.length > 0 ? ` · ${comments.length}` : ""}</div>
+        {comments.length === 0 ? (
+          <div className="py-3 text-center text-[12px] text-[var(--text-dim)]">No replies yet. Add details below if anything’s missing.</div>
+        ) : (
+          <ul className="space-y-2">
+            {comments.map((c) => (
+              <li key={c.id} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
+                <div className="mb-0.5 flex items-center gap-1.5 text-[10.5px]">
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent)]/15 text-[8px] font-bold text-[var(--accent)]">{initials(c.user_name)}</span>
+                  <span className="font-semibold text-[var(--text-secondary)]">{c.user_name ?? "—"}</span>
+                  {c.user_role && <span className="rounded bg-[var(--bg-surface)] px-1 text-[9px] text-[var(--text-dim)]">{c.user_role}</span>}
+                  <span className="ms-auto text-[var(--text-dim)]">{rel(c.created_at)}{c.edited_at ? " · edited" : ""}</span>
+                </div>
+                <div className="whitespace-pre-wrap break-words text-[12.5px] text-[var(--text-primary)]">{c.message}</div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {postErr && <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-[11.5px] text-rose-500 dark:text-rose-300">{postErr}</div>}
+        <div className="space-y-1.5 pt-1">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") void postReply(); }}
+            rows={2}
+            placeholder="Add a public reply or clarify your issue…  (⌘/Ctrl+Enter to send)"
+            className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+          />
+          <div className="flex justify-end">
+            <button type="button" onClick={postReply} disabled={posting || !text.trim()} className="rounded-lg bg-[var(--accent)] px-4 py-1.5 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-40">
+              {posting ? "Posting…" : "Reply"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Public timeline */}
+      {activity.length > 0 && (
+        <div className="mt-4 space-y-2 rounded-xl border border-[var(--border-subtle)] p-3">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Activity</div>
+          <ol className="space-y-1.5">
+            {activity.map((a) => (
+              <li key={a.id} className="flex items-start gap-2 text-[12px]">
+                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent)]/50" />
+                <span className="text-[var(--text-secondary)]">
+                  <b className="font-semibold text-[var(--text-primary)]">{a.actor_name ?? "The team"}</b>{" "}
+                  {a.activity_type === "status_changed" && a.new_value
+                    ? `moved this to ${STATUS_LABEL[a.new_value as IssueStatus] ?? a.new_value}`
+                    : (ACTIVITY_LABEL[a.activity_type] ?? a.activity_type)}
+                  <span className="ms-1.5 text-[var(--text-dim)]">· {rel(a.created_at)}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
+      {error && <div className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-500 dark:text-rose-300">{error}</div>}
+    </div>
+  );
+}

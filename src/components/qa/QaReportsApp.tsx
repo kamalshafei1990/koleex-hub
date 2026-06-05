@@ -11,6 +11,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import TargetIcon from "@/components/icons/ui/TargetIcon";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useScopeContext } from "@/lib/use-scope";
@@ -153,14 +154,36 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
   useEffect(() => { void load(); }, [load]);
 
   /* Deep-link from a notification: /database/issues?issue=<id> auto-selects
-     the row in the split panel. Read once on mount (same pattern the
-     inventory pages use for ?create=1) — the notification click navigates
-     here fresh, so the param is present at mount. */
+     the row. useSearchParams is REACTIVE, so clicking another notification
+     while already on this page (soft navigation, no remount) re-selects the
+     new issue immediately. */
+  const searchParams = useSearchParams();
+  const issueParam = searchParams.get("issue");
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const p = new URLSearchParams(window.location.search).get("issue");
-    if (p) setSelectedId(p);
-  }, []);
+    if (issueParam) setSelectedId(issueParam);
+  }, [issueParam]);
+
+  /* When the selected issue isn't in the loaded list (filtered out, or it
+     was deleted), resolve it directly. 404 → graceful "deleted" fallback;
+     200 → show it even though the list filter excludes it. */
+  const [extra, setExtra] = useState<QaReport | null>(null);
+  const [extraMissing, setExtraMissing] = useState(false);
+  useEffect(() => {
+    if (!selectedId || reports.some((r) => r.id === selectedId)) {
+      setExtra(null); setExtraMissing(false);
+      return;
+    }
+    let alive = true;
+    setExtraMissing(false);
+    fetch(`/api/qa/reports/${selectedId}`, { credentials: "include", cache: "no-store" })
+      .then(async (r) => {
+        if (r.status === 404) { if (alive) setExtraMissing(true); return null; }
+        return r.ok ? r.json() : null;
+      })
+      .then((j) => { if (alive && j?.report) setExtra(j.report as QaReport); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [selectedId, reports]);
 
   // Assignee directory for the picker (loaded once).
   useEffect(() => {
@@ -177,10 +200,14 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
     return [...reports].sort((a, b) => (PRIORITY_RANK[a.priority] ?? 2) - (PRIORITY_RANK[b.priority] ?? 2));
   }, [reports, sortPriority]);
 
-  const selected = useMemo(() => reports.find((r) => r.id === selectedId) ?? null, [reports, selectedId]);
+  const selected = useMemo(
+    () => reports.find((r) => r.id === selectedId) ?? (extra && extra.id === selectedId ? extra : null),
+    [reports, selectedId, extra],
+  );
 
   const onUpdated = useCallback((updated: QaReport) => {
     setReports((prev) => prev.map((r) => (r.id === updated.id ? { ...r, ...updated } : r)));
+    setExtra((prev) => (prev && prev.id === updated.id ? { ...prev, ...updated } : prev));
   }, []);
 
   if (forbidden) {
@@ -306,6 +333,14 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
               onUpdated={onUpdated}
               onJump={(id) => setSelectedId(id)}
             />
+          ) : extraMissing ? (
+            <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+              <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[var(--bg-surface)] text-[18px] text-[var(--text-dim)]">⌀</div>
+              <p className="text-[14px] font-semibold text-[var(--text-primary)]">This issue no longer exists or was deleted.</p>
+              <p className="mt-1 text-[12px] text-[var(--text-dim)]">The notification stays readable, but there’s nothing to open.</p>
+            </div>
+          ) : selectedId ? (
+            <div className="px-6 py-16 text-center text-[13px] text-[var(--text-dim)]">Loading issue…</div>
           ) : (
             <div className="px-6 py-16 text-center text-[13px] text-[var(--text-dim)]">Select an issue to view details, discuss, assign and resolve.</div>
           )}

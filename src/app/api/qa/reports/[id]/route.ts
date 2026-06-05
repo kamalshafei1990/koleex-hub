@@ -13,7 +13,7 @@ import {
   type Priority,
 } from "@/lib/qa/types";
 import { logActivity, type ActivityInput } from "@/lib/qa/activity";
-import { notifyIssue, type NotifyTarget } from "@/lib/qa/notify";
+import { notifyIssue, reporterIssueLink, type NotifyTarget } from "@/lib/qa/notify";
 
 const BUCKET = "qa-screenshots";
 
@@ -258,6 +258,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     const actor = auth.username ?? "Someone";
     const title = (cur.title as string) ?? "an issue";
     const reporterId = (cur.reporter_id as string | null) ?? null;
+    const reporterLink = reporterIssueLink(id); // reporters → safe read-only view
     const effectiveAssignee = ("assigned_to" in patch
       ? (patch.assigned_to as string | null)
       : (cur.assigned_to as string | null)) ?? null;
@@ -267,7 +268,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       const reason = (patch.reopen_reason as string | null) || null;
       const msg = `${actor} reopened "${title}"${reason ? `: ${reason}` : ""}`;
       targets.push({ recipientId: effectiveAssignee, type: "qa_issue_reopened", title: "Issue reopened", body: msg });
-      targets.push({ recipientId: reporterId, type: "qa_issue_reopened", title: "Issue reopened", body: msg });
+      targets.push({ recipientId: reporterId, type: "qa_issue_reopened", title: "Issue reopened", body: msg, link: reporterLink });
     } else if (patch.status && patch.status !== cur.status) {
       const newStatus = patch.status as IssueStatus;
       const type =
@@ -277,7 +278,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         : "qa_status_changed";
       const msg = `${actor} moved "${title}" to ${STATUS_LABEL[newStatus] ?? newStatus}`;
       const ntitle = `Status: ${STATUS_LABEL[newStatus] ?? newStatus}`;
-      targets.push({ recipientId: reporterId, type, title: ntitle, body: msg });
+      targets.push({ recipientId: reporterId, type, title: ntitle, body: msg, link: reporterLink });
       targets.push({ recipientId: effectiveAssignee, type, title: ntitle, body: msg });
     }
 
@@ -310,6 +311,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         type: "qa_issue_duplicate_marked",
         title: "Marked as duplicate",
         body: `${actor} marked "${title}" as a duplicate`,
+        link: reporterLink,
       });
     }
 
