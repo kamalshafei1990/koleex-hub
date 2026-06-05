@@ -1150,6 +1150,7 @@ function supplierFormErrors(f: ContactForm): string[] {
     if (m.platform === "WhatsApp" && !/^[\d+\-\s()]+$/.test(val)) e.push("WhatsApp number must be a phone number (digits only).");
   });
   if (v(f.qq_id) && !/^\d+$/.test(v(f.qq_id))) e.push("QQ number must contain digits only.");
+  if (v(f.whatsapp_business) && !/^[\d+\-\s()]+$/.test(v(f.whatsapp_business))) e.push("WhatsApp Business must be a phone number (digits only).");
 
   // K — payment link / ID sanity
   const pay = v(f.wechat_pay_id);
