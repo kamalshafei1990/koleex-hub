@@ -94,7 +94,7 @@ import {
 } from "@/lib/contacts-admin";
 import { fetchOpportunities } from "@/lib/crm";
 import { humanizeError } from "@/lib/ui/humanize-error";
-import { STRATEGIC_STATUS_LABELS, CLASSIFICATION_LABELS, FACTORY_TYPE_LABELS } from "@/lib/suppliers/intelligence";
+import { STRATEGIC_STATUS_LABELS, CLASSIFICATION_LABELS, FACTORY_TYPE_LABELS, strategicStatusTone } from "@/lib/suppliers/intelligence";
 import { useScopeContext } from "@/lib/use-scope";
 import type { CrmOpportunityWithRelations } from "@/types/supabase";
 import { Country, State, City } from "country-state-city";
@@ -4728,12 +4728,26 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                               {c.readiness_milestone}%
                             </span>
                           ) : null}
-                          {c.strategic_status ? (
-                            <span className={`inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[9px] font-semibold ${c.strategic_status === "strategic" || c.strategic_status === "preferred" ? "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400" : c.strategic_status === "watchlist" || c.strategic_status === "phasing_out" ? "bg-rose-500/12 text-rose-600 dark:text-rose-300" : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]"}`}>
-                              {(c.strategic_status === "strategic" || c.strategic_status === "preferred") ? <StarIcon size={8} /> : null}
-                              {t("opt." + c.strategic_status, STRATEGIC_STATUS_LABELS[c.strategic_status as keyof typeof STRATEGIC_STATUS_LABELS] ?? c.strategic_status)}
-                            </span>
-                          ) : null}
+                          {c.strategic_status ? (() => {
+                            /* GEN-9 — drive the guidance badge from the canonical
+                               tone helper so an approved / preferred / strategic
+                               (trusted) supplier reads green with a star, and a
+                               blocked / blacklisted one reads as a danger badge
+                               with a warning glyph — not a neutral pill. */
+                            const tone = strategicStatusTone(c.strategic_status);
+                            const cls =
+                              tone === "positive"
+                                ? "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400"
+                                : tone === "danger"
+                                  ? "bg-rose-500/15 text-rose-600 dark:text-rose-300"
+                                  : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]";
+                            return (
+                              <span className={`inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[9px] font-semibold ${cls}`}>
+                                {tone === "positive" ? <StarIcon size={8} /> : tone === "danger" ? <TriangleWarningIcon size={8} /> : null}
+                                {t("opt." + c.strategic_status, STRATEGIC_STATUS_LABELS[c.strategic_status as keyof typeof STRATEGIC_STATUS_LABELS] ?? c.strategic_status)}
+                              </span>
+                            );
+                          })() : null}
                           {c.supplier_type ? (
                             <span className="inline-flex items-center rounded px-1 py-0.5 text-[9px] font-medium bg-[var(--bg-surface-subtle)] text-[var(--text-faint)]">
                               {t("opt." + c.supplier_type, c.supplier_type)}

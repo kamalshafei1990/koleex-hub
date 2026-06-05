@@ -415,3 +415,25 @@ select option[selected] {
 :lang(ar) select option {
   font-weight: 500;
 }
+
+/* ── Knowledge article print / Download-PDF (report GEN-9) ──────────────────
+   The Download-PDF button calls window.print(). Isolate the knowledge document
+   subtree so the exported PDF contains only the article — not the Hub header,
+   sidebar, floating panel, or the button itself. */
+@media print {
+  body:has([data-knowledge-doc]) * {
+    visibility: hidden !important;
+  }
+  body:has([data-knowledge-doc]) [data-knowledge-doc],
+  body:has([data-knowledge-doc]) [data-knowledge-doc] * {
+    visibility: visible !important;
+  }
+  [data-knowledge-doc] {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+  }
+  [data-knowledge-print-hide] {
+    display: none !important;
+  }
+}
