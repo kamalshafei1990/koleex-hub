@@ -1541,6 +1541,14 @@ export const contactsT: Translations = {
   "sd.returnRate": { en: "Return rate", zh: "退货率", ar: "معدل الإرجاع" },
   "sd.groupOverview": { en: "Overview", zh: "概览", ar: "نظرة عامة" },
   "sd.groupProfile": { en: "Operations", zh: "运营", ar: "العمليات" },
+  /* Supplier detail group bands — mirror the add/edit form's supgroup.* labels
+     so the supplier page and the form read in the same order with the same names. */
+  "sd.groupIdentity": { en: "Identity & profile", zh: "身份与概况", ar: "الهوية والملف التعريفي" },
+  "sd.groupContacts": { en: "Contacts & communication", zh: "联系人与沟通", ar: "جهات الاتصال والتواصل" },
+  "sd.groupCommercialLogistics": { en: "Commercial & logistics", zh: "商务与物流", ar: "التجارة والخدمات اللوجستية" },
+  "sd.groupProducts": { en: "Products & production", zh: "产品与生产", ar: "المنتجات والإنتاج" },
+  "sd.groupLegal": { en: "Legal & compliance", zh: "法律与合规", ar: "القانونية والامتثال" },
+  "sd.groupIntelligence": { en: "Intelligence", zh: "情报", ar: "المعلومات" },
   /* Supplier form group bands (Add / Edit supplier) */
   "supgroup.identity": { en: "Identity & profile", zh: "身份与概况", ar: "الهوية والملف التعريفي" },
   "supgroup.communication": { en: "Contacts & communication", zh: "联系人与沟通", ar: "جهات الاتصال والتواصل" },
@@ -1556,7 +1564,7 @@ export const contactsT: Translations = {
   "sd.noCertifications": { en: "No certifications recorded.", zh: "未记录任何认证。", ar: "لا توجد شهادات مسجلة." },
   "sd.sampleStatus": { en: "Sample status", zh: "样品状态", ar: "حالة العينة" },
   "sd.groupCommercial": { en: "Intelligence", zh: "情报", ar: "المعلومات" },
-  "sd.groupRecords": { en: "Records", zh: "记录", ar: "السجلات" },
+  "sd.groupRecords": { en: "Records & notes", zh: "记录与备注", ar: "السجلات والملاحظات" },
   "sd.catalogue": { en: "Catalogue", zh: "产品目录", ar: "الكتالوج" },
   "sd.noProducts": { en: "No products are linked to this supplier yet.", zh: "尚未有产品关联到此供应商。", ar: "لا توجد منتجات مرتبطة بهذا المورّد حتى الآن." },
   "sd.untitled": { en: "Untitled", zh: "未命名", ar: "بدون عنوان" },

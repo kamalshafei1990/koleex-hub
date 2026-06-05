@@ -347,6 +347,13 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
   const certs = Array.isArray(s.certifications) ? (s.certifications as unknown[]).map(String) : [];
   const currency = str(s, "currency") || "USD";
 
+  /* Shared field helpers for the grouped detail sections below. Lifted to
+     component scope (out of the old section IIFE) so every section can be a
+     free sibling and the page can be regrouped to mirror the add/edit form. */
+  const lst = (...keys: string[]): string => { for (const k of keys) { const v = (s as Row)[k]; if (Array.isArray(v) && v.length) return v.map(String).join(", "); } return ""; };
+  const yn = (k: string): string => { const v = (s as Row)[k]; return v === true ? t("sd.yes", "Yes") : v === false ? t("sd.no", "No") : ""; };
+  const banks = Array.isArray(s.bank_accounts) ? (s.bank_accounts as Row[]) : [];
+
   const stats = useMemo(() => {
     const pos = data?.purchaseOrders ?? [];
     const bills = data?.bills ?? [];
@@ -1043,16 +1050,10 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
 
         {/* ═══ Everything below is one continuous page — no hidden tabs ═══ */}
 
-        <GroupLabel>{t("sd.groupProfile", "Operations")}</GroupLabel>
-
-        {/* ─── Stacked Contacts-style sections (Sec + Field 2-col grid) ─── */}
-        {(() => {
-          const lst = (...keys: string[]): string => { for (const k of keys) { const v = (s as Row)[k]; if (Array.isArray(v) && v.length) return v.map(String).join(", "); } return ""; };
-          const yn = (k: string): string => { const v = (s as Row)[k]; return v === true ? t("sd.yes", "Yes") : v === false ? t("sd.no", "No") : ""; };
-          const addr = [str(s, "address_1", "supplier_address"), str(s, "city"), str(s, "province"), str(s, "country"), str(s, "supplier_postal_code")].filter(Boolean).join(", ");
-          const banks = Array.isArray(s.bank_accounts) ? (s.bank_accounts as Row[]) : [];
-          return (
-            <div id="overview" className="scroll-mt-16">
+        {/* ─── Detailed sections — grouped to mirror the add/edit form
+            (Identity → Contacts → Commercial → Products → Legal → …) ─── */}
+        <div id="overview" className="scroll-mt-16">
+              <GroupLabel>{t("sd.groupIdentity", "Identity & profile")}</GroupLabel>
               <Sec title={t("sd.companyProfile", "Company profile")} icon={<Building2Icon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("companyProfile")} onToggle={() => toggleKey("companyProfile")} preview={[str(s, "company_type"), str(s, "year_established")].filter(Boolean).join(" · ")}>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                   <Field label={t("sd.legalName", "Legal name")} value={str(s, "legal_name", "company_name", "company_name_en")} span2 />
@@ -1085,43 +1086,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
                 })()}
               </Sec>
 
-              <Sec tone="violet" title={t("sd.identityCompliance", "Identity & compliance")} icon={<IdCardIcon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("identity")} onToggle={() => toggleKey("identity")} preview={str(s, "kyc_status") ? `KYC ${str(s, "kyc_status")}` : ""}>
-                <div className="grid grid-cols-1 @3xl:grid-cols-[1fr_180px] gap-5">
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                    <Field label={t("sd.businessRegNo", "Business reg. no.")} value={str(s, "business_registration_number")} mono />
-                    <Field label={t("sd.taxId", "Tax ID / VAT")} value={str(s, "tax_id")} mono />
-                    <Field label={t("sd.usci", "USCI / CR")} value={str(s, "cr_number")} mono />
-                    <Field label={t("sd.eori", "EORI")} value={str(s, "eori_number")} mono />
-                    <Field label={t("sd.duns", "DUNS")} value={str(s, "duns_number")} mono />
-                    <Field label={t("sd.ieCode", "Import/Export code")} value={str(s, "importer_exporter_code")} mono />
-                    <Field label={t("sd.customsCode", "Customs code")} value={str(s, "customs_code")} mono />
-                    <Field label={t("sd.kyc", "KYC")} value={str(s, "kyc_status")} />
-                    <Field label={t("sd.sanctions", "Sanctions check")} value={str(s, "sanctions_check_status")} />
-                  </div>
-                  {str(s, "business_license_image") ? (
-                    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-2 self-start">
-                      <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-2 px-1 flex items-center gap-1.5">
-                        <FileCheckIcon className="h-3 w-3" />
-                        {t("sd.businessLicense", "Business license")}
-                      </div>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={str(s, "business_license_image")} alt={t("sd.businessLicense", "Business license")} className="w-full aspect-[4/3] object-contain rounded-lg bg-white" />
-                    </div>
-                  ) : null}
-                </div>
-              </Sec>
-
-              <Sec tone="amber" title={t("sd.logisticsTrade", "Logistics & trade")} icon={<ShipIcon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("logistics")} onToggle={() => toggleKey("logistics")} preview={[str(s, "port_of_entry"), str(s, "container_preference")].filter(Boolean).join(" · ")}>
-                {/* Incoterms intentionally lives only in Commercial terms (single source). */}
-                <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                  <Field label={t("sd.portOfEntry", "Port")} value={str(s, "port_of_entry")} />
-                  <Field label={t("sd.carriers", "Preferred carriers")} value={lst("preferred_carriers")} span2 />
-                  <Field label={t("sd.container", "Container")} value={str(s, "container_preference")} />
-                  <Field label={t("sd.hsCodes", "HS codes")} value={lst("hs_codes")} mono />
-                  <Field label={t("sd.shippingMarks", "Shipping marks")} value={str(s, "shipping_marks")} span2 />
-                  <Field label={t("sd.labeling", "Labeling")} value={str(s, "labeling_requirements")} span2 />
-                </div>
-              </Sec>
+              <GroupLabel>{t("sd.groupContacts", "Contacts & communication")}</GroupLabel>
 
               {/* Social media accounts — pulled from social_profiles jsonb on the
                   contact row. Each profile renders with a real brand glyph and
@@ -1187,6 +1152,24 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
                   <Field label={t("sd.wecomSupport", "WeCom support")} value={yn("wecom_support_available")} />
                   <Field label={t("sd.preferredCommunication", "Preferred channel")} value={str(s, "communication_preference")} />
                   <Field label={t("cs.preferredLanguage", "Preferred language")} value={str(s, "language")} />
+                </div>
+              </Sec>
+
+              <Section id="contacts">
+                <ContactsSection supplierId={id} contactPersons={data.contactPersons} qrCodes={data.qrCodes ?? []} onSaved={() => load({ silent: true })} />
+              </Section>
+
+              <GroupLabel>{t("sd.groupCommercialLogistics", "Commercial & logistics")}</GroupLabel>
+
+              <Sec tone="amber" title={t("sd.logisticsTrade", "Logistics & trade")} icon={<ShipIcon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("logistics")} onToggle={() => toggleKey("logistics")} preview={[str(s, "port_of_entry"), str(s, "container_preference")].filter(Boolean).join(" · ")}>
+                {/* Incoterms intentionally lives only in Commercial terms (single source). */}
+                <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                  <Field label={t("sd.portOfEntry", "Port")} value={str(s, "port_of_entry")} />
+                  <Field label={t("sd.carriers", "Preferred carriers")} value={lst("preferred_carriers")} span2 />
+                  <Field label={t("sd.container", "Container")} value={str(s, "container_preference")} />
+                  <Field label={t("sd.hsCodes", "HS codes")} value={lst("hs_codes")} mono />
+                  <Field label={t("sd.shippingMarks", "Shipping marks")} value={str(s, "shipping_marks")} span2 />
+                  <Field label={t("sd.labeling", "Labeling")} value={str(s, "labeling_requirements")} span2 />
                 </div>
               </Sec>
 
@@ -1261,6 +1244,8 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
                 })()}
               </Sec>
 
+              <GroupLabel>{t("sd.groupProducts", "Products & production")}</GroupLabel>
+
               <div id="quality" className="scroll-mt-16">
                 <Sec tone="emerald" title={t("sd.qualityCertifications", "Quality & certifications")} icon={<FileCheckIcon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("quality")} onToggle={() => toggleKey("quality")} preview={certs.length ? `${certs.length}` : ""}>
                   {certs.length ? (
@@ -1281,26 +1266,41 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
                 </Sec>
               </div>
 
-              {str(s, "notes") ? (
-                <Sec title={t("sd.notes", "Notes")} icon={<DocumentIcon className="h-4 w-4" />}>
-                  <p className="text-sm leading-relaxed text-[var(--text-secondary)]"><AutoTranslatedText text={str(s, "notes")} /></p>
-                </Sec>
-              ) : null}
+              {/* Factory / production capacity */}
+              <Section id="factory">
+                <FactorySection supplierId={id} supplier={s} factory={data.factory} onSaved={() => load({ silent: true })} />
+              </Section>
+
+              <GroupLabel>{t("sd.groupLegal", "Legal & compliance")}</GroupLabel>
+
+              <Sec tone="violet" title={t("sd.identityCompliance", "Identity & compliance")} icon={<IdCardIcon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("identity")} onToggle={() => toggleKey("identity")} preview={str(s, "kyc_status") ? `KYC ${str(s, "kyc_status")}` : ""}>
+                <div className="grid grid-cols-1 @3xl:grid-cols-[1fr_180px] gap-5">
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                    <Field label={t("sd.businessRegNo", "Business reg. no.")} value={str(s, "business_registration_number")} mono />
+                    <Field label={t("sd.taxId", "Tax ID / VAT")} value={str(s, "tax_id")} mono />
+                    <Field label={t("sd.usci", "USCI / CR")} value={str(s, "cr_number")} mono />
+                    <Field label={t("sd.eori", "EORI")} value={str(s, "eori_number")} mono />
+                    <Field label={t("sd.duns", "DUNS")} value={str(s, "duns_number")} mono />
+                    <Field label={t("sd.ieCode", "Import/Export code")} value={str(s, "importer_exporter_code")} mono />
+                    <Field label={t("sd.customsCode", "Customs code")} value={str(s, "customs_code")} mono />
+                    <Field label={t("sd.kyc", "KYC")} value={str(s, "kyc_status")} />
+                    <Field label={t("sd.sanctions", "Sanctions check")} value={str(s, "sanctions_check_status")} />
+                  </div>
+                  {str(s, "business_license_image") ? (
+                    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-2 self-start">
+                      <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-2 px-1 flex items-center gap-1.5">
+                        <FileCheckIcon className="h-3 w-3" />
+                        {t("sd.businessLicense", "Business license")}
+                      </div>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={str(s, "business_license_image")} alt={t("sd.businessLicense", "Business license")} className="w-full aspect-[4/3] object-contain rounded-lg bg-white" />
+                    </div>
+                  ) : null}
+                </div>
+              </Sec>
             </div>
-          );
-        })()}
 
-        {/* Factory */}
-        <Section id="factory">
-          <FactorySection supplierId={id} supplier={s} factory={data.factory} onSaved={() => load({ silent: true })} />
-        </Section>
-
-        {/* Contacts (people) */}
-        <Section id="contacts">
-          <ContactsSection supplierId={id} contactPersons={data.contactPersons} qrCodes={data.qrCodes ?? []} onSaved={() => load({ silent: true })} />
-        </Section>
-
-        <GroupLabel>{t("sd.groupCommercial", "Intelligence")}</GroupLabel>
+        <GroupLabel>{t("sd.groupIntelligence", "Intelligence")}</GroupLabel>
 
         {/* Risk — one shell: hero overall bar + visual summary + intelligence editor */}
         <div id="risk" className="scroll-mt-16">
@@ -1491,7 +1491,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
           />
         </Section>
 
-        <GroupLabel>{t("sd.groupRecords", "Records")}</GroupLabel>
+        <GroupLabel>{t("sd.groupRecords", "Records & notes")}</GroupLabel>
 
         {/* Products supplied */}
         <Section id="products" noBorder>
@@ -1627,6 +1627,14 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
         <Section id="timeline">
           <TimelineSection supplierId={id} timeline={data.timeline ?? []} onSaved={() => load({ silent: true })} />
         </Section>
+
+        {/* Notes */}
+        {str(s, "notes") ? (
+          <Section id="notes">
+            <SectionHead eyebrow={t("sd.records", "Records")} title={t("sd.notes", "Notes")} icon={<DocumentIcon className="h-4 w-4" />} />
+            <p className="mt-4 text-sm leading-relaxed text-[var(--text-secondary)]"><AutoTranslatedText text={str(s, "notes")} /></p>
+          </Section>
+        ) : null}
       </main>
       </div>
     </div>

@@ -8387,49 +8387,6 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
-            {!supplierDept && <FormGroupLabel label={t("supgroup.legal", "Legal & compliance")} />}
-            {/* Legal Identity — registration & company profile */}
-            <FormSection title={t("section.legalIdentity", "Legal Identity")} icon={<Building2Icon size={14} />} owner={t("owner.compliance")} ownerLabel={t("owner.label")} dept="legal" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
-              <div className="space-y-3">
-                <Input label={t("field.tradingName", "Trading / DBA Name")} tier="optional" value={form.trading_name} onChange={v => setField("trading_name", v)} placeholder={t("placeholder.tradingName", "Doing business as")} icon={<Building2Icon size={14} />} />
-                <div className="grid grid-cols-2 gap-3">
-                  <SelectInput label={t("field.companyType", "Company Type")} tier="optional" value={form.company_type} onChange={v => setField("company_type", v)} options={COMPANY_TYPES} icon={<BriefcaseIcon size={14} />} selectLabel={t("detail.select")} />
-                  <Input label={t("field.businessRegNumber", "Business Registration #")} tier="preferred" value={form.business_registration_number} onChange={v => setField("business_registration_number", v)} placeholder={t("placeholder.regNumber", "CR / Reg #")} icon={<HashtagIcon size={14} />} />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <SelectInput label={t("field.registrationCountry", "Registration Country")} tier="optional" value={form.registration_country} onChange={v => setField("registration_country", v)} options={COUNTRY_NAMES} icon={<GlobeIcon size={14} />} selectLabel={t("detail.select")} />
-                  <SelectInput label={t("field.yearEstablished", "Year Established")} tier="preferred" value={form.year_established} onChange={v => setField("year_established", v)} options={ESTABLISHED_YEARS} icon={<CalendarRawIcon size={14} />} selectLabel={t("detail.select")} />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <SelectInput label={t("field.employeeCountRange", "Employee Count")} tier="optional" value={form.employee_count_range} onChange={v => setField("employee_count_range", v)} options={EMPLOYEE_COUNT_RANGES} icon={<UsersIcon size={14} />} selectLabel={t("detail.select")} />
-                  <SelectInput label={t("field.annualRevenueRange", "Annual Revenue")} tier="optional" value={form.annual_revenue_range} onChange={v => setField("annual_revenue_range", v)} options={ANNUAL_REVENUE_RANGES} icon={<TrendingUpIcon size={14} />} selectLabel={t("detail.select")} />
-                </div>
-                <ImageDropField
-                  label={t("field.businessLicense", "Business License")}
-                  value={form.business_license_image}
-                  onChange={v => setField("business_license_image", v)}
-                  hint={t("hint.businessLicense", "Drop the company license photo — PNG / JPG")}
-                  icon={<FileCheckIcon size={14} />}
-                  tier="preferred"
-                />
-              </div>
-            </FormSection>
-
-            {/* Trade & Tax IDs — VAT / customs identifiers */}
-            <FormSection title={t("section.tradeIdentifiers", "Trade & Tax IDs")} icon={<FileCheckIcon size={14} />} owner={t("owner.compliance")} ownerLabel={t("owner.label")} dept="legal" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <Input label={t("field.gstNumber", "VAT / GST")} help="supplier.gst_number" tier="optional" value={form.gst_number} onChange={v => setField("gst_number", v)} placeholder="VAT / GST number" icon={<HashtagIcon size={14} />} />
-                  <Input label={t("field.crNumber", "CR Number")} help="supplier.cr_number" tier="optional" value={form.cr_number} onChange={v => setField("cr_number", v)} placeholder="Commercial registration" icon={<HashtagIcon size={14} />} />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <Input label={t("field.dunsNumber", "D-U-N-S")} help="supplier.duns_number" tier="optional" value={form.duns_number} onChange={v => setField("duns_number", v)} placeholder="123456789" icon={<HashtagIcon size={14} />} />
-                  <Input label={t("field.iec", "Importer / Exporter Code")} help="supplier.iec" tier="optional" value={form.importer_exporter_code} onChange={v => setField("importer_exporter_code", v)} placeholder="IEC code" icon={<HashtagIcon size={14} />} />
-                </div>
-                <Input label={t("field.customsCode", "Customs Code")} help="supplier.customs_code" tier="optional" value={form.customs_code} onChange={v => setField("customs_code", v)} placeholder="Customs code" icon={<HashtagIcon size={14} />} />
-              </div>
-            </FormSection>
-
             {!supplierDept && <FormGroupLabel label={t("supgroup.commercial", "Commercial & logistics")} />}
             {/* Payment — terms + currency + bank accounts + mobile payment (WeChat Pay / Alipay) */}
             <FormSection title={t("section.paymentInfo", "Payment Information")} icon={<LandmarkIcon size={14} />} owner={t("owner.finance")} ownerLabel={t("owner.label")} dept="finance" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
@@ -8682,6 +8639,49 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.qualityObs")}</label>
                   <textarea value={form.quality_notes} onChange={e => setField("quality_notes", e.target.value)} placeholder={t("placeholder.qualityObs")} rows={3} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none resize-none focus:border-[var(--border-focus)]" />
                 </div>
+              </div>
+            </FormSection>
+
+            {!supplierDept && <FormGroupLabel label={t("supgroup.legal", "Legal & compliance")} />}
+            {/* Legal Identity — registration & company profile */}
+            <FormSection title={t("section.legalIdentity", "Legal Identity")} icon={<Building2Icon size={14} />} owner={t("owner.compliance")} ownerLabel={t("owner.label")} dept="legal" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
+              <div className="space-y-3">
+                <Input label={t("field.tradingName", "Trading / DBA Name")} tier="optional" value={form.trading_name} onChange={v => setField("trading_name", v)} placeholder={t("placeholder.tradingName", "Doing business as")} icon={<Building2Icon size={14} />} />
+                <div className="grid grid-cols-2 gap-3">
+                  <SelectInput label={t("field.companyType", "Company Type")} tier="optional" value={form.company_type} onChange={v => setField("company_type", v)} options={COMPANY_TYPES} icon={<BriefcaseIcon size={14} />} selectLabel={t("detail.select")} />
+                  <Input label={t("field.businessRegNumber", "Business Registration #")} tier="preferred" value={form.business_registration_number} onChange={v => setField("business_registration_number", v)} placeholder={t("placeholder.regNumber", "CR / Reg #")} icon={<HashtagIcon size={14} />} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <SelectInput label={t("field.registrationCountry", "Registration Country")} tier="optional" value={form.registration_country} onChange={v => setField("registration_country", v)} options={COUNTRY_NAMES} icon={<GlobeIcon size={14} />} selectLabel={t("detail.select")} />
+                  <SelectInput label={t("field.yearEstablished", "Year Established")} tier="preferred" value={form.year_established} onChange={v => setField("year_established", v)} options={ESTABLISHED_YEARS} icon={<CalendarRawIcon size={14} />} selectLabel={t("detail.select")} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <SelectInput label={t("field.employeeCountRange", "Employee Count")} tier="optional" value={form.employee_count_range} onChange={v => setField("employee_count_range", v)} options={EMPLOYEE_COUNT_RANGES} icon={<UsersIcon size={14} />} selectLabel={t("detail.select")} />
+                  <SelectInput label={t("field.annualRevenueRange", "Annual Revenue")} tier="optional" value={form.annual_revenue_range} onChange={v => setField("annual_revenue_range", v)} options={ANNUAL_REVENUE_RANGES} icon={<TrendingUpIcon size={14} />} selectLabel={t("detail.select")} />
+                </div>
+                <ImageDropField
+                  label={t("field.businessLicense", "Business License")}
+                  value={form.business_license_image}
+                  onChange={v => setField("business_license_image", v)}
+                  hint={t("hint.businessLicense", "Drop the company license photo — PNG / JPG")}
+                  icon={<FileCheckIcon size={14} />}
+                  tier="preferred"
+                />
+              </div>
+            </FormSection>
+
+            {/* Trade & Tax IDs — VAT / customs identifiers */}
+            <FormSection title={t("section.tradeIdentifiers", "Trade & Tax IDs")} icon={<FileCheckIcon size={14} />} owner={t("owner.compliance")} ownerLabel={t("owner.label")} dept="legal" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <Input label={t("field.gstNumber", "VAT / GST")} help="supplier.gst_number" tier="optional" value={form.gst_number} onChange={v => setField("gst_number", v)} placeholder="VAT / GST number" icon={<HashtagIcon size={14} />} />
+                  <Input label={t("field.crNumber", "CR Number")} help="supplier.cr_number" tier="optional" value={form.cr_number} onChange={v => setField("cr_number", v)} placeholder="Commercial registration" icon={<HashtagIcon size={14} />} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input label={t("field.dunsNumber", "D-U-N-S")} help="supplier.duns_number" tier="optional" value={form.duns_number} onChange={v => setField("duns_number", v)} placeholder="123456789" icon={<HashtagIcon size={14} />} />
+                  <Input label={t("field.iec", "Importer / Exporter Code")} help="supplier.iec" tier="optional" value={form.importer_exporter_code} onChange={v => setField("importer_exporter_code", v)} placeholder="IEC code" icon={<HashtagIcon size={14} />} />
+                </div>
+                <Input label={t("field.customsCode", "Customs Code")} help="supplier.customs_code" tier="optional" value={form.customs_code} onChange={v => setField("customs_code", v)} placeholder="Customs code" icon={<HashtagIcon size={14} />} />
               </div>
             </FormSection>
 
