@@ -1114,7 +1114,11 @@ export default function ProductList() {
                         trigger the parent card's product-detail Link.
                         Delete stays a <button> since it opens a modal. */}
                     {isInternal && (
-                    <div className="absolute bottom-2.5 right-2.5 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    /* GEN-7 — edit/delete were hover-only, so on touch devices
+                       (no :hover) the card had no visible edit option. Show the
+                       actions by default on small screens and keep the clean
+                       hover-reveal on desktop (md+). */
+                    <div className="absolute bottom-2.5 right-2.5 flex gap-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200">
                       <Link
                         href={`${baseRoute}/${p.id}/edit`}
                         onClick={(e) => e.stopPropagation()}
