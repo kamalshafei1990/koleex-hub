@@ -17,6 +17,7 @@ import SearchIcon from "@/components/icons/ui/SearchIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 const SELECT = "rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
 const STATE_PILL: Record<string, string> = {
@@ -127,6 +128,7 @@ function Grid({ items }: { items: VisualCollection[] }) {
 function Card({ c }: { c: VisualCollection }) {
   return (
     <Link href={`/database/collections/${c.slug}`}
+      {...kxInspectAttrs({ component: "CollectionCard", module: "Database", section: "Collections", recordId: c.id })}
       className="group flex flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] transition-all duration-200 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)]">
       <div className="flex aspect-[16/7] items-center justify-center border-b border-[var(--border-subtle)] bg-white">
         {c.cover_url || c.icon_url ? (

@@ -18,6 +18,7 @@ import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import BadgeCheckIcon from "@/components/icons/ui/BadgeCheckIcon";
 import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 const STATUS_DOT: Record<string, string> = {
   approved: "bg-emerald-400", suggested: "bg-amber-400", rejected: "bg-rose-400", archived: "bg-[var(--text-dim)]",
@@ -65,7 +66,7 @@ export default function SemanticRelationships({
   const presentTypes = useMemo(() => Array.from(new Set(rels.map((r) => r.relationship_type))), [rels]);
 
   return (
-    <div className="mt-4">
+    <div className="mt-4" {...kxInspectAttrs({ component: "AssetRelationshipsTab", module: "Database", section: "Relationships" })}>
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">
           Semantic relationships{rels.length > 0 ? ` · ${rels.length}` : ""}

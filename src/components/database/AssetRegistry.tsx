@@ -12,6 +12,7 @@ import { REGISTRY_USAGE_ROLES, type RegistryUsageRole } from "@/lib/visual-libra
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 interface Link {
   id: string; usage_role: RegistryUsageRole; priority: number; required: boolean; recommended: boolean; deprecated: boolean;
@@ -91,7 +92,7 @@ export default function AssetRegistry({ asset, onChanged }: { asset: { id: strin
   if (!data) return <p className="py-8 text-center text-[12.5px] text-[var(--text-dim)]">Couldn’t load registry.</p>;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" {...kxInspectAttrs({ component: "AssetRegistryTab", module: "Database", section: "Registry", recordId: asset.id })}>
       {/* Links */}
       <Section title={`Business mapping${data.links.length ? ` · ${data.links.length}` : ""}`}
         action={<button type="button" onClick={() => setAdding((v) => !v)} className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11.5px] font-medium text-[var(--text-primary)] hover:border-[var(--border-color)]"><PlusIcon size={12} /> Map</button>}>

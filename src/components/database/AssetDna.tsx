@@ -13,6 +13,7 @@ import type { DnaAnalysis } from "@/lib/visual-library/types";
 import { dnaMatchStatus } from "@/lib/visual-library/design-dna";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 interface Similar { id: string; title: string; public_url: string | null }
 interface Violation { kind: string; message: string }
@@ -174,7 +175,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Bar({ label, value }: { label: string; value: number }) {
   const cls = value >= 70 ? "bg-emerald-400" : value >= 50 ? "bg-amber-400" : "bg-rose-400";
   return (
-    <div className="mb-1.5">
+    <div {...kxInspectAttrs({ component: "AssetDNATab", module: "Database", section: "DNA" })} className="mb-1.5">
       <div className="mb-0.5 flex items-center justify-between text-[11px]"><span className="text-[var(--text-muted)]">{label}</span><span className="tabular-nums text-[var(--text-dim)]">{value}</span></div>
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface-hover)]"><div className={`h-full rounded-full ${cls}`} style={{ width: `${value}%` }} /></div>
     </div>

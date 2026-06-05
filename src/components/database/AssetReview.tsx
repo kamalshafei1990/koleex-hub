@@ -24,6 +24,7 @@ import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
 import BadgeCheckIcon from "@/components/icons/ui/BadgeCheckIcon";
 import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 interface Resp {
   recommendation: ReviewRecommendation;
@@ -332,7 +333,7 @@ function Pill({ label, value, tone }: { label: string; value: string; tone: stri
 }
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div>
+    <div {...kxInspectAttrs({ component: "AssetReviewTab", module: "Database", section: "Review" })}>
       <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">{title}</h4>
       {children}
     </div>

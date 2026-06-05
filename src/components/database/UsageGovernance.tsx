@@ -16,6 +16,7 @@ import CrossIcon from "@/components/icons/ui/CrossIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 const RULE_META: Record<RuleKind, { label: string; cls: string }> = {
   allowed:   { label: "Allowed",   cls: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" },
@@ -139,7 +140,7 @@ export default function UsageGovernance({
               const v = scoreVerdict(c.score);
               const tone = v.tone === "positive" ? "text-emerald-400" : v.tone === "warning" ? "text-amber-400" : "text-rose-400";
               return (
-                <div key={c.collection_id} className="flex items-center justify-between gap-2 text-[11.5px]">
+                <div {...kxInspectAttrs({ component: "AssetGovernanceTab", module: "Database", section: "Governance" })} key={c.collection_id} className="flex items-center justify-between gap-2 text-[11.5px]">
                   <span className="truncate text-[var(--text-muted)]">{c.name}</span>
                   <span className={`shrink-0 font-semibold tabular-nums ${tone}`}>{c.score}% · {v.label}</span>
                 </div>

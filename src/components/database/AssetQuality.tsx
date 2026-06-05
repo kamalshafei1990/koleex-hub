@@ -15,6 +15,7 @@ import { statusTone } from "@/lib/visual-library/quality";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 interface Similar { id: string; title: string; public_url: string | null; score: number }
 interface Resp { quality: QualityProfile; warnings?: QualityWarning[]; similar: Similar[]; collections: { name: string; preferred_style: string | null }[]; cached?: boolean }
@@ -232,7 +233,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Bar({ label, value }: { label: string; value: number }) {
   const cls = value >= 70 ? "bg-emerald-400" : value >= 50 ? "bg-amber-400" : "bg-rose-400";
   return (
-    <div className="mb-1.5">
+    <div {...kxInspectAttrs({ component: "AssetQualityTab", module: "Database", section: "Quality" })} className="mb-1.5">
       <div className="mb-0.5 flex items-center justify-between text-[11px]"><span className="text-[var(--text-muted)]">{label}</span><span className="tabular-nums text-[var(--text-dim)]">{value}</span></div>
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface-hover)]"><div className={`h-full rounded-full ${cls}`} style={{ width: `${value}%` }} /></div>
     </div>
