@@ -223,7 +223,10 @@ export const APP_REGISTRY: AppDef[] = [
   /* ── Not in sidebar — accessible via All Apps or direct URL ── */
   { id: "inbox",            tKey: "app.inbox",            name: "Mail",              icon: MailIcon,      route: "/inbox",            active: true  },
   { id: "price-calculator", tKey: "app.price-calculator", name: "Price Calculator",  icon: PriceCalculatorIcon, route: "/price-calculator", active: true  },
-  { id: "brands",           tKey: "app.brands",           name: "Brands",            icon: BrandIcon,     route: "/brands",           active: true  },
+  /* Brands moved INTO the Database app's Visual Library (visual identity).
+     active:false removes it from the launcher / All Apps; the route points to
+     its new home (the old /brands redirects there too). */
+  { id: "brands",           tKey: "app.brands",           name: "Brands",            icon: BrandIcon,     route: "/database/brands",  active: false },
   { id: "dashboard",        tKey: "app.dashboard",        name: "Dashboard",         icon: AppsIcon,    route: "/dashboard",        active: false },
 ];
 

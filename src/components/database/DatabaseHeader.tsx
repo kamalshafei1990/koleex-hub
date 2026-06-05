@@ -30,10 +30,12 @@ const VL_PREFIXES = [
   "/database/collections",
   "/database/visual-registry",
   "/database/review",
+  "/database/brands",
 ];
 
 const VL_SUBTABS: Array<{ key: string; label: string; icon: RrIconName; i18nKey: string }> = [
   { key: "/database/visual-library",  label: "General Icons", icon: "palette",          i18nKey: "db.nav.generalIcons" },
+  { key: "/database/brands",          label: "Brands",        icon: "award",            i18nKey: "db.nav.brands" },
   { key: "/database/collections",     label: "Collections",   icon: "books",            i18nKey: "db.nav.collections" },
   { key: "/database/visual-registry", label: "Classification", icon: "box-circle-check", i18nKey: "db.nav.registry" },
   { key: "/database/review",          label: "Review Board",  icon: "badge-check",      i18nKey: "db.nav.reviewBoard" },
@@ -44,6 +46,7 @@ const T: Translations = {
   "db.nav.visualLibrary": { en: "Visual Library", zh: "视觉库",   ar: "مكتبة الصور" },
   "db.nav.issues":        { en: "Issue Reports",  zh: "问题报告", ar: "بلاغات المشاكل" },
   "db.nav.generalIcons":  { en: "General Icons",  zh: "通用图标", ar: "الأيقونات العامة" },
+  "db.nav.brands":        { en: "Brands",         zh: "品牌",     ar: "العلامات التجارية" },
   "db.nav.collections":   { en: "Collections",    zh: "合集",     ar: "المجموعات" },
   "db.nav.reviewBoard":   { en: "Review Board",   zh: "审核台",   ar: "لوحة المراجعة" },
   "db.nav.registry":      { en: "Classification", zh: "分类",     ar: "التصنيف" },
