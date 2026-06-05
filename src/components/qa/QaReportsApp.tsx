@@ -15,6 +15,7 @@ import { useSearchParams } from "next/navigation";
 import TargetIcon from "@/components/icons/ui/TargetIcon";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useScopeContext } from "@/lib/use-scope";
+import { useCommentAttachments, AttachmentStrip, AttachmentThumbs } from "@/components/qa/CommentAttachments";
 import {
   SEVERITIES,
   STATUSES,
@@ -772,6 +773,7 @@ function CommentsPanel({ issueId, myId }: { issueId: string; myId: string | null
   const [internal, setInternal] = useState(false);
   const [posting, setPosting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const att = useCommentAttachments();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -785,19 +787,19 @@ function CommentsPanel({ issueId, myId }: { issueId: string; myId: string | null
 
   async function post() {
     const message = text.trim();
-    if (!message) return;
+    if (!message && att.count === 0) return;
     setPosting(true); setErr(null);
     try {
       const res = await fetch(`/api/qa/reports/${issueId}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ message, is_internal_note: internal }),
+        body: JSON.stringify({ message, is_internal_note: internal, attachments: att.payload() }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(humanizeError(j.error ?? `HTTP ${res.status}`));
       if (j.comment) setComments((prev) => [...prev, j.comment as QaComment]);
-      setText(""); setInternal(false);
+      setText(""); setInternal(false); att.clear();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Couldn't post.");
     } finally { setPosting(false); }
@@ -822,7 +824,8 @@ function CommentsPanel({ issueId, myId }: { issueId: string; myId: string | null
                 {c.is_internal_note && <span className="rounded bg-amber-500/20 px-1 text-[9px] font-semibold text-amber-600 dark:text-amber-300">Internal</span>}
                 <span className="ms-auto text-[var(--text-dim)]">{rel(c.created_at)}{c.edited_at ? " · edited" : ""}</span>
               </div>
-              <div className="whitespace-pre-wrap break-words text-[12.5px] text-[var(--text-primary)]">{c.message}</div>
+              {c.message && <div className="whitespace-pre-wrap break-words text-[12.5px] text-[var(--text-primary)]">{c.message}</div>}
+              <AttachmentThumbs attachments={c.attachments ?? []} internal={c.is_internal_note} />
             </li>
           ))}
         </ul>
@@ -830,21 +833,23 @@ function CommentsPanel({ issueId, myId }: { issueId: string; myId: string | null
 
       {err && <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-[11.5px] text-rose-500 dark:text-rose-300">{err}</div>}
 
-      <div className="space-y-1.5 pt-1">
+      <div className="space-y-1.5 pt-1" onDrop={att.onDrop} onDragOver={att.onDragOver}>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
+          onPaste={att.onPaste}
           onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") void post(); }}
           rows={2}
-          placeholder="Write a reply…  (⌘/Ctrl+Enter to send)"
+          placeholder="Write a reply…  (paste/drop an image · ⌘/Ctrl+Enter to send)"
           className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
         />
+        <AttachmentStrip att={att} disabled={posting} />
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-1.5 text-[12px] text-[var(--text-secondary)]">
             <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} className="h-3.5 w-3.5 accent-[var(--accent)]" />
             Internal note
           </label>
-          <button type="button" onClick={post} disabled={posting || !text.trim()} className="ms-auto rounded-lg bg-[var(--accent)] px-4 py-1.5 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-40">
+          <button type="button" onClick={post} disabled={posting || (!text.trim() && att.count === 0)} className="ms-auto rounded-lg bg-[var(--accent)] px-4 py-1.5 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-40">
             {posting ? "Posting…" : "Comment"}
           </button>
         </div>

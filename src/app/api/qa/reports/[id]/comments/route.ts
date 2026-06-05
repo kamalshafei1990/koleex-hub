@@ -5,6 +5,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { logActivity } from "@/lib/qa/activity";
 import { notifyIssue, parseMentions, resolveMentionedAccounts, reporterIssueLink, type NotifyTarget } from "@/lib/qa/notify";
+import { sanitizeAttachments, signAttachments } from "@/lib/qa/attachments";
 
 interface IssueParticipants {
   id: string;
@@ -47,7 +48,14 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     .order("created_at", { ascending: true })
     .limit(500);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ comments: data ?? [] }, { headers: { "Cache-Control": "private, no-store" } });
+  // Resolve attachment paths → short-lived signed URLs.
+  const comments = await Promise.all(
+    (data ?? []).map(async (c) => ({
+      ...(c as Record<string, unknown>),
+      attachments: await signAttachments(auth.tenant_id, (c as { attachments: unknown }).attachments),
+    })),
+  );
+  return NextResponse.json({ comments }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 /* POST /api/qa/reports/[id]/comments — add a reply / internal note. */
@@ -64,7 +72,12 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   const message = typeof body?.message === "string" ? body.message.trim() : "";
-  if (!message) return NextResponse.json({ error: "A message is required." }, { status: 400 });
+  const att = sanitizeAttachments(auth.tenant_id, body?.attachments);
+  if (!att.ok) return NextResponse.json({ error: att.error }, { status: 400 });
+  // A comment needs a message OR at least one attachment.
+  if (!message && att.value.length === 0) {
+    return NextResponse.json({ error: "A message or an image is required." }, { status: 400 });
+  }
 
   const row = {
     tenant_id: auth.tenant_id,
@@ -74,6 +87,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     user_role: roleLabel(auth),
     message: message.slice(0, 8000),
     is_internal_note: body?.is_internal_note === true,
+    attachments: att.value,
   };
 
   const { data, error } = await supabaseServer
@@ -85,6 +99,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     console.error("[api/qa comments POST]", error.message);
     return NextResponse.json({ error: "Couldn't post the comment." }, { status: 500 });
   }
+  const hasAttachment = att.value.length > 0;
 
   // Touch the parent so list ordering / "last activity" stays fresh, and log.
   await supabaseServer
@@ -115,18 +130,19 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const mentionedUsernames = parseMentions(message);
   const mentioned = await resolveMentionedAccounts(auth.tenant_id, mentionedUsernames);
   const actor = auth.username ?? "Someone";
+  const suffix = hasAttachment ? " (with image)" : "";
   const targets: NotifyTarget[] = [
     ...mentioned.map((u) => ({
       recipientId: u.id,
       type: "qa_issue_mentioned" as const,
       title: "You were mentioned",
-      body: `${actor} mentioned you on "${issue.title}"`,
+      body: `${actor} mentioned you on "${issue.title}"${suffix}`,
     })),
     {
       recipientId: issue.assigned_to,
       type: "qa_comment_added" as const,
       title: "New comment",
-      body: `${actor} commented on "${issue.title}"`,
+      body: `${actor} commented on "${issue.title}"${suffix}`,
     },
   ];
   if (!row.is_internal_note) {
@@ -134,7 +150,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       recipientId: issue.reporter_id,
       type: "qa_comment_added" as const,
       title: "New comment",
-      body: `${actor} commented on "${issue.title}"`,
+      body: `${actor} commented on "${issue.title}"${suffix}`,
       link: reporterIssueLink(id), // reporter → safe read-only view
     });
   }
@@ -143,5 +159,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     targets,
   );
 
-  return NextResponse.json({ comment: data }, { status: 201 });
+  const comment = {
+    ...(data as Record<string, unknown>),
+    attachments: await signAttachments(auth.tenant_id, (data as { attachments: unknown }).attachments),
+  };
+  return NextResponse.json({ comment }, { status: 201 });
 }

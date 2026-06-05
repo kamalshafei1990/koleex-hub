@@ -198,6 +198,18 @@ const ROUTE_MODULE_RULES: { prefix: string; module: string }[] = [
 
 /* ─────────────────────────── Phase-3 entities ─────────────────────────── */
 
+/** An image attached to a QA comment. Stored as path+metadata; the API
+ *  injects a short-lived signed `url` on read (paths stay private). */
+export interface QaAttachment {
+  path: string;
+  name: string;
+  type: string;
+  size: number;
+  uploaded_at?: string;
+  /** Short-lived signed URL, present only on API reads. */
+  url?: string | null;
+}
+
 /** A single message in an issue's discussion thread. */
 export interface QaComment {
   id: string;
@@ -208,7 +220,7 @@ export interface QaComment {
   user_role: string | null;
   message: string;
   is_internal_note: boolean;
-  attachments: unknown[];
+  attachments: QaAttachment[];
   created_at: string;
   edited_at: string | null;
 }

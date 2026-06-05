@@ -18,6 +18,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { logActivity } from "@/lib/qa/activity";
 import { notifyIssue, parseMentions, resolveMentionedAccounts, issueLink } from "@/lib/qa/notify";
+import { sanitizeAttachments, signAttachments } from "@/lib/qa/attachments";
 
 const BUCKET = "qa-screenshots";
 
@@ -71,15 +72,22 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       || (acct as { login_email: string | null }).login_email || null;
   }
 
-  // PUBLIC comments only — internal notes are filtered in the query.
-  const { data: cmts } = await supabaseServer
+  // PUBLIC comments only — internal notes (and their attachments) are filtered
+  // out in the query, so the reporter can never receive internal images.
+  const { data: cmtRows } = await supabaseServer
     .from("qa_issue_comments")
-    .select("id, user_name, user_role, message, created_at, edited_at")
+    .select("id, user_name, user_role, message, attachments, created_at, edited_at")
     .eq("tenant_id", auth.tenant_id)
     .eq("issue_id", id)
     .eq("is_internal_note", false)
     .order("created_at", { ascending: true })
     .limit(500);
+  const cmts = await Promise.all(
+    (cmtRows ?? []).map(async (c) => ({
+      ...(c as Record<string, unknown>),
+      attachments: await signAttachments(auth.tenant_id, (c as { attachments: unknown }).attachments),
+    })),
+  );
 
   // PUBLIC timeline — workflow events the reporter should see; internal-note
   // comment events are hidden.
@@ -122,7 +130,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   };
 
   return NextResponse.json(
-    { issue, comments: cmts ?? [], activity: publicActivity },
+    { issue, comments: cmts, activity: publicActivity },
     { headers: { "Cache-Control": "private, no-store" } },
   );
 }
@@ -140,7 +148,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   const message = typeof body?.message === "string" ? body.message.trim() : "";
-  if (!message) return NextResponse.json({ error: "A message is required." }, { status: 400 });
+  const att = sanitizeAttachments(auth.tenant_id, body?.attachments);
+  if (!att.ok) return NextResponse.json({ error: att.error }, { status: 400 });
+  if (!message && att.value.length === 0) {
+    return NextResponse.json({ error: "A message or an image is required." }, { status: 400 });
+  }
 
   const { data, error } = await supabaseServer
     .from("qa_issue_comments")
@@ -152,13 +164,15 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       user_role: "Reporter",
       message: message.slice(0, 8000),
       is_internal_note: false, // hard-forced — reporter replies are always public
+      attachments: att.value,
     })
-    .select("id, user_name, user_role, message, created_at, edited_at")
+    .select("id, user_name, user_role, message, attachments, created_at, edited_at")
     .single();
   if (error) {
     console.error("[api/qa my-issues POST]", error.message);
     return NextResponse.json({ error: "Couldn't post the reply." }, { status: 500 });
   }
+  const hasAttachment = att.value.length > 0;
 
   await supabaseServer
     .from("qa_issue_reports")
@@ -179,6 +193,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   // assignee gets the admin-console link.
   const mentioned = await resolveMentionedAccounts(auth.tenant_id, parseMentions(message));
   const actor = auth.username ?? "Reporter";
+  const suffix = hasAttachment ? " (with image)" : "";
   await notifyIssue(
     { tenantId: auth.tenant_id, issueId: id, actorId: auth.account_id, actorName: auth.username ?? null },
     [
@@ -186,18 +201,22 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         recipientId: u.id,
         type: "qa_issue_mentioned" as const,
         title: "You were mentioned",
-        body: `${actor} mentioned you on "${issue.title as string}"`,
+        body: `${actor} mentioned you on "${issue.title as string}"${suffix}`,
         link: issueLink(id),
       })),
       {
         recipientId: issue.assigned_to as string | null,
         type: "qa_comment_added" as const,
         title: "Reporter replied",
-        body: `${actor} replied on "${issue.title as string}"`,
+        body: `${actor} replied on "${issue.title as string}"${suffix}`,
         link: issueLink(id),
       },
     ],
   );
 
-  return NextResponse.json({ comment: data }, { status: 201 });
+  const comment = {
+    ...(data as Record<string, unknown>),
+    attachments: await signAttachments(auth.tenant_id, (data as { attachments: unknown }).attachments),
+  };
+  return NextResponse.json({ comment }, { status: 201 });
 }

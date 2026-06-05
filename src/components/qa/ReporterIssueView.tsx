@@ -14,6 +14,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { humanizeError } from "@/lib/ui/humanize-error";
+import { useCommentAttachments, AttachmentStrip, AttachmentThumbs } from "@/components/qa/CommentAttachments";
+import type { QaAttachment } from "@/lib/qa/types";
 import {
   SEVERITY_LABEL,
   STATUS_LABEL,
@@ -55,6 +57,7 @@ interface SafeComment {
   user_name: string | null;
   user_role: string | null;
   message: string;
+  attachments: QaAttachment[];
   created_at: string;
   edited_at: string | null;
 }
@@ -118,6 +121,7 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
   const [postErr, setPostErr] = useState<string | null>(null);
+  const att = useCommentAttachments();
 
   const load = useCallback(async () => {
     setLoading(true); setError(null); setNotFound(false);
@@ -138,19 +142,19 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
 
   async function postReply() {
     const message = text.trim();
-    if (!message) return;
+    if (!message && att.count === 0) return;
     setPosting(true); setPostErr(null);
     try {
       const res = await fetch(`/api/qa/my-issues/${issueId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, attachments: att.payload() }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(humanizeError(j.error ?? `HTTP ${res.status}`));
       if (j.comment) setComments((prev) => [...prev, j.comment as SafeComment]);
-      setText("");
+      setText(""); att.clear();
     } catch (e) {
       setPostErr(e instanceof Error ? e.message : "Couldn't post your reply.");
     } finally { setPosting(false); }
@@ -245,24 +249,27 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
                   {c.user_role && <span className="rounded bg-[var(--bg-surface)] px-1 text-[9px] text-[var(--text-dim)]">{c.user_role}</span>}
                   <span className="ms-auto text-[var(--text-dim)]">{rel(c.created_at)}{c.edited_at ? " · edited" : ""}</span>
                 </div>
-                <div className="whitespace-pre-wrap break-words text-[12.5px] text-[var(--text-primary)]">{c.message}</div>
+                {c.message && <div className="whitespace-pre-wrap break-words text-[12.5px] text-[var(--text-primary)]">{c.message}</div>}
+                <AttachmentThumbs attachments={c.attachments ?? []} />
               </li>
             ))}
           </ul>
         )}
 
         {postErr && <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-[11.5px] text-rose-500 dark:text-rose-300">{postErr}</div>}
-        <div className="space-y-1.5 pt-1">
+        <div className="space-y-1.5 pt-1" onDrop={att.onDrop} onDragOver={att.onDragOver}>
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
+            onPaste={att.onPaste}
             onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") void postReply(); }}
             rows={2}
-            placeholder="Add a public reply or clarify your issue…  (⌘/Ctrl+Enter to send)"
+            placeholder="Add a public reply, paste/drop a screenshot…  (⌘/Ctrl+Enter to send)"
             className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
           />
+          <AttachmentStrip att={att} disabled={posting} />
           <div className="flex justify-end">
-            <button type="button" onClick={postReply} disabled={posting || !text.trim()} className="rounded-lg bg-[var(--accent)] px-4 py-1.5 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-40">
+            <button type="button" onClick={postReply} disabled={posting || (!text.trim() && att.count === 0)} className="rounded-lg bg-[var(--accent)] px-4 py-1.5 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-40">
               {posting ? "Posting…" : "Reply"}
             </button>
           </div>
