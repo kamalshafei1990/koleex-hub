@@ -107,6 +107,7 @@ import ProfileCompletenessBar from "@/components/ui/ProfileCompletenessBar";
 import GuidanceTip from "@/components/ui/GuidanceTip";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import SupplierDetail from "@/components/suppliers/SupplierDetail";
+import AddressAutocomplete from "@/components/suppliers/AddressAutocomplete";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TYPES
@@ -8158,6 +8159,19 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 {/* Address — structured like a standard postal address:
                     street line → country → province/state → city + postal code. */}
                 <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] p-3 space-y-2.5">
+                  {/* AMap (高德) address lookup — China-friendly, no VPN. Self-hides
+                      until AMAP_WEB_KEY is configured. Fills the Chinese address +
+                      city + province so the address can't be mismatched (report D). */}
+                  <AddressAutocomplete
+                    label={t("field.addressLookup", "Find address (AMap / 高德)")}
+                    placeholder={t("placeholder.addressLookup", "Search a Chinese address or place…")}
+                    hint={t("hint.addressLookup", "Auto-fills Chinese street · city · province")}
+                    onSelect={(r) => {
+                      if (r.formatted) setField("supplier_address_cn", r.formatted);
+                      if (r.city) setField("city", r.city);
+                      if (r.province) setField("province", r.province);
+                    }}
+                  />
                   <Input label={t("field.streetAddressEn", "Street address (English)")} tier="preferred" value={form.supplier_address} onChange={v => setField("supplier_address", v)} placeholder={t("placeholder.street", "Street, building, unit…")} icon={<MapPinIcon size={14} />} autoComplete="street-address" />
                   <Input label={t("field.streetAddressCn", "Street address (Chinese)")} tier="preferred" value={form.supplier_address_cn} onChange={v => setField("supplier_address_cn", v)} placeholder={t("placeholder.streetCn", "街道、楼宇、单元…")} icon={<MapPinIcon size={14} />} />
                   <div className={triedSave && !form.country.trim() ? "rounded-lg ring-1 ring-rose-500/60" : undefined}>
