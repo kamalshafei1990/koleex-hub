@@ -16,6 +16,7 @@ import { InventoryEmpty, Panel } from "@/components/inventory/InventoryUi";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
 import { inventoryT } from "@/lib/translations/inventory";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 type ExpiryStatus = "normal" | "near_expiry" | "expired" | "depleted";
 
@@ -170,7 +171,7 @@ export default function InventoryBatches() {
               </thead>
               <tbody>
                 {filtered.map((b) => (
-                  <tr key={b.id} className="border-b border-[var(--border-subtle)] last:border-b-0 hover:bg-[var(--bg-elevated)]">
+                  <tr key={b.id} {...kxInspectAttrs({ component: "InventoryBatchRow", module: "Inventory", section: "Batches", recordId: b.id })} className="border-b border-[var(--border-subtle)] last:border-b-0 hover:bg-[var(--bg-elevated)]">
                     <td className="px-3 py-2 font-mono text-[11.5px] text-[var(--text-primary)]">{b.batch_no}</td>
                     <td className="px-3 py-2 text-[var(--text-primary)]">
                       <div>{b.item_name ?? "—"}</div>

@@ -16,6 +16,7 @@ import { InventoryEmpty, Panel } from "@/components/inventory/InventoryUi";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation, type Translations } from "@/lib/i18n";
 import { inventoryT } from "@/lib/translations/inventory";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 import InventoryTransferCreateDrawer from "./InventoryTransferCreateDrawer";
 import {
   BulkActionBar,
@@ -267,6 +268,7 @@ export default function InventoryTransfers() {
                 return (
                   <li
                     key={tr.id}
+                    {...kxInspectAttrs({ component: "InventoryTransferRow", module: "Inventory", section: "Transfers", recordId: tr.id })}
                     className="px-3 py-3.5 transition-colors hover:bg-[var(--bg-surface)]/60 sm:px-4"
                   >
                     {/* Operator row — stacked on mobile, inline on desktop */}

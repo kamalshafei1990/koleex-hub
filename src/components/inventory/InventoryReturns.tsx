@@ -24,6 +24,7 @@ import { useTranslation, type Translations } from "@/lib/i18n";
 import { inventoryT } from "@/lib/translations/inventory";
 import InventoryReturnCreateDrawer from "./InventoryReturnCreateDrawer";
 import { HumanStatusPill, humanStatus, relativeTime } from "./InventoryUx";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 /* INV-H5D — local i18n extension for the operator polish strings. */
 const RT_T: Translations = {
@@ -257,6 +258,7 @@ export default function InventoryReturns() {
                 return (
                   <li
                     key={rr.id}
+                    {...kxInspectAttrs({ component: "InventoryReturnRow", module: "Inventory", section: "Returns", recordId: rr.id })}
                     className="px-3 py-3.5 transition-colors hover:bg-[var(--bg-surface)]/60 sm:px-4"
                   >
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">

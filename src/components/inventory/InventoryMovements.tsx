@@ -27,6 +27,7 @@ import {
 } from "@/components/inventory/InventoryUi";
 import RrIcon from "@/components/ui/RrIcon";
 import { humanizeError } from "@/lib/ui/humanize-error";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { useTranslation, type Translations } from "@/lib/i18n";
 import Link from "next/link";
 import InventoryMovementDetail from "@/components/inventory/InventoryMovementDetail";
@@ -847,6 +848,7 @@ export default function InventoryMovements() {
                 return (
                   <li
                     key={m.id}
+                    {...kxInspectAttrs({ component: "InventoryMovementRow", module: "Inventory", section: "Movements", recordId: m.id })}
                     className="px-3 py-3.5 transition-colors hover:bg-[var(--bg-surface)]/60 sm:px-4"
                   >
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">

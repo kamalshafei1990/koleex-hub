@@ -17,6 +17,7 @@ import {
   Panel,
 } from "@/components/inventory/InventoryUi";
 import RrIcon from "@/components/ui/RrIcon";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 interface Balance {
   id: string;
@@ -321,7 +322,7 @@ export default function InventoryBalances() {
                 filteredRows.map((r) => {
                   const wh = whMap.get(r.warehouse_id);
                   return (
-                    <tr key={r.id} className="border-b border-white/[0.03] last:border-b-0 hover:bg-white/[0.02]">
+                    <tr key={r.id} {...kxInspectAttrs({ component: "InventoryBalanceRow", module: "Inventory", section: "Balances", recordId: r.id })} className="border-b border-white/[0.03] last:border-b-0 hover:bg-white/[0.02]">
                       <td className="px-4 py-2 font-mono text-[11.5px] text-gray-300 whitespace-nowrap">{r.item_code}</td>
                       <td className="px-4 py-2 text-gray-200">
                         <span className="inline-flex items-center gap-2">

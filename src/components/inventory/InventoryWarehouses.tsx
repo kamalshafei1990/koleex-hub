@@ -21,6 +21,7 @@ import {
 import { ALLOWED_LOCATION_TYPES, type LocationType, type Warehouse } from "@/lib/inventory/types";
 import RrIcon from "@/components/ui/RrIcon";
 import { humanizeError } from "@/lib/ui/humanize-error";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 /* Friendly labels for the picker. Mirrors the chip vocabulary in
    InventoryUi (which only handles display). */
@@ -153,7 +154,7 @@ export default function InventoryWarehouses() {
                 </td></tr>
               ) : (
                 visible.map((w) => (
-                  <tr key={w.id} className="border-b border-white/[0.03] last:border-b-0 hover:bg-white/[0.02]">
+                  <tr key={w.id} {...kxInspectAttrs({ component: "InventoryWarehouseRow", module: "Inventory", section: "Warehouses", recordId: w.id })} className="border-b border-white/[0.03] last:border-b-0 hover:bg-white/[0.02]">
                     <td className="px-4 py-2 font-mono text-[11.5px] text-gray-300 whitespace-nowrap">{w.code}</td>
                     <td className="px-4 py-2 text-gray-200">{w.name}</td>
                     <td className="px-4 py-2"><LocationTypeChip type={w.location_type} /></td>
