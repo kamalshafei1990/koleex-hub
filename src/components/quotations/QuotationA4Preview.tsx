@@ -1277,20 +1277,18 @@ export default function QuotationA4Preview({
                            Result: cluster sits cleanly 16 px past
                            the paper's right edge -- never inside
                            the paper, never floating far. */
-                        right: -88,
-                        width: 40,
-                        /* Cluster height shrunk 112 → 100 to leave
-                           visible vertical breathing space (≈15 px
-                           above + below) between adjacent rows'
-                           clusters. Picture-cell-driven rows are
-                           ~130 px tall, so the slack now reads as a
-                           clear vertical gap between controls. */
+                        right: -116,
+                        width: 68,
+                        /* Compact 2×2 grid (was a 4-tall stack, which grew too
+                           long once Duplicate was added and overlapped adjacent
+                           rows). 2 cols × 28 + gaps + 4 px padding × 2 = 68 wide,
+                           ~60 tall — short enough to never collide with the row
+                           above/below. Always visible. */
                         boxSizing: "border-box",
                         display: "grid",
-                        /* Rigid 28 px rows, sized to however many controls
-                           are present (3 or 4). The pill is vertically
-                           centred via top:50% so its height can be auto. */
+                        gridTemplateColumns: "28px 28px",
                         gridAutoRows: "28px",
+                        columnGap: 4,
                         rowGap: 4,
                         alignContent: "center",
                         justifyItems: "center",
@@ -1340,15 +1338,12 @@ export default function QuotationA4Preview({
                         position: "absolute",
                         top: "50%",
                         transform: "translateY(-50%)",
-                        /* Notes panel sits 8 px to the right of
-                           the cluster, 200 px wide.
-                             cluster_right = paper_right + 16 + 40
-                                           = paper_right + 56
-                             notes_left    = paper_right + 56 + 8
-                                           = paper_right + 64
-                             notes_right   = paper_right + 264
-                             → X = 264 + 32 (paper padding) = 296. */
-                        right: -296,
+                        /* Notes panel sits 8 px to the right of the (now 2×2,
+                           68 px-wide) cluster, 200 px wide.
+                             cluster_right = paper_right + 16 + 68 = +84
+                             notes_left    = +84 + 8 = +92
+                             notes_right   = +292  → X = 292 + 32 = 324. */
+                        right: -324,
                         width: 200,
                         /* Matches cluster height; 30 px slack against
                            the ~130 px row leaves ~15 px breathing
@@ -5152,25 +5147,6 @@ function ShipmentDetailsCard({
       <style>{`
         @media screen and (max-width: 767px) {
           .pq-shipment-grid { grid-template-columns: auto 1fr !important; }
-        }
-        /* Row controls + internal-note panel sit in the dark margin OUTSIDE
-           the A4 page. Keep that margin clean: hide them at rest and reveal
-           only the hovered / focused row's controls — so the editor shows one
-           tidy control set at a time instead of a cluttered stack down the side. */
-        .pq-row-actions, .pq-row-note {
-          opacity: 0;
-          pointer-events: none;
-          transition: opacity 0.14s ease;
-        }
-        .pq-row:hover .pq-row-actions,
-        .pq-row:hover .pq-row-note,
-        .pq-row:focus-within .pq-row-actions,
-        .pq-row:focus-within .pq-row-note {
-          opacity: 1;
-          pointer-events: auto;
-        }
-        @media print {
-          .pq-row-actions, .pq-row-note { display: none !important; }
         }
         .pq-detail-cell[contenteditable="true"]:empty::before {
           content: "—";
