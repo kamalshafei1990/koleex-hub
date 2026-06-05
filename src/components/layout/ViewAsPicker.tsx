@@ -38,6 +38,12 @@ interface AccountRow {
   status: string;
   role_id: string | null;
   role_name: string | null;
+  /* GEN-2 — org placement for Department → Position (senior→junior) grouping. */
+  department_id: string | null;
+  department_name: string | null;
+  department_sort: number;
+  position_title: string | null;
+  position_level: number;
 }
 
 interface RoleRow {
@@ -389,6 +395,31 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
         })
       : roles;
 
+  /* GEN-2 — group the User list by Department (org sort order) → Position
+     (senior → junior, i.e. ascending level) → name. Accounts with no org
+     placement collect under "Unassigned" at the end. */
+  type UserGroup = { id: string; name: string; sort: number; rows: AccountRow[] };
+  const userGroups: UserGroup[] = (() => {
+    const map = new Map<string, UserGroup>();
+    for (const a of filteredUsers) {
+      const key = a.department_id ?? "__none__";
+      const name = a.department_name ?? "Unassigned";
+      const sort = a.department_name ? a.department_sort : 10_000;
+      if (!map.has(key)) map.set(key, { id: key, name, sort, rows: [] });
+      map.get(key)!.rows.push(a);
+    }
+    const groups = Array.from(map.values());
+    groups.sort((x, y) => (x.sort - y.sort) || x.name.localeCompare(y.name));
+    for (const g of groups) {
+      g.rows.sort(
+        (a, b) =>
+          (a.position_level - b.position_level) ||
+          a.username.localeCompare(b.username),
+      );
+    }
+    return groups;
+  })();
+
   const activeLoaded = mode === "user" ? usersLoaded : rolesLoaded;
   const activeFiltered = mode === "user" ? filteredUsers : filteredRoles;
 
@@ -534,39 +565,53 @@ export default function ViewAsPicker({ dk }: { dk: boolean }) {
                     : "No matches."}
               </div>
             ) : mode === "user" ? (
-              (activeFiltered as AccountRow[]).map((a) => (
-                <button
-                  key={a.id}
-                  type="button"
-                  disabled={busy}
-                  onClick={() => handlePickUser(a.id)}
-                  className={`w-full px-3 py-2.5 text-left flex items-center gap-2 transition-colors disabled:opacity-50 ${
-                    dk ? "hover:bg-white/[0.04]" : "hover:bg-black/[0.03]"
-                  }`}
-                >
-                  <UsersIcon
-                    size={13}
-                    className={`shrink-0 ${
-                      dk ? "text-white/60" : "text-black/60"
+              userGroups.map((g) => (
+                <div key={g.id}>
+                  {/* Department header — org hierarchy band. */}
+                  <div
+                    className={`sticky top-0 z-[1] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider backdrop-blur ${
+                      dk
+                        ? "bg-[#141414]/95 text-white/45 border-b border-white/[0.06]"
+                        : "bg-white/95 text-black/45 border-b border-black/[0.06]"
                     }`}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div
-                      className={`text-[12.5px] font-semibold truncate ${
-                        dk ? "text-white" : "text-black"
-                      }`}
-                    >
-                      {a.username}
-                    </div>
-                    <div
-                      className={`text-[10.5px] truncate ${
-                        dk ? "text-white/45" : "text-black/45"
-                      }`}
-                    >
-                      {a.role_name ?? a.user_type} · {a.login_email}
-                    </div>
+                  >
+                    {g.name}
                   </div>
-                </button>
+                  {g.rows.map((a) => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      disabled={busy}
+                      onClick={() => handlePickUser(a.id)}
+                      className={`w-full px-3 py-2.5 text-left flex items-center gap-2 transition-colors disabled:opacity-50 ${
+                        dk ? "hover:bg-white/[0.04]" : "hover:bg-black/[0.03]"
+                      }`}
+                    >
+                      <UsersIcon
+                        size={13}
+                        className={`shrink-0 ${
+                          dk ? "text-white/60" : "text-black/60"
+                        }`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div
+                          className={`text-[12.5px] font-semibold truncate ${
+                            dk ? "text-white" : "text-black"
+                          }`}
+                        >
+                          {a.username}
+                        </div>
+                        <div
+                          className={`text-[10.5px] truncate ${
+                            dk ? "text-white/45" : "text-black/45"
+                          }`}
+                        >
+                          {a.position_title ?? a.role_name ?? a.user_type} · {a.login_email}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               ))
             ) : (
               (activeFiltered as RoleRow[]).map((r) => (
