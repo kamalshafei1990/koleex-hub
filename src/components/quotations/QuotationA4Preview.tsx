@@ -177,6 +177,8 @@ interface Props {
   onClearSignature?: () => void;
   removeItem: (idx: number) => void;
   moveItem: (idx: number, direction: -1 | 1) => void;
+  /* Insert a copy of the row directly below it. */
+  duplicateItem: (idx: number) => void;
   handleImageUpload: (idx: number, file: File) => void;
   fileInputRefs: MutableRefObject<{ [key: number]: HTMLInputElement | null }>;
   subTotal: number;
@@ -239,6 +241,16 @@ const SECTION_COLOR_PRESETS = [
   "#0D2B4E", "#14532D", "#7F1D1D", "#92400E", "#4C1D95", "#FFFFFF",
 ];
 
+/* Duplicate (two overlapping cards) glyph — no dedicated icon in the set. */
+function DuplicateGlyph() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+}
+
 /* Pick readable title text (near-black or white) for a given section-band
    colour, using perceived luminance — so a header stays legible whatever
    colour the user chooses. */
@@ -271,6 +283,7 @@ export default function QuotationA4Preview({
   onClearSignature,
   removeItem,
   moveItem,
+  duplicateItem,
   handleImageUpload,
   fileInputRefs,
   subTotal,
@@ -1091,6 +1104,7 @@ export default function QuotationA4Preview({
                           </div>
                           <button type="button" className="pq-sec-ctrl" title="Move section up" disabled={idx === 0} onClick={() => moveItem(idx, -1)}><ArrowUpIcon size={13} /></button>
                           <button type="button" className="pq-sec-ctrl" title="Move section down" disabled={idx === current.items.length - 1} onClick={() => moveItem(idx, 1)}><ArrowDownIcon size={13} /></button>
+                          <button type="button" className="pq-sec-ctrl" title="Duplicate section header" onClick={() => duplicateItem(idx)}><DuplicateGlyph /></button>
                           <button type="button" className="pq-sec-ctrl pq-sec-ctrl--danger" title="Remove section header" disabled={current.items.length <= 1} onClick={() => removeItem(idx)}><TrashIcon size={12} /></button>
                         </div>
                       </div>
@@ -1267,13 +1281,12 @@ export default function QuotationA4Preview({
                            clusters. Picture-cell-driven rows are
                            ~130 px tall, so the slack now reads as a
                            clear vertical gap between controls. */
-                        height: 100,
+                        height: 132,
                         boxSizing: "border-box",
                         display: "grid",
-                        /* 3 rigid 28 px rows + 2 × 4 px row gaps fit
-                           inside 100 px minus 4 px padding × 2 = 92
-                           content height. 28×3 + 4×2 = 92 ≤ 92. */
-                        gridTemplateRows: "28px 28px 28px",
+                        /* 4 rigid 28 px rows + 3 × 4 px row gaps =
+                           28×4 + 4×3 = 124, inside 132 − 4 px padding × 2. */
+                        gridTemplateRows: "28px 28px 28px 28px",
                         rowGap: 4,
                         alignContent: "center",
                         justifyItems: "center",
@@ -1297,6 +1310,11 @@ export default function QuotationA4Preview({
                         disabled={idx === current.items.length - 1}
                         onClick={() => moveItem(idx, 1)}
                         icon={<ArrowDownIcon size={14} />}
+                      />
+                      <RowActionBtn
+                        title="Duplicate row"
+                        onClick={() => duplicateItem(idx)}
+                        icon={<DuplicateGlyph />}
                       />
                       <RowActionBtn
                         title="Remove row"

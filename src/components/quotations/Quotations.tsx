@@ -1505,6 +1505,16 @@ export default function Quotations() {
     });
   }, [current]);
 
+  /* Duplicate a row — insert an identical copy directly below it. Works for
+     product rows and section headers alike. */
+  const duplicateItem = useCallback((idx: number) => {
+    if (!current) return;
+    const items = current.items.slice();
+    if (idx < 0 || idx >= items.length) return;
+    items.splice(idx + 1, 0, { ...items[idx] });
+    setCurrent({ ...current, items });
+  }, [current]);
+
   /* Apply a CRM customer pick to the QUOTATION TO card. Fills the
      editor's company / contact / phone / mobile / email / website
      fields and stores customerContactId in the doc so we can show
@@ -2086,6 +2096,7 @@ export default function Quotations() {
         onClearSignature={clearSignature}
         removeItem={removeItem}
         moveItem={moveItem}
+        duplicateItem={duplicateItem}
         handleImageUpload={handleImageUpload}
         fileInputRefs={fileInputRefs}
         subTotal={subTotal}
