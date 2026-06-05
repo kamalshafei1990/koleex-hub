@@ -35,6 +35,7 @@ import {
   fetchAccountWithLinks,
 } from "@/lib/accounts-admin";
 import { fetchEventsInRange, deleteEvent } from "@/lib/calendar-events";
+import { fetchHolidays, expandHolidays, type HolidayRow } from "@/lib/calendar-holidays";
 import { withDefaults } from "@/lib/access-control";
 import { useTranslation } from "@/lib/i18n";
 import { calendarT } from "@/lib/translations/calendar";
@@ -85,6 +86,9 @@ export default function CalendarApp() {
 
   // Data
   const [events, setEvents] = useState<CalendarEventRow[]>([]);
+  // Holidays (report GEN-10) — per country / customer, weekly / national / official.
+  const [holidayRows, setHolidayRows] = useState<HolidayRow[]>([]);
+  const [holidayCountry, setHolidayCountry] = useState<string>(""); // "" = all
   const [loadingAccounts, setLoadingAccounts] = useState(true);
   const [loadingEvents, setLoadingEvents] = useState(false);
 
@@ -199,6 +203,31 @@ export default function CalendarApp() {
   useEffect(() => {
     loadEvents();
   }, [loadEvents]);
+
+  /* Holidays load once (tenant-scoped by the API). They're reference data, not
+     windowed, so we fetch the full set and expand into the visible range. */
+  useEffect(() => {
+    const ctrl = new AbortController();
+    fetchHolidays({ signal: ctrl.signal })
+      .then(setHolidayRows)
+      .catch(() => { /* non-fatal — calendar still works without holidays */ });
+    return () => ctrl.abort();
+  }, []);
+
+  const holidayCountries = useMemo(
+    () =>
+      Array.from(
+        new Set(holidayRows.map((h) => h.country).filter(Boolean) as string[]),
+      ).sort(),
+    [holidayRows],
+  );
+
+  const holidaysByDay = useMemo(() => {
+    const rows = holidayCountry
+      ? holidayRows.filter((h) => h.country === holidayCountry || h.scope_type === "customer")
+      : holidayRows;
+    return expandHolidays(rows, visibleRange.from, visibleRange.to);
+  }, [holidayRows, holidayCountry, visibleRange]);
 
   useEffect(() => {
     if (!toast) return;
@@ -424,6 +453,27 @@ export default function CalendarApp() {
           </div>
         </div>
 
+        {/* Holiday country filter (report GEN-10) — only when holidays exist
+            and we're in the month grid (the view that overlays them). */}
+        {view === "month" && holidayCountries.length > 0 && (
+          <div className="mb-3 flex items-center gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">
+              {t("calendar.holidays", "Holidays")}
+            </span>
+            <select
+              value={holidayCountry}
+              onChange={(e) => setHolidayCountry(e.target.value)}
+              className="h-8 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
+              title={t("calendar.filterByCountry", "Filter holidays by country")}
+            >
+              <option value="">{t("calendar.allCountries", "All countries")}</option>
+              {holidayCountries.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* ── View body ── */}
         <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
           {!activeAccountId ? (
@@ -439,6 +489,7 @@ export default function CalendarApp() {
               focusDate={focusDate}
               events={events}
               preferences={preferences}
+              holidaysByDay={holidaysByDay}
               onDayClick={(d) => {
                 setFocusDate(d);
                 setView("day");

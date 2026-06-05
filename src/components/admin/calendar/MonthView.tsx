@@ -10,6 +10,7 @@
 
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import type { CalendarEventRow, AccountPreferences } from "@/types/supabase";
+import type { HolidayInstance } from "@/lib/calendar-holidays";
 import {
   eventsOnDay,
   isSameMonth,
@@ -24,6 +25,8 @@ interface Props {
   focusDate: Date;
   events: CalendarEventRow[];
   preferences: AccountPreferences;
+  /* Report GEN-10 — holiday occurrences keyed by yyyy-mm-dd. */
+  holidaysByDay?: Record<string, HolidayInstance[]>;
   onDayClick?: (d: Date) => void;
   onNewEventOnDay?: (d: Date) => void;
   onEventClick?: (e: CalendarEventRow) => void;
@@ -31,11 +34,19 @@ interface Props {
 
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MAX_CHIPS = 3;
+const HOLIDAY_COLOR = "#EC4899"; // matches the Calendar "Holiday" legend dot
+
+function isoKey(d: Date): string {
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
 
 export default function MonthView({
   focusDate,
   events,
   preferences,
+  holidaysByDay,
   onDayClick,
   onNewEventOnDay,
   onEventClick,
@@ -71,6 +82,7 @@ export default function MonthView({
           const inMonth = isSameMonth(day, focusDate);
           const today = isToday(day);
           const dayEvents = eventsOnDay(events, day);
+          const dayHolidays = holidaysByDay?.[isoKey(day)] ?? [];
           const shown = dayEvents.slice(0, MAX_CHIPS);
           const extra = dayEvents.length - shown.length;
           const iso = isoWeekday(day);
@@ -117,6 +129,28 @@ export default function MonthView({
                   <PlusIcon className="h-3 w-3" />
                 </button>
               </div>
+
+              {/* Holiday chips (report GEN-10) — country / customer rest days
+                  and national / official holidays for the active filter. */}
+              {dayHolidays.length > 0 && (
+                <div className="space-y-1 mb-1">
+                  {dayHolidays.map((h) => (
+                    <div
+                      key={h.id}
+                      className="w-full flex items-center gap-1 h-[18px] px-1.5 rounded text-[10px] font-semibold truncate"
+                      style={{
+                        backgroundColor: HOLIDAY_COLOR + "22",
+                        color: HOLIDAY_COLOR,
+                        borderLeft: `2px solid ${HOLIDAY_COLOR}`,
+                      }}
+                      title={`${h.name} · ${h.type}${h.country ? " · " + h.country : ""}`}
+                    >
+                      <span className="shrink-0 text-[9px]">🎌</span>
+                      <span className="truncate">{h.name}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Event chips */}
               <div className="space-y-1">
