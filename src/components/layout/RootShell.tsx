@@ -14,6 +14,7 @@ import MainHeader from "./MainHeader";
 import Sidebar from "./Sidebar";
 import FloatingPanel from "./FloatingPanel";
 import ViewAsBanner from "./ViewAsBanner";
+import ReportIssueButton from "@/components/qa/ReportIssueButton";
 import {
   SidebarProvider,
   useSidebar,
@@ -86,6 +87,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
         </div>
       </div>
       <FloatingPanel />
+      {/* Global QA issue reporter (floating button + modal). */}
+      <ReportIssueButton />
     </>
   );
 }
