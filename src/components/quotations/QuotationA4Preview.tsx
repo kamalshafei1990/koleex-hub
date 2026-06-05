@@ -45,6 +45,10 @@ export interface QuotationItem {
   unitPrice: number;
   qty: number;
   notes: string;
+  /* When "header", this row renders as a full-width black section band
+     (the `description` holds its centered title) instead of a product row.
+     It carries no price/qty, so it never affects any total. */
+  kind?: "header";
 }
 
 export interface Quotation {
@@ -123,12 +127,19 @@ export interface Quotation {
 interface Props {
   current: Quotation;
   setCurrent: Dispatch<SetStateAction<Quotation | null>>;
-  updateItem: <K extends keyof QuotationItem>(
+  /* Edits a row's scalar fields. `kind` is intentionally NOT editable
+     here (it's set once when a header row is created), which keeps this
+     signature compatible with both the Quotation and Invoice parents. */
+  updateItem: (
     idx: number,
-    field: K,
-    value: QuotationItem[K],
+    field: "description" | "model" | "image" | "unitPrice" | "qty" | "notes",
+    value: string | number,
   ) => void;
   addItem: () => void;
+  /* Optional handler for the "Add section header" button — appends a
+     full-width black band row used to group the quote into sections.
+     If undefined, the button is hidden. */
+  addHeader?: () => void;
   /* Optional handler for the "+ From catalog" button. The parent
      owns the picker modal — this prop just opens it. If undefined,
      the button is hidden (e.g. when used somewhere without a
@@ -223,6 +234,7 @@ export default function QuotationA4Preview({
   setCurrent,
   updateItem,
   addItem,
+  addHeader,
   onPickFromCatalog,
   onPickCustomer,
   docKind = "quotation",
@@ -942,6 +954,62 @@ export default function QuotationA4Preview({
                  the row. */
               const idx = startItemIdx + localIdx;
               const lineTotal = (Number(item.unitPrice) || 0) * (Number(item.qty) || 0);
+
+              /* ── Section header row ──────────────────────────────
+                 A full-width black band that groups the quote into
+                 sections. Holds a single centered, editable title in
+                 `description`; carries no price / qty so it never
+                 touches any total. Move / remove actions match the
+                 normal rows' floating cluster. */
+              if (item.kind === "header") {
+                return (
+                  <tr key={idx} style={{ position: "relative" }}>
+                    <td colSpan={7} style={{ padding: 0 }}>
+                      <style>{`.pq-section-head:empty::before{content:attr(data-ph);color:rgba(255,255,255,0.45);font-weight:600;}`}</style>
+                      <div style={{ background: "#000000", padding: "9px 18px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <div
+                          className="pq-section-head"
+                          data-ph="Section title…"
+                          contentEditable
+                          suppressContentEditableWarning
+                          onFocus={() => setFocusedItemIdx(null)}
+                          onBlur={(e) => updateItem(idx, "description", e.currentTarget.textContent || "")}
+                          dangerouslySetInnerHTML={{ __html: item.description }}
+                          style={{
+                            width: "100%",
+                            textAlign: "center",
+                            color: "#FFFFFF",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            letterSpacing: "0.1em",
+                            textTransform: "uppercase",
+                            outline: "none",
+                            minHeight: 16,
+                            lineHeight: 1.4,
+                          }}
+                        />
+                      </div>
+                      {/* Move / remove cluster — same dark pill as product rows, sits outside the paper. */}
+                      <div
+                        className="no-print"
+                        style={{
+                          position: "absolute", top: "50%", transform: "translateY(-50%)",
+                          right: -88, width: 40, height: 92, boxSizing: "border-box",
+                          display: "grid", gridTemplateRows: "28px 28px 28px", rowGap: 4,
+                          alignContent: "center", justifyItems: "center",
+                          background: "#1A1A1A", border: "1px solid #2D2D2D", borderRadius: 10,
+                          padding: 4, boxShadow: "0 6px 20px rgba(0,0,0,0.45)", overflow: "hidden", zIndex: 2,
+                        }}
+                      >
+                        <RowActionBtn title="Move section up" disabled={idx === 0} onClick={() => moveItem(idx, -1)} icon={<ArrowUpIcon size={14} />} />
+                        <RowActionBtn title="Move section down" disabled={idx === current.items.length - 1} onClick={() => moveItem(idx, 1)} icon={<ArrowDownIcon size={14} />} />
+                        <RowActionBtn title="Remove section header" disabled={current.items.length <= 1} onClick={() => removeItem(idx)} icon={<TrashIcon size={13} />} destructive />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              }
+
               return (
                 <tr key={idx} style={{ height: "auto", position: "relative" }}>
                   {/* The NO. cell carries an explicit height: 112 so
@@ -1345,6 +1413,21 @@ export default function QuotationA4Preview({
                       </svg>
                       <span>Add empty row</span>
                     </button>
+                    {addHeader && (
+                      <button
+                        type="button"
+                        onClick={addHeader}
+                        className="pq-ghost-cta pq-ghost-cta--secondary"
+                        title="Add a section header — a full-width band to group the quote into sections"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <rect x="3" y="4" width="18" height="5" rx="1.5" fill="currentColor" stroke="none" />
+                          <line x1="3" y1="14" x2="21" y2="14" />
+                          <line x1="3" y1="19" x2="14" y2="19" />
+                        </svg>
+                        <span>Add section header</span>
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

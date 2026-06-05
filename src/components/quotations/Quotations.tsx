@@ -44,6 +44,9 @@ interface QuotationItem {
   unitPrice: number;
   qty: number;
   notes: string;
+  /* "header" → a full-width black section band (title held in
+     `description`); no price/qty, never affects totals. */
+  kind?: "header";
 }
 
 export type QuoteStatus = "draft" | "sent" | "accepted" | "rejected" | "expired";
@@ -1489,6 +1492,17 @@ export default function Quotations() {
     setCurrent({ ...current, items: [...current.items, { ...EMPTY_ITEM }] });
   }, [current]);
 
+  /* Append a section-header row — a full-width black band used to
+     group the quote into sections. Carries no price/qty (0/0) so it
+     never affects any total; its title lives in `description`. */
+  const addHeader = useCallback(() => {
+    if (!current) return;
+    setCurrent({
+      ...current,
+      items: [...current.items, { ...EMPTY_ITEM, kind: "header", description: "", qty: 0, unitPrice: 0 }],
+    });
+  }, [current]);
+
   /* Apply a CRM customer pick to the QUOTATION TO card. Fills the
      editor's company / contact / phone / mobile / email / website
      fields and stores customerContactId in the doc so we can show
@@ -2056,6 +2070,7 @@ export default function Quotations() {
         setCurrent={setCurrent as never}
         updateItem={updateItem}
         addItem={addItem}
+        addHeader={addHeader}
         onPickFromCatalog={() => setPickerOpen(true)}
         onPickCustomer={() => setCustomerPickerOpen(true)}
         savedStampUrl={savedStampUrl}
