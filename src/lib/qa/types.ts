@@ -235,7 +235,9 @@ export type ActivityType =
   | "resolved"
   | "comment_added"
   | "duplicate_marked"
-  | "commit_added";
+  | "commit_added"
+  | "watcher_added"
+  | "watcher_removed";
 
 /** One append-only entry in an issue's activity timeline. */
 export interface QaActivity {
@@ -262,7 +264,16 @@ export const ACTIVITY_LABEL: Record<ActivityType, string> = {
   comment_added: "commented",
   duplicate_marked: "marked as duplicate",
   commit_added: "linked a fix commit",
+  watcher_added: "started watching",
+  watcher_removed: "stopped watching",
 };
+
+/** A user following an issue (identity exposed to admins only). */
+export interface QaWatcher {
+  account_id: string;
+  name: string;
+  avatar_url: string | null;
+}
 
 /** A pickable assignee (developer/tester) for the assignment dropdown. */
 export interface QaAssignee {

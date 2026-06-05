@@ -6,6 +6,7 @@ import { requireAuth } from "@/lib/server/auth";
 import { logActivity } from "@/lib/qa/activity";
 import { notifyIssue, parseMentions, resolveMentionedAccounts, reporterIssueLink, type NotifyTarget } from "@/lib/qa/notify";
 import { sanitizeAttachments, signAttachments } from "@/lib/qa/attachments";
+import { watcherTargets } from "@/lib/qa/watchers";
 
 interface IssueParticipants {
   id: string;
@@ -154,6 +155,16 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       link: reporterIssueLink(id), // reporter → safe read-only view
     });
   }
+  // Watchers — internal notes reach only watchers with internal access.
+  targets.push(...await watcherTargets({
+    tenantId: auth.tenant_id,
+    issueId: id,
+    actorId: auth.account_id,
+    internal: row.is_internal_note,
+    type: "qa_comment_added",
+    title: "New comment",
+    body: `${actor} commented on "${issue.title}"${suffix}`,
+  }));
   await notifyIssue(
     { tenantId: auth.tenant_id, issueId: id, actorId: auth.account_id, actorName: auth.username ?? null },
     targets,

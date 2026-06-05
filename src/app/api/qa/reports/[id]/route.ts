@@ -13,7 +13,8 @@ import {
   type Priority,
 } from "@/lib/qa/types";
 import { logActivity, type ActivityInput } from "@/lib/qa/activity";
-import { notifyIssue, reporterIssueLink, type NotifyTarget } from "@/lib/qa/notify";
+import { notifyIssue, reporterIssueLink, type NotifyTarget, type QaNotificationType } from "@/lib/qa/notify";
+import { watcherTargets } from "@/lib/qa/watchers";
 
 const BUCKET = "qa-screenshots";
 
@@ -263,12 +264,16 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       ? (patch.assigned_to as string | null)
       : (cur.assigned_to as string | null)) ?? null;
     const targets: NotifyTarget[] = [];
+    // Watchers get one notification per PATCH for the primary change (first
+    // wins); phrased in the third person (never "assigned you").
+    let watcherEvt: { type: QaNotificationType; title: string; body: string; alert?: boolean } | null = null;
 
     if (body.action === "reopen") {
       const reason = (patch.reopen_reason as string | null) || null;
       const msg = `${actor} reopened "${title}"${reason ? `: ${reason}` : ""}`;
       targets.push({ recipientId: effectiveAssignee, type: "qa_issue_reopened", title: "Issue reopened", body: msg });
       targets.push({ recipientId: reporterId, type: "qa_issue_reopened", title: "Issue reopened", body: msg, link: reporterLink });
+      watcherEvt ??= { type: "qa_issue_reopened", title: "Issue reopened", body: msg };
     } else if (patch.status && patch.status !== cur.status) {
       const newStatus = patch.status as IssueStatus;
       const type =
@@ -280,17 +285,20 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       const ntitle = `Status: ${STATUS_LABEL[newStatus] ?? newStatus}`;
       targets.push({ recipientId: reporterId, type, title: ntitle, body: msg, link: reporterLink });
       targets.push({ recipientId: effectiveAssignee, type, title: ntitle, body: msg });
+      watcherEvt ??= { type, title: ntitle, body: msg };
     }
 
     if (patch.priority && patch.priority !== cur.priority) {
       const np = patch.priority as Priority;
+      const pbody = `${actor} set "${title}" priority to ${PRIORITY_LABEL[np] ?? np}`;
       targets.push({
         recipientId: effectiveAssignee,
         type: "qa_priority_changed",
         title: `Priority: ${PRIORITY_LABEL[np] ?? np}`,
-        body: `${actor} set "${title}" priority to ${PRIORITY_LABEL[np] ?? np}`,
+        body: pbody,
         alert: np === "urgent",
       });
+      watcherEvt ??= { type: "qa_priority_changed", title: `Priority: ${PRIORITY_LABEL[np] ?? np}`, body: pbody, alert: np === "urgent" };
     }
 
     // New assignee (assigned or reassigned) — only when it actually changed.
@@ -302,17 +310,37 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         title: reassigned ? "Issue reassigned to you" : "Issue assigned to you",
         body: `${actor} assigned you "${title}"`,
       });
+      watcherEvt ??= {
+        type: reassigned ? "qa_issue_reassigned" : "qa_issue_assigned",
+        title: reassigned ? "Issue reassigned" : "Issue assigned",
+        body: `${actor} ${reassigned ? "reassigned" : "assigned"} "${title}"`,
+      };
     }
 
     // Duplicate marked → tell the reporter.
     if ("duplicate_of_issue_id" in patch && patch.duplicate_of_issue_id) {
+      const dmsg = `${actor} marked "${title}" as a duplicate`;
       targets.push({
         recipientId: reporterId,
         type: "qa_issue_duplicate_marked",
         title: "Marked as duplicate",
-        body: `${actor} marked "${title}" as a duplicate`,
+        body: dmsg,
         link: reporterLink,
       });
+      watcherEvt ??= { type: "qa_issue_duplicate_marked", title: "Marked as duplicate", body: dmsg };
+    }
+
+    // Fan out the primary change to watchers (workflow events are never
+    // internal). Appended last so notifyIssue keeps the more specific
+    // reporter/assignee target for anyone who is also a watcher.
+    if (watcherEvt) {
+      targets.push(...await watcherTargets({
+        tenantId: auth.tenant_id,
+        issueId: id,
+        actorId: auth.account_id,
+        internal: false,
+        ...watcherEvt,
+      }));
     }
 
     if (targets.length > 0) {

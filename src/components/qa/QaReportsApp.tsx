@@ -16,6 +16,7 @@ import TargetIcon from "@/components/icons/ui/TargetIcon";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useScopeContext } from "@/lib/use-scope";
 import { useCommentAttachments, AttachmentStrip, AttachmentThumbs } from "@/components/qa/CommentAttachments";
+import WatchControl from "@/components/qa/WatchControl";
 import {
   SEVERITIES,
   STATUSES,
@@ -500,6 +501,9 @@ function ReportDetail({
           </div>
         ))}
       </div>
+
+      {/* Watch / follow */}
+      <WatchControl issueId={report.id} showWatchers />
 
       {/* Quick actions: priority · assignee · duplicate · reopen */}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">

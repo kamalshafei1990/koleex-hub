@@ -19,6 +19,7 @@ import { requireAuth } from "@/lib/server/auth";
 import { logActivity } from "@/lib/qa/activity";
 import { notifyIssue, parseMentions, resolveMentionedAccounts, issueLink } from "@/lib/qa/notify";
 import { sanitizeAttachments, signAttachments } from "@/lib/qa/attachments";
+import { watcherTargets } from "@/lib/qa/watchers";
 
 const BUCKET = "qa-screenshots";
 
@@ -101,6 +102,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const publicActivity = (acts ?? []).filter((a) => {
     const r = a as { activity_type: string; metadata: Record<string, unknown> | null };
     if (r.activity_type === "comment_added" && r.metadata && r.metadata.is_internal_note === true) return false;
+    // Watcher add/remove is internal noise — reporters never see who is watching.
+    if (r.activity_type === "watcher_added" || r.activity_type === "watcher_removed") return false;
     return true;
   });
 
@@ -211,6 +214,16 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         body: `${actor} replied on "${issue.title as string}"${suffix}`,
         link: issueLink(id),
       },
+      // Watchers (reporter replies are public → no internal restriction).
+      ...await watcherTargets({
+        tenantId: auth.tenant_id,
+        issueId: id,
+        actorId: auth.account_id,
+        internal: false,
+        type: "qa_comment_added",
+        title: "Reporter replied",
+        body: `${actor} replied on "${issue.title as string}"${suffix}`,
+      }),
     ],
   );
 

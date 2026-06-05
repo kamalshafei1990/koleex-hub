@@ -15,6 +15,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useCommentAttachments, AttachmentStrip, AttachmentThumbs } from "@/components/qa/CommentAttachments";
+import WatchControl from "@/components/qa/WatchControl";
 import type { QaAttachment } from "@/lib/qa/types";
 import {
   SEVERITY_LABEL,
@@ -209,6 +210,8 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
         {issue.assigned_to_name && <span><b className="text-[var(--text-secondary)]">Owner:</b> {issue.assigned_to_name}</span>}
         {issue.reopen_count > 0 && <span>Reopened ×{issue.reopen_count}</span>}
       </div>
+
+      <div className="mt-3"><WatchControl issueId={issue.id} /></div>
 
       {/* Resolution banner */}
       {(issue.resolution_summary || issue.status === "fixed" || issue.status === "verified" || issue.status === "closed") && (
