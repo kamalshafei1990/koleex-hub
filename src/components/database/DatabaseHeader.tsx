@@ -23,6 +23,7 @@ const VL_PREFIXES = ["/database/visual-library", "/database/collections", "/data
 const DATASET_TABS: Array<PageTab & { i18nKey: string }> = [
   { key: "/database",                label: "Home",           icon: "home",    i18nKey: "db.nav.home" },
   { key: "/database/visual-library", label: "Visual Library", icon: "palette", i18nKey: "db.nav.visualLibrary" },
+  { key: "/database/issues",         label: "Issue Reports",  icon: "megaphone", i18nKey: "db.nav.issues" },
 ];
 
 const VL_SECTION_TABS: Array<PageTab & { i18nKey: string }> = [
@@ -41,6 +42,7 @@ const T: Translations = {
   "db.nav.collections":   { en: "Collections",    zh: "合集",     ar: "المجموعات" },
   "db.nav.reviewBoard":   { en: "Review Board",   zh: "审核台",   ar: "لوحة المراجعة" },
   "db.nav.registry":      { en: "Classification", zh: "分类",     ar: "التصنيف" },
+  "db.nav.issues":        { en: "Issue Reports",  zh: "问题报告", ar: "بلاغات المشاكل" },
 };
 
 export default function DatabaseHeader({

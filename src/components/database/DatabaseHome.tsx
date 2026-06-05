@@ -14,6 +14,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import PaletteIcon from "@/components/icons/ui/PaletteIcon";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
+import MegaphoneIcon from "@/components/icons/ui/MegaphoneIcon";
 import BoxesIcon from "@/components/icons/ui/BoxesIcon";
 
 interface Stats { total: number }
@@ -57,6 +58,14 @@ export default function DatabaseHome() {
             </div>
             <div className="mt-3.5 text-[15px] font-semibold text-[var(--text-primary)]">Visual Library</div>
             <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--text-muted)]">Icons & visual assets — one approved source of truth, with collections, classification and review.</p>
+            <span className="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-[var(--text-dim)] transition-colors group-hover:text-[var(--text-primary)]">Open system →</span>
+          </Link>
+
+          <Link href="/database/issues"
+            className="group flex flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5 transition-all duration-200 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)]">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)]"><MegaphoneIcon size={20} /></span>
+            <div className="mt-3.5 text-[15px] font-semibold text-[var(--text-primary)]">Issue Reports</div>
+            <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--text-muted)]">Bugs, UI issues and suggestions reported from across the Hub — triage, track and resolve.</p>
             <span className="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-[var(--text-dim)] transition-colors group-hover:text-[var(--text-primary)]">Open system →</span>
           </Link>
 

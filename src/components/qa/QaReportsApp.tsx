@@ -45,7 +45,7 @@ function fmt(iso: string | null): string {
   } catch { return iso; }
 }
 
-export default function QaReportsApp() {
+export default function QaReportsApp({ embedded = false }: { embedded?: boolean }) {
   const [reports, setReports] = useState<QaReport[]>([]);
   const [modules, setModules] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,11 +96,13 @@ export default function QaReportsApp() {
   }
 
   return (
-    <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6">
-      <div className="mb-4">
-        <h1 className="text-[20px] font-bold text-[var(--text-primary)]">Issue Reports</h1>
-        <p className="text-[12.5px] text-[var(--text-dim)]">Bugs, UI issues and suggestions submitted from across the Hub.</p>
-      </div>
+    <div className={embedded ? "" : "mx-auto max-w-[1400px] px-4 py-6 sm:px-6"}>
+      {!embedded && (
+        <div className="mb-4">
+          <h1 className="text-[20px] font-bold text-[var(--text-primary)]">Issue Reports</h1>
+          <p className="text-[12.5px] text-[var(--text-dim)]">Bugs, UI issues and suggestions submitted from across the Hub.</p>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
