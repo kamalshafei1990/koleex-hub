@@ -103,33 +103,43 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   });
 
   /* Notify: mentioned users (most specific → listed first so they win the
-     per-recipient dedupe), then the reporter and assignee. The actor is
-     suppressed inside notifyIssue. */
+     per-recipient dedupe), then the assignee, then the reporter. The actor
+     is suppressed inside notifyIssue.
+
+     Internal notes are dev-team-only (visually separated in the thread), so
+     they never notify the original reporter — that would both leak the
+     existence of internal discussion and dead-link a non-admin reporter to
+     the admin-only console. @mentions inside an internal note still fire
+     (they explicitly pull someone in), and the assignee is always the dev
+     handling it. */
   const mentionedUsernames = parseMentions(message);
   const mentioned = await resolveMentionedAccounts(auth.tenant_id, mentionedUsernames);
   const actor = auth.username ?? "Someone";
+  const targets = [
+    ...mentioned.map((u) => ({
+      recipientId: u.id,
+      type: "qa_issue_mentioned" as const,
+      title: "You were mentioned",
+      body: `${actor} mentioned you on "${issue.title}"`,
+    })),
+    {
+      recipientId: issue.assigned_to,
+      type: "qa_comment_added" as const,
+      title: "New comment",
+      body: `${actor} commented on "${issue.title}"`,
+    },
+  ];
+  if (!row.is_internal_note) {
+    targets.push({
+      recipientId: issue.reporter_id,
+      type: "qa_comment_added" as const,
+      title: "New comment",
+      body: `${actor} commented on "${issue.title}"`,
+    });
+  }
   await notifyIssue(
     { tenantId: auth.tenant_id, issueId: id, actorId: auth.account_id, actorName: auth.username ?? null },
-    [
-      ...mentioned.map((u) => ({
-        recipientId: u.id,
-        type: "qa_issue_mentioned" as const,
-        title: "You were mentioned",
-        body: `${actor} mentioned you on "${issue.title}"`,
-      })),
-      {
-        recipientId: issue.reporter_id,
-        type: "qa_comment_added" as const,
-        title: "New comment",
-        body: `${actor} commented on "${issue.title}"`,
-      },
-      {
-        recipientId: issue.assigned_to,
-        type: "qa_comment_added" as const,
-        title: "New comment",
-        body: `${actor} commented on "${issue.title}"`,
-      },
-    ],
+    targets,
   );
 
   return NextResponse.json({ comment: data }, { status: 201 });
