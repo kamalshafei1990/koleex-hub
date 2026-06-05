@@ -12,6 +12,7 @@ import { NewPaymentDialog } from "../dialogs";
 import WalletIcon from "@/components/icons/ui/WalletIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 type Payment = {
   id: string; payment_no: string | null; bill_id: string | null;
@@ -126,7 +127,7 @@ export default function PaymentsModule({ t }: PurchaseModuleProps) {
             const tone = METHOD_TONE[method] || "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)]";
             const linkedBill = p.bill_id ? billNo.get(p.bill_id) : null;
             return (
-              <div key={p.id} className="grid grid-cols-[1fr_auto] md:grid-cols-[120px_1fr_120px_120px_auto] gap-3 md:gap-4 items-center px-4 py-3">
+              <div key={p.id} {...kxInspectAttrs({ component: "PurchasePaymentRow", module: "Purchases", section: "Payments", recordId: p.id })} className="grid grid-cols-[1fr_auto] md:grid-cols-[120px_1fr_120px_120px_auto] gap-3 md:gap-4 items-center px-4 py-3">
                 <span className="font-mono text-[12px] font-semibold text-[var(--text-primary)] truncate">{linkedBill || p.payment_no || (p.reference ?? p.id.slice(0, 8))}</span>
                 <span className="text-[13px] text-[var(--text-muted)] truncate">{supplierName.get(p.supplier_id || "") || p.reference || "—"}</span>
                 <span className="hidden md:inline text-[11px] tabular-nums text-[var(--text-dim)]">{formatDate(p.paid_at || p.created_at)}</span>

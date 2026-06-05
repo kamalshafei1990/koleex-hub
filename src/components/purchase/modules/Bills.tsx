@@ -13,6 +13,7 @@ import { NewBillDialog } from "../dialogs";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 type Bill = {
   id: string; bill_no: string | null; supplier_invoice_no: string | null;
@@ -75,7 +76,7 @@ export default function BillsModule({ t }: PurchaseModuleProps) {
             const tone = STATUS_TONE_BILL[status] || STATUS_TONE_BILL.draft;
             const overdue = b.due_date && status !== "paid" && Number(b.balance) > 0 && new Date(b.due_date) < new Date();
             return (
-              <div key={b.id} className="grid grid-cols-[1fr_auto] md:grid-cols-[120px_1fr_140px_auto] gap-3 md:gap-4 items-center px-4 py-3">
+              <div key={b.id} {...kxInspectAttrs({ component: "PurchaseBillRow", module: "Purchases", section: "Bills", recordId: b.id })} className="grid grid-cols-[1fr_auto] md:grid-cols-[120px_1fr_140px_auto] gap-3 md:gap-4 items-center px-4 py-3">
                 <div className="min-w-0">
                   <p className="font-mono text-[12px] font-semibold text-[var(--text-primary)] truncate">{b.bill_no || b.id.slice(0, 8)}</p>
                   {b.supplier_invoice_no && <p className="text-[10px] text-[var(--text-ghost)]">Vendor #: {b.supplier_invoice_no}</p>}

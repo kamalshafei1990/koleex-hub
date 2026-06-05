@@ -10,6 +10,7 @@ import type { PurchaseModuleProps } from "../shared";
 import { cardCls, formatMoney, formatDate, sectionTitleCls } from "../shared";
 import CornerUpLeftIcon from "@/components/icons/ui/CornerUpLeftIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 type Return = {
   id: string; return_no: string | null; status: string | null;
@@ -70,7 +71,7 @@ export default function ReturnsModule({ t }: PurchaseModuleProps) {
             const status = (r.status || "draft").toLowerCase();
             const tone = STATUS_TONE[status] || STATUS_TONE.draft;
             return (
-              <div key={r.id} className="grid grid-cols-[1fr_auto] md:grid-cols-[120px_1fr_140px_auto] gap-3 md:gap-4 items-center px-4 py-3">
+              <div key={r.id} {...kxInspectAttrs({ component: "PurchaseReturnRow", module: "Purchases", section: "Returns", recordId: r.id })} className="grid grid-cols-[1fr_auto] md:grid-cols-[120px_1fr_140px_auto] gap-3 md:gap-4 items-center px-4 py-3">
                 <span className="font-mono text-[12px] font-semibold text-[var(--text-primary)] truncate">{r.return_no || r.id.slice(0, 8)}</span>
                 <div className="min-w-0">
                   <p className="text-[13px] text-[var(--text-primary)] truncate">{supplierName.get(r.supplier_id || "") || "—"}</p>

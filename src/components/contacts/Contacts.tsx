@@ -2280,7 +2280,7 @@ function FormGroupLabel({ label }: { label: string }) {
    `owner` (optional) shows which department / role is responsible for filling
    this section — a supplier record spans Procurement, Finance, Compliance, QC…
    so the badge makes accountability obvious without splitting the record. */
-const FormSection = React.memo(function FormSection({ title, icon, children, owner, ownerLabel, dept, activeDept, auditMap, updatedByLabel }: { title: string; icon?: React.ReactNode; children: React.ReactNode; owner?: string; ownerLabel?: string; dept?: string; activeDept?: string | null; auditMap?: Record<string, { name: string; at: string }>; updatedByLabel?: string }) {
+const FormSection = React.memo(function FormSection({ title, icon, children, owner, ownerLabel, dept, activeDept, auditMap, updatedByLabel, kxComponent, kxModule, kxSection }: { title: string; icon?: React.ReactNode; children: React.ReactNode; owner?: string; ownerLabel?: string; dept?: string; activeDept?: string | null; auditMap?: Record<string, { name: string; at: string }>; updatedByLabel?: string; kxComponent?: string; kxModule?: string; kxSection?: string }) {
   /* Department filter: when a department chip is active, only render the
      sections that belong to it. Sections without a `dept` always show. */
   if (activeDept && dept && dept !== activeDept) return null;
@@ -2293,7 +2293,10 @@ const FormSection = React.memo(function FormSection({ title, icon, children, own
      bordered panel with a tinted icon chip + title header, then a padded body —
      so the add/edit form and the detail page look like one system. */
   return (
-    <div className="mx-4 md:mx-6 my-3 overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
+    <div
+      className="mx-4 md:mx-6 my-3 overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]"
+      {...(kxComponent ? kxInspectAttrs({ component: kxComponent, module: kxModule || "Suppliers", section: kxSection }) : {})}
+    >
       <div className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/30 px-4 md:px-5 py-3">
         <div className="flex items-center gap-2.5 min-w-0">
           {icon && <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]">{icon}</span>}
@@ -6975,7 +6978,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Company Customer: Contact Persons (Activity tab) */}
         {isCompanyCustomer && showTab("activity") && (
-        <FormSection title={t("section.contactPersons")} icon={<UsersIcon size={14} />}>
+        <FormSection title={t("section.contactPersons")} kxComponent="ContactPersonsFormSection" kxModule={filterType === "supplier" ? "Suppliers" : filterType === "customer" ? "Customers" : "Contacts"} kxSection="Contacts & communication" icon={<UsersIcon size={14} />}>
           <div className="space-y-3">
             {form.contact_persons.map((cp, i) => (
               <div key={i} className="rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] overflow-hidden">
@@ -7021,7 +7024,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {/* Company Type: Company Information */}
         {isCompanyType && (
         <>
-        <FormSection title={t("section.companyInformation")} icon={<Building2Icon size={14} />}>
+        <FormSection title={t("section.companyInformation")} kxComponent="CompanyInfoFormSection" kxModule={filterType === "supplier" ? "Suppliers" : filterType === "customer" ? "Customers" : "Contacts"} kxSection="Identity & profile" icon={<Building2Icon size={14} />}>
           <div className="space-y-3">
             <div>
               <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.companyName")}</label>
@@ -7079,7 +7082,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
 
         {/* Company Type: Contact Persons */}
-        <FormSection title={t("section.contactPersons")} icon={<UsersIcon size={14} />}>
+        <FormSection title={t("section.contactPersons")} kxComponent="ContactPersonsFormSection" kxModule={filterType === "supplier" ? "Suppliers" : filterType === "customer" ? "Customers" : "Contacts"} kxSection="Contacts & communication" icon={<UsersIcon size={14} />}>
           <div className="space-y-3">
             {form.contact_persons.map((cp, i) => (
               <div key={i} className="rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] overflow-hidden">
@@ -7385,7 +7388,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Business Card (customers only — Overview tab) */}
         {isCustomer && showTab("overview") && (
-          <FormSection title={t("section.businessCard")} icon={<CreditCardIcon size={14} />}>
+          <FormSection title={t("section.businessCard")} kxComponent="BusinessCardFormSection" kxModule={filterType === "supplier" ? "Suppliers" : filterType === "customer" ? "Customers" : "Contacts"} kxSection="Records & notes" icon={<CreditCardIcon size={14} />}>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("detail.front")}</label>
@@ -7433,7 +7436,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Financial & Business (customer only — Financial tab) ── */}
         {isCustomer && showTab("financial") && (
-          <FormSection title={t("section.financialBusiness")} icon={<DollarSignIcon size={14} />}>
+          <FormSection title={t("section.financialBusiness")} kxComponent="FinancialFormSection" kxModule={filterType === "supplier" ? "Suppliers" : filterType === "customer" ? "Customers" : "Contacts"} kxSection="Commercial & logistics" icon={<DollarSignIcon size={14} />}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <SelectInput label={t("field.currency")} value={form.currency} onChange={v => setField("currency", v)} options={CURRENCIES} icon={<DollarSignIcon size={14} />} selectLabel={t("detail.select")} />
@@ -7454,7 +7457,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Classification & Segmentation (customer only — Commercial tab) ── */}
         {isCustomer && showTab("commercial") && (
-          <FormSection title={t("section.classification")} icon={<TagsIcon size={14} />}>
+          <FormSection title={t("section.classification")} kxComponent="ClassificationFormSection" kxModule={filterType === "supplier" ? "Suppliers" : filterType === "customer" ? "Customers" : "Contacts"} kxSection="Intelligence" icon={<TagsIcon size={14} />}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <SelectInput label={t("field.industry")} value={form.industry} onChange={v => setField("industry", v)} options={INDUSTRIES} icon={<FactoryIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
@@ -7536,7 +7539,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Trade & Shipping (customer only — Trade tab) ── */}
         {isCustomer && showTab("trade") && (
-          <FormSection title={t("section.tradeShipping")} icon={<ShipIcon size={14} />}>
+          <FormSection title={t("section.tradeShipping")} kxComponent="TradeShippingFormSection" kxModule={filterType === "supplier" ? "Suppliers" : filterType === "customer" ? "Customers" : "Contacts"} kxSection="Commercial & logistics" icon={<ShipIcon size={14} />}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <SelectInput label={t("field.shippingMethod")} value={form.preferred_shipping} onChange={v => setField("preferred_shipping", v)} options={SHIPPING_METHODS} icon={<ShipIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
@@ -7573,7 +7576,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Documents / Attachments (customer only — Compliance tab) ── */}
         {isCustomer && showTab("compliance") && (
-          <FormSection title={t("section.documentsAttachments")} icon={<PaperclipIcon size={14} />}>
+          <FormSection title={t("section.documentsAttachments")} kxComponent="DocumentsFormSection" kxModule={filterType === "supplier" ? "Suppliers" : filterType === "customer" ? "Customers" : "Contacts"} kxSection="Records & notes" icon={<PaperclipIcon size={14} />}>
             {form.attachments.map((a, i) => (
               <div key={i} className="flex items-center gap-2 mb-2 px-3 py-2 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-color)]">
                 <RemoveBtn onClick={() => setField("attachments", form.attachments.filter((_, idx) => idx !== i))} />
@@ -7610,7 +7613,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Commercial Profile (customer only — Commercial tab) ── */}
         {isCustomer && showTab("commercial") && (
-          <FormSection title={t("section.commercialProfile", "Commercial Profile")} icon={<BriefcaseIcon size={14} />}>
+          <FormSection title={t("section.commercialProfile", "Commercial Profile")} kxComponent="CommercialFormSection" kxModule={filterType === "supplier" ? "Suppliers" : filterType === "customer" ? "Customers" : "Contacts"} kxSection="Commercial & logistics" icon={<BriefcaseIcon size={14} />}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <SelectInput label={t("field.marketBand", "Market Band")} value={form.market_band} onChange={v => setField("market_band", v)} options={MARKET_BANDS} icon={<TargetIcon size={14} />} selectLabel={t("detail.select")} />
@@ -7652,7 +7655,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Pricing & Discounts (customer only — Commercial tab) ── */}
         {isCustomer && showTab("commercial") && (
-          <FormSection title={t("section.pricingDiscounts", "Pricing & Discounts")} icon={<HandCoinsIcon size={14} />}>
+          <FormSection title={t("section.pricingDiscounts", "Pricing & Discounts")} kxComponent="PricingFormSection" kxModule={filterType === "supplier" ? "Suppliers" : filterType === "customer" ? "Customers" : "Contacts"} kxSection="Commercial & logistics" icon={<HandCoinsIcon size={14} />}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <SelectInput label={t("field.priceListTier", "Price List Tier")} value={form.price_list_tier} onChange={v => setField("price_list_tier", v)} options={PRICE_LIST_TIERS} icon={<TagsIcon size={14} />} selectLabel={t("detail.select")} />
@@ -7716,7 +7719,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Credit Management (customer only — Financial tab) ── */}
         {isCustomer && showTab("financial") && (
-          <FormSection title={t("section.creditManagement", "Credit Management")} icon={<WalletIcon size={14} />}>
+          <FormSection title={t("section.creditManagement", "Credit Management")} kxComponent="CreditFormSection" kxModule={filterType === "supplier" ? "Suppliers" : filterType === "customer" ? "Customers" : "Contacts"} kxSection="Commercial & logistics" icon={<WalletIcon size={14} />}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <SelectInput label={t("field.creditRatingInternal", "Internal Rating")} value={form.credit_rating_internal} onChange={v => setField("credit_rating_internal", v)} options={CREDIT_RATING_INTERNAL} icon={<ShieldIcon size={14} />} selectLabel={t("detail.select")} />
@@ -7760,7 +7763,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Bank Accounts (customer only — Financial tab) ── */}
         {isCustomer && showTab("financial") && (
-          <FormSection title={t("section.bankAccountInfo")} icon={<LandmarkIcon size={14} />}>
+          <FormSection title={t("section.bankAccountInfo")} kxComponent="BankingFormSection" kxModule={filterType === "supplier" ? "Suppliers" : filterType === "customer" ? "Customers" : "Contacts"} kxSection="Commercial & logistics" icon={<LandmarkIcon size={14} />}>
             <div className="space-y-3">
               {form.bank_accounts.map((b, i) => (
                 <div key={i} className="rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] overflow-hidden">
@@ -7799,7 +7802,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Legal Identity (customer only — Compliance tab) ── */}
         {isCustomer && showTab("compliance") && (
-          <FormSection title={t("section.legalIdentity", "Legal Identity")} icon={<Building2Icon size={14} />}>
+          <FormSection title={t("section.legalIdentity", "Legal Identity")} kxComponent="LegalIdentityFormSection" kxModule={filterType === "supplier" ? "Suppliers" : filterType === "customer" ? "Customers" : "Contacts"} kxSection="Legal & compliance" icon={<Building2Icon size={14} />}>
             <div className="space-y-3">
               <Input label={t("field.tradingName", "Trading / DBA Name")} value={form.trading_name} onChange={v => setField("trading_name", v)} placeholder={t("placeholder.tradingName", "Doing business as")} icon={<Building2Icon size={14} />} />
               <div className="grid grid-cols-2 gap-3">
@@ -7824,7 +7827,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── International Trade IDs (customer only — Compliance tab) ── */}
         {isCustomer && showTab("compliance") && (
-          <FormSection title={t("section.tradeIdentifiers", "International Trade IDs")} icon={<FileCheckIcon size={14} />}>
+          <FormSection title={t("section.tradeIdentifiers", "International Trade IDs")} kxComponent="TradeIdentifiersFormSection" kxModule={filterType === "supplier" ? "Suppliers" : filterType === "customer" ? "Customers" : "Contacts"} kxSection="Legal & compliance" icon={<FileCheckIcon size={14} />}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <Input label={t("field.eoriNumber", "EORI")} value={form.eori_number} onChange={v => setField("eori_number", v)} placeholder="GB123456789000" icon={<HashtagIcon size={14} />} />
@@ -8147,7 +8150,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* 3. Contact Persons — Key people to communicate with */}
-            <FormSection title={t("section.contactPersons")} icon={<UsersIcon size={14} />} owner={t("owner.procurement")} ownerLabel={t("owner.label")} dept="procurement" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
+            <FormSection title={t("section.contactPersons")} kxComponent="ContactPersonsFormSection" kxModule={filterType === "supplier" ? "Suppliers" : filterType === "customer" ? "Customers" : "Contacts"} kxSection="Contacts & communication" icon={<UsersIcon size={14} />} owner={t("owner.procurement")} ownerLabel={t("owner.label")} dept="procurement" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
               <div className="space-y-3">
                 <p className="text-[11px] text-[var(--text-dim)]">{t("hint.atLeastOnePerson", "At least one contact person is required")} <span className="text-rose-400">*</span></p>
                 {form.contact_persons.map((cp, i) => (
@@ -8699,7 +8702,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
             {!supplierDept && <FormGroupLabel label={t("supgroup.legal", "Legal & compliance")} />}
             {/* Legal Identity — registration & company profile */}
-            <FormSection title={t("section.legalIdentity", "Legal Identity")} icon={<Building2Icon size={14} />} owner={t("owner.compliance")} ownerLabel={t("owner.label")} dept="legal" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
+            <FormSection title={t("section.legalIdentity", "Legal Identity")} kxComponent="LegalIdentityFormSection" kxModule={filterType === "supplier" ? "Suppliers" : filterType === "customer" ? "Customers" : "Contacts"} kxSection="Legal & compliance" icon={<Building2Icon size={14} />} owner={t("owner.compliance")} ownerLabel={t("owner.label")} dept="legal" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
               <div className="space-y-3">
                 <Input label={t("field.tradingName", "Trading / DBA Name")} tier="optional" value={form.trading_name} onChange={v => setField("trading_name", v)} placeholder={t("placeholder.tradingName", "Doing business as")} icon={<Building2Icon size={14} />} />
                 <div className="grid grid-cols-2 gap-3">
@@ -8726,7 +8729,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* Trade & Tax IDs — VAT / customs identifiers */}
-            <FormSection title={t("section.tradeIdentifiers", "Trade & Tax IDs")} icon={<FileCheckIcon size={14} />} owner={t("owner.compliance")} ownerLabel={t("owner.label")} dept="legal" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
+            <FormSection title={t("section.tradeIdentifiers", "Trade & Tax IDs")} kxComponent="TradeIdentifiersFormSection" kxModule={filterType === "supplier" ? "Suppliers" : filterType === "customer" ? "Customers" : "Contacts"} kxSection="Legal & compliance" icon={<FileCheckIcon size={14} />} owner={t("owner.compliance")} ownerLabel={t("owner.label")} dept="legal" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <Input label={t("field.gstNumber", "VAT / GST")} help="supplier.gst_number" tier="optional" value={form.gst_number} onChange={v => setField("gst_number", v)} placeholder="VAT / GST number" icon={<HashtagIcon size={14} />} />

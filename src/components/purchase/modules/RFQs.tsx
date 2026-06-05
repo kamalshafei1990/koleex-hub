@@ -10,6 +10,7 @@ import type { PurchaseModuleProps } from "../shared";
 import { cardCls, formatMoney, formatDate, sectionTitleCls } from "../shared";
 import FileBadge2Icon from "@/components/icons/ui/FileBadge2Icon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 type RFQ = {
   id: string; rfq_no: string | null; status: string | null;
@@ -70,7 +71,7 @@ export default function RFQsModule({ t }: PurchaseModuleProps) {
             const status = (r.status || "draft").toLowerCase();
             const tone = STATUS_TONE[status] || STATUS_TONE.draft;
             return (
-              <div key={r.id} className="grid grid-cols-[1fr_auto] md:grid-cols-[120px_1fr_140px_auto] gap-3 md:gap-4 items-center px-4 py-3">
+              <div key={r.id} {...kxInspectAttrs({ component: "PurchaseRFQRow", module: "Purchases", section: "RFQs", recordId: r.id })} className="grid grid-cols-[1fr_auto] md:grid-cols-[120px_1fr_140px_auto] gap-3 md:gap-4 items-center px-4 py-3">
                 <span className="font-mono text-[12px] font-semibold text-[var(--text-primary)] truncate">{r.rfq_no || r.id.slice(0, 8)}</span>
                 <span className="text-[13px] text-[var(--text-muted)] truncate">{supplierName.get(r.supplier_id || "") || "—"}</span>
                 <span className="hidden md:inline text-[11px] tabular-nums text-[var(--text-dim)]">{r.response_due ? `Due ${formatDate(r.response_due)}` : formatDate(r.created_at)}</span>

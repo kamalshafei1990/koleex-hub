@@ -15,6 +15,7 @@ import { NewRequisitionDialog } from "../dialogs";
 import FilePlusIcon from "@/components/icons/ui/FilePlusIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 type Requisition = {
   id: string; pr_no: string | null; status: string | null;
@@ -76,7 +77,7 @@ export default function RequisitionsModule({ t }: PurchaseModuleProps) {
             const tone = STATUS_TONE_REQ[status] || STATUS_TONE_REQ.draft;
             const prio = Math.max(0, Math.min(3, Number(r.priority) || 0));
             return (
-              <div key={r.id} className="grid grid-cols-[1fr_auto] md:grid-cols-[120px_1fr_120px_auto] gap-3 md:gap-4 items-center px-4 py-3">
+              <div key={r.id} {...kxInspectAttrs({ component: "PurchaseRequisitionRow", module: "Purchases", section: "Requisitions", recordId: r.id })} className="grid grid-cols-[1fr_auto] md:grid-cols-[120px_1fr_120px_auto] gap-3 md:gap-4 items-center px-4 py-3">
                 <span className="font-mono text-[12px] font-semibold text-[var(--text-primary)] truncate">{r.pr_no || r.id.slice(0, 8)}</span>
                 <div className="min-w-0">
                   <p className="text-[13px] text-[var(--text-primary)] truncate">{r.department || "—"}</p>

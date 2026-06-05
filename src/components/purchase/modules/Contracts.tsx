@@ -11,6 +11,7 @@ import type { PurchaseModuleProps } from "../shared";
 import { cardCls, formatMoney, formatDate, sectionTitleCls } from "../shared";
 import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 type Contract = {
   id: string; contract_no: string | null; title: string;
@@ -98,7 +99,7 @@ export default function ContractsModule({ t }: PurchaseModuleProps) {
             const status = (r.status || "draft").toLowerCase();
             const tone = STATUS_TONE[status] || STATUS_TONE.draft;
             return (
-              <div key={r.id} className="grid grid-cols-[1fr_auto] md:grid-cols-[120px_1fr_180px_auto] gap-3 md:gap-4 items-center px-4 py-3">
+              <div key={r.id} {...kxInspectAttrs({ component: "PurchaseContractRow", module: "Purchases", section: "Contracts", recordId: r.id })} className="grid grid-cols-[1fr_auto] md:grid-cols-[120px_1fr_180px_auto] gap-3 md:gap-4 items-center px-4 py-3">
                 <span className="font-mono text-[12px] font-semibold text-[var(--text-primary)] truncate">{r.contract_no || r.id.slice(0, 8)}</span>
                 <div className="min-w-0">
                   <p className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{r.title}</p>

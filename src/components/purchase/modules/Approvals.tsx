@@ -11,6 +11,7 @@ import type { PurchaseModuleProps } from "../shared";
 import { cardCls, formatMoney, sectionTitleCls } from "../shared";
 import HandCoinsIcon from "@/components/icons/ui/HandCoinsIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 type Rule = {
   id: string; code: string | null; name: string;
@@ -62,7 +63,7 @@ export default function ApprovalsModule({ t }: PurchaseModuleProps) {
           </div>
           <ul className="divide-y divide-[var(--border-subtle)]">
             {rows.map((r) => (
-              <li key={r.id} className="grid grid-cols-[80px_120px_1fr_140px_auto] gap-3 items-center px-4 py-3">
+              <li key={r.id} {...kxInspectAttrs({ component: "PurchaseApprovalRow", module: "Purchases", section: "Approvals", recordId: r.id })} className="grid grid-cols-[80px_120px_1fr_140px_auto] gap-3 items-center px-4 py-3">
                 <span className="font-mono text-[11px] font-semibold text-[var(--text-muted)]">{r.code || "—"}</span>
                 <span className="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">{APPLIES_LABEL[r.applies_to || "requisition"] || "—"}</span>
                 <div className="min-w-0">
