@@ -53,7 +53,6 @@ import DatabaseIcon from "@/components/icons/DatabaseIcon";
 import SettingsIcon from "@/components/icons/SettingsIcon";
 import CommercialPolicyIcon from "@/components/icons/CommercialPolicyIcon";
 import MailIcon from "@/components/icons/MailIcon";
-import BrandIcon from "@/components/icons/BrandIcon";
 import AiFaceIcon from "@/components/icons/AiFaceIcon";
 import HrIcon from "@/components/icons/HrIcon";
 import OperationsSidebarIcon from "@/components/icons/OperationsSidebarIcon";
@@ -223,10 +222,8 @@ export const APP_REGISTRY: AppDef[] = [
   /* ── Not in sidebar — accessible via All Apps or direct URL ── */
   { id: "inbox",            tKey: "app.inbox",            name: "Mail",              icon: MailIcon,      route: "/inbox",            active: true  },
   { id: "price-calculator", tKey: "app.price-calculator", name: "Price Calculator",  icon: PriceCalculatorIcon, route: "/price-calculator", active: true  },
-  /* Brands moved INTO the Database app's Visual Library (visual identity).
-     active:false removes it from the launcher / All Apps; the route points to
-     its new home (the old /brands redirects there too). */
-  { id: "brands",           tKey: "app.brands",           name: "Brands",            icon: BrandIcon,     route: "/database/brands",  active: false },
+  /* Brands is NOT an app — it lives inside Database → Visual Library
+     (/database/brands). Intentionally not registered here. */
   { id: "dashboard",        tKey: "app.dashboard",        name: "Dashboard",         icon: AppsIcon,    route: "/dashboard",        active: false },
 ];
 
@@ -348,7 +345,6 @@ export function getAppCategory(appId: string): string {
   const extra: Record<string, string> = {
     inbox: "communication",
     "price-calculator": "commercial",
-    brands: "operations",
     dashboard: "system",
   };
   return extra[appId] || "system";
