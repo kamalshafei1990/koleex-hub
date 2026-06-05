@@ -55,6 +55,7 @@ import Share2Icon from "@/components/icons/ui/Share2Icon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import XCircleIcon from "@/components/icons/ui/XCircleIcon";
+import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
 import { taxonomyLogoUrl } from "@/components/knowledge/product-coding/taxonomy-logo";
 import { DIVISIONS, CATEGORIES } from "@/components/knowledge/product-coding/data";
 import { fetchDivisionLogos, fetchCategoryLogos, fetchSubcategoryLogos } from "@/lib/products-admin";
@@ -534,9 +535,9 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
               ) : null}
 
               {rating > 0 ? (
-                <div className="flex items-center justify-center gap-0.5 mt-2.5">
+                <div className="flex items-center justify-center gap-0.5 mt-2.5" title={str(s, "strategic_status") === "blocked" ? t("sd.blockedRatingNote", "Supplier is blocked — rating shown for reference only") : undefined}>
                   {[1, 2, 3, 4, 5].map((i) => (
-                    <StarIcon key={i} className={`h-3.5 w-3.5 ${i <= rating ? "text-amber-400" : "text-[var(--text-faint)]"}`} />
+                    <StarIcon key={i} className={`h-3.5 w-3.5 ${str(s, "strategic_status") === "blocked" ? "text-[var(--text-faint)] opacity-50" : i <= rating ? "text-amber-400" : "text-[var(--text-faint)]"}`} />
                   ))}
                 </div>
               ) : null}
@@ -572,6 +573,15 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
                   {isActive ? t("sd.active", "Active") : t("sd.archived", "Archived")}
                 </span>
               </div>
+
+              {/* Blocked supplier — explicit warning so positive ratings/scores below
+                  are never read as an endorsement (report Q). */}
+              {str(s, "strategic_status") === "blocked" ? (
+                <div className="mt-3.5 mx-auto flex max-w-xl items-start gap-2 rounded-xl border border-rose-500/40 bg-rose-500/[0.08] px-3.5 py-2.5 text-start text-[12px] font-medium text-rose-600 dark:text-rose-300">
+                  <TriangleWarningIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>{t("sd.blockedWarning", "This supplier is BLOCKED. Ratings and scores below are shown for reference only — do not raise new orders without management approval.")}{str(s, "strategic_status_reason") ? ` — ${str(s, "strategic_status_reason")}` : ""}</span>
+                </div>
+              ) : null}
 
               {/* ── Category path + classifications (centered) ── */}
               {(() => {
