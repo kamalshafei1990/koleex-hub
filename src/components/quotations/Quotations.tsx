@@ -44,9 +44,11 @@ interface QuotationItem {
   unitPrice: number;
   qty: number;
   notes: string;
-  /* "header" → a full-width black section band (title held in
-     `description`); no price/qty, never affects totals. */
+  /* "header" → a full-width section band (title held in `description`);
+     no price/qty, never affects totals. */
   kind?: "header";
+  /* Section-band background colour (hex); defaults to black when unset. */
+  headerColor?: string;
 }
 
 export type QuoteStatus = "draft" | "sent" | "accepted" | "rejected" | "expired";

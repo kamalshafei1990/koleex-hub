@@ -45,10 +45,13 @@ export interface QuotationItem {
   unitPrice: number;
   qty: number;
   notes: string;
-  /* When "header", this row renders as a full-width black section band
+  /* When "header", this row renders as a full-width section band
      (the `description` holds its centered title) instead of a product row.
      It carries no price/qty, so it never affects any total. */
   kind?: "header";
+  /* Section-band background colour (hex). Defaults to black when unset.
+     Only meaningful on header rows. */
+  headerColor?: string;
 }
 
 export interface Quotation {
@@ -228,6 +231,18 @@ const inputResetStyle: React.CSSProperties = {
   padding: 0,
   margin: 0,
 };
+
+/* Pick readable title text (near-black or white) for a given section-band
+   colour, using perceived luminance — so a header stays legible whatever
+   colour the user chooses. */
+function headerTextColor(bg: string): string {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec((bg || "").trim());
+  if (!m) return "#FFFFFF";
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.6 ? "#111111" : "#FFFFFF";
+}
 
 export default function QuotationA4Preview({
   current,
@@ -962,17 +977,25 @@ export default function QuotationA4Preview({
                  touches any total. Move / remove actions match the
                  normal rows' floating cluster. */
               if (item.kind === "header") {
+                const headBg = /^#[0-9a-fA-F]{6}$/.test(item.headerColor || "") ? (item.headerColor as string) : "#000000";
+                const headText = headerTextColor(headBg);
+                const phColor = headText === "#FFFFFF" ? "rgba(255,255,255,0.5)" : "rgba(17,17,17,0.5)";
                 return (
                   <tr key={idx}>
                     <td colSpan={7} style={{ padding: 0 }}>
                       <style>{`
-                        .pq-section-head:empty::before{content:attr(data-ph);color:rgba(255,255,255,0.45);font-weight:600;}
-                        .pq-sec-ctrl{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid rgba(255,255,255,0.22);background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.85);cursor:pointer;padding:0;transition:background .15s ease,border-color .15s ease,color .15s ease;}
-                        .pq-sec-ctrl:hover:not(:disabled){background:rgba(255,255,255,0.18);border-color:rgba(255,255,255,0.45);color:#fff;}
+                        .pq-section-head:empty::before{content:attr(data-ph);color:var(--pq-ph,rgba(255,255,255,0.45));font-weight:600;}
+                        .pq-sec-pill{display:flex;align-items:center;gap:6px;background:rgba(0,0,0,0.32);border:1px solid rgba(255,255,255,0.22);border-radius:9px;padding:4px 6px;box-shadow:0 2px 8px rgba(0,0,0,0.3);}
+                        .pq-sec-ctrl{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid rgba(255,255,255,0.28);background:rgba(255,255,255,0.10);color:rgba(255,255,255,0.9);cursor:pointer;padding:0;transition:background .15s ease,border-color .15s ease,color .15s ease;}
+                        .pq-sec-ctrl:hover:not(:disabled){background:rgba(255,255,255,0.22);border-color:rgba(255,255,255,0.5);color:#fff;}
                         .pq-sec-ctrl:disabled{opacity:.3;cursor:not-allowed;}
-                        .pq-sec-ctrl--danger:hover:not(:disabled){background:rgba(239,68,68,0.28);border-color:rgba(239,68,68,0.65);color:#fff;}
+                        .pq-sec-ctrl--danger:hover:not(:disabled){background:rgba(239,68,68,0.3);border-color:rgba(239,68,68,0.7);color:#fff;}
+                        .pq-sec-color{width:24px;height:24px;padding:0;border:1px solid rgba(255,255,255,0.45);border-radius:6px;background:transparent;cursor:pointer;}
+                        .pq-sec-color::-webkit-color-swatch-wrapper{padding:0;}
+                        .pq-sec-color::-webkit-color-swatch{border:none;border-radius:5px;}
+                        .pq-sec-color::-moz-color-swatch{border:none;border-radius:5px;}
                       `}</style>
-                      <div style={{ position: "relative", background: "#000000", padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <div style={{ position: "relative", background: headBg, padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s ease" }}>
                         <div
                           className="pq-section-head"
                           data-ph="Section title…"
@@ -985,9 +1008,10 @@ export default function QuotationA4Preview({
                             flex: 1,
                             /* Symmetric gutters keep the title optically centered while
                                leaving room on the right for the inline controls. */
-                            paddingInline: 96,
+                            paddingInline: 130,
                             textAlign: "center",
-                            color: "#FFFFFF",
+                            color: headText,
+                            "--pq-ph": phColor,
                             fontSize: 12,
                             fontWeight: 700,
                             letterSpacing: "0.1em",
@@ -995,14 +1019,25 @@ export default function QuotationA4Preview({
                             outline: "none",
                             minHeight: 16,
                             lineHeight: 1.4,
-                          }}
+                          } as React.CSSProperties}
                         />
-                        {/* Controls live INSIDE the black band, right-aligned — a single
-                            tidy group of move-up / move-down / delete. Hidden on print/PDF. */}
+                        {/* Controls live INSIDE the band, right-aligned, in a small pill so
+                            they stay readable on ANY chosen colour: pick colour, move
+                            up / down, delete. Hidden on print/PDF. */}
                         <div
-                          className="no-print"
-                          style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center", gap: 6 }}
+                          className="no-print pq-sec-pill"
+                          style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)" }}
                         >
+                          <input
+                            type="color"
+                            className="pq-sec-color"
+                            title="Section colour"
+                            value={headBg}
+                            onChange={(e) => {
+                              const color = e.target.value;
+                              setCurrent((prev) => prev ? { ...prev, items: prev.items.map((it, i) => i === idx ? { ...it, headerColor: color } : it) } : prev);
+                            }}
+                          />
                           <button type="button" className="pq-sec-ctrl" title="Move section up" disabled={idx === 0} onClick={() => moveItem(idx, -1)}><ArrowUpIcon size={13} /></button>
                           <button type="button" className="pq-sec-ctrl" title="Move section down" disabled={idx === current.items.length - 1} onClick={() => moveItem(idx, 1)}><ArrowDownIcon size={13} /></button>
                           <button type="button" className="pq-sec-ctrl pq-sec-ctrl--danger" title="Remove section header" disabled={current.items.length <= 1} onClick={() => removeItem(idx)}><TrashIcon size={12} /></button>
