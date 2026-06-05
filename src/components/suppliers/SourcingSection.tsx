@@ -28,6 +28,7 @@ import TrashIcon from "@/components/icons/ui/TrashIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
 import ArrowRightLeftIcon from "@/components/icons/ui/ArrowRightLeftIcon";
 import AwardIcon from "@/components/icons/ui/AwardIcon";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 type Row = Record<string, unknown>;
 const str = (r: Row, k: string): string => { const v = r[k]; return typeof v === "string" ? v : typeof v === "number" ? String(v) : ""; };
@@ -160,7 +161,7 @@ export default function SourcingSection({
   const links = useMemo(() => [...sourcingLinks].sort((a, b) => (SOURCING_ROLE_RANK[str(a, "sourcing_role")] ?? 5) - (SOURCING_ROLE_RANK[str(b, "sourcing_role")] ?? 5)), [sourcingLinks]);
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-6" {...kxInspectAttrs({ component: "SupplierSourcingSection", module: "Suppliers", section: "Production", recordId: supplierId })}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2"><NetworkIcon className="h-4 w-4 text-[var(--text-secondary)]" /><h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">{t("srcg.title", "Sourcing Intelligence")}</h3></div>
         <div className="flex items-center gap-2">

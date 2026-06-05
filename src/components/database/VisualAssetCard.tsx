@@ -10,6 +10,7 @@ import type { VisualAsset } from "@/lib/visual-library/types";
 import { displayState } from "@/lib/visual-library/types";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 export const STATE_PILL: Record<string, string> = {
   approved:   "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
@@ -44,6 +45,7 @@ export default function VisualAssetCard({
   const state = displayState(asset);
   return (
     <div
+      {...kxInspectAttrs({ component: "VisualAssetCard", module: "Database", section: "Visual Library", recordId: asset.id })}
       className={`group relative flex flex-col overflow-hidden rounded-lg border bg-[var(--bg-surface)] transition-all duration-200 hover:bg-[var(--bg-surface-hover)] ${
         selected ? "border-[var(--accent)] ring-1 ring-[var(--accent)]" : "border-[var(--border-subtle)] hover:border-[var(--border-color)]"
       }`}

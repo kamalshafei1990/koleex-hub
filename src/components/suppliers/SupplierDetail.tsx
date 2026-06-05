@@ -68,6 +68,7 @@ import TimelineSection from "./TimelineSection";
 import RiskSection from "./RiskSection";
 import NegotiationSection from "./NegotiationSection";
 import SourcingSection from "./SourcingSection";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 type Row = Record<string, unknown>;
 
@@ -759,7 +760,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
             (Identity → Contacts → Commercial → Products → Legal → …) ─── */}
         <div id="overview" className="scroll-mt-16">
               <GroupLabel>{t("sd.groupIdentity", "Identity & profile")}</GroupLabel>
-              <Sec title={t("sd.companyProfile", "Company profile")} icon={<Building2Icon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("companyProfile")} onToggle={() => toggleKey("companyProfile")} preview={[str(s, "company_type"), str(s, "year_established")].filter(Boolean).join(" · ")}>
+              <Sec title={t("sd.companyProfile", "Company profile")} kxComponent="SupplierCompanyProfileSection" kxSection="Identity & profile" kxRecordId={id} icon={<Building2Icon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("companyProfile")} onToggle={() => toggleKey("companyProfile")} preview={[str(s, "company_type"), str(s, "year_established")].filter(Boolean).join(" · ")}>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                   <Field label={t("sd.legalName", "Legal name")} value={str(s, "legal_name", "company_name", "company_name_en")} span2 />
                   <Field label={t("sd.tradingName", "Trading name")} value={str(s, "trading_name")} />
@@ -816,7 +817,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
                 const hasAnything = phone || mobile || email || site || addr || channels.length || mediaQrs.length;
                 if (!hasAnything) return null;
                 return (
-                  <Sec tone="default" title={t("sd.contactChannels", "Contact & channels")} icon={<PhoneIcon className="h-4 w-4" />}>
+                  <Sec tone="default" title={t("sd.contactChannels", "Contact & channels")} kxComponent="SupplierContactSection" kxSection="Communication" kxRecordId={id} icon={<PhoneIcon className="h-4 w-4" />}>
                     <div className="grid grid-cols-1 @xl:grid-cols-2 gap-x-6 gap-y-3">
                       {mobile ? (
                         <a href={`tel:${mobile}`} className="flex items-center gap-2.5 group">
@@ -963,7 +964,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
                 const all = [...socials, ...fromDigital].filter((p) => p.platform && (p.url || p.value || p.username));
                 if (!all.length) return null;
                 return (
-                  <Sec tone="cyan" title={t("sd.socialMedia", "Social media & marketplaces")} icon={<Share2Icon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("social")} onToggle={() => toggleKey("social")} preview={`${all.length}`}>
+                  <Sec tone="cyan" title={t("sd.socialMedia", "Social media & marketplaces")} kxComponent="SupplierSocialSection" kxSection="Communication" kxRecordId={id} icon={<Share2Icon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("social")} onToggle={() => toggleKey("social")} preview={`${all.length}`}>
                     {/* Same big-logo card grammar as Messaging */}
                     <div className="grid grid-cols-1 @2xl:grid-cols-2 gap-3">
                       {all.map((p, i) => {
@@ -996,7 +997,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
 
               {/* Messaging support & groups — yes/no flags that complement the
                   per-platform IDs+QRs in the hero Contact & channels shell. */}
-              <Sec tone="cyan" title={t("sd.messagingSupport", "Messaging support & groups")} icon={<MessageSquareIcon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("messagingSupport")} onToggle={() => toggleKey("messagingSupport")} preview={str(s, "communication_preference")}>
+              <Sec tone="cyan" title={t("sd.messagingSupport", "Messaging support & groups")} kxComponent="SupplierMessagingSection" kxSection="Communication" kxRecordId={id} icon={<MessageSquareIcon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("messagingSupport")} onToggle={() => toggleKey("messagingSupport")} preview={str(s, "communication_preference")}>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                   <Field label={t("sd.wechatGroup", "WeChat sales group")} value={yn("wechat_sales_group_available")} />
                   <Field label={t("sd.wecomSupport", "WeCom support")} value={yn("wecom_support_available")} />
@@ -1012,7 +1013,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
               <GroupLabel>{t("sd.groupCommercialLogistics", "Commercial & logistics")}</GroupLabel>
 
               {terms.length > 0 ? (
-                <Sec tone="violet" title={t("sd.commercialTerms", "Commercial terms")} icon={<HandCoinsIcon className="h-4 w-4" />}>
+                <Sec tone="violet" title={t("sd.commercialTerms", "Commercial terms")} kxComponent="SupplierCommercialSection" kxSection="Commercial" kxRecordId={id} icon={<HandCoinsIcon className="h-4 w-4" />}>
                   <div className="grid grid-cols-2 @2xl:grid-cols-3 @4xl:grid-cols-5 gap-x-6 gap-y-3">
                     {terms.map((tm) => (
                       <Field key={tm.label} label={tm.label} value={tm.value} />
@@ -1021,7 +1022,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
                 </Sec>
               ) : null}
 
-              <Sec tone="amber" title={t("sd.logisticsTrade", "Logistics & trade")} icon={<ShipIcon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("logistics")} onToggle={() => toggleKey("logistics")} preview={[str(s, "port_of_entry"), str(s, "container_preference")].filter(Boolean).join(" · ")}>
+              <Sec tone="amber" title={t("sd.logisticsTrade", "Logistics & trade")} kxComponent="SupplierLogisticsSection" kxSection="Commercial" kxRecordId={id} icon={<ShipIcon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("logistics")} onToggle={() => toggleKey("logistics")} preview={[str(s, "port_of_entry"), str(s, "container_preference")].filter(Boolean).join(" · ")}>
                 {/* Incoterms intentionally lives only in Commercial terms (single source). */}
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                   <Field label={t("sd.portOfEntry", "Port")} value={str(s, "port_of_entry")} />
@@ -1033,7 +1034,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
                 </div>
               </Sec>
 
-              <Sec tone="violet" title={t("sd.banking", "Banking & payment")} icon={<LandmarkIcon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("banking")} onToggle={() => toggleKey("banking")} preview={str(s, "preferred_payment_method") || str(s, "payment_terms")}>
+              <Sec tone="violet" title={t("sd.banking", "Banking & payment")} kxComponent="SupplierBankingSection" kxSection="Commercial" kxRecordId={id} icon={<LandmarkIcon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("banking")} onToggle={() => toggleKey("banking")} preview={str(s, "preferred_payment_method") || str(s, "payment_terms")}>
                 {/* Payment terms + currency live in Commercial terms (single source);
                     this card focuses on HOW to pay — method + bank accounts. */}
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3">
@@ -1107,7 +1108,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
               <GroupLabel>{t("sd.groupProducts", "Products & production")}</GroupLabel>
 
               <div id="quality" className="scroll-mt-16">
-                <Sec tone="emerald" title={t("sd.qualityCertifications", "Quality & certifications")} icon={<FileCheckIcon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("quality")} onToggle={() => toggleKey("quality")} preview={certs.length ? `${certs.length}` : ""}>
+                <Sec tone="emerald" title={t("sd.qualityCertifications", "Quality & certifications")} kxComponent="SupplierQualitySection" kxSection="Production" kxRecordId={id} icon={<FileCheckIcon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("quality")} onToggle={() => toggleKey("quality")} preview={certs.length ? `${certs.length}` : ""}>
                   {certs.length ? (
                     <div className="flex flex-wrap gap-2">
                       {certs.map((c) => (
@@ -1133,7 +1134,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
 
               <GroupLabel>{t("sd.groupLegal", "Legal & compliance")}</GroupLabel>
 
-              <Sec tone="violet" title={t("sd.identityCompliance", "Identity & compliance")} icon={<IdCardIcon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("identity")} onToggle={() => toggleKey("identity")} preview={str(s, "kyc_status") ? `KYC ${str(s, "kyc_status")}` : ""}>
+              <Sec tone="violet" title={t("sd.identityCompliance", "Identity & compliance")} kxComponent="SupplierComplianceSection" kxSection="Legal" kxRecordId={id} icon={<IdCardIcon className="h-4 w-4" />} collapsible collapsed={collapsedKeys.has("identity")} onToggle={() => toggleKey("identity")} preview={str(s, "kyc_status") ? `KYC ${str(s, "kyc_status")}` : ""}>
                 <div className="grid grid-cols-1 @3xl:grid-cols-[1fr_180px] gap-5">
                   <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                     <Field label={t("sd.businessRegNo", "Business reg. no.")} value={str(s, "business_registration_number")} mono />
@@ -1645,7 +1646,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
 /* ─── Each section is its own SHELL — a rounded, bordered card surface that
    sets the section visually apart on the page. Uppercase mini-title + icon
    (Contacts grammar) sits at the top of the shell. */
-const Sec = ({ title, icon, children, tone = "default", action, collapsible = false, collapsed: collapsedProp, onToggle, preview }: { title: string; icon: React.ReactNode; children: React.ReactNode; tone?: "default" | "blue" | "emerald" | "amber" | "rose" | "violet" | "cyan"; action?: React.ReactNode; collapsible?: boolean; collapsed?: boolean; onToggle?: () => void; preview?: React.ReactNode }) => {
+const Sec = ({ title, icon, children, tone = "default", action, collapsible = false, collapsed: collapsedProp, onToggle, preview, kxComponent, kxSection, kxRecordId }: { title: string; icon: React.ReactNode; children: React.ReactNode; tone?: "default" | "blue" | "emerald" | "amber" | "rose" | "violet" | "cyan"; action?: React.ReactNode; collapsible?: boolean; collapsed?: boolean; onToggle?: () => void; preview?: React.ReactNode; kxComponent?: string; kxSection?: string; kxRecordId?: string }) => {
   const toneCls: Record<string, string> = {
     default: "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]",
     blue: "bg-blue-500/12 text-blue-600 dark:text-blue-400",
@@ -1662,7 +1663,10 @@ const Sec = ({ title, icon, children, tone = "default", action, collapsible = fa
   const toggle = () => { if (onToggle) onToggle(); if (!isControlled) setLocalCollapsed((c) => !c); };
   const HeaderTag = collapsible ? "button" : "div";
   return (
-    <div className="mx-4 md:mx-6 my-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
+    <div
+      className="mx-4 md:mx-6 my-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden"
+      {...(kxComponent ? kxInspectAttrs({ component: kxComponent, module: "Suppliers", section: kxSection, recordId: kxRecordId }) : {})}
+    >
       <HeaderTag
         {...(collapsible ? { type: "button" as const, onClick: toggle, "aria-expanded": !collapsed } : {})}
         className={`flex w-full items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/30 px-4 md:px-5 py-3 text-start ${collapsible ? "cursor-pointer hover:bg-[var(--bg-surface-subtle)]/60 transition-colors" : ""} ${collapsed ? "border-b-transparent" : ""}`}

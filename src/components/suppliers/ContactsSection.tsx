@@ -50,6 +50,7 @@ import BrandGlyph from "@/components/icons/brands/BrandGlyph";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import UploadIcon from "@/components/icons/ui/UploadIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 type Row = Record<string, unknown>;
 
@@ -313,7 +314,7 @@ export default function ContactsSection({
   const hasData = contactPersons.length > 0 || qrCodes.length > 0;
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-6" {...kxInspectAttrs({ component: "SupplierContactPersonsSection", module: "Suppliers", section: "Communication", recordId: supplierId })}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <UsersIcon className="h-4 w-4 text-[var(--text-secondary)]" />

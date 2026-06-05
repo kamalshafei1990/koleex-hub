@@ -24,6 +24,7 @@ import PercentIcon from "@/components/icons/ui/PercentIcon";
 import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 type Row = Record<string, unknown>;
 const str = (r: Row, k: string): string => { const v = r[k]; return typeof v === "string" ? v : typeof v === "number" ? String(v) : ""; };
@@ -120,7 +121,7 @@ export default function NegotiationSection({
   };
 
   return (
-    <section className="space-y-5">
+    <section className="space-y-5" {...kxInspectAttrs({ component: "SupplierNegotiationSection", module: "Suppliers", section: "Intelligence", recordId: supplierId })}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2"><HandshakeIcon className="h-4 w-4 text-[var(--text-secondary)]" /><h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">{t("neg.title", "Negotiation Intelligence")}</h3></div>
         <div className="flex items-center gap-2">

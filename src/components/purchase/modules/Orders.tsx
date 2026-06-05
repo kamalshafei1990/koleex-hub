@@ -15,6 +15,7 @@ import ReceiveDialog from "../ReceiveDialog";
 import BoxesIcon from "@/components/icons/ui/BoxesIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 type PO = {
   id: string; po_no: string | null; status: string | null;
@@ -85,7 +86,7 @@ export default function OrdersModule({ t }: PurchaseModuleProps) {
             const status = (p.status || "draft").toLowerCase();
             const tone = STATUS_TONE_PO[status] || STATUS_TONE_PO.draft;
             return (
-              <div key={p.id} className="grid grid-cols-[1fr_auto] md:grid-cols-[120px_1fr_140px_auto] gap-3 md:gap-4 items-center px-4 py-3">
+              <div key={p.id} {...kxInspectAttrs({ component: "PurchaseOrderRow", module: "Purchases", section: "Orders", recordId: p.id })} className="grid grid-cols-[1fr_auto] md:grid-cols-[120px_1fr_140px_auto] gap-3 md:gap-4 items-center px-4 py-3">
                 <span className="font-mono text-[12px] font-semibold text-[var(--text-primary)] truncate">{p.po_no || p.id.slice(0, 8)}</span>
                 <div className="min-w-0">
                   <p className="text-[13px] text-[var(--text-primary)] truncate">{supplierName.get(p.supplier_id || "") || "—"}</p>

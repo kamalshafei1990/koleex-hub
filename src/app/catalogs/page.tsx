@@ -10,6 +10,7 @@ import CrossIcon from "@/components/icons/ui/CrossIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import EyeIcon from "@/components/icons/ui/EyeIcon";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
@@ -1716,7 +1717,10 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
   };
 
   return (
-    <div className={`group relative flex flex-col rounded-2xl bg-[var(--bg-surface)] border overflow-hidden transition-all hover:shadow-lg hover:shadow-black/20 hover:-translate-y-0.5 ${selected ? "border-blue-500 ring-1 ring-blue-500/40" : "border-[var(--border-subtle)] hover:border-[var(--text-dim)]"}`}>
+    <div
+      {...kxInspectAttrs({ component: "CatalogCard", module: "Catalogs", section: "Main List", recordId: catalog.id })}
+      className={`group relative flex flex-col rounded-2xl bg-[var(--bg-surface)] border overflow-hidden transition-all hover:shadow-lg hover:shadow-black/20 hover:-translate-y-0.5 ${selected ? "border-blue-500 ring-1 ring-blue-500/40" : "border-[var(--border-subtle)] hover:border-[var(--text-dim)]"}`}
+    >
       {/* Selection checkbox */}
       <button onClick={onToggleSelect} aria-label="Select"
         className={`absolute top-2.5 left-2.5 z-10 h-6 w-6 rounded-md border flex items-center justify-center transition-all ${selected ? "bg-blue-500 border-blue-500 text-white opacity-100" : "bg-black/40 backdrop-blur-md border-white/40 text-transparent opacity-0 group-hover:opacity-100"}`}>

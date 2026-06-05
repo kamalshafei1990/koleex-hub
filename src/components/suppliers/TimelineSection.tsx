@@ -37,6 +37,7 @@ import BadgeCheckIcon from "@/components/icons/ui/BadgeCheckIcon";
 import TrendingUpIcon from "@/components/icons/ui/TrendingUpIcon";
 import TargetIcon from "@/components/icons/ui/TargetIcon";
 import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 type Row = Record<string, unknown>;
 const str = (r: Row, k: string): string => {
@@ -239,7 +240,7 @@ export default function TimelineSection({
   };
 
   return (
-    <section className="space-y-5">
+    <section className="space-y-5" {...kxInspectAttrs({ component: "SupplierTimelineSection", module: "Suppliers", section: "Records", recordId: supplierId })}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <HistoryIcon className="h-4 w-4 text-[var(--text-secondary)]" />

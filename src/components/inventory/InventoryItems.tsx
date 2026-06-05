@@ -33,6 +33,7 @@ import Link from "next/link";
 import { suggestSubcategories, INTERNAL_TYPE_KEYS } from "@/lib/inventory/internal-taxonomy";
 /* INV-H9 — card-based internal-item picker (replaces dropdown flow). */
 import InventoryInternalItemDrawer from "@/components/inventory/InventoryInternalItemDrawer";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 const INV_H1_T: Translations = {
   "inv.title":             { en: "Stock Profiles",   zh: "库存档案",       ar: "ملفات المخزون" },
@@ -355,6 +356,7 @@ export default function InventoryItems() {
                 rows.map((r) => (
                   <tr
                     key={r.id}
+                    {...kxInspectAttrs({ component: "InventoryItemRow", module: "Inventory", section: "Items", recordId: r.id })}
                     onClick={() => setSelectedId(r.id)}
                     className="cursor-pointer border-b border-[var(--border-subtle)] last:border-b-0 hover:bg-[var(--bg-elevated)]"
                   >

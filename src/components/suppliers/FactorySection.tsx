@@ -18,6 +18,7 @@ import FactoryIcon from "@/components/icons/ui/FactoryIcon";
 import GlobeIcon from "@/components/icons/ui/GlobeIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
 import Edit3Icon from "@/components/icons/ui/Edit3Icon";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 type Row = Record<string, unknown>;
 
@@ -305,7 +306,7 @@ export default function FactorySection({
 
   /* ── EDIT MODE ── */
   return (
-    <section className="space-y-5">
+    <section className="space-y-5" {...kxInspectAttrs({ component: "SupplierFactorySection", module: "Suppliers", section: "Production", recordId: supplierId })}>
       <div className="flex items-center gap-2">
         <FactoryIcon className="h-4 w-4 text-[var(--text-secondary)]" />
         <h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">{t("fs.editTitle", "Edit Factory Intelligence")}</h3>

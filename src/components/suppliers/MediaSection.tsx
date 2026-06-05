@@ -38,6 +38,7 @@ import TrashIcon from "@/components/icons/ui/TrashIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import ArchiveIcon from "@/components/icons/ui/ArchiveIcon";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 type Row = Record<string, unknown>;
 const str = (r: Row, k: string): string => {
@@ -267,7 +268,7 @@ export default function MediaSection({
   const hasData = media.length > 0;
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-6" {...kxInspectAttrs({ component: "SupplierDocumentsSection", module: "Suppliers", section: "Records", recordId: supplierId })}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <LayersIcon className="h-4 w-4 text-[var(--text-secondary)]" />

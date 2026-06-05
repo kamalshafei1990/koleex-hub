@@ -29,6 +29,7 @@ import Edit3Icon from "@/components/icons/ui/Edit3Icon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 type Row = Record<string, unknown>;
 const str = (r: Row, k: string): string => { const v = r[k]; return typeof v === "string" ? v : typeof v === "number" ? String(v) : ""; };
@@ -231,7 +232,7 @@ export default function RiskSection({
 
   /* ── VIEW MODE ── */
   return (
-    <section className="space-y-6">
+    <section className="space-y-6" {...kxInspectAttrs({ component: "SupplierRiskSection", module: "Suppliers", section: "Intelligence", recordId: supplierId })}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2"><ShieldExclamationIcon className="h-4 w-4 text-[var(--text-secondary)]" /><h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">{t("rs.title", "Risk Intelligence")}</h3></div>
         <div className="flex items-center gap-2">
