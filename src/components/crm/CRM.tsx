@@ -1028,7 +1028,7 @@ function PipelineColumn({
                   <MoreHorizontalIcon className="h-3.5 w-3.5" />
                 </button>
                 {menuOpen && col.stage && (
-                  <div className="absolute left-0 top-6 z-30 w-44 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-lg overflow-hidden">
+                  <div className="absolute left-0 top-6 z-30 w-44 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-xl overflow-hidden">
                     <button
                       type="button"
                       onClick={() => {

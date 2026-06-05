@@ -410,7 +410,7 @@ export default function MicButton({
       {computedState === "processing" && (
         <span
           aria-live="polite"
-          className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-medium tracking-wider text-[var(--text-dim)] bg-[var(--bg-surface)]/90 border border-[var(--border-subtle)] rounded-full px-2 py-0.5 pointer-events-none shadow-md backdrop-blur-md"
+          className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-medium tracking-wider text-[var(--text-dim)] bg-[var(--bg-secondary)]/95 border border-[var(--border-color)] rounded-full px-2 py-0.5 pointer-events-none shadow-lg backdrop-blur-md"
         >
           Transcribing…
         </span>

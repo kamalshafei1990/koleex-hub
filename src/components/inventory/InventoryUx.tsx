@@ -495,7 +495,7 @@ export function BulkActionBar({
   return (
     <div
       data-testid="inv-bulk-action-bar"
-      className="fixed inset-x-2 bottom-2 z-30 mx-auto flex max-w-[920px] flex-wrap items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2.5 shadow-lg sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2"
+      className="fixed inset-x-2 bottom-2 z-30 mx-auto flex max-w-[920px] flex-wrap items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)]/95 backdrop-blur-md px-3 py-2.5 shadow-xl sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2"
     >
       <div className="text-[12px] text-[var(--text-primary)]">
         {t("inv.bulk.selected").replace("{n}", String(count))}
