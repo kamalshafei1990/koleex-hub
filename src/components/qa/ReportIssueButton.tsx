@@ -183,7 +183,7 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
     }
   }
 
-  const field = "w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)] placeholder:text-[var(--text-ghost)]";
+  const field = "w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none focus:border-white placeholder:text-[var(--text-ghost)]";
   const label = "block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-1";
 
   return (
@@ -262,7 +262,7 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                     onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                     onDragLeave={() => setDragOver(false)}
                     onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) setImage(f); }}
-                    className={`flex w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed py-6 text-[12px] transition-colors ${dragOver ? "border-[var(--accent)] bg-[var(--accent)]/5 text-[var(--text-primary)]" : "border-[var(--border-color)] text-[var(--text-dim)] hover:border-[var(--accent)]"}`}
+                    className={`flex w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed py-6 text-[12px] transition-colors ${dragOver ? "border-white bg-white/5 text-[var(--text-primary)]" : "border-[var(--border-color)] text-[var(--text-dim)] hover:border-white"}`}
                   >
                     <span className="text-[var(--text-secondary)]">Click to upload</span>
                     <span className="text-[var(--text-ghost)]">or paste / drag an image here</span>
