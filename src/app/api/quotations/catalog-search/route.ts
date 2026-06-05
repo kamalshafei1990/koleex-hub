@@ -49,6 +49,7 @@ interface PickerRow {
   product_id: string;
   model_id: string;
   model_name: string;
+  sku: string;
   product_name: string;
   price: number;
   image_url: string | null;
@@ -157,6 +158,7 @@ export async function GET(req: Request) {
       product_id: m.product_id,
       model_id: m.id,
       model_name: modelName,
+      sku: m.sku ?? "",
       product_name: productName,
       price,
       image_url: firstImage.get(m.product_id) ?? null,

@@ -4,19 +4,20 @@
    ProductPickerModal — searchable catalog picker used by the
    Quotation editor's "+ From catalog" button.
 
-   UX:
-     · Search bar at the top (debounced 200 ms against /api/quotations/
-       catalog-search).
-     · Result list with thumbnail | MODEL CODE | product name | price.
-     · Click a row → fires onPick({ model, description, unitPrice,
-       imageUrl }) and closes the modal.
-     · Escape or backdrop click closes without picking.
+   Performance + search quality:
+     · The catalog is fetched ONCE when the modal opens (q="" returns the
+       full tenant catalog, server-capped at 2000, and is HTTP-cached). All
+       subsequent typing filters IN THE BROWSER — zero network per keystroke,
+       so search feels instant.
+     · Smart ranking: multi-word (every word must match), matches against
+       model code + SKU + product name, normalised (case/diacritics/space),
+       and ranked exact → prefix → word-start → substring, with model/SKU
+       weighted above the product name. Best matches float to the top.
+     · Only the top slice is rendered (DOM stays light even with 2000 rows).
+     · Keyboard: ↑/↓ to move, Enter to pick, Esc to close.
+   --------------------------------------------------------------------------- */
 
-   The modal is intentionally framework-light — no Headless UI dep,
-   just a fixed overlay + a focused input. Keeps the bundle small and
-   matches the rest of the editor's tone. */
-
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
@@ -24,6 +25,7 @@ export interface PickerRow {
   product_id: string;
   model_id: string;
   model_name: string;
+  sku?: string;
   product_name: string;
   price: number;
   image_url: string | null;
@@ -36,6 +38,51 @@ export interface PickResult {
   imageUrl: string;
 }
 
+/** Max rows painted at once — keeps the DOM light on broad/empty queries. */
+const MAX_RENDER = 120;
+
+/* Normalise for matching: lowercase, strip diacritics, collapse whitespace. */
+function norm(s: string | null | undefined): string {
+  return (s ?? "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/* Score one field against one term. 0 = no match. Higher = better:
+   exact > whole-prefix > word-start > substring. */
+function fieldScore(field: string, term: string): number {
+  if (!field || !term) return 0;
+  const i = field.indexOf(term);
+  if (i === -1) return 0;
+  if (field === term) return 100;
+  if (i === 0) return 70;
+  if (field[i - 1] === " ") return 50;
+  return 30;
+}
+
+/* Score a row against all search terms. Every term must match SOMEWHERE
+   (AND semantics) or the row is excluded (returns -1). Model code + SKU are
+   weighted above the product name so a code match ranks first. */
+function scoreRow(row: PickerRow, terms: string[]): number {
+  const model = norm(row.model_name);
+  const sku = norm(row.sku);
+  const name = norm(row.product_name);
+  let total = 0;
+  for (const term of terms) {
+    const best = Math.max(
+      fieldScore(model, term),
+      fieldScore(sku, term),
+      fieldScore(name, term) * 0.8,
+    );
+    if (best <= 0) return -1; // this term matched nothing → drop the row
+    total += best;
+  }
+  return total;
+}
+
 export default function ProductPickerModal({
   open,
   onClose,
@@ -46,49 +93,36 @@ export default function ProductPickerModal({
   onPick: (row: PickResult) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [rows, setRows] = useState<PickerRow[]>([]);
+  const [allRows, setAllRows] = useState<PickerRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeIdx, setActiveIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
 
-  /* Reset state every time the modal opens so the previous session's
-     query/results don't flash in. Focus the search input so the user
-     can start typing immediately. */
+  /* Fetch the catalog ONCE per open. Reset transient UI state too so the
+     previous session's query doesn't flash in. */
   useEffect(() => {
     if (!open) return;
     setQuery("");
-    setRows([]);
     setError(null);
-    const t = setTimeout(() => inputRef.current?.focus(), 40);
-    return () => clearTimeout(t);
-  }, [open]);
-
-  /* Debounced search. Empty query still runs (returns the first 40
-     visible models) so the modal is useful as a browseable list,
-     not just a search box. */
-  useEffect(() => {
-    if (!open) return;
+    setActiveIdx(0);
     setLoading(true);
     const controller = new AbortController();
-    const t = setTimeout(async () => {
+    (async () => {
       try {
         const res = await fetch(
-          /* Pull the full catalog (server caps at 2000) so the
-             picker can find any model, not just the first 60. The
-             list is virtualised only if it gets unwieldy — for now
-             the modal scrolls cleanly through a tenant-sized
-             catalog without UX issues. */
-          `/api/quotations/catalog-search?q=${encodeURIComponent(query)}&limit=2000`,
+          "/api/quotations/catalog-search?q=&limit=2000",
           { credentials: "include", signal: controller.signal },
         );
         if (!res.ok) {
           const j = await res.json().catch(() => ({}));
-          setError(j.error || `Search failed (${res.status})`);
-          setRows([]);
+          setError(j.error || `Couldn't load the catalog (${res.status})`);
+          setAllRows([]);
           return;
         }
         const json = (await res.json()) as { rows: PickerRow[] };
-        setRows(json.rows ?? []);
+        setAllRows(json.rows ?? []);
         setError(null);
       } catch (e) {
         if ((e as { name?: string })?.name !== "AbortError") {
@@ -97,23 +131,50 @@ export default function ProductPickerModal({
       } finally {
         setLoading(false);
       }
-    }, 200);
+    })();
+    const t = setTimeout(() => inputRef.current?.focus(), 40);
     return () => {
       controller.abort();
       clearTimeout(t);
     };
-  }, [open, query]);
+  }, [open]);
 
-  /* Esc-to-close. Bound on the document so the listener works even
-     when focus is on the result list. */
+  /* Instant client-side ranked filter. Empty query → the whole catalog,
+     sorted A→Z, so the modal doubles as a browseable list. */
+  const results = useMemo(() => {
+    const terms = norm(query).split(" ").filter(Boolean);
+    if (terms.length === 0) {
+      return allRows
+        .slice()
+        .sort((a, b) =>
+          (a.product_name || "").localeCompare(b.product_name || "") ||
+          (a.model_name || "").localeCompare(b.model_name || ""),
+        );
+    }
+    return allRows
+      .map((row) => ({ row, score: scoreRow(row, terms) }))
+      .filter((x) => x.score >= 0)
+      .sort(
+        (a, b) =>
+          b.score - a.score ||
+          (a.row.product_name || "").localeCompare(b.row.product_name || ""),
+      )
+      .map((x) => x.row);
+  }, [allRows, query]);
+
+  const shown = results.slice(0, MAX_RENDER);
+
+  /* Keep the active row in range whenever the result set changes. */
+  useEffect(() => { setActiveIdx(0); }, [query]);
   useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+    if (activeIdx >= shown.length) setActiveIdx(shown.length > 0 ? shown.length - 1 : 0);
+  }, [shown.length, activeIdx]);
+
+  /* Scroll the active row into view as the user arrows through. */
+  useEffect(() => {
+    const el = listRef.current?.querySelector<HTMLElement>('[data-active="1"]');
+    el?.scrollIntoView({ block: "nearest" });
+  }, [activeIdx]);
 
   const pick = useCallback(
     (row: PickerRow) => {
@@ -126,6 +187,33 @@ export default function ProductPickerModal({
       onClose();
     },
     [onPick, onClose],
+  );
+
+  /* Esc-to-close (bound on document so it works wherever focus is). */
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  const onInputKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setActiveIdx((i) => Math.min(i + 1, shown.length - 1));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setActiveIdx((i) => Math.max(i - 1, 0));
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        const row = shown[activeIdx];
+        if (row) pick(row);
+      }
+    },
+    [shown, activeIdx, pick],
   );
 
   if (!open) return null;
@@ -196,7 +284,8 @@ export default function ProductPickerModal({
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by model code or product name…"
+            onKeyDown={onInputKeyDown}
+            placeholder="Search model code, SKU or product name…"
             style={{
               width: "100%",
               height: 36,
@@ -209,87 +298,96 @@ export default function ProductPickerModal({
               outline: "none",
             }}
           />
+          {/* Result count / hint — quiet line under the search box. */}
+          {!loading && !error && allRows.length > 0 && (
+            <div style={{ marginTop: 8, fontSize: 11, opacity: 0.55, display: "flex", justifyContent: "space-between" }}>
+              <span>
+                {query.trim()
+                  ? `${results.length} match${results.length === 1 ? "" : "es"}`
+                  : `${allRows.length} products`}
+                {results.length > MAX_RENDER ? ` · showing top ${MAX_RENDER}` : ""}
+              </span>
+              <span>↑↓ to move · Enter to add</span>
+            </div>
+          )}
         </div>
 
         {/* Results */}
-        <div style={{ overflowY: "auto", flex: 1, padding: 8 }}>
+        <div ref={listRef} style={{ overflowY: "auto", flex: 1, padding: 8 }}>
           {loading && (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 32, gap: 8, opacity: 0.7 }}>
               <SpinnerIcon className="h-4 w-4 animate-spin" />
-              <span style={{ fontSize: 13 }}>Searching…</span>
+              <span style={{ fontSize: 13 }}>Loading catalog…</span>
             </div>
           )}
           {!loading && error && (
             <div style={{ padding: 32, textAlign: "center", color: "#f87171", fontSize: 13 }}>{error}</div>
           )}
-          {!loading && !error && rows.length === 0 && (
+          {!loading && !error && shown.length === 0 && (
             <div style={{ padding: 32, textAlign: "center", opacity: 0.6, fontSize: 13 }}>
               No products match {query ? `"${query}"` : "your catalog yet"}.
             </div>
           )}
-          {!loading && rows.map((row) => (
-            <button
-              key={row.model_id}
-              type="button"
-              onClick={() => pick(row)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                width: "100%",
-                padding: 10,
-                borderRadius: 10,
-                border: "1px solid transparent",
-                background: "transparent",
-                color: "inherit",
-                cursor: "pointer",
-                textAlign: "left",
-                marginBottom: 2,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "var(--bg-primary, #111827)";
-                e.currentTarget.style.borderColor = "var(--border-color, #374151)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "transparent";
-                e.currentTarget.style.borderColor = "transparent";
-              }}
-            >
-              {/* Thumbnail */}
-              <div
+          {!loading && shown.map((row, i) => {
+            const active = i === activeIdx;
+            return (
+              <button
+                key={row.model_id}
+                type="button"
+                data-active={active ? "1" : "0"}
+                onClick={() => pick(row)}
+                onMouseMove={() => { if (!active) setActiveIdx(i); }}
                 style={{
-                  width: 48,
-                  height: 48,
-                  flex: "0 0 48px",
-                  borderRadius: 8,
-                  background: "#ffffff",
-                  border: "1px solid var(--border-color, #374151)",
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "center",
-                  overflow: "hidden",
+                  gap: 12,
+                  width: "100%",
+                  padding: 10,
+                  borderRadius: 10,
+                  border: `1px solid ${active ? "var(--border-color, #374151)" : "transparent"}`,
+                  background: active ? "var(--bg-primary, #111827)" : "transparent",
+                  color: "inherit",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  marginBottom: 2,
                 }}
               >
-                {row.image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={row.image_url} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                ) : (
-                  <span style={{ fontSize: 18, color: "#9ca3af" }}>–</span>
-                )}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: "ui-monospace, monospace", fontSize: 12, fontWeight: 600, letterSpacing: "0.02em" }}>
-                  {row.model_name || "—"}
+                {/* Thumbnail */}
+                <div
+                  style={{
+                    width: 48,
+                    height: 48,
+                    flex: "0 0 48px",
+                    borderRadius: 8,
+                    background: "#ffffff",
+                    border: "1px solid var(--border-color, #374151)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    overflow: "hidden",
+                  }}
+                >
+                  {row.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={row.image_url} alt="" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                  ) : (
+                    <span style={{ fontSize: 18, color: "#9ca3af" }}>–</span>
+                  )}
                 </div>
-                <div style={{ fontSize: 13, opacity: 0.85, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {row.product_name}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: "ui-monospace, monospace", fontSize: 12, fontWeight: 600, letterSpacing: "0.02em" }}>
+                    {row.model_name || row.sku || "—"}
+                  </div>
+                  <div style={{ fontSize: 13, opacity: 0.85, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {row.product_name}
+                  </div>
                 </div>
-              </div>
-              <div style={{ fontSize: 13, fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>
-                {row.price > 0 ? `US$ ${row.price.toLocaleString()}` : "—"}
-              </div>
-            </button>
-          ))}
+                <div style={{ fontSize: 13, fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>
+                  {row.price > 0 ? `US$ ${row.price.toLocaleString()}` : "—"}
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>
