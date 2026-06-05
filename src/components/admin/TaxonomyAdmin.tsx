@@ -19,6 +19,7 @@ import PictureIcon from "@/components/icons/ui/PictureIcon";
 import { getDivisionIcon } from "@/components/icons/divisions";
 import { slugify } from "@/types/product-form";
 import ConfirmDialog from "./form-sections/ConfirmDialog";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 /* ---------------------------------------------------------------------------
    TaxonomyAdmin — Reusable CRUD admin for divisions, categories, subcategories.
@@ -283,7 +284,9 @@ export default function TaxonomyAdmin({
               </thead>
               <tbody>
                 {filtered.map((item, idx) => (
-                  <tr key={item.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
+                  <tr key={item.id}
+                    {...kxInspectAttrs({ component: `${singular.replace(/\s+/g, "")}Row`, module: "Product Data", section: title, recordId: item.id })}
+                    className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
                     <td className="px-3 py-3 text-center">
                       <div className="flex flex-col items-center gap-0.5">
                         <button onClick={() => handleMoveUp(item, idx)} disabled={idx === 0} className="text-white/15 hover:text-white/50 disabled:opacity-20 transition-colors">

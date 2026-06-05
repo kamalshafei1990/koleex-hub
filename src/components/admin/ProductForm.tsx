@@ -97,6 +97,18 @@ import {
   validatePrimaryModel,
   normalizeKoleexCode,
 } from "@/lib/product-coding";
+import { kxInspectAttrs } from "@/lib/qa/inspector";
+
+// Derive a PascalCase component name from a section title (e.g. "Technical Details" → "TechnicalDetailsSection")
+function sectionComponentName(title: string): string {
+  const pascal = title
+    .replace(/[^a-zA-Z0-9 ]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join("");
+  return `${pascal || "Product"}Section`;
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    SECTION WRAPPER — collapsible card with icon + title
@@ -106,7 +118,7 @@ function Section({ icon, title, children, id, defaultOpen = true, badge }: {
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <section id={id} className="scroll-mt-24 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,0.15)]">
+    <section id={id} {...kxInspectAttrs({ component: sectionComponentName(title), module: "Product Data", section: title })} className="scroll-mt-24 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,0.15)]">
       <button
         type="button"
         onClick={() => setOpen(!open)}
