@@ -8033,92 +8033,6 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
-            {/* Classifications — pick what describes this supplier, star one as primary */}
-            <FormSection title={t("section.classifications", "Classifications")} icon={<TagsIcon size={14} />} owner={t("owner.procurement")} ownerLabel={t("owner.label")} dept="procurement" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
-              <div className="space-y-3">
-                {/* Header: helper text + selected count + primary chip */}
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-[11.5px] leading-relaxed text-[var(--text-dim)] flex-1">
-                    {t("hint.classifications", "Pick everything that describes this supplier. Star one as the primary type.")}
-                  </p>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full text-[11px] font-semibold bg-[var(--bg-surface)] border border-[var(--border-color)] text-[var(--text-secondary)]">
-                      {sIntel.classifications.length}
-                    </span>
-                    <span className="text-[10.5px] uppercase tracking-wider text-[var(--text-faint)]">{t("classifications.selected", "selected")}</span>
-                  </div>
-                </div>
-
-                {/* Selected summary strip with primary star — only when something is selected */}
-                {sIntel.classifications.length > 0 && (
-                  <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-2.5">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {sIntel.classifications.map((k) => {
-                        const isPrimary = sIntel.primary_class === k;
-                        return (
-                          <span key={k} className={`inline-flex items-center gap-1 pl-2 pr-1 py-1 rounded-full text-[11px] font-medium border transition-colors ${isPrimary ? "bg-[var(--accent,#0066FF)] text-white border-transparent" : "bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)]"}`}>
-                            {isPrimary && <StarIcon size={10} className="opacity-90" />}
-                            {t("opt." + k, CLASSIFICATION_LABELS[k as keyof typeof CLASSIFICATION_LABELS] ?? k)}
-                            {sIntel.classifications.length > 1 && !isPrimary && (
-                              <button
-                                type="button"
-                                title={t("action.makePrimary", "Make primary")}
-                                onClick={() => setSIntel((p) => ({ ...p, primary_class: k }))}
-                                className="w-4 h-4 rounded-full flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--accent,#0066FF)] transition-colors"
-                                aria-label={t("action.makePrimary", "Make primary")}
-                              >
-                                <StarIcon size={10} />
-                              </button>
-                            )}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Picker grid — 3 columns on desktop, 2 on tablet, 1 on mobile */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5">
-                  {Object.entries(CLASSIFICATION_LABELS).map(([k, v]) => {
-                    const on = sIntel.classifications.includes(k);
-                    const isPrimary = on && sIntel.primary_class === k;
-                    return (
-                      <button
-                        type="button"
-                        key={k}
-                        onClick={() => toggleIntelClass(k)}
-                        className={`group relative flex items-center gap-2 rounded-xl border px-3 py-2 text-left transition-all ${
-                          on
-                            ? "bg-[var(--bg-surface)] border-[var(--accent,#0066FF)]/40 text-[var(--text-primary)] shadow-[0_0_0_1px_var(--accent,#0066FF)_inset]"
-                            : "bg-[var(--bg-surface)] border-[var(--border-color)] text-[var(--text-muted)] hover:border-[var(--border-focus)] hover:text-[var(--text-primary)]"
-                        }`}
-                      >
-                        {/* Check / empty indicator */}
-                        <span className={`flex items-center justify-center w-4 h-4 rounded-md border shrink-0 transition-colors ${on ? "bg-[var(--accent,#0066FF)] border-transparent text-white" : "border-[var(--border-color)] text-transparent group-hover:border-[var(--border-focus)]"}`}>
-                          {on && <CheckIcon size={10} />}
-                        </span>
-                        <span className="flex-1 text-[12px] font-medium leading-tight">
-                          {t("opt." + k, v)}
-                        </span>
-                        {isPrimary && (
-                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[var(--accent,#0066FF)]/15 text-[var(--accent,#0066FF)]" title={t("field.primary", "Primary")}>
-                            <StarIcon size={11} />
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Empty hint when nothing is picked */}
-                {sIntel.classifications.length === 0 && (
-                  <p className="text-[11px] text-[var(--text-faint)] italic">
-                    {t("hint.noClassifications", "Tip: at least one classification helps the team route this supplier correctly.")}
-                  </p>
-                )}
-              </div>
-            </FormSection>
-
             {!supplierDept && <FormGroupLabel label={t("supgroup.communication", "Contacts & communication")} />}
             {/* 2. Contact Details — How to reach the supplier */}
             <FormSection title={t("section.contactDetails")} icon={<PhoneIcon size={14} />} owner={t("owner.procurement")} ownerLabel={t("owner.label")} dept="procurement" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
@@ -8402,6 +8316,92 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   </div>
                 ))}
                 <AddButton label={t("add.socialAccount", "Add social account")} onClick={() => setField("social_profiles", [...form.social_profiles, { platform: "LinkedIn", username: "", url: "", qr_code_url: "" }])} />
+              </div>
+            </FormSection>
+
+            {/* Classifications — pick what describes this supplier, star one as primary */}
+            <FormSection title={t("section.classifications", "Classifications")} icon={<TagsIcon size={14} />} owner={t("owner.procurement")} ownerLabel={t("owner.label")} dept="procurement" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
+              <div className="space-y-3">
+                {/* Header: helper text + selected count + primary chip */}
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-[11.5px] leading-relaxed text-[var(--text-dim)] flex-1">
+                    {t("hint.classifications", "Pick everything that describes this supplier. Star one as the primary type.")}
+                  </p>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full text-[11px] font-semibold bg-[var(--bg-surface)] border border-[var(--border-color)] text-[var(--text-secondary)]">
+                      {sIntel.classifications.length}
+                    </span>
+                    <span className="text-[10.5px] uppercase tracking-wider text-[var(--text-faint)]">{t("classifications.selected", "selected")}</span>
+                  </div>
+                </div>
+
+                {/* Selected summary strip with primary star — only when something is selected */}
+                {sIntel.classifications.length > 0 && (
+                  <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-2.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {sIntel.classifications.map((k) => {
+                        const isPrimary = sIntel.primary_class === k;
+                        return (
+                          <span key={k} className={`inline-flex items-center gap-1 pl-2 pr-1 py-1 rounded-full text-[11px] font-medium border transition-colors ${isPrimary ? "bg-[var(--accent,#0066FF)] text-white border-transparent" : "bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)]"}`}>
+                            {isPrimary && <StarIcon size={10} className="opacity-90" />}
+                            {t("opt." + k, CLASSIFICATION_LABELS[k as keyof typeof CLASSIFICATION_LABELS] ?? k)}
+                            {sIntel.classifications.length > 1 && !isPrimary && (
+                              <button
+                                type="button"
+                                title={t("action.makePrimary", "Make primary")}
+                                onClick={() => setSIntel((p) => ({ ...p, primary_class: k }))}
+                                className="w-4 h-4 rounded-full flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--accent,#0066FF)] transition-colors"
+                                aria-label={t("action.makePrimary", "Make primary")}
+                              >
+                                <StarIcon size={10} />
+                              </button>
+                            )}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Picker grid — 3 columns on desktop, 2 on tablet, 1 on mobile */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5">
+                  {Object.entries(CLASSIFICATION_LABELS).map(([k, v]) => {
+                    const on = sIntel.classifications.includes(k);
+                    const isPrimary = on && sIntel.primary_class === k;
+                    return (
+                      <button
+                        type="button"
+                        key={k}
+                        onClick={() => toggleIntelClass(k)}
+                        className={`group relative flex items-center gap-2 rounded-xl border px-3 py-2 text-left transition-all ${
+                          on
+                            ? "bg-[var(--bg-surface)] border-[var(--accent,#0066FF)]/40 text-[var(--text-primary)] shadow-[0_0_0_1px_var(--accent,#0066FF)_inset]"
+                            : "bg-[var(--bg-surface)] border-[var(--border-color)] text-[var(--text-muted)] hover:border-[var(--border-focus)] hover:text-[var(--text-primary)]"
+                        }`}
+                      >
+                        {/* Check / empty indicator */}
+                        <span className={`flex items-center justify-center w-4 h-4 rounded-md border shrink-0 transition-colors ${on ? "bg-[var(--accent,#0066FF)] border-transparent text-white" : "border-[var(--border-color)] text-transparent group-hover:border-[var(--border-focus)]"}`}>
+                          {on && <CheckIcon size={10} />}
+                        </span>
+                        <span className="flex-1 text-[12px] font-medium leading-tight">
+                          {t("opt." + k, v)}
+                        </span>
+                        {isPrimary && (
+                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[var(--accent,#0066FF)]/15 text-[var(--accent,#0066FF)]" title={t("field.primary", "Primary")}>
+                            <StarIcon size={11} />
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Empty hint when nothing is picked */}
+                {sIntel.classifications.length === 0 && (
+                  <p className="text-[11px] text-[var(--text-faint)] italic">
+                    {t("hint.noClassifications", "Tip: at least one classification helps the team route this supplier correctly.")}
+                  </p>
+                )}
               </div>
             </FormSection>
 
