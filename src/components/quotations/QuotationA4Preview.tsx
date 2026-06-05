@@ -177,8 +177,10 @@ interface Props {
   onClearSignature?: () => void;
   removeItem: (idx: number) => void;
   moveItem: (idx: number, direction: -1 | 1) => void;
-  /* Insert a copy of the row directly below it. */
-  duplicateItem: (idx: number) => void;
+  /* Insert a copy of the row directly below it. Optional — when omitted
+     (e.g. read-only print pages, the invoice-doc editor) the duplicate
+     control simply isn't shown. */
+  duplicateItem?: (idx: number) => void;
   handleImageUpload: (idx: number, file: File) => void;
   fileInputRefs: MutableRefObject<{ [key: number]: HTMLInputElement | null }>;
   subTotal: number;
@@ -1104,7 +1106,9 @@ export default function QuotationA4Preview({
                           </div>
                           <button type="button" className="pq-sec-ctrl" title="Move section up" disabled={idx === 0} onClick={() => moveItem(idx, -1)}><ArrowUpIcon size={13} /></button>
                           <button type="button" className="pq-sec-ctrl" title="Move section down" disabled={idx === current.items.length - 1} onClick={() => moveItem(idx, 1)}><ArrowDownIcon size={13} /></button>
-                          <button type="button" className="pq-sec-ctrl" title="Duplicate section header" onClick={() => duplicateItem(idx)}><DuplicateGlyph /></button>
+                          {duplicateItem && (
+                            <button type="button" className="pq-sec-ctrl" title="Duplicate section header" onClick={() => duplicateItem(idx)}><DuplicateGlyph /></button>
+                          )}
                           <button type="button" className="pq-sec-ctrl pq-sec-ctrl--danger" title="Remove section header" disabled={current.items.length <= 1} onClick={() => removeItem(idx)}><TrashIcon size={12} /></button>
                         </div>
                       </div>
@@ -1281,12 +1285,12 @@ export default function QuotationA4Preview({
                            clusters. Picture-cell-driven rows are
                            ~130 px tall, so the slack now reads as a
                            clear vertical gap between controls. */
-                        height: 132,
                         boxSizing: "border-box",
                         display: "grid",
-                        /* 4 rigid 28 px rows + 3 × 4 px row gaps =
-                           28×4 + 4×3 = 124, inside 132 − 4 px padding × 2. */
-                        gridTemplateRows: "28px 28px 28px 28px",
+                        /* Rigid 28 px rows, sized to however many controls
+                           are present (3 or 4). The pill is vertically
+                           centred via top:50% so its height can be auto. */
+                        gridAutoRows: "28px",
                         rowGap: 4,
                         alignContent: "center",
                         justifyItems: "center",
@@ -1311,11 +1315,13 @@ export default function QuotationA4Preview({
                         onClick={() => moveItem(idx, 1)}
                         icon={<ArrowDownIcon size={14} />}
                       />
-                      <RowActionBtn
-                        title="Duplicate row"
-                        onClick={() => duplicateItem(idx)}
-                        icon={<DuplicateGlyph />}
-                      />
+                      {duplicateItem && (
+                        <RowActionBtn
+                          title="Duplicate row"
+                          onClick={() => duplicateItem(idx)}
+                          icon={<DuplicateGlyph />}
+                        />
+                      )}
                       <RowActionBtn
                         title="Remove row"
                         disabled={current.items.length <= 1}
