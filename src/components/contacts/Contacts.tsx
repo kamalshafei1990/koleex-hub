@@ -1905,6 +1905,16 @@ const Input = React.memo(function Input({ label, value, onChange, type = "text",
      autofill even when the caller only passes `type`. */
   const resolvedInputMode = inputMode ?? (type === "email" ? "email" : type === "url" ? "url" : type === "tel" ? "tel" : type === "number" ? "decimal" : undefined);
   const resolvedAutoComplete = autoComplete ?? (type === "email" ? "email" : type === "tel" ? "tel" : type === "url" ? "url" : undefined);
+  /* Hard-enforce the field's character set as the user types — `inputMode` is
+     only a mobile-keyboard hint, so without this a numeric field still accepts
+     letters / Arabic (report I). numeric → digits only; decimal → digits + one
+     dot; tel → phone characters. */
+  const sanitizeByMode = (raw: string): string => {
+    if (resolvedInputMode === "numeric") return raw.replace(/[^\d]/g, "");
+    if (resolvedInputMode === "decimal") return raw.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1");
+    if (resolvedInputMode === "tel") return raw.replace(/[^\d+\-\s()]/g, "");
+    return raw;
+  };
   return (
     <div>
       <label className="text-xs text-[var(--text-faint)] mb-1 flex items-center gap-1">{label}<FieldMark tier={tier} />{help && <GuidanceTip guidanceId={help} size="xs" />}</label>
@@ -1916,7 +1926,7 @@ const Input = React.memo(function Input({ label, value, onChange, type = "text",
           autoComplete={resolvedAutoComplete}
           list={list}
           value={value}
-          onChange={e => onChange(e.target.value)}
+          onChange={e => onChange(sanitizeByMode(e.target.value))}
           placeholder={placeholder || label}
           aria-invalid={invalid || undefined}
           className={`w-full h-10 rounded-lg bg-[var(--bg-surface)] border text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none transition-colors ${icon ? "ps-9 pe-3" : "px-3"} ${invalid ? "border-rose-500 ring-1 ring-rose-500/30 focus:border-rose-500" : "border-[var(--border-color)] focus:border-[var(--border-focus)]"}`}
