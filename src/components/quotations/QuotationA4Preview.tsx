@@ -963,10 +963,16 @@ export default function QuotationA4Preview({
                  normal rows' floating cluster. */
               if (item.kind === "header") {
                 return (
-                  <tr key={idx} style={{ position: "relative" }}>
+                  <tr key={idx}>
                     <td colSpan={7} style={{ padding: 0 }}>
-                      <style>{`.pq-section-head:empty::before{content:attr(data-ph);color:rgba(255,255,255,0.45);font-weight:600;}`}</style>
-                      <div style={{ background: "#000000", padding: "9px 18px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <style>{`
+                        .pq-section-head:empty::before{content:attr(data-ph);color:rgba(255,255,255,0.45);font-weight:600;}
+                        .pq-sec-ctrl{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid rgba(255,255,255,0.22);background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.85);cursor:pointer;padding:0;transition:background .15s ease,border-color .15s ease,color .15s ease;}
+                        .pq-sec-ctrl:hover:not(:disabled){background:rgba(255,255,255,0.18);border-color:rgba(255,255,255,0.45);color:#fff;}
+                        .pq-sec-ctrl:disabled{opacity:.3;cursor:not-allowed;}
+                        .pq-sec-ctrl--danger:hover:not(:disabled){background:rgba(239,68,68,0.28);border-color:rgba(239,68,68,0.65);color:#fff;}
+                      `}</style>
+                      <div style={{ position: "relative", background: "#000000", padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <div
                           className="pq-section-head"
                           data-ph="Section title…"
@@ -976,7 +982,10 @@ export default function QuotationA4Preview({
                           onBlur={(e) => updateItem(idx, "description", e.currentTarget.textContent || "")}
                           dangerouslySetInnerHTML={{ __html: item.description }}
                           style={{
-                            width: "100%",
+                            flex: 1,
+                            /* Symmetric gutters keep the title optically centered while
+                               leaving room on the right for the inline controls. */
+                            paddingInline: 96,
                             textAlign: "center",
                             color: "#FFFFFF",
                             fontSize: 12,
@@ -988,22 +997,16 @@ export default function QuotationA4Preview({
                             lineHeight: 1.4,
                           }}
                         />
-                      </div>
-                      {/* Move / remove cluster — same dark pill as product rows, sits outside the paper. */}
-                      <div
-                        className="no-print"
-                        style={{
-                          position: "absolute", top: "50%", transform: "translateY(-50%)",
-                          right: -88, width: 40, height: 92, boxSizing: "border-box",
-                          display: "grid", gridTemplateRows: "28px 28px 28px", rowGap: 4,
-                          alignContent: "center", justifyItems: "center",
-                          background: "#1A1A1A", border: "1px solid #2D2D2D", borderRadius: 10,
-                          padding: 4, boxShadow: "0 6px 20px rgba(0,0,0,0.45)", overflow: "hidden", zIndex: 2,
-                        }}
-                      >
-                        <RowActionBtn title="Move section up" disabled={idx === 0} onClick={() => moveItem(idx, -1)} icon={<ArrowUpIcon size={14} />} />
-                        <RowActionBtn title="Move section down" disabled={idx === current.items.length - 1} onClick={() => moveItem(idx, 1)} icon={<ArrowDownIcon size={14} />} />
-                        <RowActionBtn title="Remove section header" disabled={current.items.length <= 1} onClick={() => removeItem(idx)} icon={<TrashIcon size={13} />} destructive />
+                        {/* Controls live INSIDE the black band, right-aligned — a single
+                            tidy group of move-up / move-down / delete. Hidden on print/PDF. */}
+                        <div
+                          className="no-print"
+                          style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center", gap: 6 }}
+                        >
+                          <button type="button" className="pq-sec-ctrl" title="Move section up" disabled={idx === 0} onClick={() => moveItem(idx, -1)}><ArrowUpIcon size={13} /></button>
+                          <button type="button" className="pq-sec-ctrl" title="Move section down" disabled={idx === current.items.length - 1} onClick={() => moveItem(idx, 1)}><ArrowDownIcon size={13} /></button>
+                          <button type="button" className="pq-sec-ctrl pq-sec-ctrl--danger" title="Remove section header" disabled={current.items.length <= 1} onClick={() => removeItem(idx)}><TrashIcon size={12} /></button>
+                        </div>
                       </div>
                     </td>
                   </tr>
