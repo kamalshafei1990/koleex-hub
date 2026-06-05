@@ -207,7 +207,25 @@ export async function buildMovementHistory(opts: {
   if (opts.movementType) q = q.eq("movement_type", opts.movementType);
   const { data, error } = await q;
   if (error) throw new Error(error.message);
-  return (data ?? []) as StockMovement[];
+  const rows = (data ?? []) as StockMovement[];
+
+  /* Report GEN-4 — drop movements whose underlying inventory item has been
+     soft-deleted. Those rows can't resolve a product, so the UI showed them as
+     "unknown / struck-out products". The movement record stays in the DB (audit
+     trail) but is hidden from the operator history list. Items that are merely
+     archived (not deleted) are kept — they still resolve a name. */
+  const itemIds = Array.from(new Set(rows.map((r) => r.inventory_item_id).filter(Boolean) as string[]));
+  if (itemIds.length === 0) return rows;
+  const { data: itemRows } = await supabaseServer
+    .from("inventory_items")
+    .select("id, deleted_at")
+    .in("id", itemIds);
+  const alive = new Set(
+    ((itemRows ?? []) as Array<{ id: string; deleted_at: string | null }>)
+      .filter((i) => !i.deleted_at)
+      .map((i) => i.id),
+  );
+  return rows.filter((r) => !r.inventory_item_id || alive.has(r.inventory_item_id));
 }
 
 /* ─── Items list (with enrichment) ───────────────────────── */
