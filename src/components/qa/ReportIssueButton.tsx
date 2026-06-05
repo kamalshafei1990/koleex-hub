@@ -66,7 +66,7 @@ export default function ReportIssueButton() {
         onClick={() => setOpen(true)}
         title="Report an issue or suggestion"
         aria-label="Report an issue"
-        className="fixed end-6 bottom-[5.25rem] z-[80] flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--bg-secondary)]/95 text-[var(--text-secondary)] shadow-lg backdrop-blur-md transition-colors hover:text-[var(--text-primary)] hover:border-[var(--accent)]"
+        className="fixed end-6 bottom-[5.25rem] z-[80] flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--bg-secondary)]/95 text-[var(--text-secondary)] shadow-lg backdrop-blur-md transition-colors hover:text-[var(--text-primary)] hover:border-white"
       >
         <MessageSquarePlusIcon size={17} />
       </button>
