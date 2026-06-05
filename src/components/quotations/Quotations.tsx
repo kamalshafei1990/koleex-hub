@@ -2198,8 +2198,8 @@ export default function Quotations() {
               .qz-btn--ghost:hover{background:rgba(255,255,255,0.06);color:var(--text-primary,#fff);}
               .qz-btn--danger{background:transparent;color:#f87171;}
               .qz-btn--danger:hover{background:rgba(239,68,68,0.12);}
-              .qz-btn--primary{background:#0066FF;color:#fff;box-shadow:0 6px 18px rgba(0,102,255,0.35);}
-              .qz-btn--primary:hover:not(:disabled){background:#0052CC;}
+              .qz-btn--primary{background:#fff;color:#0D0D0D;border-color:#fff;box-shadow:0 6px 18px rgba(0,0,0,0.35);}
+              .qz-btn--primary:hover:not(:disabled){background:#E0E0E0;border-color:#E0E0E0;}
             `}</style>
             <div style={{ padding: "20px 22px 6px" }}>
               <div style={{ fontSize: 16, fontWeight: 600, letterSpacing: "0.01em" }}>
