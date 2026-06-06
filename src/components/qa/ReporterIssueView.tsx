@@ -126,6 +126,15 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Reporter self-edit (issue e3bc4002) — only while the issue is pre-work.
+  const [editing, setEditing] = useState(false);
+  const [eTitle, setETitle] = useState("");
+  const [eDesc, setEDesc] = useState("");
+  const [eShots, setEShots] = useState<{ path: string; localUrl: string }[]>([]);
+  const [eUploading, setEUploading] = useState(0);
+  const [eSaving, setESaving] = useState(false);
+  const [eErr, setEErr] = useState<string | null>(null);
+
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
   const [postErr, setPostErr] = useState<string | null>(null);
@@ -191,6 +200,64 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
       setPostErr(e instanceof Error ? e.message : t("qa.reporter.postErr", "Couldn't post your reply."));
     } finally { setPosting(false); }
   }
+
+  /* ── Reporter self-edit (issue e3bc4002) ─────────────────────────────── */
+  function startEdit() {
+    if (!issue) return;
+    setETitle(issue.title);
+    setEDesc(issue.description ?? "");
+    setEShots([]);
+    setEErr(null);
+    setEditing(true);
+  }
+  function cancelEdit() {
+    eShots.forEach((s) => URL.revokeObjectURL(s.localUrl));
+    setEShots([]);
+    setEditing(false);
+    setEErr(null);
+  }
+  async function uploadEditShot(file: File) {
+    if (!file.type.startsWith("image/")) { setEErr(t("qa.reporter.editOnlyImages", "Only image files.")); return; }
+    if (file.size > 5 * 1024 * 1024) { setEErr(t("qa.reporter.editMax", "Each image must be under 5 MB.")); return; }
+    setEErr(null); setEUploading((n) => n + 1);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await fetch("/api/qa/upload", { method: "POST", body: fd, credentials: "include" });
+      const j = (await r.json().catch(() => null)) as { path?: string; error?: string } | null;
+      if (!r.ok || !j?.path) { setEErr(humanizeError(j?.error ?? `HTTP ${r.status}`)); return; }
+      setEShots((prev) => [...prev, { path: j.path as string, localUrl: URL.createObjectURL(file) }]);
+    } catch (e) {
+      setEErr(e instanceof Error ? e.message : t("qa.reporter.editUploadErr", "Upload failed."));
+    } finally { setEUploading((n) => Math.max(0, n - 1)); }
+  }
+  async function saveEdit() {
+    if (!issue || eSaving) return;
+    const title = eTitle.trim();
+    if (!title) { setEErr(t("qa.reporter.editTitleRequired", "Title can't be empty.")); return; }
+    setESaving(true); setEErr(null);
+    try {
+      const res = await fetch(`/api/qa/my-issues/${issueId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          title,
+          description: eDesc.trim(),
+          add_screenshots: eShots.map((s) => ({ path: s.path, type: "image/png", size: 0 })),
+        }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(humanizeError(j.error ?? `HTTP ${res.status}`));
+      eShots.forEach((s) => URL.revokeObjectURL(s.localUrl));
+      setEShots([]); setEditing(false);
+      await load(); // realtime also fires, but refetch immediately for snappy UX
+    } catch (e) {
+      setEErr(e instanceof Error ? e.message : t("qa.reporter.editSaveErr", "Couldn't save your changes."));
+    } finally { setESaving(false); }
+  }
+  const REPORTER_EDITABLE = new Set(["new", "triaged", "needs_more_info", "reopened"]);
+  const canEdit = !!issue && !issue.is_admin_view && REPORTER_EDITABLE.has(issue.status);
 
   const shell = "mx-auto max-w-[760px] px-4 py-8 sm:px-6";
 
@@ -283,13 +350,96 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
         <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${STATUS_TONE[issue.status]}`}>{t("qa.status." + issue.status, STATUS_LABEL[issue.status])}</span>
         <span className="text-[11px] text-[var(--text-dim)]">{t("qa.issueType." + issue.issue_type, ISSUE_TYPE_LABEL[issue.issue_type])} · {t("qa.priority." + issue.priority, PRIORITY_LABEL[issue.priority])} {t("qa.badge.priorityWord", "priority")}</span>
       </div>
-      <h1 className="text-[18px] font-bold text-[var(--text-primary)]">{issue.title}</h1>
+      <div className="flex items-start justify-between gap-3">
+        <h1 className="text-[18px] font-bold text-[var(--text-primary)]">{issue.title}</h1>
+        {canEdit && !editing && (
+          <button
+            type="button"
+            onClick={startEdit}
+            className="mt-0.5 shrink-0 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-1 text-[11.5px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]"
+          >
+            {t("qa.reporter.edit", "Edit report")}
+          </button>
+        )}
+      </div>
       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[var(--text-dim)]">
         {issue.app_module && <span><b className="text-[var(--text-secondary)]">{t("qa.reporter.module", "Module:")}</b> {issue.app_module}</span>}
         <span><b className="text-[var(--text-secondary)]">{t("qa.reporter.filed", "Filed:")}</b> {fmt(issue.created_at)}</span>
         {issue.assigned_to_name && <span><b className="text-[var(--text-secondary)]">{t("qa.reporter.owner", "Owner:")}</b> {issue.assigned_to_name}</span>}
         {issue.reopen_count > 0 && <span>{t("qa.reporter.reopenedTimes", "Reopened")} ×{issue.reopen_count}</span>}
       </div>
+
+      {/* Reporter self-edit panel (issue e3bc4002): edit title/details +
+          add a forgotten screenshot, only while the report is pre-work. */}
+      {editing && (
+        <div className="mt-4 space-y-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-3.5">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">
+            {t("qa.reporter.editTitle", "Edit your report")}
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] uppercase tracking-wider text-[var(--text-dim)]">{t("qa.reporter.editTitleLabel", "Title")}</label>
+            <input
+              value={eTitle}
+              onChange={(e) => setETitle(e.target.value)}
+              maxLength={200}
+              className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[14px] font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] uppercase tracking-wider text-[var(--text-dim)]">{t("qa.reporter.editDescLabel", "What happened")}</label>
+            <textarea
+              value={eDesc}
+              onChange={(e) => setEDesc(e.target.value)}
+              rows={4}
+              maxLength={8000}
+              className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] leading-relaxed text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] uppercase tracking-wider text-[var(--text-dim)]">
+              {t("qa.reporter.editAddShots", "Add a screenshot you forgot")}
+              {eUploading > 0 && <span className="ms-2 normal-case text-[var(--text-secondary)]">· {t("qa.reporter.editUploading", "uploading…")}</span>}
+            </label>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              multiple
+              onChange={(e) => { if (e.target.files) Array.from(e.target.files).forEach((f) => void uploadEditShot(f)); e.currentTarget.value = ""; }}
+              className="block w-full text-[12px] text-[var(--text-secondary)] file:mr-3 file:rounded-md file:border file:border-[var(--border-color)] file:bg-[var(--bg-surface)] file:px-3 file:py-1.5 file:text-[12px] file:font-semibold file:text-[var(--text-primary)]"
+            />
+            {eShots.length > 0 && (
+              <ul className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                {eShots.map((s) => (
+                  <li key={s.path} className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={s.localUrl} alt="" className="block h-20 w-full rounded-md border border-[var(--border-subtle)] object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => { URL.revokeObjectURL(s.localUrl); setEShots((prev) => prev.filter((x) => x.path !== s.path)); }}
+                      className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)]/95 text-[10px] text-[var(--text-primary)]"
+                      aria-label={t("qa.reporter.editRemove", "Remove")}
+                    >✕</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {eErr && <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-500">{eErr}</div>}
+          <div className="flex items-center justify-end gap-2">
+            <button type="button" onClick={cancelEdit} className="rounded-lg px-3 py-1.5 text-[12.5px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">
+              {t("qa.reporter.editCancel", "Cancel")}
+            </button>
+            <button
+              type="button"
+              onClick={saveEdit}
+              disabled={eSaving || eUploading > 0}
+              className="rounded-lg bg-[var(--bg-inverted)] px-4 py-1.5 text-[12.5px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50"
+            >
+              {eSaving ? t("qa.reporter.editSaving", "Saving…") : t("qa.reporter.editSave", "Save changes")}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="mt-3"><WatchControl issueId={issue.id} /></div>
 

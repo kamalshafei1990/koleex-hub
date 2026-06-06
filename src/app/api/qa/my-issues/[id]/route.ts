@@ -249,3 +249,123 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   };
   return NextResponse.json({ comment }, { status: 201 });
 }
+
+/* PATCH /api/qa/my-issues/[id] — the REPORTER edits their own issue.
+   Issue e3bc4002: a reporter wants to fix a typo, add missed detail, or
+   attach a screenshot they forgot — but only before a developer has started
+   work. So this is allowed ONLY while the issue is in an early, pre-work
+   status. Once it's in_progress / fixed / verified / closed, editing the
+   original report would invalidate the work + evidence, so we refuse (the
+   reporter can still reply with a public comment instead).
+
+   Editable fields: title, description, and APPENDING screenshots. We never
+   let the reporter change status, severity, assignment, or any dev field. */
+const REPORTER_EDITABLE_STATUSES = new Set(["new", "triaged", "needs_more_info", "reopened"]);
+
+export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+
+  const { id } = await ctx.params;
+  const issue = await loadOwnedIssue(auth.tenant_id, id, auth.account_id, auth.is_super_admin);
+  if (!issue) return NextResponse.json({ error: "not_found" }, { status: 404 });
+
+  // Only the reporter may edit the report itself (an admin previewing the
+  // reporter view must not silently rewrite someone's report).
+  if (issue.reporter_id !== auth.account_id) {
+    return NextResponse.json({ error: "Only the reporter can edit this report." }, { status: 403 });
+  }
+
+  const status = String(issue.status ?? "");
+  if (!REPORTER_EDITABLE_STATUSES.has(status)) {
+    return NextResponse.json(
+      { error: "This report can no longer be edited because work has already started. Add a reply with the new details instead." },
+      { status: 409 },
+    );
+  }
+
+  const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!body) return NextResponse.json({ error: "Invalid request." }, { status: 400 });
+
+  const patch: Record<string, unknown> = {};
+  const changed: string[] = [];
+
+  if (typeof body.title === "string") {
+    const t = body.title.trim();
+    if (!t) return NextResponse.json({ error: "Title can't be empty." }, { status: 400 });
+    if (t !== issue.title) { patch.title = t.slice(0, 200); changed.push("title"); }
+  }
+  if (typeof body.description === "string") {
+    const d = body.description.trim();
+    if (d !== issue.description) { patch.description = d.slice(0, 8000); changed.push("description"); }
+  }
+
+  // Append screenshots (the common ask: "I forgot to add an image"). We MERGE
+  // with the existing array rather than replace, and validate paths are in the
+  // caller's tenant prefix via sanitizeAttachments.
+  if (body.add_screenshots !== undefined) {
+    const att = sanitizeAttachments(auth.tenant_id, body.add_screenshots);
+    if (!att.ok) return NextResponse.json({ error: att.error }, { status: 400 });
+    if (att.value.length > 0) {
+      const existing = Array.isArray(issue.screenshot_urls) ? (issue.screenshot_urls as unknown[]).filter((p): p is string => typeof p === "string") : [];
+      const additions = att.value.map((a) => a.path).filter((p): p is string => typeof p === "string");
+      const merged = Array.from(new Set([...existing, ...additions])).slice(0, 6);
+      patch.screenshot_urls = merged;
+      // Keep the scalar screenshot_url pointed at the first shot for legacy reads.
+      if (!issue.screenshot_url && merged[0]) patch.screenshot_url = merged[0];
+      changed.push("screenshots");
+    }
+  }
+
+  if (changed.length === 0) {
+    return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
+  }
+
+  patch.updated_at = new Date().toISOString();
+  const { error: upErr } = await supabaseServer
+    .from("qa_issue_reports")
+    .update(patch)
+    .eq("id", id)
+    .eq("tenant_id", auth.tenant_id);
+  if (upErr) {
+    console.error("[api/qa my-issues PATCH]", upErr.message);
+    return NextResponse.json({ error: "Couldn't save your changes." }, { status: 500 });
+  }
+
+  // Audit trail — the reporter edited their own report.
+  await logActivity({
+    tenant_id: auth.tenant_id,
+    issue_id: id,
+    actor_id: auth.account_id,
+    actor_name: auth.username ?? null,
+    activity_type: "comment_added",
+    new_value: `Reporter edited: ${changed.join(", ")}`,
+    metadata: { source: "reporter-edit", fields: changed },
+  });
+
+  // Notify the assignee + watchers that the report changed (not the actor).
+  const actor = auth.username ?? "Reporter";
+  await notifyIssue(
+    { tenantId: auth.tenant_id, issueId: id, actorId: auth.account_id, actorName: auth.username ?? null },
+    [
+      {
+        recipientId: issue.assigned_to as string | null,
+        type: "qa_comment_added" as const,
+        title: "Reporter edited their report",
+        body: `${actor} updated "${(patch.title as string) ?? issue.title}" (${changed.join(", ")})`,
+        link: issueLink(id),
+      },
+      ...await watcherTargets({
+        tenantId: auth.tenant_id,
+        issueId: id,
+        actorId: auth.account_id,
+        internal: false,
+        type: "qa_comment_added",
+        title: "Reporter edited their report",
+        body: `${actor} updated their report (${changed.join(", ")})`,
+      }),
+    ],
+  );
+
+  return NextResponse.json({ ok: true, changed }, { status: 200 });
+}
