@@ -17,6 +17,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import MessageSquarePlusIcon from "@/components/icons/ui/MessageSquarePlusIcon";
 import TargetIcon from "@/components/icons/ui/TargetIcon";
+import MonitorIcon from "@/components/icons/ui/MonitorIcon";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import {
   ISSUE_TYPES,
@@ -96,7 +97,15 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   const [done, setDone] = useState(false);
   const [selected, setSelected] = useState<PickedComponent | null>(null);
   const [inspecting, setInspecting] = useState(false);
+  const [capturing, setCapturing] = useState(false);
   const envRef = useRef<Env | null>(null);
+
+  // Live screen capture is supported in modern desktop browsers via the Screen
+  // Capture API. On most mobile browsers it's unavailable — there the user still
+  // has upload / paste / drag (and the OS camera).
+  const captureSupported =
+    typeof navigator !== "undefined" &&
+    typeof navigator.mediaDevices?.getDisplayMedia === "function";
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const inspector = useInspector();
 
@@ -135,6 +144,73 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
     setFile(f);
     setPreviewUrl((u) => { if (u) URL.revokeObjectURL(u); return URL.createObjectURL(f); });
   }, []);
+
+  // Take a live screenshot of the screen / window / tab — the browser shows its
+  // own native picker (same idea as the macOS screenshot tool or WeChat capture).
+  // We hide the report panel during the grab so it isn't in the shot, then attach
+  // the captured frame exactly like an uploaded image.
+  const captureScreenshot = useCallback(async () => {
+    if (busy || capturing) return;
+    setError(null);
+    let stream: MediaStream;
+    try {
+      // Must run inside the click gesture — call getDisplayMedia immediately.
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { displaySurface: "monitor" } as MediaTrackConstraints,
+        audio: false,
+      });
+    } catch (e) {
+      // User dismissed the picker (NotAllowedError / AbortError) → no error shown.
+      const name = e instanceof DOMException ? e.name : "";
+      if (name !== "NotAllowedError" && name !== "AbortError") {
+        setError(t("qa.report.captureFail", "Couldn't capture the screen. Try uploading instead."));
+      }
+      return;
+    }
+    // Hide the modal so the screenshot shows the page underneath, not this panel.
+    setCapturing(true);
+    try {
+      const video = document.createElement("video");
+      video.srcObject = stream;
+      video.muted = true;
+      await video.play().catch(() => {});
+      if (video.readyState < 2) {
+        await new Promise<void>((res) => { video.onloadeddata = () => res(); });
+      }
+      // Let the panel actually disappear + the page repaint before grabbing.
+      await new Promise<void>((res) => setTimeout(res, 280));
+
+      const w = video.videoWidth || 1280;
+      const h = video.videoHeight || 720;
+      // Cap the longest side so the file stays well under the 5 MB limit.
+      const maxSide = 1920;
+      const scale = Math.max(w, h) > maxSide ? maxSide / Math.max(w, h) : 1;
+      const tw = Math.round(w * scale);
+      const th = Math.round(h * scale);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = tw; canvas.height = th;
+      const ctx = canvas.getContext("2d");
+      ctx?.drawImage(video, 0, 0, tw, th);
+
+      const toBlob = (type: string, q?: number) =>
+        new Promise<Blob | null>((res) => canvas.toBlob(res, type, q));
+      let blob = await toBlob("image/png");
+      if (blob && blob.size > MAX_BYTES) blob = await toBlob("image/jpeg", 0.9);
+
+      if (blob) {
+        const ext = blob.type === "image/jpeg" ? "jpg" : "png";
+        setImage(new File([blob], `screenshot-${Date.now()}.${ext}`, { type: blob.type }));
+      } else {
+        setError(t("qa.report.captureFail", "Couldn't capture the screen. Try uploading instead."));
+      }
+    } catch {
+      setError(t("qa.report.captureFail", "Couldn't capture the screen. Try uploading instead."));
+    } finally {
+      stream.getTracks().forEach((tr) => tr.stop());
+      setCapturing(false);
+    }
+  }, [busy, capturing, setImage, t]);
 
   // Esc to close, paste-to-attach while the modal is open.
   useEffect(() => {
@@ -216,9 +292,10 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   const field = "w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--border-focus)] placeholder:text-[var(--text-ghost)]";
   const label = "block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-1";
 
-  // While inspecting, hide the panel entirely (state preserved) so the global
-  // inspector overlay is unobstructed. The panel returns on pick / Esc.
-  if (inspecting) return null;
+  // While inspecting (or grabbing a live screenshot), hide the panel entirely
+  // (state preserved) so it doesn't obstruct the overlay / appear in the shot.
+  // The panel returns on pick / Esc / once the capture frame is taken.
+  if (inspecting || capturing) return null;
 
   return (
     <div className="fixed inset-0 z-[200] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={t("qa.report.title", "Report an issue")} onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
@@ -312,7 +389,7 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
 
               {/* Screenshot */}
               <div>
-                <label className={label}>{t("qa.report.screenshot", "Screenshot")} <span className="font-normal normal-case text-[var(--text-ghost)]">{t("qa.report.screenshotHint", "(upload, paste or drag — PNG/JPG/WEBP)")}</span></label>
+                <label className={label}>{t("qa.report.screenshot", "Screenshot")} <span className="font-normal normal-case text-[var(--text-ghost)]">{t("qa.report.screenshotHint", "(capture live, upload, paste or drag — PNG/JPG/WEBP)")}</span></label>
                 {previewUrl ? (
                   <div className="relative overflow-hidden rounded-lg border border-[var(--border-color)]">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -320,17 +397,31 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                     <button type="button" onClick={() => setImage(null)} className="absolute right-2 top-2 rounded-md bg-black/60 px-2 py-1 text-[11px] font-medium text-[var(--text-inverted)] hover:bg-black/80">{t("qa.common.remove", "Remove")}</button>
                   </div>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                    onDragLeave={() => setDragOver(false)}
-                    onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) setImage(f); }}
-                    className={`flex w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed py-6 text-[12px] transition-colors ${dragOver ? "border-[var(--border-focus)] bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]" : "border-[var(--border-color)] text-[var(--text-dim)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)]"}`}
-                  >
-                    <span className="text-[var(--text-secondary)]">{t("qa.report.clickUpload", "Click to upload")}</span>
-                    <span className="text-[var(--text-ghost)]">{t("qa.report.dragHint", "or paste / drag an image here")}</span>
-                  </button>
+                  <div className="space-y-2">
+                    {/* Live capture — grab the screen right now (the browser shows
+                        its own screen/window/tab picker). Desktop browsers only. */}
+                    {captureSupported && (
+                      <button
+                        type="button"
+                        onClick={captureScreenshot}
+                        className="flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] py-2.5 text-[12.5px] font-semibold text-[var(--text-primary)] transition-colors hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)]"
+                      >
+                        <MonitorIcon size={15} className="text-[var(--text-secondary)]" />
+                        {t("qa.report.takeScreenshot", "Take a screenshot now")}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                      onDragLeave={() => setDragOver(false)}
+                      onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) setImage(f); }}
+                      className={`flex w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed py-6 text-[12px] transition-colors ${dragOver ? "border-[var(--border-focus)] bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]" : "border-[var(--border-color)] text-[var(--text-dim)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)]"}`}
+                    >
+                      <span className="text-[var(--text-secondary)]">{t("qa.report.clickUpload", "Click to upload")}</span>
+                      <span className="text-[var(--text-ghost)]">{t("qa.report.dragHint", "or paste / drag an image here")}</span>
+                    </button>
+                  </div>
                 )}
                 <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => setImage(e.target.files?.[0] ?? null)} />
               </div>
