@@ -51,7 +51,7 @@ export default function ClaudeWorkspaceDrawer({ issueId, onClose, onJump }: { is
   const [regenerating, setRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [tab, setTab] = useState<"overview" | "investigation">("overview");
+  const [tab, setTab] = useState<"overview" | "investigation" | "ai">("overview");
 
   const load = useCallback(async (regenerate = false) => {
     if (regenerate) setRegenerating(true); else setLoading(true);
@@ -125,9 +125,12 @@ export default function ClaudeWorkspaceDrawer({ issueId, onClose, onJump }: { is
                 <button type="button" onClick={() => setTab("investigation")} className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold ${tab === "investigation" ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-secondary)]"}`}>
                   Investigation{ws.investigation ? ` · risk ${ws.investigation.risk_score}` : ""}
                 </button>
+                <button type="button" onClick={() => setTab("ai")} className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold ${tab === "ai" ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-secondary)]"}`}>AI Analysis</button>
               </div>
 
-              {tab === "investigation" ? (
+              {tab === "ai" ? (
+                <AiAnalysisPanel issueId={issueId} />
+              ) : tab === "investigation" ? (
                 <InvestigationPanel inv={ws.investigation ?? null} />
               ) : (
               <>
@@ -316,6 +319,172 @@ function InvestigationPanel({ inv }: { inv: Investigation | null }) {
       </div>
 
       <p className="px-1 text-[10.5px] text-[var(--text-dim)]">Findings derived deterministically from issue history — verify before acting.</p>
+    </div>
+  );
+}
+
+/* ── AI Analysis panel (engineering analysis — NOT a chat) ───────────────── */
+interface AiSession {
+  id: string; issue_id: string; provider: string | null; model: string | null;
+  status: "pending" | "completed" | "failed"; response_markdown: string | null;
+  error: string | null; tokens_input: number | null; tokens_output: number | null;
+  latency_ms: number | null; created_at: string; confidence?: string | null;
+}
+
+function confidenceTone(c: string | null | undefined): string {
+  if (c === "High") return "border-emerald-500/30 text-emerald-600 dark:text-emerald-300";
+  if (c === "Medium") return "border-amber-500/30 text-amber-600 dark:text-amber-300";
+  if (c === "Low") return "border-rose-500/30 text-rose-600 dark:text-rose-300";
+  return "border-[var(--border-color)] text-[var(--text-dim)]";
+}
+
+/* Minimal structured renderer: splits on "## " headers, bolds them, renders
+   "- " bullets. Deliberately not a full markdown engine — engineering report. */
+function AiReport({ markdown }: { markdown: string }) {
+  const blocks = markdown.split(/\n(?=##\s)/g);
+  return (
+    <div className="space-y-2.5">
+      {blocks.map((block, i) => {
+        const lines = block.split("\n");
+        const headerLine = lines[0]?.startsWith("##") ? lines[0].replace(/^#+\s*/, "") : null;
+        const body = (headerLine ? lines.slice(1) : lines).filter((l) => l.trim());
+        return (
+          <div key={i} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3">
+            {headerLine && <div className="mb-1 text-[12px] font-bold text-[var(--text-primary)]">{headerLine}</div>}
+            <div className="space-y-1">
+              {body.map((line, j) => {
+                const t = line.trim();
+                if (/^[-*]\s/.test(t)) return <div key={j} className="flex gap-1.5 text-[12px] text-[var(--text-secondary)]"><span className="text-[var(--text-ghost)]">•</span><span>{t.replace(/^[-*]\s/, "")}</span></div>;
+                return <p key={j} className="text-[12px] leading-relaxed text-[var(--text-secondary)]">{t}</p>;
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function AiAnalysisPanel({ issueId }: { issueId: string }) {
+  const [sessions, setSessions] = useState<AiSession[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const card = "rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3";
+  const head = "text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)] mb-1.5";
+  const btn = "rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11.5px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)] disabled:opacity-50";
+
+  const loadSessions = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const res = await fetch(`/api/qa/${issueId}/ai/sessions`, { credentials: "include", cache: "no-store" });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(humanizeError(j.error ?? `HTTP ${res.status}`));
+      const list = (j.sessions as AiSession[]) ?? [];
+      setSessions(list);
+      setActiveId((prev) => prev ?? list.find((s) => s.status === "completed")?.id ?? list[0]?.id ?? null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't load AI sessions.");
+    } finally { setLoading(false); }
+  }, [issueId]);
+
+  useEffect(() => { void loadSessions(); }, [loadSessions]);
+
+  async function runAnalysis() {
+    setRunning(true); setError(null);
+    try {
+      const res = await fetch(`/api/qa/${issueId}/ai/analyze`, { method: "POST", credentials: "include", cache: "no-store" });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(humanizeError(j.error ?? `HTTP ${res.status}`));
+      const session = j.session as AiSession;
+      setSessions((prev) => [session, ...prev.filter((s) => s.id !== session.id)]);
+      setActiveId(session.id);
+      if (session.status === "failed") setError(session.error ?? "AI analysis failed.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "AI analysis failed.");
+    } finally { setRunning(false); }
+  }
+
+  const active = sessions.find((s) => s.id === activeId) ?? null;
+
+  function copyActive() {
+    if (!active?.response_markdown) return;
+    navigator.clipboard?.writeText(active.response_markdown)
+      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800); })
+      .catch(() => setError("Clipboard blocked — select & copy manually."));
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Action bar */}
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={runAnalysis} disabled={running}
+          className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-[12px] font-semibold text-white hover:opacity-90 disabled:opacity-50">
+          {running ? "Analysing…" : sessions.length ? "Re-run AI Analysis" : "Ask Claude to Analyse"}
+        </button>
+        {active?.response_markdown && (
+          <button type="button" className={btn} onClick={copyActive}>{copied ? "Copied ✓" : "Copy"}</button>
+        )}
+        <span className="ms-auto text-[10.5px] text-[var(--text-dim)]">Advisory only — never edits code.</span>
+      </div>
+
+      {error && <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-500 dark:text-rose-300">{error}</div>}
+
+      {running && (
+        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-4 text-center text-[12px] text-[var(--text-dim)]">
+          Claude is analysing the deterministic workspace context…
+        </div>
+      )}
+
+      {loading ? (
+        <div className="py-8 text-center text-[12px] text-[var(--text-dim)]">Loading sessions…</div>
+      ) : !sessions.length && !running ? (
+        <div className={card}>
+          <div className="text-[12px] text-[var(--text-secondary)]">No AI analysis yet. Run one to get a structured engineering assessment (root cause, suspected files, regression risk, fix strategy). The AI only reads the sanitized workspace context — it never touches code.</div>
+        </div>
+      ) : null}
+
+      {/* Active session */}
+      {active && (
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {active.confidence && <span className={`rounded border px-1.5 py-0.5 text-[10px] font-bold ${confidenceTone(active.confidence)}`}>{active.confidence} confidence</span>}
+            {active.provider && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] text-[var(--text-dim)]">{active.provider}</span>}
+            {active.status === "failed" && <span className="rounded border border-rose-500/30 px-1.5 py-0.5 text-[10px] font-bold text-rose-500 dark:text-rose-300">failed</span>}
+            <span className="text-[10px] text-[var(--text-dim)]">{rel(active.created_at)}</span>
+            {(active.tokens_input || active.tokens_output) && (
+              <span className="text-[10px] text-[var(--text-dim)]">· {active.tokens_input ?? "?"}→{active.tokens_output ?? "?"} tok{active.latency_ms ? ` · ${(active.latency_ms / 1000).toFixed(1)}s` : ""}</span>
+            )}
+          </div>
+          {active.status === "completed" && active.response_markdown
+            ? <AiReport markdown={active.response_markdown} />
+            : active.status === "failed"
+              ? <div className="rounded-xl border border-rose-500/25 bg-rose-500/[0.06] p-3 text-[12px] text-[var(--text-secondary)]">{active.error ?? "This analysis failed."}</div>
+              : null}
+        </div>
+      )}
+
+      {/* Previous sessions */}
+      {sessions.length > 1 && (
+        <div className={card}>
+          <div className={head}>Previous Sessions</div>
+          <ul className="space-y-1">
+            {sessions.map((s) => (
+              <li key={s.id}>
+                <button type="button" onClick={() => setActiveId(s.id)}
+                  className={`flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-[11.5px] ${s.id === activeId ? "bg-[var(--bg-surface)] text-[var(--text-primary)]" : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]"}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${s.status === "completed" ? "bg-emerald-500" : s.status === "failed" ? "bg-rose-500" : "bg-amber-500"}`} />
+                  <span className="flex-1 truncate">{rel(s.created_at)}{s.confidence ? ` · ${s.confidence}` : ""}</span>
+                  {s.provider && <span className="text-[10px] text-[var(--text-dim)]">{s.provider.split(":")[0]}</span>}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
