@@ -582,7 +582,7 @@ function ReportDetail({
             valueName={report.assigned_to_name ?? null}
             myId={myId}
             disabled={busy}
-            onChange={(id) => void patch({ assigned_to: id })}
+            onChange={(id) => patch({ assigned_to: id })}
           />
         </div>
       </div>
@@ -667,10 +667,14 @@ function AssigneePicker({
   valueName: string | null;
   myId: string | null;
   disabled?: boolean;
-  onChange: (id: string | null) => void;
+  onChange: (id: string | null) => void | Promise<boolean>;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  // Optimistic selection: reflect the picked assignee immediately, independent
+  // of the prop round-trip; reconcile when the server value arrives, revert if
+  // the change is rejected. (`undefined` = no pending choice.)
+  const [pending, setPending] = useState<string | null | undefined>(undefined);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -680,13 +684,28 @@ function AssigneePicker({
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
 
+  // Server value caught up → clear the optimistic override.
+  useEffect(() => { setPending(undefined); }, [value]);
+
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase();
     if (!s) return assignees;
     return assignees.filter((a) => a.name.toLowerCase().includes(s) || (a.email ?? "").toLowerCase().includes(s));
   }, [assignees, search]);
 
-  const current = value ? (assignees.find((a) => a.id === value)?.name ?? valueName ?? "—") : null;
+  const effectiveValue = pending !== undefined ? pending : value;
+  const current = effectiveValue ? (assignees.find((a) => a.id === effectiveValue)?.name ?? valueName ?? "—") : null;
+
+  async function choose(id: string | null) {
+    setPending(id);
+    setOpen(false);
+    setSearch("");
+    const result = onChange(id);
+    if (result instanceof Promise) {
+      const ok = await result;
+      if (ok === false) setPending(undefined); // rejected → revert to server value
+    }
+  }
 
   return (
     <div ref={ref} className="relative">
@@ -694,7 +713,7 @@ function AssigneePicker({
         type="button"
         disabled={disabled}
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-left text-[13px] text-[var(--text-primary)] outline-none hover:border-[var(--accent)] disabled:opacity-50"
+        className="flex w-full items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-left text-[13px] text-[var(--text-primary)] outline-none transition-colors hover:bg-[var(--bg-surface-hover)] disabled:opacity-50"
       >
         {current ? (
           <>
@@ -715,17 +734,20 @@ function AssigneePicker({
             placeholder="Search people…"
             className="w-full border-b border-[var(--border-subtle)] bg-transparent px-3 py-2 text-[12.5px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-dim)]"
           />
-          <ul className="max-h-56 overflow-y-auto py-1">
+          <ul className="max-h-56 overflow-y-auto p-1">
             <li>
-              <button type="button" onClick={() => { onChange(null); setOpen(false); setSearch(""); }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12.5px] text-[var(--text-dim)] hover:bg-[var(--bg-surface-hover)]">
-                Unassigned
+              <button type="button" onClick={() => choose(null)} className={`flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12.5px] hover:bg-[var(--bg-surface-hover)] ${!effectiveValue ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "text-[var(--text-dim)]"}`}>
+                <span className="flex h-5 w-5 items-center justify-center text-[var(--text-dim)]">∅</span>
+                <span className="flex-1">Unassigned</span>
+                {!effectiveValue && <span className="text-[var(--text-secondary)]">✓</span>}
               </button>
             </li>
             {filtered.map((a) => (
               <li key={a.id}>
-                <button type="button" onClick={() => { onChange(a.id); setOpen(false); setSearch(""); }} className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[12.5px] hover:bg-[var(--bg-surface-hover)] ${a.id === value ? "bg-[var(--bg-surface-active)]" : ""}`}>
+                <button type="button" onClick={() => choose(a.id)} className={`flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12.5px] hover:bg-[var(--bg-surface-hover)] ${a.id === effectiveValue ? "bg-[var(--bg-surface-active)]" : ""}`}>
                   <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--bg-surface-active)] text-[9px] font-bold text-[var(--text-secondary)]">{initials(a.name)}</span>
-                  <span className="truncate text-[var(--text-primary)]">{a.name}{a.id === myId ? " (me)" : ""}</span>
+                  <span className="flex-1 truncate text-[var(--text-primary)]">{a.name}{a.id === myId ? " (me)" : ""}</span>
+                  {a.id === effectiveValue && <span className="text-[var(--text-secondary)]">✓</span>}
                 </button>
               </li>
             ))}
