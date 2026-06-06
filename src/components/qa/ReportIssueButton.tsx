@@ -445,7 +445,18 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                   <div className="relative overflow-hidden rounded-lg border border-[var(--border-color)]">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={previewUrl} alt="screenshot preview" className="max-h-48 w-full object-contain bg-[var(--bg-surface-subtle)]" />
-                    <button type="button" onClick={() => setImage(null)} className="absolute right-2 top-2 rounded-md bg-black/60 px-2 py-1 text-[11px] font-medium text-[var(--text-inverted)] hover:bg-black/80">{t("qa.common.remove", "Remove")}</button>
+                    {/* Compact close-style remove button — matches the modal's
+                        own header chrome. backdrop-blur + low-opacity surface
+                        token keeps it legible over any captured content. */}
+                    <button
+                      type="button"
+                      onClick={() => setImage(null)}
+                      aria-label={t("qa.common.remove", "Remove")}
+                      title={t("qa.common.remove", "Remove")}
+                      className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--bg-secondary)]/85 text-[var(--text-secondary)] shadow-sm backdrop-blur-md transition-colors hover:border-[var(--border-focus)] hover:text-[var(--text-primary)]"
+                    >
+                      ✕
+                    </button>
                   </div>
                 ) : (
                   <div className="space-y-2">
