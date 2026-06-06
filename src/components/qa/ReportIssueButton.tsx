@@ -197,6 +197,10 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(humanizeError(j.error ?? `HTTP ${res.status}`));
       setDone(true);
+      // Tell any open issue list (admin console) to refresh — it lives in a
+      // separate component tree, so without this a freshly-filed report won't
+      // appear until a manual reload/filter change.
+      try { window.dispatchEvent(new CustomEvent("qa:issue-created", { detail: { id: j.id ?? null } })); } catch { /* no-op */ }
       setTimeout(onClose, 1400);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't submit the report.");

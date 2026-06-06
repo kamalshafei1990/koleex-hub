@@ -156,6 +156,15 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
 
   useEffect(() => { void load(); }, [load]);
 
+  // A report can be filed from anywhere via the global Report button (a
+  // separate component tree). Refresh the list when one is submitted so the
+  // new issue shows up immediately instead of being "lost" until reload.
+  useEffect(() => {
+    const onCreated = () => { void load(); };
+    window.addEventListener("qa:issue-created", onCreated);
+    return () => window.removeEventListener("qa:issue-created", onCreated);
+  }, [load]);
+
   /* Deep-link from a notification: /database/issues?issue=<id> auto-selects
      the row. useSearchParams is REACTIVE, so clicking another notification
      while already on this page (soft navigation, no remount) re-selects the
