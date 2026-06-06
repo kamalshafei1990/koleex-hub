@@ -298,14 +298,15 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
       {error && <div className="mb-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-500 dark:text-rose-300">{error}</div>}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(320px,440px)_1fr]">
-        {/* List */}
-        <div className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
+        {/* List — on mobile this is a full-width master view; it gives way to the
+            detail when an issue is selected (lg shows both side by side). */}
+        <div className={`overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] ${selectedId ? "hidden lg:block" : ""}`}>
           {loading ? (
             <div className="px-4 py-10 text-center text-[13px] text-[var(--text-dim)]">Loading…</div>
           ) : sorted.length === 0 ? (
             <div className="px-4 py-10 text-center text-[13px] text-[var(--text-dim)]">No issues match this view.</div>
           ) : (
-            <ul className="max-h-[72vh] divide-y divide-[var(--border-faint)] overflow-y-auto">
+            <ul className="divide-y divide-[var(--border-faint)] lg:max-h-[72vh] lg:overflow-y-auto">
               {sorted.map((r) => {
                 const ready = isClaudeReady(r);
                 return (
@@ -337,8 +338,14 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
           )}
         </div>
 
-        {/* Detail */}
-        <div className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
+        {/* Detail — hidden on mobile until an issue is picked; a Back bar
+            returns to the list (lg keeps it always visible beside the list). */}
+        <div className={`overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] ${selectedId ? "" : "hidden lg:block"}`}>
+          {selectedId && (
+            <button type="button" onClick={() => setSelectedId(null)} className="flex w-full items-center gap-1.5 border-b border-[var(--border-subtle)] px-4 py-2.5 text-[12px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] lg:hidden">
+              <span aria-hidden>←</span> Back to list
+            </button>
+          )}
           {selected ? (
             <ReportDetail
               key={selected.id}
@@ -502,7 +509,7 @@ function ReportDetail({
   const dupTarget = report.duplicate_of_issue_id ? allReports.find((r) => r.id === report.duplicate_of_issue_id) : null;
 
   return (
-    <div className="max-h-[72vh] space-y-4 overflow-y-auto px-5 py-4">
+    <div className="space-y-4 px-5 py-4 lg:max-h-[72vh] lg:overflow-y-auto">
       {/* Action error — surfaced at the top so priority/assignee/duplicate/
           reopen failures aren't hidden in a section the user isn't viewing. */}
       {err && <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-500 dark:text-rose-300">{err}</div>}
@@ -552,7 +559,7 @@ function ReportDetail({
               : i === curStep ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] ring-2 ring-[var(--border-color)]"
               : "bg-[var(--bg-surface)] text-[var(--text-dim)] border border-[var(--border-color)]"
             }`}>{i < curStep ? "✓" : i + 1}</div>
-            <span className={`text-[11px] ${i <= curStep ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-dim)]"}`}>{s.label}</span>
+            <span className={`hidden whitespace-nowrap text-[11px] sm:inline ${i <= curStep ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-dim)]"}`}>{s.label}</span>
             {i < WORKFLOW_STEPS.length - 1 && <div className={`h-px flex-1 ${i < curStep ? "bg-[var(--text-primary)]" : "bg-[var(--border-color)]"}`} />}
           </div>
         ))}
