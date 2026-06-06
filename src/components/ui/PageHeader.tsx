@@ -443,6 +443,58 @@ function HomeSearchBar({
 }) {
   const router = useRouter();
   const [q, setQ] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Detect Mac vs Windows/Linux so the shortcut badge actually matches the
+  // user's keyboard. QA report d54f3e66 surfaced this: an Arabic Windows user
+  // saw ⌘K and didn't know what it meant — the Cmd glyph isn't on their
+  // keyboard. We now render "Ctrl K" on Windows/Linux and "⌘K" on Mac, and
+  // make the badge a real, focusable button with a hover tooltip explaining
+  // what it does. The shortcut itself is wired below.
+  const [isMac, setIsMac] = useState(false);
+  const [lang, setLang] = useState<"en" | "zh" | "ar">("en");
+  useEffect(() => {
+    if (typeof navigator === "undefined") return;
+    const platform = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform
+      ?? navigator.platform ?? "";
+    setIsMac(/Mac|iPhone|iPod|iPad/i.test(platform));
+    const l = (document.documentElement.lang as "en" | "zh" | "ar") || "en";
+    setLang(l === "zh" || l === "ar" ? l : "en");
+  }, []);
+
+  // Localized hint text for the tooltip + accessibility label. Falls back to
+  // English so a missing lang attribute never produces an empty tooltip.
+  const HINT: Record<"en" | "zh" | "ar", { focus: string; key: string }> = {
+    en: { focus: "Focus search", key: isMac ? "Cmd + K" : "Ctrl + K" },
+    zh: { focus: "聚焦搜索", key: isMac ? "Cmd + K" : "Ctrl + K" },
+    ar: { focus: "تركيز البحث", key: isMac ? "Cmd + K" : "Ctrl + K" },
+  };
+  const hint = `${HINT[lang].focus} — ${HINT[lang].key}`;
+  const shortcutLabel = isMac ? "⌘K" : "Ctrl K";
+
+  const focusInput = () => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.focus();
+    // Select existing content so re-pressing the shortcut clears it on next
+    // keystroke — feels closer to standard global search palettes.
+    try { el.select(); } catch { /* no-op */ }
+  };
+
+  // Real, working keyboard shortcut. Catches Cmd+K on Mac and Ctrl+K on
+  // everywhere else. Ignored while the user is already typing in a text
+  // field other than this one (so it doesn't fight other search palettes).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "k" && e.key !== "K") return;
+      if (!(e.metaKey || e.ctrlKey)) return;
+      e.preventDefault();
+      focusInput();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     const trimmed = q.trim();
@@ -455,10 +507,11 @@ function HomeSearchBar({
       <div className="group flex items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 py-2.5 transition-all duration-200 focus-within:border-[var(--border-focus)] hover:border-[var(--border-color)] sm:gap-3 sm:px-4 sm:py-3">
         <RrIcon name="search" size={15} className="shrink-0 text-[var(--text-dim)] transition-colors group-focus-within:text-[var(--text-muted)]" />
         <input
+          ref={inputRef}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder={placeholder}
-          aria-label="Search"
+          aria-label={hint}
           className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--text-dim)] sm:text-[13.5px]"
         />
         {q.trim() ? (
@@ -469,9 +522,18 @@ function HomeSearchBar({
             Search
           </button>
         ) : (
-          <kbd className="hidden shrink-0 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10.5px] font-medium text-[var(--text-dim)] sm:inline-block">
-            ⌘K
-          </kbd>
+          // The shortcut badge is now a real button — clicking it focuses the
+          // search input (so users on touch / unfamiliar keyboards have an
+          // affordance) and the tooltip explains what the shortcut does.
+          <button
+            type="button"
+            onClick={focusInput}
+            title={hint}
+            aria-label={hint}
+            className="hidden shrink-0 cursor-pointer items-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10.5px] font-medium text-[var(--text-dim)] transition-colors hover:border-[var(--border-color)] hover:text-[var(--text-secondary)] sm:inline-flex"
+          >
+            <kbd className="font-medium">{shortcutLabel}</kbd>
+          </button>
         )}
       </div>
     </form>
