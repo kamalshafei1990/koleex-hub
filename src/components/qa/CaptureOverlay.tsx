@@ -23,7 +23,10 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import html2canvas from "html2canvas";
+// html2canvas-pro is the maintained fork. We use it because Tailwind v4
+// emits utility colors as oklch(), which classic html2canvas can't parse —
+// it throws on the first Tailwind-coloured element it walks.
+import html2canvas from "html2canvas-pro";
 
 const SKIP_ATTR = "data-qa-capture-skip";
 
@@ -111,8 +114,13 @@ export default function CaptureOverlay({ onResult, maxBytes, labels }: Props) {
         const ext = blob.type === "image/jpeg" ? "jpg" : "png";
         const file = new File([blob], `screenshot-${Date.now()}.${ext}`, { type: blob.type });
         onResult(file);
-      } catch {
-        onResult(null, labels.fail);
+      } catch (e) {
+        // Surface the real reason so a stale error never hides behind a
+        // generic "Couldn't capture". Logged loudly + appended to the toast
+        // text so QA can paste it back into a report if it reappears.
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("[qa.capture] html2canvas failed:", e);
+        onResult(null, `${labels.fail} (${msg.slice(0, 140)})`);
       }
     },
     [maxBytes, onResult, labels.fail],
