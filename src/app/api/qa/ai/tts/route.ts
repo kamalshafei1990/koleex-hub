@@ -22,13 +22,13 @@ import { requireAuth } from "@/lib/server/auth";
 export const maxDuration = 30;
 
 // One fixed voice for all users + all languages (eleven_multilingual_v2 speaks
-// en/ar/zh with the same voice). Default = "George" (JBFqnCBsd6RMkjVDRZzb), a
-// current ElevenLabs DEFAULT voice that the free API tier is allowed to use —
-// verified working. NOTE: do NOT use legacy/library voices like Rachel
-// (21m00Tcm4TlvDq8ikWAM) or Aria (9BWtsMINqrJLrRacOk9x): the free tier returns
-// 402 "Free users cannot use library voices via the API" for those.
-// Female alternative that also works free: Sarah = EXAVITQu4vr4xnSDxMaL.
-const VOICE_ID = process.env.ELEVENLABS_VOICE_ID || "JBFqnCBsd6RMkjVDRZzb";
+// en/ar/zh with the same voice). Default = "Sarah" (EXAVITQu4vr4xnSDxMaL), a
+// current ElevenLabs DEFAULT voice the free API tier is allowed to use —
+// verified working on the live key. NOTE: do NOT use legacy/library voices
+// like Rachel (21m00Tcm4TlvDq8ikWAM) or Aria (9BWtsMINqrJLrRacOk9x): the free
+// tier returns 402 "Free users cannot use library voices via the API".
+// Male alternative that also works free: George = JBFqnCBsd6RMkjVDRZzb.
+const VOICE_ID = process.env.ELEVENLABS_VOICE_ID || "EXAVITQu4vr4xnSDxMaL";
 const MODEL = process.env.ELEVENLABS_MODEL || "eleven_multilingual_v2";
 
 export async function POST(req: Request) {
