@@ -1189,7 +1189,20 @@ function ReportDetail({
           onSaved={() => { onEvidenceChanged(); onRefresh?.(); }}
         />
         <FixEvidenceSection
-          beforeUrls={(report.screenshot_urls as string[] | null) ?? (report.screenshot_url ? [report.screenshot_url] : [])}
+          /* BEFORE source — merge BOTH the multi-shot array AND the scalar
+             so we never render a blank pane just because the array happens
+             to be []. Old single-shot reports only have screenshot_url;
+             multi-shot reports have screenshot_urls[]; some have both. */
+          beforeUrls={(() => {
+            const fromArr = Array.isArray(report.screenshot_urls)
+              ? (report.screenshot_urls as string[]).filter((u): u is string => typeof u === "string" && u.length > 0)
+              : [];
+            const scalar = typeof report.screenshot_url === "string" ? report.screenshot_url : null;
+            // De-dupe (same URL might appear in both shapes).
+            const set = new Set<string>(fromArr);
+            if (scalar) set.add(scalar);
+            return Array.from(set);
+          })()}
           cycles={evidence}
         />
       </div>

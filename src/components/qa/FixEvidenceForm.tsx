@@ -127,8 +127,17 @@ export default function FixEvidenceForm({ issueId, onSaved, defaultCommit = "" }
           after_attachments: staged.map((s) => ({ path: s.path, type: s.type, size: s.size })),
         }),
       });
-      const json = (await r.json().catch(() => null)) as { error?: string } | null;
-      if (!r.ok) { setErr(json?.error || "Could not save."); return; }
+      const json = (await r.json().catch(() => null)) as { error?: string; id?: string; cycle?: number } | null;
+      if (!r.ok) {
+        // Surface what the server actually said + status so the user can
+        // tell us, instead of a silent "I clicked Save and nothing happened."
+        setErr(`${json?.error || "Could not save evidence."} (HTTP ${r.status})`);
+        return;
+      }
+      if (!json?.id) {
+        setErr("The server returned a success status but no evidence id. Reload and check the Fix Evidence section.");
+        return;
+      }
       // Reset
       staged.forEach((s) => URL.revokeObjectURL(s.localUrl));
       setStaged([]); setSummary(""); setPr(""); setOpen(false);

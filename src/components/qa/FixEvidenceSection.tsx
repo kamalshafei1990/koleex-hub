@@ -42,6 +42,21 @@ interface Props {
   cycles: FixEvidenceCycle[];
 }
 
+/** Pull every signed AFTER URL out of a cycle. Defensive: handles cases
+ *  where some attachments are missing url (sign failed silently), where
+ *  after_attachments is undefined, or the items aren't shaped as expected.
+ *  Returns the unique URL list in order. */
+function afterUrlsOf(cycle: FixEvidenceCycle): string[] {
+  const raw = Array.isArray(cycle.after_attachments) ? cycle.after_attachments : [];
+  const out = new Set<string>();
+  for (const a of raw) {
+    if (a && typeof (a as { url?: unknown }).url === "string" && (a as { url: string }).url.length > 0) {
+      out.add((a as { url: string }).url);
+    }
+  }
+  return Array.from(out);
+}
+
 function fmt(iso: string): string {
   try { return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }); }
   catch { return iso; }
@@ -131,8 +146,8 @@ export default function FixEvidenceSection({ beforeUrls, cycles }: Props) {
             />
             <Pane
               label="After"
-              urls={cycle.after_attachments.map((a) => a.url).filter((u): u is string => !!u)}
-              emptyText="No after screenshots attached."
+              urls={afterUrlsOf(cycle)}
+              emptyText="No after screenshots attached to this cycle."
               onZoom={setZoom}
             />
           </div>
