@@ -79,7 +79,7 @@ export function activeProviderName(): AiProviderName | null {
 export async function runAnalysis(system: string, user: string): Promise<ProviderResult> {
   const adapter = REGISTRY.find((p) => p.configured());
   if (!adapter) {
-    throw new ProviderError("not_configured", "No AI provider is configured. Set DEEPSEEK_API_KEY (primary), ANTHROPIC_API_KEY, or a fallback provider key.");
+    throw new ProviderError("not_configured", "Koleex AI is not available right now. Please try again later.");
   }
   return adapter.run(system, user);
 }

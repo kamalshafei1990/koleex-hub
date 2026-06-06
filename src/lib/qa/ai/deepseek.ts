@@ -28,7 +28,7 @@ export function deepseekConfigured(): boolean {
 
 export async function callDeepseek(system: string, user: string): Promise<ProviderResult> {
   const key = process.env.DEEPSEEK_API_KEY;
-  if (!key) throw new ProviderError("not_configured", "DeepSeek API key is not configured.");
+  if (!key) throw new ProviderError("not_configured", "Koleex AI is not configured.");
 
   const startedAt = Date.now();
   const controller = new AbortController();
@@ -57,17 +57,18 @@ export async function callDeepseek(system: string, user: string): Promise<Provid
     });
   } catch (e) {
     if (e instanceof Error && e.name === "AbortError") {
-      throw new ProviderError("timeout", `DeepSeek request timed out after ${TIMEOUT_MS}ms.`);
+      throw new ProviderError("timeout", `Koleex AI request timed out after ${TIMEOUT_MS}ms.`);
     }
-    throw new ProviderError("provider_error", e instanceof Error ? e.message : "Network error reaching DeepSeek.");
+    throw new ProviderError("provider_error", "Koleex AI could not be reached. Please try again.");
   } finally {
     clearTimeout(timer);
   }
 
-  if (res.status === 429) throw new ProviderError("rate_limited", "DeepSeek rate limit reached. Try again shortly.", 429);
+  if (res.status === 429) throw new ProviderError("rate_limited", "Koleex AI is busy right now. Please try again shortly.", 429);
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new ProviderError("provider_error", `DeepSeek ${res.status}: ${body.slice(0, 300)}`, 502);
+    console.error("[qa.ai.koleex]", res.status, body.slice(0, 200));
+    throw new ProviderError("provider_error", `Koleex AI service error (${res.status}).`, 502);
   }
 
   let json: {
@@ -78,14 +79,14 @@ export async function callDeepseek(system: string, user: string): Promise<Provid
   try {
     json = await res.json();
   } catch {
-    throw new ProviderError("provider_error", "DeepSeek returned a malformed (non-JSON) response.", 502);
+    throw new ProviderError("provider_error", "Koleex AI returned a malformed response.", 502);
   }
 
   // deepseek-reasoner can prefix <think>…</think>; deepseek-chat does not, but
   // strip defensively so the stored analysis is clean (no-op on clean output).
   const raw = json.choices?.[0]?.message?.content ?? "";
   const text = raw.replace(/<think[\s\S]*?<\/think>/gi, "").trim();
-  if (!text) throw new ProviderError("empty_response", "DeepSeek returned an empty response.");
+  if (!text) throw new ProviderError("empty_response", "Koleex AI returned an empty response.");
 
   const model = json.model || DEFAULT_MODEL;
   return {

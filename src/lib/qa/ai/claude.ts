@@ -22,7 +22,7 @@ export function claudeConfigured(): boolean {
 
 export async function callClaude(system: string, user: string): Promise<ProviderResult> {
   const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) throw new ProviderError("not_configured", "Anthropic API key is not configured.");
+  if (!key) throw new ProviderError("not_configured", "Koleex AI is not configured.");
 
   const startedAt = Date.now();
   const controller = new AbortController();
@@ -48,17 +48,18 @@ export async function callClaude(system: string, user: string): Promise<Provider
     });
   } catch (e) {
     if (e instanceof Error && e.name === "AbortError") {
-      throw new ProviderError("timeout", `Claude request timed out after ${TIMEOUT_MS}ms.`);
+      throw new ProviderError("timeout", `Koleex AI request timed out after ${TIMEOUT_MS}ms.`);
     }
-    throw new ProviderError("provider_error", e instanceof Error ? e.message : "Network error reaching Claude.");
+    throw new ProviderError("provider_error", "Koleex AI could not be reached. Please try again.");
   } finally {
     clearTimeout(timer);
   }
 
-  if (res.status === 429) throw new ProviderError("rate_limited", "Claude rate limit reached. Try again shortly.", 429);
+  if (res.status === 429) throw new ProviderError("rate_limited", "Koleex AI is busy right now. Please try again shortly.", 429);
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new ProviderError("provider_error", `Claude ${res.status}: ${body.slice(0, 300)}`, 502);
+    console.error("[qa.ai.koleex]", res.status, body.slice(0, 200));
+    throw new ProviderError("provider_error", `Koleex AI service error (${res.status}).`, 502);
   }
 
   let json: {
@@ -69,7 +70,7 @@ export async function callClaude(system: string, user: string): Promise<Provider
   try {
     json = await res.json();
   } catch {
-    throw new ProviderError("provider_error", "Claude returned a malformed (non-JSON) response.", 502);
+    throw new ProviderError("provider_error", "Koleex AI returned a malformed response.", 502);
   }
 
   const text = (json.content ?? [])
@@ -78,7 +79,7 @@ export async function callClaude(system: string, user: string): Promise<Provider
     .join("\n")
     .trim();
 
-  if (!text) throw new ProviderError("empty_response", "Claude returned an empty response.");
+  if (!text) throw new ProviderError("empty_response", "Koleex AI returned an empty response.");
 
   const model = json.model || DEFAULT_MODEL;
   return {
