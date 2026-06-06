@@ -653,66 +653,117 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
                 />
                 <span>{sorted.length} {sorted.length === 1 ? t("qa.list.issue", "issue") : t("qa.list.issues", "issues")}</span>
               </div>
-            <ul className="divide-y divide-[var(--border-faint)] lg:max-h-[72vh] lg:overflow-y-auto">
-              {sorted.map((r) => {
-                const ready = isClaudeReady(r);
-                const resolved = RESOLVED_STATUSES.includes(r.status);
-                const d = ageDays(r.created_at);
-                const checked = selectedIds.has(r.id);
-                return (
-                  <li key={r.id} className="relative">
-                    {/* Left edge stripe — coloured by status. A 3px bar that
-                        runs the full height of the row so the eye can scan
-                        the list vertically and instantly cluster New / In
-                        Progress / Fixed / etc. */}
-                    <span aria-hidden className={`absolute left-0 top-0 h-full w-[3px] ${STATUS_STRIPE[r.status] ?? "bg-transparent"}`} />
-                    <div className={`flex w-full items-start gap-2 pl-5 pr-4 py-3 transition-colors ${selectedId === r.id ? "bg-[var(--bg-surface-active)]" : "hover:bg-[var(--bg-surface-subtle)]"}`}>
-                      <input
-                        type="checkbox"
-                        aria-label={t("qa.list.selectRow", "Select row")}
-                        className="mt-1.5 shrink-0"
-                        checked={checked}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          setSelectedIds((prev) => {
-                            const n = new Set(prev);
-                            if (n.has(r.id)) n.delete(r.id); else n.add(r.id);
-                            return n;
-                          });
-                        }}
-                      />
-                      <button type="button" onClick={() => setSelectedId(r.id)} className="block flex-1 text-left">
-                      <div className="flex items-center gap-2">
-                        {/* Status anchor pill — leads the row so state reads
-                            first, title second. Bigger + bolder + saturated
-                            colour so it dominates from the corner of the eye. */}
-                        <span className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider shadow-sm ${STATUS_TONE[r.status]}`}>
-                          {t("qa.status." + r.status, STATUS_LABEL[r.status])}
+            {/* Grouped list. Kamal: "the issue list need to be more organized
+                … too messy." The previous flat row interleaved every state and
+                fired 5+ coloured pills per line. Now: rows are clustered into
+                4 status groups with a single section header per group, and
+                each row is stripped down to title + a single meta line. Status
+                lives in the left-edge stripe + the section header, so the
+                title gets the visual weight back. */}
+            <div className="lg:max-h-[72vh] lg:overflow-y-auto">
+              {(() => {
+                /* Cluster definitions — keep them stable and exhaustive so a
+                   new status doesn't silently disappear. */
+                const CLUSTERS: { key: string; label: string; statuses: IssueStatus[] }[] = [
+                  { key: "open",   label: t("qa.cluster.open",   "Open"),         statuses: ["new", "triaged", "reopened"]            as IssueStatus[] },
+                  { key: "active", label: t("qa.cluster.active", "In Progress"), statuses: ["in_progress", "needs_more_info"]       as IssueStatus[] },
+                  { key: "done",   label: t("qa.cluster.done",   "Done"),         statuses: ["fixed", "verified"]                    as IssueStatus[] },
+                  { key: "archive",label: t("qa.cluster.archive","Closed"),       statuses: ["closed", "rejected", "duplicate"]      as IssueStatus[] },
+                ];
+                const byCluster = new Map<string, typeof sorted>();
+                for (const c of CLUSTERS) byCluster.set(c.key, []);
+                for (const r of sorted) {
+                  const cluster = CLUSTERS.find((c) => c.statuses.includes(r.status as IssueStatus));
+                  if (cluster) byCluster.get(cluster.key)!.push(r);
+                }
+                return CLUSTERS.map((c) => {
+                  const rows = byCluster.get(c.key) ?? [];
+                  if (rows.length === 0) return null;
+                  return (
+                    <section key={c.key} className="border-b border-[var(--border-faint)] last:border-b-0">
+                      {/* Section header — sticky so the group label stays
+                          visible while scrolling the cluster. Compact
+                          uppercase, monochrome — no extra colour competing
+                          with the row stripes. */}
+                      <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-[var(--border-faint)] bg-[var(--bg-secondary)]/95 px-4 py-2 backdrop-blur-sm">
+                        <div className="flex items-center gap-2">
+                          <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${STATUS_STRIPE[c.statuses[0]]}`} />
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">{c.label}</span>
+                        </div>
+                        <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-0.5 text-[10.5px] font-semibold text-[var(--text-secondary)]">
+                          {rows.length}
                         </span>
-                        <span title={t("qa.badge.severity", "Severity")} className={`shrink-0 ${PILL} ${SEVERITY_TONE[r.severity]}`}>{t("qa.severity." + r.severity, SEVERITY_LABEL[r.severity])}</span>
-                        <span title={t("qa.badge.priority", "Priority")} className={`inline-flex shrink-0 items-center gap-1 ${PILL} ${PRIORITY_TONE[r.priority]}`}>
-                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M4 22V4m0 0h12l-2.5 4L16 12H4" /></svg>
-                          {t("qa.priority." + r.priority, PRIORITY_LABEL[r.priority])}
-                        </span>
-                        <span className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{r.title}</span>
-                      </div>
-                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10.5px] text-[var(--text-dim)]">
-                        <span title={t("qa.badge.ageTip", "Days since the issue was filed")} className={`rounded px-1.5 py-0.5 font-semibold ${ageTone(d, resolved)}`}>{ageLabel(d)}</span>
-                        <span>{t("qa.issueType." + r.issue_type, ISSUE_TYPE_LABEL[r.issue_type])}</span>
-                        <span>· {r.app_module}</span>
-                        {r.assigned_to_name && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[var(--text-secondary)]">@{r.assigned_to_name}</span>}
-                        {ready && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 font-semibold text-[var(--text-secondary)]">{t("qa.badge.aiReady", "AI-ready")}</span>}
-                        {r.duplicate_of_issue_id && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5">{t("qa.badge.dup", "dup")}</span>}
-                        {typeof r.comment_count === "number" && r.comment_count > 0 && <span>💬 {r.comment_count}</span>}
-                        <span className="ms-auto">{rel(r.created_at)}</span>
-                      </div>
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+                      </header>
+                      <ul className="divide-y divide-[var(--border-faint)]">
+                        {rows.map((r) => {
+                          const ready = isClaudeReady(r);
+                          const d = ageDays(r.created_at);
+                          const checked = selectedIds.has(r.id);
+                          return (
+                            <li key={r.id} className="relative">
+                              {/* Status stripe — kept as the single ambient
+                                  signal so colour reads spatially, never
+                                  competing with text for attention. */}
+                              <span aria-hidden className={`absolute left-0 top-0 h-full w-[3px] ${STATUS_STRIPE[r.status] ?? "bg-transparent"}`} />
+                              <div className={`flex w-full items-start gap-3 pl-5 pr-4 py-3 transition-colors ${selectedId === r.id ? "bg-[var(--bg-surface-active)]" : "hover:bg-[var(--bg-surface-subtle)]"}`}>
+                                <input
+                                  type="checkbox"
+                                  aria-label={t("qa.list.selectRow", "Select row")}
+                                  className="mt-1 shrink-0"
+                                  checked={checked}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedIds((prev) => {
+                                      const n = new Set(prev);
+                                      if (n.has(r.id)) n.delete(r.id); else n.add(r.id);
+                                      return n;
+                                    });
+                                  }}
+                                />
+                                <button type="button" onClick={() => setSelectedId(r.id)} className="block flex-1 text-left">
+                                  {/* Title row — hero. No pills competing.
+                                      Only severity gets a small dot prefix
+                                      so critical/high pop without taking
+                                      a whole pill's worth of width. */}
+                                  <div className="flex items-center gap-2">
+                                    {r.severity === "critical" || r.severity === "high" ? (
+                                      <span
+                                        aria-label={`${SEVERITY_LABEL[r.severity]} severity`}
+                                        title={t("qa.severity." + r.severity, SEVERITY_LABEL[r.severity])}
+                                        className={`shrink-0 h-1.5 w-1.5 rounded-full ${r.severity === "critical" ? "bg-rose-500" : "bg-amber-500"}`}
+                                      />
+                                    ) : null}
+                                    <span className="truncate text-[14px] font-semibold text-[var(--text-primary)]">{r.title}</span>
+                                    {r.priority === "urgent" && (
+                                      <span className="shrink-0 rounded bg-[var(--bg-inverted)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[var(--text-inverted)]">
+                                        {t("qa.priority.urgent", "Urgent")}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {/* One quiet meta line — minimum readable
+                                      context, monochrome. Drops: severity
+                                      pill, priority pill, issue type, dup
+                                      flag, comment emoji. */}
+                                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[var(--text-dim)]">
+                                    <span>{ageLabel(d)}</span>
+                                    <span aria-hidden>·</span>
+                                    <span>{r.app_module}</span>
+                                    {r.assigned_to_name && (<><span aria-hidden>·</span><span className="text-[var(--text-secondary)]">@{r.assigned_to_name}</span></>)}
+                                    {ready && (<><span aria-hidden>·</span><span className="font-medium text-[var(--text-secondary)]">{t("qa.badge.aiReady", "AI-ready")}</span></>)}
+                                    <span className="ms-auto">{rel(r.created_at)}</span>
+                                  </div>
+                                </button>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </section>
+                  );
+                });
+              })()}
+            </div>
             </>
           )}
         </div>
