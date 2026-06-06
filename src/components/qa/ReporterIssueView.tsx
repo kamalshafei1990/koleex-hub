@@ -227,6 +227,12 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
         </div>
       )}
 
+      {/* Reporter verification loop — only available while status is "fixed".
+          Verify confirms the fix; Reopen pushes back with a reason. */}
+      {issue.status === "fixed" && (
+        <VerifyControl issueId={issue.id} onChanged={load} />
+      )}
+
       {issue.screenshot_url && (
         <a href={issue.screenshot_url} target="_blank" rel="noreferrer" className="mt-4 block overflow-hidden rounded-lg border border-[var(--border-color)]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -304,6 +310,83 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
       )}
 
       {error && <div className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-500 dark:text-rose-300">{error}</div>}
+    </div>
+  );
+}
+
+/* ── Reporter verification loop ────────────────────────────────────────────
+   Calls POST /api/qa/my-issues/[id]/action with { action: "verify"|"reopen" }.
+   Reopen requires a non-empty reason. On success, the caller refreshes the
+   detail view so the status pill / banner reflect the new state. */
+function VerifyControl({ issueId, onChanged }: { issueId: string; onChanged: () => void }) {
+  const { t } = useTranslation(qaT);
+  const [busy, setBusy] = useState<"verify" | "reopen" | null>(null);
+  const [showReopen, setShowReopen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const send = async (action: "verify" | "reopen", reasonText?: string) => {
+    setBusy(action); setErr(null);
+    try {
+      const res = await fetch(`/api/qa/my-issues/${issueId}/action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ action, reason: reasonText ?? null }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(humanizeError(j.error ?? `HTTP ${res.status}`));
+      setShowReopen(false); setReason("");
+      onChanged();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : t("qa.reporter.verifyErr", "Couldn't update the issue."));
+    } finally { setBusy(null); }
+  };
+  return (
+    <div className="mt-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] px-3.5 py-3">
+      <div className="text-[12.5px] font-semibold text-[var(--text-primary)]">{t("qa.reporter.verifyTitle", "Does this fix work for you?")}</div>
+      <div className="mt-0.5 text-[11.5px] text-[var(--text-dim)]">{t("qa.reporter.verifyHint", "Confirm the fix or push back if it's not really fixed.")}</div>
+      {!showReopen ? (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => send("verify")}
+            disabled={busy !== null}
+            className="rounded-lg bg-emerald-500 px-3.5 py-1.5 text-[12.5px] font-semibold text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
+          >
+            {busy === "verify" ? t("qa.reporter.verifying", "Verifying…") : t("qa.reporter.verify", "Verify — it works")}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowReopen(true)}
+            disabled={busy !== null}
+            className="rounded-lg border border-[var(--border-color)] px-3 py-1.5 text-[12.5px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-50"
+          >
+            {t("qa.reporter.reopen", "It's not fixed — reopen")}
+          </button>
+        </div>
+      ) : (
+        <div className="mt-2 space-y-2">
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={3}
+            placeholder={t("qa.reporter.reopenPlaceholder", "Briefly describe what's still broken…")}
+            className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--border-focus)]"
+          />
+          <div className="flex items-center justify-end gap-2">
+            <button type="button" onClick={() => { setShowReopen(false); setReason(""); }} disabled={busy !== null} className="rounded-md px-3 py-1.5 text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("qa.common.cancel", "Cancel")}</button>
+            <button
+              type="button"
+              onClick={() => send("reopen", reason.trim())}
+              disabled={busy !== null || reason.trim().length === 0}
+              className="rounded-lg bg-[var(--bg-inverted)] px-3.5 py-1.5 text-[12.5px] font-semibold text-[var(--text-inverted)] shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {busy === "reopen" ? t("qa.reporter.reopening", "Reopening…") : t("qa.reporter.confirmReopen", "Confirm reopen")}
+            </button>
+          </div>
+        </div>
+      )}
+      {err && <div className="mt-2 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-[11.5px] text-rose-500 dark:text-rose-300">{err}</div>}
     </div>
   );
 }

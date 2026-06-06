@@ -21,6 +21,7 @@ import MonitorIcon from "@/components/icons/ui/MonitorIcon";
 import MinusIcon from "@/components/icons/ui/MinusIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import CaptureOverlay from "@/components/qa/CaptureOverlay";
+import AnnotationEditor from "@/components/qa/AnnotationEditor";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import {
   ISSUE_TYPES,
@@ -115,6 +116,12 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   // Lightbox: clicking a thumbnail opens the screenshot full-size so the
   // reporter can verify they captured the right thing before submitting.
   const [zoomIdx, setZoomIdx] = useState<number | null>(null);
+  // Annotation editor — opens for one shot at a time, replaces it on save.
+  const [editIdx, setEditIdx] = useState<number | null>(null);
+  // Auto-capture: on first open, silently html2canvas the page so every
+  // report carries a baseline shot. Guarded by a ref so it only fires once
+  // even if the modal re-renders before the result lands.
+  const autoCapturedRef = useRef(false);
   // Duplicate-suggest: as the reporter types a title, fetch up to 5 recent
   // open reports on the same route with similar titles. Surface them above
   // the form so dups can be acknowledged before submit.
@@ -233,6 +240,44 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   const shotsRef = useRef(shots);
   shotsRef.current = shots;
   useEffect(() => () => { shotsRef.current.forEach((s) => URL.revokeObjectURL(s.previewUrl)); }, []);
+
+  // Auto-capture once on first open so every report carries a baseline shot.
+  // We dynamic-import html2canvas-pro so the modal's first paint isn't blocked
+  // and a non-capturing open (e.g. user closes immediately) skips loading it.
+  useEffect(() => {
+    if (autoCapturedRef.current) return;
+    autoCapturedRef.current = true;
+    // Detect mobile via the same UA test the capture button uses; skip auto
+    // there (touch UX + cost is worse than the win).
+    if (!captureSupported) return;
+    const handle = (typeof requestIdleCallback === "function" ? requestIdleCallback : (cb: () => void) => setTimeout(cb, 120))(async () => {
+      try {
+        const mod = await import("html2canvas-pro");
+        const html2canvas = mod.default;
+        const canvas = await html2canvas(document.body, {
+          backgroundColor: getComputedStyle(document.body).backgroundColor || "#0d0d0d",
+          scale: Math.min(window.devicePixelRatio || 1, 2),
+          useCORS: true,
+          logging: false,
+          windowWidth: document.documentElement.clientWidth,
+          windowHeight: document.documentElement.clientHeight,
+          x: window.scrollX,
+          y: window.scrollY,
+          width: document.documentElement.clientWidth,
+          height: document.documentElement.clientHeight,
+          ignoreElements: (n) => (n as HTMLElement).hasAttribute?.("data-qa-capture-skip"),
+        });
+        const blob: Blob | null = await new Promise((res) => canvas.toBlob(res, "image/png"));
+        if (!blob) return;
+        const f = new File([blob], `auto-${Date.now()}.png`, { type: "image/png" });
+        addImage(f);
+      } catch { /* silent — the user can still capture manually */ }
+    });
+    return () => {
+      if (typeof cancelIdleCallback === "function" && typeof handle === "number") cancelIdleCallback(handle);
+      else clearTimeout(handle as unknown as number);
+    };
+  }, [addImage, captureSupported]);
 
   // Debounced duplicate suggestion. Skip while the modal is mid-busy and
   // whenever the user has explicitly dismissed the banner.
@@ -377,8 +422,42 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   // it without affecting the underlying modal state.
   const zoomShot = zoomIdx != null ? shots[zoomIdx] : null;
 
+  // Annotation editor — replace the shot at editIdx on save.
+  const editing = editIdx != null ? shots[editIdx] : null;
+
   return (
     <>
+    {editing && (
+      <AnnotationEditor
+        key={editing.previewUrl}
+        file={editing.file}
+        onCancel={() => setEditIdx(null)}
+        onSave={(out) => {
+          const idx = editIdx ?? -1;
+          setShots((prev) => {
+            if (idx < 0 || idx >= prev.length) return prev;
+            const next = [...prev];
+            URL.revokeObjectURL(next[idx].previewUrl);
+            next[idx] = { file: out, previewUrl: URL.createObjectURL(out) };
+            return next;
+          });
+          setEditIdx(null);
+        }}
+        labels={{
+          title: t("qa.annotate.title", "Annotate screenshot"),
+          arrow: t("qa.annotate.arrow", "Arrow"),
+          rect: t("qa.annotate.rect", "Rectangle"),
+          circle: t("qa.annotate.circle", "Circle"),
+          highlight: t("qa.annotate.highlight", "Highlight"),
+          blur: t("qa.annotate.blur", "Blur"),
+          text: t("qa.annotate.text", "Text"),
+          undo: t("qa.annotate.undo", "Undo"),
+          save: t("qa.annotate.save", "Save"),
+          cancel: t("qa.common.cancel", "Cancel"),
+          textPrompt: t("qa.annotate.textPrompt", "Text to add:"),
+        }}
+      />
+    )}
     {zoomShot && (
       <div
         className="fixed inset-0 z-[210] flex items-center justify-center bg-black/80 p-6 backdrop-blur-sm"
@@ -407,7 +486,7 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
         )}
       </div>
     )}
-    <div className="fixed inset-0 z-[200] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={t("qa.report.title", "Report an issue")} onMouseDown={(e) => { if (e.target === e.currentTarget && !busy && zoomIdx == null) onClose(); }}>
+    <div data-qa-capture-skip="" className="fixed inset-0 z-[200] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={t("qa.report.title", "Report an issue")} onMouseDown={(e) => { if (e.target === e.currentTarget && !busy && zoomIdx == null) onClose(); }}>
       <div className="flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-2xl sm:max-w-[560px] sm:rounded-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-3.5">
@@ -579,6 +658,15 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                         {shots.length > 1 && (
                           <span className="pointer-events-none absolute left-1.5 top-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[var(--bg-secondary)]/85 px-1 text-[10px] font-bold text-[var(--text-secondary)] backdrop-blur-md">{idx + 1}</span>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => setEditIdx(idx)}
+                          aria-label={t("qa.report.annotate", "Annotate")}
+                          title={t("qa.report.annotate", "Annotate")}
+                          className="absolute right-8 top-1.5 flex h-6 w-6 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--bg-secondary)]/85 text-[11px] text-[var(--text-secondary)] shadow-sm backdrop-blur-md transition-colors hover:border-[var(--border-focus)] hover:text-[var(--text-primary)]"
+                        >
+                          ✎
+                        </button>
                         <button
                           type="button"
                           onClick={() => removeImage(idx)}
