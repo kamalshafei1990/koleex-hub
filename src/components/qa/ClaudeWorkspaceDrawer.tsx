@@ -465,8 +465,21 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
     if (!text.trim()) return;
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text.replace(/[#*`>]/g, ""));
-    u.lang = SPEECH_LANG[tx?.lang ?? txLang];
-    u.rate = 1;
+    const wantLang = SPEECH_LANG[tx?.lang ?? txLang];
+    u.lang = wantLang;
+    // Pick the most natural installed voice for this language. Browsers expose
+    // OS voices; the default is usually the robotic one, so prefer neural /
+    // "enhanced" / Siri / Google voices when present. Free + offline.
+    const voices = window.speechSynthesis.getVoices();
+    const base = wantLang.split("-")[0];
+    const sameLang = voices.filter((v) => v.lang?.toLowerCase().startsWith(base));
+    const NICE = /(siri|premium|enhanced|natural|neural|google|wavenet)/i;
+    const best = sameLang.find((v) => NICE.test(v.name))
+      || sameLang.find((v) => !v.localService)   // online/cloud OS voices are usually nicer
+      || sameLang[0];
+    if (best) u.voice = best;
+    u.rate = 0.98;
+    u.pitch = 1;
     u.onend = () => setSpeaking(false);
     u.onerror = () => setSpeaking(false);
     setSpeaking(true);
@@ -476,8 +489,15 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
     if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
     setSpeaking(false);
   }
-  // Stop any speech when the panel unmounts.
-  useEffect(() => () => stopSpeak(), []);
+  // Warm up the OS voice list (it loads async) so speak() can pick the best
+  // one on first press; stop any speech when the panel unmounts.
+  useEffect(() => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
+    }
+    return () => stopSpeak();
+  }, []);
 
   return (
     <div className="space-y-3">
