@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { humanizeError } from "@/lib/ui/humanize-error";
+import { copyText } from "@/lib/ui/clipboard";
 import { AttachmentThumbs } from "@/components/qa/CommentAttachments";
 import { STATUS_LABEL, type IssueStatus, type QaAttachment } from "@/lib/qa/types";
 
@@ -80,9 +81,10 @@ export default function ClaudeWorkspaceDrawer({ issueId, onClose, onJump }: { is
 
   function copyPrompt() {
     if (!ws) return;
-    navigator.clipboard?.writeText(ws.generated_prompt)
-      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800); })
-      .catch(() => setError("Clipboard blocked — select & copy manually."));
+    void copyText(ws.generated_prompt).then((ok) => {
+      if (ok) { setCopied(true); setTimeout(() => setCopied(false), 1800); }
+      else setError("Couldn't copy — select the prompt text and copy manually.");
+    });
   }
 
   const s = ws?.issue_snapshot ?? {};
@@ -412,9 +414,10 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
 
   function copyActive() {
     if (!active?.response_markdown) return;
-    navigator.clipboard?.writeText(active.response_markdown)
-      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800); })
-      .catch(() => setError("Clipboard blocked — select & copy manually."));
+    void copyText(active.response_markdown).then((ok) => {
+      if (ok) { setCopied(true); setTimeout(() => setCopied(false), 1800); }
+      else setError("Couldn't copy — select the text and copy manually.");
+    });
   }
 
   return (

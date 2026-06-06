@@ -14,6 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import TargetIcon from "@/components/icons/ui/TargetIcon";
 import { humanizeError } from "@/lib/ui/humanize-error";
+import { copyText } from "@/lib/ui/clipboard";
 import { useScopeContext } from "@/lib/use-scope";
 import { useCommentAttachments, AttachmentStrip, AttachmentThumbs } from "@/components/qa/CommentAttachments";
 import WatchControl from "@/components/qa/WatchControl";
@@ -436,8 +437,9 @@ function ReportDetail({
       const res = await fetch(`/api/qa/${report.id}/workspace`, { credentials: "include", cache: "no-store" });
       const j = await res.json().catch(() => ({}));
       if (res.ok && j.workspace?.generated_prompt) {
-        await navigator.clipboard?.writeText(j.workspace.generated_prompt as string);
-        setCopied(true); setTimeout(() => setCopied(false), 1800);
+        const ok = await copyText(j.workspace.generated_prompt as string);
+        if (ok) { setCopied(true); setTimeout(() => setCopied(false), 1800); }
+        else setErr("Couldn't copy — open the issue and copy the prompt manually.");
         return;
       }
     } catch { /* fall through to the inline summary */ }
@@ -465,7 +467,9 @@ function ReportDetail({
       `Status: ${STATUS_LABEL[report.status]}`,
       `Report ID: ${report.id}`,
     ];
-    navigator.clipboard?.writeText(lines.join("\n")).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800); }).catch(() => { setErr("Clipboard blocked — select & copy manually."); });
+    const ok = await copyText(lines.join("\n"));
+    if (ok) { setCopied(true); setTimeout(() => setCopied(false), 1800); }
+    else setErr("Couldn't copy — open the issue and copy the prompt manually.");
   }
 
   const label = "block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-1";
