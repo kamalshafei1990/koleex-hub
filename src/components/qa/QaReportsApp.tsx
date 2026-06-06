@@ -1009,20 +1009,66 @@ function ReportDetail({
         <span><b className="text-[var(--text-secondary)]">{t("qa.detail.filedLabel", "Filed:")}</b> {fmt(report.created_at)}</span>
       </div>
 
-      {/* Workflow stepper */}
-      <div className="flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2.5">
-        {WORKFLOW_STEPS.map((s, i) => (
-          <div key={s.value} className="flex flex-1 items-center gap-1.5">
-            <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-              i < curStep ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
-              : i === curStep ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] ring-2 ring-[var(--border-color)]"
-              : "bg-[var(--bg-surface)] text-[var(--text-dim)] border border-[var(--border-color)]"
-            }`}>{i < curStep ? "✓" : i + 1}</div>
-            <span className={`hidden whitespace-nowrap text-[11px] sm:inline ${i <= curStep ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-dim)]"}`}>{t("qa.step." + s.value, s.label)}</span>
-            {i < WORKFLOW_STEPS.length - 1 && <div className={`h-px flex-1 ${i < curStep ? "bg-[var(--text-primary)]" : "bg-[var(--border-color)]"}`} />}
+      {/* Workflow stepper — per-step coloured icons + labels (issue dc295123,
+          Kamal). Each step has a semantic functional colour: open=blue,
+          in-progress=amber, fixed=emerald (the requested green), verified=
+          deeper emerald, closed=zinc. The active step gets the saturated
+          variant; completed steps get a muted version of the same colour so
+          history reads at a glance; future steps stay dim/neutral. */}
+      {(() => {
+        const STEP_COLOURS: Record<string, {
+          activeBg: string; activeText: string; activeRing: string;
+          doneBg: string;   doneText: string;
+          label: string; connector: string;
+        }> = {
+          new:         { activeBg: "bg-blue-500",    activeText: "text-white", activeRing: "ring-blue-300/40",
+                         doneBg:   "bg-blue-500/80", doneText:   "text-white",
+                         label:    "text-blue-500", connector: "bg-blue-500/70" },
+          in_progress: { activeBg: "bg-amber-500",   activeText: "text-black", activeRing: "ring-amber-300/40",
+                         doneBg:   "bg-amber-500/80",doneText:   "text-black",
+                         label:    "text-amber-500", connector: "bg-amber-500/70" },
+          fixed:       { activeBg: "bg-emerald-500", activeText: "text-white", activeRing: "ring-emerald-300/40",
+                         doneBg:   "bg-emerald-500/80", doneText:"text-white",
+                         label:    "text-emerald-500", connector: "bg-emerald-500/70" },
+          verified:    { activeBg: "bg-emerald-700", activeText: "text-white", activeRing: "ring-emerald-400/40",
+                         doneBg:   "bg-emerald-700/80", doneText:"text-white",
+                         label:    "text-emerald-600", connector: "bg-emerald-700/70" },
+          closed:      { activeBg: "bg-zinc-500",    activeText: "text-white", activeRing: "ring-zinc-300/40",
+                         doneBg:   "bg-zinc-500/80", doneText:   "text-white",
+                         label:    "text-zinc-500", connector: "bg-zinc-500/70" },
+        };
+        return (
+          <div className="flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2.5">
+            {WORKFLOW_STEPS.map((s, i) => {
+              const c = STEP_COLOURS[s.value] ?? STEP_COLOURS.new;
+              const isDone = i < curStep;
+              const isActive = i === curStep;
+              const circleCls = isActive
+                ? `${c.activeBg} ${c.activeText} ring-2 ${c.activeRing}`
+                : isDone
+                  ? `${c.doneBg} ${c.doneText}`
+                  : "bg-[var(--bg-surface)] text-[var(--text-dim)] border border-[var(--border-color)]";
+              const labelCls = isActive
+                ? `font-semibold ${c.label}`
+                : isDone
+                  ? `font-semibold ${c.label} opacity-80`
+                  : "text-[var(--text-dim)]";
+              const connectorCls = isDone ? c.connector : "bg-[var(--border-color)]";
+              return (
+                <div key={s.value} className="flex flex-1 items-center gap-1.5">
+                  <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${circleCls}`}>
+                    {isDone ? "✓" : i + 1}
+                  </div>
+                  <span className={`hidden whitespace-nowrap text-[11px] sm:inline ${labelCls}`}>
+                    {t("qa.step." + s.value, s.label)}
+                  </span>
+                  {i < WORKFLOW_STEPS.length - 1 && <div className={`h-px flex-1 ${connectorCls}`} />}
+                </div>
+              );
+            })}
           </div>
-        ))}
-      </div>
+        );
+      })()}
 
       {/* Watch / follow */}
       <WatchControl issueId={report.id} showWatchers />
