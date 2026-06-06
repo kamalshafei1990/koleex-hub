@@ -9,7 +9,7 @@
    Reuses AttachmentThumbs for image previews. No AI.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { copyText } from "@/lib/ui/clipboard";
 import { useTranslation } from "@/lib/i18n";
@@ -388,6 +388,10 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
   const [txBusy, setTxBusy] = useState<TxMode | null>(null);
   const [speaking, setSpeaking] = useState(false);
   const [paused, setPaused] = useState(false);
+  // When the server voice is used, audio plays through this element; the URL
+  // ref lets us revoke the blob on stop. Null = using the browser fallback.
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
 
   const card = "rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3";
   const head = "text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)] mb-1.5";
@@ -457,41 +461,83 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
   /* Read-aloud via the browser's built-in speech synthesis (no backend).
      Reads whatever is currently shown — the transform result if present,
      else the analysis — in the matching language. */
-  function speak() {
+  const langOf = (): TxLang => tx?.lang ?? txLang;
+
+  /* Browser-voice fallback (per-machine voice) — used only when the server
+     voice isn't configured/available. */
+  function speakBrowser(text: string) {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-      setError(t("qa.ai.noTts", "Your browser doesn't support read-aloud."));
-      return;
+      setError(t("qa.ai.noTts", "Read-aloud isn't available."));
+      setSpeaking(false); return;
     }
-    const text = tx?.text || active?.response_markdown || "";
-    if (!text.trim()) return;
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text.replace(/[#*`>]/g, ""));
-    const wantLang = SPEECH_LANG[tx?.lang ?? txLang];
+    const wantLang = SPEECH_LANG[langOf()];
     u.lang = wantLang;
-    // Pick the most natural installed voice for this language. Browsers expose
-    // OS voices; the default is usually the robotic one, so prefer neural /
-    // "enhanced" / Siri / Google voices when present. Free + offline.
     const voices = window.speechSynthesis.getVoices();
     const base = wantLang.split("-")[0];
     const sameLang = voices.filter((v) => v.lang?.toLowerCase().startsWith(base));
     const NICE = /(siri|premium|enhanced|natural|neural|google|wavenet)/i;
-    const best = sameLang.find((v) => NICE.test(v.name))
-      || sameLang.find((v) => !v.localService)   // online/cloud OS voices are usually nicer
-      || sameLang[0];
+    const best = sameLang.find((v) => NICE.test(v.name)) || sameLang.find((v) => !v.localService) || sameLang[0];
     if (best) u.voice = best;
-    u.rate = 0.98;
-    u.pitch = 1;
+    u.rate = 0.98; u.pitch = 1;
     u.onend = () => { setSpeaking(false); setPaused(false); };
     u.onerror = () => { setSpeaking(false); setPaused(false); };
-    setSpeaking(true); setPaused(false);
     window.speechSynthesis.speak(u);
   }
+
+  /* Read aloud. Tries the SERVER voice first (one consistent voice for every
+     user); falls back to the browser voice if the server voice isn't set up. */
+  async function speak() {
+    const text = tx?.text || active?.response_markdown || "";
+    if (!text.trim()) return;
+    stopSpeak();
+    setSpeaking(true); setPaused(false);
+    try {
+      const res = await fetch(`/api/qa/ai/tts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ text, lang: langOf() }),
+      });
+      if (res.ok && (res.headers.get("content-type") ?? "").includes("audio")) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        audioUrlRef.current = url;
+        const audio = new Audio(url);
+        audioRef.current = audio;
+        audio.onended = () => { setSpeaking(false); setPaused(false); cleanupAudio(); };
+        audio.onerror = () => { setSpeaking(false); setPaused(false); cleanupAudio(); };
+        await audio.play();
+        return;
+      }
+      // 503/4xx/5xx → server voice not available, use the browser voice.
+      speakBrowser(text);
+    } catch {
+      speakBrowser(text);
+    }
+  }
+
+  function cleanupAudio() {
+    if (audioUrlRef.current) { URL.revokeObjectURL(audioUrlRef.current); audioUrlRef.current = null; }
+    audioRef.current = null;
+  }
+
   function pauseResume() {
+    // Cloud-audio mode
+    if (audioRef.current) {
+      if (paused) { void audioRef.current.play(); setPaused(false); }
+      else { audioRef.current.pause(); setPaused(true); }
+      return;
+    }
+    // Browser-voice mode
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
     if (paused) { window.speechSynthesis.resume(); setPaused(false); }
     else { window.speechSynthesis.pause(); setPaused(true); }
   }
+
   function stopSpeak() {
+    if (audioRef.current) { try { audioRef.current.pause(); } catch { /* */ } cleanupAudio(); }
     if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
     setSpeaking(false); setPaused(false);
   }
