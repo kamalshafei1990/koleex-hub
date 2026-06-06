@@ -977,11 +977,28 @@ function ReportDetail({
         </div>
         <div>
           <label className={label}>{t("qa.triage.devNotes", "Developer notes")}</label>
-          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={input} placeholder={t("qa.triage.devNotesPlaceholder", "Investigation notes, root cause…")} />
+          {/* Bigger by default + user-resizable. Issue f548b45e (Kamal): the
+             3-row textarea was too short to read multi-paragraph dev notes;
+             Koleex AI auto-fix routinely writes 1000+ chars here. min-h
+             holds the floor when empty, resize-y lets him pull it taller,
+             leading-relaxed makes wrapped Arabic / Chinese readable. */}
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={8}
+            className={`${input} min-h-[180px] resize-y leading-relaxed`}
+            placeholder={t("qa.triage.devNotesPlaceholder", "Investigation notes, root cause…")}
+          />
         </div>
         <div>
           <label className={label}>{t("qa.triage.resolution", "Resolution summary")}</label>
-          <textarea value={resolution} onChange={(e) => setResolution(e.target.value)} rows={2} className={input} placeholder={t("qa.triage.resolutionPlaceholder", "What was done to fix it")} />
+          <textarea
+            value={resolution}
+            onChange={(e) => setResolution(e.target.value)}
+            rows={4}
+            className={`${input} min-h-[96px] resize-y leading-relaxed`}
+            placeholder={t("qa.triage.resolutionPlaceholder", "What was done to fix it")}
+          />
         </div>
         <div>
           <label className={label}>{t("qa.triage.commit", "Fixed commit")}</label>
