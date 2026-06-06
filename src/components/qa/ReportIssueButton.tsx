@@ -348,7 +348,22 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
           component_section: selectedList[0]?.section ?? null,
           component_record_id: selectedList[0]?.recordId ?? null,
           component_rect: selectedList[0]?.rect ?? null,
-          components: selectedList.length > 0 ? selectedList : null,
+          components: selectedList.length > 0
+            ? selectedList.map((c) => ({
+                component: c.component,
+                module: c.module,
+                section: c.section,
+                recordId: c.recordId,
+                rect: c.rect,
+                fallback: c.fallback,
+                route: c.route,
+                styles: c.styles ?? null,
+              }))
+            : null,
+          // Scalar back-compat: first pick's computed styles get stored on
+          // the report row so the AI prompt can render them without a JSON
+          // walk. Server tolerates the field if the column isn't present.
+          component_styles: selectedList[0]?.styles ?? null,
         }),
       });
       const j = await res.json().catch(() => ({}));

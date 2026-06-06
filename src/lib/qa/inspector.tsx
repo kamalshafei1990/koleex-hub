@@ -38,6 +38,9 @@ export interface PickedComponent {
   rect: { top: number; left: number; width: number; height: number } | null;
   /** true when resolved from a best-effort fallback (no data-kx-component). */
   fallback: boolean;
+  /** Computed styles snapshot of the picked element at click time. Lets the
+   *  AI prompt diagnose UI/CSS bugs without having to open a browser. */
+  styles?: Record<string, string>;
 }
 
 interface InspectorCtx {
@@ -183,6 +186,29 @@ function rectOf(el: HTMLElement) {
   return { top: r.top, left: r.left, width: r.width, height: r.height };
 }
 
+/** Snapshot the computed styles the AI prompt cares about for UI/CSS bugs.
+ *  Tiny payload (≤12 fields), no DOM traversal, no allocation explosion. */
+function stylesOf(el: HTMLElement): Record<string, string> {
+  try {
+    const cs = window.getComputedStyle(el);
+    const pick = (k: string) => cs.getPropertyValue(k).trim();
+    return {
+      color: pick("color"),
+      backgroundColor: pick("background-color"),
+      fontFamily: pick("font-family"),
+      fontSize: pick("font-size"),
+      fontWeight: pick("font-weight"),
+      lineHeight: pick("line-height"),
+      letterSpacing: pick("letter-spacing"),
+      textAlign: pick("text-align"),
+      direction: pick("direction"),
+      opacity: pick("opacity"),
+      borderRadius: pick("border-radius"),
+      display: pick("display"),
+    };
+  } catch { return {}; }
+}
+
 function InspectorOverlay({ onFinish }: { onFinish: (c: PickedComponent | null) => void }) {
   const pathname = usePathname() ?? "/";
   const [hover, setHover] = useState<Hover | null>(null);
@@ -218,6 +244,7 @@ function InspectorOverlay({ onFinish }: { onFinish: (c: PickedComponent | null) 
         route: pathname,
         rect: rectOf(resolved.el),
         fallback: m.fallback,
+        styles: stylesOf(resolved.el),
       });
     };
 

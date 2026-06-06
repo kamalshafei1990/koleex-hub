@@ -160,11 +160,14 @@ export async function aggregateWorkspace(tenantId: string, issueId: string): Pro
     component_name: issue.component_name, component_module: issue.component_module,
     component_section: issue.component_section, component_record_id: issue.component_record_id,
     component_path: issue.component_path, component_rect: issue.component_rect,
+    component_styles: issue.component_styles, // computed CSS at file time
+    components: issue.components,             // full multi-pick array
     repro_steps: issue.repro_steps, reopen_count: issue.reopen_count,
     duplicate_of_issue_id: issue.duplicate_of_issue_id, fixed_commit: issue.fixed_commit,
     resolution_summary: issue.resolution_summary, reporter_name: issue.reporter_name,
     created_at: issue.created_at, resolved_at: issue.resolved_at,
-    screenshot_path: issue.screenshot_url, // stored path; signed on read
+    screenshot_path: issue.screenshot_url,  // stored path; signed on read
+    screenshot_paths: issue.screenshot_urls, // multi-shot array; signed on read
   };
 
   return {
@@ -207,14 +210,19 @@ async function signPath(tenantId: string, path: unknown): Promise<string | null>
   return data?.signedUrl ?? null;
 }
 
-export interface SignedWorkspace { screenshotUrl: string | null; comments: WsComment[] }
+export interface SignedWorkspace { screenshotUrl: string | null; screenshotUrls: string[]; comments: WsComment[] }
 export async function signWorkspace(tenantId: string, data: WorkspaceData): Promise<SignedWorkspace> {
   const screenshotUrl = await signPath(tenantId, data.issue_snapshot.screenshot_path);
+  const rawPaths = Array.isArray(data.issue_snapshot.screenshot_paths)
+    ? (data.issue_snapshot.screenshot_paths as unknown[])
+    : [];
+  const signedAll = await Promise.all(rawPaths.map((p) => signPath(tenantId, p)));
+  const screenshotUrls = signedAll.filter((u): u is string => !!u);
   const comments = await Promise.all(data.debug_context.comments.map(async (c) => ({
     ...c,
     attachments: await Promise.all(c.attachments.map(async (a) => ({ ...a, url: await signPath(tenantId, a.path) }))),
   })));
-  return { screenshotUrl, comments };
+  return { screenshotUrl, screenshotUrls, comments };
 }
 
 /* ── Prompt rendering (deterministic, copy-paste ready) ──────────────────── */
@@ -301,7 +309,22 @@ export function renderPrompt(data: WorkspaceData, signed: SignedWorkspace): stri
   L.push(`- Screen: ${e.screen_size ?? "—"} · Locale: ${e.language ?? "—"} · Timezone: ${e.timezone ?? "—"}`);
 
   h("Component Information");
-  if (s.component_name) {
+  // Multi-pick aware: if components[] is populated, list each pick stacked.
+  const compList = Array.isArray(s.components) ? (s.components as Array<Record<string, unknown>>) : [];
+  if (compList.length > 0) {
+    L.push(`- Inspected ${compList.length} component(s):`);
+    compList.forEach((c, idx) => {
+      const crumb = [c.module, c.section, c.component].filter(Boolean).join(" → ");
+      L.push(`  ${idx + 1}. ${crumb}${c.recordId ? ` (record ${c.recordId})` : ""}${c.fallback ? " [untagged fallback]" : ""}`);
+      if (c.rect) L.push(`     rect: ${JSON.stringify(c.rect)}`);
+      if (c.styles && typeof c.styles === "object" && !Array.isArray(c.styles)) {
+        const lines = Object.entries(c.styles as Record<string, unknown>)
+          .filter(([, v]) => typeof v === "string" && (v as string).trim().length > 0)
+          .map(([k, v]) => `${k}: ${v}`);
+        if (lines.length > 0) L.push(`     computed styles: ${lines.join("; ")}`);
+      }
+    });
+  } else if (s.component_name) {
     const crumb = [s.component_module, s.component_section, s.component_name].filter(Boolean).join(" → ");
     L.push(`- Inspected component: ${crumb}`);
     if (s.component_record_id) L.push(`- Record id: ${s.component_record_id}`);
@@ -309,6 +332,17 @@ export function renderPrompt(data: WorkspaceData, signed: SignedWorkspace): stri
     if (s.component_rect) L.push(`- On-screen rect: ${JSON.stringify(s.component_rect)}`);
   } else {
     L.push("- No specific component was pinned (whole-page report).");
+  }
+  // Scalar component_styles (first-pick mirror) — printed even when components[]
+  // isn't populated (legacy rows or single-pick reports).
+  if (compList.length === 0 && s.component_styles && typeof s.component_styles === "object" && !Array.isArray(s.component_styles)) {
+    const lines = Object.entries(s.component_styles as Record<string, unknown>)
+      .filter(([, v]) => typeof v === "string" && (v as string).trim().length > 0)
+      .map(([k, v]) => `  - ${k}: ${v}`);
+    if (lines.length > 0) {
+      L.push("- Computed styles (at file time):");
+      L.push(...lines);
+    }
   }
 
   h("Related Issues");
@@ -334,8 +368,20 @@ export function renderPrompt(data: WorkspaceData, signed: SignedWorkspace): stri
   }
 
   h("Attachments");
-  if (signed.screenshotUrl) L.push(`- Issue screenshot: ${signed.screenshotUrl}`);
-  let any = !!signed.screenshotUrl;
+  // Multi-shot first; the scalar screenshotUrl is the first entry's signed
+  // URL, but the user can attach up to 6 — print all of them so the AI can
+  // open each in turn.
+  let any = false;
+  const multi = signed.screenshotUrls ?? [];
+  if (multi.length > 1) {
+    multi.forEach((u, i) => { L.push(`- Issue screenshot ${i + 1}/${multi.length}: ${u}`); any = true; });
+  } else if (signed.screenshotUrl) {
+    L.push(`- Issue screenshot: ${signed.screenshotUrl}`);
+    any = true;
+  } else if (multi.length === 1) {
+    L.push(`- Issue screenshot: ${multi[0]}`);
+    any = true;
+  }
   for (const c of signed.comments) {
     for (const a of c.attachments) {
       if (a.url) { L.push(`- Comment image (${a.name})${c.internal ? " [internal]" : ""}: ${a.url}`); any = true; }

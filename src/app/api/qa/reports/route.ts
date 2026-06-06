@@ -102,6 +102,10 @@ export async function POST(req: Request) {
       body.component_rect && typeof body.component_rect === "object" && !Array.isArray(body.component_rect)
         ? body.component_rect
         : null,
+    component_styles:
+      body.component_styles && typeof body.component_styles === "object" && !Array.isArray(body.component_styles)
+        ? body.component_styles
+        : null,
     // Multi-select: the reporter can pick several components in one report.
     // The scalar component_* fields mirror the first entry for back-compat with
     // any consumer that hasn't been updated yet. Cap at 20 to keep payloads sane.

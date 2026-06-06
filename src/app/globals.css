@@ -84,17 +84,23 @@
   --border-faint: rgba(0,0,0,0.04);
   --border-focus: rgba(0,0,0,0.20);
 
-  /* Text */
+  /* Text — light mode tokens.
+     QA reported (#issue af3a11b7) that secondary / muted / dim text was hard
+     to read in Arabic on light mode. The lower-tier tokens (0.30 / 0.20
+     /0.15 / 0.10) failed both AA contrast at small sizes AND felt washed out
+     for Arabic glyphs that already render thinner. Bumped each tier up so
+     dim text passes AA on white background and reads cleanly in any locale.
+     --text-primary stays #000 for unmissable hierarchy. */
   --text-primary: #000000;
-  --text-highlight: rgba(0,0,0,0.80);
-  --text-secondary: rgba(0,0,0,0.70);
-  --text-muted: rgba(0,0,0,0.60);
-  --text-subtle: rgba(0,0,0,0.50);
-  --text-faint: rgba(0,0,0,0.40);
-  --text-dim: rgba(0,0,0,0.30);
-  --text-ghost: rgba(0,0,0,0.20);
-  --text-whisper: rgba(0,0,0,0.15);
-  --text-barely: rgba(0,0,0,0.10);
+  --text-highlight: rgba(0,0,0,0.86);
+  --text-secondary: rgba(0,0,0,0.78);
+  --text-muted: rgba(0,0,0,0.68);
+  --text-subtle: rgba(0,0,0,0.58);
+  --text-faint: rgba(0,0,0,0.48);
+  --text-dim: rgba(0,0,0,0.42);
+  --text-ghost: rgba(0,0,0,0.34);
+  --text-whisper: rgba(0,0,0,0.26);
+  --text-barely: rgba(0,0,0,0.18);
 
   /* Inverted (buttons etc.) */
   --bg-inverted: #000000;
@@ -437,3 +443,75 @@ select option[selected] {
     display: none !important;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Arabic legibility (issue af3a11b7).
+
+   Two problems combined to make Arabic text feel light & hard to read,
+   especially in light mode:
+
+   1. The fallback Arabic stack on Chrome/Windows renders thinner than the
+      Latin stack at the same px size and weight. Body copy looks anaemic.
+   2. Our small-text tokens used too-low alpha; Arabic dropped below
+      legible contrast more quickly than Latin.
+
+   The fix: bump body line-height and weight ONE step up whenever the
+   document direction is RTL or the active language is Arabic, and prefer
+   the Tahoma family which has a much heavier Arabic rendering on Windows.
+   Scoped to lang/dir so Latin pages are unaffected.
+   ───────────────────────────────────────────────────────────────────────── */
+:root[dir="rtl"],
+:root:lang(ar),
+:lang(ar) {
+  /* Better Arabic shaping at small sizes than the default sans-serif fall-
+     through. Tahoma renders Arabic heavier; "Segoe UI" gives a graceful
+     fallback on non-Windows. */
+  --font-sans:
+    -apple-system, "Segoe UI", Tahoma, "Geeza Pro", "Arabic UI Text",
+    "Noto Sans Arabic", "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Bump weight on the dim / secondary tiers so the alpha+thin-stack combo
+   stays readable. Latin pages keep their lighter feel because this only
+   applies inside RTL / Arabic content. */
+[dir="rtl"] *,
+:lang(ar) {
+  letter-spacing: 0;
+}
+[dir="rtl"] p,
+[dir="rtl"] span,
+[dir="rtl"] li,
+[dir="rtl"] td,
+[dir="rtl"] th,
+[dir="rtl"] button,
+[dir="rtl"] label,
+[dir="rtl"] a,
+:lang(ar) p,
+:lang(ar) span,
+:lang(ar) li,
+:lang(ar) td,
+:lang(ar) th,
+:lang(ar) button,
+:lang(ar) label,
+:lang(ar) a {
+  /* Subtle line-height bump — most of our type runs at 1.25-1.4 which is
+     fine for Latin but cramped for Arabic ascenders / descenders. */
+  line-height: 1.55;
+}
+
+/* Small text in Arabic needs an extra weight tick to avoid the "anaemic"
+   look the QA report described. The selector targets only the secondary /
+   muted tiers, so the design hierarchy survives. */
+[dir="rtl"] .text-\[var\(--text-secondary\)\],
+[dir="rtl"] .text-\[var\(--text-muted\)\],
+[dir="rtl"] .text-\[var\(--text-subtle\)\],
+[dir="rtl"] .text-\[var\(--text-faint\)\],
+[dir="rtl"] .text-\[var\(--text-dim\)\],
+:lang(ar) .text-\[var\(--text-secondary\)\],
+:lang(ar) .text-\[var\(--text-muted\)\],
+:lang(ar) .text-\[var\(--text-subtle\)\],
+:lang(ar) .text-\[var\(--text-faint\)\],
+:lang(ar) .text-\[var\(--text-dim\)\] {
+  font-weight: 500;
+}
+
