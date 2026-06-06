@@ -235,7 +235,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
     );
   }
 
-  const selectCls = "h-9 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2.5 text-[12.5px] text-[var(--text-primary)]";
+  const selectCls = "h-9 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2.5 text-[12.5px] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--border-focus)]";
 
   return (
     <div className={embedded ? "" : "mx-auto max-w-[1500px] px-4 py-6 sm:px-6"}>
@@ -267,7 +267,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
 
       {/* Filters */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("qa.filter.search", "Search title / description…")} className="h-9 min-w-[180px] flex-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("qa.filter.search", "Search title / description…")} className="h-9 min-w-[180px] flex-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]" />
         <select value={fModule} onChange={(e) => setFModule(e.target.value)} className={selectCls}>
           <option value="">{t("qa.filter.allModules", "All modules")}</option>
           {modules.map((m) => <option key={m} value={m}>{m}</option>)}
@@ -505,7 +505,7 @@ function ReportDetail({
 
   const label = "block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-1";
   const box = "rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap break-words";
-  const input = "w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]";
+  const input = "w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
 
   const ready = isClaudeReady(report);
   const isResolved = (RESOLVED_STATUSES as string[]).includes(report.status) || report.status === "closed";
@@ -944,7 +944,7 @@ function CommentsPanel({ issueId, myId, refreshKey = 0 }: { issueId: string; myI
           onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") void post(); }}
           rows={2}
           placeholder={t("qa.discussion.replyPlaceholder", "Write a reply…  (paste/drop an image · ⌘/Ctrl+Enter to send)")}
-          className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+          className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
         />
         <AttachmentStrip att={att} disabled={posting} />
         <div className="flex items-center gap-3">
