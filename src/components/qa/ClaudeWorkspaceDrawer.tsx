@@ -380,9 +380,11 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
   const [copied, setCopied] = useState(false);
   const { t } = useTranslation(qaT);
 
-  // Koleex AI actions: summarize / Arabic / Chinese / final solution + voice.
-  type TxMode = "summary" | "ar" | "zh" | "solution";
-  const [tx, setTx] = useState<{ mode: TxMode; text: string; lang: string } | null>(null);
+  // Koleex AI actions: summarize / final solution / explain — in any language.
+  type TxMode = "summary" | "solution" | "explain";
+  type TxLang = "en" | "ar" | "zh";
+  const [txLang, setTxLang] = useState<TxLang>("en");
+  const [tx, setTx] = useState<{ mode: TxMode; text: string; lang: TxLang } | null>(null);
   const [txBusy, setTxBusy] = useState<TxMode | null>(null);
   const [speaking, setSpeaking] = useState(false);
 
@@ -431,7 +433,7 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
     });
   }
 
-  const TX_LANG: Record<TxMode, string> = { summary: "en-US", solution: "en-US", ar: "ar", zh: "zh-CN" };
+  const SPEECH_LANG: Record<TxLang, string> = { en: "en-US", ar: "ar", zh: "zh-CN" };
   async function runTransform(mode: TxMode) {
     if (!active?.id || txBusy) return;
     stopSpeak();
@@ -441,11 +443,11 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ sessionId: active.id, mode }),
+        body: JSON.stringify({ sessionId: active.id, mode, lang: txLang }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(humanizeError(j.error ?? `HTTP ${res.status}`));
-      setTx({ mode, text: (j.text as string) ?? "", lang: TX_LANG[mode] });
+      setTx({ mode, text: (j.text as string) ?? "", lang: txLang });
     } catch (e) {
       setError(e instanceof Error ? e.message : t("qa.ai.txErr", "Koleex AI couldn't process that."));
     } finally { setTxBusy(null); }
@@ -463,7 +465,7 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
     if (!text.trim()) return;
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text.replace(/[#*`>]/g, ""));
-    u.lang = tx?.lang ?? "en-US";
+    u.lang = SPEECH_LANG[tx?.lang ?? txLang];
     u.rate = 1;
     u.onend = () => setSpeaking(false);
     u.onerror = () => setSpeaking(false);
@@ -534,6 +536,24 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--accent)]" aria-hidden><path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3M18 12h3M16.3 7.7l2.1-2.1M12 12l9 3-4 1-1 4-4-8Z"/></svg>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("qa.ai.koleexActions", "Koleex AI")}</span>
               </div>
+              {/* Language selector — applies to Summarize / Final solution /
+                  Explain AND read-aloud. */}
+              <div className="mb-2 flex items-center gap-1.5">
+                <span className="text-[10px] uppercase tracking-wider text-[var(--text-dim)]">{t("qa.ai.language", "Language")}</span>
+                <div className="inline-flex overflow-hidden rounded-lg border border-[var(--border-color)]">
+                  {([["en", "EN"], ["ar", "العربية"], ["zh", "中文"]] as [TxLang, string][]).map(([code, lbl]) => (
+                    <button
+                      key={code}
+                      type="button"
+                      onClick={() => setTxLang(code)}
+                      className={`px-2.5 py-1 text-[11px] font-semibold transition-colors ${txLang === code ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}
+                    >
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="flex flex-wrap gap-1.5">
                 <button type="button" className={btn} onClick={() => runTransform("summary")} disabled={!!txBusy}>
                   {txBusy === "summary" ? t("qa.ai.txWorking", "…") : t("qa.ai.summarize", "Summarize")}
@@ -541,11 +561,8 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
                 <button type="button" className={btn} onClick={() => runTransform("solution")} disabled={!!txBusy}>
                   {txBusy === "solution" ? t("qa.ai.txWorking", "…") : t("qa.ai.solution", "Final solution")}
                 </button>
-                <button type="button" className={btn} onClick={() => runTransform("ar")} disabled={!!txBusy}>
-                  {txBusy === "ar" ? t("qa.ai.txWorking", "…") : t("qa.ai.arabic", "العربية")}
-                </button>
-                <button type="button" className={btn} onClick={() => runTransform("zh")} disabled={!!txBusy}>
-                  {txBusy === "zh" ? t("qa.ai.txWorking", "…") : t("qa.ai.chinese", "中文")}
+                <button type="button" className={btn} onClick={() => runTransform("explain")} disabled={!!txBusy}>
+                  {txBusy === "explain" ? t("qa.ai.txWorking", "…") : t("qa.ai.explain", "Explain")}
                 </button>
                 <button type="button" className={btn} onClick={speaking ? stopSpeak : speak}>
                   {speaking ? `■ ${t("qa.ai.stop", "Stop")}` : `▶ ${t("qa.ai.readAloud", "Read aloud")}`}
@@ -556,9 +573,10 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
                 <div className="mt-2.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] p-3">
                   <div className="mb-1 flex items-center justify-between">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)]">
-                      {tx.mode === "summary" ? t("qa.ai.summary", "Summary")
+                      {(tx.mode === "summary" ? t("qa.ai.summary", "Summary")
                         : tx.mode === "solution" ? t("qa.ai.proposedFix", "Proposed fix")
-                        : tx.mode === "ar" ? "العربية" : "中文"}
+                        : t("qa.ai.explanation", "Explanation"))}
+                      {tx.lang === "ar" ? " · العربية" : tx.lang === "zh" ? " · 中文" : ""}
                     </span>
                     <button type="button" onClick={() => { stopSpeak(); setTx(null); }} className="text-[11px] text-[var(--text-dim)] hover:text-[var(--text-primary)]" aria-label={t("qa.common.close", "Close")}>✕</button>
                   </div>
