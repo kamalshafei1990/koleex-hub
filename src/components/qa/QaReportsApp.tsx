@@ -982,16 +982,23 @@ function ReportDetail({
         {report.duplicate_of_issue_id && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--text-dim)]">{t("qa.badge.duplicate", "Duplicate")}</span>}
         {report.reopen_count > 0 && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] text-[var(--text-dim)]">{t("qa.badge.reopenedTimes", "Reopened")} ×{report.reopen_count}</span>}
         <div className="ms-auto flex items-center gap-2">
-          {/* Open Route — also append ?qa_focus= so the destination page
-              can highlight the picked component on arrival. Issue dc295123
-              follow-up. */}
+          {/* Open Route — ALWAYS carry qa_issue + qa_title so the destination
+              shows an arrival banner identifying the issue, even for whole-page
+              reports with no pinned component. qa_focus is added only when a
+              component was pinned, so the page can also ring it. (Issue
+              dc295123 + 46dba6b3 follow-up: previously no-component reports
+              navigated with no marker at all.) */}
           {report.route ? (
             <a
               href={(() => {
+                const base = report.route as string;
+                const sep = base.includes("?") ? "&" : "?";
+                const params = new URLSearchParams();
+                params.set("qa_issue", report.id);
+                if (report.title) params.set("qa_title", String(report.title).slice(0, 120));
                 const name = report.component_name?.trim();
-                if (!name) return report.route as string;
-                const sep = (report.route as string).includes("?") ? "&" : "?";
-                return `${report.route}${sep}qa_focus=${encodeURIComponent(name)}&qa_issue=${encodeURIComponent(report.id)}`;
+                if (name) params.set("qa_focus", name);
+                return `${base}${sep}${params.toString()}`;
               })()}
               target="_blank"
               rel="noreferrer"
