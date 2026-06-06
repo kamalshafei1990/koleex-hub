@@ -16,6 +16,18 @@ import { STATUS_LABEL, type IssueStatus, type QaAttachment } from "@/lib/qa/type
 
 interface RelatedIssue { id: string; title: string; status: IssueStatus; reasons: string[] }
 interface WsComment { author: string | null; role: string | null; internal: boolean; message: string; created_at: string; attachments: QaAttachment[] }
+interface Investigation {
+  possible_causes: Array<{ cause: string; evidence: string }>;
+  regression_flags: Array<{ label: string; detail: string }>;
+  hotspot_flags: Array<{ label: string; detail: string }>;
+  related_patterns: Array<{ pattern: string; count: number; examples: string[] }>;
+  suggested_files: string[];
+  investigation_notes: string[];
+  risk_score: number;
+  confidence_score: number;
+  module_health_snapshot: { module: string | null; total: number; open: number; urgent: number; reopened: number; duplicates: number };
+  generated_summary: string;
+}
 interface Workspace {
   issue_snapshot: Record<string, unknown>;
   related_components: Array<{ name: string | null; module: string | null; section: string | null; record_id: string | null }>;
@@ -25,6 +37,7 @@ interface Workspace {
   screenshot_url: string | null;
   generated_prompt: string;
   generation_version: string;
+  investigation?: Investigation | null;
   cached?: boolean;
 }
 
@@ -38,6 +51,7 @@ export default function ClaudeWorkspaceDrawer({ issueId, onClose, onJump }: { is
   const [regenerating, setRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [tab, setTab] = useState<"overview" | "investigation">("overview");
 
   const load = useCallback(async (regenerate = false) => {
     if (regenerate) setRegenerating(true); else setLoading(true);
@@ -105,6 +119,18 @@ export default function ClaudeWorkspaceDrawer({ issueId, onClose, onJump }: { is
             <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-500 dark:text-rose-300">{error}</div>
           ) : ws ? (
             <>
+              {/* Tabs */}
+              <div className="flex gap-1.5">
+                <button type="button" onClick={() => setTab("overview")} className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold ${tab === "overview" ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-secondary)]"}`}>Overview</button>
+                <button type="button" onClick={() => setTab("investigation")} className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold ${tab === "investigation" ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-secondary)]"}`}>
+                  Investigation{ws.investigation ? ` · risk ${ws.investigation.risk_score}` : ""}
+                </button>
+              </div>
+
+              {tab === "investigation" ? (
+                <InvestigationPanel inv={ws.investigation ?? null} />
+              ) : (
+              <>
               {/* Component info */}
               <div className={card}>
                 <div className={head}>Component & Context</div>
@@ -181,10 +207,115 @@ export default function ClaudeWorkspaceDrawer({ issueId, onClose, onJump }: { is
                 </div>
                 <pre className="max-h-[40vh] overflow-auto whitespace-pre-wrap break-words rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 font-mono text-[11px] leading-relaxed text-[var(--text-secondary)]">{ws.generated_prompt}</pre>
               </div>
+              </>
+              )}
             </>
           ) : null}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ── Investigation panel (deterministic engineering dashboard) ───────────── */
+function Gauge({ label, value, tone }: { label: string; value: number; tone: "risk" | "confidence" }) {
+  const color = tone === "risk"
+    ? (value >= 66 ? "bg-rose-500" : value >= 33 ? "bg-amber-500" : "bg-emerald-500")
+    : "bg-[var(--accent)]";
+  return (
+    <div className="flex-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3">
+      <div className="flex items-baseline justify-between">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{label}</span>
+        <span className="text-[18px] font-bold tabular-nums text-[var(--text-primary)]">{value}</span>
+      </div>
+      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface)]">
+        <div className={`h-full ${color}`} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function InvestigationPanel({ inv }: { inv: Investigation | null }) {
+  const card = "rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3";
+  const head = "text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)] mb-1.5";
+  if (!inv) return <div className="py-10 text-center text-[12px] text-[var(--text-dim)]">No analysis available.</div>;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-2">
+        <Gauge label="Risk" value={inv.risk_score} tone="risk" />
+        <Gauge label="Confidence" value={inv.confidence_score} tone="confidence" />
+      </div>
+
+      <div className={card}>
+        <div className={head}>Summary</div>
+        <p className="text-[12.5px] text-[var(--text-secondary)]">{inv.generated_summary}</p>
+      </div>
+
+      <div className={card}>
+        <div className={head}>Possible Causes</div>
+        {inv.possible_causes.length === 0 ? (
+          <div className="text-[12px] text-[var(--text-dim)]">No strong cause detected.</div>
+        ) : (
+          <ul className="space-y-1.5">
+            {inv.possible_causes.map((c, i) => (
+              <li key={i} className="text-[12px]"><b className="text-[var(--text-primary)]">{c.cause}</b><div className="text-[11px] text-[var(--text-dim)]">{c.evidence}</div></li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {inv.regression_flags.length > 0 && (
+        <div className="rounded-xl border border-rose-500/25 bg-rose-500/[0.06] p-3">
+          <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-rose-500 dark:text-rose-300">Regression Warnings</div>
+          <ul className="space-y-1">
+            {inv.regression_flags.map((f, i) => (<li key={i} className="text-[12px] text-[var(--text-secondary)]"><b className="text-[var(--text-primary)]">{f.label}:</b> {f.detail}</li>))}
+          </ul>
+        </div>
+      )}
+
+      {inv.hotspot_flags.length > 0 && (
+        <div className="rounded-xl border border-amber-500/25 bg-amber-500/[0.06] p-3">
+          <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-300">Hotspot Warnings</div>
+          <ul className="space-y-1">
+            {inv.hotspot_flags.map((f, i) => (<li key={i} className="text-[12px] text-[var(--text-secondary)]"><b className="text-[var(--text-primary)]">{f.label}:</b> {f.detail}</li>))}
+          </ul>
+        </div>
+      )}
+
+      <div className={card}>
+        <div className={head}>Suggested Investigation Files</div>
+        {inv.suggested_files.length === 0 ? (
+          <div className="text-[12px] text-[var(--text-dim)]">None derived.</div>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {inv.suggested_files.map((f) => (<code key={f} className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--text-secondary)]">{f}</code>))}
+          </div>
+        )}
+      </div>
+
+      {inv.related_patterns.length > 0 && (
+        <div className={card}>
+          <div className={head}>Related Patterns</div>
+          <ul className="space-y-1">
+            {inv.related_patterns.map((p, i) => (<li key={i} className="text-[12px] text-[var(--text-secondary)]"><b className="text-[var(--text-primary)]">{p.pattern}</b> · {p.count}</li>))}
+          </ul>
+        </div>
+      )}
+
+      <div className={card}>
+        <div className={head}>Module Health · {inv.module_health_snapshot.module ?? "—"}</div>
+        <div className="grid grid-cols-3 gap-2 text-center">
+          {([["Total", inv.module_health_snapshot.total], ["Open", inv.module_health_snapshot.open], ["Urgent", inv.module_health_snapshot.urgent], ["Reopened", inv.module_health_snapshot.reopened], ["Duplicates", inv.module_health_snapshot.duplicates]] as const).map(([k, v]) => (
+            <div key={k} className="rounded-lg bg-[var(--bg-surface)] py-2">
+              <div className="text-[16px] font-bold tabular-nums text-[var(--text-primary)]">{v}</div>
+              <div className="text-[9.5px] uppercase tracking-wider text-[var(--text-dim)]">{k}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <p className="px-1 text-[10.5px] text-[var(--text-dim)]">Findings derived deterministically from issue history — verify before acting.</p>
     </div>
   );
 }
