@@ -234,7 +234,7 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
 
         {done ? (
           <div className="flex flex-col items-center justify-center gap-2 px-6 py-14 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--bg-surface-active)] text-[var(--text-secondary)] text-xl">✓</div>
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#00CC66]/12 text-[#00CC66] text-xl">✓</div>
             <p className="text-[14px] font-semibold">{t("qa.report.thanks", "Thank you — report submitted.")}</p>
             <p className="text-[12px] text-[var(--text-dim)]">{t("qa.report.thanksSub", "The team can see it in Issue Reports.")}</p>
           </div>
