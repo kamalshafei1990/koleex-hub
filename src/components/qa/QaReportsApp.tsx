@@ -982,10 +982,10 @@ function ReportDetail({
         {report.duplicate_of_issue_id && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--text-dim)]">{t("qa.badge.duplicate", "Duplicate")}</span>}
         {report.reopen_count > 0 && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] text-[var(--text-dim)]">{t("qa.badge.reopenedTimes", "Reopened")} ×{report.reopen_count}</span>}
         <div className="ms-auto flex items-center gap-2">
+          {/* Open Route — also append ?qa_focus= so the destination page
+              can highlight the picked component on arrival. Issue dc295123
+              follow-up. */}
           {report.route ? (
-            {/* Open Route — also append ?qa_focus= so the destination page
-                can highlight the picked component on arrival. Issue dc295123
-                follow-up. */}
             <a
               href={(() => {
                 const name = report.component_name?.trim();
