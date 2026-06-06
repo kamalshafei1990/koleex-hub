@@ -10,7 +10,8 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { RESOLVED_STATUSES, type IssueStatus } from "@/lib/qa/types";
+import { RESOLVED_STATUSES } from "@/lib/qa/types";
+import { isTrustedComponentName } from "@/lib/qa/debug-workspace";
 
 export const ANALYSIS_VERSION = "1.0";
 const LOOKBACK_DAYS = 180;
@@ -71,14 +72,22 @@ type Row = {
 };
 
 /* ── Suggested files (deterministic naming heuristics) ───────────────────── */
+/* Phase X: NEVER fabricate a filename from an inspector fallback label like
+   "Inventory OperationsWhat needs doing today — rec" or the glyph "⌘K".
+   We only turn a component_name into "<name>.tsx" when it's a TRUSTED code
+   identifier (ASCII PascalCase-ish, no spaces). Otherwise we emit only the
+   safe, real paths: the module root and the route page. */
 function suggestedFiles(issue: { component_name: string | null; app_module: string | null; route: string | null }, sameComponent: Row[]): string[] {
   const out = new Set<string>();
-  if (issue.component_name) out.add(`${issue.component_name}.tsx`);
-  for (const c of sameComponent) if (c.component_name) out.add(`${c.component_name}.tsx`);
+  if (isTrustedComponentName(issue.component_name)) out.add(`${issue.component_name}.tsx`);
+  for (const c of sameComponent) if (isTrustedComponentName(c.component_name)) out.add(`${c.component_name}.tsx`);
+  // Module root + route page are derived from real routing/folder conventions,
+  // not from user-visible text — always safe.
   if (issue.app_module && MODULE_ROOTS[issue.app_module]) out.add(MODULE_ROOTS[issue.app_module]);
   if (issue.route) {
     const path = issue.route.split("?")[0].replace(/\/+$/, "");
-    if (path) out.add(`src/app${path}/page.tsx`);
+    // Guard against dynamic-segment routes producing fake static page paths.
+    if (path && !/\/[0-9a-f]{8}-[0-9a-f]{4}-/i.test(path)) out.add(`src/app${path}/page.tsx`);
   }
   return Array.from(out).slice(0, 8);
 }
@@ -184,8 +193,12 @@ export async function analyzeIssue(tenantId: string, issue: Record<string, unkno
   const confidence_score = clamp(conf);
 
   // ── Notes + summary ─────────────────────────────────────────────────────
+  // Only reference the component by name when it's a TRUSTED identifier —
+  // never tell Claude to "start in <garbage fallback label>".
+  const trustedComponent = isTrustedComponentName(component) ? component : null;
   const notes: string[] = [];
-  if (component) notes.push(`Start in ${component} — it's the pinned component for this report.`);
+  if (trustedComponent) notes.push(`Start in ${trustedComponent} — it's the pinned component for this report.`);
+  else if (component) notes.push("The pinned component is an approximate fallback label — don't search for it by name; locate the element via the route + screenshots.");
   if (recentlyFixedComponent.length > 0) notes.push("Diff the recent fix to this component first; this is the most likely regression source.");
   if (reopenCount > 0) notes.push("Verify the previous fix actually addressed the root cause, not just the symptom.");
   if (route) notes.push(`Reproduce on ${route} with the reporter's environment.`);
@@ -199,7 +212,7 @@ export async function analyzeIssue(tenantId: string, issue: Record<string, unkno
     (topCause ? `Most likely: ${topCause.cause.toLowerCase()} (${topCause.evidence}). ` : "No strong single cause detected. ") +
     (regressions.length ? `${regressions.length} regression signal(s). ` : "") +
     (hotspots.length ? `${hotspots.length} module hotspot(s). ` : "") +
-    (component ? `Begin in ${component}.` : `Begin in the ${module ?? "owning"} module.`);
+    (trustedComponent ? `Begin in ${trustedComponent}.` : `Begin in the ${module ?? "owning"} module.`);
 
   return {
     possible_causes: causes,
@@ -298,12 +311,16 @@ export function renderInvestigationPromptSection(inv: InvestigationResult): stri
   }
 
   h("Suggested Investigation Files");
-  if (inv.suggested_files.length === 0) L.push("- (none derived)");
-  else for (const f of inv.suggested_files) L.push(`- ${f}`);
+  if (inv.suggested_files.length === 0) {
+    L.push("- No reliable file candidates could be derived. Do NOT guess a filename — use the route + the Investigation Areas above to locate the code.");
+  } else {
+    L.push("_Real paths only (module roots + route pages + trusted component identifiers). These are candidates, not confirmed — verify each exists before editing._");
+    for (const f of inv.suggested_files) L.push(`- ${f}`);
+  }
 
   h("Suggested Investigation Areas (analysis)");
   for (const n of inv.investigation_notes) L.push(`- ${n}`);
 
-  L.push("", "_These findings are derived deterministically from issue history — verify before acting._");
+  L.push("", "_These findings are derived deterministically from issue history — verify before acting. Deterministic history analysis cannot confirm a visual fix; build/type success is not proof. Confirm visually before claiming the issue resolved._");
   return L.join("\n");
 }
