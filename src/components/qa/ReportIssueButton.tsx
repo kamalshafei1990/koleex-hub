@@ -68,7 +68,7 @@ export default function ReportIssueButton() {
         onClick={() => setOpen(true)}
         title="Report an issue or suggestion"
         aria-label="Report an issue"
-        className="fixed end-6 bottom-[5.25rem] z-[80] flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--bg-secondary)]/95 text-[var(--text-secondary)] shadow-lg backdrop-blur-md transition-colors hover:text-[var(--text-primary)] hover:border-white"
+        className="fixed end-6 bottom-[5.25rem] z-[80] flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--bg-secondary)]/95 text-[var(--text-secondary)] shadow-lg backdrop-blur-md transition-colors hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]"
       >
         <MessageSquarePlusIcon size={17} />
       </button>
@@ -209,7 +209,7 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
     }
   }
 
-  const field = "w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none focus:border-white placeholder:text-[var(--text-ghost)]";
+  const field = "w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--border-focus)] placeholder:text-[var(--text-ghost)]";
   const label = "block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-1";
 
   // While inspecting, hide the panel entirely (state preserved) so the global
@@ -217,7 +217,7 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   if (inspecting) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
+    <div className="fixed inset-0 z-[200] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label="Report an issue" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
       <div className="flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-2xl sm:max-w-[560px] sm:rounded-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-3.5">
@@ -267,7 +267,7 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                 <button
                   type="button"
                   onClick={pickComponent}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-[var(--border-color)] py-2 text-[12px] font-medium text-[var(--text-dim)] transition-colors hover:border-white hover:text-[var(--text-primary)]"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-[var(--border-color)] py-2 text-[12px] font-medium text-[var(--text-dim)] transition-colors hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
                 >
                   <TargetIcon size={14} /> Select specific item / component
                 </button>
@@ -322,7 +322,7 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                     onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                     onDragLeave={() => setDragOver(false)}
                     onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) setImage(f); }}
-                    className={`flex w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed py-6 text-[12px] transition-colors ${dragOver ? "border-white bg-white/5 text-[var(--text-primary)]" : "border-[var(--border-color)] text-[var(--text-dim)] hover:border-white"}`}
+                    className={`flex w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed py-6 text-[12px] transition-colors ${dragOver ? "border-[var(--border-focus)] bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]" : "border-[var(--border-color)] text-[var(--text-dim)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)]"}`}
                   >
                     <span className="text-[var(--text-secondary)]">Click to upload</span>
                     <span className="text-[var(--text-ghost)]">or paste / drag an image here</span>
