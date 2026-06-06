@@ -215,7 +215,19 @@ function SlidingPillNav({
   ariaLabel: string;
 }) {
   const [tabWidth, setTabWidth] = useState<number>(TAB_WIDTH_LG);
+  const [rtl, setRtl] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
+
+  /* Direction-aware: in RTL the tabs flow right-to-left, so the sliding pill
+     must be anchored to the inline-start (right edge) and translate the other
+     way — otherwise it lands on the wrong side as a detached white box. */
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const read = () => setRtl((document.documentElement.dir || document.dir) === "rtl");
+    read();
+    window.addEventListener("langchange", read as EventListener);
+    return () => window.removeEventListener("langchange", read as EventListener);
+  }, []);
 
   /* Responsive tab width — 148px on ≥900px, 120px below. */
   useEffect(() => {
@@ -360,10 +372,11 @@ function SlidingPillNav({
           GPU-accelerated and respects prefers-reduced-motion. */}
       <span
         aria-hidden
-        className="pointer-events-none absolute top-1.5 bottom-1.5 left-0 rounded-[10px] bg-[var(--bg-inverted)] shadow-sm transition-transform motion-reduce:transition-none"
+        className="pointer-events-none absolute top-1.5 bottom-1.5 rounded-[10px] bg-[var(--bg-inverted)] shadow-sm transition-transform motion-reduce:transition-none"
         style={{
           width: `${tabWidth}px`,
-          transform: `translateX(${TRACK_PADDING + activeIndex * tabWidth}px)`,
+          insetInlineStart: 0,
+          transform: `translateX(${(rtl ? -1 : 1) * (TRACK_PADDING + activeIndex * tabWidth)}px)`,
           transitionDuration: "350ms",
           transitionTimingFunction: "cubic-bezier(0.22, 0.61, 0.36, 1)",
         }}

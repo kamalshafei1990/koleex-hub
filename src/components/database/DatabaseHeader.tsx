@@ -50,6 +50,7 @@ const T: Translations = {
   "db.nav.collections":   { en: "Collections",    zh: "合集",     ar: "المجموعات" },
   "db.nav.reviewBoard":   { en: "Review Board",   zh: "审核台",   ar: "لوحة المراجعة" },
   "db.nav.registry":      { en: "Classification", zh: "分类",     ar: "التصنيف" },
+  "db.search.placeholder": { en: "Search the Visual Library…", zh: "搜索视觉库…", ar: "ابحث في مكتبة الصور…" },
 };
 
 function isOn(pathname: string, key: string): boolean {
@@ -85,7 +86,7 @@ export default function DatabaseHeader({
         meta={meta}
         tabs={topTabs}
         showTabs={showTabs}
-        searchPlaceholder="Search the Visual Library…"
+        searchPlaceholder={t("db.search.placeholder", "Search the Visual Library…")}
         searchHref="/database/visual-library"
       />
 
