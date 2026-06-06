@@ -1097,11 +1097,16 @@ function ReportDetail({
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <div>
           <label className={label}>{t("qa.action.priority", "Priority")}</label>
+          {/* Issue 06ae2743 (reopened): the priority control looked thinner
+              than the assignee control beside it. A native <select> with only
+              min-height renders shorter than the flex AssigneePicker button on
+              some browsers. Force the exact same box: explicit h-[38px], full
+              width, leading-normal so the two sit at identical height. */}
           <select
             value={report.priority}
             disabled={busy}
             onChange={(e) => void patch({ priority: e.target.value as Priority })}
-            className={input}
+            className={`${input} h-[38px] leading-normal`}
           >
             {PRIORITIES.map((p) => <option key={p.value} value={p.value}>{t("qa.priority." + p.value, p.label)}</option>)}
           </select>

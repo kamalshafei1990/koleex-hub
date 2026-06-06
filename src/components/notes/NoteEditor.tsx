@@ -116,11 +116,13 @@ export default function NoteEditor({
     editorProps: {
       attributes: {
         class:
-          // Issue 75570338 (Mustafa): the editable area felt small. Bumped
-          // the minimum height from 60vh to 80vh so the editor becomes the
-          // dominant surface in the window, matching the "main interface"
-          // expectation. md:prose-lg also widens type for readability.
-          "notes-editor prose prose-invert prose-sm md:prose-lg max-w-none focus:outline-none min-h-[80vh] text-[var(--text-primary)]",
+          // Issue 75570338 (Mustafa, reopened ×3): the editable area must fill
+          // the HEIGHT of the window, not just a fraction. The fixed-vh
+          // minimums (60→80vh) still left the writing surface short relative
+          // to the screen. Tie it to the actual viewport minus the app chrome
+          // so the editor is the dominant, full-height surface. h-full lets it
+          // stretch to fill the flex pane when content is short.
+          "notes-editor prose prose-invert prose-sm md:prose-lg max-w-none focus:outline-none h-full min-h-[calc(100dvh-13rem)] text-[var(--text-primary)]",
       },
     },
     onUpdate: ({ editor: ed }) => {

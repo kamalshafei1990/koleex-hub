@@ -217,6 +217,33 @@ function SlidingPillNav({
   const [tabWidth, setTabWidth] = useState<number>(TAB_WIDTH_LG);
   const [rtl, setRtl] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
+  // Clickable scroll arrows (issue 4c9884b1): the tab strip scrolls on
+  // touch/trackpad, but mouse users had no way to reach off-screen tabs and
+  // reported the nav "doesn't work". These flags drive ‹ › buttons that
+  // actually scroll the track; each hides when there's nothing more that way.
+  const [canL, setCanL] = useState(false);
+  const [canR, setCanR] = useState(false);
+  const updateArrows = () => {
+    const el = trackRef.current;
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    const x = Math.abs(el.scrollLeft); // RTL scrollLeft can be negative
+    setCanL(x > 2);
+    setCanR(x < max - 2);
+  };
+  useEffect(() => {
+    updateArrows();
+    const el = trackRef.current;
+    if (!el) return;
+    el.addEventListener("scroll", updateArrows, { passive: true });
+    window.addEventListener("resize", updateArrows);
+    return () => { el.removeEventListener("scroll", updateArrows); window.removeEventListener("resize", updateArrows); };
+  }, [tabWidth, tabs.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  const nudge = (dir: -1 | 1) => {
+    const el = trackRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * Math.max(160, tabWidth * 2), behavior: "smooth" });
+  };
 
   /* Direction-aware: in RTL the tabs flow right-to-left, so the sliding pill
      must be anchored to the inline-start (right edge) and translate the other
@@ -339,6 +366,17 @@ function SlidingPillNav({
   };
 
   return (
+    <div className="relative flex max-w-full items-center">
+    {canL && (
+      <button
+        type="button"
+        aria-label="Scroll tabs left"
+        onClick={() => nudge(-1)}
+        className="absolute start-1 z-20 grid h-7 w-7 place-items-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)]/95 text-[var(--text-secondary)] shadow-sm backdrop-blur transition-colors hover:text-[var(--text-primary)]"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M15 18l-6-6 6-6" /></svg>
+      </button>
+    )}
     <nav
       ref={trackRef}
       role="tablist"
@@ -434,6 +472,17 @@ function SlidingPillNav({
         );
       })}
     </nav>
+    {canR && (
+      <button
+        type="button"
+        aria-label="Scroll tabs right"
+        onClick={() => nudge(1)}
+        className="absolute end-1 z-20 grid h-7 w-7 place-items-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)]/95 text-[var(--text-secondary)] shadow-sm backdrop-blur transition-colors hover:text-[var(--text-primary)]"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M9 18l6-6-6-6" /></svg>
+      </button>
+    )}
+    </div>
   );
 }
 
