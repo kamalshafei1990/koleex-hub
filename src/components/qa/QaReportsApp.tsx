@@ -136,7 +136,18 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
     return p;
   }, [view, myId]);
 
+  // Keep a ref to the AbortController of the in-flight fetch so a fresh
+  // load() can cancel the stale one. Without this, a slow earlier fetch
+  // can resolve AFTER a successful newer fetch and overwrite good state
+  // with an error (we used to see a sticky "Not signed in" banner over
+  // already-loaded data because of this race in dev / Strict Mode).
+  const loadAbortRef = useRef<AbortController | null>(null);
   const load = useCallback(async () => {
+    // Cancel any in-flight call so its late response can't clobber us.
+    loadAbortRef.current?.abort();
+    const ac = new AbortController();
+    loadAbortRef.current = ac;
+
     setLoading(true); setError(null);
     const params = new URLSearchParams(viewParams);
     if (fModule) params.set("module", fModule);
@@ -145,20 +156,44 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
     if (fPriority && !params.has("priority")) params.set("priority", fPriority);
     if (fAssignee && !params.has("assignee")) params.set("assignee", fAssignee);
     if (q.trim()) params.set("q", q.trim());
+
+    // One transparent retry on 401 — the auth cookie is sometimes a beat
+    // behind a soft navigation / view-as switch, so a single retry after
+    // a tiny delay turns a flash-of-failure into a successful load.
+    const doFetch = (): Promise<Response> =>
+      fetch(`/api/qa/reports?${params}`, { credentials: "include", cache: "no-store", signal: ac.signal });
+
     try {
-      const res = await fetch(`/api/qa/reports?${params}`, { credentials: "include", cache: "no-store" });
+      let res = await doFetch();
+      if (res.status === 401 && !ac.signal.aborted) {
+        await new Promise((r) => setTimeout(r, 350));
+        if (ac.signal.aborted) return;
+        res = await doFetch();
+      }
+      if (ac.signal.aborted) return;
       if (res.status === 403) { setForbidden(true); setLoading(false); return; }
       const j = await res.json();
+      if (ac.signal.aborted) return;
       if (!res.ok) throw new Error(humanizeError(j.error ?? `HTTP ${res.status}`));
       setReports(j.reports ?? []);
       setModules(j.modules ?? []);
       setAssigneeFacet(j.assignees ?? []);
     } catch (e) {
+      // Aborted = a newer load() superseded us. Stay silent — the newer
+      // call owns the UI state now.
+      if (ac.signal.aborted || (e instanceof DOMException && e.name === "AbortError")) return;
       setError(e instanceof Error ? e.message : t("qa.list.loadErr", "Couldn't load reports."));
-    } finally { setLoading(false); }
+    } finally {
+      // Only the LATEST controller clears loading; a stale call landing
+      // after a newer one started must not flip the spinner off early.
+      if (loadAbortRef.current === ac) setLoading(false);
+    }
   }, [viewParams, fModule, fSeverity, fStatus, fPriority, fAssignee, q, t]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+    return () => { loadAbortRef.current?.abort(); };
+  }, [load]);
 
   // A report can be filed from anywhere via the global Report button (a
   // separate component tree). Refresh the list when one is submitted so the
