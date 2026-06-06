@@ -529,7 +529,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
   const selectCls = "h-9 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2.5 text-[12.5px] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--border-focus)]";
 
   return (
-    <div className={embedded ? "" : "mx-auto max-w-[1500px] px-4 py-6 sm:px-6"}>
+    <div className={embedded ? "" : "mx-auto max-w-[1850px] px-4 py-6 sm:px-6"}>
       {!embedded && (
         <div className="mb-4">
           <h1 className="text-[20px] font-bold text-[var(--text-primary)]">{t("qa.list.heading", "Issue Reports")}</h1>
