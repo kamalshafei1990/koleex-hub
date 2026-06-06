@@ -55,6 +55,78 @@ export default function CaptureOverlay({ onResult, maxBytes, labels }: Props) {
   // Track whether the mouse moved enough to count as a drag vs a click.
   const movedRef = useRef(false);
 
+  /**
+   * Auto-trim solid-color borders (the page background) from a freshly
+   * rendered canvas. Walks each edge inward until it hits a row/column with
+   * pixels that differ meaningfully from the sampled background colour, then
+   * crops to that bounding box. Skipped if the bg can't be detected, or if
+   * the trim would remove >85% of the image (a sign that detection went
+   * wrong, or the user really did capture an empty area).
+   */
+  const autoTrim = useCallback((canvas: HTMLCanvasElement): HTMLCanvasElement => {
+    const w = canvas.width;
+    const h = canvas.height;
+    if (w < 20 || h < 20) return canvas;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return canvas;
+    let img: ImageData;
+    try { img = ctx.getImageData(0, 0, w, h); } catch { return canvas; }
+    const d = img.data;
+    // Sample the four corners — if they all agree (within tolerance), that's
+    // our background colour. Otherwise the edges aren't uniform and trimming
+    // would be unsafe; skip.
+    const pixAt = (x: number, y: number): [number, number, number, number] => {
+      const i = (y * w + x) * 4;
+      return [d[i], d[i + 1], d[i + 2], d[i + 3]];
+    };
+    const dist = (a: number[], b: number[]) =>
+      Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
+    const c1 = pixAt(2, 2);
+    const c2 = pixAt(w - 3, 2);
+    const c3 = pixAt(2, h - 3);
+    const c4 = pixAt(w - 3, h - 3);
+    const cornerTol = 18;
+    if (dist(c1, c2) > cornerTol || dist(c1, c3) > cornerTol || dist(c1, c4) > cornerTol) {
+      return canvas;
+    }
+    const bg = c1;
+    const pixelTol = 28; // generous — anti-aliasing dust and JPEG noise.
+    const isContent = (x: number, y: number) => dist(pixAt(x, y), bg) > pixelTol;
+    // Scan every 2nd pixel for speed — we only need the bounding-box edges.
+    const step = 2;
+    let top = 0, bottom = h - 1, left = 0, right = w - 1;
+    outer: for (let y = 0; y < h; y += step) {
+      for (let x = 0; x < w; x += step) if (isContent(x, y)) { top = y; break outer; }
+    }
+    outer: for (let y = h - 1; y >= 0; y -= step) {
+      for (let x = 0; x < w; x += step) if (isContent(x, y)) { bottom = y; break outer; }
+    }
+    outer: for (let x = 0; x < w; x += step) {
+      for (let y = top; y <= bottom; y += step) if (isContent(x, y)) { left = x; break outer; }
+    }
+    outer: for (let x = w - 1; x >= 0; x -= step) {
+      for (let y = top; y <= bottom; y += step) if (isContent(x, y)) { right = x; break outer; }
+    }
+    // Pad a few pixels so we don't shave the outermost content.
+    const pad = 4;
+    top = Math.max(0, top - pad);
+    left = Math.max(0, left - pad);
+    bottom = Math.min(h - 1, bottom + pad);
+    right = Math.min(w - 1, right + pad);
+    const tw = right - left + 1;
+    const th = bottom - top + 1;
+    if (tw < 20 || th < 20) return canvas;
+    const removed = 1 - (tw * th) / (w * h);
+    if (removed > 0.85) return canvas; // sanity guard.
+    if (removed < 0.04) return canvas; // not worth a re-encode.
+    const out = document.createElement("canvas");
+    out.width = tw; out.height = th;
+    const octx = out.getContext("2d");
+    if (!octx) return canvas;
+    octx.drawImage(canvas, left, top, tw, th, 0, 0, tw, th);
+    return out;
+  }, []);
+
   const finishWith = useCallback(
     async (target: { kind: "rect"; rect: Rect } | { kind: "element"; el: HTMLElement }) => {
       if (lockRef.current) return;
@@ -105,8 +177,12 @@ export default function CaptureOverlay({ onResult, maxBytes, labels }: Props) {
           ctx.drawImage(full, sx, sy, sw, sh, 0, 0, sw, sh);
         }
 
+        // Auto-trim solid background borders — turns wide-rectangle drags
+        // that landed empty space on the right / bottom into clean shots of
+        // just the actual content.
+        const trimmed = autoTrim(canvas);
         const toBlob = (type: string, q?: number) =>
-          new Promise<Blob | null>((res) => canvas.toBlob(res, type, q));
+          new Promise<Blob | null>((res) => trimmed.toBlob(res, type, q));
         let blob = await toBlob("image/png");
         if (blob && blob.size > maxBytes) blob = await toBlob("image/jpeg", 0.9);
         if (blob && blob.size > maxBytes) blob = await toBlob("image/jpeg", 0.75);
@@ -123,7 +199,7 @@ export default function CaptureOverlay({ onResult, maxBytes, labels }: Props) {
         onResult(null, `${labels.fail} (${msg.slice(0, 140)})`);
       }
     },
-    [maxBytes, onResult, labels.fail],
+    [maxBytes, onResult, labels.fail, autoTrim],
   );
 
   // Find the nearest tagged component under a point (for click-without-drag).
