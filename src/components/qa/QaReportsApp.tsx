@@ -17,6 +17,7 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 import { useScopeContext } from "@/lib/use-scope";
 import { useCommentAttachments, AttachmentStrip, AttachmentThumbs } from "@/components/qa/CommentAttachments";
 import WatchControl from "@/components/qa/WatchControl";
+import ClaudeWorkspaceDrawer from "@/components/qa/ClaudeWorkspaceDrawer";
 import {
   SEVERITIES,
   STATUSES,
@@ -383,6 +384,7 @@ function ReportDetail({
   const [copied, setCopied] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
 
   useEffect(() => {
     setStatus(report.status);
@@ -418,7 +420,18 @@ function ReportDetail({
     setSaving(false);
   }
 
-  function copyDebugPrompt() {
+  async function copyDebugPrompt() {
+    // Phase 6: copy the FULL deterministic workspace prompt; fall back to the
+    // inline summary if the workspace can't be built.
+    try {
+      const res = await fetch(`/api/qa/${report.id}/workspace`, { credentials: "include", cache: "no-store" });
+      const j = await res.json().catch(() => ({}));
+      if (res.ok && j.workspace?.generated_prompt) {
+        await navigator.clipboard?.writeText(j.workspace.generated_prompt as string);
+        setCopied(true); setTimeout(() => setCopied(false), 1800);
+        return;
+      }
+    } catch { /* fall through to the inline summary */ }
     const lines = [
       `Fix this issue reported in KOLEEX Hub (${report.app_module}).`,
       "",
@@ -472,11 +485,18 @@ function ReportDetail({
               Open Route ↗
             </a>
           ) : null}
+          <button type="button" onClick={() => setWorkspaceOpen(true)} className="rounded-lg border border-[var(--accent)]/40 bg-[var(--accent)]/10 px-2.5 py-1.5 text-[11.5px] font-semibold text-[var(--accent)] hover:bg-[var(--accent)]/15">
+            Debug Workspace
+          </button>
           <button type="button" onClick={copyDebugPrompt} className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11.5px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)]">
-            {copied ? "Copied ✓" : "Copy Debug Prompt"}
+            {copied ? "Copied ✓" : "Copy Claude Prompt"}
           </button>
         </div>
       </div>
+
+      {workspaceOpen && (
+        <ClaudeWorkspaceDrawer issueId={report.id} onClose={() => setWorkspaceOpen(false)} onJump={onJump} />
+      )}
 
       <h2 className="text-[16px] font-bold text-[var(--text-primary)]">{report.title}</h2>
 
