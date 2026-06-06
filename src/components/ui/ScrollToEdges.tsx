@@ -22,35 +22,61 @@
      "Scroll to top/bottom" instead of the generic fallback.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const THRESHOLD = 320;
+
+/* Resolve the element that ACTUALLY scrolls. The Koleex shell does NOT scroll
+   on window — RootShell renders content inside `.shell-content-offset` which
+   is `overflow-auto` inside a `100vh overflow-hidden` shell. So window.scrollY
+   is always 0 and a window-scroll listener never fires (this is exactly why
+   the earlier version of this button never appeared — issue 46dba6b3 reopen).
+   We prefer the in-shell scroller, then any large scrollable ancestor, then
+   fall back to the document scrolling element for pages outside the shell. */
+function resolveScroller(): HTMLElement | null {
+  if (typeof document === "undefined") return null;
+  const shell = document.querySelector<HTMLElement>(".shell-content-offset");
+  if (shell && shell.scrollHeight > shell.clientHeight + 4) return shell;
+  // Fallback: the document scroller (pages rendered outside RootShell).
+  const docEl = (document.scrollingElement as HTMLElement) || document.documentElement;
+  return docEl;
+}
 
 export default function ScrollToEdges() {
   const [canUp, setCanUp] = useState(false);
   const [canDown, setCanDown] = useState(false);
+  const scrollerRef = useRef<HTMLElement | null>(null);
 
   const recompute = useCallback(() => {
     if (typeof window === "undefined") return;
-    const doc = document.documentElement;
-    const scrollTop = window.scrollY || doc.scrollTop || 0;
-    const viewport = window.innerHeight || doc.clientHeight || 0;
-    const full = Math.max(doc.scrollHeight, doc.offsetHeight);
+    const el = scrollerRef.current ?? resolveScroller();
+    scrollerRef.current = el;
+    if (!el) return;
+    const scrollTop = el.scrollTop || 0;
+    const viewport = el.clientHeight || 0;
+    const full = el.scrollHeight || 0;
     const distanceToBottom = full - (scrollTop + viewport);
     setCanUp(scrollTop > THRESHOLD);
     setCanDown(distanceToBottom > THRESHOLD);
   }, []);
 
   useEffect(() => {
+    const el = resolveScroller();
+    scrollerRef.current = el;
     recompute();
     const onScroll = () => recompute();
     const onResize = () => recompute();
+    // Listen on the real scroller for scroll; window for resize. Also keep a
+    // window scroll listener as a belt-and-suspenders for the fallback case.
+    el?.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onResize);
-    // Re-evaluate when the body's height changes (lazy lists, image loads).
+    // Re-evaluate when content height changes (lazy lists, image loads,
+    // route changes that swap the inner content).
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(onResize) : null;
-    if (ro && document.body) ro.observe(document.body);
+    if (ro && el) ro.observe(el);
     return () => {
+      el?.removeEventListener("scroll", onScroll);
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onResize);
       if (ro) ro.disconnect();
@@ -60,7 +86,9 @@ export default function ScrollToEdges() {
   if (!canUp && !canDown) return null;
 
   const scrollTo = (y: number) => {
-    try { window.scrollTo({ top: y, behavior: "smooth" }); } catch { window.scrollTo(0, y); }
+    const el = scrollerRef.current ?? resolveScroller();
+    if (!el) return;
+    try { el.scrollTo({ top: y, behavior: "smooth" }); } catch { el.scrollTop = y; }
   };
 
   return (
@@ -88,7 +116,7 @@ export default function ScrollToEdges() {
       {canDown && (
         <button
           type="button"
-          onClick={() => scrollTo(document.documentElement.scrollHeight)}
+          onClick={() => scrollTo((scrollerRef.current ?? resolveScroller())?.scrollHeight ?? 0)}
           title="Scroll to bottom"
           aria-label="Scroll to bottom"
           className="grid h-10 w-10 place-items-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-inverted)] text-[var(--text-inverted)] shadow-lg backdrop-blur-sm transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--border-focus)]"
