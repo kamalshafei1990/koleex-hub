@@ -387,6 +387,7 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
   const [tx, setTx] = useState<{ mode: TxMode; text: string; lang: TxLang } | null>(null);
   const [txBusy, setTxBusy] = useState<TxMode | null>(null);
   const [speaking, setSpeaking] = useState(false);
+  const [paused, setPaused] = useState(false);
 
   const card = "rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3";
   const head = "text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)] mb-1.5";
@@ -480,14 +481,19 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
     if (best) u.voice = best;
     u.rate = 0.98;
     u.pitch = 1;
-    u.onend = () => setSpeaking(false);
-    u.onerror = () => setSpeaking(false);
-    setSpeaking(true);
+    u.onend = () => { setSpeaking(false); setPaused(false); };
+    u.onerror = () => { setSpeaking(false); setPaused(false); };
+    setSpeaking(true); setPaused(false);
     window.speechSynthesis.speak(u);
+  }
+  function pauseResume() {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    if (paused) { window.speechSynthesis.resume(); setPaused(false); }
+    else { window.speechSynthesis.pause(); setPaused(true); }
   }
   function stopSpeak() {
     if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
-    setSpeaking(false);
+    setSpeaking(false); setPaused(false);
   }
   // Warm up the OS voice list (it loads async) so speak() can pick the best
   // one on first press; stop any speech when the panel unmounts.
@@ -584,9 +590,20 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
                 <button type="button" className={btn} onClick={() => runTransform("explain")} disabled={!!txBusy}>
                   {txBusy === "explain" ? t("qa.ai.txWorking", "…") : t("qa.ai.explain", "Explain")}
                 </button>
-                <button type="button" className={btn} onClick={speaking ? stopSpeak : speak}>
-                  {speaking ? `■ ${t("qa.ai.stop", "Stop")}` : `▶ ${t("qa.ai.readAloud", "Read aloud")}`}
-                </button>
+                {!speaking ? (
+                  <button type="button" className={btn} onClick={speak}>
+                    {`▶ ${t("qa.ai.readAloud", "Read aloud")}`}
+                  </button>
+                ) : (
+                  <>
+                    <button type="button" className={btn} onClick={pauseResume}>
+                      {paused ? `▶ ${t("qa.ai.resume", "Resume")}` : `❚❚ ${t("qa.ai.pause", "Pause")}`}
+                    </button>
+                    <button type="button" className={btn} onClick={stopSpeak}>
+                      {`■ ${t("qa.ai.stop", "Stop")}`}
+                    </button>
+                  </>
+                )}
               </div>
 
               {tx && (
