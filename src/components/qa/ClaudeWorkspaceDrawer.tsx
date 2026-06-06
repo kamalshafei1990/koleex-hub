@@ -380,6 +380,12 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
   const [copied, setCopied] = useState(false);
   const { t } = useTranslation(qaT);
 
+  // Koleex AI actions: summarize / Arabic / Chinese / final solution + voice.
+  type TxMode = "summary" | "ar" | "zh" | "solution";
+  const [tx, setTx] = useState<{ mode: TxMode; text: string; lang: string } | null>(null);
+  const [txBusy, setTxBusy] = useState<TxMode | null>(null);
+  const [speaking, setSpeaking] = useState(false);
+
   const card = "rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3";
   const head = "text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)] mb-1.5";
   const btn = "rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11.5px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)] disabled:opacity-50";
@@ -425,6 +431,52 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
     });
   }
 
+  const TX_LANG: Record<TxMode, string> = { summary: "en-US", solution: "en-US", ar: "ar", zh: "zh-CN" };
+  async function runTransform(mode: TxMode) {
+    if (!active?.id || txBusy) return;
+    stopSpeak();
+    setTxBusy(mode); setError(null);
+    try {
+      const res = await fetch(`/api/qa/${issueId}/ai/transform`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ sessionId: active.id, mode }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(humanizeError(j.error ?? `HTTP ${res.status}`));
+      setTx({ mode, text: (j.text as string) ?? "", lang: TX_LANG[mode] });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("qa.ai.txErr", "Koleex AI couldn't process that."));
+    } finally { setTxBusy(null); }
+  }
+
+  /* Read-aloud via the browser's built-in speech synthesis (no backend).
+     Reads whatever is currently shown — the transform result if present,
+     else the analysis — in the matching language. */
+  function speak() {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      setError(t("qa.ai.noTts", "Your browser doesn't support read-aloud."));
+      return;
+    }
+    const text = tx?.text || active?.response_markdown || "";
+    if (!text.trim()) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text.replace(/[#*`>]/g, ""));
+    u.lang = tx?.lang ?? "en-US";
+    u.rate = 1;
+    u.onend = () => setSpeaking(false);
+    u.onerror = () => setSpeaking(false);
+    setSpeaking(true);
+    window.speechSynthesis.speak(u);
+  }
+  function stopSpeak() {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
+    setSpeaking(false);
+  }
+  // Stop any speech when the panel unmounts.
+  useEffect(() => () => stopSpeak(), []);
+
   return (
     <div className="space-y-3">
       {/* Action bar */}
@@ -460,7 +512,9 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-1.5">
             {active.confidence && <span className={`rounded border px-1.5 py-0.5 text-[10px] font-bold ${confidenceTone(active.confidence)}`}>{active.confidence} {t("qa.ai.confidence", "confidence")}</span>}
-            {active.provider && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] text-[var(--text-dim)]">{active.provider}</span>}
+            {/* Branded as Koleex AI — the underlying provider/model stays in the
+                DB for audit but is never surfaced in the UI. */}
+            <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--text-secondary)]">Koleex AI</span>
             {active.status === "failed" && <span className="rounded border border-rose-500/30 px-1.5 py-0.5 text-[10px] font-bold text-rose-500 dark:text-rose-300">{t("qa.ai.failedBadge", "failed")}</span>}
             <span className="text-[10px] text-[var(--text-dim)]">{rel(active.created_at)}</span>
             {(active.tokens_input || active.tokens_output) && (
@@ -472,6 +526,47 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
             : active.status === "failed"
               ? <div className="rounded-xl border border-rose-500/25 bg-rose-500/[0.06] p-3 text-[12px] text-[var(--text-secondary)]">{active.error ?? t("qa.ai.failed", "This analysis failed.")}</div>
               : <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3 text-[12px] text-[var(--text-dim)]">{t("qa.ai.processing", "This analysis is still processing. Re-run if it doesn’t resolve.")}</div>}
+
+          {/* Koleex AI actions — reshape / translate / speak the analysis. */}
+          {active.status === "completed" && active.response_markdown && (
+            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-2.5">
+              <div className="mb-2 flex items-center gap-1.5">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--accent)]" aria-hidden><path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3M18 12h3M16.3 7.7l2.1-2.1M12 12l9 3-4 1-1 4-4-8Z"/></svg>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("qa.ai.koleexActions", "Koleex AI")}</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <button type="button" className={btn} onClick={() => runTransform("summary")} disabled={!!txBusy}>
+                  {txBusy === "summary" ? t("qa.ai.txWorking", "…") : t("qa.ai.summarize", "Summarize")}
+                </button>
+                <button type="button" className={btn} onClick={() => runTransform("solution")} disabled={!!txBusy}>
+                  {txBusy === "solution" ? t("qa.ai.txWorking", "…") : t("qa.ai.solution", "Final solution")}
+                </button>
+                <button type="button" className={btn} onClick={() => runTransform("ar")} disabled={!!txBusy}>
+                  {txBusy === "ar" ? t("qa.ai.txWorking", "…") : t("qa.ai.arabic", "العربية")}
+                </button>
+                <button type="button" className={btn} onClick={() => runTransform("zh")} disabled={!!txBusy}>
+                  {txBusy === "zh" ? t("qa.ai.txWorking", "…") : t("qa.ai.chinese", "中文")}
+                </button>
+                <button type="button" className={btn} onClick={speaking ? stopSpeak : speak}>
+                  {speaking ? `■ ${t("qa.ai.stop", "Stop")}` : `▶ ${t("qa.ai.readAloud", "Read aloud")}`}
+                </button>
+              </div>
+
+              {tx && (
+                <div className="mt-2.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] p-3">
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)]">
+                      {tx.mode === "summary" ? t("qa.ai.summary", "Summary")
+                        : tx.mode === "solution" ? t("qa.ai.proposedFix", "Proposed fix")
+                        : tx.mode === "ar" ? "العربية" : "中文"}
+                    </span>
+                    <button type="button" onClick={() => { stopSpeak(); setTx(null); }} className="text-[11px] text-[var(--text-dim)] hover:text-[var(--text-primary)]" aria-label={t("qa.common.close", "Close")}>✕</button>
+                  </div>
+                  <p dir={tx.lang === "ar" ? "rtl" : "ltr"} className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-[var(--text-secondary)]">{tx.text}</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -486,7 +581,7 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
                   className={`flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-[11.5px] ${s.id === activeId ? "bg-[var(--bg-surface)] text-[var(--text-primary)]" : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]"}`}>
                   <span className={`h-1.5 w-1.5 rounded-full ${s.status === "completed" ? "bg-emerald-500" : s.status === "failed" ? "bg-rose-500" : "bg-amber-500"}`} />
                   <span className="flex-1 truncate">{rel(s.created_at)}{s.confidence ? ` · ${s.confidence}` : ""}</span>
-                  {s.provider && <span className="text-[10px] text-[var(--text-dim)]">{s.provider.split(":")[0]}</span>}
+                  <span className="text-[10px] text-[var(--text-dim)]">Koleex AI</span>
                 </button>
               </li>
             ))}
