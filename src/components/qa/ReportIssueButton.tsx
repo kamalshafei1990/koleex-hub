@@ -18,6 +18,8 @@ import { usePathname } from "next/navigation";
 import MessageSquarePlusIcon from "@/components/icons/ui/MessageSquarePlusIcon";
 import TargetIcon from "@/components/icons/ui/TargetIcon";
 import MonitorIcon from "@/components/icons/ui/MonitorIcon";
+import MinusIcon from "@/components/icons/ui/MinusIcon";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import {
   ISSUE_TYPES,
@@ -95,9 +97,16 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
-  const [selected, setSelected] = useState<PickedComponent | null>(null);
+  // Multi-select: a report can target several components. Each picker run
+  // APPENDS to this list; users add more via "Add another item", and remove
+  // any one independently. Empty list = no specific item.
+  const [selectedList, setSelectedList] = useState<PickedComponent[]>([]);
   const [inspecting, setInspecting] = useState(false);
   const [capturing, setCapturing] = useState(false);
+  // Minimize: collapse the modal to a small floating pill so the reporter can
+  // see / use the screen again WITHOUT losing anything they've typed. The
+  // component stays mounted — all field state is preserved.
+  const [minimized, setMinimized] = useState(false);
   const envRef = useRef<Env | null>(null);
 
   // Live screen capture is supported in modern desktop browsers via the Screen
@@ -111,14 +120,24 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
 
   // Enter inspect mode: hide the modal panel (state is preserved — the
   // component stays mounted), let the global inspector overlay take over, and
-  // capture the picked component when the user clicks one (or Esc cancels).
+  // append the picked component to the list (Esc cancels without changes).
+  // Picks are deduped by component+section+recordId so re-clicking the same
+  // element doesn't add a phantom duplicate.
   const pickComponent = useCallback(() => {
     setInspecting(true);
     inspector.start((c) => {
       setInspecting(false);
-      if (c) setSelected(c);
+      if (!c) return;
+      setSelectedList((prev) => {
+        const key = `${c.component}|${c.section ?? ""}|${c.recordId ?? ""}`;
+        if (prev.some((p) => `${p.component}|${p.section ?? ""}|${p.recordId ?? ""}` === key)) return prev;
+        return [...prev, c];
+      });
     });
   }, [inspector]);
+  const removePick = useCallback((idx: number) => {
+    setSelectedList((prev) => prev.filter((_, i) => i !== idx));
+  }, []);
 
   // Capture environment once on open.
   if (!envRef.current && typeof window !== "undefined") {
@@ -295,12 +314,14 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
           screen_size: env.screenSize,
           language: env.language,
           timezone: env.timezone,
-          // Phase-2 component inspection metadata (null when not selected).
-          component_name: selected?.component ?? null,
-          component_module: selected?.module ?? null,
-          component_section: selected?.section ?? null,
-          component_record_id: selected?.recordId ?? null,
-          component_rect: selected?.rect ?? null,
+          // Phase-2 component inspection metadata. The scalar fields mirror the
+          // first pick (back-compat); `components` carries all picks (multi-select).
+          component_name: selectedList[0]?.component ?? null,
+          component_module: selectedList[0]?.module ?? null,
+          component_section: selectedList[0]?.section ?? null,
+          component_record_id: selectedList[0]?.recordId ?? null,
+          component_rect: selectedList[0]?.rect ?? null,
+          components: selectedList.length > 0 ? selectedList : null,
         }),
       });
       const j = await res.json().catch(() => ({}));
@@ -326,6 +347,31 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   // The panel returns on pick / Esc / once the capture frame is taken.
   if (inspecting || capturing) return null;
 
+  // Minimized: render a small floating pill instead of the full modal. All
+  // form state is preserved because this component stays mounted; we just
+  // swap what's rendered. Clicking the pill restores the full modal exactly
+  // as the user left it (title, description, picked items, screenshot…).
+  if (minimized) {
+    const draftLabel = title.trim() || t("qa.report.minimizedDraft", "Draft report");
+    return (
+      <button
+        type="button"
+        onClick={() => setMinimized(false)}
+        aria-label={t("qa.report.restore", "Restore report")}
+        title={t("qa.report.restore", "Restore report")}
+        className="fixed end-6 bottom-[5.25rem] z-[80] flex max-w-[260px] items-center gap-2 rounded-full border border-[var(--border-color)] bg-[var(--bg-secondary)]/95 px-3.5 py-2 text-[12.5px] font-medium text-[var(--text-primary)] shadow-lg backdrop-blur-md transition-colors hover:border-[var(--border-focus)]"
+      >
+        <MessageSquarePlusIcon size={14} className="shrink-0 text-[var(--text-secondary)]" />
+        <span className="truncate">{draftLabel}</span>
+        {selectedList.length > 0 && (
+          <span className="shrink-0 rounded-full bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--text-secondary)]">
+            {selectedList.length}
+          </span>
+        )}
+      </button>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-[200] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={t("qa.report.title", "Report an issue")} onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
       <div className="flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-2xl sm:max-w-[560px] sm:rounded-2xl">
@@ -335,7 +381,20 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
             <MessageSquarePlusIcon size={16} className="text-[var(--text-secondary)]" />
             <h2 className="text-[14px] font-bold">{t("qa.report.title", "Report an issue")}</h2>
           </div>
-          <button type="button" onClick={() => !busy && onClose()} aria-label={t("qa.report.close", "Close")} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]">✕</button>
+          <div className="flex items-center gap-1">
+            {/* Minimize → collapses the modal to a small floating pill so the
+                reporter can see the screen again. All entered data is kept. */}
+            <button
+              type="button"
+              onClick={() => !busy && setMinimized(true)}
+              aria-label={t("qa.report.minimize", "Minimize")}
+              title={t("qa.report.minimize", "Minimize")}
+              className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--text-dim)] transition-colors hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
+            >
+              <MinusIcon size={14} />
+            </button>
+            <button type="button" onClick={() => !busy && onClose()} aria-label={t("qa.report.close", "Close")} className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--text-dim)] transition-colors hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]">✕</button>
+          </div>
         </div>
 
         {done ? (
@@ -353,25 +412,46 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                 <span className="truncate rounded-md bg-[var(--bg-surface)] px-1.5 py-0.5 font-mono">{env.route}</span>
               </div>
 
-              {/* Component inspector — pick a specific UI component for this report. */}
-              {selected ? (
-                <div className="flex items-start gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] px-3 py-2">
-                  <span className="mt-0.5 text-[var(--text-secondary)]"><TargetIcon size={14} /></span>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[12.5px] font-semibold text-[var(--text-primary)]">
-                      {selected.component}
-                      {selected.fallback ? <span className="ml-1 text-[10px] font-normal text-[var(--text-ghost)]">{t("qa.report.untagged", "(untagged)")}</span> : null}
+              {/* Component inspector — pick one OR MANY specific UI components.
+                  Each pick is appended as its own row; an "Add another item"
+                  CTA re-opens the picker. Each row is independently removable. */}
+              {selectedList.length > 0 ? (
+                <div className="space-y-2">
+                  {selectedList.map((sel, idx) => (
+                    <div key={`${sel.component}-${idx}`} className="flex items-start gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] px-3 py-2">
+                      <span className="mt-0.5 text-[var(--text-secondary)]"><TargetIcon size={14} /></span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[12.5px] font-semibold text-[var(--text-primary)]">
+                          {selectedList.length > 1 && (
+                            <span className="me-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[var(--bg-surface)] px-1 text-[10px] font-bold text-[var(--text-secondary)]">{idx + 1}</span>
+                          )}
+                          {sel.component}
+                          {sel.fallback ? <span className="ml-1 text-[10px] font-normal text-[var(--text-ghost)]">{t("qa.report.untagged", "(untagged)")}</span> : null}
+                        </div>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[10.5px] text-[var(--text-dim)]">
+                          {sel.module ? <span>{sel.module}</span> : null}
+                          {sel.section ? <span>· {sel.section}</span> : null}
+                          {sel.recordId ? <span>· #{sel.recordId}</span> : null}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removePick(idx)}
+                        aria-label={t("qa.report.removeItem", "Remove this item")}
+                        title={t("qa.report.removeItem", "Remove this item")}
+                        className="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium text-[var(--text-dim)] transition-colors hover:text-[var(--text-primary)]"
+                      >
+                        ✕
+                      </button>
                     </div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[10.5px] text-[var(--text-dim)]">
-                      {selected.module ? <span>{selected.module}</span> : null}
-                      {selected.section ? <span>· {selected.section}</span> : null}
-                      {selected.recordId ? <span>· #{selected.recordId}</span> : null}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <button type="button" onClick={pickComponent} className="rounded-md px-2 py-1 text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("qa.report.reselect", "Re-select")}</button>
-                    <button type="button" onClick={() => setSelected(null)} className="rounded-md px-2 py-1 text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("qa.report.clear", "Clear")}</button>
-                  </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={pickComponent}
+                    className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[var(--border-color)] py-1.5 text-[11.5px] font-medium text-[var(--text-dim)] transition-colors hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
+                  >
+                    <PlusIcon size={12} /> {t("qa.report.addAnotherItem", "Add another item")}
+                  </button>
                 </div>
               ) : (
                 <button

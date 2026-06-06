@@ -88,6 +88,13 @@ export async function POST(req: Request) {
       body.component_rect && typeof body.component_rect === "object" && !Array.isArray(body.component_rect)
         ? body.component_rect
         : null,
+    // Multi-select: the reporter can pick several components in one report.
+    // The scalar component_* fields mirror the first entry for back-compat with
+    // any consumer that hasn't been updated yet. Cap at 20 to keep payloads sane.
+    components:
+      Array.isArray(body.components) && body.components.length > 0
+        ? (body.components as unknown[]).slice(0, 20).filter((c) => c && typeof c === "object" && !Array.isArray(c))
+        : null,
     // Future-ready fields (accepted if a client sends them; UI not wired yet).
     component_path: clampStr(body.component_path, 300),
     data_entity: clampStr(body.data_entity, 80),
