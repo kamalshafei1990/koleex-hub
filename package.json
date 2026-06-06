@@ -59,6 +59,7 @@
     "@tiptap/starter-kit": "^3.22.3",
     "@types/papaparse": "^5.5.2",
     "country-state-city": "^3.2.1",
+    "html2canvas": "^1.4.1",
     "jsbarcode": "^3.12.3",
     "lottie-react": "^2.4.1",
     "next": "16.2.2",

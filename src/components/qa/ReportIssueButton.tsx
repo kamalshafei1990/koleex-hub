@@ -20,6 +20,7 @@ import TargetIcon from "@/components/icons/ui/TargetIcon";
 import MonitorIcon from "@/components/icons/ui/MonitorIcon";
 import MinusIcon from "@/components/icons/ui/MinusIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
+import CaptureOverlay from "@/components/qa/CaptureOverlay";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import {
   ISSUE_TYPES,
@@ -74,6 +75,7 @@ export default function ReportIssueButton() {
         onClick={() => setOpen(true)}
         title={t("qa.report.fabTitle", "Report an issue or suggestion")}
         aria-label={t("qa.report.title", "Report an issue")}
+        data-qa-capture-skip=""
         className="fixed end-6 bottom-[5.25rem] z-[80] flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--bg-secondary)]/95 text-[var(--text-secondary)] shadow-lg backdrop-blur-md transition-colors hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]"
       >
         <MessageSquarePlusIcon size={17} />
@@ -109,12 +111,11 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   const [minimized, setMinimized] = useState(false);
   const envRef = useRef<Env | null>(null);
 
-  // Live screen capture is supported in modern desktop browsers via the Screen
-  // Capture API. On most mobile browsers it's unavailable — there the user still
-  // has upload / paste / drag (and the OS camera).
+  // In-app DOM capture: no OS / browser permission, no share picker. Mobile
+  // gets the upload-only flow (advanced area select would fight touch UX).
   const captureSupported =
-    typeof navigator !== "undefined" &&
-    typeof navigator.mediaDevices?.getDisplayMedia === "function";
+    typeof window !== "undefined" &&
+    !/Mobi|Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const inspector = useInspector();
 
@@ -164,101 +165,24 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
     setPreviewUrl((u) => { if (u) URL.revokeObjectURL(u); return URL.createObjectURL(f); });
   }, []);
 
-  // Take a live screenshot of the screen / window / tab — the browser shows its
-  // own native picker (same idea as the macOS screenshot tool or WeChat capture).
-  // We hide the report panel during the grab so it isn't in the shot, then attach
-  // the captured frame exactly like an uploaded image.
-  const captureScreenshot = useCallback(async () => {
+  // Enter in-app capture mode. The modal hides itself, the CaptureOverlay
+  // takes over (drag to select OR click a tagged component), and the result
+  // flows back through setImage() — same pipeline as upload / paste / drag.
+  const captureScreenshot = useCallback(() => {
     if (busy || capturing) return;
     setError(null);
-    const md = navigator.mediaDevices;
-    if (!md || typeof md.getDisplayMedia !== "function") {
-      setError(t("qa.report.captureUnsupported", "Your browser can't capture the screen here — please upload an image instead."));
-      return;
-    }
-
-    let stream: MediaStream;
-    try {
-      // Must run synchronously inside the click gesture — call it immediately,
-      // with the simplest possible constraints for the widest browser support.
-      stream = await md.getDisplayMedia({ video: true, audio: false });
-    } catch (e) {
-      const name = e instanceof DOMException ? e.name : "";
-      // A genuine user-cancel of the picker (AbortError) → stay silent.
-      // Anything else (incl. NotAllowedError from a blocked context, or the
-      // OS withholding Screen-Recording permission) → tell them, with a code.
-      if (name !== "AbortError") {
-        const hint = name === "NotAllowedError"
-          ? t("qa.report.captureBlocked", "Screen capture was blocked or cancelled. If you meant to allow it, check your browser / system screen-recording permission — or just upload an image.")
-          : t("qa.report.captureFail", "Couldn't capture the screen. Try uploading instead.");
-        setError(name ? `${hint} (${name})` : hint);
-      }
-      return;
-    }
-
-    // Hide the modal so the screenshot shows the page underneath, not this panel.
     setCapturing(true);
-    const video = document.createElement("video");
-    try {
-      video.srcObject = stream;
-      video.muted = true;
-      (video as HTMLVideoElement).playsInline = true;
-      // Some browsers only paint frames for a video that's actually in the DOM,
-      // so attach it off-screen (1px, invisible) for the duration of the grab.
-      video.style.cssText = "position:fixed;left:-99999px;top:0;width:2px;height:2px;opacity:0;pointer-events:none;";
-      document.body.appendChild(video);
-      await video.play().catch(() => {});
+  }, [busy, capturing]);
 
-      // Wait for a REAL painted frame before drawing (avoids black/blank shots),
-      // and give the panel a beat to disappear. requestVideoFrameCallback is the
-      // reliable signal where available; otherwise fall back to loadeddata + delay.
-      await new Promise<void>((res) => {
-        let settled = false;
-        const finish = () => { if (!settled) { settled = true; res(); } };
-        const v = video as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number };
-        if (typeof v.requestVideoFrameCallback === "function") {
-          v.requestVideoFrameCallback(() => setTimeout(finish, 200));
-        } else if (video.readyState >= 2) {
-          setTimeout(finish, 320);
-        } else {
-          video.onloadeddata = () => setTimeout(finish, 320);
-        }
-        setTimeout(finish, 1500); // hard cap so we never hang
-      });
-
-      const w = video.videoWidth || 1280;
-      const h = video.videoHeight || 720;
-      // Cap the longest side so the file stays well under the 5 MB limit.
-      const maxSide = 1920;
-      const scale = Math.max(w, h) > maxSide ? maxSide / Math.max(w, h) : 1;
-      const tw = Math.max(1, Math.round(w * scale));
-      const th = Math.max(1, Math.round(h * scale));
-
-      const canvas = document.createElement("canvas");
-      canvas.width = tw; canvas.height = th;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("no-2d-context");
-      ctx.drawImage(video, 0, 0, tw, th);
-
-      const toBlob = (type: string, q?: number) =>
-        new Promise<Blob | null>((res) => canvas.toBlob(res, type, q));
-      let blob = await toBlob("image/png");
-      if (blob && blob.size > MAX_BYTES) blob = await toBlob("image/jpeg", 0.9);
-
-      if (blob && blob.size > 0) {
-        const ext = blob.type === "image/jpeg" ? "jpg" : "png";
-        setImage(new File([blob], `screenshot-${Date.now()}.${ext}`, { type: blob.type }));
-      } else {
-        setError(t("qa.report.captureFail", "Couldn't capture the screen. Try uploading instead."));
-      }
-    } catch {
-      setError(t("qa.report.captureFail", "Couldn't capture the screen. Try uploading instead."));
-    } finally {
-      try { stream.getTracks().forEach((tr) => tr.stop()); } catch { /* no-op */ }
-      try { video.srcObject = null; video.remove(); } catch { /* no-op */ }
+  // Receives the file (or null = cancelled) from CaptureOverlay.
+  const onCaptureResult = useCallback(
+    (f: File | null, errMsg?: string) => {
       setCapturing(false);
-    }
-  }, [busy, capturing, setImage, t]);
+      if (errMsg) { setError(errMsg); return; }
+      if (f) setImage(f);
+    },
+    [setImage],
+  );
 
   // Esc to close, paste-to-attach while the modal is open.
   useEffect(() => {
@@ -342,10 +266,27 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   const field = "w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--border-focus)] placeholder:text-[var(--text-ghost)]";
   const label = "block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-1";
 
-  // While inspecting (or grabbing a live screenshot), hide the panel entirely
-  // (state preserved) so it doesn't obstruct the overlay / appear in the shot.
-  // The panel returns on pick / Esc / once the capture frame is taken.
-  if (inspecting || capturing) return null;
+  // While inspecting, hide the panel entirely so the inspector overlay is
+  // unobstructed. Comes back on pick / Esc.
+  if (inspecting) return null;
+
+  // While capturing, swap the modal for the CaptureOverlay. The modal's local
+  // state is preserved (the component stays mounted; we just render different
+  // content). On cancel/result the overlay calls onCaptureResult, which flips
+  // `capturing` back off and the modal returns.
+  if (capturing) {
+    return (
+      <CaptureOverlay
+        onResult={onCaptureResult}
+        maxBytes={MAX_BYTES}
+        labels={{
+          hint: t("qa.report.captureHint", "Drag to select an area · click a component · Esc to cancel"),
+          rendering: t("qa.report.captureRendering", "Rendering screenshot…"),
+          fail: t("qa.report.captureFail", "Couldn't capture. Try uploading instead."),
+        }}
+      />
+    );
+  }
 
   // Minimized: render a small floating pill instead of the full modal. All
   // form state is preserved because this component stays mounted; we just
@@ -359,6 +300,7 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
         onClick={() => setMinimized(false)}
         aria-label={t("qa.report.restore", "Restore report")}
         title={t("qa.report.restore", "Restore report")}
+        data-qa-capture-skip=""
         className="fixed end-6 bottom-[5.25rem] z-[80] flex max-w-[260px] items-center gap-2 rounded-full border border-[var(--border-color)] bg-[var(--bg-secondary)]/95 px-3.5 py-2 text-[12.5px] font-medium text-[var(--text-primary)] shadow-lg backdrop-blur-md transition-colors hover:border-[var(--border-focus)]"
       >
         <MessageSquarePlusIcon size={14} className="shrink-0 text-[var(--text-secondary)]" />
@@ -498,7 +440,7 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
 
               {/* Screenshot */}
               <div>
-                <label className={label}>{t("qa.report.screenshot", "Screenshot")} <span className="font-normal normal-case text-[var(--text-ghost)]">{t("qa.report.screenshotHint", "(capture live, upload, paste or drag — PNG/JPG/WEBP)")}</span></label>
+                <label className={label}>{t("qa.report.screenshot", "Screenshot")} <span className="font-normal normal-case text-[var(--text-ghost)]">{t("qa.report.screenshotHint", "(capture an area, upload, paste or drag — PNG/JPG/WEBP)")}</span></label>
                 {previewUrl ? (
                   <div className="relative overflow-hidden rounded-lg border border-[var(--border-color)]">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -516,7 +458,7 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                         className="flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] py-2.5 text-[12.5px] font-semibold text-[var(--text-primary)] transition-colors hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)]"
                       >
                         <MonitorIcon size={15} className="text-[var(--text-secondary)]" />
-                        {t("qa.report.takeScreenshot", "Take a screenshot now")}
+                        {t("qa.report.takeScreenshot", "Capture an area or component")}
                       </button>
                     )}
                     <button
