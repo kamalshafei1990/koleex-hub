@@ -19,7 +19,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 // One fixed voice for all users + all languages (eleven_multilingual_v2 speaks
 // en/ar/zh with the same voice). Default = "Sarah" (EXAVITQu4vr4xnSDxMaL), a
@@ -29,7 +29,11 @@ export const maxDuration = 30;
 // tier returns 402 "Free users cannot use library voices via the API".
 // Male alternative that also works free: George = JBFqnCBsd6RMkjVDRZzb.
 const VOICE_ID = process.env.ELEVENLABS_VOICE_ID || "EXAVITQu4vr4xnSDxMaL";
-const MODEL = process.env.ELEVENLABS_MODEL || "eleven_multilingual_v2";
+// Turbo v2.5 is multilingual (en/ar/zh) AND fast (~4s vs ~20s for
+// multilingual_v2). The slow model was timing out (504) on full-length
+// analyses → the client fell back to the robotic browser voice. Override
+// via ELEVENLABS_MODEL if needed.
+const MODEL = process.env.ELEVENLABS_MODEL || "eleven_turbo_v2_5";
 
 export async function POST(req: Request) {
   const auth = await requireAuth();
