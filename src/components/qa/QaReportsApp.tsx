@@ -937,7 +937,11 @@ function ReportDetail({
 
   const label = "block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-1";
   const box = "rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap break-words";
-  const input = "w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
+  // min-h-[38px] enforces a consistent height floor so native <select>
+  // elements match the AssigneePicker button (which is taller because of its
+  // inner avatar pill). Without this, the Priority dropdown rendered visibly
+  // thinner than the Assigned-to picker beside it — issue 06ae2743.
+  const input = "w-full min-h-[38px] rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
 
   const ready = isClaudeReady(report);
   const isResolved = (RESOLVED_STATUSES as string[]).includes(report.status) || report.status === "closed";
@@ -1156,7 +1160,7 @@ function AssigneePicker({
         type="button"
         disabled={disabled}
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-left text-[13px] text-[var(--text-primary)] outline-none transition-colors hover:bg-[var(--bg-surface-hover)] disabled:opacity-50"
+        className="flex w-full min-h-[38px] items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-left text-[13px] text-[var(--text-primary)] outline-none transition-colors hover:bg-[var(--bg-surface-hover)] disabled:opacity-50"
       >
         {current ? (
           <>

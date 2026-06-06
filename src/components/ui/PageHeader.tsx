@@ -362,7 +362,12 @@ function SlidingPillNav({
         scrollSnapType: "x mandatory",
         scrollPaddingLeft: `${TRACK_PADDING}px`,
       }}
-      className="relative inline-flex max-w-full overflow-x-auto rounded-[14px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      // Subtle but visible thin scrollbar — issue 4c9884b1 (Mustafa) reported
+      // there was no scroll affordance when the nav overflowed. Hiding the
+      // bar completely hid the fact that more tabs existed off-screen. A
+      // thin, low-contrast scrollbar gives the cue without harming the
+      // brand-minimal aesthetic.
+      className="relative inline-flex max-w-full overflow-x-auto rounded-[14px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-1.5 [scrollbar-width:thin] [scrollbar-color:var(--border-color)_transparent] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-[var(--border-color)] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
     >
       {/* The sliding indicator — single absolutely-positioned element that
           glides between active tabs via `transform: translateX(...)`.

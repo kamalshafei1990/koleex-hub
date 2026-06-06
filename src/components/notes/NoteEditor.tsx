@@ -116,7 +116,11 @@ export default function NoteEditor({
     editorProps: {
       attributes: {
         class:
-          "notes-editor prose prose-invert prose-sm md:prose-base max-w-none focus:outline-none min-h-[60vh] text-[var(--text-primary)]",
+          // Issue 75570338 (Mustafa): the editable area felt small. Bumped
+          // the minimum height from 60vh to 80vh so the editor becomes the
+          // dominant surface in the window, matching the "main interface"
+          // expectation. md:prose-lg also widens type for readability.
+          "notes-editor prose prose-invert prose-sm md:prose-lg max-w-none focus:outline-none min-h-[80vh] text-[var(--text-primary)]",
       },
     },
     onUpdate: ({ editor: ed }) => {

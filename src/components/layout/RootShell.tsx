@@ -15,6 +15,7 @@ import Sidebar from "./Sidebar";
 import FloatingPanel from "./FloatingPanel";
 import ViewAsBanner from "./ViewAsBanner";
 import ReportIssueButton from "@/components/qa/ReportIssueButton";
+import ScrollToEdges from "@/components/ui/ScrollToEdges";
 import { QAInspectorProvider } from "@/lib/qa/inspector";
 import {
   SidebarProvider,
@@ -90,6 +91,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       <FloatingPanel />
       {/* Global QA issue reporter (floating button + modal). */}
       <ReportIssueButton />
+      {/* System-wide scroll-to-top/bottom (issue 46dba6b3). */}
+      <ScrollToEdges />
     </QAInspectorProvider>
   );
 }
