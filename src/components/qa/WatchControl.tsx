@@ -29,7 +29,7 @@ export default function WatchControl({ issueId, showWatchers = false }: { issueI
   const [err, setErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    setLoading(true); setErr(null);
     try {
       const res = await fetch(`/api/qa/${issueId}/watchers`, { credentials: "include", cache: "no-store" });
       const j = await res.json().catch(() => ({}));
@@ -37,7 +37,12 @@ export default function WatchControl({ issueId, showWatchers = false }: { issueI
         setCount(j.count ?? 0);
         setWatching(!!j.is_watching);
         setWatchers(j.watchers ?? []);
+      } else {
+        // Don't present "Watch / 0" as authoritative when the load failed.
+        setErr(humanizeError(j.error ?? `HTTP ${res.status}`));
       }
+    } catch {
+      setErr("Couldn't load watch state.");
     } finally { setLoading(false); }
   }, [issueId]);
   useEffect(() => { void load(); }, [load]);

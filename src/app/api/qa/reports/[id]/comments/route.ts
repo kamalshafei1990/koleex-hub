@@ -61,7 +61,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 
 /* POST /api/qa/reports/[id]/comments — add a reply / internal note. */
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAuth();
+  const auth = await requireAuth(req); // block comment writes while in view-as mode
   if (auth instanceof NextResponse) return auth;
   if (!auth.is_super_admin) return NextResponse.json({ error: "Not authorised." }, { status: 403 });
 

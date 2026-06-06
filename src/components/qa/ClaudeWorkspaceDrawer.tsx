@@ -466,7 +466,7 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
             ? <AiReport markdown={active.response_markdown} />
             : active.status === "failed"
               ? <div className="rounded-xl border border-rose-500/25 bg-rose-500/[0.06] p-3 text-[12px] text-[var(--text-secondary)]">{active.error ?? "This analysis failed."}</div>
-              : null}
+              : <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3 text-[12px] text-[var(--text-dim)]">This analysis is still processing. Re-run if it doesn’t resolve.</div>}
         </div>
       )}
 

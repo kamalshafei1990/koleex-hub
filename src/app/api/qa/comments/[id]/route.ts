@@ -7,7 +7,7 @@ import { requireAuth } from "@/lib/server/auth";
 /* PATCH /api/qa/comments/[id] — edit a comment's message (author or admin).
    Stamps edited_at so the UI can show "(edited)". */
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAuth();
+  const auth = await requireAuth(req); // block comment edits while in view-as mode
   if (auth instanceof NextResponse) return auth;
   if (!auth.is_super_admin) return NextResponse.json({ error: "Not authorised." }, { status: 403 });
 
@@ -29,8 +29,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 }
 
 /* DELETE /api/qa/comments/[id] — remove a comment (admin). */
-export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAuth();
+export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const auth = await requireAuth(req); // block comment deletes while in view-as mode
   if (auth instanceof NextResponse) return auth;
   if (!auth.is_super_admin) return NextResponse.json({ error: "Not authorised." }, { status: 403 });
 

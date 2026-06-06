@@ -78,7 +78,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
      • triage notes / commit    { developer_notes, resolution_summary, fixed_commit }
    Every meaningful change is mirrored into qa_issue_activity. */
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAuth();
+  const auth = await requireAuth(req); // block QA workflow writes while in view-as mode
   if (auth instanceof NextResponse) return auth;
   if (!auth.is_super_admin) {
     return NextResponse.json({ error: "Not authorised." }, { status: 403 });
@@ -106,6 +106,11 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   // ── Reopen ────────────────────────────────────────────────────────────
   // Preserves prior resolution_summary / fixed_commit; only flips the status.
   if (body.action === "reopen") {
+    // Only a resolved issue can be reopened — guards against inflating
+    // reopen_count and emitting a spurious "reopened" event on a live issue.
+    if (!(RESOLVED_STATUSES as string[]).includes(cur.status as string)) {
+      return NextResponse.json({ error: "Only a resolved issue can be reopened." }, { status: 400 });
+    }
     const reason = typeof body.reopen_reason === "string" ? body.reopen_reason.trim().slice(0, 2000) : null;
     patch.status = "reopened" satisfies IssueStatus;
     patch.reopened_at = now;

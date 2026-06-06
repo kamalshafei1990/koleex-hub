@@ -60,8 +60,12 @@ export function useCommentAttachments(): AttachmentUploader {
   const addFiles = useCallback(async (files: FileList | File[]) => {
     const list = Array.from(files);
     setError(null);
+    // Track the count synchronously — stagedRef only updates after render, so a
+    // multi-file batch would otherwise blow past MAX_COUNT (all iterations read
+    // the same stale length) and then get rejected by the server on post.
+    let projected = stagedRef.current.length;
     for (const f of list) {
-      if (stagedRef.current.length >= MAX_COUNT) { setError(`Up to ${MAX_COUNT} images per comment.`); break; }
+      if (projected >= MAX_COUNT) { setError(`Up to ${MAX_COUNT} images per comment.`); break; }
       if (!ALLOWED.includes(f.type)) { setError("Only PNG, JPG or WEBP images are allowed."); continue; }
       if (f.size > MAX_BYTES) { setError("Image is too large (max 5 MB)."); continue; }
       setUploading(true);
@@ -73,6 +77,7 @@ export function useCommentAttachments(): AttachmentUploader {
         if (!res.ok || !j.path) throw new Error(j.error || "Upload failed.");
         const item: Staged = { path: j.path, name: f.name, type: f.type, size: f.size, previewUrl: URL.createObjectURL(f) };
         setStaged((prev) => [...prev, item]);
+        projected++;
       } catch (e) {
         setError(e instanceof Error ? e.message : "Upload failed.");
       } finally {

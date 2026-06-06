@@ -344,6 +344,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
               allReports={reports}
               myId={myId}
               onUpdated={onUpdated}
+              onRefresh={load}
               onJump={(id) => setSelectedId(id)}
             />
           ) : extraMissing ? (
@@ -376,15 +377,19 @@ function stepIndex(status: IssueStatus): number {
 }
 
 function ReportDetail({
-  report, assignees, allReports, myId, onUpdated, onJump,
+  report, assignees, allReports, myId, onUpdated, onRefresh, onJump,
 }: {
   report: QaReport;
   assignees: QaAssignee[];
   allReports: QaReport[];
   myId: string | null;
   onUpdated: (r: QaReport) => void;
+  onRefresh?: () => void;
   onJump: (id: string) => void;
 }) {
+  // Bumped after any successful mutation so the Discussion/Activity panels
+  // reload (the server writes a timeline event we'd otherwise miss).
+  const [refreshKey, setRefreshKey] = useState(0);
   const [status, setStatus] = useState<IssueStatus>(report.status);
   const [notes, setNotes] = useState(report.developer_notes ?? "");
   const [resolution, setResolution] = useState(report.resolution_summary ?? "");
@@ -416,12 +421,17 @@ function ReportDetail({
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(humanizeError(j.error ?? `HTTP ${res.status}`));
       if (j.report) onUpdated(j.report as QaReport);
+      // Reconcile the list (a changed field may now match/violate the active
+      // filter) and reload the Discussion/Activity panels (the server logged a
+      // new timeline event).
+      onRefresh?.();
+      setRefreshKey((k) => k + 1);
       return true;
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Couldn't save.");
       return false;
     } finally { setBusy(false); }
-  }, [report.id, onUpdated]);
+  }, [report.id, onUpdated, onRefresh]);
 
   async function saveTriage() {
     setSaving(true); setErr(null); setSaved(false);
@@ -483,6 +493,9 @@ function ReportDetail({
 
   return (
     <div className="max-h-[72vh] space-y-4 overflow-y-auto px-5 py-4">
+      {/* Action error — surfaced at the top so priority/assignee/duplicate/
+          reopen failures aren't hidden in a section the user isn't viewing. */}
+      {err && <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-500 dark:text-rose-300">{err}</div>}
       {/* Badges row */}
       <div className="flex flex-wrap items-center gap-1.5">
         <span className={`${PILL} ${SEVERITY_TONE[report.severity]}`}>{SEVERITY_LABEL[report.severity]}</span>
@@ -620,7 +633,6 @@ function ReportDetail({
           <label className={label}>Fixed commit</label>
           <input value={commit} onChange={(e) => setCommit(e.target.value)} className={`${input} font-mono`} placeholder="e.g. a5b5481d" />
         </div>
-        {err && <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-500 dark:text-rose-300">{err}</div>}
         <div className="flex items-center justify-end gap-2">
           {saved && <span className="text-[12px] text-emerald-500">Saved ✓</span>}
           <button type="button" onClick={saveTriage} disabled={saving} className="rounded-lg bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-50">
@@ -630,8 +642,8 @@ function ReportDetail({
       </div>
 
       {/* Discussion + Activity */}
-      <CommentsPanel issueId={report.id} myId={myId} />
-      <ActivityPanel issueId={report.id} />
+      <CommentsPanel issueId={report.id} myId={myId} refreshKey={refreshKey} />
+      <ActivityPanel issueId={report.id} refreshKey={refreshKey} />
     </div>
   );
 }
@@ -803,9 +815,10 @@ function ReopenControl({ disabled, onReopen }: { disabled?: boolean; onReopen: (
 }
 
 /* ── Comments / discussion ───────────────────────────────────────────────── */
-function CommentsPanel({ issueId, myId }: { issueId: string; myId: string | null }) {
+function CommentsPanel({ issueId, myId, refreshKey = 0 }: { issueId: string; myId: string | null; refreshKey?: number }) {
   const [comments, setComments] = useState<QaComment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
   const [text, setText] = useState("");
   const [internal, setInternal] = useState(false);
   const [posting, setPosting] = useState(false);
@@ -813,14 +826,18 @@ function CommentsPanel({ issueId, myId }: { issueId: string; myId: string | null
   const att = useCommentAttachments();
 
   const load = useCallback(async () => {
-    setLoading(true);
+    setLoading(true); setLoadErr(null);
     try {
       const res = await fetch(`/api/qa/reports/${issueId}/comments`, { credentials: "include", cache: "no-store" });
       const j = await res.json().catch(() => ({}));
       if (res.ok) setComments(j.comments ?? []);
+      else setLoadErr(humanizeError(j.error ?? `HTTP ${res.status}`));
+    } catch {
+      setLoadErr("Couldn't load the discussion.");
     } finally { setLoading(false); }
   }, [issueId]);
-  useEffect(() => { void load(); }, [load]);
+  // Reload on mount, on issue change, and after any detail mutation (refreshKey).
+  useEffect(() => { void load(); }, [load, refreshKey]);
 
   async function post() {
     const message = text.trim();
@@ -848,6 +865,8 @@ function CommentsPanel({ issueId, myId }: { issueId: string; myId: string | null
 
       {loading ? (
         <div className="py-3 text-center text-[12px] text-[var(--text-dim)]">Loading…</div>
+      ) : loadErr ? (
+        <div className="py-3 text-center text-[12px] text-rose-500 dark:text-rose-300">{loadErr}</div>
       ) : comments.length === 0 ? (
         <div className="py-3 text-center text-[12px] text-[var(--text-dim)]">No comments yet. Start the thread below.</div>
       ) : (
@@ -896,20 +915,26 @@ function CommentsPanel({ issueId, myId }: { issueId: string; myId: string | null
 }
 
 /* ── Activity timeline ───────────────────────────────────────────────────── */
-function ActivityPanel({ issueId }: { issueId: string }) {
+function ActivityPanel({ issueId, refreshKey = 0 }: { issueId: string; refreshKey?: number }) {
   const [activity, setActivity] = useState<QaActivity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
 
+  // Reload on mount, on issue change, and after any detail mutation (refreshKey)
+  // so the freshly-logged timeline event shows without reopening the issue.
   useEffect(() => {
     let alive = true;
-    setLoading(true);
+    setLoading(true); setLoadErr(null);
     fetch(`/api/qa/reports/${issueId}/activity`, { credentials: "include", cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : { activity: [] }))
+      .then(async (r) => {
+        if (!r.ok) { if (alive) setLoadErr("Couldn't load the activity timeline."); return { activity: [] }; }
+        return r.json();
+      })
       .then((j) => { if (alive) setActivity(j.activity ?? []); })
-      .catch(() => {})
+      .catch(() => { if (alive) setLoadErr("Couldn't load the activity timeline."); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [issueId]);
+  }, [issueId, refreshKey]);
 
   function describe(a: QaActivity): string {
     const verb = ACTIVITY_LABEL[a.activity_type] ?? a.activity_type;
@@ -928,6 +953,8 @@ function ActivityPanel({ issueId }: { issueId: string }) {
       <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Activity</div>
       {loading ? (
         <div className="py-2 text-center text-[12px] text-[var(--text-dim)]">Loading…</div>
+      ) : loadErr ? (
+        <div className="py-2 text-center text-[12px] text-rose-500 dark:text-rose-300">{loadErr}</div>
       ) : activity.length === 0 ? (
         <div className="py-2 text-center text-[12px] text-[var(--text-dim)]">No activity yet.</div>
       ) : (
