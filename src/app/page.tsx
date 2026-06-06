@@ -34,6 +34,7 @@ import {
 } from "@/lib/app-launcher";
 import { usePermittedModules } from "@/lib/use-scope";
 import { getMeBootstrapLastError, retryMeBootstrap } from "@/lib/me-bootstrap";
+import { useShortcutHint } from "@/lib/ui/use-shortcut-hint";
 
 const PRIMARY_CATS = ["operations", "commercial", "people", "communication", "system"];
 
@@ -211,6 +212,7 @@ export default function HomePage() {
   const dk = theme === "dark";
 
   /* ── Search + filter ── */
+  const shortcut = useShortcutHint(); // platform-aware ⌘K / Ctrl K label + tooltip
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
   const [showMore, setShowMore] = useState(false);
@@ -589,9 +591,21 @@ export default function HomePage() {
                 Clear
               </button>
             )}
-            <kbd className={`hidden md:inline text-[10px] font-medium px-1.5 py-0.5 rounded ${
-              dk ? "bg-white/[0.06] text-white/20" : "bg-black/[0.06] text-black/20"
-            }`}>⌘K</kbd>
+            {/* Issue d54f3e66 (reopened): badge now shows the platform-
+                correct key and carries a hover tooltip explaining what it
+                does. Clicking it focuses the search input so it's usable
+                without knowing the keyboard shortcut. */}
+            <button
+              type="button"
+              onClick={() => document.getElementById("hub-search")?.focus()}
+              title={shortcut.hint}
+              aria-label={shortcut.hint}
+              className={`hidden md:inline cursor-pointer text-[10px] font-medium px-1.5 py-0.5 rounded transition-colors ${
+                dk ? "bg-white/[0.06] text-white/40 hover:text-white/70" : "bg-black/[0.06] text-black/40 hover:text-black/70"
+              }`}
+            >
+              <kbd>{shortcut.label}</kbd>
+            </button>
           </div>
         </div>
 

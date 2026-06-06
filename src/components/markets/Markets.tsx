@@ -18,6 +18,7 @@ import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
 import EyeIcon from "@/components/icons/ui/EyeIcon";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import MarketsIcon from "@/components/icons/MarketsIcon";
+import { useShortcutHint } from "@/lib/ui/use-shortcut-hint";
 
 /* ─────────── Reference Data ─────────── */
 
@@ -138,6 +139,7 @@ function getAdjustmentDisplay(pct: number): string {
 /* ─────────── Component ─────────── */
 
 export default function Markets() {
+  const shortcut = useShortcutHint(); // platform-aware ⌘K / Ctrl K + tooltip
   const [markets] = useState<MarketEntry[]>(() => parseReferenceData());
   const [search, setSearch] = useState("");
   const [selectedMarket, setSelectedMarket] = useState<MarketEntry | null>(
@@ -619,9 +621,18 @@ export default function Markets() {
                 Clear
               </button>
             )}
-            <kbd className="hidden md:inline-block text-[11px] font-medium px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-ghost)] border border-[var(--border-color)]">
-              ⌘K
-            </kbd>
+            {/* Issue d54f3e66 (reopened): platform-aware label + hover
+                tooltip + click-to-focus. The Ctrl/⌘+K listener already
+                exists above. */}
+            <button
+              type="button"
+              onClick={() => document.getElementById("markets-search")?.focus()}
+              title={shortcut.hint}
+              aria-label={shortcut.hint}
+              className="hidden md:inline-block cursor-pointer text-[11px] font-medium px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-dim)] border border-[var(--border-color)] transition-colors hover:text-[var(--text-secondary)] hover:border-[var(--border-focus)]"
+            >
+              <kbd>{shortcut.label}</kbd>
+            </button>
           </div>
         </div>
 

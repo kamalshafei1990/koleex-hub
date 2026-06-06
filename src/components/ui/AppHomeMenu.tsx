@@ -18,10 +18,11 @@
    default view. Inactive pills have a subtle border + surface bg + hover.
    --------------------------------------------------------------------------- */
 
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
+import { useShortcutHint } from "@/lib/ui/use-shortcut-hint";
 
 export interface AppHomeNavItem {
   /** Route href — used when onClick is NOT provided. */
@@ -135,6 +136,19 @@ function HomeSearchBar({
 }) {
   const router = useRouter();
   const [q, setQ] = useState("");
+  // Issue d54f3e66 (reopened): this AppHomeMenu search bar had a bare,
+  // dead ⌘K badge — no platform label, no tooltip, no working shortcut.
+  // Wire it the same way as the PageHeader HomeSearchBar via the shared hook.
+  const shortcut = useShortcutHint();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const focusInput = () => { const el = inputRef.current; if (el) { el.focus(); try { el.select(); } catch { /* */ } } };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.key === "k" || e.key === "K") && (e.metaKey || e.ctrlKey)) { e.preventDefault(); focusInput(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     const trimmed = q.trim();
@@ -147,10 +161,11 @@ function HomeSearchBar({
       <div className="group flex items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 py-2.5 transition-all duration-200 focus-within:border-[var(--border-focus)] hover:border-[var(--border-color)] sm:gap-3 sm:px-4 sm:py-3">
         <RrIcon name="search" size={15} className="shrink-0 text-[var(--text-dim)] transition-colors group-focus-within:text-[var(--text-muted)]" />
         <input
+          ref={inputRef}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder={placeholder}
-          aria-label="Search"
+          aria-label={shortcut.hint}
           className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--text-dim)] sm:text-[13.5px]"
         />
         {q.trim() ? (
@@ -161,9 +176,15 @@ function HomeSearchBar({
             Search
           </button>
         ) : (
-          <kbd className="hidden shrink-0 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10.5px] font-medium text-[var(--text-dim)] sm:inline-block">
-            ⌘K
-          </kbd>
+          <button
+            type="button"
+            onClick={focusInput}
+            title={shortcut.hint}
+            aria-label={shortcut.hint}
+            className="hidden shrink-0 cursor-pointer items-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10.5px] font-medium text-[var(--text-dim)] transition-colors hover:border-[var(--border-color)] hover:text-[var(--text-secondary)] sm:inline-flex"
+          >
+            <kbd>{shortcut.label}</kbd>
+          </button>
         )}
       </div>
     </form>
