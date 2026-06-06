@@ -6,7 +6,7 @@
    No type here implies code mutation, execution, or autonomous action.
    --------------------------------------------------------------------------- */
 
-export type AiProviderName = "claude" | "openai" | "gemini" | "groq";
+export type AiProviderName = "claude" | "openai" | "gemini" | "groq" | "deepseek";
 
 export type AiSessionStatus = "pending" | "completed" | "failed";
 

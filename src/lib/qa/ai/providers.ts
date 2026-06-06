@@ -14,6 +14,7 @@ import "server-only";
 
 import { ProviderError, type AiProviderName, type ProviderResult } from "./types";
 import { callClaude, claudeConfigured } from "./claude";
+import { callDeepseek, deepseekConfigured } from "./deepseek";
 import { aiChat } from "@/lib/server/ai-provider";
 
 interface ProviderAdapter {
@@ -50,8 +51,12 @@ const fallbackAdapter: ProviderAdapter = {
   },
 };
 
-/* Registry — ordered by preference. Claude first (the named initial provider). */
+/* Registry — ordered by preference. DeepSeek is the PRIMARY analysis
+   provider (activated by DEEPSEEK_API_KEY alone); Claude is kept as a
+   secondary, and the Hub's Groq/Gemini chain is the final graceful
+   fallback so analysis still works wherever a key is configured. */
 const REGISTRY: ProviderAdapter[] = [
+  { name: "deepseek", configured: deepseekConfigured, run: callDeepseek },
   { name: "claude", configured: claudeConfigured, run: callClaude },
   fallbackAdapter,
 ];
@@ -74,7 +79,7 @@ export function activeProviderName(): AiProviderName | null {
 export async function runAnalysis(system: string, user: string): Promise<ProviderResult> {
   const adapter = REGISTRY.find((p) => p.configured());
   if (!adapter) {
-    throw new ProviderError("not_configured", "No AI provider is configured. Set ANTHROPIC_API_KEY (or a fallback provider key).");
+    throw new ProviderError("not_configured", "No AI provider is configured. Set DEEPSEEK_API_KEY (primary), ANTHROPIC_API_KEY, or a fallback provider key.");
   }
   return adapter.run(system, user);
 }

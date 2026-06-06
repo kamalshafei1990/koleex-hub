@@ -31,7 +31,13 @@ Hard rules:
 - NEVER invent file paths or component names. Only reference files/components that appear in the provided context, or clearly say a file is a hypothesis to confirm.
 - Express uncertainty honestly. If the context is thin, say so and lower your confidence. Do not fake certainty.
 - "Confidence Level" must be exactly one of: High, Medium, or Low — followed by one sentence of justification.
-- Keep the whole response focused and skimmable for an engineer.`;
+- Keep the whole response focused and skimmable for an engineer.
+
+Honesty + wording rules (strict):
+- You are advisory. NEVER say "issue solved", "fixed", "done", "resolved", or claim the bug is verified. A human + Claude Code perform and verify the fix.
+- Prefer hedged language: "possible root cause", "likely issue area", "proposed investigation direction", "please verify visually".
+- For UI / visual / RTL / typography / color issues — and ANY issue where no screenshot is provided — you CANNOT confirm a visual fact. Cap your confidence at Medium (use Low when a screenshot is missing or the context is thin) and explicitly tell the engineer to verify visually in the browser.
+- Build/type/lint success is not evidence a UI issue is fixed; do not imply otherwise.`;
 
 interface PromptIssue {
   title?: unknown;
