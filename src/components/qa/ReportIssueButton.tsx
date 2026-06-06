@@ -26,9 +26,11 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 import {
   ISSUE_TYPES,
   SEVERITIES,
+  PRIORITIES,
   moduleForRoute,
   type IssueType,
   type Severity,
+  type Priority,
 } from "@/lib/qa/types";
 import { useInspector, type PickedComponent } from "@/lib/qa/inspector";
 import { useTranslation } from "@/lib/i18n";
@@ -98,6 +100,9 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   const { t } = useTranslation(qaT);
   const [issueType, setIssueType] = useState<IssueType>("bug");
   const [severity, setSeverity] = useState<Severity>("medium");
+  // Priority on the report itself (issue bed8bed6) — the reporter picks how
+  // urgent it is; admins can still re-prioritise during triage.
+  const [priority, setPriority] = useState<Priority>("normal");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [expected, setExpected] = useState("");
@@ -147,11 +152,12 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
       const raw = localStorage.getItem(DRAFT_KEY);
       if (!raw) return;
       const d = JSON.parse(raw) as Partial<{
-        issueType: IssueType; severity: Severity; title: string;
+        issueType: IssueType; severity: Severity; priority: Priority; title: string;
         description: string; expected: string; solution: string;
       }>;
       if (d.issueType) setIssueType(d.issueType);
       if (d.severity) setSeverity(d.severity);
+      if (d.priority) setPriority(d.priority);
       if (typeof d.title === "string") setTitle(d.title);
       if (typeof d.description === "string") setDescription(d.description);
       if (typeof d.expected === "string") setExpected(d.expected);
@@ -162,12 +168,12 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
     const hasContent = Boolean(title || description || expected || solution);
     try {
       if (hasContent) {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify({ issueType, severity, title, description, expected, solution }));
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ issueType, severity, priority, title, description, expected, solution }));
       } else {
         localStorage.removeItem(DRAFT_KEY);
       }
     } catch { /* quota / private mode — ignore */ }
-  }, [issueType, severity, title, description, expected, solution]);
+  }, [issueType, severity, priority, title, description, expected, solution]);
 
   // In-app DOM capture: no OS / browser permission, no share picker. Mobile
   // gets the upload-only flow (advanced area select would fight touch UX).
@@ -367,6 +373,7 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
         body: JSON.stringify({
           issue_type: issueType,
           severity,
+          priority,
           title: title.trim(),
           description: description.trim() || null,
           expected_result: expected.trim() || null,
@@ -633,8 +640,8 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                 </button>
               )}
 
-              {/* Type + Severity */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* Type + Severity + Priority */}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <div>
                   <label className={label}>{t("qa.report.issueType", "Issue type")}</label>
                   <select value={issueType} onChange={(e) => setIssueType(e.target.value as IssueType)} className={field}>
@@ -645,6 +652,12 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                   <label className={label}>{t("qa.report.severity", "Severity")}</label>
                   <select value={severity} onChange={(e) => setSeverity(e.target.value as Severity)} className={field}>
                     {SEVERITIES.map((o) => <option key={o.value} value={o.value}>{t("qa.severity." + o.value, o.label)}</option>)}
+                  </select>
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <label className={label}>{t("qa.action.priority", "Priority")}</label>
+                  <select value={priority} onChange={(e) => setPriority(e.target.value as Priority)} className={field}>
+                    {PRIORITIES.map((o) => <option key={o.value} value={o.value}>{t("qa.priority." + o.value, o.label)}</option>)}
                   </select>
                 </div>
               </div>

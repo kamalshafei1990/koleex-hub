@@ -68,6 +68,11 @@ export async function POST(req: Request) {
   const severity = (SEVERITY_VALUES as string[]).includes(String(body.severity))
     ? (body.severity as Severity)
     : "medium";
+  // Reporter-chosen priority (issue bed8bed6). Defaults to "normal" if absent
+  // or invalid; admins can still re-prioritise during triage.
+  const priority = (PRIORITY_VALUES as string[]).includes(String(body.priority))
+    ? (body.priority as string)
+    : "normal";
 
   const route = clampStr(body.route, 300);
   // Trust client-supplied storage paths only if they live under THIS tenant's
@@ -97,6 +102,7 @@ export async function POST(req: Request) {
     page_title: clampStr(body.page_title, 200),
     issue_type: issueType,
     severity,
+    priority,
     title,
     description: clampStr(body.description, 6000),
     expected_result: clampStr(body.expected_result, 4000),
