@@ -56,15 +56,20 @@ export default function NotesApp() {
   });
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
   const [activeNote, setActiveNote] = useState<NoteFull | null>(null);
-  // Issue 75570338 (Mustafa) — reopened the issue after my first fix because
-  // the editor still didn't feel like "the main interface in the window".
-  // Focus mode hides both side panes so the editor takes the entire window
-  // width. Persisted to localStorage so the user's preference sticks.
-  const [focusMode, setFocusMode] = useState<boolean>(false);
+  // Issue 75570338 (Mustafa) — cycle 3. The previous cycle added a Focus
+  // Mode toggle but defaulted it OFF, so the editor was still sharing
+  // screen with two side panes on open. A toggle is no help if you don't
+  // know it exists. Default is now ON: the editor takes the full window
+  // width the moment you open Notes. The toggle stays for users who want
+  // the 3-pane layout back; their choice persists in localStorage.
+  // Storage rule: only an explicit "0" means OFF; anything else (incl.
+  // never-saved) keeps the new default ON.
+  const [focusMode, setFocusMode] = useState<boolean>(true);
   useEffect(() => {
     try {
       const v = window.localStorage.getItem("notes:focusMode");
-      if (v === "1") setFocusMode(true);
+      if (v === "0") setFocusMode(false);
+      else setFocusMode(true);
     } catch { /* sandboxed storage — no-op */ }
   }, []);
   useEffect(() => {
@@ -526,7 +531,7 @@ export default function NotesApp() {
 
       {/* ── BODY ── 3 panes by default, single pane in focus mode. */}
       <div className="flex-1 min-h-0 overflow-hidden">
-        <div className={`h-full grid grid-cols-1 ${focusMode ? "md:grid-cols-1" : "md:grid-cols-[240px_300px_1fr]"}`}>
+        <div className={`h-full grid grid-cols-1 ${focusMode ? "md:grid-cols-1" : "md:grid-cols-[200px_260px_1fr]"}`}>
           {/* Pane 1 — Folders (hidden in focus mode) */}
           <div className={`${focusMode ? "hidden" : "hidden md:block"} border-e border-[var(--border-subtle)] bg-[var(--bg-secondary)]/40 overflow-y-auto`}>
             <FoldersSidebar
