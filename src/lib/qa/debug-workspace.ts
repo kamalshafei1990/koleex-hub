@@ -257,7 +257,7 @@ export async function buildWorkspacePayload(
 
 /** Upsert the cache row (stable: stored prompt carries no expiring signed URLs). */
 export async function persistWorkspace(tenantId: string, issueId: string, actorId: string | null, data: WorkspaceData): Promise<void> {
-  const storedPrompt = renderPrompt(data, { screenshotUrl: null, comments: data.debug_context.comments });
+  const storedPrompt = renderPrompt(data, { screenshotUrl: null, screenshotUrls: [], comments: data.debug_context.comments });
   const { error } = await supabaseServer.from("qa_debug_workspaces").upsert({
     issue_id: issueId,
     tenant_id: tenantId,
