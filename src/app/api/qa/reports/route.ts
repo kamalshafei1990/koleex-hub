@@ -20,6 +20,21 @@ const BUCKET = "qa-screenshots";
 
 /* Resolve a stored screenshot path (within this tenant) to a short-lived
    signed URL. Returns null on any failure so the row still renders. */
+/** Sign every screenshot path on the multi-shot array. Order preserved.
+ *  Without this the list endpoint returned raw storage paths in
+ *  `screenshot_urls`, which the admin viewer's gallery then tried to load
+ *  as `<img src="490fbd4d-.../uuid.png">` — 404, broken image, alt text
+ *  showing as "screenshot". */
+async function signScreenshots(tenantId: string, paths: unknown): Promise<string[] | null> {
+  if (!Array.isArray(paths) || paths.length === 0) return null;
+  const out: string[] = [];
+  for (const p of paths) {
+    if (typeof p !== "string") continue;
+    const u = await signScreenshot(tenantId, p);
+    if (u) out.push(u);
+  }
+  return out.length > 0 ? out : null;
+}
 async function signScreenshot(tenantId: string, path: string | null): Promise<string | null> {
   if (!path) return null;
   // Never sign a path that isn't under the caller's tenant prefix.
@@ -274,6 +289,11 @@ export async function GET(req: Request) {
     rows.map(async (r) => ({
       ...r,
       screenshot_url: await signScreenshot(auth.tenant_id, r.screenshot_url as string | null),
+      // Sign every entry on the multi-shot array as well — previously this
+      // came through as raw storage paths so the admin viewer's gallery
+      // tried to <img src="490fbd4d-.../uuid.png"> and 404'd. (Bug from QA
+      // report 46dba6b3.)
+      screenshot_urls: await signScreenshots(auth.tenant_id, r.screenshot_urls),
       assigned_to_name: r.assigned_to ? nameById[r.assigned_to as string] ?? null : null,
       comment_count: commentCount[r.id as string] ?? 0,
     })),
