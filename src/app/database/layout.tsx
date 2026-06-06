@@ -20,6 +20,7 @@ const ROUTE_META: Record<string, RouteMeta> = {
   "/database/visual-registry": { titleKey: "db.page.registry.title", titleEn: "Classification", subKey: "db.page.registry.sub", subEn: "KOLEEX product hierarchy — divisions, categories, subcategories and types." },
   "/database/issues":          { titleKey: "db.page.issues.title", titleEn: "Issue Reports", subKey: "db.page.issues.sub", subEn: "Bugs, UI issues and suggestions reported from across the Hub." },
   "/database/brands":          { titleKey: "db.page.brands.title", titleEn: "Brands", subKey: "db.page.brands.sub", subEn: "Product brands and their logos — part of the KOLEEX visual identity." },
+  "/database/components":      { titleKey: "db.page.components.title", titleEn: "UI Components", subKey: "db.page.components.sub", subEn: "Every UI component in the system — the KOLEEX design system in one place." },
 };
 
 const T: Translations = {
@@ -37,6 +38,8 @@ const T: Translations = {
   "db.page.issues.sub": { en: "Bugs, UI issues and suggestions reported from across the Hub.", zh: "来自整个 Hub 的缺陷、界面问题和建议。", ar: "الأخطاء ومشاكل الواجهة والاقتراحات الواردة من جميع أنحاء النظام." },
   "db.page.brands.title": { en: "Brands", zh: "品牌", ar: "العلامات التجارية" },
   "db.page.brands.sub": { en: "Product brands and their logos — part of the KOLEEX visual identity.", zh: "产品品牌及其标志 — KOLEEX 视觉识别的一部分。", ar: "علامات المنتجات وشعاراتها — جزء من الهوية البصرية لـ KOLEEX." },
+  "db.page.components.title": { en: "UI Components", zh: "界面组件", ar: "مكوّنات الواجهة" },
+  "db.page.components.sub": { en: "Every UI component in the system — the KOLEEX design system in one place.", zh: "系统中的全部界面组件 — KOLEEX 设计系统一览。", ar: "كل مكوّنات الواجهة في النظام — نظام تصميم KOLEEX في مكان واحد." },
 };
 
 function metaFor(pathname: string): RouteMeta {
