@@ -18,6 +18,7 @@ import { useTranslation } from "@/lib/i18n";
 import { qaT } from "@/lib/translations/qa";
 import { useCommentAttachments, AttachmentStrip, AttachmentThumbs } from "@/components/qa/CommentAttachments";
 import WatchControl from "@/components/qa/WatchControl";
+import FixEvidenceSection from "@/components/qa/FixEvidenceSection";
 import type { QaAttachment } from "@/lib/qa/types";
 import {
   SEVERITY_LABEL,
@@ -118,6 +119,9 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
   const [issue, setIssue] = useState<SafeIssue | null>(null);
   const [comments, setComments] = useState<SafeComment[]>([]);
   const [activity, setActivity] = useState<SafeActivity[]>([]);
+  // Phase 9.2
+  const [evidence, setEvidence] = useState<import("@/lib/qa/types").FixEvidenceCycle[]>([]);
+  const [beforeUrls, setBeforeUrls] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -137,6 +141,8 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
       setIssue(j.issue);
       setComments(j.comments ?? []);
       setActivity(j.activity ?? []);
+      setEvidence(Array.isArray(j.fix_evidence) ? j.fix_evidence : []);
+      setBeforeUrls(Array.isArray(j.before_urls) ? j.before_urls : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : t("qa.reporter.loadErr", "Couldn't load this issue."));
     } finally { setLoading(false); }
@@ -254,6 +260,12 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
       {issue.status === "fixed" && (
         <VerifyControl issueId={issue.id} onChanged={load} />
       )}
+
+      {/* Phase 9.2 — Fix Evidence (BEFORE / AFTER). Shows whenever any cycle
+          exists, regardless of current status — so a reopened-then-re-fixed
+          issue still shows the full history. */}
+      <FixEvidenceSection beforeUrls={beforeUrls} cycles={evidence} />
+
 
       {issue.screenshot_url && (
         <a href={issue.screenshot_url} target="_blank" rel="noreferrer" className="mt-4 block overflow-hidden rounded-lg border border-[var(--border-color)]">

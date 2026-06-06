@@ -20,6 +20,7 @@ import { logActivity } from "@/lib/qa/activity";
 import { notifyIssue, parseMentions, resolveMentionedAccounts, issueLink } from "@/lib/qa/notify";
 import { sanitizeAttachments, signAttachments } from "@/lib/qa/attachments";
 import { watcherTargets } from "@/lib/qa/watchers";
+import { loadFixEvidence } from "@/lib/qa/evidence";
 
 const BUCKET = "qa-screenshots";
 
@@ -132,8 +133,23 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     is_admin_view: auth.is_super_admin && row.reporter_id !== auth.account_id,
   };
 
+  // Phase 9.2 — reporter sees BEFORE (their original screenshots, already on
+  // the issue object) and AFTER (every cycle's after_attachments). We attach
+  // the original report screenshot_urls too so the UI doesn't need a separate
+  // call to map BEFORE → cycle.
+  const fix_evidence = await loadFixEvidence(auth.tenant_id, id);
+  // Also expose the original report's multi-shot URLs as the BEFORE set.
+  const beforeRaw = Array.isArray(row.screenshot_urls) ? (row.screenshot_urls as unknown[]) : [];
+  const beforeUrls: string[] = [];
+  for (const p of beforeRaw) {
+    if (typeof p !== "string") continue;
+    const u = await signScreenshot(auth.tenant_id, p);
+    if (u) beforeUrls.push(u);
+  }
+  if (beforeUrls.length === 0 && issue.screenshot_url) beforeUrls.push(issue.screenshot_url);
+
   return NextResponse.json(
-    { issue, comments: cmts, activity: publicActivity },
+    { issue, comments: cmts, activity: publicActivity, fix_evidence, before_urls: beforeUrls },
     { headers: { "Cache-Control": "private, no-store" } },
   );
 }

@@ -21,6 +21,8 @@ import { useScopeContext } from "@/lib/use-scope";
 import { useCommentAttachments, AttachmentStrip, AttachmentThumbs } from "@/components/qa/CommentAttachments";
 import WatchControl from "@/components/qa/WatchControl";
 import ClaudeWorkspaceDrawer from "@/components/qa/ClaudeWorkspaceDrawer";
+import FixEvidenceSection from "@/components/qa/FixEvidenceSection";
+import FixEvidenceForm from "@/components/qa/FixEvidenceForm";
 import {
   SEVERITIES,
   STATUSES,
@@ -301,9 +303,13 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
      200 → show it even though the list filter excludes it. */
   const [extra, setExtra] = useState<QaReport | null>(null);
   const [extraMissing, setExtraMissing] = useState(false);
+  // Phase 9.2 — fix evidence cycles for the currently selected issue. Always
+  // fetched fresh on selection because the list endpoint doesn't carry it.
+  const [evidence, setEvidence] = useState<import("@/lib/qa/types").FixEvidenceCycle[]>([]);
+  const [evidenceTick, setEvidenceTick] = useState(0); // bump to force refetch
   useEffect(() => {
-    if (!selectedId || reports.some((r) => r.id === selectedId)) {
-      setExtra(null); setExtraMissing(false);
+    if (!selectedId) {
+      setExtra(null); setExtraMissing(false); setEvidence([]);
       return;
     }
     let alive = true;
@@ -313,10 +319,18 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
         if (r.status === 404) { if (alive) setExtraMissing(true); return null; }
         return r.ok ? r.json() : null;
       })
-      .then((j) => { if (alive && j?.report) setExtra(j.report as QaReport); })
+      .then((j) => {
+        if (!alive) return;
+        if (j?.report) {
+          // Update extra only when the row isn't already in the list; if it
+          // IS, the list copy stays canonical.
+          if (!reports.some((r) => r.id === selectedId)) setExtra(j.report as QaReport);
+        }
+        setEvidence(Array.isArray(j?.fix_evidence) ? j.fix_evidence : []);
+      })
       .catch(() => {});
     return () => { alive = false; };
-  }, [selectedId, reports]);
+  }, [selectedId, reports, evidenceTick]);
 
   // Assignee directory for the picker (loaded once).
   useEffect(() => {
@@ -787,6 +801,8 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
               onUpdated={onUpdated}
               onRefresh={load}
               onJump={(id) => setSelectedId(id)}
+              evidence={evidence}
+              onEvidenceChanged={() => setEvidenceTick((t) => t + 1)}
             />
           ) : extraMissing ? (
             <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
@@ -823,6 +839,7 @@ function stepIndex(status: IssueStatus): number {
 
 function ReportDetail({
   report, assignees, allReports, myId, onUpdated, onRefresh, onJump,
+  evidence, onEvidenceChanged,
 }: {
   report: QaReport;
   assignees: QaAssignee[];
@@ -831,6 +848,8 @@ function ReportDetail({
   onUpdated: (r: QaReport) => void;
   onRefresh?: () => void;
   onJump: (id: string) => void;
+  evidence: import("@/lib/qa/types").FixEvidenceCycle[];
+  onEvidenceChanged: () => void;
 }) {
   const { t } = useTranslation(qaT);
   // Bumped after any successful mutation so the Discussion/Activity panels
@@ -1095,6 +1114,25 @@ function ReportDetail({
             {saving ? t("qa.triage.saving", "Saving…") : t("qa.triage.save", "Save changes")}
           </button>
         </div>
+      </div>
+
+      {/* Phase 9.2 — Fix Evidence (BEFORE / AFTER) + admin upload form. The
+          form is always available on the admin side so an admin can pre-stage
+          evidence before flipping the status. The display section auto-hides
+          when there are no cycles. */}
+      <div className="space-y-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-3">
+        <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">
+          {t("qa.evidence.title", "Fix Evidence")}
+        </div>
+        <FixEvidenceForm
+          issueId={report.id}
+          defaultCommit={commit}
+          onSaved={() => { onEvidenceChanged(); onRefresh?.(); }}
+        />
+        <FixEvidenceSection
+          beforeUrls={(report.screenshot_urls as string[] | null) ?? (report.screenshot_url ? [report.screenshot_url] : [])}
+          cycles={evidence}
+        />
       </div>
 
       {/* Discussion + Activity */}

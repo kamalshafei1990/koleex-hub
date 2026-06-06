@@ -15,6 +15,7 @@ import {
 import { logActivity, type ActivityInput } from "@/lib/qa/activity";
 import { notifyIssue, reporterIssueLink, type NotifyTarget, type QaNotificationType } from "@/lib/qa/notify";
 import { watcherTargets } from "@/lib/qa/watchers";
+import { loadFixEvidence } from "@/lib/qa/evidence";
 
 const BUCKET = "qa-screenshots";
 
@@ -76,7 +77,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     screenshot_urls: await signScreenshots(auth.tenant_id, row.screenshot_urls),
     assigned_to_name: row.assigned_to ? names[row.assigned_to as string] ?? null : null,
   };
-  return NextResponse.json({ report }, { headers: { "Cache-Control": "private, no-store" } });
+  // Phase 9.2 — every cycle's AFTER screenshots, signed for ~1h.
+  const fix_evidence = await loadFixEvidence(auth.tenant_id, id);
+  return NextResponse.json({ report, fix_evidence }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 /* PATCH /api/qa/reports/[id] — workflow mutations (admins / management only).

@@ -105,6 +105,18 @@ export const PRIORITY_VALUES = PRIORITIES.map((t) => t.value);
 /** Sort weight for the priority queue (urgent first). */
 export const PRIORITY_RANK: Record<Priority, number> = { urgent: 0, high: 1, normal: 2, low: 3 };
 
+/** Phase 9.2 — one fix cycle worth of after-fix evidence on an issue. */
+export interface FixEvidenceCycle {
+  id: string;
+  cycle_number: number;
+  summary: string | null;
+  commit_hash: string | null;
+  pr_link: string | null;
+  after_attachments: Array<{ path: string; url: string | null; type: string | null; size: number | null; label: string | null }>;
+  created_by_name: string | null;
+  created_at: string;
+}
+
 export interface QaReport {
   id: string;
   tenant_id: string;
