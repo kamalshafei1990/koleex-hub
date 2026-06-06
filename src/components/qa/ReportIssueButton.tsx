@@ -579,6 +579,12 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#00CC66]/12 text-[#00CC66] text-xl">✓</div>
             <p className="text-[14px] font-semibold">{t("qa.report.thanks", "Thank you — report submitted.")}</p>
             <p className="text-[12px] text-[var(--text-dim)]">{t("qa.report.thanksSub", "The team can see it in Issue Reports.")}</p>
+            <a
+              href="/qa/my-issues"
+              className="mt-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]"
+            >
+              {t("qa.report.viewMyReports", "View my reports")}
+            </a>
           </div>
         ) : (
           <>

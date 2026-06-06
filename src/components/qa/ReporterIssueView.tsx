@@ -316,6 +316,12 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
             )}
           </div>
           <div className="flex items-center gap-2 text-[12px]">
+            <Link
+              href="/qa/my-issues"
+              className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1 font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            >
+              {t("qa.myIssues.title", "My Reports")}
+            </Link>
             {issue.route && (
               <Link
                 href={issue.route}
