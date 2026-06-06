@@ -56,6 +56,20 @@ export default function NotesApp() {
   });
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
   const [activeNote, setActiveNote] = useState<NoteFull | null>(null);
+  // Issue 75570338 (Mustafa) — reopened the issue after my first fix because
+  // the editor still didn't feel like "the main interface in the window".
+  // Focus mode hides both side panes so the editor takes the entire window
+  // width. Persisted to localStorage so the user's preference sticks.
+  const [focusMode, setFocusMode] = useState<boolean>(false);
+  useEffect(() => {
+    try {
+      const v = window.localStorage.getItem("notes:focusMode");
+      if (v === "1") setFocusMode(true);
+    } catch { /* sandboxed storage — no-op */ }
+  }, []);
+  useEffect(() => {
+    try { window.localStorage.setItem("notes:focusMode", focusMode ? "1" : "0"); } catch { /* */ }
+  }, [focusMode]);
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState<"idle" | "saving" | "saved">("idle");
 
@@ -486,11 +500,35 @@ export default function NotesApp() {
         </div>
       </div>
 
-      {/* ── THREE-PANE BODY ── */}
+      {/* Focus mode toggle — a small strip above the body so it's always
+          reachable. When ON, hides folders + notes-list and gives the editor
+          the full window width (issue 75570338 reopened by Mustafa). */}
+      <div className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--bg-primary)]/95">
+        <div className="max-w-[1600px] mx-auto flex items-center justify-end gap-2 px-4 md:px-6 lg:px-8 py-2">
+          <button
+            type="button"
+            onClick={() => setFocusMode((v) => !v)}
+            title={focusMode ? "Show folders + notes list" : "Hide folders + notes list (give the editor the whole window)"}
+            aria-pressed={focusMode}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11.5px] font-semibold transition-colors ${
+              focusMode
+                ? "border-[var(--bg-inverted)] bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                : "border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            }`}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M3 9V5a2 2 0 0 1 2-2h4M21 9V5a2 2 0 0 0-2-2h-4M3 15v4a2 2 0 0 0 2 2h4M21 15v4a2 2 0 0 1-2 2h-4" />
+            </svg>
+            {focusMode ? "Exit focus" : "Focus mode"}
+          </button>
+        </div>
+      </div>
+
+      {/* ── BODY ── 3 panes by default, single pane in focus mode. */}
       <div className="flex-1 min-h-0 overflow-hidden">
-        <div className="h-full grid grid-cols-1 md:grid-cols-[240px_300px_1fr]">
-          {/* Pane 1 — Folders */}
-          <div className="hidden md:block border-e border-[var(--border-subtle)] bg-[var(--bg-secondary)]/40 overflow-y-auto">
+        <div className={`h-full grid grid-cols-1 ${focusMode ? "md:grid-cols-1" : "md:grid-cols-[240px_300px_1fr]"}`}>
+          {/* Pane 1 — Folders (hidden in focus mode) */}
+          <div className={`${focusMode ? "hidden" : "hidden md:block"} border-e border-[var(--border-subtle)] bg-[var(--bg-secondary)]/40 overflow-y-auto`}>
             <FoldersSidebar
               folders={folders}
               selection={selection}
@@ -502,8 +540,8 @@ export default function NotesApp() {
             />
           </div>
 
-          {/* Pane 2 — Notes list */}
-          <div className="hidden md:block border-e border-[var(--border-subtle)] overflow-hidden">
+          {/* Pane 2 — Notes list (hidden in focus mode) */}
+          <div className={`${focusMode ? "hidden" : "hidden md:block"} border-e border-[var(--border-subtle)] overflow-hidden`}>
             <NotesList
               notes={notes}
               activeId={activeNoteId}
