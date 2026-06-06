@@ -14,6 +14,7 @@ import {
   type IssueStatus,
 } from "@/lib/qa/types";
 import { logActivity } from "@/lib/qa/activity";
+import { notifyIssue, issueLink } from "@/lib/qa/notify";
 
 const BUCKET = "qa-screenshots";
 
@@ -140,6 +141,46 @@ export async function POST(req: Request) {
     activity_type: "created",
     new_value: title,
   });
+
+  // Auto-add the reporter as a watcher so they receive every update on
+  // their own issue without having to opt in. Best-effort — a duplicate
+  // (already-watching) error is silently swallowed by the unique index.
+  try {
+    await supabaseServer
+      .from("qa_issue_watchers")
+      .insert({ tenant_id: auth.tenant_id, issue_id: data.id, account_id: auth.account_id })
+      .select("issue_id");
+  } catch { /* unique-constraint or RLS quirk — no-op */ }
+
+  // Notification fan-out. Every Super Admin in the tenant is told a new
+  // issue was filed (so the QA owners see it without manually polling),
+  // and the reporter themselves never gets self-notified (the notify
+  // helper drops the actor automatically). Best-effort: a notify failure
+  // must not break the report submission.
+  try {
+    const { data: admins } = await supabaseServer
+      .from("accounts")
+      .select("id")
+      .eq("tenant_id", auth.tenant_id)
+      .eq("status", "active")
+      .eq("is_super_admin", true);
+    const reporter = auth.username ?? auth.login_email ?? "Someone";
+    const moduleLabel = clampStr(body.app_module, 80) ?? moduleForRoute(route);
+    const subject = `New issue: ${title}`;
+    const messageBody = `${reporter} filed "${title}" on ${moduleLabel}${route ? ` (${route})` : ""}.`;
+    await notifyIssue(
+      { tenantId: auth.tenant_id, issueId: data.id, actorId: auth.account_id, actorName: auth.username ?? null },
+      (admins ?? []).map((a) => ({
+        recipientId: a.id,
+        type: "qa_issue_assigned" as const,   // closest existing type; UI surfaces it as a task chip
+        title: subject,
+        body: messageBody,
+        link: issueLink(data.id),
+      })),
+    );
+  } catch (e) {
+    console.error("[api/qa/reports POST notify]", e instanceof Error ? e.message : String(e));
+  }
 
   return NextResponse.json({ id: data.id }, { status: 201 });
 }
