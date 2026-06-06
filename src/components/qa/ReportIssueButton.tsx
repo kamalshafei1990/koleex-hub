@@ -26,6 +26,8 @@ import {
   type Severity,
 } from "@/lib/qa/types";
 import { useInspector, type PickedComponent } from "@/lib/qa/inspector";
+import { useTranslation } from "@/lib/i18n";
+import { qaT } from "@/lib/translations/qa";
 
 interface Env {
   route: string;
@@ -58,6 +60,7 @@ const MAX_BYTES = 5 * 1024 * 1024;
 const OK_TYPES = ["image/png", "image/jpeg", "image/webp"];
 
 export default function ReportIssueButton() {
+  const { t } = useTranslation(qaT);
   const pathname = usePathname() ?? "/";
   const [open, setOpen] = useState(false);
 
@@ -66,8 +69,8 @@ export default function ReportIssueButton() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        title="Report an issue or suggestion"
-        aria-label="Report an issue"
+        title={t("qa.report.fabTitle", "Report an issue or suggestion")}
+        aria-label={t("qa.report.title", "Report an issue")}
         className="fixed end-6 bottom-[5.25rem] z-[80] flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--bg-secondary)]/95 text-[var(--text-secondary)] shadow-lg backdrop-blur-md transition-colors hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]"
       >
         <MessageSquarePlusIcon size={17} />
@@ -78,6 +81,7 @@ export default function ReportIssueButton() {
 }
 
 function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => void }) {
+  const { t } = useTranslation(qaT);
   const [issueType, setIssueType] = useState<IssueType>("bug");
   const [severity, setSeverity] = useState<Severity>("medium");
   const [title, setTitle] = useState("");
@@ -126,8 +130,8 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   const setImage = useCallback((f: File | null) => {
     setError(null);
     if (!f) { setFile(null); setPreviewUrl((u) => { if (u) URL.revokeObjectURL(u); return null; }); return; }
-    if (!OK_TYPES.includes(f.type)) { setError("Only PNG, JPG or WEBP images are allowed."); return; }
-    if (f.size > MAX_BYTES) { setError("Screenshot is too large (max 5 MB)."); return; }
+    if (!OK_TYPES.includes(f.type)) { setError(t("qa.report.errType", "Only PNG, JPG or WEBP images are allowed.")); return; }
+    if (f.size > MAX_BYTES) { setError(t("qa.report.errSize", "Screenshot is too large (max 5 MB).")); return; }
     setFile(f);
     setPreviewUrl((u) => { if (u) URL.revokeObjectURL(u); return URL.createObjectURL(f); });
   }, []);
@@ -154,7 +158,7 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
 
   async function submit() {
     if (busy) return;
-    if (!title.trim()) { setError("Please add a short title."); return; }
+    if (!title.trim()) { setError(t("qa.report.errTitle", "Please add a short title.")); return; }
     setBusy(true); setError(null);
     try {
       let screenshotPath: string | null = null;
@@ -203,7 +207,7 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
       try { window.dispatchEvent(new CustomEvent("qa:issue-created", { detail: { id: j.id ?? null } })); } catch { /* no-op */ }
       setTimeout(onClose, 1400);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't submit the report.");
+      setError(e instanceof Error ? e.message : t("qa.report.errSubmit", "Couldn't submit the report."));
     } finally {
       setBusy(false);
     }
@@ -217,22 +221,22 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   if (inspecting) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label="Report an issue" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
+    <div className="fixed inset-0 z-[200] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={t("qa.report.title", "Report an issue")} onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
       <div className="flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-2xl sm:max-w-[560px] sm:rounded-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-3.5">
           <div className="flex items-center gap-2">
             <MessageSquarePlusIcon size={16} className="text-[var(--text-secondary)]" />
-            <h2 className="text-[14px] font-bold">Report an issue</h2>
+            <h2 className="text-[14px] font-bold">{t("qa.report.title", "Report an issue")}</h2>
           </div>
-          <button type="button" onClick={() => !busy && onClose()} aria-label="Close" className="text-[var(--text-dim)] hover:text-[var(--text-primary)]">✕</button>
+          <button type="button" onClick={() => !busy && onClose()} aria-label={t("qa.report.close", "Close")} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]">✕</button>
         </div>
 
         {done ? (
           <div className="flex flex-col items-center justify-center gap-2 px-6 py-14 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--bg-surface-active)] text-[var(--text-secondary)] text-xl">✓</div>
-            <p className="text-[14px] font-semibold">Thank you — report submitted.</p>
-            <p className="text-[12px] text-[var(--text-dim)]">The team can see it in Issue Reports.</p>
+            <p className="text-[14px] font-semibold">{t("qa.report.thanks", "Thank you — report submitted.")}</p>
+            <p className="text-[12px] text-[var(--text-dim)]">{t("qa.report.thanksSub", "The team can see it in Issue Reports.")}</p>
           </div>
         ) : (
           <>
@@ -250,7 +254,7 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                   <div className="min-w-0 flex-1">
                     <div className="text-[12.5px] font-semibold text-[var(--text-primary)]">
                       {selected.component}
-                      {selected.fallback ? <span className="ml-1 text-[10px] font-normal text-[var(--text-ghost)]">(untagged)</span> : null}
+                      {selected.fallback ? <span className="ml-1 text-[10px] font-normal text-[var(--text-ghost)]">{t("qa.report.untagged", "(untagged)")}</span> : null}
                     </div>
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[10.5px] text-[var(--text-dim)]">
                       {selected.module ? <span>{selected.module}</span> : null}
@@ -259,8 +263,8 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
-                    <button type="button" onClick={pickComponent} className="rounded-md px-2 py-1 text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">Re-select</button>
-                    <button type="button" onClick={() => setSelected(null)} className="rounded-md px-2 py-1 text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">Clear</button>
+                    <button type="button" onClick={pickComponent} className="rounded-md px-2 py-1 text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("qa.report.reselect", "Re-select")}</button>
+                    <button type="button" onClick={() => setSelected(null)} className="rounded-md px-2 py-1 text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("qa.report.clear", "Clear")}</button>
                   </div>
                 </div>
               ) : (
@@ -269,51 +273,51 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                   onClick={pickComponent}
                   className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-[var(--border-color)] py-2 text-[12px] font-medium text-[var(--text-dim)] transition-colors hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
                 >
-                  <TargetIcon size={14} /> Select specific item / component
+                  <TargetIcon size={14} /> {t("qa.report.selectComponent", "Select specific item / component")}
                 </button>
               )}
 
               {/* Type + Severity */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={label}>Issue type</label>
+                  <label className={label}>{t("qa.report.issueType", "Issue type")}</label>
                   <select value={issueType} onChange={(e) => setIssueType(e.target.value as IssueType)} className={field}>
-                    {ISSUE_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                    {ISSUE_TYPES.map((o) => <option key={o.value} value={o.value}>{t("qa.issueType." + o.value, o.label)}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className={label}>Severity</label>
+                  <label className={label}>{t("qa.report.severity", "Severity")}</label>
                   <select value={severity} onChange={(e) => setSeverity(e.target.value as Severity)} className={field}>
-                    {SEVERITIES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                    {SEVERITIES.map((o) => <option key={o.value} value={o.value}>{t("qa.severity." + o.value, o.label)}</option>)}
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className={label}>Title<span className="text-[var(--text-secondary)]"> *</span></label>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Short summary of the issue" className={field} maxLength={200} autoFocus />
+                <label className={label}>{t("qa.report.titleLabel", "Title")}<span className="text-[var(--text-secondary)]"> *</span></label>
+                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("qa.report.titlePlaceholder", "Short summary of the issue")} className={field} maxLength={200} autoFocus />
               </div>
               <div>
-                <label className={label}>What happened?</label>
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Describe what you saw…" className={field} />
+                <label className={label}>{t("qa.report.whatHappened", "What happened?")}</label>
+                <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder={t("qa.report.whatHappenedPlaceholder", "Describe what you saw…")} className={field} />
               </div>
               <div>
-                <label className={label}>Expected result</label>
-                <textarea value={expected} onChange={(e) => setExpected(e.target.value)} rows={2} placeholder="What should happen instead?" className={field} />
+                <label className={label}>{t("qa.report.expected", "Expected result")}</label>
+                <textarea value={expected} onChange={(e) => setExpected(e.target.value)} rows={2} placeholder={t("qa.report.expectedPlaceholder", "What should happen instead?")} className={field} />
               </div>
               <div>
-                <label className={label}>Suggested solution <span className="font-normal normal-case text-[var(--text-ghost)]">(optional)</span></label>
-                <textarea value={solution} onChange={(e) => setSolution(e.target.value)} rows={2} placeholder="Any idea how to fix it?" className={field} />
+                <label className={label}>{t("qa.report.solution", "Suggested solution")} <span className="font-normal normal-case text-[var(--text-ghost)]">{t("qa.common.optional", "(optional)")}</span></label>
+                <textarea value={solution} onChange={(e) => setSolution(e.target.value)} rows={2} placeholder={t("qa.report.solutionPlaceholder", "Any idea how to fix it?")} className={field} />
               </div>
 
               {/* Screenshot */}
               <div>
-                <label className={label}>Screenshot <span className="font-normal normal-case text-[var(--text-ghost)]">(upload, paste or drag — PNG/JPG/WEBP)</span></label>
+                <label className={label}>{t("qa.report.screenshot", "Screenshot")} <span className="font-normal normal-case text-[var(--text-ghost)]">{t("qa.report.screenshotHint", "(upload, paste or drag — PNG/JPG/WEBP)")}</span></label>
                 {previewUrl ? (
                   <div className="relative overflow-hidden rounded-lg border border-[var(--border-color)]">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={previewUrl} alt="screenshot preview" className="max-h-48 w-full object-contain bg-[var(--bg-surface-subtle)]" />
-                    <button type="button" onClick={() => setImage(null)} className="absolute right-2 top-2 rounded-md bg-black/60 px-2 py-1 text-[11px] font-medium text-[var(--text-inverted)] hover:bg-black/80">Remove</button>
+                    <button type="button" onClick={() => setImage(null)} className="absolute right-2 top-2 rounded-md bg-black/60 px-2 py-1 text-[11px] font-medium text-[var(--text-inverted)] hover:bg-black/80">{t("qa.common.remove", "Remove")}</button>
                   </div>
                 ) : (
                   <button
@@ -324,8 +328,8 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                     onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) setImage(f); }}
                     className={`flex w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed py-6 text-[12px] transition-colors ${dragOver ? "border-[var(--border-focus)] bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]" : "border-[var(--border-color)] text-[var(--text-dim)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)]"}`}
                   >
-                    <span className="text-[var(--text-secondary)]">Click to upload</span>
-                    <span className="text-[var(--text-ghost)]">or paste / drag an image here</span>
+                    <span className="text-[var(--text-secondary)]">{t("qa.report.clickUpload", "Click to upload")}</span>
+                    <span className="text-[var(--text-ghost)]">{t("qa.report.dragHint", "or paste / drag an image here")}</span>
                   </button>
                 )}
                 <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => setImage(e.target.files?.[0] ?? null)} />
@@ -336,9 +340,9 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
 
             {/* Footer */}
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-subtle)] px-5 py-3">
-              <button type="button" onClick={() => !busy && onClose()} className="rounded-lg px-3.5 py-2 text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">Cancel</button>
+              <button type="button" onClick={() => !busy && onClose()} className="rounded-lg px-3.5 py-2 text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("qa.common.cancel", "Cancel")}</button>
               <button type="button" onClick={submit} disabled={busy || !title.trim()} className="rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[13px] font-semibold text-[var(--text-inverted)] shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50">
-                {busy ? "Submitting…" : "Submit report"}
+                {busy ? t("qa.report.submitting", "Submitting…") : t("qa.report.submit", "Submit report")}
               </button>
             </div>
           </>

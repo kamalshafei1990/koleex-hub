@@ -13,6 +13,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { humanizeError } from "@/lib/ui/humanize-error";
+import { useTranslation } from "@/lib/i18n";
+import { qaT } from "@/lib/translations/qa";
 import type { QaWatcher } from "@/lib/qa/types";
 
 function initials(name: string | null | undefined): string {
@@ -21,6 +23,7 @@ function initials(name: string | null | undefined): string {
 }
 
 export default function WatchControl({ issueId, showWatchers = false }: { issueId: string; showWatchers?: boolean }) {
+  const { t } = useTranslation(qaT);
   const [count, setCount] = useState(0);
   const [watching, setWatching] = useState(false);
   const [watchers, setWatchers] = useState<QaWatcher[]>([]);
@@ -42,9 +45,9 @@ export default function WatchControl({ issueId, showWatchers = false }: { issueI
         setErr(humanizeError(j.error ?? `HTTP ${res.status}`));
       }
     } catch {
-      setErr("Couldn't load watch state.");
+      setErr(t("qa.watch.loadErr", "Couldn't load watch state."));
     } finally { setLoading(false); }
-  }, [issueId]);
+  }, [issueId, t]);
   useEffect(() => { void load(); }, [load]);
 
   async function toggle() {
@@ -65,7 +68,7 @@ export default function WatchControl({ issueId, showWatchers = false }: { issueI
       // Revert on failure.
       setWatching(!next);
       setCount((c) => Math.max(0, c + (next ? -1 : 1)));
-      setErr(e instanceof Error ? e.message : "Couldn't update.");
+      setErr(e instanceof Error ? e.message : t("qa.watch.updateErr", "Couldn't update."));
     } finally { setBusy(false); }
   }
 
@@ -88,11 +91,11 @@ export default function WatchControl({ issueId, showWatchers = false }: { issueI
           <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
           <circle cx="12" cy="12" r="3" />
         </svg>
-        {watching ? "Watching" : "Watch"}
+        {watching ? t("qa.watch.watching", "Watching") : t("qa.watch.watch", "Watch")}
       </button>
 
       <span className="text-[12px] text-[var(--text-dim)] tabular-nums">
-        {loading ? "…" : `${count} ${count === 1 ? "watcher" : "watchers"}`}
+        {loading ? "…" : `${count} ${count === 1 ? t("qa.watch.one", "watcher") : t("qa.watch.many", "watchers")}`}
       </span>
 
       {showWatchers && shown.length > 0 && (

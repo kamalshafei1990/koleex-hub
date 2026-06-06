@@ -12,6 +12,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useTranslation } from "@/lib/i18n";
+import { qaT } from "@/lib/translations/qa";
 import TargetIcon from "@/components/icons/ui/TargetIcon";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { copyText } from "@/lib/ui/clipboard";
@@ -97,6 +99,7 @@ function initials(name: string | null | undefined): string {
 const PILL = "rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide";
 
 export default function QaReportsApp({ embedded = false }: { embedded?: boolean }) {
+  const { t } = useTranslation(qaT);
   const scope = useScopeContext();
   const myId = scope?.account_id ?? null;
 
@@ -151,9 +154,9 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
       setModules(j.modules ?? []);
       setAssigneeFacet(j.assignees ?? []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't load reports.");
+      setError(e instanceof Error ? e.message : t("qa.list.loadErr", "Couldn't load reports."));
     } finally { setLoading(false); }
-  }, [viewParams, fModule, fSeverity, fStatus, fPriority, fAssignee, q]);
+  }, [viewParams, fModule, fSeverity, fStatus, fPriority, fAssignee, q, t]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -226,8 +229,8 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
   if (forbidden) {
     return (
       <div className="mx-auto max-w-md px-6 py-24 text-center text-[var(--text-dim)]">
-        <h1 className="mb-2 text-[18px] font-bold text-[var(--text-primary)]">Issue Reports</h1>
-        <p className="text-[13px]">You don’t have access to the QA console. Ask a Super Admin for access.</p>
+        <h1 className="mb-2 text-[18px] font-bold text-[var(--text-primary)]">{t("qa.list.noAccessTitle", "Issue Reports")}</h1>
+        <p className="text-[13px]">{t("qa.list.noAccess", "You don’t have access to the QA console. Ask a Super Admin for access.")}</p>
       </div>
     );
   }
@@ -238,8 +241,8 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
     <div className={embedded ? "" : "mx-auto max-w-[1500px] px-4 py-6 sm:px-6"}>
       {!embedded && (
         <div className="mb-4">
-          <h1 className="text-[20px] font-bold text-[var(--text-primary)]">Issue Reports</h1>
-          <p className="text-[12.5px] text-[var(--text-dim)]">Report → review → assign → fix → verify → close. A lightweight QA workflow.</p>
+          <h1 className="text-[20px] font-bold text-[var(--text-primary)]">{t("qa.list.heading", "Issue Reports")}</h1>
+          <p className="text-[12.5px] text-[var(--text-dim)]">{t("qa.list.subtitle", "Report → review → assign → fix → verify → close. A lightweight QA workflow.")}</p>
         </div>
       )}
 
@@ -257,33 +260,33 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
                 : "border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
             }`}
           >
-            {v.label}
+            {t("qa.view." + v.id, v.label)}
           </button>
         ))}
       </div>
 
       {/* Filters */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search title / description…" className="h-9 min-w-[180px] flex-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("qa.filter.search", "Search title / description…")} className="h-9 min-w-[180px] flex-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]" />
         <select value={fModule} onChange={(e) => setFModule(e.target.value)} className={selectCls}>
-          <option value="">All modules</option>
+          <option value="">{t("qa.filter.allModules", "All modules")}</option>
           {modules.map((m) => <option key={m} value={m}>{m}</option>)}
         </select>
         <select value={fStatus} onChange={(e) => setFStatus(e.target.value)} className={selectCls}>
-          <option value="">All status</option>
-          {STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          <option value="">{t("qa.filter.allStatus", "All status")}</option>
+          {STATUSES.map((s) => <option key={s.value} value={s.value}>{t("qa.status." + s.value, s.label)}</option>)}
         </select>
         <select value={fPriority} onChange={(e) => setFPriority(e.target.value)} className={selectCls}>
-          <option value="">All priority</option>
-          {PRIORITIES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          <option value="">{t("qa.filter.allPriority", "All priority")}</option>
+          {PRIORITIES.map((s) => <option key={s.value} value={s.value}>{t("qa.priority." + s.value, s.label)}</option>)}
         </select>
         <select value={fSeverity} onChange={(e) => setFSeverity(e.target.value)} className={selectCls}>
-          <option value="">All severity</option>
-          {SEVERITIES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          <option value="">{t("qa.filter.allSeverity", "All severity")}</option>
+          {SEVERITIES.map((s) => <option key={s.value} value={s.value}>{t("qa.severity." + s.value, s.label)}</option>)}
         </select>
         <select value={fAssignee} onChange={(e) => setFAssignee(e.target.value)} className={selectCls}>
-          <option value="">All assignees</option>
-          <option value="unassigned">Unassigned</option>
+          <option value="">{t("qa.filter.allAssignees", "All assignees")}</option>
+          <option value="unassigned">{t("qa.filter.unassigned", "Unassigned")}</option>
           {assigneeFacet.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
         </select>
         <button
@@ -291,7 +294,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
           onClick={() => setSortPriority((v) => !v)}
           className={`h-9 rounded-lg border px-3 text-[12px] font-semibold ${sortPriority ? "border-[var(--accent)] text-[var(--text-secondary)]" : "border-[var(--border-color)] text-[var(--text-secondary)]"}`}
         >
-          Sort: {sortPriority ? "Priority" : "Newest"}
+          {sortPriority ? t("qa.filter.sortPriority", "Sort: Priority") : t("qa.filter.sortNewest", "Sort: Newest")}
         </button>
       </div>
 
@@ -302,9 +305,9 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
             detail when an issue is selected (lg shows both side by side). */}
         <div className={`overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] ${selectedId ? "hidden lg:block" : ""}`}>
           {loading ? (
-            <div className="px-4 py-10 text-center text-[13px] text-[var(--text-dim)]">Loading…</div>
+            <div className="px-4 py-10 text-center text-[13px] text-[var(--text-dim)]">{t("qa.common.loading", "Loading…")}</div>
           ) : sorted.length === 0 ? (
-            <div className="px-4 py-10 text-center text-[13px] text-[var(--text-dim)]">No issues match this view.</div>
+            <div className="px-4 py-10 text-center text-[13px] text-[var(--text-dim)]">{t("qa.list.noMatch", "No issues match this view.")}</div>
           ) : (
             <ul className="divide-y divide-[var(--border-faint)] lg:max-h-[72vh] lg:overflow-y-auto">
               {sorted.map((r) => {
@@ -313,20 +316,20 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
                   <li key={r.id}>
                     <button type="button" onClick={() => setSelectedId(r.id)} className={`block w-full px-4 py-3 text-left transition-colors ${selectedId === r.id ? "bg-[var(--bg-surface-active)]" : "hover:bg-[var(--bg-surface-subtle)]"}`}>
                       <div className="flex items-center gap-2">
-                        <span title="Severity" className={`shrink-0 ${PILL} ${SEVERITY_TONE[r.severity]}`}>{SEVERITY_LABEL[r.severity]}</span>
-                        <span title="Priority" className={`inline-flex shrink-0 items-center gap-1 ${PILL} ${PRIORITY_TONE[r.priority]}`}>
+                        <span title={t("qa.badge.severity", "Severity")} className={`shrink-0 ${PILL} ${SEVERITY_TONE[r.severity]}`}>{t("qa.severity." + r.severity, SEVERITY_LABEL[r.severity])}</span>
+                        <span title={t("qa.badge.priority", "Priority")} className={`inline-flex shrink-0 items-center gap-1 ${PILL} ${PRIORITY_TONE[r.priority]}`}>
                           <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M4 22V4m0 0h12l-2.5 4L16 12H4" /></svg>
-                          {PRIORITY_LABEL[r.priority]}
+                          {t("qa.priority." + r.priority, PRIORITY_LABEL[r.priority])}
                         </span>
                         <span className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{r.title}</span>
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10.5px] text-[var(--text-dim)]">
-                        <span className={`rounded px-1.5 py-0.5 font-semibold ${STATUS_TONE[r.status]}`}>{STATUS_LABEL[r.status]}</span>
-                        <span>{ISSUE_TYPE_LABEL[r.issue_type]}</span>
+                        <span className={`rounded px-1.5 py-0.5 font-semibold ${STATUS_TONE[r.status]}`}>{t("qa.status." + r.status, STATUS_LABEL[r.status])}</span>
+                        <span>{t("qa.issueType." + r.issue_type, ISSUE_TYPE_LABEL[r.issue_type])}</span>
                         <span>· {r.app_module}</span>
                         {r.assigned_to_name && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[var(--text-secondary)]">@{r.assigned_to_name}</span>}
-                        {ready && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 font-semibold text-[var(--text-secondary)]">AI-ready</span>}
-                        {r.duplicate_of_issue_id && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5">dup</span>}
+                        {ready && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 font-semibold text-[var(--text-secondary)]">{t("qa.badge.aiReady", "AI-ready")}</span>}
+                        {r.duplicate_of_issue_id && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5">{t("qa.badge.dup", "dup")}</span>}
                         {typeof r.comment_count === "number" && r.comment_count > 0 && <span>💬 {r.comment_count}</span>}
                         <span className="ms-auto">{rel(r.created_at)}</span>
                       </div>
@@ -343,7 +346,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
         <div className={`overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] ${selectedId ? "" : "hidden lg:block"}`}>
           {selectedId && (
             <button type="button" onClick={() => setSelectedId(null)} className="flex w-full items-center gap-1.5 border-b border-[var(--border-subtle)] px-4 py-2.5 text-[12px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] lg:hidden">
-              <span aria-hidden>←</span> Back to list
+              <span aria-hidden>←</span> {t("qa.list.backToList", "Back to list")}
             </button>
           )}
           {selected ? (
@@ -360,13 +363,13 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
           ) : extraMissing ? (
             <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
               <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[var(--bg-surface)] text-[18px] text-[var(--text-dim)]">⌀</div>
-              <p className="text-[14px] font-semibold text-[var(--text-primary)]">This issue no longer exists or was deleted.</p>
-              <p className="mt-1 text-[12px] text-[var(--text-dim)]">The notification stays readable, but there’s nothing to open.</p>
+              <p className="text-[14px] font-semibold text-[var(--text-primary)]">{t("qa.list.deletedTitle", "This issue no longer exists or was deleted.")}</p>
+              <p className="mt-1 text-[12px] text-[var(--text-dim)]">{t("qa.list.deletedSub", "The notification stays readable, but there’s nothing to open.")}</p>
             </div>
           ) : selectedId ? (
-            <div className="px-6 py-16 text-center text-[13px] text-[var(--text-dim)]">Loading issue…</div>
+            <div className="px-6 py-16 text-center text-[13px] text-[var(--text-dim)]">{t("qa.list.loadingIssue", "Loading issue…")}</div>
           ) : (
-            <div className="px-6 py-16 text-center text-[13px] text-[var(--text-dim)]">Select an issue to view details, discuss, assign and resolve.</div>
+            <div className="px-6 py-16 text-center text-[13px] text-[var(--text-dim)]">{t("qa.list.selectPrompt", "Select an issue to view details, discuss, assign and resolve.")}</div>
           )}
         </div>
       </div>
@@ -397,6 +400,7 @@ function ReportDetail({
   onRefresh?: () => void;
   onJump: (id: string) => void;
 }) {
+  const { t } = useTranslation(qaT);
   // Bumped after any successful mutation so the Discussion/Activity panels
   // reload (the server writes a timeline event we'd otherwise miss).
   const [refreshKey, setRefreshKey] = useState(0);
@@ -439,10 +443,10 @@ function ReportDetail({
       setRefreshKey((k) => k + 1);
       return true;
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Couldn't save.");
+      setErr(e instanceof Error ? e.message : t("qa.triage.errSave", "Couldn't save."));
       return false;
     } finally { setBusy(false); }
-  }, [report.id, onUpdated, onRefresh]);
+  }, [report.id, onUpdated, onRefresh, t]);
 
   async function saveTriage() {
     setSaving(true); setErr(null); setSaved(false);
@@ -464,7 +468,7 @@ function ReportDetail({
       if (res.ok && j.workspace?.generated_prompt) {
         const ok = await copyText(j.workspace.generated_prompt as string);
         if (ok) { setCopied(true); setTimeout(() => setCopied(false), 1800); }
-        else setErr("Couldn't copy — open the issue and copy the prompt manually.");
+        else setErr(t("qa.detail.copyManual", "Couldn't copy — open the issue and copy the prompt manually."));
         setCopying(false);
         return;
       }
@@ -495,7 +499,7 @@ function ReportDetail({
     ];
     const ok = await copyText(lines.join("\n"));
     if (ok) { setCopied(true); setTimeout(() => setCopied(false), 1800); }
-    else setErr("Couldn't copy — open the issue and copy the prompt manually.");
+    else setErr(t("qa.detail.copyManual", "Couldn't copy — open the issue and copy the prompt manually."));
     setCopying(false);
   }
 
@@ -515,24 +519,24 @@ function ReportDetail({
       {err && <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-500 dark:text-rose-300">{err}</div>}
       {/* Badges row */}
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className={`${PILL} ${SEVERITY_TONE[report.severity]}`}>{SEVERITY_LABEL[report.severity]}</span>
-        <span className={`${PILL} ${PRIORITY_TONE[report.priority]}`}>{PRIORITY_LABEL[report.priority]} priority</span>
-        <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${STATUS_TONE[report.status]}`}>{STATUS_LABEL[report.status]}</span>
-        <span className="text-[11px] text-[var(--text-dim)]">{ISSUE_TYPE_LABEL[report.issue_type]}</span>
-        {ready && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--text-secondary)]">AI-ready</span>}
-        {report.duplicate_of_issue_id && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--text-dim)]">Duplicate</span>}
-        {report.reopen_count > 0 && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] text-[var(--text-dim)]">Reopened ×{report.reopen_count}</span>}
+        <span className={`${PILL} ${SEVERITY_TONE[report.severity]}`}>{t("qa.severity." + report.severity, SEVERITY_LABEL[report.severity])}</span>
+        <span className={`${PILL} ${PRIORITY_TONE[report.priority]}`}>{t("qa.priority." + report.priority, PRIORITY_LABEL[report.priority])} {t("qa.badge.priorityWord", "priority")}</span>
+        <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${STATUS_TONE[report.status]}`}>{t("qa.status." + report.status, STATUS_LABEL[report.status])}</span>
+        <span className="text-[11px] text-[var(--text-dim)]">{t("qa.issueType." + report.issue_type, ISSUE_TYPE_LABEL[report.issue_type])}</span>
+        {ready && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--text-secondary)]">{t("qa.badge.aiReady", "AI-ready")}</span>}
+        {report.duplicate_of_issue_id && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--text-dim)]">{t("qa.badge.duplicate", "Duplicate")}</span>}
+        {report.reopen_count > 0 && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] text-[var(--text-dim)]">{t("qa.badge.reopenedTimes", "Reopened")} ×{report.reopen_count}</span>}
         <div className="ms-auto flex items-center gap-2">
           {report.route ? (
             <a href={report.route} target="_blank" rel="noreferrer" className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11.5px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)]">
-              Open Route ↗
+              {t("qa.detail.openRoute", "Open Route ↗")}
             </a>
           ) : null}
           <button type="button" onClick={() => setWorkspaceOpen(true)} className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11.5px] font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]">
-            Debug Workspace
+            {t("qa.detail.debugWorkspace", "Debug Workspace")}
           </button>
           <button type="button" onClick={copyDebugPrompt} disabled={copying} className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11.5px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)] disabled:opacity-60">
-            {copying ? "Preparing…" : copied ? "Copied ✓" : "Copy AI Prompt"}
+            {copying ? t("qa.detail.preparing", "Preparing…") : copied ? t("qa.common.copied", "Copied ✓") : t("qa.detail.copyPrompt", "Copy AI Prompt")}
           </button>
         </div>
       </div>
@@ -544,10 +548,10 @@ function ReportDetail({
       <h2 className="text-[16px] font-bold text-[var(--text-primary)]">{report.title}</h2>
 
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[var(--text-dim)]">
-        <span><b className="text-[var(--text-secondary)]">Module:</b> {report.app_module}</span>
-        <span className="font-mono"><b className="font-sans text-[var(--text-secondary)]">Route:</b> {report.route ?? "—"}</span>
-        <span><b className="text-[var(--text-secondary)]">Reporter:</b> {report.reporter_name ?? "—"}</span>
-        <span><b className="text-[var(--text-secondary)]">Filed:</b> {fmt(report.created_at)}</span>
+        <span><b className="text-[var(--text-secondary)]">{t("qa.detail.moduleLabel", "Module:")}</b> {report.app_module}</span>
+        <span className="font-mono"><b className="font-sans text-[var(--text-secondary)]">{t("qa.detail.routeLabel", "Route:")}</b> {report.route ?? "—"}</span>
+        <span><b className="text-[var(--text-secondary)]">{t("qa.detail.reporter", "Reporter")}:</b> {report.reporter_name ?? "—"}</span>
+        <span><b className="text-[var(--text-secondary)]">{t("qa.detail.filedLabel", "Filed:")}</b> {fmt(report.created_at)}</span>
       </div>
 
       {/* Workflow stepper */}
@@ -559,7 +563,7 @@ function ReportDetail({
               : i === curStep ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] ring-2 ring-[var(--border-color)]"
               : "bg-[var(--bg-surface)] text-[var(--text-dim)] border border-[var(--border-color)]"
             }`}>{i < curStep ? "✓" : i + 1}</div>
-            <span className={`hidden whitespace-nowrap text-[11px] sm:inline ${i <= curStep ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-dim)]"}`}>{s.label}</span>
+            <span className={`hidden whitespace-nowrap text-[11px] sm:inline ${i <= curStep ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-dim)]"}`}>{t("qa.step." + s.value, s.label)}</span>
             {i < WORKFLOW_STEPS.length - 1 && <div className={`h-px flex-1 ${i < curStep ? "bg-[var(--text-primary)]" : "bg-[var(--border-color)]"}`} />}
           </div>
         ))}
@@ -571,18 +575,18 @@ function ReportDetail({
       {/* Quick actions: priority · assignee · duplicate · reopen */}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <div>
-          <label className={label}>Priority</label>
+          <label className={label}>{t("qa.action.priority", "Priority")}</label>
           <select
             value={report.priority}
             disabled={busy}
             onChange={(e) => void patch({ priority: e.target.value as Priority })}
             className={input}
           >
-            {PRIORITIES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+            {PRIORITIES.map((p) => <option key={p.value} value={p.value}>{t("qa.priority." + p.value, p.label)}</option>)}
           </select>
         </div>
         <div>
-          <label className={label}>Assigned to</label>
+          <label className={label}>{t("qa.action.assignedTo", "Assigned to")}</label>
           <AssigneePicker
             assignees={assignees}
             value={report.assigned_to}
@@ -602,7 +606,7 @@ function ReportDetail({
       {report.component_name && (
         <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] px-3.5 py-3">
           <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)]">
-            <TargetIcon size={12} className="text-[var(--text-secondary)]" /> Inspected component
+            <TargetIcon size={12} className="text-[var(--text-secondary)]" /> {t("qa.detail.inspected", "Inspected component")}
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[12.5px]">
             {report.component_module && (<><span className="text-[var(--text-secondary)]">{report.component_module}</span><span className="text-[var(--text-ghost)]">→</span></>)}
@@ -620,40 +624,40 @@ function ReportDetail({
         </a>
       )}
 
-      <div><div className={label}>What happened</div><div className={box}>{report.description || "—"}</div></div>
-      <div><div className={label}>Expected result</div><div className={box}>{report.expected_result || "—"}</div></div>
-      <div><div className={label}>Suggested solution</div><div className={box}>{report.suggested_solution || "—"}</div></div>
+      <div><div className={label}>{t("qa.detail.whatHappened", "What happened")}</div><div className={box}>{report.description || "—"}</div></div>
+      <div><div className={label}>{t("qa.report.expected", "Expected result")}</div><div className={box}>{report.expected_result || "—"}</div></div>
+      <div><div className={label}>{t("qa.report.solution", "Suggested solution")}</div><div className={box}>{report.suggested_solution || "—"}</div></div>
 
       <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[11px] text-[var(--text-dim)]">
-        <b className="text-[var(--text-secondary)]">Environment</b> — {report.device_info ?? "—"} · screen {report.screen_size ?? "—"} · {report.language ?? "—"} · {report.timezone ?? "—"}
+        <b className="text-[var(--text-secondary)]">{t("qa.detail.environment", "Environment")}</b> — {report.device_info ?? "—"} · screen {report.screen_size ?? "—"} · {report.language ?? "—"} · {report.timezone ?? "—"}
         <div className="mt-1 break-words font-mono text-[10px] opacity-80">{report.browser_info ?? ""}</div>
       </div>
 
       {/* Triage */}
       <div className="space-y-3 rounded-xl border border-[var(--border-subtle)] p-3">
-        <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Triage</div>
+        <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("qa.triage.title", "Triage")}</div>
         <div>
-          <label className={label}>Status</label>
+          <label className={label}>{t("qa.triage.status", "Status")}</label>
           <select value={status} onChange={(e) => setStatus(e.target.value as IssueStatus)} className={input}>
-            {STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            {STATUSES.map((s) => <option key={s.value} value={s.value}>{t("qa.status." + s.value, s.label)}</option>)}
           </select>
         </div>
         <div>
-          <label className={label}>Developer notes</label>
-          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={input} placeholder="Investigation notes, root cause…" />
+          <label className={label}>{t("qa.triage.devNotes", "Developer notes")}</label>
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={input} placeholder={t("qa.triage.devNotesPlaceholder", "Investigation notes, root cause…")} />
         </div>
         <div>
-          <label className={label}>Resolution summary</label>
-          <textarea value={resolution} onChange={(e) => setResolution(e.target.value)} rows={2} className={input} placeholder="What was done to fix it" />
+          <label className={label}>{t("qa.triage.resolution", "Resolution summary")}</label>
+          <textarea value={resolution} onChange={(e) => setResolution(e.target.value)} rows={2} className={input} placeholder={t("qa.triage.resolutionPlaceholder", "What was done to fix it")} />
         </div>
         <div>
-          <label className={label}>Fixed commit</label>
+          <label className={label}>{t("qa.triage.commit", "Fixed commit")}</label>
           <input value={commit} onChange={(e) => setCommit(e.target.value)} className={`${input} font-mono`} placeholder="e.g. a5b5481d" />
         </div>
         <div className="flex items-center justify-end gap-2">
-          {saved && <span className="text-[12px] text-emerald-500">Saved ✓</span>}
+          {saved && <span className="text-[12px] text-emerald-500">{t("qa.triage.saved", "Saved ✓")}</span>}
           <button type="button" onClick={saveTriage} disabled={saving} className="rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[13px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
-            {saving ? "Saving…" : "Save changes"}
+            {saving ? t("qa.triage.saving", "Saving…") : t("qa.triage.save", "Save changes")}
           </button>
         </div>
       </div>
@@ -676,6 +680,7 @@ function AssigneePicker({
   disabled?: boolean;
   onChange: (id: string | null) => void | Promise<boolean>;
 }) {
+  const { t } = useTranslation(qaT);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   // Optimistic selection: reflect the picked assignee immediately, independent
@@ -728,7 +733,7 @@ function AssigneePicker({
             <span className="truncate">{current}</span>
           </>
         ) : (
-          <span className="text-[var(--text-dim)]">Unassigned</span>
+          <span className="text-[var(--text-dim)]">{t("qa.assignee.unassigned", "Unassigned")}</span>
         )}
         <span className="ms-auto text-[var(--text-dim)]">▾</span>
       </button>
@@ -738,14 +743,14 @@ function AssigneePicker({
             autoFocus
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search people…"
+            placeholder={t("qa.assignee.search", "Search people…")}
             className="w-full border-b border-[var(--border-subtle)] bg-transparent px-3 py-2 text-[12.5px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-dim)]"
           />
           <ul className="max-h-56 overflow-y-auto p-1">
             <li>
               <button type="button" onClick={() => choose(null)} className={`flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12.5px] hover:bg-[var(--bg-surface-hover)] ${!effectiveValue ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "text-[var(--text-dim)]"}`}>
                 <span className="flex h-5 w-5 items-center justify-center text-[var(--text-dim)]">∅</span>
-                <span className="flex-1">Unassigned</span>
+                <span className="flex-1">{t("qa.assignee.unassigned", "Unassigned")}</span>
                 {!effectiveValue && <span className="text-[var(--text-secondary)]">✓</span>}
               </button>
             </li>
@@ -753,12 +758,12 @@ function AssigneePicker({
               <li key={a.id}>
                 <button type="button" onClick={() => choose(a.id)} className={`flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12.5px] hover:bg-[var(--bg-surface-hover)] ${a.id === effectiveValue ? "bg-[var(--bg-surface-active)]" : ""}`}>
                   <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--bg-surface-active)] text-[9px] font-bold text-[var(--text-secondary)]">{initials(a.name)}</span>
-                  <span className="flex-1 truncate text-[var(--text-primary)]">{a.name}{a.id === myId ? " (me)" : ""}</span>
+                  <span className="flex-1 truncate text-[var(--text-primary)]">{a.name}{a.id === myId ? t("qa.common.me", " (me)") : ""}</span>
                   {a.id === effectiveValue && <span className="text-[var(--text-secondary)]">✓</span>}
                 </button>
               </li>
             ))}
-            {filtered.length === 0 && <li className="px-3 py-2 text-[12px] text-[var(--text-dim)]">No matches.</li>}
+            {filtered.length === 0 && <li className="px-3 py-2 text-[12px] text-[var(--text-dim)]">{t("qa.assignee.noMatch", "No matches.")}</li>}
           </ul>
         </div>
       )}
@@ -777,18 +782,19 @@ function DuplicateControl({
   onJump: (id: string) => void;
   dupTarget: QaReport | null;
 }) {
+  const { t } = useTranslation(qaT);
   const [picking, setPicking] = useState(false);
   const [search, setSearch] = useState("");
 
   if (report.duplicate_of_issue_id) {
     return (
       <div className="flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[12px]">
-        <span className="text-[var(--text-dim)]">Duplicate of</span>
+        <span className="text-[var(--text-dim)]">{t("qa.action.duplicateOf", "Duplicate of")}</span>
         <button type="button" onClick={() => dupTarget && onJump(dupTarget.id)} className="truncate font-semibold text-[var(--accent)] hover:underline">
           {dupTarget ? dupTarget.title : report.duplicate_of_issue_id}
         </button>
         <button type="button" disabled={disabled} onClick={() => void onPatch({ duplicate_of_issue_id: null })} className="ms-auto text-[11px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">
-          Unlink
+          {t("qa.action.unlink", "Unlink")}
         </button>
       </div>
     );
@@ -802,15 +808,15 @@ function DuplicateControl({
     <div>
       {!picking ? (
         <button type="button" disabled={disabled} onClick={() => setPicking(true)} className="text-[12px] font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)]">
-          + Mark as duplicate
+          + {t("qa.action.markDuplicateShort", "Mark as duplicate")}
         </button>
       ) : (
         <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] p-2">
           <div className="mb-1 flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">Duplicate of…</span>
-            <button type="button" onClick={() => { setPicking(false); setSearch(""); }} className="text-[11px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">Cancel</button>
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">{t("qa.action.duplicateOfPrompt", "Duplicate of…")}</span>
+            <button type="button" onClick={() => { setPicking(false); setSearch(""); }} className="text-[11px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("qa.common.cancel", "Cancel")}</button>
           </div>
-          <input autoFocus value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search issues…" className="mb-1 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none" />
+          <input autoFocus value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("qa.action.searchIssues", "Search issues…")} className="mb-1 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none" />
           <ul className="max-h-40 overflow-y-auto">
             {filtered.map((r) => (
               <li key={r.id}>
@@ -819,7 +825,7 @@ function DuplicateControl({
                 </button>
               </li>
             ))}
-            {filtered.length === 0 && <li className="px-2 py-1.5 text-[12px] text-[var(--text-dim)]">No matches.</li>}
+            {filtered.length === 0 && <li className="px-2 py-1.5 text-[12px] text-[var(--text-dim)]">{t("qa.assignee.noMatch", "No matches.")}</li>}
           </ul>
         </div>
       )}
@@ -829,22 +835,23 @@ function DuplicateControl({
 
 /* ── Reopen ──────────────────────────────────────────────────────────────── */
 function ReopenControl({ disabled, onReopen }: { disabled?: boolean; onReopen: (reason: string) => Promise<boolean> }) {
+  const { t } = useTranslation(qaT);
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   return (
     <div>
       {!open ? (
         <button type="button" disabled={disabled} onClick={() => setOpen(true)} className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[12px] font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--text-primary)]">
-          ↻ Reopen issue
+          ↻ {t("qa.action.reopenIssue", "Reopen issue")}
         </button>
       ) : (
         <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] p-2.5">
-          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">Why reopen?</div>
-          <textarea autoFocus value={reason} onChange={(e) => setReason(e.target.value)} rows={2} placeholder="Reason (preserved on the timeline)…" className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none" />
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">{t("qa.action.whyReopen", "Why reopen?")}</div>
+          <textarea autoFocus value={reason} onChange={(e) => setReason(e.target.value)} rows={2} placeholder={t("qa.action.reopenReasonPlaceholder", "Reason (preserved on the timeline)…")} className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none" />
           <div className="mt-1.5 flex justify-end gap-2">
-            <button type="button" onClick={() => { setOpen(false); setReason(""); }} className="text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">Cancel</button>
+            <button type="button" onClick={() => { setOpen(false); setReason(""); }} className="text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("qa.common.cancel", "Cancel")}</button>
             <button type="button" disabled={disabled} onClick={async () => { const ok = await onReopen(reason.trim()); if (ok) { setOpen(false); setReason(""); } }} className="rounded-md bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
-              Reopen
+              {t("qa.action.reopen", "Reopen")}
             </button>
           </div>
         </div>
@@ -855,6 +862,7 @@ function ReopenControl({ disabled, onReopen }: { disabled?: boolean; onReopen: (
 
 /* ── Comments / discussion ───────────────────────────────────────────────── */
 function CommentsPanel({ issueId, myId, refreshKey = 0 }: { issueId: string; myId: string | null; refreshKey?: number }) {
+  const { t } = useTranslation(qaT);
   const [comments, setComments] = useState<QaComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState<string | null>(null);
@@ -872,9 +880,9 @@ function CommentsPanel({ issueId, myId, refreshKey = 0 }: { issueId: string; myI
       if (res.ok) setComments(j.comments ?? []);
       else setLoadErr(humanizeError(j.error ?? `HTTP ${res.status}`));
     } catch {
-      setLoadErr("Couldn't load the discussion.");
+      setLoadErr(t("qa.discussion.loadErr", "Couldn't load the discussion."));
     } finally { setLoading(false); }
-  }, [issueId]);
+  }, [issueId, t]);
   // Reload on mount, on issue change, and after any detail mutation (refreshKey).
   useEffect(() => { void load(); }, [load, refreshKey]);
 
@@ -894,20 +902,20 @@ function CommentsPanel({ issueId, myId, refreshKey = 0 }: { issueId: string; myI
       if (j.comment) setComments((prev) => [...prev, j.comment as QaComment]);
       setText(""); setInternal(false); att.clear();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Couldn't post.");
+      setErr(e instanceof Error ? e.message : t("qa.discussion.postErr", "Couldn't post."));
     } finally { setPosting(false); }
   }
 
   return (
     <div className="space-y-2 rounded-xl border border-[var(--border-subtle)] p-3">
-      <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Discussion{comments.length > 0 ? ` · ${comments.length}` : ""}</div>
+      <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("qa.discussion.title", "Discussion")}{comments.length > 0 ? ` · ${comments.length}` : ""}</div>
 
       {loading ? (
-        <div className="py-3 text-center text-[12px] text-[var(--text-dim)]">Loading…</div>
+        <div className="py-3 text-center text-[12px] text-[var(--text-dim)]">{t("qa.common.loading", "Loading…")}</div>
       ) : loadErr ? (
         <div className="py-3 text-center text-[12px] text-rose-500 dark:text-rose-300">{loadErr}</div>
       ) : comments.length === 0 ? (
-        <div className="py-3 text-center text-[12px] text-[var(--text-dim)]">No comments yet. Start the thread below.</div>
+        <div className="py-3 text-center text-[12px] text-[var(--text-dim)]">{t("qa.discussion.empty", "No comments yet. Start the thread below.")}</div>
       ) : (
         <ul className="space-y-2">
           {comments.map((c) => (
@@ -916,8 +924,8 @@ function CommentsPanel({ issueId, myId, refreshKey = 0 }: { issueId: string; myI
                 <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--bg-surface-active)] text-[8px] font-bold text-[var(--text-secondary)]">{initials(c.user_name)}</span>
                 <span className="font-semibold text-[var(--text-secondary)]">{c.user_name ?? "—"}</span>
                 {c.user_role && <span className="rounded bg-[var(--bg-surface)] px-1 text-[9px] text-[var(--text-dim)]">{c.user_role}</span>}
-                {c.is_internal_note && <span className="rounded bg-amber-500/20 px-1 text-[9px] font-semibold text-amber-600 dark:text-amber-300">Internal</span>}
-                <span className="ms-auto text-[var(--text-dim)]">{rel(c.created_at)}{c.edited_at ? " · edited" : ""}</span>
+                {c.is_internal_note && <span className="rounded bg-amber-500/20 px-1 text-[9px] font-semibold text-amber-600 dark:text-amber-300">{t("qa.discussion.internalBadge", "Internal")}</span>}
+                <span className="ms-auto text-[var(--text-dim)]">{rel(c.created_at)}{c.edited_at ? ` · ${t("qa.discussion.edited", "edited")}` : ""}</span>
               </div>
               {c.message && <div className="whitespace-pre-wrap break-words text-[12.5px] text-[var(--text-primary)]">{c.message}</div>}
               <AttachmentThumbs attachments={c.attachments ?? []} internal={c.is_internal_note} />
@@ -935,17 +943,17 @@ function CommentsPanel({ issueId, myId, refreshKey = 0 }: { issueId: string; myI
           onPaste={att.onPaste}
           onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") void post(); }}
           rows={2}
-          placeholder="Write a reply…  (paste/drop an image · ⌘/Ctrl+Enter to send)"
+          placeholder={t("qa.discussion.replyPlaceholder", "Write a reply…  (paste/drop an image · ⌘/Ctrl+Enter to send)")}
           className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
         />
         <AttachmentStrip att={att} disabled={posting} />
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-1.5 text-[12px] text-[var(--text-secondary)]">
             <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} className="h-3.5 w-3.5 accent-[var(--accent)]" />
-            Internal note
+            {t("qa.discussion.internal", "Internal note")}
           </label>
           <button type="button" onClick={post} disabled={posting || (!text.trim() && att.count === 0)} className="ms-auto rounded-lg bg-[var(--bg-inverted)] px-4 py-1.5 text-[13px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-40">
-            {posting ? "Posting…" : "Comment"}
+            {posting ? t("qa.discussion.posting", "Posting…") : t("qa.discussion.comment", "Comment")}
           </button>
         </div>
       </div>
@@ -955,6 +963,7 @@ function CommentsPanel({ issueId, myId, refreshKey = 0 }: { issueId: string; myI
 
 /* ── Activity timeline ───────────────────────────────────────────────────── */
 function ActivityPanel({ issueId, refreshKey = 0 }: { issueId: string; refreshKey?: number }) {
+  const { t } = useTranslation(qaT);
   const [activity, setActivity] = useState<QaActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState<string | null>(null);
@@ -966,21 +975,21 @@ function ActivityPanel({ issueId, refreshKey = 0 }: { issueId: string; refreshKe
     setLoading(true); setLoadErr(null);
     fetch(`/api/qa/reports/${issueId}/activity`, { credentials: "include", cache: "no-store" })
       .then(async (r) => {
-        if (!r.ok) { if (alive) setLoadErr("Couldn't load the activity timeline."); return { activity: [] }; }
+        if (!r.ok) { if (alive) setLoadErr(t("qa.activityPanel.loadErr", "Couldn't load the activity timeline.")); return { activity: [] }; }
         return r.json();
       })
       .then((j) => { if (alive) setActivity(j.activity ?? []); })
-      .catch(() => { if (alive) setLoadErr("Couldn't load the activity timeline."); })
+      .catch(() => { if (alive) setLoadErr(t("qa.activityPanel.loadErr", "Couldn't load the activity timeline.")); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [issueId, refreshKey]);
+  }, [issueId, refreshKey, t]);
 
   function describe(a: QaActivity): string {
-    const verb = ACTIVITY_LABEL[a.activity_type] ?? a.activity_type;
+    const verb = t("qa.activity." + a.activity_type, ACTIVITY_LABEL[a.activity_type] ?? a.activity_type);
     switch (a.activity_type) {
-      case "status_changed": return `${verb} → ${STATUS_LABEL[a.new_value as IssueStatus] ?? a.new_value}`;
-      case "priority_changed": return `${verb} → ${PRIORITY_LABEL[a.new_value as Priority] ?? a.new_value}`;
-      case "assigned": return `${verb} to ${(a.metadata?.assignee_name as string) ?? "someone"}`;
+      case "status_changed": return `${verb} → ${a.new_value ? t("qa.status." + a.new_value, STATUS_LABEL[a.new_value as IssueStatus] ?? (a.new_value as string)) : a.new_value}`;
+      case "priority_changed": return `${verb} → ${a.new_value ? t("qa.priority." + a.new_value, PRIORITY_LABEL[a.new_value as Priority] ?? (a.new_value as string)) : a.new_value}`;
+      case "assigned": return `${verb} ${t("qa.activityPanel.to", "to")} ${(a.metadata?.assignee_name as string) ?? t("qa.activityPanel.someone", "someone")}`;
       case "commit_added": return `${verb} ${a.new_value ?? ""}`;
       case "reopened": return a.metadata?.reason ? `${verb}: ${a.metadata.reason as string}` : verb;
       default: return verb;
@@ -989,20 +998,20 @@ function ActivityPanel({ issueId, refreshKey = 0 }: { issueId: string; refreshKe
 
   return (
     <div className="space-y-2 rounded-xl border border-[var(--border-subtle)] p-3">
-      <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Activity</div>
+      <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("qa.activityPanel.title", "Activity")}</div>
       {loading ? (
-        <div className="py-2 text-center text-[12px] text-[var(--text-dim)]">Loading…</div>
+        <div className="py-2 text-center text-[12px] text-[var(--text-dim)]">{t("qa.common.loading", "Loading…")}</div>
       ) : loadErr ? (
         <div className="py-2 text-center text-[12px] text-rose-500 dark:text-rose-300">{loadErr}</div>
       ) : activity.length === 0 ? (
-        <div className="py-2 text-center text-[12px] text-[var(--text-dim)]">No activity yet.</div>
+        <div className="py-2 text-center text-[12px] text-[var(--text-dim)]">{t("qa.activityPanel.empty", "No activity yet.")}</div>
       ) : (
         <ol className="space-y-1.5">
           {activity.map((a) => (
             <li key={a.id} className="flex items-start gap-2 text-[12px]">
               <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--text-dim)]" />
               <span className="text-[var(--text-secondary)]">
-                <b className="font-semibold text-[var(--text-primary)]">{a.actor_name ?? "Someone"}</b> {describe(a)}
+                <b className="font-semibold text-[var(--text-primary)]">{a.actor_name ?? t("qa.activityPanel.someoneCap", "Someone")}</b> {describe(a)}
                 <span className="ms-1.5 text-[var(--text-dim)]">· {rel(a.created_at)}</span>
               </span>
             </li>

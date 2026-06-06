@@ -18,6 +18,8 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { qaT } from "@/lib/translations/qa";
 import type { QaAttachment } from "@/lib/qa/types";
 
 const ALLOWED = ["image/png", "image/jpeg", "image/webp"];
@@ -48,6 +50,7 @@ export interface AttachmentUploader {
 }
 
 export function useCommentAttachments(): AttachmentUploader {
+  const { t } = useTranslation(qaT);
   const [staged, setStaged] = useState<Staged[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,26 +68,26 @@ export function useCommentAttachments(): AttachmentUploader {
     // the same stale length) and then get rejected by the server on post.
     let projected = stagedRef.current.length;
     for (const f of list) {
-      if (projected >= MAX_COUNT) { setError(`Up to ${MAX_COUNT} images per comment.`); break; }
-      if (!ALLOWED.includes(f.type)) { setError("Only PNG, JPG or WEBP images are allowed."); continue; }
-      if (f.size > MAX_BYTES) { setError("Image is too large (max 5 MB)."); continue; }
+      if (projected >= MAX_COUNT) { setError(t("qa.attach.max", `Up to ${MAX_COUNT} images per comment.`)); break; }
+      if (!ALLOWED.includes(f.type)) { setError(t("qa.attach.type", "Only PNG, JPG or WEBP images are allowed.")); continue; }
+      if (f.size > MAX_BYTES) { setError(t("qa.attach.size", "Image is too large (max 5 MB).")); continue; }
       setUploading(true);
       try {
         const fd = new FormData();
         fd.append("file", f);
         const res = await fetch("/api/qa/upload", { method: "POST", credentials: "include", body: fd });
         const j = await res.json().catch(() => ({}));
-        if (!res.ok || !j.path) throw new Error(j.error || "Upload failed.");
+        if (!res.ok || !j.path) throw new Error(j.error || t("qa.attach.uploadErr", "Upload failed."));
         const item: Staged = { path: j.path, name: f.name, type: f.type, size: f.size, previewUrl: URL.createObjectURL(f) };
         setStaged((prev) => [...prev, item]);
         projected++;
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Upload failed.");
+        setError(e instanceof Error ? e.message : t("qa.attach.uploadErr", "Upload failed."));
       } finally {
         setUploading(false);
       }
     }
-  }, []);
+  }, [t]);
 
   const removeAt = useCallback((i: number) => {
     setStaged((prev) => {
@@ -127,6 +130,7 @@ export function useCommentAttachments(): AttachmentUploader {
 
 /* ── Composer strip ──────────────────────────────────────────────────────── */
 export function AttachmentStrip({ att, disabled }: { att: AttachmentUploader; disabled?: boolean }) {
+  const { t } = useTranslation(qaT);
   const inputRef = useRef<HTMLInputElement>(null);
   return (
     <div className="flex flex-col gap-1.5">
@@ -140,9 +144,9 @@ export function AttachmentStrip({ att, disabled }: { att: AttachmentUploader; di
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
           </svg>
-          Attach
+          {t("qa.attach.attach", "Attach")}
         </button>
-        {att.uploading && <span className="text-[11px] text-[var(--text-dim)]">Uploading…</span>}
+        {att.uploading && <span className="text-[11px] text-[var(--text-dim)]">{t("qa.attach.uploading", "Uploading…")}</span>}
         <input
           ref={inputRef}
           type="file"
@@ -162,7 +166,7 @@ export function AttachmentStrip({ att, disabled }: { att: AttachmentUploader; di
               <button
                 type="button"
                 onClick={() => att.removeAt(i)}
-                aria-label="Remove attachment"
+                aria-label={t("qa.attach.remove", "Remove attachment")}
                 className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/60 text-[10px] font-bold text-white hover:bg-black/80"
               >
                 ×
@@ -181,6 +185,7 @@ export function AttachmentStrip({ att, disabled }: { att: AttachmentUploader; di
 
 /* ── Thumbnails + lightbox (read-only thread view) ───────────────────────── */
 export function AttachmentThumbs({ attachments, internal = false }: { attachments: QaAttachment[]; internal?: boolean }) {
+  const { t } = useTranslation(qaT);
   const [active, setActive] = useState<string | null>(null);
   const images = (attachments ?? []).filter((a) => a && a.url);
 
@@ -222,7 +227,7 @@ export function AttachmentThumbs({ attachments, internal = false }: { attachment
           <button
             type="button"
             onClick={() => setActive(null)}
-            aria-label="Close"
+            aria-label={t("qa.report.close", "Close")}
             className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-[18px] text-white hover:bg-white/20"
           >
             ×

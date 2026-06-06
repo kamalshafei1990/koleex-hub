@@ -12,6 +12,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { copyText } from "@/lib/ui/clipboard";
+import { useTranslation } from "@/lib/i18n";
+import { qaT } from "@/lib/translations/qa";
 import { AttachmentThumbs } from "@/components/qa/CommentAttachments";
 import { STATUS_LABEL, type IssueStatus, type QaAttachment } from "@/lib/qa/types";
 
@@ -53,6 +55,7 @@ export default function ClaudeWorkspaceDrawer({ issueId, onClose, onJump }: { is
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [tab, setTab] = useState<"overview" | "investigation" | "ai">("overview");
+  const { t } = useTranslation(qaT);
 
   const load = useCallback(async (regenerate = false) => {
     if (regenerate) setRegenerating(true); else setLoading(true);
@@ -66,9 +69,9 @@ export default function ClaudeWorkspaceDrawer({ issueId, onClose, onJump }: { is
       if (!res.ok) throw new Error(humanizeError(j.error ?? `HTTP ${res.status}`));
       setWs({ ...(j.workspace as Workspace), cached: j.cached });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't build the workspace.");
+      setError(e instanceof Error ? e.message : t("qa.ws.buildErr", "Couldn't build the workspace."));
     } finally { setLoading(false); setRegenerating(false); }
-  }, [issueId]);
+  }, [issueId, t]);
 
   useEffect(() => { void load(false); }, [load]);
 
@@ -83,7 +86,7 @@ export default function ClaudeWorkspaceDrawer({ issueId, onClose, onJump }: { is
     if (!ws) return;
     void copyText(ws.generated_prompt).then((ok) => {
       if (ok) { setCopied(true); setTimeout(() => setCopied(false), 1800); }
-      else setError("Couldn't copy — select the prompt text and copy manually.");
+      else setError(t("qa.ws.copyManual", "Couldn't copy — select the prompt text and copy manually."));
     });
   }
 
@@ -104,30 +107,30 @@ export default function ClaudeWorkspaceDrawer({ issueId, onClose, onJump }: { is
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M12 2l2.4 7.4H22l-6 4.4 2.3 7.2L12 16.6 5.7 21l2.3-7.2-6-4.4h7.6z" />
             </svg>
-            <span className="text-[14px] font-bold text-[var(--text-primary)]">AI Debug Workspace</span>
-            {ws && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[9px] text-[var(--text-dim)]">v{ws.generation_version}{ws.cached ? " · cached" : " · fresh"}</span>}
+            <span className="text-[14px] font-bold text-[var(--text-primary)]">{t("qa.ws.title", "AI Debug Workspace")}</span>
+            {ws && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[9px] text-[var(--text-dim)]">v{ws.generation_version}{ws.cached ? ` · ${t("qa.ws.cached", "cached")}` : ` · ${t("qa.ws.fresh", "fresh")}`}</span>}
           </div>
           <div className="ms-auto flex items-center gap-1.5">
-            <button type="button" className={btn} onClick={() => load(true)} disabled={regenerating || loading}>{regenerating ? "Regenerating…" : "Regenerate"}</button>
-            <button type="button" className={btn} onClick={copyPrompt} disabled={!ws}>{copied ? "Copied ✓" : "Copy AI Prompt"}</button>
+            <button type="button" className={btn} onClick={() => load(true)} disabled={regenerating || loading}>{regenerating ? t("qa.ws.regenerating", "Regenerating…") : t("qa.ws.regenerate", "Regenerate")}</button>
+            <button type="button" className={btn} onClick={copyPrompt} disabled={!ws}>{copied ? t("qa.common.copied", "Copied ✓") : t("qa.detail.copyPrompt", "Copy AI Prompt")}</button>
             <button type="button" aria-label="Close" onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-md text-[16px] text-[var(--text-dim)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]">×</button>
           </div>
         </div>
 
         <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
           {loading ? (
-            <div className="py-16 text-center text-[13px] text-[var(--text-dim)]">Building workspace…</div>
+            <div className="py-16 text-center text-[13px] text-[var(--text-dim)]">{t("qa.ws.building", "Building workspace…")}</div>
           ) : error ? (
             <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-500 dark:text-rose-300">{error}</div>
           ) : ws ? (
             <>
               {/* Tabs */}
               <div className="flex gap-1.5">
-                <button type="button" onClick={() => setTab("overview")} className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold ${tab === "overview" ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-secondary)]"}`}>Overview</button>
+                <button type="button" onClick={() => setTab("overview")} className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold ${tab === "overview" ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-secondary)]"}`}>{t("qa.ws.tabOverview", "Overview")}</button>
                 <button type="button" onClick={() => setTab("investigation")} className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold ${tab === "investigation" ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-secondary)]"}`}>
-                  Investigation{ws.investigation ? ` · risk ${ws.investigation.risk_score}` : ""}
+                  {t("qa.ws.tabInvestigation", "Investigation")}{ws.investigation ? ` · risk ${ws.investigation.risk_score}` : ""}
                 </button>
-                <button type="button" onClick={() => setTab("ai")} className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold ${tab === "ai" ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-secondary)]"}`}>AI Analysis</button>
+                <button type="button" onClick={() => setTab("ai")} className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold ${tab === "ai" ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-secondary)]"}`}>{t("qa.ws.tabAi", "AI Analysis")}</button>
               </div>
 
               {tab === "ai" ? (
@@ -138,13 +141,13 @@ export default function ClaudeWorkspaceDrawer({ issueId, onClose, onJump }: { is
               <>
               {/* Component info */}
               <div className={card}>
-                <div className={head}>Component & Context</div>
+                <div className={head}>{t("qa.ws.componentContext", "Component & Context")}</div>
                 <div className="text-[12.5px] text-[var(--text-secondary)]">
                   <div><b className="text-[var(--text-primary)]">{String(s.title ?? "—")}</b></div>
                   <div className="mt-1 text-[11.5px] text-[var(--text-dim)]">
                     {String(s.app_module ?? "—")} · {String(s.route ?? "—")}
                     {ws.debug_context.assignee_name ? ` · @${ws.debug_context.assignee_name}` : ""}
-                    {ws.debug_context.watchers_count > 0 ? ` · ${ws.debug_context.watchers_count} watching` : ""}
+                    {ws.debug_context.watchers_count > 0 ? ` · ${ws.debug_context.watchers_count} ${t("qa.ws.watching", "watching")}` : ""}
                   </div>
                   {s.component_name ? (
                     <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[12px]">
@@ -153,14 +156,14 @@ export default function ClaudeWorkspaceDrawer({ issueId, onClose, onJump }: { is
                       <span className="font-semibold text-[var(--text-primary)]">{String(s.component_name)}</span>
                       {s.component_record_id ? <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 font-mono text-[10.5px]">#{String(s.component_record_id)}</span> : null}
                     </div>
-                  ) : <div className="mt-1 text-[11.5px] text-[var(--text-dim)]">Whole-page report (no component pinned).</div>}
+                  ) : <div className="mt-1 text-[11.5px] text-[var(--text-dim)]">{t("qa.ws.wholePage", "Whole-page report (no component pinned).")}</div>}
                 </div>
               </div>
 
               {/* Attachments */}
               {(ws.screenshot_url || ws.debug_context.comments.some((c) => c.attachments?.length)) && (
                 <div className={card}>
-                  <div className={head}>Attachments</div>
+                  <div className={head}>{t("qa.ws.attachments", "Attachments")}</div>
                   {ws.screenshot_url && (
                     <AttachmentThumbs attachments={[{ path: "screenshot", name: "Issue screenshot", type: "image", size: 0, url: ws.screenshot_url }]} />
                   )}
@@ -172,15 +175,15 @@ export default function ClaudeWorkspaceDrawer({ issueId, onClose, onJump }: { is
 
               {/* Related issues */}
               <div className={card}>
-                <div className={head}>Related Issues</div>
+                <div className={head}>{t("qa.ws.relatedIssues", "Related Issues")}</div>
                 {ws.related_issues.length === 0 ? (
-                  <div className="text-[12px] text-[var(--text-dim)]">None found in the recent timeframe.</div>
+                  <div className="text-[12px] text-[var(--text-dim)]">{t("qa.ws.relatedNone", "None found in the recent timeframe.")}</div>
                 ) : (
                   <ul className="space-y-1.5">
                     {ws.related_issues.map((r) => (
                       <li key={r.id} className="text-[12px]">
                         <button type="button" onClick={() => onJump?.(r.id)} className="font-semibold text-[var(--accent)] hover:underline">{r.title}</button>
-                        <span className="ms-1 rounded bg-[var(--bg-surface)] px-1 text-[10px] text-[var(--text-dim)]">{STATUS_LABEL[r.status] ?? r.status}</span>
+                        <span className="ms-1 rounded bg-[var(--bg-surface)] px-1 text-[10px] text-[var(--text-dim)]">{t("qa.status." + r.status, STATUS_LABEL[r.status] ?? r.status)}</span>
                         <div className="text-[10.5px] text-[var(--text-dim)]">{r.reasons.join(" · ")}</div>
                       </li>
                     ))}
@@ -190,9 +193,9 @@ export default function ClaudeWorkspaceDrawer({ issueId, onClose, onJump }: { is
 
               {/* Timeline */}
               <div className={card}>
-                <div className={head}>Timeline</div>
+                <div className={head}>{t("qa.ws.timeline", "Timeline")}</div>
                 {ws.debug_context.activity.length === 0 ? (
-                  <div className="text-[12px] text-[var(--text-dim)]">No recorded activity.</div>
+                  <div className="text-[12px] text-[var(--text-dim)]">{t("qa.ws.timelineNone", "No recorded activity.")}</div>
                 ) : (
                   <ol className="space-y-1">
                     {ws.debug_context.activity.slice(-12).map((a, i) => (
@@ -207,8 +210,8 @@ export default function ClaudeWorkspaceDrawer({ issueId, onClose, onJump }: { is
               {/* Generated prompt */}
               <div className={card}>
                 <div className="mb-1.5 flex items-center justify-between">
-                  <span className={head + " mb-0"}>Generated AI Prompt</span>
-                  <button type="button" className={btn} onClick={copyPrompt}>{copied ? "Copied ✓" : "Copy"}</button>
+                  <span className={head + " mb-0"}>{t("qa.ws.generatedPrompt", "Generated AI Prompt")}</span>
+                  <button type="button" className={btn} onClick={copyPrompt}>{copied ? t("qa.common.copied", "Copied ✓") : t("qa.common.copy", "Copy")}</button>
                 </div>
                 <pre className="max-h-[40vh] overflow-auto whitespace-pre-wrap break-words rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 font-mono text-[11px] leading-relaxed text-[var(--text-secondary)]">{ws.generated_prompt}</pre>
               </div>
@@ -241,26 +244,27 @@ function Gauge({ label, value, tone }: { label: string; value: number; tone: "ri
 }
 
 function InvestigationPanel({ inv }: { inv: Investigation | null }) {
+  const { t } = useTranslation(qaT);
   const card = "rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3";
   const head = "text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)] mb-1.5";
-  if (!inv) return <div className="py-10 text-center text-[12px] text-[var(--text-dim)]">No analysis available.</div>;
+  if (!inv) return <div className="py-10 text-center text-[12px] text-[var(--text-dim)]">{t("qa.inv.none", "No analysis available.")}</div>;
 
   return (
     <div className="space-y-3">
       <div className="flex gap-2">
-        <Gauge label="Risk" value={inv.risk_score} tone="risk" />
-        <Gauge label="Confidence" value={inv.confidence_score} tone="confidence" />
+        <Gauge label={t("qa.inv.risk", "Risk")} value={inv.risk_score} tone="risk" />
+        <Gauge label={t("qa.inv.confidence", "Confidence")} value={inv.confidence_score} tone="confidence" />
       </div>
 
       <div className={card}>
-        <div className={head}>Summary</div>
+        <div className={head}>{t("qa.inv.summary", "Summary")}</div>
         <p className="text-[12.5px] text-[var(--text-secondary)]">{inv.generated_summary}</p>
       </div>
 
       <div className={card}>
-        <div className={head}>Possible Causes</div>
+        <div className={head}>{t("qa.inv.causes", "Possible Causes")}</div>
         {inv.possible_causes.length === 0 ? (
-          <div className="text-[12px] text-[var(--text-dim)]">No strong cause detected.</div>
+          <div className="text-[12px] text-[var(--text-dim)]">{t("qa.inv.causesNone", "No strong cause detected.")}</div>
         ) : (
           <ul className="space-y-1.5">
             {inv.possible_causes.map((c, i) => (
@@ -272,7 +276,7 @@ function InvestigationPanel({ inv }: { inv: Investigation | null }) {
 
       {inv.regression_flags.length > 0 && (
         <div className="rounded-xl border border-rose-500/25 bg-rose-500/[0.06] p-3">
-          <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-rose-500 dark:text-rose-300">Regression Warnings</div>
+          <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-rose-500 dark:text-rose-300">{t("qa.inv.regression", "Regression Warnings")}</div>
           <ul className="space-y-1">
             {inv.regression_flags.map((f, i) => (<li key={i} className="text-[12px] text-[var(--text-secondary)]"><b className="text-[var(--text-primary)]">{f.label}:</b> {f.detail}</li>))}
           </ul>
@@ -281,7 +285,7 @@ function InvestigationPanel({ inv }: { inv: Investigation | null }) {
 
       {inv.hotspot_flags.length > 0 && (
         <div className="rounded-xl border border-amber-500/25 bg-amber-500/[0.06] p-3">
-          <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-300">Hotspot Warnings</div>
+          <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-300">{t("qa.inv.hotspot", "Hotspot Warnings")}</div>
           <ul className="space-y-1">
             {inv.hotspot_flags.map((f, i) => (<li key={i} className="text-[12px] text-[var(--text-secondary)]"><b className="text-[var(--text-primary)]">{f.label}:</b> {f.detail}</li>))}
           </ul>
@@ -289,9 +293,9 @@ function InvestigationPanel({ inv }: { inv: Investigation | null }) {
       )}
 
       <div className={card}>
-        <div className={head}>Suggested Investigation Files</div>
+        <div className={head}>{t("qa.inv.suggestedFiles", "Suggested Investigation Files")}</div>
         {inv.suggested_files.length === 0 ? (
-          <div className="text-[12px] text-[var(--text-dim)]">None derived.</div>
+          <div className="text-[12px] text-[var(--text-dim)]">{t("qa.inv.filesNone", "None derived.")}</div>
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {inv.suggested_files.map((f) => (<code key={f} className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--text-secondary)]">{f}</code>))}
@@ -301,7 +305,7 @@ function InvestigationPanel({ inv }: { inv: Investigation | null }) {
 
       {inv.related_patterns.length > 0 && (
         <div className={card}>
-          <div className={head}>Related Patterns</div>
+          <div className={head}>{t("qa.inv.patterns", "Related Patterns")}</div>
           <ul className="space-y-1">
             {inv.related_patterns.map((p, i) => (<li key={i} className="text-[12px] text-[var(--text-secondary)]"><b className="text-[var(--text-primary)]">{p.pattern}</b> · {p.count}</li>))}
           </ul>
@@ -309,18 +313,18 @@ function InvestigationPanel({ inv }: { inv: Investigation | null }) {
       )}
 
       <div className={card}>
-        <div className={head}>Module Health · {inv.module_health_snapshot.module ?? "—"}</div>
+        <div className={head}>{t("qa.inv.moduleHealth", "Module Health")} · {inv.module_health_snapshot.module ?? "—"}</div>
         <div className="grid grid-cols-3 gap-2 text-center">
-          {([["Total", inv.module_health_snapshot.total], ["Open", inv.module_health_snapshot.open], ["Urgent", inv.module_health_snapshot.urgent], ["Reopened", inv.module_health_snapshot.reopened], ["Duplicates", inv.module_health_snapshot.duplicates]] as const).map(([k, v]) => (
-            <div key={k} className="rounded-lg bg-[var(--bg-surface)] py-2">
+          {([["qa.inv.total", "Total", inv.module_health_snapshot.total], ["qa.inv.open", "Open", inv.module_health_snapshot.open], ["qa.inv.urgent", "Urgent", inv.module_health_snapshot.urgent], ["qa.inv.reopened", "Reopened", inv.module_health_snapshot.reopened], ["qa.inv.duplicates", "Duplicates", inv.module_health_snapshot.duplicates]] as const).map(([key, label, v]) => (
+            <div key={key} className="rounded-lg bg-[var(--bg-surface)] py-2">
               <div className="text-[16px] font-bold tabular-nums text-[var(--text-primary)]">{v}</div>
-              <div className="text-[9.5px] uppercase tracking-wider text-[var(--text-dim)]">{k}</div>
+              <div className="text-[9.5px] uppercase tracking-wider text-[var(--text-dim)]">{t(key, label)}</div>
             </div>
           ))}
         </div>
       </div>
 
-      <p className="px-1 text-[10.5px] text-[var(--text-dim)]">Findings derived deterministically from issue history — verify before acting.</p>
+      <p className="px-1 text-[10.5px] text-[var(--text-dim)]">{t("qa.inv.footer", "Findings derived deterministically from issue history — verify before acting.")}</p>
     </div>
   );
 }
@@ -374,6 +378,7 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const { t } = useTranslation(qaT);
 
   const card = "rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3";
   const head = "text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)] mb-1.5";
@@ -389,9 +394,9 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
       setSessions(list);
       setActiveId((prev) => prev ?? list.find((s) => s.status === "completed")?.id ?? list[0]?.id ?? null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't load AI sessions.");
+      setError(e instanceof Error ? e.message : t("qa.ai.sessionsErr", "Couldn't load AI sessions."));
     } finally { setLoading(false); }
-  }, [issueId]);
+  }, [issueId, t]);
 
   useEffect(() => { void loadSessions(); }, [loadSessions]);
 
@@ -404,9 +409,9 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
       const session = j.session as AiSession;
       setSessions((prev) => [session, ...prev.filter((s) => s.id !== session.id)]);
       setActiveId(session.id);
-      if (session.status === "failed") setError(session.error ?? "AI analysis failed.");
+      if (session.status === "failed") setError(session.error ?? t("qa.ai.runErr", "AI analysis failed."));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "AI analysis failed.");
+      setError(e instanceof Error ? e.message : t("qa.ai.runErr", "AI analysis failed."));
     } finally { setRunning(false); }
   }
 
@@ -416,7 +421,7 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
     if (!active?.response_markdown) return;
     void copyText(active.response_markdown).then((ok) => {
       if (ok) { setCopied(true); setTimeout(() => setCopied(false), 1800); }
-      else setError("Couldn't copy — select the text and copy manually.");
+      else setError(t("qa.ws.copyManual", "Couldn't copy — select the prompt text and copy manually."));
     });
   }
 
@@ -426,27 +431,27 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
       <div className="flex items-center gap-2">
         <button type="button" onClick={runAnalysis} disabled={running}
           className="rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
-          {running ? "Analysing…" : sessions.length ? "Re-run AI Analysis" : "Ask AI to Analyse"}
+          {running ? t("qa.ai.analysing", "Analysing…") : sessions.length ? t("qa.ai.rerun", "Re-run AI Analysis") : t("qa.ai.ask", "Ask AI to Analyse")}
         </button>
         {active?.response_markdown && (
-          <button type="button" className={btn} onClick={copyActive}>{copied ? "Copied ✓" : "Copy"}</button>
+          <button type="button" className={btn} onClick={copyActive}>{copied ? t("qa.common.copied", "Copied ✓") : t("qa.common.copy", "Copy")}</button>
         )}
-        <span className="ms-auto text-[10.5px] text-[var(--text-dim)]">Advisory only — never edits code.</span>
+        <span className="ms-auto text-[10.5px] text-[var(--text-dim)]">{t("qa.ai.advisory", "Advisory only — never edits code.")}</span>
       </div>
 
       {error && <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-500 dark:text-rose-300">{error}</div>}
 
       {running && (
         <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-4 text-center text-[12px] text-[var(--text-dim)]">
-          AI is analysing the deterministic workspace context…
+          {t("qa.ai.running", "AI is analysing the deterministic workspace context…")}
         </div>
       )}
 
       {loading ? (
-        <div className="py-8 text-center text-[12px] text-[var(--text-dim)]">Loading sessions…</div>
+        <div className="py-8 text-center text-[12px] text-[var(--text-dim)]">{t("qa.ai.loadingSessions", "Loading sessions…")}</div>
       ) : !sessions.length && !running ? (
         <div className={card}>
-          <div className="text-[12px] text-[var(--text-secondary)]">No AI analysis yet. Run one to get a structured engineering assessment (root cause, suspected files, regression risk, fix strategy). The AI only reads the sanitized workspace context — it never touches code.</div>
+          <div className="text-[12px] text-[var(--text-secondary)]">{t("qa.ai.empty", "No AI analysis yet. Run one to get a structured engineering assessment (root cause, suspected files, regression risk, fix strategy). The AI only reads the sanitized workspace context — it never touches code.")}</div>
         </div>
       ) : null}
 
@@ -454,9 +459,9 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
       {active && (
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-1.5">
-            {active.confidence && <span className={`rounded border px-1.5 py-0.5 text-[10px] font-bold ${confidenceTone(active.confidence)}`}>{active.confidence} confidence</span>}
+            {active.confidence && <span className={`rounded border px-1.5 py-0.5 text-[10px] font-bold ${confidenceTone(active.confidence)}`}>{active.confidence} {t("qa.ai.confidence", "confidence")}</span>}
             {active.provider && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] text-[var(--text-dim)]">{active.provider}</span>}
-            {active.status === "failed" && <span className="rounded border border-rose-500/30 px-1.5 py-0.5 text-[10px] font-bold text-rose-500 dark:text-rose-300">failed</span>}
+            {active.status === "failed" && <span className="rounded border border-rose-500/30 px-1.5 py-0.5 text-[10px] font-bold text-rose-500 dark:text-rose-300">{t("qa.ai.failedBadge", "failed")}</span>}
             <span className="text-[10px] text-[var(--text-dim)]">{rel(active.created_at)}</span>
             {(active.tokens_input || active.tokens_output) && (
               <span className="text-[10px] text-[var(--text-dim)]">· {active.tokens_input ?? "?"}→{active.tokens_output ?? "?"} tok{active.latency_ms ? ` · ${(active.latency_ms / 1000).toFixed(1)}s` : ""}</span>
@@ -465,15 +470,15 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
           {active.status === "completed" && active.response_markdown
             ? <AiReport markdown={active.response_markdown} />
             : active.status === "failed"
-              ? <div className="rounded-xl border border-rose-500/25 bg-rose-500/[0.06] p-3 text-[12px] text-[var(--text-secondary)]">{active.error ?? "This analysis failed."}</div>
-              : <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3 text-[12px] text-[var(--text-dim)]">This analysis is still processing. Re-run if it doesn’t resolve.</div>}
+              ? <div className="rounded-xl border border-rose-500/25 bg-rose-500/[0.06] p-3 text-[12px] text-[var(--text-secondary)]">{active.error ?? t("qa.ai.failed", "This analysis failed.")}</div>
+              : <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3 text-[12px] text-[var(--text-dim)]">{t("qa.ai.processing", "This analysis is still processing. Re-run if it doesn’t resolve.")}</div>}
         </div>
       )}
 
       {/* Previous sessions */}
       {sessions.length > 1 && (
         <div className={card}>
-          <div className={head}>Previous Sessions</div>
+          <div className={head}>{t("qa.ai.prevSessions", "Previous Sessions")}</div>
           <ul className="space-y-1">
             {sessions.map((s) => (
               <li key={s.id}>
