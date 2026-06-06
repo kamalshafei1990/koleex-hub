@@ -515,3 +515,20 @@ select option[selected] {
   font-weight: 500;
 }
 
+/* Issue af3a11b7 (reopened): in LIGHT mode the dim/muted text tiers were too
+   low-contrast for Arabic — its finer strokes washed out against the light
+   background, which the reporter said made it uncomfortable to read. Darken
+   those tiers and hold a minimum weight for Arabic/RTL in light mode only, so
+   day-mode Arabic stays legible without changing the Latin or dark themes. */
+[data-theme="light"]:lang(ar) .text-\[var\(--text-dim\)\],
+[data-theme="light"] [dir="rtl"] .text-\[var\(--text-dim\)\],
+[data-theme="light"]:lang(ar) .text-\[var\(--text-muted\)\],
+[data-theme="light"] [dir="rtl"] .text-\[var\(--text-muted\)\],
+[data-theme="light"]:lang(ar) .text-\[var\(--text-subtle\)\],
+[data-theme="light"] [dir="rtl"] .text-\[var\(--text-subtle\)\],
+[data-theme="light"]:lang(ar) .text-\[var\(--text-faint\)\],
+[data-theme="light"] [dir="rtl"] .text-\[var\(--text-faint\)\] {
+  color: rgba(0, 0, 0, 0.64);
+  font-weight: 500;
+}
+
