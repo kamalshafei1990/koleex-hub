@@ -221,6 +221,55 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
 
   return (
     <div className={shell}>
+      {/* Page header — issue dc295123 follow-up (Kamal): when the reporter
+          lands here from a notification deep-link there was no in-page nav,
+          no breadcrumb, no way back. This strip is the page identity + the
+          escape hatch: Back, what page this is, where the underlying issue
+          lives. Sticky-top so it's reachable while scrolling long discussions. */}
+      <div className="sticky top-0 z-20 -mx-4 mb-4 border-b border-[var(--border-subtle)] bg-[var(--bg-primary)]/95 px-4 py-3 backdrop-blur md:-mx-6 md:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-[12px]">
+            <Link
+              href="/"
+              className="flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1 font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              aria-label="Back to Hub"
+            >
+              <span aria-hidden>←</span>
+              <span>{t("qa.reporter.backHub", "Hub")}</span>
+            </Link>
+            <span className="text-[var(--text-ghost)]" aria-hidden>/</span>
+            <span className="font-semibold text-[var(--text-primary)]">
+              {t("qa.reporter.pageTitle", "My Issue Report")}
+            </span>
+            {issue.app_module && (
+              <>
+                <span className="text-[var(--text-ghost)]" aria-hidden>·</span>
+                <span className="text-[var(--text-secondary)]">{issue.app_module}</span>
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-2 text-[12px]">
+            {issue.route && (
+              <Link
+                href={issue.route}
+                className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1 font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                title={`Go to ${issue.route}`}
+              >
+                {t("qa.reporter.openRoute", "Open page where this happened")} ↗
+              </Link>
+            )}
+            {issue.is_admin_view && (
+              <Link
+                href={`/database/issues?issue=${issue.id}`}
+                className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1 font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              >
+                {t("qa.reporter.adminPanel", "Admin panel")} ↗
+              </Link>
+            )}
+          </div>
+        </div>
+      </div>
+
       {issue.is_admin_view && (
         <div className="mb-3 flex items-center justify-between rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[12px] text-[var(--text-secondary)]">
           <span>{t("qa.reporter.adminNote", "You’re viewing the reporter experience as an admin.")}</span>

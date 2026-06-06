@@ -983,7 +983,20 @@ function ReportDetail({
         {report.reopen_count > 0 && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] text-[var(--text-dim)]">{t("qa.badge.reopenedTimes", "Reopened")} ×{report.reopen_count}</span>}
         <div className="ms-auto flex items-center gap-2">
           {report.route ? (
-            <a href={report.route} target="_blank" rel="noreferrer" className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11.5px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)]">
+            {/* Open Route — also append ?qa_focus= so the destination page
+                can highlight the picked component on arrival. Issue dc295123
+                follow-up. */}
+            <a
+              href={(() => {
+                const name = report.component_name?.trim();
+                if (!name) return report.route as string;
+                const sep = (report.route as string).includes("?") ? "&" : "?";
+                return `${report.route}${sep}qa_focus=${encodeURIComponent(name)}&qa_issue=${encodeURIComponent(report.id)}`;
+              })()}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11.5px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)]"
+            >
               {t("qa.detail.openRoute", "Open Route ↗")}
             </a>
           ) : null}
