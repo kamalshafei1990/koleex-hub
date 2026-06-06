@@ -51,17 +51,37 @@ const SEVERITY_TONE: Record<string, string> = {
   high: "bg-amber-500/15 text-amber-600 dark:text-amber-300",
   critical: "bg-rose-500/15 text-rose-600 dark:text-rose-300",
 };
+/* Status visualization. Two coordinated layers that make state readable from
+ * across the room (Kamal — issue f548b45e follow-up):
+ *   1. STATUS_STRIPE — a 3px coloured bar on the LEFT edge of every list row.
+ *      The eye locks on shape + position, so a glance down the list tells you
+ *      counts/clusters of each state without reading any text.
+ *   2. STATUS_TONE — the pill itself: saturated bg + light text, bigger and
+ *      bolder than before, moved BEFORE the title in the row so it anchors
+ *      the line. */
 const STATUS_TONE: Record<string, string> = {
-  new: "bg-blue-500/12 text-blue-600 dark:text-blue-300",
-  triaged: "bg-[var(--bg-surface)] text-[var(--text-secondary)]",
-  in_progress: "bg-amber-500/15 text-amber-600 dark:text-amber-300",
-  fixed: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300",
-  verified: "bg-emerald-500/20 text-emerald-700 dark:text-emerald-200",
-  rejected: "bg-rose-500/15 text-rose-600 dark:text-rose-300",
-  duplicate: "bg-[var(--bg-surface)] text-[var(--text-dim)]",
-  needs_more_info: "bg-amber-500/12 text-amber-600 dark:text-amber-300",
-  closed: "bg-[var(--bg-surface)] text-[var(--text-dim)]",
-  reopened: "bg-blue-500/15 text-blue-600 dark:text-blue-300",
+  new:             "bg-blue-600 text-white",
+  triaged:         "bg-slate-500 text-white",
+  in_progress:     "bg-amber-500 text-black",
+  fixed:           "bg-emerald-600 text-white",
+  verified:        "bg-emerald-700 text-white",
+  rejected:        "bg-rose-600 text-white",
+  duplicate:       "bg-violet-600 text-white",
+  needs_more_info: "bg-yellow-500 text-black",
+  closed:          "bg-zinc-500 text-white",
+  reopened:        "bg-red-600 text-white",
+};
+const STATUS_STRIPE: Record<string, string> = {
+  new:             "bg-blue-500",
+  triaged:         "bg-slate-400",
+  in_progress:     "bg-amber-500",
+  fixed:           "bg-emerald-500",
+  verified:        "bg-emerald-600",
+  rejected:        "bg-rose-500",
+  duplicate:       "bg-violet-500",
+  needs_more_info: "bg-yellow-500",
+  closed:          "bg-zinc-400",
+  reopened:        "bg-red-500",
 };
 // Priority stays monochrome (brand): urgency reads through weight, not colour.
 const PRIORITY_TONE: Record<Priority, string> = {
@@ -640,12 +660,17 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
                 const d = ageDays(r.created_at);
                 const checked = selectedIds.has(r.id);
                 return (
-                  <li key={r.id}>
-                    <div className={`flex w-full items-start gap-2 px-4 py-3 transition-colors ${selectedId === r.id ? "bg-[var(--bg-surface-active)]" : "hover:bg-[var(--bg-surface-subtle)]"}`}>
+                  <li key={r.id} className="relative">
+                    {/* Left edge stripe — coloured by status. A 3px bar that
+                        runs the full height of the row so the eye can scan
+                        the list vertically and instantly cluster New / In
+                        Progress / Fixed / etc. */}
+                    <span aria-hidden className={`absolute left-0 top-0 h-full w-[3px] ${STATUS_STRIPE[r.status] ?? "bg-transparent"}`} />
+                    <div className={`flex w-full items-start gap-2 pl-5 pr-4 py-3 transition-colors ${selectedId === r.id ? "bg-[var(--bg-surface-active)]" : "hover:bg-[var(--bg-surface-subtle)]"}`}>
                       <input
                         type="checkbox"
                         aria-label={t("qa.list.selectRow", "Select row")}
-                        className="mt-1 shrink-0"
+                        className="mt-1.5 shrink-0"
                         checked={checked}
                         onClick={(e) => e.stopPropagation()}
                         onChange={(e) => {
@@ -659,6 +684,12 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
                       />
                       <button type="button" onClick={() => setSelectedId(r.id)} className="block flex-1 text-left">
                       <div className="flex items-center gap-2">
+                        {/* Status anchor pill — leads the row so state reads
+                            first, title second. Bigger + bolder + saturated
+                            colour so it dominates from the corner of the eye. */}
+                        <span className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider shadow-sm ${STATUS_TONE[r.status]}`}>
+                          {t("qa.status." + r.status, STATUS_LABEL[r.status])}
+                        </span>
                         <span title={t("qa.badge.severity", "Severity")} className={`shrink-0 ${PILL} ${SEVERITY_TONE[r.severity]}`}>{t("qa.severity." + r.severity, SEVERITY_LABEL[r.severity])}</span>
                         <span title={t("qa.badge.priority", "Priority")} className={`inline-flex shrink-0 items-center gap-1 ${PILL} ${PRIORITY_TONE[r.priority]}`}>
                           <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M4 22V4m0 0h12l-2.5 4L16 12H4" /></svg>
@@ -666,8 +697,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
                         </span>
                         <span className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{r.title}</span>
                       </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10.5px] text-[var(--text-dim)]">
-                        <span className={`rounded px-1.5 py-0.5 font-semibold ${STATUS_TONE[r.status]}`}>{t("qa.status." + r.status, STATUS_LABEL[r.status])}</span>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10.5px] text-[var(--text-dim)]">
                         <span title={t("qa.badge.ageTip", "Days since the issue was filed")} className={`rounded px-1.5 py-0.5 font-semibold ${ageTone(d, resolved)}`}>{ageLabel(d)}</span>
                         <span>{t("qa.issueType." + r.issue_type, ISSUE_TYPE_LABEL[r.issue_type])}</span>
                         <span>· {r.app_module}</span>
