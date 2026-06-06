@@ -144,6 +144,28 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
 
   useEffect(() => { void load(); }, [load]);
 
+  /* Realtime: refetch the reporter view whenever the row changes. This is
+     how the "Does this fix work for you?" Verify / Reopen banner appears
+     instantly the moment status flips to fixed — no manual refresh. */
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let unsub: (() => void) | undefined;
+    (async () => {
+      const mod = await import("@/lib/qa/realtime");
+      if (cancelled) return;
+      unsub = mod.subscribeToQaReport(issueId, () => {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => { if (!cancelled) void load(); }, 250);
+      });
+    })();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      if (unsub) unsub();
+    };
+  }, [issueId, load]);
+
   async function postReply() {
     const message = text.trim();
     if (!message && att.count === 0) return;

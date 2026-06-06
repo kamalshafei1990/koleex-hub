@@ -238,6 +238,34 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
     return () => window.removeEventListener("qa:issue-created", onCreated);
   }, [load]);
 
+  /* Realtime: when any row in qa_issue_reports changes (e.g. Koleex AI
+     auto-fix writes the Triage directly via MCP, bypassing the React state),
+     refetch the list so what we display matches what the database actually
+     holds. Without this, an open page can show stale "New" / empty Triage
+     long after the row was actually moved to Fixed. Debounced — many
+     updates in quick succession (e.g. a bulk action) coalesce into one
+     refetch. */
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleRefetch = () => {
+      if (cancelled) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => { if (!cancelled) void load(); }, 250);
+    };
+    let unsub: (() => void) | undefined;
+    (async () => {
+      const mod = await import("@/lib/qa/realtime");
+      if (cancelled) return;
+      unsub = mod.subscribeToQaReports(scheduleRefetch);
+    })();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      if (unsub) unsub();
+    };
+  }, [load]);
+
   /* Deep-link from a notification: /database/issues?issue=<id> auto-selects
      the row. useSearchParams is REACTIVE, so clicking another notification
      while already on this page (soft navigation, no remount) re-selects the
