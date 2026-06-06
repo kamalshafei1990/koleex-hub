@@ -54,9 +54,22 @@ export async function POST(req: Request) {
     : "medium";
 
   const route = clampStr(body.route, 300);
-  // Trust the client's screenshot path only if it's under THIS tenant's prefix.
+  // Trust client-supplied storage paths only if they live under THIS tenant's
+  // prefix. Same rule for the single back-compat field and the multi-shot array.
+  const isTenantPath = (p: unknown): p is string =>
+    typeof p === "string" && p.length > 0 && p.startsWith(`${auth.tenant_id}/`);
   const rawPath = clampStr(body.screenshot_path, 400);
-  const screenshotPath = rawPath && rawPath.startsWith(`${auth.tenant_id}/`) ? rawPath : null;
+  const screenshotPath = isTenantPath(rawPath) ? rawPath : null;
+  const screenshotPathsArr: string[] = Array.isArray(body.screenshot_paths)
+    ? (body.screenshot_paths as unknown[])
+        .slice(0, 10)
+        .filter(isTenantPath)
+        .map((p) => p.slice(0, 400))
+    : [];
+  // If only the array was sent, mirror the first entry into the scalar field
+  // so consumers that read screenshot_url keep working unchanged.
+  const screenshotPathFinal = screenshotPath ?? (screenshotPathsArr[0] ?? null);
+  const screenshotPathsFinal = screenshotPathsArr.length > 0 ? screenshotPathsArr : null;
 
   const row = {
     tenant_id: auth.tenant_id,
@@ -72,7 +85,8 @@ export async function POST(req: Request) {
     description: clampStr(body.description, 6000),
     expected_result: clampStr(body.expected_result, 4000),
     suggested_solution: clampStr(body.suggested_solution, 4000),
-    screenshot_url: screenshotPath,
+    screenshot_url: screenshotPathFinal,
+    screenshot_urls: screenshotPathsFinal,
     browser_info: clampStr(body.browser_info, 400),
     device_info: clampStr(body.device_info, 400),
     screen_size: clampStr(body.screen_size, 40),

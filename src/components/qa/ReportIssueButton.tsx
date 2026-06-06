@@ -62,6 +62,8 @@ function detectOS(ua: string): string {
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const OK_TYPES = ["image/png", "image/jpeg", "image/webp"];
+/** Cap a single report's attachments to a sane number. Same limit on the API. */
+const MAX_SHOTS = 6;
 
 export default function ReportIssueButton() {
   const { t } = useTranslation(qaT);
@@ -93,8 +95,9 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   const [description, setDescription] = useState("");
   const [expected, setExpected] = useState("");
   const [solution, setSolution] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // Multiple screenshots — array preserves order of attachment. Each preview
+  // object stays parallel to its File so removals stay in sync.
+  const [shots, setShots] = useState<{ file: File; previewUrl: string }[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -156,13 +159,27 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   }
   const env = envRef.current!;
 
-  const setImage = useCallback((f: File | null) => {
+  // Append a new screenshot. Each call adds one to the list (capped at
+  // MAX_SHOTS). Validation matches the upload route.
+  const addImage = useCallback((f: File | null) => {
     setError(null);
-    if (!f) { setFile(null); setPreviewUrl((u) => { if (u) URL.revokeObjectURL(u); return null; }); return; }
+    if (!f) return;
     if (!OK_TYPES.includes(f.type)) { setError(t("qa.report.errType", "Only PNG, JPG or WEBP images are allowed.")); return; }
     if (f.size > MAX_BYTES) { setError(t("qa.report.errSize", "Screenshot is too large (max 5 MB).")); return; }
-    setFile(f);
-    setPreviewUrl((u) => { if (u) URL.revokeObjectURL(u); return URL.createObjectURL(f); });
+    setShots((prev) => {
+      if (prev.length >= MAX_SHOTS) {
+        setError(t("qa.report.errMaxShots", `You can attach up to ${MAX_SHOTS} screenshots.`).replace("{n}", String(MAX_SHOTS)));
+        return prev;
+      }
+      return [...prev, { file: f, previewUrl: URL.createObjectURL(f) }];
+    });
+  }, [t]);
+  const removeImage = useCallback((idx: number) => {
+    setShots((prev) => {
+      const dropped = prev[idx];
+      if (dropped) URL.revokeObjectURL(dropped.previewUrl);
+      return prev.filter((_, i) => i !== idx);
+    });
   }, []);
 
   // Enter in-app capture mode. The modal hides itself, the CaptureOverlay
@@ -179,9 +196,9 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
     (f: File | null, errMsg?: string) => {
       setCapturing(false);
       if (errMsg) { setError(errMsg); return; }
-      if (f) setImage(f);
+      if (f) addImage(f);
     },
-    [setImage],
+    [addImage],
   );
 
   // Esc to close, paste-to-attach while the modal is open.
@@ -193,31 +210,42 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
       for (const it of Array.from(items)) {
         if (it.type.startsWith("image/")) {
           const f = it.getAsFile();
-          if (f) { setImage(f); e.preventDefault(); break; }
+          if (f) { addImage(f); e.preventDefault(); break; }
         }
       }
     };
     window.addEventListener("keydown", onKey);
     window.addEventListener("paste", onPaste);
     return () => { window.removeEventListener("keydown", onKey); window.removeEventListener("paste", onPaste); };
-  }, [busy, onClose, setImage]);
+  }, [busy, onClose, addImage]);
 
-  useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
+  // Revoke all preview URLs on unmount to avoid leaking object URLs.
+  // Keep the latest snapshot in a ref so the cleanup only fires once, at
+  // unmount, rather than on every shots-state change.
+  const shotsRef = useRef(shots);
+  shotsRef.current = shots;
+  useEffect(() => () => { shotsRef.current.forEach((s) => URL.revokeObjectURL(s.previewUrl)); }, []);
 
   async function submit() {
     if (busy) return;
     if (!title.trim()) { setError(t("qa.report.errTitle", "Please add a short title.")); return; }
     setBusy(true); setError(null);
     try {
-      let screenshotPath: string | null = null;
-      if (file) {
+      // Upload every attached screenshot sequentially. Sequential keeps the
+      // resulting paths array in the same order the reporter attached them
+      // and keeps the storage bucket from being hammered with parallel
+      // requests on a slow connection.
+      const paths: string[] = [];
+      for (const s of shots) {
         const fd = new FormData();
-        fd.append("file", file);
+        fd.append("file", s.file);
         const up = await fetch("/api/qa/upload", { method: "POST", body: fd, credentials: "include" });
         const uj = await up.json().catch(() => ({}));
         if (!up.ok) throw new Error(humanizeError(uj.error ?? `Upload failed (${up.status})`));
-        screenshotPath = uj.path ?? null;
+        if (uj.path) paths.push(uj.path as string);
       }
+      // Single-shot back-compat: send the first path as the scalar field too.
+      const firstPath = paths[0] ?? null;
       const res = await fetch("/api/qa/reports", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -229,7 +257,8 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
           description: description.trim() || null,
           expected_result: expected.trim() || null,
           suggested_solution: solution.trim() || null,
-          screenshot_path: screenshotPath,
+          screenshot_path: firstPath,
+          screenshot_paths: paths.length > 0 ? paths : null,
           route: env.route,
           page_title: env.pageTitle,
           app_module: env.appModule,
@@ -305,9 +334,9 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
       >
         <MessageSquarePlusIcon size={14} className="shrink-0 text-[var(--text-secondary)]" />
         <span className="truncate">{draftLabel}</span>
-        {selectedList.length > 0 && (
+        {(selectedList.length > 0 || shots.length > 0) && (
           <span className="shrink-0 rounded-full bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--text-secondary)]">
-            {selectedList.length}
+            {selectedList.length + shots.length}
           </span>
         )}
       </button>
@@ -438,30 +467,46 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                 <textarea value={solution} onChange={(e) => setSolution(e.target.value)} rows={2} placeholder={t("qa.report.solutionPlaceholder", "Any idea how to fix it?")} className={field} />
               </div>
 
-              {/* Screenshot */}
+              {/* Screenshots — supports MULTIPLE attachments. Each call to the
+                  capture button / upload picker / paste / drag APPENDS a new
+                  shot (capped at MAX_SHOTS). Each thumbnail has its own ✕. */}
               <div>
-                <label className={label}>{t("qa.report.screenshot", "Screenshot")} <span className="font-normal normal-case text-[var(--text-ghost)]">{t("qa.report.screenshotHint", "(capture an area, upload, paste or drag — PNG/JPG/WEBP)")}</span></label>
-                {previewUrl ? (
-                  <div className="relative overflow-hidden rounded-lg border border-[var(--border-color)]">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={previewUrl} alt="screenshot preview" className="max-h-48 w-full object-contain bg-[var(--bg-surface-subtle)]" />
-                    {/* Compact close-style remove button — matches the modal's
-                        own header chrome. backdrop-blur + low-opacity surface
-                        token keeps it legible over any captured content. */}
-                    <button
-                      type="button"
-                      onClick={() => setImage(null)}
-                      aria-label={t("qa.common.remove", "Remove")}
-                      title={t("qa.common.remove", "Remove")}
-                      className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--bg-secondary)]/85 text-[var(--text-secondary)] shadow-sm backdrop-blur-md transition-colors hover:border-[var(--border-focus)] hover:text-[var(--text-primary)]"
-                    >
-                      ✕
-                    </button>
+                <label className={label}>
+                  {t("qa.report.screenshots", "Screenshots")}{" "}
+                  <span className="font-normal normal-case text-[var(--text-ghost)]">
+                    {shots.length > 0
+                      ? `${shots.length} / ${MAX_SHOTS}`
+                      : t("qa.report.screenshotHint", "(capture an area, upload, paste or drag — PNG/JPG/WEBP)")}
+                  </span>
+                </label>
+
+                {/* Thumbnail strip — shown only when at least one shot exists. */}
+                {shots.length > 0 && (
+                  <div className="mb-2 grid grid-cols-3 gap-2">
+                    {shots.map((s, idx) => (
+                      <div key={s.previewUrl} className="relative overflow-hidden rounded-lg border border-[var(--border-color)]">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={s.previewUrl} alt={`screenshot ${idx + 1}`} className="h-24 w-full object-cover bg-[var(--bg-surface-subtle)]" />
+                        {shots.length > 1 && (
+                          <span className="absolute left-1.5 top-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[var(--bg-secondary)]/85 px-1 text-[10px] font-bold text-[var(--text-secondary)] backdrop-blur-md">{idx + 1}</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeImage(idx)}
+                          aria-label={t("qa.common.remove", "Remove")}
+                          title={t("qa.common.remove", "Remove")}
+                          className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--bg-secondary)]/85 text-[11px] text-[var(--text-secondary)] shadow-sm backdrop-blur-md transition-colors hover:border-[var(--border-focus)] hover:text-[var(--text-primary)]"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                ) : (
+                )}
+
+                {/* Add controls — always present until the cap is reached. */}
+                {shots.length < MAX_SHOTS ? (
                   <div className="space-y-2">
-                    {/* Live capture — grab the screen right now (the browser shows
-                        its own screen/window/tab picker). Desktop browsers only. */}
                     {captureSupported && (
                       <button
                         type="button"
@@ -469,7 +514,9 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                         className="flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] py-2.5 text-[12.5px] font-semibold text-[var(--text-primary)] transition-colors hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)]"
                       >
                         <MonitorIcon size={15} className="text-[var(--text-secondary)]" />
-                        {t("qa.report.takeScreenshot", "Capture an area or component")}
+                        {shots.length === 0
+                          ? t("qa.report.takeScreenshot", "Capture an area or component")
+                          : t("qa.report.takeAnotherScreenshot", "Capture another")}
                       </button>
                     )}
                     <button
@@ -477,15 +524,35 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                       onClick={() => fileInputRef.current?.click()}
                       onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                       onDragLeave={() => setDragOver(false)}
-                      onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) setImage(f); }}
-                      className={`flex w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed py-6 text-[12px] transition-colors ${dragOver ? "border-[var(--border-focus)] bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]" : "border-[var(--border-color)] text-[var(--text-dim)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)]"}`}
+                      onDrop={(e) => {
+                        e.preventDefault(); setDragOver(false);
+                        const fs = Array.from(e.dataTransfer.files ?? []);
+                        for (const f of fs) addImage(f);
+                      }}
+                      className={`flex w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed py-${shots.length > 0 ? "4" : "6"} text-[12px] transition-colors ${dragOver ? "border-[var(--border-focus)] bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]" : "border-[var(--border-color)] text-[var(--text-dim)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)]"}`}
                     >
-                      <span className="text-[var(--text-secondary)]">{t("qa.report.clickUpload", "Click to upload")}</span>
+                      <span className="text-[var(--text-secondary)]">
+                        {shots.length === 0
+                          ? t("qa.report.clickUpload", "Click to upload")
+                          : t("qa.report.clickUploadAnother", "Click to add another")}
+                      </span>
                       <span className="text-[var(--text-ghost)]">{t("qa.report.dragHint", "or paste / drag an image here")}</span>
                     </button>
                   </div>
+                ) : (
+                  <p className="text-[11px] text-[var(--text-dim)]">{t("qa.report.maxShotsReached", `Up to ${MAX_SHOTS} screenshots per report.`).replace("{n}", String(MAX_SHOTS))}</p>
                 )}
-                <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => setImage(e.target.files?.[0] ?? null)} />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    for (const f of Array.from(e.target.files ?? [])) addImage(f);
+                    e.target.value = "";
+                  }}
+                />
               </div>
 
               {error && <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-500 dark:text-rose-300">{error}</div>}
