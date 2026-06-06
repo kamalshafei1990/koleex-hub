@@ -11,7 +11,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
 import { qaT } from "@/lib/translations/qa";
 import TargetIcon from "@/components/icons/ui/TargetIcon";
@@ -98,6 +98,26 @@ function initials(name: string | null | undefined): string {
 
 const PILL = "rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide";
 
+/* Days since creation — used both for sort comparison and for the age tone. */
+function ageDays(iso: string | null): number {
+  if (!iso) return 0;
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return 0;
+  return (Date.now() - t) / 86400000;
+}
+/* Color-coded age tone: fresh (green) → amber → red. RESOLVED issues are
+   muted regardless of age. */
+function ageTone(d: number, resolved: boolean): string {
+  if (resolved) return "bg-[var(--bg-surface)] text-[var(--text-dim)]";
+  if (d <= 2) return "bg-emerald-500/12 text-emerald-600 dark:text-emerald-300";
+  if (d <= 7) return "bg-amber-500/15 text-amber-600 dark:text-amber-300";
+  return "bg-rose-500/15 text-rose-600 dark:text-rose-300";
+}
+function ageLabel(d: number): string {
+  if (d < 1) return "<1d";
+  return `${Math.floor(d)}d`;
+}
+
 export default function QaReportsApp({ embedded = false }: { embedded?: boolean }) {
   const { t } = useTranslation(qaT);
   const scope = useScopeContext();
@@ -121,6 +141,20 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
   const [fAssignee, setFAssignee] = useState("");
   const [q, setQ] = useState("");
   const [sortPriority, setSortPriority] = useState(false);
+
+  // Selection set for bulk operations. Stable Set so we don't reallocate
+  // the array on every toggle; reset whenever the filter results change.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  // View mode — list (master/detail) or board (kanban-style by status).
+  const [boardView, setBoardView] = useState(false);
+
+  // URL-persistent filter / view state — read once on mount, replaced on
+  // every change so refreshing or sharing the link reproduces the view.
+  const router = useRouter();
+  const pageRoute = usePathname() ?? "/database/issues";
+  const initFromUrlRef = useRef(false);
 
   // Saved views translate to concrete query params.
   const viewParams = useMemo(() => {
@@ -261,6 +295,166 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
     setExtra((prev) => (prev && prev.id === updated.id ? { ...prev, ...updated } : prev));
   }, []);
 
+  /* URL ↔ filter sync. On mount we hydrate state from the URL once (so
+     bookmarks / shared links work). On every subsequent filter change we
+     replace the URL — never push — so the back button doesn't bounce
+     through every keystroke. */
+  useEffect(() => {
+    if (initFromUrlRef.current) return;
+    initFromUrlRef.current = true;
+    const v = searchParams.get("view"); if (v) setView(v as SavedViewId);
+    const m = searchParams.get("module"); if (m) setFModule(m);
+    const sv = searchParams.get("severity"); if (sv) setFSeverity(sv);
+    const st = searchParams.get("status"); if (st) setFStatus(st);
+    const pr = searchParams.get("priority"); if (pr) setFPriority(pr);
+    const as = searchParams.get("assignee"); if (as) setFAssignee(as);
+    const qp = searchParams.get("q"); if (qp) setQ(qp);
+    const sp = searchParams.get("sort"); if (sp === "priority") setSortPriority(true);
+    const bv = searchParams.get("board"); if (bv === "1") setBoardView(true);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!initFromUrlRef.current) return;
+    const p = new URLSearchParams();
+    if (view !== "all") p.set("view", view);
+    if (fModule) p.set("module", fModule);
+    if (fSeverity) p.set("severity", fSeverity);
+    if (fStatus) p.set("status", fStatus);
+    if (fPriority) p.set("priority", fPriority);
+    if (fAssignee) p.set("assignee", fAssignee);
+    if (q.trim()) p.set("q", q.trim());
+    if (sortPriority) p.set("sort", "priority");
+    if (boardView) p.set("board", "1");
+    if (issueParam) p.set("issue", issueParam);
+    const qs = p.toString();
+    router.replace(qs ? `${pageRoute}?${qs}` : pageRoute, { scroll: false });
+  }, [view, fModule, fSeverity, fStatus, fPriority, fAssignee, q, sortPriority, boardView, issueParam, router, pageRoute]);
+
+  /* Bulk action — apply one workflow change to every selected row in a
+     single API call. Optimistic so the UI reacts immediately. */
+  const bulkApply = useCallback(async (change: { status?: IssueStatus; priority?: Priority; assigned_to?: string | null }) => {
+    if (selectedIds.size === 0 || bulkBusy) return;
+    setBulkBusy(true);
+    const ids = Array.from(selectedIds);
+    // Optimistic local update so the action feels instant.
+    setReports((prev) => prev.map((r) => (selectedIds.has(r.id) ? { ...r, ...change } as QaReport : r)));
+    try {
+      const res = await fetch("/api/qa/reports/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ ids, change }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(humanizeError(j.error ?? `Bulk update failed (${res.status})`));
+        // Revert by reloading the list.
+        void load();
+      } else {
+        setSelectedIds(new Set());
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Bulk update failed.");
+      void load();
+    } finally {
+      setBulkBusy(false);
+    }
+  }, [selectedIds, bulkBusy, load]);
+
+  /* Clear selection whenever the filtered list changes — otherwise stale
+     ids that fell out of the current view would still be "selected". */
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      const next = new Set<string>();
+      for (const r of reports) if (prev.has(r.id)) next.add(r.id);
+      return next.size === prev.size ? prev : next;
+    });
+  }, [reports]);
+
+  /* KPI strip — computed off the current filtered list, no extra fetch. */
+  const kpis = useMemo(() => {
+    const open = reports.filter((r) => !RESOLVED_STATUSES.includes(r.status));
+    const urgent = reports.filter((r) => r.priority === "urgent" && !RESOLVED_STATUSES.includes(r.status));
+    const waiting = reports.filter((r) => r.status === "fixed");
+    const aiReady = reports.filter((r) => isClaudeReady(r));
+    const stale = reports.filter((r) => !RESOLVED_STATUSES.includes(r.status) && ageDays(r.created_at) > 7);
+    const ages = open.map((r) => ageDays(r.created_at));
+    const avgAge = ages.length > 0 ? ages.reduce((a, b) => a + b, 0) / ages.length : 0;
+    return {
+      total: reports.length,
+      open: open.length,
+      urgent: urgent.length,
+      waiting: waiting.length,
+      aiReady: aiReady.length,
+      stale: stale.length,
+      avgAge,
+    };
+  }, [reports]);
+
+  /* Keyboard triage: j/k navigate, enter/o opens, a/p/s focus the matching
+     control on the detail pane, c clears selection, ? toggles help. Ignored
+     when the focus is in an input/textarea/select. */
+  const [showHelp, setShowHelp] = useState(false);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select" || t?.isContentEditable) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const visible = sorted;
+      const idx = selectedId ? visible.findIndex((r) => r.id === selectedId) : -1;
+      const move = (dir: 1 | -1) => {
+        if (visible.length === 0) return;
+        const next = idx < 0 ? 0 : Math.max(0, Math.min(visible.length - 1, idx + dir));
+        setSelectedId(visible[next].id);
+      };
+      switch (e.key) {
+        case "j": case "ArrowDown": e.preventDefault(); move(1); break;
+        case "k": case "ArrowUp": e.preventDefault(); move(-1); break;
+        case "/": e.preventDefault(); document.querySelector<HTMLInputElement>("[data-qa-search]")?.focus(); break;
+        case "?": e.preventDefault(); setShowHelp((v) => !v); break;
+        case "Escape": setShowHelp(false); break;
+        case "c": if (selectedIds.size > 0) { e.preventDefault(); setSelectedIds(new Set()); } break;
+        case "b": e.preventDefault(); setBoardView((v) => !v); break;
+        default: break;
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sorted, selectedId, selectedIds.size]);
+
+  /* CSV export — pulls only the rows currently in view (post-filter, sort
+     preserved). Encoded client-side so it works without a new endpoint. */
+  const exportCSV = useCallback(() => {
+    const rows = sorted;
+    const cols: Array<[string, (r: QaReport) => string]> = [
+      ["id", (r) => r.id],
+      ["title", (r) => r.title],
+      ["status", (r) => r.status],
+      ["priority", (r) => r.priority],
+      ["severity", (r) => r.severity],
+      ["issue_type", (r) => r.issue_type],
+      ["module", (r) => r.app_module ?? ""],
+      ["route", (r) => r.route ?? ""],
+      ["assignee", (r) => r.assigned_to_name ?? ""],
+      ["reporter", (r) => r.reporter_name ?? ""],
+      ["component", (r) => r.component_name ?? ""],
+      ["fixed_commit", (r) => r.fixed_commit ?? ""],
+      ["created_at", (r) => r.created_at],
+      ["age_days", (r) => Math.floor(ageDays(r.created_at)).toString()],
+    ];
+    const esc = (s: string) => (/[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
+    const lines = [cols.map(([h]) => esc(h)).join(",")];
+    for (const r of rows) lines.push(cols.map(([, f]) => esc(f(r) ?? "")).join(","));
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const stamp = new Date().toISOString().slice(0, 10);
+    a.href = url; a.download = `qa-issues-${stamp}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, [sorted]);
+
   if (forbidden) {
     return (
       <div className="mx-auto max-w-md px-6 py-24 text-center text-[var(--text-dim)]">
@@ -280,6 +474,10 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
           <p className="text-[12.5px] text-[var(--text-dim)]">{t("qa.list.subtitle", "Report → review → assign → fix → verify → close. A lightweight QA workflow.")}</p>
         </div>
       )}
+
+      {/* KPI strip — at-a-glance team-health signal computed over the
+          currently-filtered list. No extra API call. */}
+      <KpiStrip kpis={kpis} />
 
       {/* Saved views */}
       <div className="mb-3 flex flex-wrap items-center gap-1.5">
@@ -302,7 +500,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
 
       {/* Filters */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("qa.filter.search", "Search title / description…")} className="h-9 min-w-[180px] flex-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]" />
+        <input data-qa-search value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("qa.filter.search", "Search title / description…  ( / )")} className="h-9 min-w-[180px] flex-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]" />
         <select value={fModule} onChange={(e) => setFModule(e.target.value)} className={selectCls}>
           <option value="">{t("qa.filter.allModules", "All modules")}</option>
           {modules.map((m) => <option key={m} value={m}>{m}</option>)}
@@ -331,25 +529,107 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
         >
           {sortPriority ? t("qa.filter.sortPriority", "Sort: Priority") : t("qa.filter.sortNewest", "Sort: Newest")}
         </button>
+        <button
+          type="button"
+          onClick={() => setBoardView((v) => !v)}
+          aria-pressed={boardView}
+          title={t("qa.filter.boardTip", "Kanban-style board grouped by status (b)")}
+          className={`h-9 rounded-lg border px-3 text-[12px] font-semibold ${boardView ? "border-[var(--text-secondary)] text-[var(--text-primary)]" : "border-[var(--border-color)] text-[var(--text-secondary)]"}`}
+        >
+          {boardView ? t("qa.filter.viewList", "View: List") : t("qa.filter.viewBoard", "View: Board")}
+        </button>
+        <button
+          type="button"
+          onClick={exportCSV}
+          title={t("qa.filter.exportTip", "Export the current view as CSV")}
+          className="h-9 rounded-lg border border-[var(--border-color)] px-3 text-[12px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+        >
+          {t("qa.filter.exportCSV", "Export CSV")}
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowHelp(true)}
+          title={t("qa.filter.helpTip", "Keyboard shortcuts (?)")}
+          aria-label={t("qa.filter.help", "Keyboard shortcuts")}
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-color)] text-[12px] font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+        >
+          ?
+        </button>
       </div>
+
+      {/* Bulk action bar — sticky just below the filters; appears once one
+          or more rows are selected. Keeps a low profile until needed. */}
+      {selectedIds.size > 0 && (
+        <BulkBar
+          count={selectedIds.size}
+          busy={bulkBusy}
+          assignees={allAssignees}
+          onClear={() => setSelectedIds(new Set())}
+          onApply={(c) => void bulkApply(c)}
+        />
+      )}
 
       {error && <div className="mb-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-500 dark:text-rose-300">{error}</div>}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(320px,440px)_1fr]">
-        {/* List — on mobile this is a full-width master view; it gives way to the
-            detail when an issue is selected (lg shows both side by side). */}
+      <div className={boardView ? "" : "grid grid-cols-1 gap-4 lg:grid-cols-[minmax(320px,440px)_1fr]"}>
+        {/* Board view replaces the master/detail grid with a Kanban grouped
+            by status. Clicking a card still opens the detail in a modal-ish
+            inline area below (keep simple: just sets selectedId, which the
+            user can then view by switching back to List). */}
+        {boardView ? (
+          <BoardView
+            rows={sorted}
+            selectedIds={selectedIds}
+            onToggle={(id) => setSelectedIds((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; })}
+            onOpen={(id) => { setSelectedId(id); setBoardView(false); }}
+          />
+        ) : (
         <div className={`overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] ${selectedId ? "hidden lg:block" : ""}`}>
           {loading ? (
             <div className="px-4 py-10 text-center text-[13px] text-[var(--text-dim)]">{t("qa.common.loading", "Loading…")}</div>
           ) : sorted.length === 0 ? (
             <div className="px-4 py-10 text-center text-[13px] text-[var(--text-dim)]">{t("qa.list.noMatch", "No issues match this view.")}</div>
           ) : (
+            <>
+              {/* Select-all header */}
+              <div className="flex items-center gap-2 border-b border-[var(--border-faint)] px-4 py-2 text-[11px] text-[var(--text-dim)]">
+                <input
+                  type="checkbox"
+                  aria-label={t("qa.list.selectAll", "Select all visible")}
+                  checked={sorted.length > 0 && sorted.every((r) => selectedIds.has(r.id))}
+                  ref={(el) => { if (el) { const all = sorted.length > 0 && sorted.every((r) => selectedIds.has(r.id)); const some = sorted.some((r) => selectedIds.has(r.id)); el.indeterminate = some && !all; } }}
+                  onChange={(e) => {
+                    if (e.target.checked) setSelectedIds(new Set(sorted.map((r) => r.id)));
+                    else setSelectedIds(new Set());
+                  }}
+                />
+                <span>{sorted.length} {sorted.length === 1 ? t("qa.list.issue", "issue") : t("qa.list.issues", "issues")}</span>
+              </div>
             <ul className="divide-y divide-[var(--border-faint)] lg:max-h-[72vh] lg:overflow-y-auto">
               {sorted.map((r) => {
                 const ready = isClaudeReady(r);
+                const resolved = RESOLVED_STATUSES.includes(r.status);
+                const d = ageDays(r.created_at);
+                const checked = selectedIds.has(r.id);
                 return (
                   <li key={r.id}>
-                    <button type="button" onClick={() => setSelectedId(r.id)} className={`block w-full px-4 py-3 text-left transition-colors ${selectedId === r.id ? "bg-[var(--bg-surface-active)]" : "hover:bg-[var(--bg-surface-subtle)]"}`}>
+                    <div className={`flex w-full items-start gap-2 px-4 py-3 transition-colors ${selectedId === r.id ? "bg-[var(--bg-surface-active)]" : "hover:bg-[var(--bg-surface-subtle)]"}`}>
+                      <input
+                        type="checkbox"
+                        aria-label={t("qa.list.selectRow", "Select row")}
+                        className="mt-1 shrink-0"
+                        checked={checked}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          setSelectedIds((prev) => {
+                            const n = new Set(prev);
+                            if (n.has(r.id)) n.delete(r.id); else n.add(r.id);
+                            return n;
+                          });
+                        }}
+                      />
+                      <button type="button" onClick={() => setSelectedId(r.id)} className="block flex-1 text-left">
                       <div className="flex items-center gap-2">
                         <span title={t("qa.badge.severity", "Severity")} className={`shrink-0 ${PILL} ${SEVERITY_TONE[r.severity]}`}>{t("qa.severity." + r.severity, SEVERITY_LABEL[r.severity])}</span>
                         <span title={t("qa.badge.priority", "Priority")} className={`inline-flex shrink-0 items-center gap-1 ${PILL} ${PRIORITY_TONE[r.priority]}`}>
@@ -360,6 +640,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10.5px] text-[var(--text-dim)]">
                         <span className={`rounded px-1.5 py-0.5 font-semibold ${STATUS_TONE[r.status]}`}>{t("qa.status." + r.status, STATUS_LABEL[r.status])}</span>
+                        <span title={t("qa.badge.ageTip", "Days since the issue was filed")} className={`rounded px-1.5 py-0.5 font-semibold ${ageTone(d, resolved)}`}>{ageLabel(d)}</span>
                         <span>{t("qa.issueType." + r.issue_type, ISSUE_TYPE_LABEL[r.issue_type])}</span>
                         <span>· {r.app_module}</span>
                         {r.assigned_to_name && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[var(--text-secondary)]">@{r.assigned_to_name}</span>}
@@ -368,16 +649,19 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
                         {typeof r.comment_count === "number" && r.comment_count > 0 && <span>💬 {r.comment_count}</span>}
                         <span className="ms-auto">{rel(r.created_at)}</span>
                       </div>
-                    </button>
+                      </button>
+                    </div>
                   </li>
                 );
               })}
             </ul>
+            </>
           )}
         </div>
-
-        {/* Detail — hidden on mobile until an issue is picked; a Back bar
-            returns to the list (lg keeps it always visible beside the list). */}
+        )}
+        {!boardView && (
+        /* Detail — hidden on mobile until an issue is picked; a Back bar
+           returns to the list (lg keeps it always visible beside the list). */
         <div className={`overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] ${selectedId ? "" : "hidden lg:block"}`}>
           {selectedId && (
             <button type="button" onClick={() => setSelectedId(null)} className="flex w-full items-center gap-1.5 border-b border-[var(--border-subtle)] px-4 py-2.5 text-[12px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] lg:hidden">
@@ -407,7 +691,11 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
             <div className="px-6 py-16 text-center text-[13px] text-[var(--text-dim)]">{t("qa.list.selectPrompt", "Select an issue to view details, discuss, assign and resolve.")}</div>
           )}
         </div>
+        )}
       </div>
+
+      {/* Keyboard-shortcuts cheatsheet — opened with `?`. */}
+      {showHelp && <ShortcutsHelp onClose={() => setShowHelp(false)} />}
     </div>
   );
 }
@@ -637,27 +925,9 @@ function ReportDetail({
 
       {isResolved && <ReopenControl disabled={busy} onReopen={(reason) => patch({ action: "reopen", reopen_reason: reason })} />}
 
-      {/* Inspected component breadcrumb (Phase-2, preserved). */}
-      {report.component_name && (
-        <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] px-3.5 py-3">
-          <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)]">
-            <TargetIcon size={12} className="text-[var(--text-secondary)]" /> {t("qa.detail.inspected", "Inspected component")}
-          </div>
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[12.5px]">
-            {report.component_module && (<><span className="text-[var(--text-secondary)]">{report.component_module}</span><span className="text-[var(--text-ghost)]">→</span></>)}
-            {report.component_section && (<><span className="text-[var(--text-secondary)]">{report.component_section}</span><span className="text-[var(--text-ghost)]">→</span></>)}
-            <span className="font-semibold text-[var(--text-primary)]">{report.component_name}</span>
-            {report.component_record_id && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--text-secondary)]">#{report.component_record_id}</span>}
-          </div>
-        </div>
-      )}
+      <ComponentsBreadcrumbs report={report} />
 
-      {report.screenshot_url && (
-        <a href={report.screenshot_url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-[var(--border-color)]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={report.screenshot_url} alt="screenshot" className="max-h-72 w-full bg-[var(--bg-surface-subtle)] object-contain" />
-        </a>
-      )}
+      <ScreenshotsGallery report={report} />
 
       <div><div className={label}>{t("qa.detail.whatHappened", "What happened")}</div><div className={box}>{report.description || "—"}</div></div>
       <div><div className={label}>{t("qa.report.expected", "Expected result")}</div><div className={box}>{report.expected_result || "—"}</div></div>
@@ -1056,3 +1326,272 @@ function ActivityPanel({ issueId, refreshKey = 0 }: { issueId: string; refreshKe
     </div>
   );
 }
+
+/* ── Components breadcrumb (multi-pick aware) ─────────────────────────────────
+   When a report carries the new `components` array, list every pick stacked
+   vertically. Falls back to the scalar component_* fields for legacy rows. */
+function ComponentsBreadcrumbs({ report }: { report: QaReport }) {
+  const { t } = useTranslation(qaT);
+  const list = useMemo(() => {
+    if (Array.isArray(report.components) && report.components.length > 0) {
+      return report.components.map((c) => ({
+        name: c.component,
+        module: c.module,
+        section: c.section,
+        recordId: c.recordId,
+      }));
+    }
+    if (report.component_name) {
+      return [{
+        name: report.component_name,
+        module: report.component_module,
+        section: report.component_section,
+        recordId: report.component_record_id,
+      }];
+    }
+    return [];
+  }, [report.components, report.component_name, report.component_module, report.component_section, report.component_record_id]);
+  if (list.length === 0) return null;
+  return (
+    <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] px-3.5 py-3">
+      <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)]">
+        <TargetIcon size={12} className="text-[var(--text-secondary)]" />{" "}
+        {list.length > 1
+          ? t("qa.detail.inspectedMany", `Inspected components (${list.length})`).replace("{n}", String(list.length))
+          : t("qa.detail.inspected", "Inspected component")}
+      </div>
+      <ul className="mt-1.5 space-y-1">
+        {list.map((c, idx) => (
+          <li key={`${c.name}-${idx}`} className="flex flex-wrap items-center gap-1.5 text-[12.5px]">
+            {list.length > 1 && (
+              <span className="inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[var(--bg-surface)] px-1 text-[10px] font-bold text-[var(--text-secondary)]">{idx + 1}</span>
+            )}
+            {c.module && (<><span className="text-[var(--text-secondary)]">{c.module}</span><span className="text-[var(--text-ghost)]">→</span></>)}
+            {c.section && (<><span className="text-[var(--text-secondary)]">{c.section}</span><span className="text-[var(--text-ghost)]">→</span></>)}
+            <span className="font-semibold text-[var(--text-primary)]">{c.name}</span>
+            {c.recordId && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--text-secondary)]">#{c.recordId}</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/* ── KPI strip ───────────────────────────────────────────────────────────────
+   Six compact numbers showing team health over the current filtered list. */
+function KpiStrip({ kpis }: { kpis: { total: number; open: number; urgent: number; waiting: number; aiReady: number; stale: number; avgAge: number } }) {
+  const { t } = useTranslation(qaT);
+  const cells: Array<{ label: string; value: string; tone?: string; title?: string }> = [
+    { label: t("qa.kpi.total", "Total"), value: String(kpis.total) },
+    { label: t("qa.kpi.open", "Open"), value: String(kpis.open) },
+    { label: t("qa.kpi.urgent", "Urgent"), value: String(kpis.urgent), tone: kpis.urgent > 0 ? "text-rose-500" : undefined },
+    { label: t("qa.kpi.waiting", "Waiting verify"), value: String(kpis.waiting) },
+    { label: t("qa.kpi.aiReady", "AI-ready"), value: String(kpis.aiReady) },
+    { label: t("qa.kpi.stale", ">7d stale"), value: String(kpis.stale), tone: kpis.stale > 0 ? "text-amber-500" : undefined, title: t("qa.kpi.staleTip", "Open issues older than 7 days") },
+    { label: t("qa.kpi.avgAge", "Avg age"), value: `${kpis.avgAge.toFixed(1)}d` },
+  ];
+  return (
+    <div className="mb-3 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+      {cells.map((c) => (
+        <div key={c.label} title={c.title} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2.5">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{c.label}</div>
+          <div className={`mt-0.5 text-[18px] font-bold ${c.tone ?? "text-[var(--text-primary)]"}`}>{c.value}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ── Bulk action bar ─────────────────────────────────────────────────────────
+   Sticky strip that appears whenever ≥1 row is selected. Single-action design:
+   pick status / priority / assignee, apply, done. */
+function BulkBar({
+  count, busy, assignees, onClear, onApply,
+}: {
+  count: number; busy: boolean; assignees: QaAssignee[];
+  onClear: () => void;
+  onApply: (change: { status?: IssueStatus; priority?: Priority; assigned_to?: string | null }) => void;
+}) {
+  const { t } = useTranslation(qaT);
+  const cls = "h-8 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-2 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
+  return (
+    <div className="sticky top-2 z-30 mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)]/95 px-3 py-2 shadow-md backdrop-blur-md">
+      <span className="text-[12px] font-semibold text-[var(--text-primary)]">{count} {count === 1 ? t("qa.bulk.selected1", "selected") : t("qa.bulk.selectedN", "selected")}</span>
+      <select className={cls} defaultValue="" disabled={busy} onChange={(e) => { const v = e.target.value as IssueStatus; if (!v) return; onApply({ status: v }); e.target.value = ""; }}>
+        <option value="">{t("qa.bulk.setStatus", "Set status…")}</option>
+        {STATUSES.map((s) => <option key={s.value} value={s.value}>{t("qa.status." + s.value, s.label)}</option>)}
+      </select>
+      <select className={cls} defaultValue="" disabled={busy} onChange={(e) => { const v = e.target.value as Priority; if (!v) return; onApply({ priority: v }); e.target.value = ""; }}>
+        <option value="">{t("qa.bulk.setPriority", "Set priority…")}</option>
+        {PRIORITIES.map((s) => <option key={s.value} value={s.value}>{t("qa.priority." + s.value, s.label)}</option>)}
+      </select>
+      <select className={cls} defaultValue="" disabled={busy} onChange={(e) => { const v = e.target.value; if (v === "") return; onApply({ assigned_to: v === "__null" ? null : v }); e.target.value = ""; }}>
+        <option value="">{t("qa.bulk.assign", "Assign to…")}</option>
+        <option value="__null">{t("qa.bulk.unassign", "Unassign")}</option>
+        {assignees.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+      </select>
+      <button type="button" onClick={onClear} disabled={busy} className="ms-auto rounded-md px-2 py-1 text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("qa.bulk.clear", "Clear selection")}</button>
+    </div>
+  );
+}
+
+/* ── Board view (Kanban by status) ───────────────────────────────────────────
+   Cards grouped into columns matching the workflow steps. Click a card →
+   it opens in the list (auto-switches back). Checkboxes mirror the list. */
+const BOARD_COLS: IssueStatus[] = ["new", "triaged", "in_progress", "fixed", "verified", "closed"];
+function BoardView({
+  rows, selectedIds, onToggle, onOpen,
+}: {
+  rows: QaReport[]; selectedIds: Set<string>;
+  onToggle: (id: string) => void;
+  onOpen: (id: string) => void;
+}) {
+  const { t } = useTranslation(qaT);
+  const cols = useMemo(() => {
+    const map = new Map<IssueStatus, QaReport[]>();
+    for (const s of BOARD_COLS) map.set(s, []);
+    for (const r of rows) {
+      // Coalesce statuses outside the canonical set into "triaged".
+      const k = (BOARD_COLS as string[]).includes(r.status) ? r.status : "triaged";
+      map.get(k as IssueStatus)?.push(r);
+    }
+    return BOARD_COLS.map((s) => ({ status: s, rows: map.get(s) ?? [] }));
+  }, [rows]);
+  return (
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+      {cols.map(({ status, rows: list }) => (
+        <div key={status} className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
+          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
+            <span>{t("qa.status." + status, STATUS_LABEL[status])}</span>
+            <span className="rounded-full bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--text-secondary)]">{list.length}</span>
+          </div>
+          <div className="max-h-[68vh] overflow-y-auto p-2">
+            {list.length === 0 ? (
+              <div className="px-2 py-6 text-center text-[11px] text-[var(--text-ghost)]">—</div>
+            ) : (
+              <ul className="space-y-2">
+                {list.map((r) => {
+                  const d = ageDays(r.created_at);
+                  const resolved = RESOLVED_STATUSES.includes(r.status);
+                  return (
+                    <li key={r.id}>
+                      <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] p-2">
+                        <div className="flex items-start gap-1.5">
+                          <input type="checkbox" className="mt-1 shrink-0" checked={selectedIds.has(r.id)} onChange={() => onToggle(r.id)} />
+                          <button type="button" onClick={() => onOpen(r.id)} className="block flex-1 text-left">
+                            <div className="line-clamp-2 text-[12px] font-semibold text-[var(--text-primary)]">{r.title}</div>
+                            <div className="mt-1 flex flex-wrap items-center gap-1 text-[10px] text-[var(--text-dim)]">
+                              <span className={`rounded px-1 py-0.5 font-semibold ${ageTone(d, resolved)}`}>{ageLabel(d)}</span>
+                              <span className={`rounded px-1 py-0.5 ${PRIORITY_TONE[r.priority]}`}>{t("qa.priority." + r.priority, PRIORITY_LABEL[r.priority])}</span>
+                              {r.assigned_to_name && <span className="rounded bg-[var(--bg-surface-subtle)] px-1 py-0.5">@{r.assigned_to_name}</span>}
+                            </div>
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ── Keyboard shortcuts cheatsheet ───────────────────────────────────────── */
+function ShortcutsHelp({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation(qaT);
+  const rows: Array<[string, string]> = [
+    ["j  /  ↓", t("qa.keys.next", "Next issue")],
+    ["k  /  ↑", t("qa.keys.prev", "Previous issue")],
+    ["/", t("qa.keys.search", "Focus the search box")],
+    ["b", t("qa.keys.board", "Toggle Board / List view")],
+    ["c", t("qa.keys.clearSel", "Clear bulk selection")],
+    ["Esc", t("qa.keys.escape", "Close this overlay")],
+    ["?", t("qa.keys.toggleHelp", "Toggle this help")],
+  ];
+  return (
+    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="w-full max-w-md rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-5 shadow-2xl">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-[14px] font-bold text-[var(--text-primary)]">{t("qa.keys.title", "Keyboard shortcuts")}</h3>
+          <button type="button" onClick={onClose} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]">✕</button>
+        </div>
+        <table className="w-full text-[12.5px]">
+          <tbody>
+            {rows.map(([k, label]) => (
+              <tr key={k}>
+                <td className="py-1 pr-3"><kbd className="rounded border border-[var(--border-color)] bg-[var(--bg-surface)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--text-secondary)]">{k}</kbd></td>
+                <td className="py-1 text-[var(--text-secondary)]">{label}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ── Screenshots gallery (multi-shot aware) ──────────────────────────────────
+   Renders all attached screenshots with a click-to-zoom lightbox. Falls back
+   to the scalar screenshot_url for legacy rows. */
+function ScreenshotsGallery({ report }: { report: QaReport }) {
+  const { t } = useTranslation(qaT);
+  const urls = useMemo(() => {
+    const arr = Array.isArray(report.screenshot_urls) ? report.screenshot_urls.filter((u): u is string => !!u) : [];
+    if (arr.length > 0) return arr;
+    return report.screenshot_url ? [report.screenshot_url] : [];
+  }, [report.screenshot_url, report.screenshot_urls]);
+  const [zoomIdx, setZoomIdx] = useState<number | null>(null);
+  useEffect(() => {
+    if (zoomIdx == null) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setZoomIdx(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [zoomIdx]);
+  if (urls.length === 0) return null;
+  const zoomUrl = zoomIdx != null ? urls[zoomIdx] : null;
+  return (
+    <>
+      {urls.length === 1 ? (
+        <button type="button" onClick={() => setZoomIdx(0)} className="block w-full overflow-hidden rounded-lg border border-[var(--border-color)]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={urls[0]} alt="screenshot" className="max-h-72 w-full bg-[var(--bg-surface-subtle)] object-contain" />
+        </button>
+      ) : (
+        <div>
+          <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)]">
+            {t("qa.detail.screenshots", "Screenshots")} <span className="text-[var(--text-ghost)]">{urls.length}</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {urls.map((u, idx) => (
+              <button key={u} type="button" onClick={() => setZoomIdx(idx)} className="relative overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface-subtle)]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={u} alt={`screenshot ${idx + 1}`} className="h-28 w-full object-contain" />
+                <span className="pointer-events-none absolute left-1.5 top-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[var(--bg-secondary)]/85 px-1 text-[10px] font-bold text-[var(--text-secondary)] backdrop-blur-md">{idx + 1}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {zoomUrl && (
+        <div
+          className="fixed inset-0 z-[210] flex items-center justify-center bg-black/80 p-6 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setZoomIdx(null); }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={zoomUrl} alt="full size" className="max-h-[92vh] max-w-[94vw] rounded-lg object-contain shadow-2xl" />
+          <button type="button" onClick={() => setZoomIdx(null)} aria-label={t("qa.report.close", "Close")} className="fixed right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/70 text-[15px] text-white shadow-lg backdrop-blur-md hover:bg-black/90">✕</button>
+          {urls.length > 1 && (
+            <div className="fixed bottom-5 left-1/2 -translate-x-1/2 rounded-full border border-white/15 bg-black/70 px-3 py-1 text-[12px] font-medium text-white shadow-lg backdrop-blur-md">{(zoomIdx ?? 0) + 1} / {urls.length}</div>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+

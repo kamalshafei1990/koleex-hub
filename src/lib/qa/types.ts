@@ -120,8 +120,12 @@ export interface QaReport {
   description: string | null;
   expected_result: string | null;
   suggested_solution: string | null;
-  /** Resolved to a short-lived signed URL by the API; null when no screenshot. */
+  /** Resolved to a short-lived signed URL by the API; null when no screenshot.
+   *  Mirrors `screenshot_urls[0]` for backward compatibility. */
   screenshot_url: string | null;
+  /** All screenshots attached to this report, as short-lived signed URLs.
+   *  null when none were attached. Hydrated by the API. */
+  screenshot_urls?: string[] | null;
   browser_info: string | null;
   device_info: string | null;
   screen_size: string | null;
@@ -152,6 +156,17 @@ export interface QaReport {
   component_section: string | null;
   component_record_id: string | null;
   component_rect: { top: number; left: number; width: number; height: number } | null;
+  /** All components picked by the reporter (multi-select). The first entry
+   *  mirrors the scalar component_* fields for backward compatibility. */
+  components?: Array<{
+    component: string;
+    module: string | null;
+    section: string | null;
+    recordId: string | null;
+    rect: { top: number; left: number; width: number; height: number } | null;
+    fallback?: boolean;
+    route?: string;
+  }> | null;
   component_path: string | null;
   data_entity: string | null;
   db_table: string | null;

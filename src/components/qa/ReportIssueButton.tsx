@@ -115,6 +115,11 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   // Lightbox: clicking a thumbnail opens the screenshot full-size so the
   // reporter can verify they captured the right thing before submitting.
   const [zoomIdx, setZoomIdx] = useState<number | null>(null);
+  // Duplicate-suggest: as the reporter types a title, fetch up to 5 recent
+  // open reports on the same route with similar titles. Surface them above
+  // the form so dups can be acknowledged before submit.
+  const [dups, setDups] = useState<Array<{ id: string; title: string; status: string; created_at: string }>>([]);
+  const [dupDismissed, setDupDismissed] = useState(false);
   const envRef = useRef<Env | null>(null);
 
   // In-app DOM capture: no OS / browser permission, no share picker. Mobile
@@ -228,6 +233,27 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   const shotsRef = useRef(shots);
   shotsRef.current = shots;
   useEffect(() => () => { shotsRef.current.forEach((s) => URL.revokeObjectURL(s.previewUrl)); }, []);
+
+  // Debounced duplicate suggestion. Skip while the modal is mid-busy and
+  // whenever the user has explicitly dismissed the banner.
+  useEffect(() => {
+    if (dupDismissed) return;
+    const t = title.trim();
+    if (t.length < 6) { setDups([]); return; }
+    const ac = new AbortController();
+    const handle = setTimeout(async () => {
+      try {
+        const u = new URL("/api/qa/reports/similar", window.location.origin);
+        u.searchParams.set("route", env.route);
+        u.searchParams.set("title", t);
+        const res = await fetch(u.toString(), { credentials: "include", signal: ac.signal, cache: "no-store" });
+        if (!res.ok) return;
+        const j = await res.json();
+        if (Array.isArray(j.candidates)) setDups(j.candidates);
+      } catch { /* aborted / network — silent */ }
+    }, 500);
+    return () => { clearTimeout(handle); ac.abort(); };
+  }, [title, env.route, dupDismissed]);
 
   async function submit() {
     if (busy) return;
@@ -489,7 +515,24 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
 
               <div>
                 <label className={label}>{t("qa.report.titleLabel", "Title")}<span className="text-[var(--text-secondary)]"> *</span></label>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("qa.report.titlePlaceholder", "Short summary of the issue")} className={field} maxLength={200} autoFocus />
+                <input value={title} onChange={(e) => { setTitle(e.target.value); setDupDismissed(false); }} placeholder={t("qa.report.titlePlaceholder", "Short summary of the issue")} className={field} maxLength={200} autoFocus />
+                {dups.length > 0 && (
+                  <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11.5px]">
+                    <div className="mb-1 flex items-center justify-between">
+                      <span className="font-semibold text-amber-700 dark:text-amber-200">{t("qa.report.dupSuggestTitle", "Similar open issues on this page")}</span>
+                      <button type="button" onClick={() => setDupDismissed(true)} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]">✕</button>
+                    </div>
+                    <ul className="space-y-0.5">
+                      {dups.map((d) => (
+                        <li key={d.id} className="truncate">
+                          <a href={`/database/issues?issue=${d.id}`} target="_blank" rel="noreferrer" className="font-medium text-[var(--text-primary)] hover:underline">{d.title}</a>
+                          <span className="ms-1 text-[var(--text-dim)]">· {d.status}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="mt-1 text-[10.5px] text-[var(--text-dim)]">{t("qa.report.dupSuggestHelp", "If your problem is one of these, comment on the existing issue instead.")}</div>
+                  </div>
+                )}
               </div>
               <div>
                 <label className={label}>{t("qa.report.whatHappened", "What happened?")}</label>

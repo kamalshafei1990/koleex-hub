@@ -23,6 +23,17 @@ async function signScreenshot(tenantId: string, path: string | null): Promise<st
   const { data } = await supabaseServer.storage.from(BUCKET).createSignedUrl(path, 3600);
   return data?.signedUrl ?? null;
 }
+/** Sign every screenshot path (multi-shot reports). Order preserved. */
+async function signScreenshots(tenantId: string, paths: unknown): Promise<string[] | null> {
+  if (!Array.isArray(paths) || paths.length === 0) return null;
+  const out: string[] = [];
+  for (const p of paths) {
+    if (typeof p !== "string") continue;
+    const u = await signScreenshot(tenantId, p);
+    if (u) out.push(u);
+  }
+  return out.length > 0 ? out : null;
+}
 
 /** Resolve assignee account ids → display names (one round-trip). */
 async function nameMap(tenantId: string, ids: (string | null | undefined)[]): Promise<Record<string, string>> {
@@ -62,6 +73,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const report = {
     ...row,
     screenshot_url: await signScreenshot(auth.tenant_id, row.screenshot_url as string | null),
+    screenshot_urls: await signScreenshots(auth.tenant_id, row.screenshot_urls),
     assigned_to_name: row.assigned_to ? names[row.assigned_to as string] ?? null : null,
   };
   return NextResponse.json({ report }, { headers: { "Cache-Control": "private, no-store" } });
@@ -361,6 +373,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const report = {
     ...row,
     screenshot_url: await signScreenshot(auth.tenant_id, row.screenshot_url as string | null),
+    screenshot_urls: await signScreenshots(auth.tenant_id, row.screenshot_urls),
     assigned_to_name: row.assigned_to ? names[row.assigned_to as string] ?? null : null,
   };
   return NextResponse.json({ report });
