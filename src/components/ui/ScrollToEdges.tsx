@@ -96,7 +96,11 @@ export default function ScrollToEdges() {
       data-qa-capture-skip=""
       data-kx-component="Scroll edges"
       data-kx-module="Global"
-      className="fixed bottom-6 end-6 z-[120] flex flex-col gap-2 print:hidden"
+      /* Positioned on the START corner (bottom-left in LTR, bottom-right in RTL)
+         so it never sits on top of the assistant/discuss FAB, which lives on the
+         END corner at bottom-6 end-6 (FloatingPanel). Issue 46dba6b3 reopen:
+         the scroll button was covering the smart-assistant + discussion FAB. */
+      className="fixed bottom-6 start-6 z-[120] flex flex-col gap-2 print:hidden"
       role="group"
       aria-label="Page navigation"
     >

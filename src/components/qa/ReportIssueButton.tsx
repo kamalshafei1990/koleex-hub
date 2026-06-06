@@ -88,6 +88,12 @@ export default function ReportIssueButton() {
   return <ReportModal pathname={pathname} onClose={() => setOpen(false)} />;
 }
 
+// Draft persistence key (issue f2792dc8). A half-written report must survive a
+// page refresh, an in-app navigation, or closing/minimising the floating
+// window — only the typed text is persisted (screenshots + picked components
+// are non-serialisable session objects). Cleared on successful submit.
+const DRAFT_KEY = "koleex.qa.report.draft.v1";
+
 function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => void }) {
   const { t } = useTranslation(qaT);
   const [issueType, setIssueType] = useState<IssueType>("bug");
@@ -128,6 +134,40 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   const [dups, setDups] = useState<Array<{ id: string; title: string; status: string; created_at: string }>>([]);
   const [dupDismissed, setDupDismissed] = useState(false);
   const envRef = useRef<Env | null>(null);
+
+  // ── Draft persistence (issue f2792dc8) ───────────────────────────────────
+  // Restore any previously-typed-but-unsubmitted report ONCE on open, then
+  // continuously persist the text fields so nothing is lost on refresh /
+  // navigation / close. Screenshots aren't persisted (Files can't be JSON'd).
+  const draftLoadedRef = useRef(false);
+  useEffect(() => {
+    if (draftLoadedRef.current) return;
+    draftLoadedRef.current = true;
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const d = JSON.parse(raw) as Partial<{
+        issueType: IssueType; severity: Severity; title: string;
+        description: string; expected: string; solution: string;
+      }>;
+      if (d.issueType) setIssueType(d.issueType);
+      if (d.severity) setSeverity(d.severity);
+      if (typeof d.title === "string") setTitle(d.title);
+      if (typeof d.description === "string") setDescription(d.description);
+      if (typeof d.expected === "string") setExpected(d.expected);
+      if (typeof d.solution === "string") setSolution(d.solution);
+    } catch { /* corrupt/absent draft — ignore */ }
+  }, []);
+  useEffect(() => {
+    const hasContent = Boolean(title || description || expected || solution);
+    try {
+      if (hasContent) {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ issueType, severity, title, description, expected, solution }));
+      } else {
+        localStorage.removeItem(DRAFT_KEY);
+      }
+    } catch { /* quota / private mode — ignore */ }
+  }, [issueType, severity, title, description, expected, solution]);
 
   // In-app DOM capture: no OS / browser permission, no share picker. Mobile
   // gets the upload-only flow (advanced area select would fight touch UX).
@@ -369,6 +409,8 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(humanizeError(j.error ?? `HTTP ${res.status}`));
       setDone(true);
+      // Report submitted → discard the saved draft so the next report starts clean.
+      try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
       // Tell any open issue list (admin console) to refresh — it lives in a
       // separate component tree, so without this a freshly-filed report won't
       // appear until a manual reload/filter change.
