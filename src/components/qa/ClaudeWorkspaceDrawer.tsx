@@ -101,15 +101,15 @@ export default function ClaudeWorkspaceDrawer({ issueId, onClose, onJump }: { is
         {/* Header */}
         <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-4 py-3">
           <div className="flex items-center gap-1.5">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M12 2l2.4 7.4H22l-6 4.4 2.3 7.2L12 16.6 5.7 21l2.3-7.2-6-4.4h7.6z" />
             </svg>
-            <span className="text-[14px] font-bold text-[var(--text-primary)]">Claude Debug Workspace</span>
+            <span className="text-[14px] font-bold text-[var(--text-primary)]">AI Debug Workspace</span>
             {ws && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[9px] text-[var(--text-dim)]">v{ws.generation_version}{ws.cached ? " · cached" : " · fresh"}</span>}
           </div>
           <div className="ms-auto flex items-center gap-1.5">
             <button type="button" className={btn} onClick={() => load(true)} disabled={regenerating || loading}>{regenerating ? "Regenerating…" : "Regenerate"}</button>
-            <button type="button" className={btn} onClick={copyPrompt} disabled={!ws}>{copied ? "Copied ✓" : "Copy Claude Prompt"}</button>
+            <button type="button" className={btn} onClick={copyPrompt} disabled={!ws}>{copied ? "Copied ✓" : "Copy AI Prompt"}</button>
             <button type="button" aria-label="Close" onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-md text-[16px] text-[var(--text-dim)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]">×</button>
           </div>
         </div>
@@ -207,7 +207,7 @@ export default function ClaudeWorkspaceDrawer({ issueId, onClose, onJump }: { is
               {/* Generated prompt */}
               <div className={card}>
                 <div className="mb-1.5 flex items-center justify-between">
-                  <span className={head + " mb-0"}>Generated Claude Prompt</span>
+                  <span className={head + " mb-0"}>Generated AI Prompt</span>
                   <button type="button" className={btn} onClick={copyPrompt}>{copied ? "Copied ✓" : "Copy"}</button>
                 </div>
                 <pre className="max-h-[40vh] overflow-auto whitespace-pre-wrap break-words rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 font-mono text-[11px] leading-relaxed text-[var(--text-secondary)]">{ws.generated_prompt}</pre>
@@ -226,7 +226,7 @@ export default function ClaudeWorkspaceDrawer({ issueId, onClose, onJump }: { is
 function Gauge({ label, value, tone }: { label: string; value: number; tone: "risk" | "confidence" }) {
   const color = tone === "risk"
     ? (value >= 66 ? "bg-rose-500" : value >= 33 ? "bg-amber-500" : "bg-emerald-500")
-    : "bg-[var(--accent)]";
+    : "bg-[var(--text-primary)]";
   return (
     <div className="flex-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3">
       <div className="flex items-baseline justify-between">
@@ -425,8 +425,8 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
       {/* Action bar */}
       <div className="flex items-center gap-2">
         <button type="button" onClick={runAnalysis} disabled={running}
-          className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-[12px] font-semibold text-white hover:opacity-90 disabled:opacity-50">
-          {running ? "Analysing…" : sessions.length ? "Re-run AI Analysis" : "Ask Claude to Analyse"}
+          className="rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
+          {running ? "Analysing…" : sessions.length ? "Re-run AI Analysis" : "Ask AI to Analyse"}
         </button>
         {active?.response_markdown && (
           <button type="button" className={btn} onClick={copyActive}>{copied ? "Copied ✓" : "Copy"}</button>
@@ -438,7 +438,7 @@ function AiAnalysisPanel({ issueId }: { issueId: string }) {
 
       {running && (
         <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-4 text-center text-[12px] text-[var(--text-dim)]">
-          Claude is analysing the deterministic workspace context…
+          AI is analysing the deterministic workspace context…
         </div>
       )}
 

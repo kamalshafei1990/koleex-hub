@@ -222,7 +222,7 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-3.5">
           <div className="flex items-center gap-2">
-            <MessageSquarePlusIcon size={16} className="text-[var(--accent)]" />
+            <MessageSquarePlusIcon size={16} className="text-[var(--text-secondary)]" />
             <h2 className="text-[14px] font-bold">Report an issue</h2>
           </div>
           <button type="button" onClick={() => !busy && onClose()} aria-label="Close" className="text-[var(--text-dim)] hover:text-[var(--text-primary)]">✕</button>
@@ -230,7 +230,7 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
 
         {done ? (
           <div className="flex flex-col items-center justify-center gap-2 px-6 py-14 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--accent)]/15 text-[var(--accent)] text-xl">✓</div>
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--bg-surface-active)] text-[var(--text-secondary)] text-xl">✓</div>
             <p className="text-[14px] font-semibold">Thank you — report submitted.</p>
             <p className="text-[12px] text-[var(--text-dim)]">The team can see it in Issue Reports.</p>
           </div>
@@ -245,8 +245,8 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
 
               {/* Component inspector — pick a specific UI component for this report. */}
               {selected ? (
-                <div className="flex items-start gap-2 rounded-lg border border-[var(--accent)]/40 bg-[var(--accent)]/[0.06] px-3 py-2">
-                  <span className="mt-0.5 text-[var(--accent)]"><TargetIcon size={14} /></span>
+                <div className="flex items-start gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] px-3 py-2">
+                  <span className="mt-0.5 text-[var(--text-secondary)]"><TargetIcon size={14} /></span>
                   <div className="min-w-0 flex-1">
                     <div className="text-[12.5px] font-semibold text-[var(--text-primary)]">
                       {selected.component}
@@ -290,7 +290,7 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
               </div>
 
               <div>
-                <label className={label}>Title<span className="text-[var(--accent)]"> *</span></label>
+                <label className={label}>Title<span className="text-[var(--text-secondary)]"> *</span></label>
                 <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Short summary of the issue" className={field} maxLength={200} autoFocus />
               </div>
               <div>
@@ -313,7 +313,7 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                   <div className="relative overflow-hidden rounded-lg border border-[var(--border-color)]">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={previewUrl} alt="screenshot preview" className="max-h-48 w-full object-contain bg-[var(--bg-surface-subtle)]" />
-                    <button type="button" onClick={() => setImage(null)} className="absolute right-2 top-2 rounded-md bg-black/60 px-2 py-1 text-[11px] font-medium text-white hover:bg-black/80">Remove</button>
+                    <button type="button" onClick={() => setImage(null)} className="absolute right-2 top-2 rounded-md bg-black/60 px-2 py-1 text-[11px] font-medium text-[var(--text-inverted)] hover:bg-black/80">Remove</button>
                   </div>
                 ) : (
                   <button
@@ -337,7 +337,7 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
             {/* Footer */}
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-subtle)] px-5 py-3">
               <button type="button" onClick={() => !busy && onClose()} className="rounded-lg px-3.5 py-2 text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">Cancel</button>
-              <button type="button" onClick={submit} disabled={busy || !title.trim()} className="rounded-lg bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50">
+              <button type="button" onClick={submit} disabled={busy || !title.trim()} className="rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[13px] font-semibold text-[var(--text-inverted)] shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50">
                 {busy ? "Submitting…" : "Submit report"}
               </button>
             </div>

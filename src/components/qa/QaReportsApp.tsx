@@ -289,7 +289,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
         <button
           type="button"
           onClick={() => setSortPriority((v) => !v)}
-          className={`h-9 rounded-lg border px-3 text-[12px] font-semibold ${sortPriority ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border-color)] text-[var(--text-secondary)]"}`}
+          className={`h-9 rounded-lg border px-3 text-[12px] font-semibold ${sortPriority ? "border-[var(--accent)] text-[var(--text-secondary)]" : "border-[var(--border-color)] text-[var(--text-secondary)]"}`}
         >
           Sort: {sortPriority ? "Priority" : "Newest"}
         </button>
@@ -312,8 +312,11 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
                   <li key={r.id}>
                     <button type="button" onClick={() => setSelectedId(r.id)} className={`block w-full px-4 py-3 text-left transition-colors ${selectedId === r.id ? "bg-[var(--bg-surface-active)]" : "hover:bg-[var(--bg-surface-subtle)]"}`}>
                       <div className="flex items-center gap-2">
-                        <span className={`shrink-0 ${PILL} ${SEVERITY_TONE[r.severity]}`}>{SEVERITY_LABEL[r.severity]}</span>
-                        <span className={`shrink-0 ${PILL} ${PRIORITY_TONE[r.priority]}`}>{PRIORITY_LABEL[r.priority]}</span>
+                        <span title="Severity" className={`shrink-0 ${PILL} ${SEVERITY_TONE[r.severity]}`}>{SEVERITY_LABEL[r.severity]}</span>
+                        <span title="Priority" className={`inline-flex shrink-0 items-center gap-1 ${PILL} ${PRIORITY_TONE[r.priority]}`}>
+                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M4 22V4m0 0h12l-2.5 4L16 12H4" /></svg>
+                          {PRIORITY_LABEL[r.priority]}
+                        </span>
                         <span className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{r.title}</span>
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10.5px] text-[var(--text-dim)]">
@@ -321,7 +324,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
                         <span>{ISSUE_TYPE_LABEL[r.issue_type]}</span>
                         <span>· {r.app_module}</span>
                         {r.assigned_to_name && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[var(--text-secondary)]">@{r.assigned_to_name}</span>}
-                        {ready && <span className="rounded bg-[var(--accent)]/12 px-1.5 py-0.5 font-semibold text-[var(--accent)]">Claude-ready</span>}
+                        {ready && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 font-semibold text-[var(--text-secondary)]">AI-ready</span>}
                         {r.duplicate_of_issue_id && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5">dup</span>}
                         {typeof r.comment_count === "number" && r.comment_count > 0 && <span>💬 {r.comment_count}</span>}
                         <span className="ms-auto">{rel(r.created_at)}</span>
@@ -397,6 +400,7 @@ function ReportDetail({
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copying, setCopying] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
@@ -441,8 +445,12 @@ function ReportDetail({
   }
 
   async function copyDebugPrompt() {
+    if (copying) return;
     // Phase 6: copy the FULL deterministic workspace prompt; fall back to the
-    // inline summary if the workspace can't be built.
+    // inline summary if the workspace can't be built. Building the workspace on
+    // first read can take a second — show a "Preparing…" state so it doesn't
+    // feel frozen.
+    setCopying(true); setErr(null);
     try {
       const res = await fetch(`/api/qa/${report.id}/workspace`, { credentials: "include", cache: "no-store" });
       const j = await res.json().catch(() => ({}));
@@ -450,6 +458,7 @@ function ReportDetail({
         const ok = await copyText(j.workspace.generated_prompt as string);
         if (ok) { setCopied(true); setTimeout(() => setCopied(false), 1800); }
         else setErr("Couldn't copy — open the issue and copy the prompt manually.");
+        setCopying(false);
         return;
       }
     } catch { /* fall through to the inline summary */ }
@@ -480,6 +489,7 @@ function ReportDetail({
     const ok = await copyText(lines.join("\n"));
     if (ok) { setCopied(true); setTimeout(() => setCopied(false), 1800); }
     else setErr("Couldn't copy — open the issue and copy the prompt manually.");
+    setCopying(false);
   }
 
   const label = "block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-1";
@@ -502,7 +512,7 @@ function ReportDetail({
         <span className={`${PILL} ${PRIORITY_TONE[report.priority]}`}>{PRIORITY_LABEL[report.priority]} priority</span>
         <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${STATUS_TONE[report.status]}`}>{STATUS_LABEL[report.status]}</span>
         <span className="text-[11px] text-[var(--text-dim)]">{ISSUE_TYPE_LABEL[report.issue_type]}</span>
-        {ready && <span className="rounded bg-[var(--accent)]/12 px-1.5 py-0.5 text-[10px] font-semibold text-[var(--accent)]">Claude-ready</span>}
+        {ready && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--text-secondary)]">AI-ready</span>}
         {report.duplicate_of_issue_id && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--text-dim)]">Duplicate</span>}
         {report.reopen_count > 0 && <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10px] text-[var(--text-dim)]">Reopened ×{report.reopen_count}</span>}
         <div className="ms-auto flex items-center gap-2">
@@ -511,11 +521,11 @@ function ReportDetail({
               Open Route ↗
             </a>
           ) : null}
-          <button type="button" onClick={() => setWorkspaceOpen(true)} className="rounded-lg border border-[var(--accent)]/40 bg-[var(--accent)]/10 px-2.5 py-1.5 text-[11.5px] font-semibold text-[var(--accent)] hover:bg-[var(--accent)]/15">
+          <button type="button" onClick={() => setWorkspaceOpen(true)} className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11.5px] font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]">
             Debug Workspace
           </button>
-          <button type="button" onClick={copyDebugPrompt} className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11.5px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)]">
-            {copied ? "Copied ✓" : "Copy Claude Prompt"}
+          <button type="button" onClick={copyDebugPrompt} disabled={copying} className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11.5px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)] disabled:opacity-60">
+            {copying ? "Preparing…" : copied ? "Copied ✓" : "Copy AI Prompt"}
           </button>
         </div>
       </div>
@@ -538,12 +548,12 @@ function ReportDetail({
         {WORKFLOW_STEPS.map((s, i) => (
           <div key={s.value} className="flex flex-1 items-center gap-1.5">
             <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-              i < curStep ? "bg-[var(--accent)] text-white"
-              : i === curStep ? "bg-[var(--accent)] text-white ring-2 ring-[var(--accent)]/25"
+              i < curStep ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+              : i === curStep ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] ring-2 ring-[var(--border-color)]"
               : "bg-[var(--bg-surface)] text-[var(--text-dim)] border border-[var(--border-color)]"
             }`}>{i < curStep ? "✓" : i + 1}</div>
             <span className={`text-[11px] ${i <= curStep ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-dim)]"}`}>{s.label}</span>
-            {i < WORKFLOW_STEPS.length - 1 && <div className={`h-px flex-1 ${i < curStep ? "bg-[var(--accent)]" : "bg-[var(--border-color)]"}`} />}
+            {i < WORKFLOW_STEPS.length - 1 && <div className={`h-px flex-1 ${i < curStep ? "bg-[var(--text-primary)]" : "bg-[var(--border-color)]"}`} />}
           </div>
         ))}
       </div>
@@ -583,9 +593,9 @@ function ReportDetail({
 
       {/* Inspected component breadcrumb (Phase-2, preserved). */}
       {report.component_name && (
-        <div className="rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/[0.05] px-3.5 py-3">
+        <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] px-3.5 py-3">
           <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)]">
-            <TargetIcon size={12} className="text-[var(--accent)]" /> Inspected component
+            <TargetIcon size={12} className="text-[var(--text-secondary)]" /> Inspected component
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[12.5px]">
             {report.component_module && (<><span className="text-[var(--text-secondary)]">{report.component_module}</span><span className="text-[var(--text-ghost)]">→</span></>)}
@@ -635,7 +645,7 @@ function ReportDetail({
         </div>
         <div className="flex items-center justify-end gap-2">
           {saved && <span className="text-[12px] text-emerald-500">Saved ✓</span>}
-          <button type="button" onClick={saveTriage} disabled={saving} className="rounded-lg bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-50">
+          <button type="button" onClick={saveTriage} disabled={saving} className="rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-[13px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
             {saving ? "Saving…" : "Save changes"}
           </button>
         </div>
@@ -688,7 +698,7 @@ function AssigneePicker({
       >
         {current ? (
           <>
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)]/15 text-[9px] font-bold text-[var(--accent)]">{initials(current)}</span>
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--bg-surface-active)] text-[9px] font-bold text-[var(--text-secondary)]">{initials(current)}</span>
             <span className="truncate">{current}</span>
           </>
         ) : (
@@ -697,7 +707,7 @@ function AssigneePicker({
         <span className="ms-auto text-[var(--text-dim)]">▾</span>
       </button>
       {open && (
-        <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-elevated)] shadow-lg">
+        <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
           <input
             autoFocus
             value={search}
@@ -714,7 +724,7 @@ function AssigneePicker({
             {filtered.map((a) => (
               <li key={a.id}>
                 <button type="button" onClick={() => { onChange(a.id); setOpen(false); setSearch(""); }} className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[12.5px] hover:bg-[var(--bg-surface-hover)] ${a.id === value ? "bg-[var(--bg-surface-active)]" : ""}`}>
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)]/15 text-[9px] font-bold text-[var(--accent)]">{initials(a.name)}</span>
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--bg-surface-active)] text-[9px] font-bold text-[var(--text-secondary)]">{initials(a.name)}</span>
                   <span className="truncate text-[var(--text-primary)]">{a.name}{a.id === myId ? " (me)" : ""}</span>
                 </button>
               </li>
@@ -804,7 +814,7 @@ function ReopenControl({ disabled, onReopen }: { disabled?: boolean; onReopen: (
           <textarea autoFocus value={reason} onChange={(e) => setReason(e.target.value)} rows={2} placeholder="Reason (preserved on the timeline)…" className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none" />
           <div className="mt-1.5 flex justify-end gap-2">
             <button type="button" onClick={() => { setOpen(false); setReason(""); }} className="text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)]">Cancel</button>
-            <button type="button" disabled={disabled} onClick={async () => { const ok = await onReopen(reason.trim()); if (ok) { setOpen(false); setReason(""); } }} className="rounded-md bg-[var(--accent)] px-3 py-1.5 text-[12px] font-semibold text-white hover:opacity-90 disabled:opacity-50">
+            <button type="button" disabled={disabled} onClick={async () => { const ok = await onReopen(reason.trim()); if (ok) { setOpen(false); setReason(""); } }} className="rounded-md bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50">
               Reopen
             </button>
           </div>
@@ -874,7 +884,7 @@ function CommentsPanel({ issueId, myId, refreshKey = 0 }: { issueId: string; myI
           {comments.map((c) => (
             <li key={c.id} className={`rounded-lg border px-3 py-2 ${c.is_internal_note ? "border-amber-500/30 bg-amber-500/[0.06]" : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]"} ${c.user_id === myId ? "ms-6" : "me-6"}`}>
               <div className="mb-0.5 flex items-center gap-1.5 text-[10.5px]">
-                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent)]/15 text-[8px] font-bold text-[var(--accent)]">{initials(c.user_name)}</span>
+                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--bg-surface-active)] text-[8px] font-bold text-[var(--text-secondary)]">{initials(c.user_name)}</span>
                 <span className="font-semibold text-[var(--text-secondary)]">{c.user_name ?? "—"}</span>
                 {c.user_role && <span className="rounded bg-[var(--bg-surface)] px-1 text-[9px] text-[var(--text-dim)]">{c.user_role}</span>}
                 {c.is_internal_note && <span className="rounded bg-amber-500/20 px-1 text-[9px] font-semibold text-amber-600 dark:text-amber-300">Internal</span>}
@@ -905,7 +915,7 @@ function CommentsPanel({ issueId, myId, refreshKey = 0 }: { issueId: string; myI
             <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} className="h-3.5 w-3.5 accent-[var(--accent)]" />
             Internal note
           </label>
-          <button type="button" onClick={post} disabled={posting || (!text.trim() && att.count === 0)} className="ms-auto rounded-lg bg-[var(--accent)] px-4 py-1.5 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-40">
+          <button type="button" onClick={post} disabled={posting || (!text.trim() && att.count === 0)} className="ms-auto rounded-lg bg-[var(--bg-inverted)] px-4 py-1.5 text-[13px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-40">
             {posting ? "Posting…" : "Comment"}
           </button>
         </div>
@@ -961,7 +971,7 @@ function ActivityPanel({ issueId, refreshKey = 0 }: { issueId: string; refreshKe
         <ol className="space-y-1.5">
           {activity.map((a) => (
             <li key={a.id} className="flex items-start gap-2 text-[12px]">
-              <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent)]/50" />
+              <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--text-dim)]" />
               <span className="text-[var(--text-secondary)]">
                 <b className="font-semibold text-[var(--text-primary)]">{a.actor_name ?? "Someone"}</b> {describe(a)}
                 <span className="ms-1.5 text-[var(--text-dim)]">· {rel(a.created_at)}</span>

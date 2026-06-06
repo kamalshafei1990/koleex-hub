@@ -191,7 +191,7 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
   return (
     <div className={shell}>
       {issue.is_admin_view && (
-        <div className="mb-3 flex items-center justify-between rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/[0.06] px-3 py-2 text-[12px] text-[var(--text-secondary)]">
+        <div className="mb-3 flex items-center justify-between rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[12px] text-[var(--text-secondary)]">
           <span>You’re viewing the reporter experience as an admin.</span>
           <Link href={`/database/issues?issue=${issue.id}`} className="font-semibold text-[var(--accent)] hover:underline">Open in QA Console →</Link>
         </div>
@@ -247,7 +247,7 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
             {comments.map((c) => (
               <li key={c.id} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
                 <div className="mb-0.5 flex items-center gap-1.5 text-[10.5px]">
-                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent)]/15 text-[8px] font-bold text-[var(--accent)]">{initials(c.user_name)}</span>
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--bg-surface-active)] text-[8px] font-bold text-[var(--text-secondary)]">{initials(c.user_name)}</span>
                   <span className="font-semibold text-[var(--text-secondary)]">{c.user_name ?? "—"}</span>
                   {c.user_role && <span className="rounded bg-[var(--bg-surface)] px-1 text-[9px] text-[var(--text-dim)]">{c.user_role}</span>}
                   <span className="ms-auto text-[var(--text-dim)]">{rel(c.created_at)}{c.edited_at ? " · edited" : ""}</span>
@@ -272,7 +272,7 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
           />
           <AttachmentStrip att={att} disabled={posting} />
           <div className="flex justify-end">
-            <button type="button" onClick={postReply} disabled={posting || (!text.trim() && att.count === 0)} className="rounded-lg bg-[var(--accent)] px-4 py-1.5 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-40">
+            <button type="button" onClick={postReply} disabled={posting || (!text.trim() && att.count === 0)} className="rounded-lg bg-[var(--bg-inverted)] px-4 py-1.5 text-[13px] font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-40">
               {posting ? "Posting…" : "Reply"}
             </button>
           </div>
@@ -286,7 +286,7 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
           <ol className="space-y-1.5">
             {activity.map((a) => (
               <li key={a.id} className="flex items-start gap-2 text-[12px]">
-                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent)]/50" />
+                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--text-dim)]" />
                 <span className="text-[var(--text-secondary)]">
                   <b className="font-semibold text-[var(--text-primary)]">{a.actor_name ?? "The team"}</b>{" "}
                   {a.activity_type === "status_changed" && a.new_value

@@ -297,7 +297,7 @@ export const SAVED_VIEWS: { id: SavedViewId; label: string }[] = [
   { id: "my_issues", label: "My Issues" },
   { id: "urgent", label: "Urgent" },
   { id: "waiting_verification", label: "Waiting Verification" },
-  { id: "ready_for_claude", label: "Ready for Claude" },
+  { id: "ready_for_claude", label: "Ready for AI" },
   { id: "recently_reopened", label: "Recently Reopened" },
 ];
 

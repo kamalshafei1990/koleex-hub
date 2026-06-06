@@ -80,7 +80,7 @@ export default function WatchControl({ issueId, showWatchers = false }: { issueI
         disabled={busy || loading}
         className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[12px] font-semibold transition-colors disabled:opacity-50 ${
           watching
-            ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]"
+            ? "border-[var(--accent)] bg-[var(--bg-surface)] text-[var(--text-secondary)]"
             : "border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)]"
         }`}
       >
@@ -101,7 +101,7 @@ export default function WatchControl({ issueId, showWatchers = false }: { issueI
             <span
               key={w.account_id}
               title={w.name}
-              className="flex h-5 w-5 items-center justify-center rounded-full border border-[var(--bg-secondary)] bg-[var(--accent)]/15 text-[8px] font-bold text-[var(--accent)]"
+              className="flex h-5 w-5 items-center justify-center rounded-full border border-[var(--bg-secondary)] bg-[var(--bg-surface-active)] text-[8px] font-bold text-[var(--text-secondary)]"
             >
               {initials(w.name)}
             </span>
