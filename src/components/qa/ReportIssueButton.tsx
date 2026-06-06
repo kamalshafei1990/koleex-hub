@@ -152,53 +152,81 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   const captureScreenshot = useCallback(async () => {
     if (busy || capturing) return;
     setError(null);
+    const md = navigator.mediaDevices;
+    if (!md || typeof md.getDisplayMedia !== "function") {
+      setError(t("qa.report.captureUnsupported", "Your browser can't capture the screen here — please upload an image instead."));
+      return;
+    }
+
     let stream: MediaStream;
     try {
-      // Must run inside the click gesture — call getDisplayMedia immediately.
-      stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { displaySurface: "monitor" } as MediaTrackConstraints,
-        audio: false,
-      });
+      // Must run synchronously inside the click gesture — call it immediately,
+      // with the simplest possible constraints for the widest browser support.
+      stream = await md.getDisplayMedia({ video: true, audio: false });
     } catch (e) {
-      // User dismissed the picker (NotAllowedError / AbortError) → no error shown.
       const name = e instanceof DOMException ? e.name : "";
-      if (name !== "NotAllowedError" && name !== "AbortError") {
-        setError(t("qa.report.captureFail", "Couldn't capture the screen. Try uploading instead."));
+      // A genuine user-cancel of the picker (AbortError) → stay silent.
+      // Anything else (incl. NotAllowedError from a blocked context, or the
+      // OS withholding Screen-Recording permission) → tell them, with a code.
+      if (name !== "AbortError") {
+        const hint = name === "NotAllowedError"
+          ? t("qa.report.captureBlocked", "Screen capture was blocked or cancelled. If you meant to allow it, check your browser / system screen-recording permission — or just upload an image.")
+          : t("qa.report.captureFail", "Couldn't capture the screen. Try uploading instead.");
+        setError(name ? `${hint} (${name})` : hint);
       }
       return;
     }
+
     // Hide the modal so the screenshot shows the page underneath, not this panel.
     setCapturing(true);
+    const video = document.createElement("video");
     try {
-      const video = document.createElement("video");
       video.srcObject = stream;
       video.muted = true;
+      (video as HTMLVideoElement).playsInline = true;
+      // Some browsers only paint frames for a video that's actually in the DOM,
+      // so attach it off-screen (1px, invisible) for the duration of the grab.
+      video.style.cssText = "position:fixed;left:-99999px;top:0;width:2px;height:2px;opacity:0;pointer-events:none;";
+      document.body.appendChild(video);
       await video.play().catch(() => {});
-      if (video.readyState < 2) {
-        await new Promise<void>((res) => { video.onloadeddata = () => res(); });
-      }
-      // Let the panel actually disappear + the page repaint before grabbing.
-      await new Promise<void>((res) => setTimeout(res, 280));
+
+      // Wait for a REAL painted frame before drawing (avoids black/blank shots),
+      // and give the panel a beat to disappear. requestVideoFrameCallback is the
+      // reliable signal where available; otherwise fall back to loadeddata + delay.
+      await new Promise<void>((res) => {
+        let settled = false;
+        const finish = () => { if (!settled) { settled = true; res(); } };
+        const v = video as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number };
+        if (typeof v.requestVideoFrameCallback === "function") {
+          v.requestVideoFrameCallback(() => setTimeout(finish, 200));
+        } else if (video.readyState >= 2) {
+          setTimeout(finish, 320);
+        } else {
+          video.onloadeddata = () => setTimeout(finish, 320);
+        }
+        setTimeout(finish, 1500); // hard cap so we never hang
+      });
 
       const w = video.videoWidth || 1280;
       const h = video.videoHeight || 720;
       // Cap the longest side so the file stays well under the 5 MB limit.
       const maxSide = 1920;
       const scale = Math.max(w, h) > maxSide ? maxSide / Math.max(w, h) : 1;
-      const tw = Math.round(w * scale);
-      const th = Math.round(h * scale);
+      const tw = Math.max(1, Math.round(w * scale));
+      const th = Math.max(1, Math.round(h * scale));
 
       const canvas = document.createElement("canvas");
       canvas.width = tw; canvas.height = th;
       const ctx = canvas.getContext("2d");
-      ctx?.drawImage(video, 0, 0, tw, th);
+      if (!ctx) throw new Error("no-2d-context");
+      ctx.drawImage(video, 0, 0, tw, th);
 
       const toBlob = (type: string, q?: number) =>
         new Promise<Blob | null>((res) => canvas.toBlob(res, type, q));
       let blob = await toBlob("image/png");
       if (blob && blob.size > MAX_BYTES) blob = await toBlob("image/jpeg", 0.9);
 
-      if (blob) {
+      if (blob && blob.size > 0) {
         const ext = blob.type === "image/jpeg" ? "jpg" : "png";
         setImage(new File([blob], `screenshot-${Date.now()}.${ext}`, { type: blob.type }));
       } else {
@@ -207,7 +235,8 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
     } catch {
       setError(t("qa.report.captureFail", "Couldn't capture the screen. Try uploading instead."));
     } finally {
-      stream.getTracks().forEach((tr) => tr.stop());
+      try { stream.getTracks().forEach((tr) => tr.stop()); } catch { /* no-op */ }
+      try { video.srcObject = null; video.remove(); } catch { /* no-op */ }
       setCapturing(false);
     }
   }, [busy, capturing, setImage, t]);

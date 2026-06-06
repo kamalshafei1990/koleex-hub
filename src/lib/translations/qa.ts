@@ -110,6 +110,8 @@ export const qaT: Translations = {
   "qa.report.screenshotHint": { en: "(capture live, upload, paste or drag — PNG/JPG/WEBP)", zh: "（即时截屏、上传、粘贴或拖拽 — PNG/JPG/WEBP）", ar: "(التقاط مباشر أو رفع أو لصق أو سحب — PNG/JPG/WEBP)" },
   "qa.report.takeScreenshot": { en: "Take a screenshot now", zh: "立即截屏", ar: "التقط لقطة شاشة الآن" },
   "qa.report.captureFail": { en: "Couldn't capture the screen. Try uploading instead.", zh: "无法截屏，请改用上传。", ar: "تعذّر التقاط الشاشة. جرّب الرفع بدلاً من ذلك." },
+  "qa.report.captureBlocked": { en: "Screen capture was blocked or cancelled. If you meant to allow it, check your browser / system screen-recording permission — or just upload an image.", zh: "截屏被阻止或已取消。如需允许，请检查浏览器/系统的屏幕录制权限，或直接上传图片。", ar: "تم حظر التقاط الشاشة أو إلغاؤه. إذا كنت تريد السماح به، فتحقّق من إذن تسجيل الشاشة في المتصفح/النظام — أو ارفع صورة مباشرةً." },
+  "qa.report.captureUnsupported": { en: "Your browser can't capture the screen here — please upload an image instead.", zh: "您的浏览器无法在此截屏，请改为上传图片。", ar: "لا يمكن لمتصفحك التقاط الشاشة هنا — يُرجى رفع صورة بدلاً من ذلك." },
   "qa.report.clickUpload": { en: "Click to upload", zh: "点击上传", ar: "انقر للرفع" },
   "qa.report.dragHint": { en: "or paste / drag an image here", zh: "或在此粘贴 / 拖拽图片", ar: "أو الصق / اسحب صورة هنا" },
   "qa.report.submit": { en: "Submit report", zh: "提交报告", ar: "إرسال البلاغ" },
