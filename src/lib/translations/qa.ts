@@ -113,6 +113,8 @@ export const qaT: Translations = {
   "qa.report.solutionPlaceholder": { en: "Any idea how to fix it?", zh: "有修复思路吗？", ar: "هل لديك فكرة عن كيفية إصلاحها؟" },
   "qa.report.screenshot": { en: "Screenshot", zh: "截图", ar: "لقطة شاشة" },
   "qa.report.screenshots": { en: "Screenshots", zh: "截图", ar: "لقطات الشاشة" },
+  "qa.report.openFullSize": { en: "Open full size", zh: "查看原图", ar: "فتح بالحجم الكامل" },
+  "qa.report.fullSize": { en: "Full-size screenshot", zh: "原图", ar: "لقطة شاشة بالحجم الكامل" },
   "qa.report.screenshotHint": { en: "(capture an area, upload, paste or drag — PNG/JPG/WEBP)", zh: "（截取区域、上传、粘贴或拖拽 — PNG/JPG/WEBP）", ar: "(التقط منطقة أو ارفع أو الصق أو اسحب — PNG/JPG/WEBP)" },
   "qa.report.takeScreenshot": { en: "Capture an area or component", zh: "截取区域或组件", ar: "التقط منطقة أو مكوّنًا" },
   "qa.report.takeAnotherScreenshot": { en: "Capture another", zh: "再截取一张", ar: "التقط لقطة أخرى" },

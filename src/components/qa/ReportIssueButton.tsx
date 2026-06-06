@@ -112,6 +112,9 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   // see / use the screen again WITHOUT losing anything they've typed. The
   // component stays mounted — all field state is preserved.
   const [minimized, setMinimized] = useState(false);
+  // Lightbox: clicking a thumbnail opens the screenshot full-size so the
+  // reporter can verify they captured the right thing before submitting.
+  const [zoomIdx, setZoomIdx] = useState<number | null>(null);
   const envRef = useRef<Env | null>(null);
 
   // In-app DOM capture: no OS / browser permission, no share picker. Mobile
@@ -343,8 +346,42 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
     );
   }
 
+  // Lightbox overlay — only mounted while one is open. Stacks ABOVE the
+  // modal (z-[210]). Clicking the backdrop, the ✕, or pressing Esc closes
+  // it without affecting the underlying modal state.
+  const zoomShot = zoomIdx != null ? shots[zoomIdx] : null;
+
   return (
-    <div className="fixed inset-0 z-[200] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={t("qa.report.title", "Report an issue")} onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
+    <>
+    {zoomShot && (
+      <div
+        className="fixed inset-0 z-[210] flex items-center justify-center bg-black/80 p-6 backdrop-blur-sm"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("qa.report.fullSize", "Full-size screenshot")}
+        onMouseDown={(e) => { if (e.target === e.currentTarget) setZoomIdx(null); }}
+        onKeyDown={(e) => { if (e.key === "Escape") setZoomIdx(null); }}
+        tabIndex={-1}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={zoomShot.previewUrl} alt={`screenshot ${(zoomIdx ?? 0) + 1} full size`} className="max-h-[92vh] max-w-[94vw] rounded-lg object-contain shadow-2xl" />
+        <button
+          type="button"
+          onClick={() => setZoomIdx(null)}
+          aria-label={t("qa.report.close", "Close")}
+          title={t("qa.report.close", "Close")}
+          className="fixed right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/70 text-[15px] text-white shadow-lg backdrop-blur-md transition-colors hover:bg-black/90"
+        >
+          ✕
+        </button>
+        {shots.length > 1 && (
+          <div className="fixed bottom-5 left-1/2 -translate-x-1/2 rounded-full border border-white/15 bg-black/70 px-3 py-1 text-[12px] font-medium text-white shadow-lg backdrop-blur-md">
+            {(zoomIdx ?? 0) + 1} / {shots.length}
+          </div>
+        )}
+      </div>
+    )}
+    <div className="fixed inset-0 z-[200] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={t("qa.report.title", "Report an issue")} onMouseDown={(e) => { if (e.target === e.currentTarget && !busy && zoomIdx == null) onClose(); }}>
       <div className="flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-2xl sm:max-w-[560px] sm:rounded-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-3.5">
@@ -480,15 +517,24 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                   </span>
                 </label>
 
-                {/* Thumbnail strip — shown only when at least one shot exists. */}
+                {/* Thumbnail strip — shown only when at least one shot exists.
+                    object-contain so the WHOLE image is visible (no crop),
+                    and the tile itself is a button → opens the lightbox. */}
                 {shots.length > 0 && (
                   <div className="mb-2 grid grid-cols-3 gap-2">
                     {shots.map((s, idx) => (
-                      <div key={s.previewUrl} className="relative overflow-hidden rounded-lg border border-[var(--border-color)]">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={s.previewUrl} alt={`screenshot ${idx + 1}`} className="h-24 w-full object-cover bg-[var(--bg-surface-subtle)]" />
+                      <div key={s.previewUrl} className="relative overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface-subtle)]">
+                        <button
+                          type="button"
+                          onClick={() => setZoomIdx(idx)}
+                          title={t("qa.report.openFullSize", "Open full size")}
+                          className="block w-full"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={s.previewUrl} alt={`screenshot ${idx + 1}`} className="h-28 w-full object-contain" />
+                        </button>
                         {shots.length > 1 && (
-                          <span className="absolute left-1.5 top-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[var(--bg-secondary)]/85 px-1 text-[10px] font-bold text-[var(--text-secondary)] backdrop-blur-md">{idx + 1}</span>
+                          <span className="pointer-events-none absolute left-1.5 top-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[var(--bg-secondary)]/85 px-1 text-[10px] font-bold text-[var(--text-secondary)] backdrop-blur-md">{idx + 1}</span>
                         )}
                         <button
                           type="button"
@@ -569,5 +615,6 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
         )}
       </div>
     </div>
+    </>
   );
 }
