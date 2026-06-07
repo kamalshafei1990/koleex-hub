@@ -173,6 +173,26 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", up);
   };
+  // Remember the window's position / size / minimised state across opens,
+  // navigation and refresh, so it reappears exactly where you left it.
+  const winLoadedRef = useRef(false);
+  useEffect(() => {
+    if (winLoadedRef.current) return;
+    winLoadedRef.current = true;
+    try {
+      const raw = localStorage.getItem("koleex.qa.report.win.v1");
+      if (raw) {
+        const w = JSON.parse(raw) as { pos?: { x: number; y: number } | null; size?: { w: number; h: number } | null; minimized?: boolean };
+        if (w.pos) setWinPos(w.pos);
+        if (w.size) setWinSize(w.size);
+        if (typeof w.minimized === "boolean") setMinimized(w.minimized);
+      }
+    } catch { /* ignore */ }
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem("koleex.qa.report.win.v1", JSON.stringify({ pos: winPos, size: winSize, minimized })); }
+    catch { /* ignore */ }
+  }, [winPos, winSize, minimized]);
   // Lightbox: clicking a thumbnail opens the screenshot full-size so the
   // reporter can verify they captured the right thing before submitting.
   const [zoomIdx, setZoomIdx] = useState<number | null>(null);
