@@ -237,9 +237,12 @@ function getFileType(fileName: string): string {
 }
 
 function formatFileSize(bytes: number): string {
+  if (!bytes || bytes < 0) return "0 B";
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1048576).toFixed(1)} MB`;
+  if (bytes < 1073741824) return `${(bytes / 1048576).toFixed(1)} MB`;
+  if (bytes < 1099511627776) return `${(bytes / 1073741824).toFixed(2)} GB`;
+  return `${(bytes / 1099511627776).toFixed(2)} TB`;
 }
 
 function isImageFile(type: string): boolean {
@@ -1747,7 +1750,7 @@ function MergedSupplierCard({ group, divLogos, catLogos, selected, onToggleSelec
   const n = Math.min(items.length, 4);
   return (
     <div
-      className="flex h-full flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 p-3 gap-3"
+      className="flex h-full flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 gap-3"
       style={{ gridColumn: `span ${n} / span ${n}` }}
     >
       {/* Each catalog = a full single-style card, supplier hidden */}
@@ -3229,7 +3232,7 @@ export default function CatalogsPage() {
           <div className="text-center py-16 border border-dashed border-[var(--border-subtle)] rounded-xl">
             <p className="text-[13px] text-[var(--text-dim)]">{t("cat.noMatch")}</p>
           </div>
-        ) : groupBySupplier ? (
+        ) : (groupBySupplier && viewMode !== "list") ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
             {(() => {
               const items = filtered.slice(0, visibleCount);
