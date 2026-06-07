@@ -54,6 +54,7 @@ const T: Translations = {
   "db.nav.registry":      { en: "Classification", zh: "分类",     ar: "التصنيف" },
   "db.nav.components":    { en: "UI Components",  zh: "界面组件", ar: "مكوّنات الواجهة" },
   "db.search.placeholder": { en: "Search the Visual Library…", zh: "搜索视觉库…", ar: "ابحث في مكتبة الصور…" },
+  "db.search.issues":      { en: "Search issue reports…",     zh: "搜索问题报告…", ar: "ابحث في بلاغات المشاكل…" },
 };
 
 function isOn(pathname: string, key: string): boolean {
@@ -68,6 +69,13 @@ export default function DatabaseHeader({
   const { t } = useTranslation(T);
   const pathname = usePathname() ?? "/database";
   const inVL = VL_PREFIXES.some((p) => isOn(pathname, p));
+  const inIssues = isOn(pathname, "/database/issues");
+  // The header search is context-aware: on Issue Reports it searches issues
+  // (→ ?q=, which the issues app reads), elsewhere it searches the Visual Library.
+  const searchPlaceholder = inIssues
+    ? t("db.search.issues", "Search issue reports…")
+    : t("db.search.placeholder", "Search the Visual Library…");
+  const searchHref = inIssues ? "/database/issues" : "/database/visual-library";
 
   /* Top-level dataset tabs. Active state is forced so the Visual Library tab
      stays lit on every sub-section route (Collections, Classification, …),
@@ -89,8 +97,8 @@ export default function DatabaseHeader({
         meta={meta}
         tabs={topTabs}
         showTabs={showTabs}
-        searchPlaceholder={t("db.search.placeholder", "Search the Visual Library…")}
-        searchHref="/database/visual-library"
+        searchPlaceholder={searchPlaceholder}
+        searchHref={searchHref}
       />
 
       {/* Visual Library sub-sections — a stable second level shown only inside
