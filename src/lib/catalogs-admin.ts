@@ -316,7 +316,10 @@ export async function fetchCatalogContacts(): Promise<
       contact_type: (c.contact_type as string) || "supplier",
       division: (c.division as string) || null,
       category: (c.category as string) || null,
-      photo_url: (c.photo_url as string) || null,
+      // Prefer the company logo; fall back to the contact photo. Suppliers
+      // store their brand logo in logo_url, so the picker list + the saved
+      // catalog card logo both come through here.
+      photo_url: (c.logo_url as string) || (c.photo_url as string) || null,
     }))
     .sort((a, b) => a.display_name.localeCompare(b.display_name));
 }
