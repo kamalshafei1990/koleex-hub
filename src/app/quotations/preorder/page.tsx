@@ -164,7 +164,7 @@ export default function PreorderPage() {
               <table className="w-full border-collapse text-[12.5px] [&_td]:align-middle [&_th]:align-middle [&_th]:border-s [&_th]:border-neutral-200 [&_td]:border-s [&_td]:border-neutral-200 [&_tr>:first-child]:!border-s-0">
                 <thead>
                   <tr className="border-b-2 border-black bg-white text-[10px] font-bold uppercase tracking-wider text-neutral-500">
-                    <th className="w-[40px] px-1 py-2.5 text-center">م</th>
+                    <th className="w-[44px] px-1 py-2.5 text-center">بند</th>
                     <th className="w-[124px] px-2 py-2.5 text-center">صورة</th>
                     <th className="px-3 py-2.5 text-right">الصنف</th>
                     {doc.buyers.map((b, bi) => (
