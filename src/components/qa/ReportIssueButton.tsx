@@ -121,6 +121,15 @@ export default function ReportIssueButton() {
 // are non-serialisable session objects). Cleared on successful submit.
 const DRAFT_KEY = "koleex.qa.report.draft.v1";
 
+/** All common tags a reporter can pick from (they can also type their own). */
+const SUGGESTED_TAGS = [
+  "UI", "UX", "Layout", "Design", "Visual glitch", "Typo", "Translation", "Arabic / RTL",
+  "Mobile", "Desktop", "Performance", "Slow", "Crash", "Error", "Bug", "Data issue",
+  "Calculation", "Login / Auth", "Permissions", "Notification", "Search", "Filter",
+  "Navigation", "Validation", "Sync", "Export", "Import", "Upload", "Print",
+  "Accessibility", "Security", "Enhancement",
+];
+
 function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => void }) {
   const { t } = useTranslation(qaT);
   const [issueType, setIssueType] = useState<IssueType>("bug");
@@ -128,6 +137,16 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   // Priority on the report itself (issue bed8bed6) — the reporter picks how
   // urgent it is; admins can still re-prioritise during triage.
   const [priority, setPriority] = useState<Priority>("normal");
+  // Optional: tags to categorise the issue (suggested set + free-form).
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
+  const addTag = (raw: string) => {
+    const v = raw.trim().replace(/^#/, "").slice(0, 40);
+    if (!v) return;
+    setTags((prev) => (prev.some((x) => x.toLowerCase() === v.toLowerCase()) || prev.length >= 12 ? prev : [...prev, v]));
+    setTagInput("");
+  };
+  const removeTag = (v: string) => setTags((prev) => prev.filter((x) => x !== v));
   // Optional: assign the issue to a teammate right from the report form.
   const [assignedTo, setAssignedTo] = useState("");
   const [assignees, setAssignees] = useState<{ id: string; name: string; avatar_url?: string | null }[]>([]);
@@ -266,12 +285,13 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
       if (!raw) return;
       const d = JSON.parse(raw) as Partial<{
         issueType: IssueType; severity: Severity; priority: Priority; title: string;
-        description: string; expected: string; solution: string; assignedTo: string;
+        description: string; expected: string; solution: string; assignedTo: string; tags: string[];
       }>;
       if (d.issueType) setIssueType(d.issueType);
       if (d.severity) setSeverity(d.severity);
       if (d.priority) setPriority(d.priority);
       if (typeof d.assignedTo === "string") setAssignedTo(d.assignedTo);
+      if (Array.isArray(d.tags)) setTags(d.tags.filter((x): x is string => typeof x === "string"));
       if (typeof d.title === "string") setTitle(d.title);
       if (typeof d.description === "string") setDescription(d.description);
       if (typeof d.expected === "string") setExpected(d.expected);
@@ -282,12 +302,12 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
     const hasContent = Boolean(title || description || expected || solution);
     try {
       if (hasContent) {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify({ issueType, severity, priority, assignedTo, title, description, expected, solution }));
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ issueType, severity, priority, assignedTo, tags, title, description, expected, solution }));
       } else {
         localStorage.removeItem(DRAFT_KEY);
       }
     } catch { /* quota / private mode — ignore */ }
-  }, [issueType, severity, priority, title, description, expected, solution]);
+  }, [issueType, severity, priority, assignedTo, tags, title, description, expected, solution]);
 
   // In-app DOM capture: no OS / browser permission, no share picker. Mobile
   // gets the upload-only flow (advanced area select would fight touch UX).
@@ -489,6 +509,7 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
           severity,
           priority,
           assigned_to: assignedTo || null,
+          tags,
           title: title.trim(),
           description: description.trim() || null,
           expected_result: expected.trim() || null,
@@ -820,6 +841,36 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                     </>
                   );
                 })()}
+              </div>
+
+              {/* Tags — pick from the suggested set or type a custom one. */}
+              <div>
+                <label className={label}>{t("qa.report.tags", "Tags")}</label>
+                {tags.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-1.5">
+                    {tags.map((tg) => (
+                      <span key={tg} className="inline-flex items-center gap-1 rounded-full border border-[var(--border-focus)] bg-[var(--bg-surface-subtle)] px-2.5 py-1 text-[11.5px] font-medium text-[var(--text-primary)]">
+                        <span className="text-[var(--text-dim)]">#</span>{tg}
+                        <button type="button" onClick={() => removeTag(tg)} className="ml-0.5 text-[var(--text-dim)] hover:text-[var(--text-primary)]" aria-label={t("qa.report.removeTag", "Remove tag")}>✕</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <input
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addTag(tagInput); } }}
+                  placeholder={t("qa.report.tagsPlaceholder", "Type a tag and press Enter, or pick below")}
+                  className={field}
+                  maxLength={40}
+                />
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {SUGGESTED_TAGS.filter((s) => !tags.some((t2) => t2.toLowerCase() === s.toLowerCase())).map((s) => (
+                    <button key={s} type="button" onClick={() => addTag(s)} className="rounded-full border border-[var(--border-subtle)] bg-transparent px-2.5 py-1 text-[11.5px] text-[var(--text-secondary)] transition-colors hover:border-[var(--border-focus)] hover:text-[var(--text-primary)]">
+                      + {s}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div>

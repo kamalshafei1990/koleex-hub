@@ -109,6 +109,16 @@ export async function POST(req: Request) {
     }
   }
 
+  // Free-form + suggested tags. Cleaned, de-duped, capped.
+  const tags = Array.isArray(body.tags)
+    ? Array.from(new Set(
+        (body.tags as unknown[])
+          .filter((x): x is string => typeof x === "string")
+          .map((s) => s.trim().slice(0, 40))
+          .filter(Boolean),
+      )).slice(0, 12)
+    : [];
+
   const row = {
     tenant_id: auth.tenant_id,
     reporter_id: auth.account_id,
@@ -159,6 +169,7 @@ export async function POST(req: Request) {
     db_table: clampStr(body.db_table, 80),
     repro_steps: clampStr(body.repro_steps, 6000),
     session_id: clampStr(body.session_id, 80),
+    tags,
   };
 
   const { data, error } = await supabaseServer
@@ -292,8 +303,21 @@ export async function GET(req: Request) {
   if (from) query = query.gte("created_at", from);
   if (to) query = query.lte("created_at", to);
   if (q) {
+    // Smart search across the issue's own fields only (this query is scoped to
+    // qa_issue_reports): title, description, module, page, reporter, route, and
+    // an exact tag match. Escaped for ilike; tag token stripped of separators.
     const s = q.replace(/[%_]/g, "\\$&");
-    query = query.or(`title.ilike.%${s}%,description.ilike.%${s}%`);
+    const tag = q.replace(/[{}\\,]/g, "").trim();
+    const clauses = [
+      `title.ilike.%${s}%`,
+      `description.ilike.%${s}%`,
+      `app_module.ilike.%${s}%`,
+      `page_title.ilike.%${s}%`,
+      `reporter_name.ilike.%${s}%`,
+      `route.ilike.%${s}%`,
+    ];
+    if (tag) clauses.push(`tags.cs.{${tag}}`);
+    query = query.or(clauses.join(","));
   }
 
   const { data, error } = await query;
