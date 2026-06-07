@@ -1858,7 +1858,7 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
         {(catalog.company_name_en || catalog.contact_name) && (
           <div className="flex items-center gap-2 min-w-0">
             {catalog.contact_photo_url && (
-              <img src={catalog.contact_photo_url} alt="" className="h-9 w-9 shrink-0 rounded-lg border border-[var(--border-subtle)] object-contain bg-white p-0.5" />
+              <img src={catalog.contact_photo_url} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
             )}
             <div className="flex min-w-0 flex-col">
               <p className="text-[11px] text-[var(--text-secondary)] truncate">
@@ -2023,7 +2023,7 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
           {(catalog.company_name_en || catalog.contact_name) && (
             <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)] truncate max-w-[240px]">
               {catalog.contact_photo_url && (
-                <img src={catalog.contact_photo_url} alt="" className="h-6 w-6 shrink-0 rounded-md border border-[var(--border-subtle)] object-contain bg-white p-0.5" />
+                <img src={catalog.contact_photo_url} alt="" className="h-6 w-6 shrink-0 rounded-md object-cover" />
               )}
               <span className="truncate">
                 {catalog.company_name_en || catalog.contact_name}
