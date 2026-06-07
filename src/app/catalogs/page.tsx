@@ -1726,7 +1726,7 @@ function DeleteModal({ open, onClose, catalog, onConfirm, deleting }: {
 /* ═══════════════════════════
    ── Catalog Card ──
    ═══════════════════════════ */
-function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, onPreview, onEdit, onDelete, onDownload }: {
+function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, onPreview, onEdit, onDelete, onDownload, hideSupplier = false }: {
   catalog: CatalogEntry;
   divLogos: Record<string, string>;
   catLogos: Record<string, string>;
@@ -1736,6 +1736,7 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
   onEdit: () => void;
   onDelete: () => void;
   onDownload: () => void;
+  hideSupplier?: boolean;
 }) {
   const ft = FILE_TYPE_CONFIG[catalog.file_type] || DEFAULT_FT;
   const Icon = ft.icon;
@@ -1855,7 +1856,7 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
         {catalog.description && (
           <p className="text-[11px] text-[var(--text-secondary)] leading-snug line-clamp-2">{catalog.description}</p>
         )}
-        {(catalog.company_name_en || catalog.contact_name) && (
+        {!hideSupplier && (catalog.company_name_en || catalog.contact_name) && (
           catalog.contact_id ? (
             <Link
               href={`/suppliers/${catalog.contact_id}`}
@@ -1956,7 +1957,7 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
 /* ═══════════════════════════
    ── List Row ──
    ═══════════════════════════ */
-function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onPreview, onEdit, onDelete, onDownload }: {
+function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onPreview, onEdit, onDelete, onDownload, hideSupplier = false }: {
   catalog: CatalogEntry;
   divLogos: Record<string, string>;
   catLogos: Record<string, string>;
@@ -1966,6 +1967,7 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
   onEdit: () => void;
   onDelete: () => void;
   onDownload: () => void;
+  hideSupplier?: boolean;
 }) {
   const ft = FILE_TYPE_CONFIG[catalog.file_type] || DEFAULT_FT;
   const Icon = ft.icon;
@@ -2046,7 +2048,7 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
           {catalog.title_cn && <span className="text-[var(--text-dim)] font-normal"> · {catalog.title_cn}</span>}
         </h3>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-          {(catalog.company_name_en || catalog.contact_name) && (
+          {!hideSupplier && (catalog.company_name_en || catalog.contact_name) && (
             catalog.contact_id ? (
               <Link
                 href={`/suppliers/${catalog.contact_id}`}
@@ -3192,7 +3194,7 @@ export default function CatalogsPage() {
                   {viewMode === "list" ? (
                     <div className="flex flex-col gap-2">
                       {g.items.map(catalog => (
-                        <CatalogRow key={catalog.id} catalog={catalog} divLogos={divLogos} catLogos={catLogos}
+                        <CatalogRow key={catalog.id} catalog={catalog} divLogos={divLogos} catLogos={catLogos} hideSupplier
                           selected={selected.has(catalog.id)} onToggleSelect={() => toggleSelect(catalog.id)}
                           onPreview={() => handlePreview(catalog)}
                           onDownload={() => bumpMetric(catalog.id, "download")}
@@ -3203,7 +3205,7 @@ export default function CatalogsPage() {
                   ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
                       {g.items.map(catalog => (
-                        <CatalogCard key={catalog.id} catalog={catalog} divLogos={divLogos} catLogos={catLogos}
+                        <CatalogCard key={catalog.id} catalog={catalog} divLogos={divLogos} catLogos={catLogos} hideSupplier
                           selected={selected.has(catalog.id)} onToggleSelect={() => toggleSelect(catalog.id)}
                           onPreview={() => handlePreview(catalog)}
                           onDownload={() => bumpMetric(catalog.id, "download")}
