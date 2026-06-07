@@ -116,6 +116,17 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   // Priority on the report itself (issue bed8bed6) — the reporter picks how
   // urgent it is; admins can still re-prioritise during triage.
   const [priority, setPriority] = useState<Priority>("normal");
+  // Optional: assign the issue to a teammate right from the report form.
+  const [assignedTo, setAssignedTo] = useState("");
+  const [assignees, setAssignees] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/qa/assignees", { credentials: "include", cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { assignees: [] }))
+      .then((j) => { if (alive) setAssignees(Array.isArray(j.assignees) ? j.assignees : []); })
+      .catch(() => { /* ignore — assignee picker just stays empty */ });
+    return () => { alive = false; };
+  }, []);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [expected, setExpected] = useState("");
@@ -235,11 +246,12 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
       if (!raw) return;
       const d = JSON.parse(raw) as Partial<{
         issueType: IssueType; severity: Severity; priority: Priority; title: string;
-        description: string; expected: string; solution: string;
+        description: string; expected: string; solution: string; assignedTo: string;
       }>;
       if (d.issueType) setIssueType(d.issueType);
       if (d.severity) setSeverity(d.severity);
       if (d.priority) setPriority(d.priority);
+      if (typeof d.assignedTo === "string") setAssignedTo(d.assignedTo);
       if (typeof d.title === "string") setTitle(d.title);
       if (typeof d.description === "string") setDescription(d.description);
       if (typeof d.expected === "string") setExpected(d.expected);
@@ -250,7 +262,7 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
     const hasContent = Boolean(title || description || expected || solution);
     try {
       if (hasContent) {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify({ issueType, severity, priority, title, description, expected, solution }));
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ issueType, severity, priority, assignedTo, title, description, expected, solution }));
       } else {
         localStorage.removeItem(DRAFT_KEY);
       }
@@ -456,6 +468,7 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
           issue_type: issueType,
           severity,
           priority,
+          assigned_to: assignedTo || null,
           title: title.trim(),
           description: description.trim() || null,
           expected_result: expected.trim() || null,
@@ -756,6 +769,15 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                     {PRIORITIES.map((o) => <option key={o.value} value={o.value}>{t("qa.priority." + o.value, o.label)}</option>)}
                   </select>
                 </div>
+              </div>
+
+              {/* Optional: choose who this issue is assigned to. */}
+              <div>
+                <label className={label}>{t("qa.report.assignedTo", "Assign to")}</label>
+                <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} className={field}>
+                  <option value="">{t("qa.report.assignUnassigned", "Unassigned")}</option>
+                  {assignees.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
               </div>
 
               <div>

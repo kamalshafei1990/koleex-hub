@@ -92,6 +92,23 @@ export async function POST(req: Request) {
   const screenshotPathFinal = screenshotPath ?? (screenshotPathsArr[0] ?? null);
   const screenshotPathsFinal = screenshotPathsArr.length > 0 ? screenshotPathsArr : null;
 
+  // Optional assignee chosen by the reporter. Validated against a real, active
+  // account in this tenant so a bad id can't 500 the insert or leak cross-tenant.
+  let assigneeId: string | null = null;
+  let assigneeName: string | null = null;
+  if (typeof body.assigned_to === "string" && body.assigned_to) {
+    const { data: acct } = await supabaseServer
+      .from("accounts")
+      .select("id, username, login_email")
+      .eq("tenant_id", auth.tenant_id)
+      .eq("id", body.assigned_to)
+      .maybeSingle();
+    if (acct) {
+      assigneeId = acct.id as string;
+      assigneeName = (acct.username as string | null) || (acct.login_email as string | null) || null;
+    }
+  }
+
   const row = {
     tenant_id: auth.tenant_id,
     reporter_id: auth.account_id,
@@ -107,6 +124,7 @@ export async function POST(req: Request) {
     description: clampStr(body.description, 6000),
     expected_result: clampStr(body.expected_result, 4000),
     suggested_solution: clampStr(body.suggested_solution, 4000),
+    assigned_to: assigneeId,
     screenshot_url: screenshotPathFinal,
     screenshot_urls: screenshotPathsFinal,
     browser_info: clampStr(body.browser_info, 400),
@@ -163,6 +181,18 @@ export async function POST(req: Request) {
     new_value: title,
   });
 
+  // If the reporter assigned it on creation, record that on the timeline too.
+  if (assigneeId) {
+    await logActivity({
+      tenant_id: auth.tenant_id,
+      issue_id: data.id,
+      actor_id: auth.account_id,
+      actor_name: auth.username ?? null,
+      activity_type: "assigned",
+      new_value: assigneeName,
+    });
+  }
+
   // Auto-add the reporter as a watcher so they receive every update on
   // their own issue without having to opt in. Best-effort — a duplicate
   // (already-watching) error is silently swallowed by the unique index.
@@ -191,13 +221,26 @@ export async function POST(req: Request) {
     const messageBody = `${reporter} filed "${title}" on ${moduleLabel}${route ? ` (${route})` : ""}.`;
     await notifyIssue(
       { tenantId: auth.tenant_id, issueId: data.id, actorId: auth.account_id, actorName: auth.username ?? null },
-      (admins ?? []).map((a) => ({
-        recipientId: a.id,
-        type: "qa_issue_assigned" as const,   // closest existing type; UI surfaces it as a task chip
-        title: subject,
-        body: messageBody,
-        link: issueLink(data.id),
-      })),
+      [
+        // The chosen assignee gets a direct, alerting "assigned to you" first.
+        ...(assigneeId
+          ? [{
+              recipientId: assigneeId,
+              type: "qa_issue_assigned" as const,
+              title: `Assigned to you: ${title}`,
+              body: `${reporter} assigned you "${title}" on ${moduleLabel}.`,
+              link: issueLink(data.id),
+              alert: true,
+            }]
+          : []),
+        ...(admins ?? []).map((a) => ({
+          recipientId: a.id,
+          type: "qa_issue_assigned" as const,   // closest existing type; UI surfaces it as a task chip
+          title: subject,
+          body: messageBody,
+          link: issueLink(data.id),
+        })),
+      ],
     );
   } catch (e) {
     console.error("[api/qa/reports POST notify]", e instanceof Error ? e.message : String(e));
