@@ -1797,9 +1797,18 @@ export default function Quotations() {
             icon={<QuotationIcon size={16} />}
             showTabs={false}
             action={
-              <Button onClick={handleNew} icon={<PlusIcon size={12} />}>
-                {t("quot.new")}
-              </Button>
+              <div className="flex items-center gap-2">
+                <a
+                  href="/quotations/preorder"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] font-medium text-[var(--text-secondary)] transition-colors hover:border-[var(--border-focus)] hover:text-[var(--text-primary)]"
+                  title="Preorder — customer price request / طلب مُسبق"
+                >
+                  Preorder
+                </a>
+                <Button onClick={handleNew} icon={<PlusIcon size={12} />}>
+                  {t("quot.new")}
+                </Button>
+              </div>
             }
           />
         </div>
