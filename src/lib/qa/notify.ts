@@ -105,6 +105,22 @@ export async function notifyIssue(ctx: NotifyContext, targets: NotifyTarget[]): 
     },
   }));
 
+  // Thread per issue: collapse repeated updates into ONE notification per
+  // recipient per issue instead of piling up a new row for every change. We
+  // clear any still-UNREAD QA notification for this issue (any qa_type) for
+  // these recipients, then insert the fresh one — so the inbox shows a single,
+  // latest entry per issue. Read notifications are left untouched (history).
+  const recipientIds = Array.from(byRecipient.keys());
+  const { error: delErr } = await supabaseServer
+    .from("inbox_messages")
+    .delete()
+    .eq("tenant_id", ctx.tenantId)
+    .in("recipient_account_id", recipientIds)
+    .is("read_at", null)
+    .eq("metadata->>entity_type", "qa_issue")
+    .eq("metadata->>entity_id", ctx.issueId);
+  if (delErr) console.error("[qa notify] collapse", delErr.message);
+
   const { error } = await supabaseServer.from("inbox_messages").insert(rows);
   if (error) console.error("[qa notify]", error.message);
 }
