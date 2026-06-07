@@ -259,6 +259,28 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: "Not found." }, { status: 404 });
 
+  // Mirror a new/changed resolution into the discussion thread so it reads as a
+  // conversation entry (preserved in order) instead of only overwriting the
+  // box at the top of the issue. Only fires when it genuinely changed to a
+  // non-empty value, so repeated saves don't spam the thread.
+  if ("resolution_summary" in body) {
+    const nextRes = typeof body.resolution_summary === "string" ? body.resolution_summary.trim() : "";
+    const prevRes = ((cur.resolution_summary as string | null) ?? "").trim();
+    if (nextRes && nextRes !== prevRes) {
+      const { error: cErr } = await supabaseServer.from("qa_issue_comments").insert({
+        tenant_id: auth.tenant_id,
+        issue_id: id,
+        user_id: auth.account_id,
+        user_name: auth.username ?? null,
+        user_role: "developer",
+        message: nextRes,
+        is_internal_note: false,
+        attachments: [],
+      });
+      if (cErr) console.error("[api/qa reports PATCH resolution-comment]", cErr.message);
+    }
+  }
+
   // Mirror the changes into the timeline (best-effort).
   if (activities.length > 0) {
     await logActivity(
