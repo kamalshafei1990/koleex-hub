@@ -164,6 +164,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
   const [fAssignee, setFAssignee] = useState("");
   const [fReporter, setFReporter] = useState("");
   const [q, setQ] = useState("");
+  const [searchFocus, setSearchFocus] = useState(false);
   const [sortPriority, setSortPriority] = useState(false);
 
   // Selection set for bulk operations. Stable Set so we don't reallocate
@@ -567,7 +568,57 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
 
       {/* Filters */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <input data-qa-search value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("qa.filter.search", "Search title / description…  ( / )")} className="h-9 min-w-[180px] flex-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]" />
+        <div className="relative min-w-[200px] flex-1">
+          <input
+            data-qa-search
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onFocus={() => setSearchFocus(true)}
+            onBlur={() => setTimeout(() => setSearchFocus(false), 150)}
+            onKeyDown={(e) => { if (e.key === "Escape") setSearchFocus(false); }}
+            placeholder={t("qa.filter.search", "Search issues — title, tag, module, reporter…  ( / )")}
+            className="h-9 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
+          />
+          {(() => {
+            const term = q.trim().toLowerCase();
+            if (!searchFocus || term.length < 1) return null;
+            const seen = new Set<string>();
+            const out: { kind: string; value: string }[] = [];
+            const add = (kind: string, value?: string | null) => {
+              if (!value) return;
+              if (!value.toLowerCase().includes(term)) return;
+              const k = kind + ":" + value.toLowerCase();
+              if (seen.has(k)) return;
+              seen.add(k);
+              out.push({ kind, value });
+            };
+            for (const r of reports as unknown as Array<Record<string, unknown>>) {
+              add("Title", r.title as string);
+              add("Module", r.app_module as string);
+              add("Reporter", r.reporter_name as string);
+              const tg = r.tags;
+              if (Array.isArray(tg)) tg.forEach((x) => add("Tag", String(x)));
+              if (out.length > 40) break;
+            }
+            const top = out.slice(0, 8);
+            if (top.length === 0) return null;
+            return (
+              <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] py-1 shadow-xl">
+                {top.map((s) => (
+                  <button
+                    key={s.kind + s.value}
+                    type="button"
+                    onMouseDown={(e) => { e.preventDefault(); setQ(s.value); setSearchFocus(false); }}
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
+                  >
+                    <span className="shrink-0 rounded border border-[var(--border-subtle)] px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">{s.kind}</span>
+                    <span className="truncate">{s.value}</span>
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
         <select value={fModule} onChange={(e) => setFModule(e.target.value)} className={selectCls}>
           <option value="">{t("qa.filter.allModules", "All modules")}</option>
           {modules.map((m) => <option key={m} value={m}>{m}</option>)}

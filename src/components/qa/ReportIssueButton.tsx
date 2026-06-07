@@ -121,13 +121,18 @@ export default function ReportIssueButton() {
 // are non-serialisable session objects). Cleared on successful submit.
 const DRAFT_KEY = "koleex.qa.report.draft.v1";
 
-/** All common tags a reporter can pick from (they can also type their own). */
-const SUGGESTED_TAGS = [
-  "UI", "UX", "Layout", "Design", "Visual glitch", "Typo", "Translation", "Arabic / RTL",
-  "Mobile", "Desktop", "Performance", "Slow", "Crash", "Error", "Bug", "Data issue",
-  "Calculation", "Login / Auth", "Permissions", "Notification", "Search", "Filter",
-  "Navigation", "Validation", "Sync", "Export", "Import", "Upload", "Print",
-  "Accessibility", "Security", "Enhancement",
+/** Common tags a reporter can pick from, grouped by theme (they can also type
+ *  their own). Keep groups short and scannable. */
+const TAG_GROUPS: { label: string; tags: string[] }[] = [
+  { label: "Type", tags: ["Bug", "Crash", "Error", "Freeze", "Regression", "Enhancement", "Suggestion", "Question", "Not working"] },
+  { label: "Look & feel", tags: ["UI", "UX", "Layout", "Design", "Visual glitch", "Alignment", "Color / contrast", "Dark mode", "Responsive"] },
+  { label: "Content", tags: ["Content", "Typo", "Wrong text", "Translation", "Arabic / RTL", "Missing label"] },
+  { label: "Function", tags: ["Login / Auth", "Permissions", "Search", "Filter", "Sort", "Navigation", "Buttons", "Form", "Dropdown", "Validation", "Notification", "Calculation"] },
+  { label: "Data", tags: ["Data issue", "Missing data", "Wrong data", "Duplicate", "Sync", "Not saving"] },
+  { label: "Files", tags: ["Upload", "Download", "Export", "Import", "Print", "Image", "PDF"] },
+  { label: "Platform", tags: ["Mobile", "Desktop", "Tablet", "Browser"] },
+  { label: "Quality", tags: ["Performance", "Slow", "Loading", "Accessibility", "Security"] },
+  { label: "Module", tags: ["Finance", "Inventory", "Sales", "Purchase", "HR", "CRM", "Products", "Suppliers", "Catalogs", "Quotations", "Invoices"] },
 ];
 
 function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => void }) {
@@ -864,12 +869,27 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                   className={field}
                   maxLength={40}
                 />
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {SUGGESTED_TAGS.filter((s) => !tags.some((t2) => t2.toLowerCase() === s.toLowerCase())).map((s) => (
-                    <button key={s} type="button" onClick={() => addTag(s)} className="rounded-full border border-[var(--border-subtle)] bg-transparent px-2.5 py-1 text-[11.5px] text-[var(--text-secondary)] transition-colors hover:border-[var(--border-focus)] hover:text-[var(--text-primary)]">
-                      + {s}
-                    </button>
-                  ))}
+                <div className="mt-2 space-y-2">
+                  {TAG_GROUPS.map((g) => {
+                    const f = tagInput.trim().toLowerCase();
+                    const avail = g.tags.filter((s) =>
+                      !tags.some((t2) => t2.toLowerCase() === s.toLowerCase()) &&
+                      (!f || s.toLowerCase().includes(f)),
+                    );
+                    if (avail.length === 0) return null;
+                    return (
+                      <div key={g.label}>
+                        <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">{g.label}</div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {avail.map((s) => (
+                            <button key={s} type="button" onClick={() => addTag(s)} className="rounded-full border border-[var(--border-subtle)] bg-transparent px-2.5 py-1 text-[11.5px] text-[var(--text-secondary)] transition-colors hover:border-[var(--border-focus)] hover:text-[var(--text-primary)]">
+                              + {s}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
