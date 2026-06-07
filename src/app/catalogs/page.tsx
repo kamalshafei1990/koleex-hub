@@ -3183,8 +3183,9 @@ export default function CatalogsPage() {
                 groups[i].items.push(c);
               }
               return groups.map((g) => {
-                // Single catalog → normal card. Multiple → one WIDER merged card
-                // for that supplier holding all its catalogs.
+                // Single catalog → normal card. Multiple → a same-height group
+                // spanning two columns, each catalog shown as a normal card with
+                // the supplier in its usual position (under the Chinese name).
                 if (g.items.length === 1) {
                   const catalog = g.items[0];
                   return (
@@ -3196,36 +3197,16 @@ export default function CatalogsPage() {
                       onDelete={() => setDeleteModal({ open: true, catalog })} />
                   );
                 }
-                const Header = (
-                  <>
-                    {g.logo
-                      ? <img src={g.logo} alt="" className="h-8 w-8 shrink-0 rounded-lg object-cover" />
-                      : <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]"><Building2Icon className="h-4 w-4 text-[var(--text-dim)]" /></span>}
-                    <div className="min-w-0">
-                      <p className="truncate text-[13px] font-bold text-[var(--text-primary)]">{g.name}</p>
-                      {g.nameCn && <p className="truncate text-[10.5px] text-[var(--text-dim)]">{g.nameCn}</p>}
-                    </div>
-                    <span className="ms-auto shrink-0 rounded-full bg-[var(--bg-surface)] px-2 py-0.5 text-[11px] font-semibold text-[var(--text-dim)]">{g.items.length} {t("cat.catalogsWord", "catalogs")}</span>
-                  </>
-                );
                 return (
-                  <div key={g.key} className="col-span-2 flex flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/30 p-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      {g.items.map(catalog => (
-                        <CatalogCard key={catalog.id} catalog={catalog} divLogos={divLogos} catLogos={catLogos} hideSupplier
-                          selected={selected.has(catalog.id)} onToggleSelect={() => toggleSelect(catalog.id)}
-                          onPreview={() => handlePreview(catalog)}
-                          onDownload={() => bumpMetric(catalog.id, "download")}
-                          onEdit={() => setUploadModal({ open: true, editEntry: catalog })}
-                          onDelete={() => setDeleteModal({ open: true, catalog })} />
-                      ))}
-                    </div>
-                    {/* Supplier identity below the catalogs */}
-                    {g.contactId ? (
-                      <Link href={`/suppliers/${g.contactId}`} className="mt-3 flex items-center gap-2 rounded-lg -mx-1 px-1 py-1 hover:bg-[var(--bg-surface-hover)] transition-colors border-t border-[var(--border-subtle)] pt-3">{Header}</Link>
-                    ) : (
-                      <div className="mt-3 flex items-center gap-2 px-1 py-1 border-t border-[var(--border-subtle)] pt-3">{Header}</div>
-                    )}
+                  <div key={g.key} className="col-span-2 grid grid-cols-2 gap-3 items-start">
+                    {g.items.map(catalog => (
+                      <CatalogCard key={catalog.id} catalog={catalog} divLogos={divLogos} catLogos={catLogos}
+                        selected={selected.has(catalog.id)} onToggleSelect={() => toggleSelect(catalog.id)}
+                        onPreview={() => handlePreview(catalog)}
+                        onDownload={() => bumpMetric(catalog.id, "download")}
+                        onEdit={() => setUploadModal({ open: true, editEntry: catalog })}
+                        onDelete={() => setDeleteModal({ open: true, catalog })} />
+                    ))}
                   </div>
                 );
               });
