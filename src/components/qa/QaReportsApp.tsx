@@ -568,7 +568,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
 
       {/* Filters */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[200px] flex-1">
+        <div className="relative w-full sm:w-80">
           <input
             data-qa-search
             value={q}
@@ -603,7 +603,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
             const top = out.slice(0, 8);
             if (top.length === 0) return null;
             return (
-              <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] py-1 shadow-xl">
+              <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] py-1 shadow-xl">
                 {top.map((s) => (
                   <button
                     key={s.kind + s.value}

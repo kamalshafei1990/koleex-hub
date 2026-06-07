@@ -307,17 +307,14 @@ export async function GET(req: Request) {
     // qa_issue_reports): title, description, module, page, reporter, route, and
     // an exact tag match. Escaped for ilike; tag token stripped of separators.
     const s = q.replace(/[%_]/g, "\\$&");
-    const tag = q.replace(/[{}\\,]/g, "").trim();
-    const clauses = [
+    query = query.or([
       `title.ilike.%${s}%`,
       `description.ilike.%${s}%`,
       `app_module.ilike.%${s}%`,
       `page_title.ilike.%${s}%`,
       `reporter_name.ilike.%${s}%`,
       `route.ilike.%${s}%`,
-    ];
-    if (tag) clauses.push(`tags.cs.{${tag}}`);
-    query = query.or(clauses.join(","));
+    ].join(","));
   }
 
   const { data, error } = await query;
