@@ -165,9 +165,9 @@ export default function PreorderPage() {
                     {doc.buyers.map((b, bi) => (
                       <th key={bi} className="w-[58px] px-1 py-2.5 text-center font-bold normal-case" style={{ color: BUYER_COLORS[bi] }}>{b}</th>
                     ))}
-                    <th className="w-[62px] px-1 py-2.5 text-center">الكمية</th>
+                    <th className="w-[62px] border-s-2 border-neutral-300 bg-neutral-100 px-1 py-2.5 text-center text-black">الكمية</th>
                     <th className="w-[112px] border-x-2 border-neutral-300 bg-neutral-100 px-2 py-2.5 text-center text-black">السعر</th>
-                    <th className="w-[116px] px-2 py-2.5 text-center">الإجمالي</th>
+                    <th className="w-[116px] border-e-2 border-neutral-300 bg-neutral-100 px-2 py-2.5 text-center text-black">الإجمالي</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -221,8 +221,8 @@ export default function PreorderPage() {
                             />
                           </td>
                         ))}
-                        {/* Total qty */}
-                        <td className="px-1 py-2.5 text-center text-[14px] font-extrabold tabular-nums">{qty || "—"}</td>
+                        {/* Total qty (special) */}
+                        <td className="border-s-2 border-neutral-200 bg-neutral-50 px-1 py-2.5 text-center text-[14px] font-extrabold tabular-nums">{qty || "—"}</td>
                         {/* Price (special column) */}
                         <td className="border-x-2 border-neutral-200 bg-neutral-50 px-1.5 py-2.5 text-center">
                           <input
@@ -233,8 +233,8 @@ export default function PreorderPage() {
                             className="w-full rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-center text-[13px] font-bold tabular-nums text-black outline-none focus:border-black print:border-0 print:bg-transparent"
                           />
                         </td>
-                        {/* Line total */}
-                        <td className="px-2 py-2.5 text-center text-[13px] font-bold tabular-nums">{money(line)}</td>
+                        {/* Line total (special) */}
+                        <td className="border-e-2 border-neutral-200 bg-neutral-50 px-2 py-2.5 text-center text-[13px] font-bold tabular-nums">{money(line)}</td>
                       </tr>
                     );
                   })}
