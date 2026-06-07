@@ -753,6 +753,13 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
               <a
                 key={n.id}
                 href={`#${n.target}`}
+                onClick={(e) => {
+                  // The Hub scrolls inside .shell-content-offset, not the window,
+                  // so plain #anchor jumps don't move. scrollIntoView walks to the
+                  // real scroll container and scrolls smoothly to the section.
+                  const el = typeof document !== "undefined" ? document.getElementById(n.target) : null;
+                  if (el) { e.preventDefault(); el.scrollIntoView({ behavior: "smooth", block: "start" }); }
+                }}
                 aria-current={active ? "true" : undefined}
                 className={`group/nav shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-medium transition-colors ${
                   active

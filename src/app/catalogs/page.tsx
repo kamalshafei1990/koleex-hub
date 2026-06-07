@@ -2554,7 +2554,7 @@ export default function CatalogsPage() {
   // Group-by-supplier (Option A): collapse the flat grid into per-supplier
   // sections so "this supplier has N catalogs" is obvious. Composes with the
   // grid/list view inside each section.
-  const [groupBySupplier, setGroupBySupplier] = useState(false);
+  const [groupBySupplier, setGroupBySupplier] = useState(true);
 
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
@@ -3170,40 +3170,52 @@ export default function CatalogsPage() {
             <p className="text-[13px] text-[var(--text-dim)]">{t("cat.noMatch")}</p>
           </div>
         ) : groupBySupplier ? (
-          <div className="flex flex-col gap-7">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5 items-start">
             {(() => {
               const items = filtered.slice(0, visibleCount);
-              const groups: { key: string; name: string; logo: string | null; items: CatalogEntry[] }[] = [];
+              const groups: { key: string; name: string; nameCn: string | null; logo: string | null; contactId: string | null; items: CatalogEntry[] }[] = [];
               const idx = new Map<string, number>();
               for (const c of items) {
                 const key = c.contact_id || c.company_name_en || c.contact_name || "__none";
                 const name = c.company_name_en || c.contact_name || t("cat.noSupplier", "No supplier");
                 let i = idx.get(key);
-                if (i === undefined) { i = groups.length; idx.set(key, i); groups.push({ key, name, logo: c.contact_photo_url ?? null, items: [] }); }
+                if (i === undefined) { i = groups.length; idx.set(key, i); groups.push({ key, name, nameCn: c.company_name_cn ?? null, logo: c.contact_photo_url ?? null, contactId: c.contact_id ?? null, items: [] }); }
                 groups[i].items.push(c);
               }
-              return groups.map((g) => (
-                <section key={g.key}>
-                  <div className="mb-3 flex items-center gap-2 border-b border-[var(--border-subtle)] pb-2">
+              return groups.map((g) => {
+                // Single catalog → normal card. Multiple → one WIDER merged card
+                // for that supplier holding all its catalogs.
+                if (g.items.length === 1) {
+                  const catalog = g.items[0];
+                  return (
+                    <CatalogCard key={catalog.id} catalog={catalog} divLogos={divLogos} catLogos={catLogos}
+                      selected={selected.has(catalog.id)} onToggleSelect={() => toggleSelect(catalog.id)}
+                      onPreview={() => handlePreview(catalog)}
+                      onDownload={() => bumpMetric(catalog.id, "download")}
+                      onEdit={() => setUploadModal({ open: true, editEntry: catalog })}
+                      onDelete={() => setDeleteModal({ open: true, catalog })} />
+                  );
+                }
+                const Header = (
+                  <>
                     {g.logo
-                      ? <img src={g.logo} alt="" className="h-7 w-7 shrink-0 rounded-md object-cover" />
-                      : <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)]"><Building2Icon className="h-3.5 w-3.5 text-[var(--text-dim)]" /></span>}
-                    <h3 className="truncate text-[14px] font-bold text-[var(--text-primary)]">{g.name}</h3>
-                    <span className="rounded-full bg-[var(--bg-surface)] px-1.5 py-0.5 text-[11px] font-semibold text-[var(--text-dim)]">{g.items.length}</span>
-                  </div>
-                  {viewMode === "list" ? (
-                    <div className="flex flex-col gap-2">
-                      {g.items.map(catalog => (
-                        <CatalogRow key={catalog.id} catalog={catalog} divLogos={divLogos} catLogos={catLogos} hideSupplier
-                          selected={selected.has(catalog.id)} onToggleSelect={() => toggleSelect(catalog.id)}
-                          onPreview={() => handlePreview(catalog)}
-                          onDownload={() => bumpMetric(catalog.id, "download")}
-                          onEdit={() => setUploadModal({ open: true, editEntry: catalog })}
-                          onDelete={() => setDeleteModal({ open: true, catalog })} />
-                      ))}
+                      ? <img src={g.logo} alt="" className="h-8 w-8 shrink-0 rounded-lg object-cover" />
+                      : <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]"><Building2Icon className="h-4 w-4 text-[var(--text-dim)]" /></span>}
+                    <div className="min-w-0">
+                      <p className="truncate text-[13px] font-bold text-[var(--text-primary)]">{g.name}</p>
+                      {g.nameCn && <p className="truncate text-[10.5px] text-[var(--text-dim)]">{g.nameCn}</p>}
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
+                    <span className="ms-auto shrink-0 rounded-full bg-[var(--bg-surface)] px-2 py-0.5 text-[11px] font-semibold text-[var(--text-dim)]">{g.items.length} {t("cat.catalogsWord", "catalogs")}</span>
+                  </>
+                );
+                return (
+                  <div key={g.key} className="col-span-2 flex flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/30 p-3">
+                    {g.contactId ? (
+                      <Link href={`/suppliers/${g.contactId}`} className="mb-3 flex items-center gap-2 rounded-lg -mx-1 px-1 py-1 hover:bg-[var(--bg-surface-hover)] transition-colors">{Header}</Link>
+                    ) : (
+                      <div className="mb-3 flex items-center gap-2 px-1 py-1">{Header}</div>
+                    )}
+                    <div className="grid grid-cols-2 gap-3">
                       {g.items.map(catalog => (
                         <CatalogCard key={catalog.id} catalog={catalog} divLogos={divLogos} catLogos={catLogos} hideSupplier
                           selected={selected.has(catalog.id)} onToggleSelect={() => toggleSelect(catalog.id)}
@@ -3213,9 +3225,9 @@ export default function CatalogsPage() {
                           onDelete={() => setDeleteModal({ open: true, catalog })} />
                       ))}
                     </div>
-                  )}
-                </section>
-              ));
+                  </div>
+                );
+              });
             })()}
           </div>
         ) : viewMode === "grid" ? (
