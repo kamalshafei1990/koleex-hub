@@ -181,7 +181,7 @@ export default function PreorderPage() {
                     const line = qty * it.price;
                     const fkey = `${si}-${ii}`;
                     return (
-                      <tr key={ii} className="pre-row align-middle">
+                      <tr key={ii} className="pre-row align-middle border-b border-neutral-200 last:border-b-0">
                         {/* No. (running, 1,2,3…) */}
                         <td className="px-1 py-2.5 text-center text-[12.5px] font-bold tabular-nums text-neutral-500">
                           {doc.sections.slice(0, si).reduce((a, s) => a + s.items.length, 0) + ii + 1}
