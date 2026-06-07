@@ -113,7 +113,7 @@ export default function PreorderPage() {
           <header dir="ltr" className="flex flex-wrap items-center justify-between gap-6 rounded-2xl border border-neutral-200 bg-neutral-50 px-6 py-5">
             <div>
               <KoleexLogo className="h-7 w-auto text-black" />
-              <div className="mt-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-neutral-400">Smart Sewing Equipment</div>
+              <div className="mt-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-neutral-400">Koleex International Group</div>
             </div>
             <div className="text-right">
               <div className="text-[30px] font-black leading-none tracking-tight">PREORDER</div>
