@@ -30,6 +30,9 @@ export interface CatalogEntry {
   company_name_en: string | null;
   company_name_cn: string | null;
   contact_type: string | null;
+  // Supplier logo/photo, denormalised at save so the card can show it beside
+  // the supplier name without a separate contacts lookup.
+  contact_photo_url?: string | null;
   division_slug: string | null;
   division_name: string | null;
   category_slug: string | null;

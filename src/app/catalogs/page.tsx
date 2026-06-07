@@ -1176,6 +1176,7 @@ function CatalogModal({
             contact_id: contactId || null, contact_name: contact?.display_name || null,
             company_name_en: contact?.company_name_en || null, company_name_cn: contact?.company_name_cn || null,
             contact_type: contact?.contact_type || null,
+            contact_photo_url: contact?.photo_url || null,
             division_slug: divisionSlug || null, division_name: div?.name || null,
             category_slug: categorySlug || null, category_name: cat?.name || null,
             category_slugs: catSlugsField, category_names: catNamesField,
@@ -1247,6 +1248,7 @@ function CatalogModal({
             company_name_en: contact?.company_name_en || null,
             company_name_cn: contact?.company_name_cn || null,
             contact_type: contact?.contact_type || null,
+            contact_photo_url: contact?.photo_url || null,
             division_slug: divisionSlug || null,
             division_name: div?.name || null,
             category_slug: categorySlug || null,
@@ -1303,6 +1305,7 @@ function CatalogModal({
             company_name_en: contact?.company_name_en || null,
             company_name_cn: contact?.company_name_cn || null,
             contact_type: contact?.contact_type || null,
+            contact_photo_url: contact?.photo_url || null,
             division_slug: divisionSlug || null,
             division_name: div?.name || null,
             category_slug: categorySlug || null,
@@ -1853,13 +1856,18 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
           <p className="text-[11px] text-[var(--text-secondary)] leading-snug line-clamp-2">{catalog.description}</p>
         )}
         {(catalog.company_name_en || catalog.contact_name) && (
-          <div className="flex flex-col">
-            <p className="text-[11px] text-[var(--text-secondary)] truncate">
-              {catalog.company_name_en || catalog.contact_name}
-            </p>
-            {catalog.company_name_cn && (
-              <p className="text-[11px] text-[var(--text-dim)] truncate">{catalog.company_name_cn}</p>
+          <div className="flex items-center gap-1.5 min-w-0">
+            {catalog.contact_photo_url && (
+              <img src={catalog.contact_photo_url} alt="" className="h-5 w-5 shrink-0 rounded-full border border-[var(--border-subtle)] object-cover bg-[var(--bg-surface)]" />
             )}
+            <div className="flex min-w-0 flex-col">
+              <p className="text-[11px] text-[var(--text-secondary)] truncate">
+                {catalog.company_name_en || catalog.contact_name}
+              </p>
+              {catalog.company_name_cn && (
+                <p className="text-[11px] text-[var(--text-dim)] truncate">{catalog.company_name_cn}</p>
+              )}
+            </div>
           </div>
         )}
 
@@ -2013,9 +2021,14 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
         </h3>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           {(catalog.company_name_en || catalog.contact_name) && (
-            <span className="text-[11px] text-[var(--text-secondary)] truncate max-w-[200px]">
-              {catalog.company_name_en || catalog.contact_name}
-              {catalog.company_name_cn && <span className="text-[var(--text-dim)]"> ({catalog.company_name_cn})</span>}
+            <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)] truncate max-w-[220px]">
+              {catalog.contact_photo_url && (
+                <img src={catalog.contact_photo_url} alt="" className="h-4 w-4 shrink-0 rounded-full border border-[var(--border-subtle)] object-cover bg-[var(--bg-surface)]" />
+              )}
+              <span className="truncate">
+                {catalog.company_name_en || catalog.contact_name}
+                {catalog.company_name_cn && <span className="text-[var(--text-dim)]"> ({catalog.company_name_cn})</span>}
+              </span>
             </span>
           )}
           {catalog.division_name && catalog.division_slug && (

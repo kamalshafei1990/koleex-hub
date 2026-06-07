@@ -17,7 +17,7 @@ import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
    created_by, timestamps) is owned by the server. */
 const WRITABLE = [
   "title", "title_cn", "description",
-  "contact_id", "contact_name", "company_name_en", "company_name_cn", "contact_type",
+  "contact_id", "contact_name", "company_name_en", "company_name_cn", "contact_type", "contact_photo_url",
   "division_slug", "division_name", "category_slug", "category_name",
   "category_slugs", "category_names",
   "file_name", "file_path", "file_url", "file_type", "file_size",
