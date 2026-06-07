@@ -68,6 +68,18 @@ const OK_TYPES = ["image/png", "image/jpeg", "image/webp"];
 /** Cap a single report's attachments to a sane number. Same limit on the API. */
 const MAX_SHOTS = 6;
 
+/** Small round avatar (photo or initial) for the assignee picker. */
+function AssigneeAvatar({ a }: { a: { name: string; avatar_url?: string | null } }) {
+  return a.avatar_url ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={a.avatar_url} alt="" className="h-6 w-6 shrink-0 rounded-full object-cover" />
+  ) : (
+    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[var(--bg-surface-bright)] text-[10px] font-bold text-[var(--text-secondary)]">
+      {(a.name || "?").slice(0, 1).toUpperCase()}
+    </span>
+  );
+}
+
 export default function ReportIssueButton() {
   const { t } = useTranslation(qaT);
   const pathname = usePathname() ?? "/";
@@ -118,7 +130,9 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   const [priority, setPriority] = useState<Priority>("normal");
   // Optional: assign the issue to a teammate right from the report form.
   const [assignedTo, setAssignedTo] = useState("");
-  const [assignees, setAssignees] = useState<{ id: string; name: string }[]>([]);
+  const [assignees, setAssignees] = useState<{ id: string; name: string; avatar_url?: string | null }[]>([]);
+  const [assigneeOpen, setAssigneeOpen] = useState(false);
+  const assigneeRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     let alive = true;
     fetch("/api/qa/assignees", { credentials: "include", cache: "no-store" })
@@ -127,6 +141,12 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
       .catch(() => { /* ignore — assignee picker just stays empty */ });
     return () => { alive = false; };
   }, []);
+  useEffect(() => {
+    if (!assigneeOpen) return;
+    const h = (e: MouseEvent) => { if (assigneeRef.current && !assigneeRef.current.contains(e.target as Node)) setAssigneeOpen(false); };
+    window.addEventListener("mousedown", h);
+    return () => window.removeEventListener("mousedown", h);
+  }, [assigneeOpen]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [expected, setExpected] = useState("");
@@ -771,13 +791,35 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                 </div>
               </div>
 
-              {/* Optional: choose who this issue is assigned to. */}
-              <div>
+              {/* Optional: choose who this issue is assigned to — with avatars. */}
+              <div ref={assigneeRef} className="relative">
                 <label className={label}>{t("qa.report.assignedTo", "Assign to")}</label>
-                <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} className={field}>
-                  <option value="">{t("qa.report.assignUnassigned", "Unassigned")}</option>
-                  {assignees.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                </select>
+                {(() => {
+                  const sel = assignees.find((a) => a.id === assignedTo) || null;
+                  return (
+                    <>
+                      <button type="button" onClick={() => setAssigneeOpen((v) => !v)} className={`${field} flex items-center gap-2 text-left`}>
+                        {sel ? <AssigneeAvatar a={sel} /> : <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-[var(--border-color)] text-[11px] text-[var(--text-dim)]">—</span>}
+                        <span className="flex-1 truncate">{sel ? sel.name : t("qa.report.assignUnassigned", "Unassigned")}</span>
+                        <span className="text-[10px] text-[var(--text-dim)]">▾</span>
+                      </button>
+                      {assigneeOpen && (
+                        <div className="absolute left-0 right-0 z-30 mt-1 max-h-60 overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+                          <button type="button" onClick={() => { setAssignedTo(""); setAssigneeOpen(false); }} className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-[var(--bg-surface-subtle)]">
+                            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-[var(--border-color)] text-[11px] text-[var(--text-dim)]">—</span>
+                            <span className="text-[13px] text-[var(--text-secondary)]">{t("qa.report.assignUnassigned", "Unassigned")}</span>
+                          </button>
+                          {assignees.map((a) => (
+                            <button key={a.id} type="button" onClick={() => { setAssignedTo(a.id); setAssigneeOpen(false); }} className={`flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-[var(--bg-surface-subtle)] ${a.id === assignedTo ? "bg-[var(--bg-surface-subtle)]" : ""}`}>
+                              <AssigneeAvatar a={a} />
+                              <span className="truncate text-[13px] text-[var(--text-primary)]">{a.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
 
               <div>
