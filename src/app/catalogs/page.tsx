@@ -1742,10 +1742,16 @@ function MergedSupplierCard({ group, divLogos, catLogos, selected, onToggleSelec
 }) {
   const { t } = useTranslation(T);
   const items = group.items;
+  // Grow WIDER, not taller: the card spans one grid column per catalog (capped
+  // at 4 so it never eats the whole row), and the catalogs sit side-by-side.
+  const n = Math.min(items.length, 4);
   return (
-    <div className="col-span-2 flex h-full flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 p-3 gap-3">
+    <div
+      className="flex h-full flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 p-3 gap-3"
+      style={{ gridColumn: `span ${n} / span ${n}` }}
+    >
       {/* Each catalog = a full single-style card, supplier hidden */}
-      <div className="grid grid-cols-2 gap-3 flex-1">
+      <div className="grid gap-3 flex-1" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}>
         {items.map((c) => (
           <CatalogCard key={c.id} catalog={c} divLogos={divLogos} catLogos={catLogos} hideSupplier
             selected={selected.has(c.id)} onToggleSelect={() => onToggleSelect(c.id)}
