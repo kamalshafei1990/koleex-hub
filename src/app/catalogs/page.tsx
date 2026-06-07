@@ -161,6 +161,7 @@ const T: Translations = {
   "preview.print":        { en: "Print", zh: "打印", ar: "طباعة" },
   "preview.fullscreen":   { en: "Fullscreen", zh: "全屏", ar: "ملء الشاشة" },
   "cat.loadMore":         { en: "Load more ({n})", zh: "加载更多（{n}）", ar: "تحميل المزيد ({n})" },
+  "cat.loading":          { en: "Loading…", zh: "加载中…", ar: "جارٍ التحميل…" },
   "modal.descPlaceholder":{ en: "Optional notes about this catalog", zh: "关于此目录的可选备注", ar: "ملاحظات اختيارية حول هذا الكتالوج" },
   "modal.saveChanges":    { en: "Save Changes", zh: "保存更改", ar: "حفظ التغييرات" },
   "modal.uploadBtn":      { en: "Upload", zh: "上传", ar: "رفع" },
@@ -2630,6 +2631,7 @@ export default function CatalogsPage() {
   const [filterTag, setFilterTag] = useState("all");
   const [sortBy, setSortBy] = useState<"newest" | "name" | "size" | "year">("newest");
   const [visibleCount, setVisibleCount] = useState(24);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [previewCatalog, setPreviewCatalog] = useState<CatalogEntry | null>(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
@@ -2722,6 +2724,21 @@ export default function CatalogsPage() {
     });
     return result;
   }, [catalogs, search, filterSupplier, filterDivision, filterType, filterYear, filterTag, sortBy]);
+
+  // Infinite scroll: when the sentinel nears the viewport, reveal the next
+  // batch. The Hub scrolls inside .shell-content-offset (not the window), so we
+  // observe against that container; rootMargin pre-loads before you hit bottom.
+  useEffect(() => {
+    const el = loadMoreRef.current;
+    if (!el || filtered.length <= visibleCount) return;
+    const root = (el.closest(".shell-content-offset") as HTMLElement) || null;
+    const io = new IntersectionObserver(
+      (entries) => { if (entries.some((e) => e.isIntersecting)) setVisibleCount((c) => c + 24); },
+      { root, rootMargin: "600px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [filtered.length, visibleCount]);
 
   const catalogSuppliers = useMemo(() => {
     const map = new Map<string, { id: string; name: string }>();
@@ -3354,13 +3371,11 @@ export default function CatalogsPage() {
           </div>
         )}
 
-        {/* Load more */}
+        {/* Infinite scroll — auto-loads the next batch as the sentinel nears view */}
         {!loading && filtered.length > visibleCount && (
-          <div className="mt-6 flex justify-center">
-            <button onClick={() => setVisibleCount(c => c + 24)}
-              className="h-10 px-5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--text-dim)] transition-colors">
-              {t("cat.loadMore").replace("{n}", String(filtered.length - visibleCount))}
-            </button>
+          <div ref={loadMoreRef} className="mt-6 flex items-center justify-center gap-2 py-2 text-[12px] text-[var(--text-dim)]">
+            <SpinnerIcon className="h-4 w-4 animate-spin" />
+            {t("cat.loading", "Loading…")}
           </div>
         )}
 
