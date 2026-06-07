@@ -54,12 +54,6 @@ function isBypassed(pathname: string | null): boolean {
 function ShellContent({ children }: { children: React.ReactNode }) {
   const { expanded } = useSidebar();
   const desktopPad = expanded ? SIDEBAR_EXPANDED_W : SIDEBAR_COLLAPSED_W;
-  /* When a Super Admin is "viewing as", a fixed banner sits below the header
-     (top-14). Without extra top padding it overlaps and hides the first rows
-     of page content (e.g. the picker's employee options). Push content down by
-     the banner height while it's shown. */
-  const { data: bootstrap } = useMeBootstrap();
-  const viewingAs = !!bootstrap?.viewingAs;
 
   return (
     <QAInspectorProvider>
@@ -70,9 +64,10 @@ function ShellContent({ children }: { children: React.ReactNode }) {
           when no view-as is active. */}
       <ViewAsBanner />
       <Sidebar />
-      {/* pt-14 = header height (+ banner height when viewing-as). Desktop: offset by sidebar width. */}
+      {/* pt-14 = header height. The view-as indicator is now a compact floating
+          pill (overlay), so it no longer needs to push content down. */}
       <div
-        className={`${viewingAs ? "pt-[5.75rem]" : "pt-14"} flex-1 flex flex-col min-h-0 h-[calc(100vh-0px)] overflow-hidden transition-all duration-300 ease-in-out`}
+        className={`pt-14 flex-1 flex flex-col min-h-0 h-[calc(100vh-0px)] overflow-hidden transition-all duration-300 ease-in-out`}
         style={{
           /* @ts-ignore — inline style for responsive sidebar offset */
           paddingInlineStart: undefined,

@@ -58,31 +58,33 @@ export default function ViewAsBanner() {
     ? viewingAs.targetRoleName || "a role"
     : viewingAs.targetDisplayName || viewingAs.targetUsername || "another user";
   const subtext = isRole
-    ? "— read-only. Permission checks evaluate as this role only (no account overrides)."
-    : "— read-only. All permission checks evaluate as this user.";
+    ? "Read-only. Permission checks evaluate as this role only (no account overrides)."
+    : "Read-only. All permission checks evaluate as this user.";
 
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      className="fixed left-0 right-0 top-14 z-[120] flex items-center justify-center gap-3 border-b border-amber-500/40 bg-amber-500/20 px-4 py-2 text-[12.5px] backdrop-blur"
-    >
-      <span className="flex h-2 w-2 shrink-0 animate-pulse rounded-full bg-amber-500" aria-hidden />
-      <span className="text-amber-900 dark:text-amber-100">
-        <strong className="font-semibold">
-          Viewing as {label}
-          {isRole ? " (role)" : ""}
-        </strong>
-        <span className="ml-2 opacity-80 hidden sm:inline">{subtext}</span>
-      </span>
-      <button
-        type="button"
-        onClick={handleExit}
-        disabled={busy}
-        className="ml-1 inline-flex items-center rounded-md border border-amber-700/40 bg-amber-700 px-2.5 py-1 text-[11.5px] font-semibold text-white shadow-sm hover:bg-amber-800 disabled:opacity-50"
+    /* Compact floating pill — centered near the top, auto width, so it reads as
+       a reminder of who you're viewing as without covering the page behind it.
+       Not edge-to-edge; pointer-events only on the pill itself. */
+    <div className="pointer-events-none fixed inset-x-0 top-16 z-[120] flex justify-center px-3">
+      <div
+        role="status"
+        aria-live="polite"
+        title={subtext}
+        className="pointer-events-auto flex max-w-[92vw] items-center gap-2 rounded-full border border-amber-500/50 bg-amber-500/95 py-1 pl-3 pr-1 text-[12px] shadow-lg shadow-black/20 backdrop-blur"
       >
-        {busy ? "Exiting…" : "Exit view-as"}
-      </button>
+        <span className="flex h-2 w-2 shrink-0 animate-pulse rounded-full bg-amber-900/80" aria-hidden />
+        <span className="truncate font-semibold text-amber-950">
+          Viewing as {label}{isRole ? " · role" : ""}
+        </span>
+        <button
+          type="button"
+          onClick={handleExit}
+          disabled={busy}
+          className="ml-1 inline-flex shrink-0 items-center rounded-full bg-amber-900 px-2.5 py-1 text-[11px] font-semibold text-amber-50 hover:bg-amber-950 disabled:opacity-50"
+        >
+          {busy ? "Exiting…" : "Exit"}
+        </button>
+      </div>
     </div>
   );
 }
