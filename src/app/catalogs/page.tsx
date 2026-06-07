@@ -1856,19 +1856,40 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
           <p className="text-[11px] text-[var(--text-secondary)] leading-snug line-clamp-2">{catalog.description}</p>
         )}
         {(catalog.company_name_en || catalog.contact_name) && (
-          <div className="flex items-center gap-2 min-w-0">
-            {catalog.contact_photo_url && (
-              <img src={catalog.contact_photo_url} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
-            )}
-            <div className="flex min-w-0 flex-col">
-              <p className="text-[11px] text-[var(--text-secondary)] truncate">
-                {catalog.company_name_en || catalog.contact_name}
-              </p>
-              {catalog.company_name_cn && (
-                <p className="text-[11px] text-[var(--text-dim)] truncate">{catalog.company_name_cn}</p>
+          catalog.contact_id ? (
+            <Link
+              href={`/suppliers/${catalog.contact_id}`}
+              onClick={(e) => e.stopPropagation()}
+              title={`Open ${catalog.company_name_en || catalog.contact_name}`}
+              className="group/sup flex items-center gap-2 min-w-0 -mx-1 px-1 py-0.5 rounded-md hover:bg-[var(--bg-surface-hover)] transition-colors"
+            >
+              {catalog.contact_photo_url && (
+                <img src={catalog.contact_photo_url} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
               )}
+              <div className="flex min-w-0 flex-col">
+                <p className="text-[11px] text-[var(--text-secondary)] truncate group-hover/sup:text-[var(--text-primary)] group-hover/sup:underline">
+                  {catalog.company_name_en || catalog.contact_name}
+                </p>
+                {catalog.company_name_cn && (
+                  <p className="text-[11px] text-[var(--text-dim)] truncate">{catalog.company_name_cn}</p>
+                )}
+              </div>
+            </Link>
+          ) : (
+            <div className="flex items-center gap-2 min-w-0">
+              {catalog.contact_photo_url && (
+                <img src={catalog.contact_photo_url} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
+              )}
+              <div className="flex min-w-0 flex-col">
+                <p className="text-[11px] text-[var(--text-secondary)] truncate">
+                  {catalog.company_name_en || catalog.contact_name}
+                </p>
+                {catalog.company_name_cn && (
+                  <p className="text-[11px] text-[var(--text-dim)] truncate">{catalog.company_name_cn}</p>
+                )}
+              </div>
             </div>
-          </div>
+          )
         )}
 
         {/* Division / Category with icons */}
@@ -2026,15 +2047,32 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
         </h3>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           {(catalog.company_name_en || catalog.contact_name) && (
-            <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)] truncate max-w-[240px]">
-              {catalog.contact_photo_url && (
-                <img src={catalog.contact_photo_url} alt="" className="h-6 w-6 shrink-0 rounded-md object-cover" />
-              )}
-              <span className="truncate">
-                {catalog.company_name_en || catalog.contact_name}
-                {catalog.company_name_cn && <span className="text-[var(--text-dim)]"> ({catalog.company_name_cn})</span>}
+            catalog.contact_id ? (
+              <Link
+                href={`/suppliers/${catalog.contact_id}`}
+                onClick={(e) => e.stopPropagation()}
+                title={`Open ${catalog.company_name_en || catalog.contact_name}`}
+                className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)] truncate max-w-[240px] hover:text-[var(--text-primary)] hover:underline"
+              >
+                {catalog.contact_photo_url && (
+                  <img src={catalog.contact_photo_url} alt="" className="h-6 w-6 shrink-0 rounded-md object-cover" />
+                )}
+                <span className="truncate">
+                  {catalog.company_name_en || catalog.contact_name}
+                  {catalog.company_name_cn && <span className="text-[var(--text-dim)]"> ({catalog.company_name_cn})</span>}
+                </span>
+              </Link>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)] truncate max-w-[240px]">
+                {catalog.contact_photo_url && (
+                  <img src={catalog.contact_photo_url} alt="" className="h-6 w-6 shrink-0 rounded-md object-cover" />
+                )}
+                <span className="truncate">
+                  {catalog.company_name_en || catalog.contact_name}
+                  {catalog.company_name_cn && <span className="text-[var(--text-dim)]"> ({catalog.company_name_cn})</span>}
+                </span>
               </span>
-            </span>
+            )
           )}
           {catalog.division_name && catalog.division_slug && (
             <span className="inline-flex items-center gap-1 h-4 px-1.5 rounded bg-[var(--bg-surface-bright)] text-[9px] font-semibold text-[var(--text-dim)]">
