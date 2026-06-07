@@ -94,15 +94,20 @@ export default function PreorderPage() {
       <style>{`
         @media print {
           @page { size: A4 landscape; margin: 8mm; }
-          html, body { background:#fff !important; }
+          html, body { background:#fff !important; height:auto !important; }
           body * { visibility:hidden !important; }
           #pre, #pre * { visibility:visible !important; }
-          #pre { position:absolute; inset:0; margin:0 !important; width:100% !important; box-shadow:none !important; }
+          /* Pull to the top-left and let it FLOW (auto height) so the whole
+             document paginates across pages instead of clipping to one. */
+          #pre { position:absolute !important; left:0 !important; top:0 !important; width:100% !important; margin:0 !important; box-shadow:none !important; border-radius:0 !important; }
+          #pre .pre-paper { padding:0 !important; }
           .no-print { display:none !important; }
           .pre-row, tr, td, th, section { break-inside:avoid; }
           thead { display:table-header-group; }
           .pre-band { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-          input { border:0 !important; }
+          input, textarea { border:0 !important; }
+          /* Slightly smaller photos in print so more rows fit per page. */
+          #pre .pre-photo { height:74px !important; width:74px !important; }
         }
         #pre input::placeholder { color:#cbd5e1; }
         /* Remove number spinners so centered numbers are truly centered. */
@@ -129,7 +134,7 @@ export default function PreorderPage() {
 
       {/* Paper */}
       <div id="pre" className="mx-auto max-w-[1160px] overflow-hidden rounded-2xl bg-white text-black shadow-[0_4px_40px_rgba(0,0,0,0.12)]">
-        <div className="px-7 py-8 sm:px-11 sm:py-10">
+        <div className="pre-paper px-7 py-8 sm:px-11 sm:py-10">
 
           {/* ── Header: logo LEFT · PREORDER RIGHT ── */}
           <header dir="ltr" className="flex flex-wrap items-center justify-between gap-6 rounded-2xl border border-neutral-200 bg-white px-6 py-5">
@@ -210,7 +215,7 @@ export default function PreorderPage() {
                         </td>
                         {/* Photo — fits without crop, replace / remove */}
                         <td className="px-2 py-2.5 text-center">
-                          <div className="relative mx-auto h-[108px] w-[108px]">
+                          <div className="pre-photo relative mx-auto h-[108px] w-[108px]">
                             <button
                               type="button"
                               onClick={() => fileRefs.current[fkey]?.click()}
