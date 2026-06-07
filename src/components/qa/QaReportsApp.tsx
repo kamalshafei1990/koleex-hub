@@ -148,6 +148,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
   const [reports, setReports] = useState<QaReport[]>([]);
   const [modules, setModules] = useState<string[]>([]);
   const [assigneeFacet, setAssigneeFacet] = useState<{ id: string; name: string }[]>([]);
+  const [reporterFacet, setReporterFacet] = useState<{ id: string; name: string }[]>([]);
   const [allAssignees, setAllAssignees] = useState<QaAssignee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -161,6 +162,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
   const [fStatus, setFStatus] = useState("");
   const [fPriority, setFPriority] = useState("");
   const [fAssignee, setFAssignee] = useState("");
+  const [fReporter, setFReporter] = useState("");
   const [q, setQ] = useState("");
   const [sortPriority, setSortPriority] = useState(false);
 
@@ -211,6 +213,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
     if (fStatus && !params.has("status")) params.set("status", fStatus);
     if (fPriority && !params.has("priority")) params.set("priority", fPriority);
     if (fAssignee && !params.has("assignee")) params.set("assignee", fAssignee);
+    if (fReporter && !params.has("reporter")) params.set("reporter", fReporter);
     if (q.trim()) params.set("q", q.trim());
 
     // One transparent retry on 401 — the auth cookie is sometimes a beat
@@ -234,6 +237,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
       setReports(j.reports ?? []);
       setModules(j.modules ?? []);
       setAssigneeFacet(j.assignees ?? []);
+      setReporterFacet(j.reporters ?? []);
     } catch (e) {
       // Aborted = a newer load() superseded us. Stay silent — the newer
       // call owns the UI state now.
@@ -244,7 +248,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
       // after a newer one started must not flip the spinner off early.
       if (loadAbortRef.current === ac) setLoading(false);
     }
-  }, [viewParams, fModule, fSeverity, fStatus, fPriority, fAssignee, q, t]);
+  }, [viewParams, fModule, fSeverity, fStatus, fPriority, fAssignee, fReporter, q, t]);
 
   useEffect(() => {
     void load();
@@ -384,13 +388,14 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
     if (fStatus) p.set("status", fStatus);
     if (fPriority) p.set("priority", fPriority);
     if (fAssignee) p.set("assignee", fAssignee);
+    if (fReporter) p.set("reporter", fReporter);
     if (q.trim()) p.set("q", q.trim());
     if (sortPriority) p.set("sort", "priority");
     if (boardView) p.set("board", "1");
     if (issueParam) p.set("issue", issueParam);
     const qs = p.toString();
     router.replace(qs ? `${pageRoute}?${qs}` : pageRoute, { scroll: false });
-  }, [view, fModule, fSeverity, fStatus, fPriority, fAssignee, q, sortPriority, boardView, issueParam, router, pageRoute]);
+  }, [view, fModule, fSeverity, fStatus, fPriority, fAssignee, fReporter, q, sortPriority, boardView, issueParam, router, pageRoute]);
 
   /* Bulk action — apply one workflow change to every selected row in a
      single API call. Optimistic so the UI reacts immediately. */
@@ -584,6 +589,11 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
           <option value="unassigned">{t("qa.filter.unassigned", "Unassigned")}</option>
           {assigneeFacet.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
         </select>
+        <select value={fReporter} onChange={(e) => setFReporter(e.target.value)} className={selectCls}>
+          <option value="">{t("qa.filter.allReporters", "All reporters")}</option>
+          {myId && <option value={myId}>{t("qa.filter.myReports", "My reports")}</option>}
+          {reporterFacet.filter((r) => r.id !== myId).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+        </select>
         <button
           type="button"
           onClick={() => setSortPriority((v) => !v)}
@@ -763,6 +773,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
                                     <span>{ageLabel(d)}</span>
                                     <span aria-hidden>·</span>
                                     <span>{r.app_module}</span>
+                                    {r.reporter_name && (<><span aria-hidden>·</span><span>{t("qa.row.by", "by")} {r.reporter_name}</span></>)}
                                     {r.assigned_to_name && (<><span aria-hidden>·</span><span className="text-[var(--text-secondary)]">@{r.assigned_to_name}</span></>)}
                                     {ready && (<><span aria-hidden>·</span><span className="font-medium text-[var(--text-secondary)]">{t("qa.badge.aiReady", "AI-ready")}</span></>)}
                                     <span className="ms-auto">{rel(r.created_at)}</span>

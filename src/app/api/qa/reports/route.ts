@@ -312,9 +312,19 @@ export async function GET(req: Request) {
   const assignees = assigneeIds
     .map((id) => ({ id, name: nameById[id] ?? "—" }))
     .sort((a, b) => a.name.localeCompare(b.name));
+  // Reporter facet — who filed reports in this set (for the "by reporter" filter).
+  const reporters = Array.from(
+    new Map(
+      rows
+        .filter((r) => r.reporter_id)
+        .map((r) => [r.reporter_id as string, (r.reporter_name as string) || "—"]),
+    ).entries(),
+  )
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   return NextResponse.json(
-    { reports, modules, assignees },
+    { reports, modules, assignees, reporters },
     { headers: { "Cache-Control": "private, no-store" } },
   );
 }
