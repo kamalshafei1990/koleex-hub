@@ -90,7 +90,7 @@ export default function PreorderPage() {
   const cell = "w-full bg-transparent outline-none rounded-md px-1.5 py-1 transition-colors focus:bg-neutral-100 print:focus:bg-transparent";
 
   return (
-    <div dir="rtl" className="min-h-screen bg-neutral-300/60 px-3 py-6 sm:px-6" style={{ colorScheme: "light" }}>
+    <div dir="rtl" className="min-h-screen bg-neutral-100 px-3 py-6 text-neutral-900 sm:px-6" style={{ colorScheme: "light" }}>
       <style>{`
         @media print {
           @page { size: A4 landscape; margin: 8mm; }
@@ -132,7 +132,7 @@ export default function PreorderPage() {
         <div className="px-7 py-8 sm:px-11 sm:py-10">
 
           {/* ── Header: logo LEFT · PREORDER RIGHT ── */}
-          <header dir="ltr" className="flex flex-wrap items-center justify-between gap-6 rounded-2xl border border-neutral-200 bg-neutral-50 px-6 py-5">
+          <header dir="ltr" className="flex flex-wrap items-center justify-between gap-6 rounded-2xl border border-neutral-200 bg-white px-6 py-5">
             <div>
               <KoleexLogo className="h-7 w-auto text-black" />
               <div className="mt-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-neutral-400">Koleex International Group</div>
