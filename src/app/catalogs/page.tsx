@@ -3232,7 +3232,7 @@ export default function CatalogsPage() {
           <div className="text-center py-16 border border-dashed border-[var(--border-subtle)] rounded-xl">
             <p className="text-[13px] text-[var(--text-dim)]">{t("cat.noMatch")}</p>
           </div>
-        ) : (groupBySupplier && viewMode !== "list") ? (
+        ) : (groupBySupplier && viewMode === "grid") ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
             {(() => {
               const items = filtered.slice(0, visibleCount);
@@ -3267,6 +3267,65 @@ export default function CatalogsPage() {
                     onDownload={(c) => bumpMetric(c.id, "download")}
                     onEdit={(c) => setUploadModal({ open: true, editEntry: c })}
                     onDelete={(c) => setDeleteModal({ open: true, catalog: c })} />
+                );
+              });
+            })()}
+          </div>
+        ) : (groupBySupplier && viewMode === "list") ? (
+          <div className="flex flex-col gap-2">
+            {(() => {
+              const items = filtered.slice(0, visibleCount);
+              const groups: { key: string; name: string; nameCn: string | null; logo: string | null; contactId: string | null; items: CatalogEntry[] }[] = [];
+              const idx = new Map<string, number>();
+              for (const c of items) {
+                const key = c.contact_id || c.company_name_en || c.contact_name || "__none";
+                const name = c.company_name_en || c.contact_name || t("cat.noSupplier", "No supplier");
+                let i = idx.get(key);
+                if (i === undefined) { i = groups.length; idx.set(key, i); groups.push({ key, name, nameCn: c.company_name_cn ?? null, logo: c.contact_photo_url ?? null, contactId: c.contact_id ?? null, items: [] }); }
+                groups[i].items.push(c);
+              }
+              return groups.map((g) => {
+                if (g.items.length === 1) {
+                  const catalog = g.items[0];
+                  return (
+                    <CatalogRow key={catalog.id} catalog={catalog} divLogos={divLogos} catLogos={catLogos}
+                      selected={selected.has(catalog.id)} onToggleSelect={() => toggleSelect(catalog.id)}
+                      onPreview={() => handlePreview(catalog)}
+                      onDownload={() => bumpMetric(catalog.id, "download")}
+                      onEdit={() => setUploadModal({ open: true, editEntry: catalog })}
+                      onDelete={() => setDeleteModal({ open: true, catalog })} />
+                  );
+                }
+                return (
+                  <div key={g.key} className="flex flex-col gap-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
+                    {g.items.map(c => (
+                      <CatalogRow key={c.id} catalog={c} divLogos={divLogos} catLogos={catLogos} hideSupplier
+                        selected={selected.has(c.id)} onToggleSelect={() => toggleSelect(c.id)}
+                        onPreview={() => handlePreview(c)}
+                        onDownload={() => bumpMetric(c.id, "download")}
+                        onEdit={() => setUploadModal({ open: true, editEntry: c })}
+                        onDelete={() => setDeleteModal({ open: true, catalog: c })} />
+                    ))}
+                    {g.contactId ? (
+                      <Link href={`/suppliers/${g.contactId}`} className="group/sup flex items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 hover:bg-[var(--bg-surface-hover)] transition-colors">
+                        {g.logo
+                          ? <img src={g.logo} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
+                          : <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]"><Building2Icon className="h-4 w-4 text-[var(--text-dim)]" /></span>}
+                        <div className="flex min-w-0 flex-col">
+                          <p className="text-[12px] font-semibold text-[var(--text-primary)] truncate group-hover/sup:underline">{g.name}</p>
+                          <p className="text-[10.5px] text-[var(--text-dim)] truncate">{g.nameCn ? `${g.nameCn} · ` : ""}{g.items.length} {t("cat.catalogsWord", "catalogs")}</p>
+                        </div>
+                      </Link>
+                    ) : (
+                      <div className="flex items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
+                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]"><Building2Icon className="h-4 w-4 text-[var(--text-dim)]" /></span>
+                        <div className="flex min-w-0 flex-col">
+                          <p className="text-[12px] font-semibold text-[var(--text-primary)] truncate">{g.name}</p>
+                          <p className="text-[10.5px] text-[var(--text-dim)] truncate">{g.items.length} {t("cat.catalogsWord", "catalogs")}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 );
               });
             })()}
