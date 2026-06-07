@@ -6,7 +6,7 @@
    seeded from the customer's sheet; edits live in local state (DB persistence,
    product photos and convert-to-quotation come next). */
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import KoleexLogo from "@/components/layout/KoleexLogo";
 import { PREORDER_SECTIONS, PREORDER_BUYERS, PREORDER_META } from "./data";
 
@@ -20,6 +20,28 @@ interface Doc { customerAr: string; reference: string; currency: string; date: s
 function money(n: number): string {
   if (!n) return "—";
   return n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+/** Textarea that grows with its content so the description wraps to as many
+ *  lines as needed (no fixed single line). */
+function AutoText({ value, onChange, placeholder, className }: { value: string; onChange: (v: string) => void; placeholder?: string; className?: string }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "0px";
+    el.style.height = `${el.scrollHeight}px`;
+  });
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      value={value}
+      placeholder={placeholder}
+      onChange={(e) => onChange(e.target.value)}
+      className={className}
+    />
+  );
 }
 
 export default function PreorderPage() {
@@ -226,7 +248,7 @@ export default function PreorderPage() {
                         {/* Item: model + description (editable) */}
                         <td className="px-2 py-2.5 text-right">
                           <input dir="ltr" value={it.model} placeholder="موديل" onChange={(e) => patchItem(si, ii, { model: e.target.value })} className={`${cell} text-right font-mono text-[12.5px] font-bold`} />
-                          <input value={it.desc} placeholder="الوصف" onChange={(e) => patchItem(si, ii, { desc: e.target.value })} className={`${cell} text-[12.5px] text-neutral-600`} />
+                          <AutoText value={it.desc} placeholder="الوصف" onChange={(v) => patchItem(si, ii, { desc: v })} className={`${cell} block resize-none overflow-hidden text-right text-[12.5px] leading-snug text-neutral-600`} />
                         </td>
                         {/* Buyer quantities (coloured) */}
                         {it.q.map((v, qi) => (
