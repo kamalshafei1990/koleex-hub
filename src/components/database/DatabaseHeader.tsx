@@ -55,6 +55,7 @@ const T: Translations = {
   "db.nav.components":    { en: "UI Components",  zh: "界面组件", ar: "مكوّنات الواجهة" },
   "db.search.placeholder": { en: "Search the Visual Library…", zh: "搜索视觉库…", ar: "ابحث في مكتبة الصور…" },
   "db.search.issues":      { en: "Search issue reports…",     zh: "搜索问题报告…", ar: "ابحث في بلاغات المشاكل…" },
+  "db.search.home":        { en: "Search the database…",      zh: "搜索数据库…",   ar: "ابحث في قاعدة البيانات…" },
 };
 
 function isOn(pathname: string, key: string): boolean {
@@ -73,9 +74,12 @@ export default function DatabaseHeader({
   // The main header search is context-aware: on Issue Reports it searches
   // issues (Enter → /database/issues?q=…, which the issues list reads and
   // filters by); elsewhere it searches the Visual Library.
+  const isHome = pathname === "/database";
   const searchPlaceholder = inIssues
     ? t("db.search.issues", "Search issue reports…")
-    : t("db.search.placeholder", "Search the Visual Library…");
+    : isHome
+      ? t("db.search.home", "Search the database…")
+      : t("db.search.placeholder", "Search the Visual Library…");
   const searchHref = inIssues ? "/database/issues" : "/database/visual-library";
 
   /* Top-level dataset tabs. Active state is forced so the Visual Library tab
