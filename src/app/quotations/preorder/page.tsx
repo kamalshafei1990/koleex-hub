@@ -230,14 +230,14 @@ export default function PreorderPage() {
                         </td>
                         {/* Buyer quantities (coloured) */}
                         {it.q.map((v, qi) => (
-                          <td key={qi} className="px-0.5 py-2.5 text-center">
+                          <td key={qi} className="px-1 py-2.5 text-center">
                             <input
                               type="number" min={0} inputMode="numeric" dir="ltr"
-                              value={v || ""}
-                              onChange={(e) => setQty(si, ii, qi, Number(e.target.value) || 0)}
-                              placeholder="·"
-                              className={`${cell} text-center text-[12.5px] font-semibold tabular-nums`}
-                              style={{ color: v ? BUYER_COLORS[qi] : undefined }}
+                              value={v ? String(v) : ""}
+                              onChange={(e) => setQty(si, ii, qi, e.target.value === "" ? 0 : Math.max(0, Math.floor(Number(e.target.value)) || 0))}
+                              placeholder="0"
+                              className="w-full rounded-md border border-neutral-200 bg-white px-1 py-1.5 text-center text-[12.5px] font-bold tabular-nums outline-none transition-colors focus:border-black print:border-0 print:bg-transparent"
+                              style={{ color: v ? BUYER_COLORS[qi] : "#cbd5e1" }}
                             />
                           </td>
                         ))}
