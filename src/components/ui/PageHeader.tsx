@@ -557,8 +557,8 @@ function HomeSearchBar({
     else if (searchHref) router.push(`${searchHref}?q=${encodeURIComponent(trimmed)}`);
   };
   return (
-    <form onSubmit={handleSubmit}>
-      <div className="group flex items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 py-2.5 transition-all duration-200 focus-within:border-[var(--border-focus)] hover:border-[var(--border-color)] sm:gap-3 sm:px-4 sm:py-3">
+    <form onSubmit={handleSubmit} className="w-full">
+      <div className="group flex w-full items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 py-2.5 transition-colors duration-200 focus-within:border-[var(--border-focus)] hover:border-[var(--border-color)] sm:gap-3 sm:px-4 sm:py-3">
         <RrIcon name="search" size={15} className="shrink-0 text-[var(--text-dim)] transition-colors group-focus-within:text-[var(--text-muted)]" />
         <input
           ref={inputRef}
