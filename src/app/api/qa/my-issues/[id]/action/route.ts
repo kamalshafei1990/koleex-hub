@@ -105,6 +105,23 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       : { by: "reporter", reason },
   });
 
+  // Unify reopen with the discussion (issue: "reopen is separate from the
+  // discussion"). Mirror the reopen reason into the thread as a comment so it
+  // shows inline in the conversation, not only buried in the activity log.
+  if (action === "reopen") {
+    const { error: cErr } = await supabaseServer.from("qa_issue_comments").insert({
+      tenant_id: auth.tenant_id,
+      issue_id: id,
+      user_id: auth.account_id,
+      user_name: auth.username ?? null,
+      user_role: "reporter",
+      message: `Reopened — ${reason}`,
+      is_internal_note: false,
+      attachments: [],
+    });
+    if (cErr) console.error("[api/qa my-issues action reopen-comment]", cErr.message);
+  }
+
   // Notify the assignee + admin watchers — never the actor.
   const actor = auth.username ?? "Reporter";
   const title = action === "verify"
