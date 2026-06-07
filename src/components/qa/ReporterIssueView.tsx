@@ -11,7 +11,7 @@
    renders what it receives.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
@@ -114,6 +114,22 @@ function initials(name: string | null | undefined): string {
   return name.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("") || "?";
 }
 
+/* Persist a text draft to localStorage so nothing typed is lost on navigate /
+   refresh / close. Keyed per-issue + field. Cleared by the caller on submit. */
+function usePersistentDraft(key: string, value: string, setValue: (v: string) => void) {
+  const loaded = useRef(false);
+  useEffect(() => {
+    if (loaded.current) return;
+    loaded.current = true;
+    try { const v = localStorage.getItem(key); if (v) setValue(v); } catch { /* ignore */ }
+  }, [key, setValue]);
+  useEffect(() => {
+    try { if (value.trim()) localStorage.setItem(key, value); else localStorage.removeItem(key); }
+    catch { /* quota / private mode */ }
+  }, [key, value]);
+}
+export function clearDraft(key: string) { try { localStorage.removeItem(key); } catch { /* ignore */ } }
+
 export default function ReporterIssueView({ issueId }: { issueId: string }) {
   const { t } = useTranslation(qaT);
   const [issue, setIssue] = useState<SafeIssue | null>(null);
@@ -139,6 +155,8 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
   const [posting, setPosting] = useState(false);
   const [postErr, setPostErr] = useState<string | null>(null);
   const att = useCommentAttachments();
+  const replyDraftKey = `koleex.qa.reply.${issueId}`;
+  usePersistentDraft(replyDraftKey, text, setText);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null); setNotFound(false);
@@ -195,7 +213,7 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(humanizeError(j.error ?? `HTTP ${res.status}`));
       if (j.comment) setComments((prev) => [...prev, j.comment as SafeComment]);
-      setText(""); att.clear();
+      setText(""); att.clear(); clearDraft(replyDraftKey);
     } catch (e) {
       setPostErr(e instanceof Error ? e.message : t("qa.reporter.postErr", "Couldn't post your reply."));
     } finally { setPosting(false); }
@@ -563,6 +581,8 @@ function VerifyControl({ issueId, onChanged }: { issueId: string; onChanged: () 
   const [showReopen, setShowReopen] = useState(false);
   const [reason, setReason] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  const reopenDraftKey = `koleex.qa.reopen.${issueId}`;
+  usePersistentDraft(reopenDraftKey, reason, setReason);
   const send = async (action: "verify" | "reopen", reasonText?: string) => {
     setBusy(action); setErr(null);
     try {
@@ -574,7 +594,7 @@ function VerifyControl({ issueId, onChanged }: { issueId: string; onChanged: () 
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(humanizeError(j.error ?? `HTTP ${res.status}`));
-      setShowReopen(false); setReason("");
+      setShowReopen(false); setReason(""); clearDraft(reopenDraftKey);
       onChanged();
     } catch (e) {
       setErr(e instanceof Error ? e.message : t("qa.reporter.verifyErr", "Couldn't update the issue."));
