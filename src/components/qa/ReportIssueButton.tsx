@@ -73,6 +73,19 @@ export default function ReportIssueButton() {
   const pathname = usePathname() ?? "/";
   const [open, setOpen] = useState(false);
 
+  // Keep the support window open as you navigate the system / refresh — it's a
+  // standalone, free-roaming window, not a one-page modal. Restored after mount
+  // (not in the initial state) to avoid an SSR hydration mismatch.
+  const openLoadedRef = useRef(false);
+  useEffect(() => {
+    if (openLoadedRef.current) return;
+    openLoadedRef.current = true;
+    try { if (localStorage.getItem("koleex.qa.report.open.v1") === "1") setOpen(true); } catch { /* ignore */ }
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem("koleex.qa.report.open.v1", open ? "1" : "0"); } catch { /* ignore */ }
+  }, [open]);
+
   if (!open) {
     return (
       <button
