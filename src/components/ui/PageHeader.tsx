@@ -568,27 +568,31 @@ function HomeSearchBar({
           aria-label={hint}
           className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--text-dim)] sm:text-[13.5px]"
         />
-        {q.trim() ? (
-          <button
-            type="submit"
-            className="shrink-0 rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[11.5px] font-semibold text-[var(--text-inverted)] transition-opacity hover:opacity-90"
-          >
-            Search
-          </button>
-        ) : (
-          // The shortcut badge is now a real button — clicking it focuses the
-          // search input (so users on touch / unfamiliar keyboards have an
-          // affordance) and the tooltip explains what the shortcut does.
-          <button
-            type="button"
-            onClick={focusInput}
-            title={hint}
-            aria-label={hint}
-            className="hidden shrink-0 cursor-pointer items-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10.5px] font-medium text-[var(--text-dim)] transition-colors hover:border-[var(--border-color)] hover:text-[var(--text-secondary)] sm:inline-flex"
-          >
-            <kbd className="font-medium">{shortcutLabel}</kbd>
-          </button>
-        )}
+        {/* Fixed-width right slot so swapping the badge ↔ Search button never
+            resizes the input or shifts the bar when you start typing. */}
+        <div className="flex w-[72px] shrink-0 items-center justify-end">
+          {q.trim() ? (
+            <button
+              type="submit"
+              className="rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[11.5px] font-semibold text-[var(--text-inverted)] transition-opacity hover:opacity-90"
+            >
+              Search
+            </button>
+          ) : (
+            // The shortcut badge is a real button — clicking it focuses the
+            // search input (so users on touch / unfamiliar keyboards have an
+            // affordance) and the tooltip explains what the shortcut does.
+            <button
+              type="button"
+              onClick={focusInput}
+              title={hint}
+              aria-label={hint}
+              className="hidden cursor-pointer items-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-1.5 py-0.5 text-[10.5px] font-medium text-[var(--text-dim)] transition-colors hover:border-[var(--border-color)] hover:text-[var(--text-secondary)] sm:inline-flex"
+            >
+              <kbd className="font-medium">{shortcutLabel}</kbd>
+            </button>
+          )}
+        </div>
       </div>
     </form>
   );

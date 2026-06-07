@@ -380,6 +380,16 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
     const bv = searchParams.get("board"); if (bv === "1") setBoardView(true);
   }, [searchParams]);
 
+  // Keep `q` in sync when the URL changes AFTER mount — e.g. the header search
+  // submits ?q=… while we're already on this page. Guarded against our own
+  // URL writes (compare to the trimmed current value) so it never fights typing.
+  const qRef = useRef(q);
+  qRef.current = q;
+  useEffect(() => {
+    const qp = searchParams.get("q") ?? "";
+    if (qp !== qRef.current.trim()) setQ(qp);
+  }, [searchParams]);
+
   useEffect(() => {
     if (!initFromUrlRef.current) return;
     const p = new URLSearchParams();

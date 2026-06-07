@@ -70,12 +70,13 @@ export default function DatabaseHeader({
   const pathname = usePathname() ?? "/database";
   const inVL = VL_PREFIXES.some((p) => isOn(pathname, p));
   const inIssues = isOn(pathname, "/database/issues");
-  // On Issue Reports we hide the generic header search entirely — that page has
-  // its OWN smart search (live title/tag/module/reporter suggestions) in the
-  // filter row, so a second plain box here was redundant and confusing.
-  // Elsewhere the header search drives the Visual Library.
-  const searchPlaceholder = inIssues ? undefined : t("db.search.placeholder", "Search the Visual Library…");
-  const searchHref = inIssues ? undefined : "/database/visual-library";
+  // The main header search is context-aware: on Issue Reports it searches
+  // issues (Enter → /database/issues?q=…, which the issues list reads and
+  // filters by); elsewhere it searches the Visual Library.
+  const searchPlaceholder = inIssues
+    ? t("db.search.issues", "Search issue reports…")
+    : t("db.search.placeholder", "Search the Visual Library…");
+  const searchHref = inIssues ? "/database/issues" : "/database/visual-library";
 
   /* Top-level dataset tabs. Active state is forced so the Visual Library tab
      stays lit on every sub-section route (Collections, Classification, …),
