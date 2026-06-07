@@ -164,7 +164,8 @@ export default function PreorderPage() {
               <table className="w-full border-collapse text-[12.5px] [&_td]:align-middle [&_th]:align-middle [&_th]:border-s [&_th]:border-neutral-200 [&_td]:border-s [&_td]:border-neutral-200 [&_tr>:first-child]:!border-s-0">
                 <thead>
                   <tr className="border-b-2 border-black bg-white text-[10px] font-bold uppercase tracking-wider text-neutral-500">
-                    <th className="w-[92px] px-2 py-2.5 text-center">صورة</th>
+                    <th className="w-[40px] px-1 py-2.5 text-center">م</th>
+                    <th className="w-[124px] px-2 py-2.5 text-center">صورة</th>
                     <th className="px-3 py-2.5 text-right">الصنف</th>
                     {doc.buyers.map((b, bi) => (
                       <th key={bi} className="w-[58px] px-1 py-2.5 text-center font-bold normal-case" style={{ color: BUYER_COLORS[bi] }}>{b}</th>
@@ -181,30 +182,45 @@ export default function PreorderPage() {
                     const fkey = `${si}-${ii}`;
                     return (
                       <tr key={ii} className="pre-row align-middle">
-                        {/* Photo upload */}
+                        {/* No. (running, 1,2,3…) */}
+                        <td className="px-1 py-2.5 text-center text-[12.5px] font-bold tabular-nums text-neutral-500">
+                          {doc.sections.slice(0, si).reduce((a, s) => a + s.items.length, 0) + ii + 1}
+                        </td>
+                        {/* Photo — fits without crop, replace / remove */}
                         <td className="px-2 py-2.5 text-center">
-                          <button
-                            type="button"
-                            onClick={() => fileRefs.current[fkey]?.click()}
-                            className="group relative mx-auto block h-[70px] w-[70px] overflow-hidden rounded-lg border border-neutral-300 bg-neutral-50"
-                            title="رفع صورة"
-                          >
-                            {it.photo ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={it.photo} alt="" className="h-full w-full object-cover" />
-                            ) : (
-                              <span className="flex h-full w-full flex-col items-center justify-center gap-1 text-neutral-300">
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.6"/><path d="m21 15-5-5L5 21"/></svg>
-                              </span>
+                          <div className="relative mx-auto h-[108px] w-[108px]">
+                            <button
+                              type="button"
+                              onClick={() => fileRefs.current[fkey]?.click()}
+                              className="group block h-full w-full overflow-hidden rounded-lg border border-neutral-300 bg-white"
+                              title={it.photo ? "استبدال الصورة" : "رفع صورة"}
+                            >
+                              {it.photo ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={it.photo} alt="" className="h-full w-full object-contain p-1" />
+                              ) : (
+                                <span className="flex h-full w-full flex-col items-center justify-center gap-1.5 text-neutral-300">
+                                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.6"/><path d="m21 15-5-5L5 21"/></svg>
+                                  <span className="text-[9px] font-semibold">رفع صورة</span>
+                                </span>
+                              )}
+                              <span className="no-print absolute inset-0 hidden items-center justify-center bg-black/55 text-[10px] font-semibold text-white group-hover:flex">{it.photo ? "استبدال" : "رفع صورة"}</span>
+                            </button>
+                            {it.photo && (
+                              <button
+                                type="button"
+                                onClick={() => patchItem(si, ii, { photo: null })}
+                                className="no-print absolute -end-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full border border-neutral-300 bg-white text-[11px] text-neutral-600 shadow-sm hover:bg-red-50 hover:text-red-600"
+                                title="حذف الصورة"
+                              >✕</button>
                             )}
-                            <span className="no-print absolute inset-0 hidden items-center justify-center bg-black/55 text-[10px] font-semibold text-white group-hover:flex">رفع صورة</span>
-                          </button>
+                          </div>
                           <input
                             ref={(el) => { fileRefs.current[fkey] = el; }}
                             type="file"
                             accept="image/*"
                             className="hidden"
-                            onChange={(e) => onPhoto(si, ii, e.target.files?.[0])}
+                            onChange={(e) => { onPhoto(si, ii, e.target.files?.[0]); e.target.value = ""; }}
                           />
                         </td>
                         {/* Item: model + description (editable) */}
