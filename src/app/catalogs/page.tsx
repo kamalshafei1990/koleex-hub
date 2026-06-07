@@ -1725,9 +1725,9 @@ function DeleteModal({ open, onClose, catalog, onConfirm, deleting }: {
 
 /* ═══════════════════════════
    ── Merged Supplier Card ──
-   One card for a supplier with 2+ catalogs: covers split in the cover area,
-   a single supplier identity in the info area. Same shell/height as a single
-   catalog card.
+   One card for a supplier with 2+ catalogs (spans two columns):
+   each catalog as its own column (cover + its info), then ONE full-width
+   supplier info band at the bottom. Matches the requested layout.
    ═══════════════════════════ */
 function MergedSupplierCard({ group, onPreview, onEdit, onDelete }: {
   group: { key: string; name: string; nameCn: string | null; logo: string | null; contactId: string | null; items: CatalogEntry[] };
@@ -1737,62 +1737,66 @@ function MergedSupplierCard({ group, onPreview, onEdit, onDelete }: {
 }) {
   const { t } = useTranslation(T);
   const items = group.items;
-  const shown = items.slice(0, 4);
   const cover = (c: CatalogEntry) => c.cover_url || (isImageFile(c.file_type) ? c.file_url : null);
   return (
-    <div className="group relative flex h-full flex-col rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] overflow-hidden transition-all hover:shadow-lg hover:shadow-black/20 hover:-translate-y-0.5 hover:border-[var(--text-dim)]">
-      <div className={`relative aspect-[3/4] grid gap-px bg-[var(--border-subtle)] ${shown.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
-        {shown.map((c) => {
+    <div className="col-span-2 group relative flex h-full flex-col rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-3 gap-3 transition-all hover:shadow-lg hover:shadow-black/20 hover:-translate-y-0.5 hover:border-[var(--text-dim)]">
+      {/* Catalog columns */}
+      <div className="grid grid-cols-2 gap-3 flex-1">
+        {items.map((c) => {
           const ft = FILE_TYPE_CONFIG[c.file_type] || DEFAULT_FT;
           const Icon = ft.icon;
           const cv = cover(c);
+          const meta = [c.category_name, c.year ? String(c.year) : ""].filter(Boolean).join(" · ");
           return (
-            <div key={c.id} className="group/cell relative overflow-hidden bg-white">
-              {cv ? (
-                <img src={cv} alt={c.title} loading="lazy" className="w-full h-full object-cover" />
-              ) : (
-                <div className={`w-full h-full bg-gradient-to-br ${ft.bgFrom} ${ft.bgTo} flex flex-col items-center justify-center gap-1`}>
-                  <Icon className={`h-7 w-7 ${ft.color} opacity-60`} />
-                  <span className={`text-[11px] font-black ${ft.color} opacity-40 tracking-wider`}>{ft.label}</span>
+            <div key={c.id} className="flex flex-col">
+              <div className="group/cell relative aspect-[3/4] overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-white">
+                {cv ? (
+                  <img src={cv} alt={c.title} loading="lazy" className="w-full h-full object-cover" />
+                ) : (
+                  <div className={`w-full h-full bg-gradient-to-br ${ft.bgFrom} ${ft.bgTo} flex flex-col items-center justify-center gap-1`}>
+                    <Icon className={`h-9 w-9 ${ft.color} opacity-60`} />
+                    <span className={`text-[13px] font-black ${ft.color} opacity-40 tracking-wider`}>{ft.label}</span>
+                  </div>
+                )}
+                <div className={`absolute top-2 right-2 h-5 px-1.5 rounded-md ${ft.color} bg-black/60 backdrop-blur-md text-[9px] font-bold flex items-center gap-1`}>
+                  <Icon className="h-2.5 w-2.5" />{ft.label}
                 </div>
-              )}
-              <button onClick={() => onPreview(c)} aria-label={t("card.preview")} className="absolute inset-0" />
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 pt-4 pb-1">
-                <p className="truncate text-[10px] font-medium text-white">{c.title}</p>
+                <button onClick={() => onPreview(c)} aria-label={t("card.preview")} className="absolute inset-0" />
+                <div className="absolute top-2 left-2 flex gap-1 opacity-0 group-hover/cell:opacity-100 transition-opacity">
+                  <button onClick={(e) => { e.stopPropagation(); onEdit(c); }} title={t("card.edit")} className="h-6 w-6 rounded-md bg-black/60 backdrop-blur-md text-white flex items-center justify-center hover:bg-black/80"><PencilIcon className="h-3 w-3" /></button>
+                  <button onClick={(e) => { e.stopPropagation(); onDelete(c); }} title={t("card.delete")} className="h-6 w-6 rounded-md bg-red-500/40 backdrop-blur-md text-red-200 flex items-center justify-center hover:bg-red-500/60"><TrashIcon className="h-3 w-3" /></button>
+                </div>
               </div>
-              <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover/cell:opacity-100 transition-opacity">
-                <button onClick={(e) => { e.stopPropagation(); onEdit(c); }} title={t("card.edit")} className="h-6 w-6 rounded-md bg-black/60 backdrop-blur-md text-white flex items-center justify-center hover:bg-black/80"><PencilIcon className="h-3 w-3" /></button>
-                <button onClick={(e) => { e.stopPropagation(); onDelete(c); }} title={t("card.delete")} className="h-6 w-6 rounded-md bg-red-500/40 backdrop-blur-md text-red-200 flex items-center justify-center hover:bg-red-500/60"><TrashIcon className="h-3 w-3" /></button>
+              {/* Per-catalog info */}
+              <div className="mt-1.5 min-w-0">
+                <p className="truncate text-[12px] font-semibold text-[var(--text-primary)]" title={c.title}>{c.title}</p>
+                {c.title_cn && <p className="truncate text-[10.5px] text-[var(--text-dim)] -mt-0.5">{c.title_cn}</p>}
+                {meta && <p className="truncate text-[10px] text-[var(--text-dim)]">{meta}</p>}
               </div>
             </div>
           );
         })}
-        {items.length > shown.length && (
-          <div className="absolute bottom-1.5 left-1.5 rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white">+{items.length - shown.length}</div>
-        )}
       </div>
-      {/* Single supplier identity */}
-      <div className="p-3.5 flex flex-1 flex-col">
-        {group.contactId ? (
-          <Link href={`/suppliers/${group.contactId}`} className="group/sup mt-auto flex items-center gap-2 min-w-0 -mx-1 px-1 py-0.5 rounded-md hover:bg-[var(--bg-surface-hover)] transition-colors">
-            {group.logo
-              ? <img src={group.logo} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
-              : <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]"><Building2Icon className="h-4 w-4 text-[var(--text-dim)]" /></span>}
-            <div className="flex min-w-0 flex-col">
-              <p className="text-[12px] font-semibold text-[var(--text-primary)] truncate group-hover/sup:underline">{group.name}</p>
-              <p className="text-[10.5px] text-[var(--text-dim)] truncate">{group.nameCn ? `${group.nameCn} · ` : ""}{items.length} {t("cat.catalogsWord", "catalogs")}</p>
-            </div>
-          </Link>
-        ) : (
-          <div className="mt-auto flex items-center gap-2 min-w-0 px-1 py-0.5">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]"><Building2Icon className="h-4 w-4 text-[var(--text-dim)]" /></span>
-            <div className="flex min-w-0 flex-col">
-              <p className="text-[12px] font-semibold text-[var(--text-primary)] truncate">{group.name}</p>
-              <p className="text-[10.5px] text-[var(--text-dim)] truncate">{items.length} {t("cat.catalogsWord", "catalogs")}</p>
-            </div>
+      {/* Single full-width supplier info band */}
+      {group.contactId ? (
+        <Link href={`/suppliers/${group.contactId}`} className="group/sup flex items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 hover:bg-[var(--bg-surface-hover)] transition-colors">
+          {group.logo
+            ? <img src={group.logo} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
+            : <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]"><Building2Icon className="h-4 w-4 text-[var(--text-dim)]" /></span>}
+          <div className="flex min-w-0 flex-col">
+            <p className="text-[12px] font-semibold text-[var(--text-primary)] truncate group-hover/sup:underline">{group.name}</p>
+            <p className="text-[10.5px] text-[var(--text-dim)] truncate">{group.nameCn ? `${group.nameCn} · ` : ""}{items.length} {t("cat.catalogsWord", "catalogs")}</p>
           </div>
-        )}
-      </div>
+        </Link>
+      ) : (
+        <div className="flex items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]"><Building2Icon className="h-4 w-4 text-[var(--text-dim)]" /></span>
+          <div className="flex min-w-0 flex-col">
+            <p className="text-[12px] font-semibold text-[var(--text-primary)] truncate">{group.name}</p>
+            <p className="text-[10.5px] text-[var(--text-dim)] truncate">{items.length} {t("cat.catalogsWord", "catalogs")}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
