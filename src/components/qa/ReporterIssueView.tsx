@@ -635,7 +635,6 @@ function VerifyControl({ issueId, onChanged }: { issueId: string; onChanged: () 
           />
           {/* Attach a screenshot of what's still broken (issue: no way to show
               where the error is when reopening). */}
-          <AttachmentThumbs att={att} />
           <AttachmentStrip att={att} disabled={busy !== null} />
           <div className="flex items-center justify-end gap-2">
             <button type="button" onClick={() => { setShowReopen(false); setReason(""); }} disabled={busy !== null} className="rounded-md px-3 py-1.5 text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("qa.common.cancel", "Cancel")}</button>
