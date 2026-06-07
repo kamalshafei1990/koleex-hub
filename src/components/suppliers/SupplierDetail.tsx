@@ -485,6 +485,23 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
               edge. Not a dashboard table. ─── */}
         <div className="mx-4 md:mx-6 mt-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
           <div className="px-4 sm:px-8 md:px-10 pt-4">
+            {/* Standalone breadcrumb — clear orientation + a real Back.
+                Back returns to wherever you came from (e.g. Catalogs); the
+                crumbs jump straight to Home or the Suppliers app. */}
+            {!embedded && (
+              <nav className="mb-3 flex items-center gap-1.5 text-[12px] text-[var(--text-dim)]">
+                <button type="button" onClick={() => router.back()}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5 font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]">
+                  <ArrowLeftIcon className="h-3.5 w-3.5 rtl:rotate-180" /> {t("sd.back", "Back")}
+                </button>
+                <span className="mx-1 h-4 w-px bg-[var(--border-subtle)]" />
+                <button type="button" onClick={() => router.push("/")} className="transition-colors hover:text-[var(--text-primary)]">{t("sd.home", "Home")}</button>
+                <span className="text-[var(--text-faint)]">/</span>
+                <button type="button" onClick={() => router.push("/suppliers")} className="transition-colors hover:text-[var(--text-primary)]">{t("sd.suppliers", "Suppliers")}</button>
+                <span className="text-[var(--text-faint)]">/</span>
+                <span className="truncate font-medium text-[var(--text-primary)] max-w-[45vw]">{name}</span>
+              </nav>
+            )}
             {/* Top bar — back + mode toggle (start) · Edit / Delete (end) */}
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 min-w-0">
@@ -494,21 +511,6 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
                   <ArrowLeftIcon className="h-3.5 w-3.5 rtl:rotate-180" />
                   <span className="hidden sm:inline">{t("sd.overview", "Overview")}</span>
                 </button>
-              ) : !embedded ? (
-                <>
-                  {/* Standalone page (e.g. opened from Catalogs) needs a way out:
-                      Back returns to wherever you came from; Suppliers opens the app. */}
-                  <button type="button" onClick={() => router.back()} aria-label={t("sd.back", "Back")} title={t("sd.back", "Back")}
-                    className="flex items-center gap-1.5 shrink-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]">
-                    <ArrowLeftIcon className="h-3.5 w-3.5 rtl:rotate-180" />
-                    <span className="hidden sm:inline">{t("sd.back", "Back")}</span>
-                  </button>
-                  <button type="button" onClick={() => router.push("/suppliers")} aria-label={t("sd.suppliers", "Suppliers")} title={t("sd.suppliers", "Suppliers")}
-                    className="flex items-center gap-1.5 shrink-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]">
-                    <Building2Icon className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">{t("sd.suppliers", "Suppliers")}</span>
-                  </button>
-                </>
               ) : null}
               <div className="inline-flex items-center rounded-lg bg-[var(--bg-surface-subtle)] p-0.5 text-[10.5px] font-medium">
                 <button type="button" onClick={() => setMode(false)} aria-pressed={!execMode}
