@@ -1916,31 +1916,31 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
               href={`/suppliers/${catalog.contact_id}`}
               onClick={(e) => e.stopPropagation()}
               title={`Open ${catalog.company_name_en || catalog.contact_name}`}
-              className="group/sup flex items-center gap-2 min-w-0 -mx-1 px-1 py-0.5 rounded-md hover:bg-[var(--bg-surface-hover)] transition-colors"
+              className="group/sup flex items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 hover:bg-[var(--bg-surface-hover)] transition-colors"
             >
-              {catalog.contact_photo_url && (
-                <img src={catalog.contact_photo_url} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
-              )}
+              {catalog.contact_photo_url
+                ? <img src={catalog.contact_photo_url} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
+                : <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]"><Building2Icon className="h-4 w-4 text-[var(--text-dim)]" /></span>}
               <div className="flex min-w-0 flex-col">
-                <p className="text-[11px] text-[var(--text-secondary)] truncate group-hover/sup:text-[var(--text-primary)] group-hover/sup:underline">
+                <p className="text-[12px] font-semibold text-[var(--text-primary)] truncate group-hover/sup:underline">
                   {catalog.company_name_en || catalog.contact_name}
                 </p>
                 {catalog.company_name_cn && (
-                  <p className="text-[11px] text-[var(--text-dim)] truncate">{catalog.company_name_cn}</p>
+                  <p className="text-[10.5px] text-[var(--text-dim)] truncate">{catalog.company_name_cn}</p>
                 )}
               </div>
             </Link>
           ) : (
-            <div className="flex items-center gap-2 min-w-0">
-              {catalog.contact_photo_url && (
-                <img src={catalog.contact_photo_url} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
-              )}
+            <div className="flex items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
+              {catalog.contact_photo_url
+                ? <img src={catalog.contact_photo_url} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
+                : <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]"><Building2Icon className="h-4 w-4 text-[var(--text-dim)]" /></span>}
               <div className="flex min-w-0 flex-col">
-                <p className="text-[11px] text-[var(--text-secondary)] truncate">
+                <p className="text-[12px] font-semibold text-[var(--text-primary)] truncate">
                   {catalog.company_name_en || catalog.contact_name}
                 </p>
                 {catalog.company_name_cn && (
-                  <p className="text-[11px] text-[var(--text-dim)] truncate">{catalog.company_name_cn}</p>
+                  <p className="text-[10.5px] text-[var(--text-dim)] truncate">{catalog.company_name_cn}</p>
                 )}
               </div>
             </div>
