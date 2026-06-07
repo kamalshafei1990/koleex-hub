@@ -21,6 +21,7 @@ import { requireAuth } from "@/lib/server/auth";
 import { logActivity } from "@/lib/qa/activity";
 import { notifyIssue, issueLink } from "@/lib/qa/notify";
 import { watcherTargets } from "@/lib/qa/watchers";
+import { sanitizeAttachments } from "@/lib/qa/attachments";
 
 interface IssueRow {
   id: string;
@@ -46,6 +47,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   if (action === "reopen" && reason.length === 0) {
     return NextResponse.json({ error: "A short reason is required to reopen." }, { status: 400 });
   }
+  // Optional screenshot(s) attached to a reopen — validated + tenant-scoped.
+  const att = sanitizeAttachments(auth.tenant_id, body?.attachments);
+  if (!att.ok) return NextResponse.json({ error: att.error }, { status: 400 });
 
   // Load + ownership check + status guard, in a single round-trip.
   const { data, error: readErr } = await supabaseServer
@@ -117,7 +121,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       user_role: "reporter",
       message: `Reopened — ${reason}`,
       is_internal_note: false,
-      attachments: [],
+      attachments: att.value,
     });
     if (cErr) console.error("[api/qa my-issues action reopen-comment]", cErr.message);
   }

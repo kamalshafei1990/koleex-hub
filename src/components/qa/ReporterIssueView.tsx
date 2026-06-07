@@ -583,6 +583,7 @@ function VerifyControl({ issueId, onChanged }: { issueId: string; onChanged: () 
   const [err, setErr] = useState<string | null>(null);
   const reopenDraftKey = `koleex.qa.reopen.${issueId}`;
   usePersistentDraft(reopenDraftKey, reason, setReason);
+  const att = useCommentAttachments();
   const send = async (action: "verify" | "reopen", reasonText?: string) => {
     setBusy(action); setErr(null);
     try {
@@ -590,11 +591,11 @@ function VerifyControl({ issueId, onChanged }: { issueId: string; onChanged: () 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ action, reason: reasonText ?? null }),
+        body: JSON.stringify({ action, reason: reasonText ?? null, attachments: action === "reopen" ? att.payload() : [] }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(humanizeError(j.error ?? `HTTP ${res.status}`));
-      setShowReopen(false); setReason(""); clearDraft(reopenDraftKey);
+      setShowReopen(false); setReason(""); clearDraft(reopenDraftKey); att.clear();
       onChanged();
     } catch (e) {
       setErr(e instanceof Error ? e.message : t("qa.reporter.verifyErr", "Couldn't update the issue."));
@@ -632,6 +633,10 @@ function VerifyControl({ issueId, onChanged }: { issueId: string; onChanged: () 
             placeholder={t("qa.reporter.reopenPlaceholder", "Briefly describe what's still broken…")}
             className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--border-focus)]"
           />
+          {/* Attach a screenshot of what's still broken (issue: no way to show
+              where the error is when reopening). */}
+          <AttachmentThumbs att={att} />
+          <AttachmentStrip att={att} disabled={busy !== null} />
           <div className="flex items-center justify-end gap-2">
             <button type="button" onClick={() => { setShowReopen(false); setReason(""); }} disabled={busy !== null} className="rounded-md px-3 py-1.5 text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("qa.common.cancel", "Cancel")}</button>
             <button
