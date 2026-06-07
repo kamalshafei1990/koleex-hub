@@ -881,35 +881,47 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                     (!searching || s.toLowerCase().includes(f)),
                   );
                   return (
-                    <div className="mt-2">
-                      {/* Category tabs — hidden while searching across all. */}
+                    <div className="mt-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3">
+                      {/* Category row — a labelled segmented filter, visually
+                          distinct from the tag chips (rectangular, no border,
+                          on its own line with a caption). */}
                       {!searching && (
-                        <div className="mb-2 flex flex-wrap gap-1.5">
-                          {TAG_GROUPS.map((g) => (
-                            <button
-                              key={g.label}
-                              type="button"
-                              onClick={() => setTagCat(g.label)}
-                              className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                                tagCat === g.label
-                                  ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
-                                  : "border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                              }`}
-                            >
-                              {g.label}
-                            </button>
-                          ))}
+                        <div className="mb-3 flex items-center gap-2">
+                          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("qa.report.tagCategory", "Category")}</span>
+                          <div className="flex flex-1 flex-wrap gap-1">
+                            {TAG_GROUPS.map((g) => (
+                              <button
+                                key={g.label}
+                                type="button"
+                                onClick={() => setTagCat(g.label)}
+                                className={`rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
+                                  tagCat === g.label
+                                    ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                                    : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
+                                }`}
+                              >
+                                {g.label}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       )}
-                      {/* Tags for the active category (or search results). */}
+                      {/* Divider + caption so "tags to add" reads separately. */}
+                      <div className="mb-2 flex items-center gap-2 border-t border-[var(--border-subtle)] pt-2.5">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">
+                          {searching ? t("qa.report.tagMatches", "Matches") : t("qa.report.tagAdd", "Add a tag")}
+                        </span>
+                      </div>
+                      {/* Tag chips — dashed "+" pills (clearly "add" affordances,
+                          a different shape/weight from the category filter). */}
                       <div className="flex flex-wrap gap-1.5">
                         {avail.length === 0 ? (
                           <span className="text-[11.5px] text-[var(--text-dim)]">
                             {searching ? t("qa.report.tagAddCustom", "Press Enter to add this tag") : t("qa.report.tagAllAdded", "All added")}
                           </span>
                         ) : avail.map((s) => (
-                          <button key={s} type="button" onClick={() => addTag(s)} className="rounded-full border border-[var(--border-subtle)] bg-transparent px-2.5 py-1 text-[11.5px] text-[var(--text-secondary)] transition-colors hover:border-[var(--border-focus)] hover:text-[var(--text-primary)]">
-                            + {s}
+                          <button key={s} type="button" onClick={() => addTag(s)} className="inline-flex items-center gap-1 rounded-full border border-dashed border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-1 text-[11.5px] text-[var(--text-secondary)] transition-colors hover:border-solid hover:border-[var(--border-focus)] hover:text-[var(--text-primary)]">
+                            <span className="text-[var(--text-dim)]">+</span>{s}
                           </button>
                         ))}
                       </div>
