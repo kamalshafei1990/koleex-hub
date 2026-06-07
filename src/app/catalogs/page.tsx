@@ -120,6 +120,7 @@ const T: Translations = {
   "modal.selectDivision": { en: "Select division", zh: "选择部门", ar: "اختر القسم" },
   "modal.category":       { en: "Category", zh: "类别", ar: "الفئة" },
   "modal.selectCategory": { en: "Select category", zh: "选择类别", ar: "اختر الفئة" },
+  "modal.moreCategories": { en: "More categories", zh: "更多类别", ar: "فئات إضافية" },
   "modal.description":    { en: "Description", zh: "描述", ar: "الوصف" },
   "modal.optional":       { en: "(optional)", zh: "（可选）", ar: "(اختياري)" },
   "modal.year":           { en: "Year", zh: "年份", ar: "السنة" },
@@ -900,8 +901,14 @@ function CatalogModal({
   const [contactId, setContactId] = useState<string>("");
   const [divisionSlug, setDivisionSlug] = useState<string>("");
   const [categorySlug, setCategorySlug] = useState<string>("");
+  // Additional categories beyond the primary — a catalog/supplier can span
+  // several categories. The primary (categorySlug) stays for back-compat
+  // (filters, search, card logo); these are extras.
+  const [extraCats, setExtraCats] = useState<string[]>([]);
   const [year, setYear] = useState("");
-  const [tagsInput, setTagsInput] = useState("");
+  // Tags as committed chips + the in-progress draft (comma/Enter commits it).
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagDraft, setTagDraft] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [batchFiles, setBatchFiles] = useState<File[]>([]);
   const [dupWarn, setDupWarn] = useState("");
@@ -942,8 +949,10 @@ function CatalogModal({
         setContactId(editEntry.contact_id || "");
         setDivisionSlug(editEntry.division_slug || "");
         setCategorySlug(editEntry.category_slug || "");
+        setExtraCats((editEntry.category_slugs || []).filter((s) => s && s !== editEntry.category_slug));
         setYear(editEntry.year ? String(editEntry.year) : "");
-        setTagsInput((editEntry.tags || []).join(", "));
+        setTags(editEntry.tags || []);
+        setTagDraft("");
         setThumbPreview(editEntry.cover_url || (isImageFile(editEntry.file_type) ? editEntry.file_url : null));
       } else {
         setTitle("");
@@ -952,8 +961,10 @@ function CatalogModal({
         setContactId("");
         setDivisionSlug("");
         setCategorySlug("");
+        setExtraCats([]);
         setYear("");
-        setTagsInput("");
+        setTags([]);
+        setTagDraft("");
         setThumbPreview(null);
       }
       setFile(null);
@@ -1131,7 +1142,15 @@ function CatalogModal({
     const div = divisions.find(d => d.slug === divisionSlug);
     const cat = categories.find(c => c.slug === categorySlug);
     const yearVal = year.trim() ? (parseInt(year.trim(), 10) || null) : null;
-    const tagList = tagsInput.split(",").map(s => s.trim()).filter(Boolean);
+    // Tags = committed chips + any text still in the draft box (so a value the
+    // user typed but didn't press comma on isn't silently dropped). Deduped.
+    const tagList = Array.from(new Set([...tags, tagDraft.trim()].map(s => s.trim()).filter(Boolean)));
+    // Multi-category: primary first, then the extras, deduped. Names mapped
+    // from the category list (fallback to the slug).
+    const catSlugList = Array.from(new Set([categorySlug, ...extraCats].filter(Boolean)));
+    const catNameList = catSlugList.map(s => categories.find(c => c.slug === s)?.name || s);
+    const catSlugsField = catSlugList.length ? catSlugList : null;
+    const catNamesField = catNameList.length ? catNameList : null;
 
     // ── Batch upload: one catalog per file, shared metadata ──
     if (!editEntry && batchFiles.length > 1) {
@@ -1159,6 +1178,7 @@ function CatalogModal({
             contact_type: contact?.contact_type || null,
             division_slug: divisionSlug || null, division_name: div?.name || null,
             category_slug: categorySlug || null, category_name: cat?.name || null,
+            category_slugs: catSlugsField, category_names: catNamesField,
             file_name: f.name, file_path: uploaded.path, file_url: uploaded.url,
             file_type: ft, file_size: f.size, cover_url: coverUrl, cover_path: coverPath,
             tags: tagList, year: yearVal,
@@ -1231,6 +1251,7 @@ function CatalogModal({
             division_name: div?.name || null,
             category_slug: categorySlug || null,
             category_name: cat?.name || null,
+            category_slugs: catSlugsField, category_names: catNamesField,
             file_name: fileName,
             file_path: filePath,
             file_url: fileUrl,
@@ -1286,6 +1307,7 @@ function CatalogModal({
             division_name: div?.name || null,
             category_slug: categorySlug || null,
             category_name: cat?.name || null,
+            category_slugs: catSlugsField, category_names: catNamesField,
             file_name: file!.name,
             file_path: uploaded.path,
             file_url: uploaded.url,
@@ -1524,15 +1546,37 @@ function CatalogModal({
               <label className={lbl}>{t("modal.division")}</label>
               <IconSelect value={divisionSlug} placeholder={t("modal.selectDivision")}
                 options={divisionOptions}
-                onChange={(v) => { setDivisionSlug(v); setCategorySlug(""); }} />
+                onChange={(v) => { setDivisionSlug(v); setCategorySlug(""); setExtraCats([]); }} />
             </div>
             <div>
               <label className={lbl}>{t("modal.category")}</label>
               <IconSelect value={categorySlug} placeholder={t("modal.selectCategory")}
                 options={categoryOptions} disabled={!divisionSlug}
-                onChange={setCategorySlug} />
+                onChange={(v) => { setCategorySlug(v); setExtraCats((prev) => prev.filter((s) => s !== v)); }} />
             </div>
           </div>
+
+          {/* Additional categories — a catalog/supplier can belong to several.
+              The control above is the PRIMARY; toggle any extras here. */}
+          {divisionSlug && categorySlug && categoryOptions.filter((o) => o.value !== categorySlug).length > 0 && (
+            <div>
+              <label className={lbl}>{t("modal.moreCategories")} <span className="font-normal normal-case">{t("modal.optional")}</span></label>
+              <div className="flex flex-wrap gap-1.5">
+                {categoryOptions.filter((o) => o.value !== categorySlug).map((o) => {
+                  const on = extraCats.includes(o.value);
+                  return (
+                    <button key={o.value} type="button"
+                      onClick={() => setExtraCats((prev) => on ? prev.filter((s) => s !== o.value) : [...prev, o.value])}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] transition-colors ${on ? "border-transparent bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>
+                      {o.icon && <span className="inline-flex h-3.5 w-3.5 items-center justify-center">{o.icon}</span>}
+                      <span>{o.label}</span>
+                      {on && <span aria-hidden>✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Year */}
           <div className="grid grid-cols-2 gap-3">
@@ -1543,11 +1587,43 @@ function CatalogModal({
             </div>
           </div>
 
-          {/* Tags */}
+          {/* Tags — type then press comma (or Enter) to lock each as a chip */}
           <div>
             <label className={lbl}>{t("modal.tags")} <span className="font-normal normal-case">{t("modal.optional")}</span></label>
-            <input type="text" value={tagsInput} onChange={(e) => setTagsInput(e.target.value)}
-              placeholder={t("modal.tagsPlaceholder")} className={inp} />
+            <div
+              className={`${inp} flex h-auto min-h-[42px] flex-wrap items-center gap-1.5 py-1.5 cursor-text`}
+              onClick={(e) => (e.currentTarget.querySelector("input") as HTMLInputElement | null)?.focus()}
+            >
+              {tags.map((tg, i) => (
+                <span key={`${tg}-${i}`} className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-surface-active)] px-2 py-0.5 text-[12px] text-[var(--text-secondary)]">
+                  {tg}
+                  <button type="button" aria-label="Remove tag"
+                    onClick={(e) => { e.stopPropagation(); setTags((prev) => prev.filter((_, idx) => idx !== i)); }}
+                    className="text-[var(--text-dim)] hover:text-[var(--text-primary)]">×</button>
+                </span>
+              ))}
+              <input type="text" value={tagDraft}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v.includes(",")) {
+                    const parts = v.split(",");
+                    const toAdd = parts.slice(0, -1).map((s) => s.trim()).filter(Boolean);
+                    if (toAdd.length) setTags((prev) => Array.from(new Set([...prev, ...toAdd])));
+                    setTagDraft(parts[parts.length - 1]);
+                  } else setTagDraft(v);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    const v = tagDraft.trim();
+                    if (v) { setTags((prev) => Array.from(new Set([...prev, v]))); setTagDraft(""); }
+                  } else if (e.key === "Backspace" && !tagDraft && tags.length) {
+                    setTags((prev) => prev.slice(0, -1));
+                  }
+                }}
+                placeholder={tags.length ? "" : t("modal.tagsPlaceholder")}
+                className="min-w-[120px] flex-1 bg-transparent text-[13px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-ghost)]" />
+            </div>
           </div>
 
           {/* Description */}

@@ -34,6 +34,11 @@ export interface CatalogEntry {
   division_name: string | null;
   category_slug: string | null;
   category_name: string | null;
+  // Multi-category: a catalog can belong to several categories. category_slug /
+  // category_name stay as the PRIMARY (first) for back-compat with filters,
+  // search and card display; these arrays carry the full set.
+  category_slugs?: string[] | null;
+  category_names?: string[] | null;
   file_name: string;
   file_path: string;
   file_url: string;
