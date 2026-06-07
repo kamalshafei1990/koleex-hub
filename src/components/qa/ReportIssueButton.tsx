@@ -152,6 +152,27 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", up);
   };
+  // Resizable window — drag the bottom-right grip. Pins the top-left first so
+  // resizing grows from a fixed corner.
+  const [winSize, setWinSize] = useState<{ w: number; h: number } | null>(null);
+  const onResizeDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (busy) return;
+    const el = panelRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    if (!winPos) setWinPos({ x: r.left, y: r.top });
+    const start = { sx: e.clientX, sy: e.clientY, w: r.width, h: r.height, ox: r.left, oy: r.top };
+    const move = (ev: MouseEvent) => {
+      const w = Math.max(320, Math.min(window.innerWidth - start.ox - 8, start.w + (ev.clientX - start.sx)));
+      const h = Math.max(280, Math.min(window.innerHeight - start.oy - 8, start.h + (ev.clientY - start.sy)));
+      setWinSize({ w, h });
+    };
+    const up = () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
   // Lightbox: clicking a thumbnail opens the screenshot full-size so the
   // reporter can verify they captured the right thing before submitting.
   const [zoomIdx, setZoomIdx] = useState<number | null>(null);
@@ -578,12 +599,16 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
         )}
       </div>
     )}
-    <div data-qa-capture-skip="" className={`pointer-events-none fixed z-[200] flex w-[min(480px,calc(100vw-1.5rem))] flex-col ${winPos ? "" : "end-3 bottom-3 top-16"}`} style={winPos ? { left: winPos.x, top: winPos.y } : undefined} role="dialog" aria-label={t("qa.report.title", "Report an issue")}>
-      {/* Non-blocking, side-docked, draggable panel: the rest of the app stays
-          usable and editable while this is open (no full-screen backdrop).
-          Grab the title bar to move it. Minimise / ✕ / Esc still close it, and
-          the draft persists. */}
-      <div ref={panelRef} className={`pointer-events-auto flex w-full flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-2xl shadow-black/30 ${winPos ? "max-h-[calc(100vh-5rem)]" : "h-full"}`}>
+    <div data-qa-capture-skip="" className={`pointer-events-none fixed z-[200] flex w-[min(480px,calc(100vw-1.5rem))] flex-col ${winPos ? "" : "end-3 bottom-3 top-16"}`} style={{ ...(winPos ? { left: winPos.x, top: winPos.y } : {}), ...(winSize ? { width: winSize.w } : {}) }} role="dialog" aria-label={t("qa.report.title", "Report an issue")}>
+      {/* Non-blocking, side-docked, draggable + resizable panel: the rest of the
+          app stays usable and editable while this is open (no full-screen
+          backdrop). Grab the title bar to move it, the corner grip to resize.
+          Minimise / ✕ / Esc still close it, and the draft persists. */}
+      <div ref={panelRef} style={winSize ? { height: winSize.h } : undefined} className={`pointer-events-auto relative flex w-full flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-2xl shadow-black/30 ${winSize ? "" : winPos ? "max-h-[calc(100vh-5rem)]" : "h-full"}`}>
+        {/* Resize grip (bottom-right) */}
+        <div onMouseDown={onResizeDown} title={t("qa.report.resize", "Resize")} className="absolute bottom-0 end-0 z-20 h-4 w-4 cursor-nwse-resize" aria-hidden>
+          <span className="absolute bottom-1 end-1 h-2 w-2 border-b-2 border-r-2 border-[var(--text-dim)] rtl:border-l-2 rtl:border-r-0" />
+        </div>
         {/* Header (drag handle) */}
         <div onMouseDown={onHeaderDown} className="flex cursor-move select-none items-center justify-between border-b border-[var(--border-subtle)] px-5 py-3.5">
           <div className="flex items-center gap-2">
