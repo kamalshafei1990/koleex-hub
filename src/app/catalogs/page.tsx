@@ -3210,11 +3210,6 @@ export default function CatalogsPage() {
                 );
                 return (
                   <div key={g.key} className="col-span-2 flex flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/30 p-3">
-                    {g.contactId ? (
-                      <Link href={`/suppliers/${g.contactId}`} className="mb-3 flex items-center gap-2 rounded-lg -mx-1 px-1 py-1 hover:bg-[var(--bg-surface-hover)] transition-colors">{Header}</Link>
-                    ) : (
-                      <div className="mb-3 flex items-center gap-2 px-1 py-1">{Header}</div>
-                    )}
                     <div className="grid grid-cols-2 gap-3">
                       {g.items.map(catalog => (
                         <CatalogCard key={catalog.id} catalog={catalog} divLogos={divLogos} catLogos={catLogos} hideSupplier
@@ -3225,6 +3220,12 @@ export default function CatalogsPage() {
                           onDelete={() => setDeleteModal({ open: true, catalog })} />
                       ))}
                     </div>
+                    {/* Supplier identity below the catalogs */}
+                    {g.contactId ? (
+                      <Link href={`/suppliers/${g.contactId}`} className="mt-3 flex items-center gap-2 rounded-lg -mx-1 px-1 py-1 hover:bg-[var(--bg-surface-hover)] transition-colors border-t border-[var(--border-subtle)] pt-3">{Header}</Link>
+                    ) : (
+                      <div className="mt-3 flex items-center gap-2 px-1 py-1 border-t border-[var(--border-subtle)] pt-3">{Header}</div>
+                    )}
                   </div>
                 );
               });
