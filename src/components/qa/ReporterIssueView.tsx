@@ -11,7 +11,7 @@
    renders what it receives.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
@@ -129,6 +129,50 @@ function usePersistentDraft(key: string, value: string, setValue: (v: string) =>
   }, [key, value]);
 }
 export function clearDraft(key: string) { try { localStorage.removeItem(key); } catch { /* ignore */ } }
+
+/* Per-issue lifecycle stepper — treats each ticket like its own mini-project so
+   you can see at a glance where it stands. */
+const LIFECYCLE = [
+  { key: "reported", label: "Reported" },
+  { key: "triaged", label: "Triaged" },
+  { key: "in_progress", label: "In progress" },
+  { key: "fixed", label: "Fixed" },
+  { key: "verified", label: "Verified" },
+] as const;
+function lifecycleStage(status: string): number {
+  switch (status) {
+    case "new": return 0;
+    case "triaged": case "needs_more_info": return 1;
+    case "in_progress": case "reopened": return 2;
+    case "fixed": return 3;
+    case "verified": case "closed": case "duplicate": return 4;
+    default: return 0;
+  }
+}
+function IssueLifecycle({ status }: { status: string }) {
+  const { t } = useTranslation(qaT);
+  const cur = lifecycleStage(status);
+  return (
+    <div className="mt-3 flex items-center gap-1.5 overflow-x-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] px-3 py-2 scrollbar-none">
+      {LIFECYCLE.map((s, i) => {
+        const done = i < cur;
+        const here = i === cur;
+        return (
+          <Fragment key={s.key}>
+            {i > 0 && <span className={`h-px w-4 shrink-0 ${i <= cur ? "bg-[var(--text-secondary)]" : "bg-[var(--border-color)]"}`} />}
+            <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ${here ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : done ? "text-[var(--text-secondary)]" : "text-[var(--text-dim)]"}`}>
+              <span className={`grid h-4 w-4 place-items-center rounded-full text-[9px] font-bold ${here ? "bg-white/20" : done ? "bg-[var(--text-secondary)] text-[var(--bg-surface)]" : "border border-[var(--border-color)]"}`}>{done ? "✓" : i + 1}</span>
+              {t("qa.lifecycle." + s.key, s.label)}
+            </span>
+          </Fragment>
+        );
+      })}
+      {status === "reopened" && (
+        <span className="ms-1 shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-300">{t("qa.lifecycle.reopened", "Reopened")}</span>
+      )}
+    </div>
+  );
+}
 
 export default function ReporterIssueView({ issueId }: { issueId: string }) {
   const { t } = useTranslation(qaT);
@@ -392,6 +436,9 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
         {issue.assigned_to_name && <span><b className="text-[var(--text-secondary)]">{t("qa.reporter.owner", "Owner:")}</b> {issue.assigned_to_name}</span>}
         {issue.reopen_count > 0 && <span>{t("qa.reporter.reopenedTimes", "Reopened")} ×{issue.reopen_count}</span>}
       </div>
+
+      {/* Lifecycle stepper — where this ticket stands, as its own mini-project */}
+      <IssueLifecycle status={issue.status} />
 
       {/* Reporter self-edit panel (issue e3bc4002): edit title/details +
           add a forgotten screenshot, only while the report is pre-work. */}
