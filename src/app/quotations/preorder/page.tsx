@@ -90,7 +90,7 @@ export default function PreorderPage() {
   const cell = "w-full bg-transparent outline-none rounded-md px-1.5 py-1 transition-colors focus:bg-neutral-100 print:focus:bg-transparent";
 
   return (
-    <div dir="rtl" className="min-h-screen bg-neutral-100 px-3 py-6 text-neutral-900 sm:px-6" style={{ colorScheme: "light" }}>
+    <div dir="rtl" className="min-h-screen bg-black px-3 py-6 text-neutral-300 sm:px-6" style={{ colorScheme: "light" }}>
       <style>{`
         @media print {
           @page { size: A4 landscape; margin: 8mm; }
@@ -113,13 +113,13 @@ export default function PreorderPage() {
 
       {/* Toolbar (screen only) */}
       <div className="no-print mx-auto mb-4 flex max-w-[1160px] items-center justify-between gap-3">
-        <a href="/quotations" className="text-[13px] text-neutral-500 transition-colors hover:text-black" dir="ltr">← Quotations</a>
+        <a href="/quotations" className="text-[13px] text-neutral-300 transition-colors hover:text-white" dir="ltr">← Quotations</a>
         <div className="flex items-center gap-2">
-          <span className="text-[12px] text-neutral-500">كل الحقول قابلة للتعديل</span>
+          <span className="text-[12px] text-neutral-400">كل الحقول قابلة للتعديل</span>
           <button
             type="button"
             onClick={() => window.print()}
-            className="inline-flex items-center gap-2 rounded-full bg-black px-5 py-2.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-85"
+            className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-[13px] font-semibold text-black transition-opacity hover:opacity-85"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
             طباعة / تصدير PDF
