@@ -124,6 +124,34 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   // see / use the screen again WITHOUT losing anything they've typed. The
   // component stays mounted — all field state is preserved.
   const [minimized, setMinimized] = useState(false);
+  // Draggable window position (null = use the default right-docked spot).
+  // Grab the title bar to move the panel anywhere, like a real window.
+  const panelRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null);
+  const [winPos, setWinPos] = useState<{ x: number; y: number } | null>(null);
+  const onHeaderDown = (e: React.MouseEvent) => {
+    if (busy) return;
+    if ((e.target as HTMLElement).closest("button")) return; // don't drag from controls
+    const el = panelRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    dragRef.current = { sx: e.clientX, sy: e.clientY, ox: r.left, oy: r.top };
+    setWinPos({ x: r.left, y: r.top });
+    const move = (ev: MouseEvent) => {
+      const d = dragRef.current;
+      if (!d) return;
+      const nx = Math.max(4, Math.min(window.innerWidth - 80, d.ox + (ev.clientX - d.sx)));
+      const ny = Math.max(4, Math.min(window.innerHeight - 40, d.oy + (ev.clientY - d.sy)));
+      setWinPos({ x: nx, y: ny });
+    };
+    const up = () => {
+      dragRef.current = null;
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
   // Lightbox: clicking a thumbnail opens the screenshot full-size so the
   // reporter can verify they captured the right thing before submitting.
   const [zoomIdx, setZoomIdx] = useState<number | null>(null);
@@ -550,13 +578,14 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
         )}
       </div>
     )}
-    <div data-qa-capture-skip="" className="pointer-events-none fixed end-3 bottom-3 top-16 z-[200] flex w-[min(480px,calc(100vw-1.5rem))] flex-col" role="dialog" aria-label={t("qa.report.title", "Report an issue")}>
-      {/* Non-blocking, side-docked panel: the rest of the app stays usable and
-          editable while this is open (no full-screen backdrop). Minimise / ✕ /
-          Esc still close it, and the draft persists. */}
-      <div className="pointer-events-auto flex h-full w-full flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-2xl shadow-black/30">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-3.5">
+    <div data-qa-capture-skip="" className={`pointer-events-none fixed z-[200] flex w-[min(480px,calc(100vw-1.5rem))] flex-col ${winPos ? "" : "end-3 bottom-3 top-16"}`} style={winPos ? { left: winPos.x, top: winPos.y } : undefined} role="dialog" aria-label={t("qa.report.title", "Report an issue")}>
+      {/* Non-blocking, side-docked, draggable panel: the rest of the app stays
+          usable and editable while this is open (no full-screen backdrop).
+          Grab the title bar to move it. Minimise / ✕ / Esc still close it, and
+          the draft persists. */}
+      <div ref={panelRef} className={`pointer-events-auto flex w-full flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-2xl shadow-black/30 ${winPos ? "max-h-[calc(100vh-5rem)]" : "h-full"}`}>
+        {/* Header (drag handle) */}
+        <div onMouseDown={onHeaderDown} className="flex cursor-move select-none items-center justify-between border-b border-[var(--border-subtle)] px-5 py-3.5">
           <div className="flex items-center gap-2">
             <MessageSquarePlusIcon size={16} className="text-[var(--text-secondary)]" />
             <h2 className="text-[14px] font-bold">{t("qa.report.title", "Report an issue")}</h2>
