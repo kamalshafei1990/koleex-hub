@@ -603,7 +603,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
             const top = out.slice(0, 8);
             if (top.length === 0) return null;
             return (
-              <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] py-1 shadow-xl">
+              <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] py-1 shadow-2xl shadow-black/40 backdrop-blur-none">
                 {top.map((s) => (
                   <button
                     key={s.kind + s.value}
