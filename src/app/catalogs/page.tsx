@@ -2511,6 +2511,10 @@ export default function CatalogsPage() {
   const [catLogos, setCatLogos] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  // Group-by-supplier (Option A): collapse the flat grid into per-supplier
+  // sections so "this supplier has N catalogs" is obvious. Composes with the
+  // grid/list view inside each section.
+  const [groupBySupplier, setGroupBySupplier] = useState(false);
 
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
@@ -3068,6 +3072,16 @@ export default function CatalogsPage() {
             </button>
           </div>
 
+          {/* Group by supplier toggle (Option A) */}
+          <button
+            onClick={() => setGroupBySupplier((v) => !v)}
+            title={t("cat.groupBySupplier", "Group by supplier")}
+            className={`h-9 px-3 rounded-lg border text-[12px] font-medium inline-flex items-center gap-1.5 transition-colors ${groupBySupplier ? "border-transparent bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"}`}
+          >
+            <Building2Icon className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">{t("cat.groupBySupplier", "Group by supplier")}</span>
+          </button>
+
           <button onClick={() => setUploadModal({ open: true, editEntry: null })}
             className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-colors shrink-0 ml-auto">
             <PlusIcon className="h-3.5 w-3.5" /> {t("cat.upload")}
@@ -3114,6 +3128,55 @@ export default function CatalogsPage() {
         ) : filtered.length === 0 ? (
           <div className="text-center py-16 border border-dashed border-[var(--border-subtle)] rounded-xl">
             <p className="text-[13px] text-[var(--text-dim)]">{t("cat.noMatch")}</p>
+          </div>
+        ) : groupBySupplier ? (
+          <div className="flex flex-col gap-7">
+            {(() => {
+              const items = filtered.slice(0, visibleCount);
+              const groups: { key: string; name: string; logo: string | null; items: CatalogEntry[] }[] = [];
+              const idx = new Map<string, number>();
+              for (const c of items) {
+                const key = c.contact_id || c.company_name_en || c.contact_name || "__none";
+                const name = c.company_name_en || c.contact_name || t("cat.noSupplier", "No supplier");
+                let i = idx.get(key);
+                if (i === undefined) { i = groups.length; idx.set(key, i); groups.push({ key, name, logo: c.contact_photo_url ?? null, items: [] }); }
+                groups[i].items.push(c);
+              }
+              return groups.map((g) => (
+                <section key={g.key}>
+                  <div className="mb-3 flex items-center gap-2 border-b border-[var(--border-subtle)] pb-2">
+                    {g.logo
+                      ? <img src={g.logo} alt="" className="h-7 w-7 shrink-0 rounded-md object-cover" />
+                      : <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)]"><Building2Icon className="h-3.5 w-3.5 text-[var(--text-dim)]" /></span>}
+                    <h3 className="truncate text-[14px] font-bold text-[var(--text-primary)]">{g.name}</h3>
+                    <span className="rounded-full bg-[var(--bg-surface)] px-1.5 py-0.5 text-[11px] font-semibold text-[var(--text-dim)]">{g.items.length}</span>
+                  </div>
+                  {viewMode === "list" ? (
+                    <div className="flex flex-col gap-2">
+                      {g.items.map(catalog => (
+                        <CatalogRow key={catalog.id} catalog={catalog} divLogos={divLogos} catLogos={catLogos}
+                          selected={selected.has(catalog.id)} onToggleSelect={() => toggleSelect(catalog.id)}
+                          onPreview={() => handlePreview(catalog)}
+                          onDownload={() => bumpMetric(catalog.id, "download")}
+                          onEdit={() => setUploadModal({ open: true, editEntry: catalog })}
+                          onDelete={() => setDeleteModal({ open: true, catalog })} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
+                      {g.items.map(catalog => (
+                        <CatalogCard key={catalog.id} catalog={catalog} divLogos={divLogos} catLogos={catLogos}
+                          selected={selected.has(catalog.id)} onToggleSelect={() => toggleSelect(catalog.id)}
+                          onPreview={() => handlePreview(catalog)}
+                          onDownload={() => bumpMetric(catalog.id, "download")}
+                          onEdit={() => setUploadModal({ open: true, editEntry: catalog })}
+                          onDelete={() => setDeleteModal({ open: true, catalog })} />
+                      ))}
+                    </div>
+                  )}
+                </section>
+              ));
+            })()}
           </div>
         ) : viewMode === "grid" ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
