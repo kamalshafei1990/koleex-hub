@@ -550,8 +550,11 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
         )}
       </div>
     )}
-    <div data-qa-capture-skip="" className="fixed inset-0 z-[200] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={t("qa.report.title", "Report an issue")} onMouseDown={(e) => { if (e.target === e.currentTarget && !busy && zoomIdx == null) onClose(); }}>
-      <div className="flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-2xl sm:max-w-[560px] sm:rounded-2xl">
+    <div data-qa-capture-skip="" className="pointer-events-none fixed end-3 bottom-3 top-16 z-[200] flex w-[min(480px,calc(100vw-1.5rem))] flex-col" role="dialog" aria-label={t("qa.report.title", "Report an issue")}>
+      {/* Non-blocking, side-docked panel: the rest of the app stays usable and
+          editable while this is open (no full-screen backdrop). Minimise / ✕ /
+          Esc still close it, and the draft persists. */}
+      <div className="pointer-events-auto flex h-full w-full flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-2xl shadow-black/30">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-3.5">
           <div className="flex items-center gap-2">
