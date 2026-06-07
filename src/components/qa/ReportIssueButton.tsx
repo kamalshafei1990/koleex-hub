@@ -145,6 +145,7 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   // Optional: tags to categorise the issue (suggested set + free-form).
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
+  const [tagCat, setTagCat] = useState<string>(TAG_GROUPS[0].label);
   const addTag = (raw: string) => {
     const v = raw.trim().replace(/^#/, "").slice(0, 40);
     if (!v) return;
@@ -869,28 +870,52 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                   className={field}
                   maxLength={40}
                 />
-                <div className="mt-2 space-y-2">
-                  {TAG_GROUPS.map((g) => {
-                    const f = tagInput.trim().toLowerCase();
-                    const avail = g.tags.filter((s) =>
-                      !tags.some((t2) => t2.toLowerCase() === s.toLowerCase()) &&
-                      (!f || s.toLowerCase().includes(f)),
-                    );
-                    if (avail.length === 0) return null;
-                    return (
-                      <div key={g.label}>
-                        <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">{g.label}</div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {avail.map((s) => (
-                            <button key={s} type="button" onClick={() => addTag(s)} className="rounded-full border border-[var(--border-subtle)] bg-transparent px-2.5 py-1 text-[11.5px] text-[var(--text-secondary)] transition-colors hover:border-[var(--border-focus)] hover:text-[var(--text-primary)]">
-                              + {s}
+                {(() => {
+                  const f = tagInput.trim().toLowerCase();
+                  const searching = f.length > 0;
+                  // While typing: search every category. Otherwise: show the
+                  // selected category only (tabbed) so it stays compact + tidy.
+                  const pool = searching ? TAG_GROUPS.flatMap((g) => g.tags) : (TAG_GROUPS.find((g) => g.label === tagCat)?.tags ?? []);
+                  const avail = pool.filter((s) =>
+                    !tags.some((t2) => t2.toLowerCase() === s.toLowerCase()) &&
+                    (!searching || s.toLowerCase().includes(f)),
+                  );
+                  return (
+                    <div className="mt-2">
+                      {/* Category tabs — hidden while searching across all. */}
+                      {!searching && (
+                        <div className="mb-2 flex flex-wrap gap-1.5">
+                          {TAG_GROUPS.map((g) => (
+                            <button
+                              key={g.label}
+                              type="button"
+                              onClick={() => setTagCat(g.label)}
+                              className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                                tagCat === g.label
+                                  ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                                  : "border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                              }`}
+                            >
+                              {g.label}
                             </button>
                           ))}
                         </div>
+                      )}
+                      {/* Tags for the active category (or search results). */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {avail.length === 0 ? (
+                          <span className="text-[11.5px] text-[var(--text-dim)]">
+                            {searching ? t("qa.report.tagAddCustom", "Press Enter to add this tag") : t("qa.report.tagAllAdded", "All added")}
+                          </span>
+                        ) : avail.map((s) => (
+                          <button key={s} type="button" onClick={() => addTag(s)} className="rounded-full border border-[var(--border-subtle)] bg-transparent px-2.5 py-1 text-[11.5px] text-[var(--text-secondary)] transition-colors hover:border-[var(--border-focus)] hover:text-[var(--text-primary)]">
+                            + {s}
+                          </button>
+                        ))}
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               <div>
