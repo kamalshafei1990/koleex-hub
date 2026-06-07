@@ -1898,9 +1898,14 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
 
         {catalog.tags && catalog.tags.length > 0 && (
           <div className="flex items-center gap-1 flex-wrap mt-0.5">
-            {catalog.tags.slice(0, 3).map(tag => (
-              <span key={tag} className="inline-flex items-center h-4 px-1.5 rounded bg-[var(--bg-surface-bright)] text-[9px] text-[var(--text-dim)]">{tag}</span>
+            {catalog.tags.slice(0, 4).map(tag => (
+              <span key={tag} className="inline-flex items-center h-4 px-1.5 rounded-full border border-[var(--border-color)] bg-transparent text-[9px] font-medium text-[var(--text-secondary)]">
+                <span className="opacity-50">#</span>{tag}
+              </span>
             ))}
+            {catalog.tags.length > 4 && (
+              <span className="text-[9px] text-[var(--text-dim)]">+{catalog.tags.length - 4}</span>
+            )}
           </div>
         )}
         {catalog.created_by_name && (
