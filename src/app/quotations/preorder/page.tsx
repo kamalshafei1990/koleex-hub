@@ -44,8 +44,9 @@ function AutoText({ value, onChange, placeholder, className }: { value: string; 
   );
 }
 
-export default function PreorderPage() {
-  const [doc, setDoc] = useState<Doc>(() => ({
+/** A fresh seeded preorder (used for "New" and the initial state). */
+function freshDoc(): Doc {
+  return {
     customerAr: PREORDER_META.customerAr,
     reference: PREORDER_META.reference,
     currency: PREORDER_META.currency,
@@ -56,7 +57,88 @@ export default function PreorderPage() {
       en: s.en,
       items: s.items.map((it) => ({ model: it.model, desc: it.desc, q: [...it.q], price: 0, photo: null as string | null })),
     })),
-  }));
+  };
+}
+
+interface PreorderListItem { id: string; title: string | null; customer_ar: string | null; updated_at: string }
+
+export default function PreorderPage() {
+  const [doc, setDoc] = useState<Doc>(freshDoc);
+
+  // Persistence
+  const [docId, setDocId] = useState<string | null>(null);
+  const [list, setList] = useState<PreorderListItem[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [savedMsg, setSavedMsg] = useState("");
+
+  const refreshList = () => {
+    fetch("/api/quotations/preorders", { credentials: "include", cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { preorders: [] }))
+      .then((j) => setList(Array.isArray(j.preorders) ? j.preorders : []))
+      .catch(() => { /* ignore */ });
+  };
+
+  const loadDoc = (id: string) => {
+    if (!id) return;
+    fetch(`/api/quotations/preorders/${id}`, { credentials: "include", cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (j?.preorder?.doc && typeof j.preorder.doc === "object") {
+          setDoc((d) => ({ ...freshDoc(), ...d, ...j.preorder.doc }));
+          setDocId(id);
+          try { window.history.replaceState(null, "", `/quotations/preorder?id=${id}`); } catch { /* ignore */ }
+        }
+      })
+      .catch(() => { /* ignore */ });
+  };
+
+  const newDoc = () => {
+    setDoc(freshDoc());
+    setDocId(null);
+    setSavedMsg("");
+    try { window.history.replaceState(null, "", "/quotations/preorder"); } catch { /* ignore */ }
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setSavedMsg("");
+    try {
+      const payload = {
+        doc,
+        title: doc.customerAr || doc.reference || "Preorder",
+        customer_ar: doc.customerAr,
+        reference: doc.reference,
+        currency: doc.currency,
+      };
+      if (docId) {
+        const r = await fetch(`/api/quotations/preorders/${docId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(payload) });
+        if (!r.ok) throw new Error();
+      } else {
+        const r = await fetch("/api/quotations/preorders", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(payload) });
+        const j = await r.json();
+        if (!r.ok) throw new Error();
+        setDocId(j.id as string);
+        try { window.history.replaceState(null, "", `/quotations/preorder?id=${j.id}`); } catch { /* ignore */ }
+      }
+      setSavedMsg("تم الحفظ ✓");
+      refreshList();
+    } catch {
+      setSavedMsg("فشل الحفظ");
+    } finally {
+      setSaving(false);
+      setTimeout(() => setSavedMsg(""), 2500);
+    }
+  };
+
+  // Load the list + any ?id= on mount.
+  useEffect(() => {
+    refreshList();
+    try {
+      const id = new URLSearchParams(window.location.search).get("id");
+      if (id) loadDoc(id);
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -119,8 +201,29 @@ export default function PreorderPage() {
       {/* Toolbar (screen only) */}
       <div className="no-print mx-auto mb-4 flex max-w-[1160px] items-center justify-between gap-3">
         <a href="/quotations" className="text-[13px] text-neutral-300 transition-colors hover:text-white" dir="ltr">← Quotations</a>
-        <div className="flex items-center gap-2">
-          <span className="text-[12px] text-neutral-400">كل الحقول قابلة للتعديل</span>
+        <div className="flex flex-wrap items-center gap-2">
+          {savedMsg && <span className="text-[12px] font-medium text-emerald-400">{savedMsg}</span>}
+          {/* Open a saved preorder */}
+          <select
+            value={docId ?? ""}
+            onChange={(e) => (e.target.value ? loadDoc(e.target.value) : newDoc())}
+            className="h-9 rounded-lg border border-white/20 bg-neutral-900 px-2 text-[12.5px] text-white outline-none"
+            title="فتح طلب محفوظ"
+          >
+            <option value="">— طلبات محفوظة —</option>
+            {list.map((p) => (
+              <option key={p.id} value={p.id}>{p.title || p.customer_ar || p.id.slice(0, 8)}</option>
+            ))}
+          </select>
+          <button type="button" onClick={newDoc} className="h-9 rounded-lg border border-white/20 px-3 text-[12.5px] font-medium text-white transition-colors hover:bg-white/10">جديد</button>
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving}
+            className="h-9 rounded-lg bg-white px-4 text-[12.5px] font-semibold text-black transition-opacity hover:opacity-85 disabled:opacity-50"
+          >
+            {saving ? "جارٍ الحفظ…" : docId ? "حفظ" : "حفظ جديد"}
+          </button>
           <button
             type="button"
             onClick={() => window.print()}
