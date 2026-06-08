@@ -370,16 +370,16 @@ export default function PreorderPage() {
 
               <table className="w-full border-collapse text-[12.5px] [&_td]:align-middle [&_th]:align-middle [&_th]:border-s [&_th]:border-neutral-200 [&_td]:border-s [&_td]:border-neutral-200 [&_tr>:first-child]:!border-s-0">
                 <thead>
-                  <tr className="sticky top-0 z-10 border-b-2 border-black bg-white text-[10px] font-bold uppercase tracking-wider text-neutral-500">
+                  <tr className="sticky top-0 z-10 border-b-2 border-black bg-neutral-200 text-[10px] font-bold uppercase tracking-wider text-neutral-600">
                     <th className="w-[44px] px-1 py-2.5 text-center">بند</th>
                     <th className="w-[124px] px-2 py-2.5 text-center">صورة</th>
                     <th className="px-3 py-2.5 text-right">الصنف</th>
                     {doc.buyers.map((b, bi) => (
                       <th key={bi} className="w-[58px] px-1 py-2.5 text-center font-bold normal-case" style={{ color: BUYER_COLORS[bi] }}>{b}</th>
                     ))}
-                    <th className="w-[112px] border-s-2 border-neutral-300 bg-neutral-100 px-2 py-2.5 text-center text-black">السعر</th>
-                    <th className="w-[62px] border-x-2 border-neutral-300 bg-neutral-100 px-1 py-2.5 text-center text-black">الكمية</th>
-                    <th className="w-[116px] border-e-2 border-neutral-300 bg-neutral-100 px-2 py-2.5 text-center text-black">الإجمالي</th>
+                    <th className="w-[112px] border-s-2 border-neutral-400 bg-neutral-300 px-2 py-2.5 text-center text-black">السعر</th>
+                    <th className="w-[62px] border-x-2 border-neutral-400 bg-neutral-300 px-1 py-2.5 text-center text-black">الكمية</th>
+                    <th className="w-[116px] border-e-2 border-neutral-400 bg-neutral-300 px-2 py-2.5 text-center text-black">الإجمالي</th>
                   </tr>
                 </thead>
                 <tbody>
