@@ -957,13 +957,10 @@ export default function QuotationA4Preview({
             marginTop: 12,
           }}
         >
-          {/* Items-table header renders on EVERY page. Continuation
-              pages (2..N) used to skip the thead to save vertical
-              space, but that left the table starting flush at the
-              top of the page — looked "cropped". Repeating the
-              header on every page also makes printed pages self-
-              explanatory: the customer can flip to any sheet and
-              see which column is which. */}
+          {/* Column header renders on the FIRST page only (per request:
+              one header for the whole document, not repeated on every
+              sheet). Continuation pages start with their rows directly. */}
+          {isFirstPage && (
           <thead>
             <tr>
               {/* Column widths measured against worst-case real
@@ -989,6 +986,7 @@ export default function QuotationA4Preview({
               <Th width="16%" align="center" isLast>TOTAL</Th>
             </tr>
           </thead>
+          )}
           <tbody>
             {pageItems.map((item, localIdx) => {
               /* `idx` is the GLOBAL item index across all pages, so

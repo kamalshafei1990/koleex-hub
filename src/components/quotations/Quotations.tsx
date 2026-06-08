@@ -1572,7 +1572,11 @@ export default function Quotations() {
         description: pick.description,
         model: pick.model,
         image: pick.imageUrl,
-        unitPrice: pick.unitPrice,
+        /* Do NOT auto-fill the product's saved price. Quotation prices must be
+           entered deliberately — auto-copying a price produced "surprise" totals
+           on quotes the user thought were unpriced. Start at 0; the salesperson
+           types the price to quote. */
+        unitPrice: 0,
         qty: 1,
       };
       const items = current.items.slice();
