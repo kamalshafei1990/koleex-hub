@@ -968,6 +968,18 @@ export default function QuotationA4Preview({
             marginTop: 12,
           }}
         >
+          {/* Column widths are fixed on EVERY page via this colgroup, so pages
+              that don't render the <thead> (pages 2..N) keep identical column
+              sizes to page 1. */}
+          <colgroup>
+            <col style={{ width: "5%" }} />
+            <col style={{ width: "28%" }} />
+            <col style={{ width: "15%" }} />
+            <col style={{ width: "15%" }} />
+            <col style={{ width: "14%" }} />
+            <col style={{ width: "7%" }} />
+            <col style={{ width: "16%" }} />
+          </colgroup>
           {/* Column header renders on the FIRST page only (per request:
               one header for the whole document, not repeated on every
               sheet). Continuation pages start with their rows directly. */}
