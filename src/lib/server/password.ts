@@ -89,6 +89,28 @@ export async function hashPassword(
   return { hash, algo: "argon2id" };
 }
 
+/**
+ * Hash a password FOR STORAGE, honoring the S1b rollout flag.
+ *
+ *   default / AUTH_NEW_HASH_ON_WRITE unset or "on"  → Argon2id (secure).
+ *   AUTH_NEW_HASH_ON_WRITE === "off"                → emergency rollback only:
+ *       writes the legacy reversible tmp$ tag so account creation / reset keeps
+ *       working WITHOUT a redeploy if Argon2 ever misbehaves in production.
+ *
+ * The tmp$ generator (`legacyTag`) is defined ONCE in this module and shared
+ * with the verifier — no API route or admin lib duplicates it. Callers must
+ * persist BOTH the returned hash and algo into accounts.password_hash /
+ * accounts.password_algo (and stamp password_changed_at).
+ */
+export async function hashForWrite(
+  password: string,
+): Promise<{ hash: string; algo: PasswordAlgo }> {
+  if (process.env.AUTH_NEW_HASH_ON_WRITE === "off") {
+    return { hash: legacyTag(password), algo: "legacy" };
+  }
+  return hashPassword(password);
+}
+
 /* Burn ~one Argon2 op worth of time without revealing anything — used when
    there is no real hash to compare against, so "no such account / no password"
    costs about the same as a real verify. Errors are swallowed. */

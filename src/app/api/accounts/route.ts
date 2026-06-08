@@ -7,6 +7,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { hashForWrite } from "@/lib/server/password";
 
 export async function GET() {
   const auth = await requireAuth();
@@ -43,11 +44,6 @@ export async function GET() {
    The temporary_password is hashed server-side (same scheme as the
    legacy path). tenant_id is enforced from the session. */
 
-function hashTempPassword(plain: string): string {
-  // Matches the hashing used in accounts-admin.ts / auth/signin.
-  return `tmp$${Buffer.from(plain, "utf8").toString("base64")}`;
-}
-
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
@@ -73,10 +69,17 @@ export async function POST(req: Request) {
     );
   }
 
+  // Hash the chosen password server-side (Argon2id via hashForWrite). The
+  // server is the ONLY place password_algo is computed — never trusted from
+  // the request body. No hash → null (sign-in disabled), algo stays 'legacy'.
+  const hashed = trimmedTmp ? await hashForWrite(trimmedTmp) : null;
+
   const payload = {
     ...rest,
     tenant_id: auth.tenant_id, // server-side truth
-    password_hash: trimmedTmp ? hashTempPassword(trimmedTmp) : null,
+    password_hash: hashed ? hashed.hash : null,
+    password_algo: hashed ? hashed.algo : "legacy",
+    password_changed_at: hashed ? new Date().toISOString() : null,
     /* Default OFF — admin's chosen password is the real one. If the
        caller explicitly included force_password_change in `rest`
        (AccountForm's toggle for example), that value overrides this

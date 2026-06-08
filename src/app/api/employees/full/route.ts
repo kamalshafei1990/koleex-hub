@@ -22,6 +22,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
+import { hashForWrite } from "@/lib/server/password";
 
 /* ── Table names ── */
 const PEOPLE = "people";
@@ -381,22 +382,19 @@ export async function POST(req: Request) {
         ? usernameRaw.trim()
         : `${firstName ?? ""}.${lastName ?? ""}`.toLowerCase().replace(/[^a-z0-9._-]/g, "");
 
-    /* Lightweight base64 tag for temp password — MUST use `tmp$` to
-       match accounts-admin.ts::hashTempPassword. /api/auth/signin
-       compares against exactly that prefix; a mismatch makes the
-       freshly-created account unable to log in ("Invalid username or
-       password"). Base64 body only, no cryptographic hashing — a
-       real hash is set the first time the user changes their
-       password. */
+    /* Temp password is hashed server-side with Argon2id (hashForWrite). The
+       server is the only writer of password_algo. */
     const tempPassword = str(body, "temp_password") || "changeme";
-    const hashTag = `tmp$${Buffer.from(tempPassword, "utf8").toString("base64")}`;
+    const hashed = await hashForWrite(tempPassword);
 
     const { data: account, error: accErr } = await supabaseServer
       .from(ACCOUNTS)
       .insert({
         username,
         login_email: loginEmail,
-        password_hash: hashTag,
+        password_hash: hashed.hash,
+        password_algo: hashed.algo,
+        password_changed_at: new Date().toISOString(),
         /* Default OFF — whatever password the admin sets is the
            employee's real password. No forced change on first
            login. Admins who DO want a forced reset can flip the
