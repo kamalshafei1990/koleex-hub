@@ -193,6 +193,10 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   // see / use the screen again WITHOUT losing anything they've typed. The
   // component stays mounted — all field state is preserved.
   const [minimized, setMinimized] = useState(false);
+  // Timed capture (issue 282b8025): counts down while the panel is minimized so
+  // the reporter can re-open a dropdown/popover that the report panel closed,
+  // then snapshots the whole viewport WITH the menu open.
+  const [countdown, setCountdown] = useState<number | null>(null);
   // Draggable window position (null = use the default right-docked spot).
   // Grab the title bar to move the panel anywhere, like a real window.
   const panelRef = useRef<HTMLDivElement>(null);
@@ -402,6 +406,45 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
     [addImage],
   );
 
+  // Timed full-viewport capture: minimize the panel so the page is interactive,
+  // count down (the reporter re-opens the dropdown/popover they want to show),
+  // then html2canvas the current viewport — capturing the open menu. Solves the
+  // "opening the report closes the dropdown" problem (issue 282b8025).
+  const startTimedCapture = useCallback((seconds = 3) => {
+    if (busy || capturing || countdown !== null || !captureSupported) return;
+    setError(null);
+    setMinimized(true);
+    let n = seconds;
+    setCountdown(n);
+    const tick = setInterval(() => {
+      n -= 1;
+      if (n > 0) { setCountdown(n); return; }
+      clearInterval(tick);
+      setCountdown(null);
+      (async () => {
+        try {
+          const mod = await import("html2canvas-pro");
+          const canvas = await mod.default(document.body, {
+            backgroundColor: getComputedStyle(document.body).backgroundColor || "#0d0d0d",
+            scale: Math.min(window.devicePixelRatio || 1, 2),
+            useCORS: true,
+            logging: false,
+            windowWidth: document.documentElement.clientWidth,
+            windowHeight: document.documentElement.clientHeight,
+            x: window.scrollX,
+            y: window.scrollY,
+            width: document.documentElement.clientWidth,
+            height: document.documentElement.clientHeight,
+            ignoreElements: (el) => (el as HTMLElement).hasAttribute?.("data-qa-capture-skip"),
+          });
+          const blob: Blob | null = await new Promise((res) => canvas.toBlob(res, "image/png"));
+          if (blob) addImage(new File([blob], `timed-${Date.now()}.png`, { type: "image/png" }));
+        } catch { /* silent — user can still capture manually */ }
+        finally { setMinimized(false); }
+      })();
+    }, 1000);
+  }, [busy, capturing, countdown, captureSupported, addImage]);
+
   // Esc to close, paste-to-attach while the modal is open.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !busy) onClose(); };
@@ -604,6 +647,15 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
   if (minimized) {
     const draftLabel = title.trim() || t("qa.report.minimizedDraft", "Draft report");
     return (
+      <>
+        {countdown !== null && (
+          <div data-qa-capture-skip="" className="pointer-events-none fixed inset-0 z-[300] flex items-center justify-center">
+            <div className="flex flex-col items-center gap-2 rounded-2xl bg-black/70 px-10 py-7 backdrop-blur-sm">
+              <span className="text-[64px] font-black leading-none text-white tabular-nums">{countdown}</span>
+              <span className="text-[12.5px] font-medium text-white/80">{t("qa.report.timedHint", "Open the menu you want to capture…")}</span>
+            </div>
+          </div>
+        )}
       <button
         type="button"
         onClick={() => setMinimized(false)}
@@ -620,6 +672,7 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
           </span>
         )}
       </button>
+      </>
     );
   }
 
@@ -1032,6 +1085,18 @@ function ReportModal({ pathname, onClose }: { pathname: string; onClose: () => v
                         {shots.length === 0
                           ? t("qa.report.takeScreenshot", "Capture an area or component")
                           : t("qa.report.takeAnotherScreenshot", "Capture another")}
+                      </button>
+                    )}
+                    {captureSupported && (
+                      <button
+                        type="button"
+                        onClick={() => startTimedCapture(3)}
+                        disabled={countdown !== null}
+                        title={t("qa.report.timedCaptureHint", "Minimizes this panel and captures the screen after 3s — so you can re-open a dropdown or popup first")}
+                        className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-[var(--border-color)] bg-[var(--bg-surface)] py-2 text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:border-[var(--border-focus)] hover:text-[var(--text-primary)] disabled:opacity-50"
+                      >
+                        <MonitorIcon size={14} className="text-[var(--text-dim)]" />
+                        {t("qa.report.timedCapture", "Capture in 3s (keeps menus open)")}
                       </button>
                     )}
                     <button
