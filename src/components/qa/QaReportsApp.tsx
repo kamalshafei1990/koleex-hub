@@ -297,6 +297,24 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
     };
   }, [load]);
 
+  /* Belt-and-suspenders auto-refresh so a status change (e.g. Koleex AI moving
+     an issue to Fixed, or another admin saving) appears WITHOUT a manual page
+     refresh — even when the realtime socket is blocked/asleep/RLS-filtered:
+     refetch when the tab regains focus or becomes visible, and poll every 20s
+     while the tab is visible. load() aborts stale calls, so this is cheap and
+     never races. Idle/hidden tabs don't poll. */
+  useEffect(() => {
+    const refreshIfVisible = () => { if (document.visibilityState === "visible") void load(); };
+    window.addEventListener("focus", refreshIfVisible);
+    document.addEventListener("visibilitychange", refreshIfVisible);
+    const id = setInterval(refreshIfVisible, 20000);
+    return () => {
+      window.removeEventListener("focus", refreshIfVisible);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
+      clearInterval(id);
+    };
+  }, [load]);
+
   /* Deep-link from a notification: /database/issues?issue=<id> auto-selects
      the row. useSearchParams is REACTIVE, so clicking another notification
      while already on this page (soft navigation, no remount) re-selects the
