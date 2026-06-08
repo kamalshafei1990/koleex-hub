@@ -2164,3 +2164,27 @@ export interface HrDocumentRow {
   updated_at: string;
 }
 export type HrDocumentInsert = Omit<HrDocumentRow, "id" | "created_at" | "updated_at">;
+
+/* Phase 2A S2b — login_attempts (rate-limiting / brute-force). Additive table;
+   not wired into any code yet (recording = S2c, enforcement = S2d). */
+export type LoginAttemptOutcome =
+  | "success"
+  | "failure"
+  | "blocked"
+  | "disabled"
+  | "unknown_user";
+
+export interface LoginAttemptRow {
+  id: string;
+  tenant_id: string | null;
+  account_id: string | null;
+  identifier: string;
+  identifier_hash: string | null;
+  ip_address: string;
+  user_agent: string | null;
+  outcome: LoginAttemptOutcome;
+  reason: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+export type LoginAttemptInsert = Omit<LoginAttemptRow, "id" | "created_at">;

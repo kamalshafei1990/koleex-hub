@@ -17,6 +17,15 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { setSessionCookie } from "@/lib/server/session";
 import { verifyPassword } from "@/lib/server/password";
+import {
+  rateLimitMode,
+  clientIp,
+  clientUserAgent,
+  normalizeIdentifier,
+  computeWouldBlock,
+  recordAttempt,
+  type WouldBlockResult,
+} from "@/lib/server/rate-limit";
 
 export async function POST(req: Request) {
   // Outer try/catch so an unexpected throw (missing env var, DB outage,
@@ -46,6 +55,19 @@ export async function POST(req: Request) {
 
     // Look up the account by login_email or username (case-insensitive).
     // One round-trip either way so login latency is predictable.
+    /* ---- Rate-limiting OBSERVE MODE (S2c) ----------------------------------
+       Capture IP / UA / normalized identifier and compute the would-block
+       decision AT ARRIVAL (before the account lookup, matching real enforcement
+       semantics). This NEVER blocks in S2c. Zero work when AUTH_RATELIMIT=off. */
+    const rlMode = rateLimitMode();
+    const rlActive = rlMode !== "off";
+    const ip = rlActive ? clientIp(req) : "";
+    const userAgent = rlActive ? clientUserAgent(req) : null;
+    const identifier = rlActive ? normalizeIdentifier(emailOrUsername) : "";
+    const wouldBlock: WouldBlockResult = rlActive
+      ? await computeWouldBlock(ip, identifier)
+      : { would_block: false, rule: null, counts: {} };
+
     let account: {
       id: string;
       username: string;
@@ -55,9 +77,10 @@ export async function POST(req: Request) {
       password_algo: string | null;
       user_type: string;
       force_password_change: boolean | null;
+      tenant_id: string | null;
     } | null = null;
 
-    const SELECT_COLS = "id, username, login_email, status, password_hash, password_algo, user_type, force_password_change";
+    const SELECT_COLS = "id, username, login_email, status, password_hash, password_algo, user_type, force_password_change, tenant_id";
     if (emailOrUsername.includes("@")) {
       const { data } = await supabaseServer
         .from("accounts")
@@ -76,12 +99,24 @@ export async function POST(req: Request) {
 
     // Uniform error messages so attackers can't probe for valid emails.
     if (!account) {
+      if (rlActive) {
+        await recordAttempt({
+          ip, identifier, userAgent, accountId: null, tenantId: null,
+          outcome: "unknown_user", reason: "unknown_account", wouldBlock, mode: rlMode,
+        });
+      }
       return NextResponse.json(
         { ok: false, error: "Invalid email/username or password" },
         { status: 401 },
       );
     }
     if (account.status !== "active") {
+      if (rlActive) {
+        await recordAttempt({
+          ip, identifier, userAgent, accountId: account.id, tenantId: account.tenant_id,
+          outcome: "disabled", reason: "disabled_account", wouldBlock, mode: rlMode,
+        });
+      }
       return NextResponse.json(
         { ok: false, error: "This account is disabled" },
         { status: 403 },
@@ -93,6 +128,12 @@ export async function POST(req: Request) {
     // password_algo column is advisory only.
     const verdict = await verifyPassword(password, account.password_hash, account.password_algo);
     if (!verdict.ok) {
+      if (rlActive) {
+        await recordAttempt({
+          ip, identifier, userAgent, accountId: account.id, tenantId: account.tenant_id,
+          outcome: "failure", reason: "invalid_password", wouldBlock, mode: rlMode,
+        });
+      }
       return NextResponse.json(
         { ok: false, error: "Invalid email/username or password" },
         { status: 401 },
@@ -138,6 +179,14 @@ export async function POST(req: Request) {
       ]);
     } catch {
       /* never block a successful login on a side-effect write */
+    }
+
+    // Observe-mode: record the successful attempt (awaited, self-guarded).
+    if (rlActive) {
+      await recordAttempt({
+        ip, identifier, userAgent, accountId: account.id, tenantId: account.tenant_id,
+        outcome: "success", reason: "login_success", wouldBlock, mode: rlMode,
+      });
     }
 
     return NextResponse.json({
