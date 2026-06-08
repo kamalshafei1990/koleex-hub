@@ -34,13 +34,15 @@
   --text-primary: #ffffff;
   --text-highlight: rgba(255,255,255,0.80);
   --text-secondary: rgba(255,255,255,0.70);
-  --text-muted: rgba(255,255,255,0.60);
-  --text-subtle: rgba(255,255,255,0.50);
-  --text-faint: rgba(255,255,255,0.40);
-  --text-dim: rgba(255,255,255,0.30);
-  --text-ghost: rgba(255,255,255,0.20);
-  --text-whisper: rgba(255,255,255,0.15);
-  --text-barely: rgba(255,255,255,0.10);
+  --text-muted: rgba(255,255,255,0.66);
+  --text-subtle: rgba(255,255,255,0.56);
+  /* Bumped (issue af3a11b7): meta/dim text was too faint to read, esp. for
+     Arabic glyphs which render thinner. Raised the low tiers for legibility. */
+  --text-faint: rgba(255,255,255,0.50);
+  --text-dim: rgba(255,255,255,0.44);
+  --text-ghost: rgba(255,255,255,0.32);
+  --text-whisper: rgba(255,255,255,0.22);
+  --text-barely: rgba(255,255,255,0.14);
 
   /* Inverted (buttons etc.) */
   --bg-inverted: #ffffff;
@@ -92,15 +94,18 @@
      dim text passes AA on white background and reads cleanly in any locale.
      --text-primary stays #000 for unmissable hierarchy. */
   --text-primary: #000000;
-  --text-highlight: rgba(0,0,0,0.86);
-  --text-secondary: rgba(0,0,0,0.78);
-  --text-muted: rgba(0,0,0,0.68);
-  --text-subtle: rgba(0,0,0,0.58);
-  --text-faint: rgba(0,0,0,0.48);
-  --text-dim: rgba(0,0,0,0.42);
-  --text-ghost: rgba(0,0,0,0.34);
-  --text-whisper: rgba(0,0,0,0.26);
-  --text-barely: rgba(0,0,0,0.18);
+  --text-highlight: rgba(0,0,0,0.88);
+  --text-secondary: rgba(0,0,0,0.82);
+  --text-muted: rgba(0,0,0,0.72);
+  --text-subtle: rgba(0,0,0,0.64);
+  /* Bumped again (issue af3a11b7): dim/faint/ghost still failed AA on white at
+     small sizes, worst for thinner Arabic glyphs in light mode. Meta text now
+     clears ~4.5:1 (dim/faint ≥ 0.60) so it's comfortably readable. */
+  --text-faint: rgba(0,0,0,0.60);
+  --text-dim: rgba(0,0,0,0.58);
+  --text-ghost: rgba(0,0,0,0.48);
+  --text-whisper: rgba(0,0,0,0.38);
+  --text-barely: rgba(0,0,0,0.26);
 
   /* Inverted (buttons etc.) */
   --bg-inverted: #000000;
