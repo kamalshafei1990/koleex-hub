@@ -274,7 +274,8 @@ export function NewRequisitionDialog({ open, onClose, onCreated }: DialogProps) 
           </div>
           <div>
             <label className={labelCls}>Needed by</label>
-            <input type="date" value={neededBy} onChange={(e) => setNeededBy(e.target.value)} className={inputCls} />
+            {/* Future event — can't be needed in the past (QA issue 8f009186). */}
+            <input type="date" min={new Date().toISOString().slice(0, 10)} value={neededBy} onChange={(e) => setNeededBy(e.target.value)} className={inputCls} />
           </div>
         </div>
         <div>
@@ -444,7 +445,8 @@ export function NewPurchaseOrderDialog({ open, onClose, onCreated }: DialogProps
           </div>
           <div>
             <label className={labelCls}>Expected delivery</label>
-            <input type="date" value={expectedDelivery} onChange={(e) => setExpectedDelivery(e.target.value)} className={inputCls} />
+            {/* Delivery is in the future — never before the order date (QA issue 8f009186). */}
+            <input type="date" min={orderDate || new Date().toISOString().slice(0, 10)} value={expectedDelivery} onChange={(e) => setExpectedDelivery(e.target.value)} className={inputCls} />
           </div>
           <div>
             <label className={labelCls}>Currency</label>
