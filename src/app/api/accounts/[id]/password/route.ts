@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
+import { hashForWrite } from "@/lib/server/password";
 
 /* POST /api/accounts/[id]/password
    Change an account's password. Two modes:
@@ -19,10 +20,6 @@ import { requireAuth } from "@/lib/server/auth";
 
    Requires the caller to have Accounts module access (matches the
    force-password-change endpoint). */
-
-function hashTempPassword(plain: string): string {
-  return `tmp$${Buffer.from(plain, "utf8").toString("base64")}`;
-}
 
 /** Mirror of generateTemporaryPassword() in lib/accounts-admin.ts —
  *  duplicated here so this server route has zero client-bundle
@@ -83,10 +80,14 @@ export async function POST(
     );
   }
 
+  // Argon2id hash server-side; server is the only writer of password_algo.
+  const hashed = await hashForWrite(plain);
   const { error } = await supabaseServer
     .from("accounts")
     .update({
-      password_hash: hashTempPassword(plain),
+      password_hash: hashed.hash,
+      password_algo: hashed.algo,
+      password_changed_at: new Date().toISOString(),
       /* Default: clear force_password_change so the admin who just
          reset the password isn't forcing themselves into a loop.
          Caller can explicitly request force-reset by sending

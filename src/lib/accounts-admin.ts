@@ -187,6 +187,9 @@ export async function fetchAccountForHeader(
     username: row.username as string,
     login_email: "",
     password_hash: null,
+    password_algo: "legacy",
+    password_changed_at: null,
+    password_rehash_required: false,
     force_password_change: false,
     two_factor_enabled: false,
     last_login_at: null,
@@ -279,9 +282,14 @@ export async function createAccount(
   }
 
   const { temporary_password, preferences, ...rest } = input;
+  // S1b: this client fallback NEVER hashes (Argon2 is server-only). The real
+  // creation path is POST /api/accounts above, which hashes server-side. If we
+  // ever reach this fallback (API unreachable) the row is created WITHOUT a
+  // password (sign-in disabled) and an admin sets one via the password endpoint.
+  void temporary_password; // intentionally not stored here
   const payload: Record<string, unknown> = {
     ...rest,
-    password_hash: temporary_password ? hashTempPassword(temporary_password) : null,
+    password_hash: null,
     /* Default OFF — the admin's chosen password is the real one.
        Callers that DO want a forced reset can pass
        force_password_change: true explicitly via `rest`. */
@@ -353,24 +361,22 @@ export async function resetAccountPassword(
   id: string,
   newTemporaryPassword: string,
 ): Promise<boolean> {
-  const { error } = await supabase
-    .from(ACCOUNTS)
-    .update({
-      password_hash: hashTempPassword(newTemporaryPassword),
-      /* Default OFF: admin-driven resets no longer force the user
-         to change the password on next login. If an admin wants
-         that behaviour they can flip the per-account toggle in
-         AccountForm or the /api/accounts/[id]/password endpoint
-         with forceReset: true. */
-      force_password_change: false,
-    })
-    .eq("id", id);
-  if (error) {
-    console.error("[Accounts] Reset password:", error.message);
+  /* S1b: password hashing is server-only (Argon2id). Delegate to the password
+     endpoint — which hashes via hashForWrite and persists password_algo +
+     password_changed_at — instead of writing a hash from the client. The
+     endpoint is super-admin-gated and clears force_password_change by default. */
+  try {
+    const res = await fetch(`/api/accounts/${id}/password`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: newTemporaryPassword }),
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("[Accounts] resetAccountPassword API failed:", e);
     return false;
   }
-  void logEvent(id, "password_reset", { source: "admin" });
-  return true;
 }
 
 /** Flip the force-password-change flag on without issuing a new password. */
@@ -1308,19 +1314,10 @@ export async function replacePermissionOverrides(
    Helpers
    ============================================================================ */
 
-/**
- * Lightweight client-side hash for the temporary password column.
- * This is NOT a cryptographic password hash — it's a base64 tag used as a
- * placeholder until Supabase Auth is wired up. The first time a user logs in
- * with real auth, `force_password_change` will require them to set a proper
- * password that Supabase Auth will handle with bcrypt.
- */
-function hashTempPassword(plain: string): string {
-  if (typeof window !== "undefined" && typeof window.btoa === "function") {
-    return `tmp$${window.btoa(unescape(encodeURIComponent(plain)))}`;
-  }
-  return `tmp$${Buffer.from(plain, "utf8").toString("base64")}`;
-}
+/* Phase 2A S1b: the legacy client-side `hashTempPassword` was REMOVED.
+   Password hashing is now Argon2id and happens exclusively server-side
+   (src/lib/server/password.ts via the API routes) — this client-importable
+   module must never produce a password hash. */
 
 /**
  * Look up an account row by username. Used by the legacy login form so we

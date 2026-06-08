@@ -744,6 +744,12 @@ export interface AccountRow {
   username: string;
   login_email: string;
   password_hash: string | null;
+  /* Phase 2A S0b — password hashing migration scaffolding (additive).
+     'legacy' = reversible tmp$ hash (being phased out); 'argon2id'/'bcrypt'
+     = securely hashed. password_changed_at stamps the last (re)hash. */
+  password_algo: "legacy" | "argon2id" | "bcrypt";
+  password_changed_at: string | null;
+  password_rehash_required: boolean;
   force_password_change: boolean;
   two_factor_enabled: boolean;
   last_login_at: string | null;
@@ -783,7 +789,16 @@ export interface AccountRow {
 }
 
 /** Columns that have DB-level defaults and can be omitted on insert. */
-type AccountInsertDefaulted = "tenant_id" | "is_super_admin";
+/* Columns the DB fills with a default on INSERT — callers may omit them.
+   Phase 2A S0b added password_algo/password_changed_at/password_rehash_required
+   (DB defaults: 'legacy' / NULL / false), so account-creation callers don't
+   need to pass them. */
+type AccountInsertDefaulted =
+  | "tenant_id"
+  | "is_super_admin"
+  | "password_algo"
+  | "password_changed_at"
+  | "password_rehash_required";
 
 export type AccountInsert =
   & Omit<AccountRow, "id" | "created_at" | "updated_at" | AccountInsertDefaulted>

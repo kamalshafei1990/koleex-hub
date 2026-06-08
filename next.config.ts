@@ -2,6 +2,11 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  /* Native N-API module (Argon2id password hashing, Phase 2A S0). Keep it
+     OUT of the server bundle so the prebuilt .node binary is require()'d at
+     runtime instead of being mangled by the bundler. Server (Node) runtime
+     only — never imported into client/edge code. */
+  serverExternalPackages: ["@node-rs/argon2"],
   compiler: {
     removeConsole: process.env.NODE_ENV === "production" ? { exclude: ["error", "warn"] } : false,
   },
