@@ -1199,6 +1199,19 @@ function ReportDetail({
 
       <DuplicateControl report={report} allReports={allReports} disabled={busy} onPatch={patch} onJump={onJump} dupTarget={dupTarget ?? null} />
 
+      {/* A fixed issue can be verified (the fix works) OR reopened — right from
+         the board, not just the reporter's notification view (QA gap report). */}
+      {report.status === "fixed" && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => patch({ status: "verified" })}
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-[12.5px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+        >
+          ✓ {t("qa.action.verify", "Verify — this fix works")}
+        </button>
+      )}
+
       {isResolved && <ReopenControl disabled={busy} onReopen={(reason) => patch({ action: "reopen", reopen_reason: reason })} />}
 
       <ComponentsBreadcrumbs report={report} />
