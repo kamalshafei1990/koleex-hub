@@ -211,6 +211,36 @@ export default function PreorderPage() {
     }
   };
 
+  // Auto: whenever the set of model codes changes, fetch matching product photos
+  // and fill any empty صورة cell. Never overwrites a manually uploaded photo.
+  const photosSigRef = useRef<string>("");
+  useEffect(() => {
+    const models = Array.from(new Set(doc.sections.flatMap((s) => s.items.map((i) => i.model.trim()).filter(Boolean))));
+    if (models.length === 0) return;
+    const sig = models.join("|");
+    if (sig === photosSigRef.current) return;
+    const t = setTimeout(async () => {
+      photosSigRef.current = sig;
+      try {
+        const r = await fetch("/api/quotations/preorders/match-products", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ models }) });
+        const j = await r.json();
+        if (!r.ok) { photosSigRef.current = ""; return; }
+        const map: Record<string, string> = j.matches || {};
+        setDoc((d) => ({
+          ...d,
+          sections: d.sections.map((s) => ({
+            ...s,
+            items: s.items.map((it) => {
+              const url = it.model ? map[it.model.trim().toUpperCase()] : undefined;
+              return url && !it.photo ? { ...it, photo: url } : it;
+            }),
+          })),
+        }));
+      } catch { photosSigRef.current = ""; }
+    }, 600);
+    return () => clearTimeout(t);
+  }, [doc.sections]);
+
   // Pull machine photos from the Products app by model code (sku/model_name).
   const [linking, setLinking] = useState(false);
   const linkProductPhotos = async () => {
