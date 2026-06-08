@@ -363,12 +363,9 @@ export default function PreorderPage() {
           {/* ── Sections ── */}
           {doc.sections.map((sec, si) => (
             <section key={si} className="mt-6 overflow-hidden rounded-2xl border border-neutral-200">
-              <div className="flex items-center justify-between gap-3 border-b-2 border-black bg-white px-4 py-2.5">
-                <div className="flex flex-1 items-center gap-2.5">
-                  <span className="h-4 w-1.5 rounded-sm bg-black" />
-                  <input value={sec.ar} onChange={(e) => setDoc((d) => ({ ...d, sections: d.sections.map((s, i) => (i === si ? { ...s, ar: e.target.value } : s)) }))} className="flex-1 rounded bg-transparent px-1 text-[15px] font-bold tracking-wide text-black outline-none placeholder:text-neutral-300 focus:bg-neutral-100" />
-                </div>
-                <span className="text-[10.5px] font-semibold uppercase tracking-[0.18em] text-neutral-400" dir="ltr">{sec.en} · {sec.items.length}</span>
+              <div className="pre-band flex items-center justify-between gap-3 bg-black px-5 py-3.5">
+                <input value={sec.ar} onChange={(e) => setDoc((d) => ({ ...d, sections: d.sections.map((s, i) => (i === si ? { ...s, ar: e.target.value } : s)) }))} className="flex-1 rounded bg-transparent px-1 text-[19px] font-black tracking-wide text-white outline-none placeholder:text-white/40 focus:bg-white/10" />
+                <span className="text-[15px] font-bold uppercase tracking-[0.12em] text-white" dir="ltr">{sec.en} · {sec.items.length}</span>
               </div>
 
               <table className="w-full border-collapse text-[12.5px] [&_td]:align-middle [&_th]:align-middle [&_th]:border-s [&_th]:border-neutral-200 [&_td]:border-s [&_td]:border-neutral-200 [&_tr>:first-child]:!border-s-0">
