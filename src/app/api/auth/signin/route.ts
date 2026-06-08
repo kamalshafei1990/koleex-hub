@@ -22,9 +22,10 @@ import {
   clientIp,
   clientUserAgent,
   normalizeIdentifier,
-  computeWouldBlock,
+  evaluateEnforcement,
   recordAttempt,
-  type WouldBlockResult,
+  writeRateLimitAudit,
+  type EnforcementDecision,
 } from "@/lib/server/rate-limit";
 
 export async function POST(req: Request) {
@@ -53,21 +54,49 @@ export async function POST(req: Request) {
       );
     }
 
-    // Look up the account by login_email or username (case-insensitive).
-    // One round-trip either way so login latency is predictable.
-    /* ---- Rate-limiting OBSERVE MODE (S2c) ----------------------------------
-       Capture IP / UA / normalized identifier and compute the would-block
-       decision AT ARRIVAL (before the account lookup, matching real enforcement
-       semantics). This NEVER blocks in S2c. Zero work when AUTH_RATELIMIT=off. */
+    /* ---- Rate-limiting (S2c observe + S2d enforce) -------------------------
+       Capture IP / UA / normalized identifier and compute the decision AT
+       ARRIVAL — BEFORE the account lookup and BEFORE the expensive Argon2
+       verify. Zero work when AUTH_RATELIMIT=off. */
     const rlMode = rateLimitMode();
     const rlActive = rlMode !== "off";
     const ip = rlActive ? clientIp(req) : "";
     const userAgent = rlActive ? clientUserAgent(req) : null;
     const identifier = rlActive ? normalizeIdentifier(emailOrUsername) : "";
-    const wouldBlock: WouldBlockResult = rlActive
-      ? await computeWouldBlock(ip, identifier)
-      : { would_block: false, rule: null, counts: {} };
+    const enforcement: EnforcementDecision = rlActive
+      ? await evaluateEnforcement(ip, identifier)
+      : { blocked: false, rule: null, retryAfterSeconds: 0, wouldBlock: { would_block: false, rule: null, counts: {} } };
+    const wouldBlock = enforcement.wouldBlock;
 
+    /* ENFORCE: if a hard-block rule is tripped, stop here. No account lookup,
+       no verifyPassword, no session — block decided before any expensive work.
+       observe/off never enter this branch (enforcement.blocked stays false in
+       observe because we only act on it when rlMode === "enforce"). */
+    if (rlMode === "enforce" && enforcement.blocked) {
+      await recordAttempt({
+        ip, identifier, userAgent, accountId: null, tenantId: null,
+        outcome: "blocked", reason: "rate_limited", wouldBlock, mode: rlMode,
+      });
+      await writeRateLimitAudit({
+        ip, identifier, userAgent,
+        rule: enforcement.rule, retryAfterSeconds: enforcement.retryAfterSeconds,
+      });
+      const res = NextResponse.json(
+        { ok: false, error: "Too many login attempts. Please wait and try again." },
+        { status: 429 },
+      );
+      // Generic, enumeration-safe: never reveals account existence or which
+      // rule/identity tripped. Retry-After is the cooldown in seconds.
+      res.headers.set("Retry-After", String(enforcement.retryAfterSeconds));
+      // Preview-only diagnostic (Vercel sets VERCEL_ENV); omitted in production.
+      if (process.env.VERCEL_ENV !== "production" && enforcement.rule) {
+        res.headers.set("X-RateLimit-Rule", enforcement.rule);
+      }
+      return res;
+    }
+
+    // Look up the account by login_email or username (case-insensitive).
+    // One round-trip either way so login latency is predictable.
     let account: {
       id: string;
       username: string;

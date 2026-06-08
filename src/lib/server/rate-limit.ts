@@ -66,11 +66,18 @@ const FAILED_OUTCOMES: LoginAttemptOutcome[] = [
   "blocked",
 ];
 
-/** Initial would-block rules (observe only). */
+/** Rate-limit rules.
+ *  hardBlock=true  → enforce mode returns 429 when tripped (per-IP, per-IP+identifier).
+ *  hardBlock=false → would_block is recorded + (in enforce) a security-audit row is
+ *                    written, but the request is NEVER globally blocked. This is the
+ *                    per-identifier rule: a hard account lock would let an attacker
+ *                    lock any user out by spamming their username (DoS), so it is
+ *                    observe/alert-only by design.
+ *  blockSeconds    → Retry-After / cooldown for hardBlock rules (time-boxed; never permanent). */
 const RULES = [
-  { rule: "ip_10_failures_10m", scope: "ip", limit: 10, windowMin: 10 },
-  { rule: "ip_identifier_5_failures_15m", scope: "ip_identifier", limit: 5, windowMin: 15 },
-  { rule: "identifier_20_failures_30m", scope: "identifier", limit: 20, windowMin: 30 },
+  { rule: "ip_10_failures_10m",          scope: "ip",            limit: 10, windowMin: 10, hardBlock: true,  blockSeconds: 600 },
+  { rule: "ip_identifier_5_failures_15m", scope: "ip_identifier", limit: 5,  windowMin: 15, hardBlock: true,  blockSeconds: 900 },
+  { rule: "identifier_20_failures_30m",   scope: "identifier",    limit: 20, windowMin: 30, hardBlock: false, blockSeconds: 0 },
 ] as const;
 
 export interface WouldBlockResult {
@@ -114,6 +121,73 @@ export async function computeWouldBlock(
     console.error("[rate-limit] computeWouldBlock failed:", (e as Error)?.name);
   }
   return { would_block: triggered !== null, rule: triggered, counts };
+}
+
+/** Shared system "actor" for automated security-audit rows (rate-limit events
+ *  have no human actor). This is the existing approvals/automation system
+ *  account; koleex_security_audit.actor_account_id has no FK, but using a real
+ *  stable id keeps any actor joins well-behaved. */
+const RATE_LIMIT_AUDIT_ACTOR = "00000000-0000-4000-a000-0000000000b9";
+
+export interface EnforcementDecision {
+  /** True only when a HARD-block rule is tripped (per-IP or per-IP+identifier). */
+  blocked: boolean;
+  /** The hard-block rule that tripped, or null. */
+  rule: string | null;
+  /** Cooldown / Retry-After in seconds for the tripped rule (0 if not blocked). */
+  retryAfterSeconds: number;
+  /** The full would-block picture (all rules, incl. the observe-only identifier rule). */
+  wouldBlock: WouldBlockResult;
+}
+
+/**
+ * Decide whether this request should be BLOCKED right now. Reuses the same
+ * failed-attempt window counts as observe mode (single set of queries) and
+ * blocks ONLY on hard-block rules. The per-identifier rule never blocks (it is
+ * surfaced via wouldBlock for alerting). Pure read; never throws.
+ */
+export async function evaluateEnforcement(
+  ip: string,
+  identifier: string,
+): Promise<EnforcementDecision> {
+  const wouldBlock = await computeWouldBlock(ip, identifier);
+  for (const r of RULES) {
+    if (r.hardBlock && (wouldBlock.counts[r.rule] ?? 0) >= r.limit) {
+      return { blocked: true, rule: r.rule, retryAfterSeconds: r.blockSeconds, wouldBlock };
+    }
+  }
+  return { blocked: false, rule: null, retryAfterSeconds: 0, wouldBlock };
+}
+
+/**
+ * Write a koleex_security_audit row when enforcement triggers. AWAITED +
+ * self-guarded — a failure here must NEVER affect the login response. Never
+ * includes the password. actor = system; target left null (the request was
+ * blocked before any account lookup).
+ */
+export async function writeRateLimitAudit(params: {
+  ip: string;
+  identifier: string;
+  userAgent: string | null;
+  rule: string | null;
+  retryAfterSeconds: number;
+}): Promise<void> {
+  try {
+    await supabaseServer.from("koleex_security_audit").insert({
+      actor_account_id: RATE_LIMIT_AUDIT_ACTOR,
+      target_account_id: null,
+      action: "login_rate_limit_triggered",
+      ip: params.ip,
+      user_agent: params.userAgent,
+      details: {
+        identifier: params.identifier,
+        rule: params.rule,
+        retry_after_seconds: params.retryAfterSeconds,
+      },
+    });
+  } catch (e) {
+    console.error("[rate-limit] writeRateLimitAudit failed:", (e as Error)?.name);
+  }
 }
 
 /**
