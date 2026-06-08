@@ -50,7 +50,7 @@ function freshDoc(): Doc {
     customerAr: PREORDER_META.customerAr,
     reference: PREORDER_META.reference,
     currency: PREORDER_META.currency,
-    date: "",
+    date: new Date().toISOString().slice(0, 10),
     buyers: [...PREORDER_BUYERS],
     sections: PREORDER_SECTIONS.map((s) => ({
       ar: s.ar,
@@ -160,15 +160,16 @@ export default function PreorderPage() {
   };
 
   const totals = useMemo(() => {
-    let units = 0, value = 0, lines = 0;
+    let units = 0, value = 0, lines = 0, priced = 0;
     const bq = doc.buyers.map(() => 0);
     const bv = doc.buyers.map(() => 0);
     doc.sections.forEach((s) => s.items.forEach((it) => {
       const q = it.q.reduce((a, b) => a + b, 0);
       units += q; value += q * it.price; lines += 1;
+      if (it.price > 0) priced += 1;
       it.q.forEach((v, i) => { bq[i] += v; bv[i] += v * it.price; });
     }));
-    return { units, value, lines, bq, bv };
+    return { units, value, lines, priced, bq, bv };
   }, [doc]);
 
   // Shared input styling — looks like text until focused, prints clean.
@@ -296,7 +297,7 @@ export default function PreorderPage() {
 
               <table className="w-full border-collapse text-[12.5px] [&_td]:align-middle [&_th]:align-middle [&_th]:border-s [&_th]:border-neutral-200 [&_td]:border-s [&_td]:border-neutral-200 [&_tr>:first-child]:!border-s-0">
                 <thead>
-                  <tr className="border-b-2 border-black bg-white text-[10px] font-bold uppercase tracking-wider text-neutral-500">
+                  <tr className="sticky top-0 z-10 border-b-2 border-black bg-white text-[10px] font-bold uppercase tracking-wider text-neutral-500">
                     <th className="w-[44px] px-1 py-2.5 text-center">بند</th>
                     <th className="w-[124px] px-2 py-2.5 text-center">صورة</th>
                     <th className="px-3 py-2.5 text-right">الصنف</th>
@@ -381,7 +382,7 @@ export default function PreorderPage() {
                             value={it.price || ""}
                             onChange={(e) => patchItem(si, ii, { price: Number(e.target.value) || 0 })}
                             placeholder="—"
-                            className="w-full rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-center text-[13px] font-bold tabular-nums text-black outline-none focus:border-black print:border-0 print:bg-transparent"
+                            className={`w-full rounded-md border px-2 py-1.5 text-center text-[13px] font-bold tabular-nums text-black outline-none focus:border-black print:border-0 print:bg-transparent ${qty > 0 && !it.price ? "border-amber-400 bg-amber-50" : "border-neutral-300 bg-white"}`}
                           />
                         </td>
                         {/* Total qty (special) */}
@@ -391,6 +392,19 @@ export default function PreorderPage() {
                       </tr>
                     );
                   })}
+                  {/* Section subtotal */}
+                  {(() => {
+                    const sq = sec.items.reduce((a, it) => a + it.q.reduce((x, y) => x + y, 0), 0);
+                    const sv = sec.items.reduce((a, it) => a + it.q.reduce((x, y) => x + y, 0) * it.price, 0);
+                    return (
+                      <tr className="pre-band bg-neutral-100 font-bold">
+                        <td colSpan={3 + doc.buyers.length} className="px-3 py-2 text-right text-[11.5px] text-neutral-600">إجمالي {sec.ar}</td>
+                        <td className="border-s-2 border-neutral-300 px-1 py-2 text-center text-[11px] text-neutral-400">—</td>
+                        <td className="border-x-2 border-neutral-300 px-1 py-2 text-center text-[13px] tabular-nums">{sq.toLocaleString("en-US")}</td>
+                        <td className="border-e-2 border-neutral-300 px-2 py-2 text-center text-[13px] tabular-nums">{money(sv)}</td>
+                      </tr>
+                    );
+                  })()}
                 </tbody>
               </table>
             </section>
@@ -421,6 +435,10 @@ export default function PreorderPage() {
             <div className="flex items-baseline gap-3">
               <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">إجمالي الكميات</span>
               <span className="text-[26px] font-black tabular-nums leading-none">{totals.units.toLocaleString("en-US")}</span>
+            </div>
+            <div className="flex items-baseline gap-3">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">تم التسعير</span>
+              <span className="text-[20px] font-black tabular-nums leading-none">{totals.priced} / {totals.lines}</span>
             </div>
             <div className="flex items-baseline gap-3" dir="ltr">
               <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">Total · {doc.currency}</span>
