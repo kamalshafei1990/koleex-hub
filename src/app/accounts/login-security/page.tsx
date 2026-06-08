@@ -12,9 +12,11 @@
    no polling (manual refresh).
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import AuthGate from "@/components/admin/AuthGate";
+import SecurityCenter from "@/components/security/SecurityCenter";
 import KpiCard from "@/components/ui/KpiCard";
 import { AreaChart, DonutChart } from "@/components/finance/charts";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
@@ -64,9 +66,18 @@ const READINESS: Record<Readiness["level"], { label: string; tone: "default" | "
 export default function LoginSecurityPage() {
   return (
     <AuthGate title="Login Security" subtitle="Observe-mode rate-limit analytics and enforcement readiness">
-      <Monitor />
+      <Suspense fallback={null}>
+        <VersionSwitch />
+      </Suspense>
     </AuthGate>
   );
+}
+
+/* A3: the redesigned Security Center is opt-in behind ?v=2; the existing monitor
+   stays the default until the redesign is fully verified (A5 cutover). */
+function VersionSwitch() {
+  const v2 = useSearchParams().get("v") === "2";
+  return v2 ? <SecurityCenter /> : <Monitor />;
 }
 
 function Monitor() {
