@@ -58,6 +58,21 @@ export default function QuotationPrintPage({
     };
   }, [id]);
 
+  /* Name the saved PDF after the quotation. The browser's "Save as PDF"
+     dialog uses document.title as the default filename, so without this every
+     export defaulted to the same generic title. */
+  useEffect(() => {
+    if (!quote) return;
+    const safe = (s: unknown) => (typeof s === "string" ? s.trim() : "");
+    const name =
+      [safe(quote.invoiceNo), safe(quote.customerName) || safe(quote.companyName)]
+        .filter(Boolean)
+        .join(" - ") || "Quotation";
+    const prev = document.title;
+    document.title = name;
+    return () => { document.title = prev; };
+  }, [quote]);
+
   /* Flag the page as ready once the data is loaded and all <img> tags
      under the doc have finished decoding. The PDF endpoint polls for
      `window.__quotation_pdf_ready__ === true` before snapshotting,
