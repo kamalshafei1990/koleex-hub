@@ -621,9 +621,19 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
                 const classes = data.classifications.slice()
                   .sort((a, b) => Number(b.is_primary) - Number(a.is_primary))
                   .filter((c) => classificationLabel(str(c, "classification")).toLowerCase().replace(/[^a-z0-9]/g, "") !== typeNorm);
-                if (!crumbs.length && !classes.length) return null;
+                const multiCats: string[] = Array.isArray((s as Record<string, unknown>).categories)
+                  ? ((s as Record<string, unknown>).categories as unknown[]).filter((x): x is string => typeof x === "string" && x.trim() !== "")
+                  : [];
+                if (!crumbs.length && !classes.length && multiCats.length === 0) return null;
                 return (
                   <div className="mt-3.5 space-y-2">
+                    {multiCats.length > 0 ? (
+                      <div className="flex flex-wrap items-center justify-center gap-1.5">
+                        {multiCats.map((c) => (
+                          <span key={c} className="inline-flex items-center rounded-full bg-[var(--bg-surface-subtle)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">{c}</span>
+                        ))}
+                      </div>
+                    ) : null}
                     {crumbs.length ? (
                       <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
                         {crumbs.map((c, i) => (
