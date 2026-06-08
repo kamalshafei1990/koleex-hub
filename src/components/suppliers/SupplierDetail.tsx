@@ -64,6 +64,7 @@ import SuppliersHeader from "./SuppliersHeader";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import ContactsSection from "./ContactsSection";
 import MediaSection from "./MediaSection";
+import CatalogsSection from "./CatalogsSection";
 import TimelineSection from "./TimelineSection";
 import RiskSection from "./RiskSection";
 import NegotiationSection from "./NegotiationSection";
@@ -1647,6 +1648,11 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
         {/* Documents */}
         <Section id="documents">
           <MediaSection supplierId={id} media={data.media} onSaved={() => load({ silent: true })} />
+        </Section>
+
+        {/* Catalogs (synced from the Catalogs app via the contact link) */}
+        <Section id="catalogs">
+          <CatalogsSection supplierId={id} />
         </Section>
 
         {/* Timeline */}
