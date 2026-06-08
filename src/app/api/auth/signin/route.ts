@@ -16,12 +16,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { setSessionCookie } from "@/lib/server/session";
-
-/** Same base64-tag scheme the legacy write path used. Keep parity with
- *  accounts-admin.ts::hashTempPassword so existing stored hashes verify. */
-function hashTempPassword(plain: string): string {
-  return `tmp$${Buffer.from(plain, "utf8").toString("base64")}`;
-}
+import { verifyPassword } from "@/lib/server/password";
 
 export async function POST(req: Request) {
   // Outer try/catch so an unexpected throw (missing env var, DB outage,
@@ -57,11 +52,12 @@ export async function POST(req: Request) {
       login_email: string;
       status: string;
       password_hash: string | null;
+      password_algo: string | null;
       user_type: string;
       force_password_change: boolean | null;
     } | null = null;
 
-    const SELECT_COLS = "id, username, login_email, status, password_hash, user_type, force_password_change";
+    const SELECT_COLS = "id, username, login_email, status, password_hash, password_algo, user_type, force_password_change";
     if (emailOrUsername.includes("@")) {
       const { data } = await supabaseServer
         .from("accounts")
@@ -92,15 +88,38 @@ export async function POST(req: Request) {
       );
     }
 
-    const expected = hashTempPassword(password);
-    if (!account.password_hash || account.password_hash !== expected) {
+    // Polymorphic verify (legacy tmp$ / argon2id / bcrypt / null). Uniform 401
+    // on failure — same behavior as before. Detection is by hash prefix; the
+    // password_algo column is advisory only.
+    const verdict = await verifyPassword(password, account.password_hash, account.password_algo);
+    if (!verdict.ok) {
       return NextResponse.json(
         { ok: false, error: "Invalid email/username or password" },
         { status: 401 },
       );
     }
 
-    // Success — mint the session cookie.
+    /* Lazy upgrade: a successful login against a legacy tmp$ hash returns an
+       Argon2id rehash. Re-store it so the account stops being reversible —
+       BEST-EFFORT and flag-gated. A failed update must NEVER block the login
+       (the user is already authenticated). Never log the hash. Gate: lazy
+       rehash only runs unless AUTH_LAZY_REHASH === "off". */
+    if (
+      verdict.needsRehash &&
+      verdict.newHash &&
+      process.env.AUTH_LAZY_REHASH !== "off"
+    ) {
+      void supabaseServer
+        .from("accounts")
+        .update({
+          password_hash: verdict.newHash,
+          password_algo: verdict.newAlgo ?? "argon2id",
+          password_changed_at: new Date().toISOString(),
+        })
+        .eq("id", account.id);
+    }
+
+    // Success — mint the session cookie. (Unchanged.)
     await setSessionCookie(account.id);
 
     /* Stamp last_login_at + write an audit row. Fire-and-forget so a
