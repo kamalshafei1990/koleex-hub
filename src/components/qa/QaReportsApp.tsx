@@ -704,7 +704,10 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
 
       {error && <div className="mb-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-500 dark:text-rose-300">{error}</div>}
 
-      <div className={boardView ? "" : "grid grid-cols-1 gap-4 lg:grid-cols-[minmax(320px,440px)_1fr]"}>
+      {/* When an issue is open it takes the FULL width (single column) instead
+         of sharing the screen with the list — the reporter wanted the opened
+         report to fill the screen (QA issue c8915f5d). Closed → master/detail. */}
+      <div className={boardView ? "" : `grid grid-cols-1 gap-4 ${selectedId ? "" : "lg:grid-cols-[minmax(320px,440px)_1fr]"}`}>
         {/* Board view replaces the master/detail grid with a Kanban grouped
             by status. Clicking a card still opens the detail in a modal-ish
             inline area below (keep simple: just sets selectedId, which the
@@ -717,7 +720,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
             onOpen={(id) => { setSelectedId(id); setBoardView(false); }}
           />
         ) : (
-        <div className={`overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] ${selectedId ? "hidden lg:block" : ""}`}>
+        <div className={`overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] ${selectedId ? "hidden" : ""}`}>
           {loading ? (
             <div className="px-4 py-10 text-center text-[13px] text-[var(--text-dim)]">{t("qa.common.loading", "Loading…")}</div>
           ) : sorted.length === 0 ? (
@@ -860,7 +863,7 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
            returns to the list (lg keeps it always visible beside the list). */
         <div className={`overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] ${selectedId ? "" : "hidden lg:block"}`}>
           {selectedId && (
-            <button type="button" onClick={() => setSelectedId(null)} className="flex w-full items-center gap-1.5 border-b border-[var(--border-subtle)] px-4 py-2.5 text-[12px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] lg:hidden">
+            <button type="button" onClick={() => setSelectedId(null)} className="flex w-full items-center gap-1.5 border-b border-[var(--border-subtle)] px-4 py-2.5 text-[12px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
               <span aria-hidden>←</span> {t("qa.list.backToList", "Back to list")}
             </button>
           )}
