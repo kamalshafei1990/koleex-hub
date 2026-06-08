@@ -99,44 +99,46 @@ export async function POST(req: Request) {
       );
     }
 
-    /* Lazy upgrade: a successful login against a legacy tmp$ hash returns an
-       Argon2id rehash. Re-store it so the account stops being reversible —
-       BEST-EFFORT and flag-gated. A failed update must NEVER block the login
-       (the user is already authenticated). Never log the hash. Gate: lazy
-       rehash only runs unless AUTH_LAZY_REHASH === "off". */
-    if (
-      verdict.needsRehash &&
-      verdict.newHash &&
-      process.env.AUTH_LAZY_REHASH !== "off"
-    ) {
-      void supabaseServer
-        .from("accounts")
-        .update({
-          password_hash: verdict.newHash,
-          password_algo: verdict.newAlgo ?? "argon2id",
-          password_changed_at: new Date().toISOString(),
-        })
-        .eq("id", account.id);
-    }
-
     // Success — mint the session cookie. (Unchanged.)
     await setSessionCookie(account.id);
 
-    /* Stamp last_login_at + write an audit row. Fire-and-forget so a
-       failure to record the event never blocks a legitimate login.
-       Previously the Security tab on every account always showed
-       "Last login: never" because nothing on the signin path ever
-       wrote this column. */
+    /* Best-effort side-effects, AWAITED.
+       On Vercel the lambda freezes right after the Response resolves, so
+       un-awaited (fire-and-forget) writes are dropped — confirmed on the
+       S1c preview (login worked but the rehash + last_login + history never
+       persisted). We therefore AWAIT them, but wrap in allSettled + try/catch
+       so a DB hiccup can NEVER block or fail an already-successful login.
+
+       Includes the lazy Argon2id upgrade for legacy logins (flag-gated by
+       AUTH_LAZY_REHASH). Never logs the password or hash. */
     const now = new Date().toISOString();
-    void supabaseServer
-      .from("accounts")
-      .update({ last_login_at: now })
-      .eq("id", account.id);
-    void supabaseServer.from("account_login_history").insert({
-      account_id: account.id,
-      event_type: "login_success",
-      metadata: { via: "password" },
-    });
+    const doRehash =
+      verdict.needsRehash && verdict.newHash && process.env.AUTH_LAZY_REHASH !== "off";
+    try {
+      await Promise.allSettled([
+        doRehash
+          ? supabaseServer
+              .from("accounts")
+              .update({
+                password_hash: verdict.newHash,
+                password_algo: verdict.newAlgo ?? "argon2id",
+                password_changed_at: now,
+                last_login_at: now,
+              })
+              .eq("id", account.id)
+          : supabaseServer
+              .from("accounts")
+              .update({ last_login_at: now })
+              .eq("id", account.id),
+        supabaseServer.from("account_login_history").insert({
+          account_id: account.id,
+          event_type: "login_success",
+          metadata: { via: "password" },
+        }),
+      ]);
+    } catch {
+      /* never block a successful login on a side-effect write */
+    }
 
     return NextResponse.json({
       ok: true,
