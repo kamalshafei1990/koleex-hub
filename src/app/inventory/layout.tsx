@@ -28,34 +28,37 @@
 import { usePathname } from "next/navigation";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
 import { InventoryShortcutsLegend } from "@/components/inventory/InventoryUx";
+import { useTranslation } from "@/lib/i18n";
+import { inventoryT } from "@/lib/translations/inventory";
 
-interface RouteMeta { title: string; subtitle?: string }
-
-const ROUTE_META: Record<string, RouteMeta> = {
-  "/inventory":            { title: "Inventory Operations", subtitle: "What needs doing today — receive, ship, transfer, adjust." },
-  "/inventory/items":      { title: "Items",                subtitle: "Every stocked SKU — quantities on hand, status, lifecycle." },
-  "/inventory/movements":  { title: "Movements",            subtitle: "Every in/out event posted against your stock." },
-  "/inventory/transfers":  { title: "Transfers",            subtitle: "Move stock between warehouses with a single document." },
-  "/inventory/returns":    { title: "Returns",              subtitle: "Customer and supplier returns — reverses stock, issues credit." },
-  "/inventory/balances":   { title: "Stock Balances",       subtitle: "Derived truth — never edited directly. One row per item × location." },
-  "/inventory/search":     { title: "Search",               subtitle: "Find any item, serial, batch, transfer, return or movement across all warehouses." },
-  "/inventory/serials":    { title: "Serials",              subtitle: "Per-unit identity & lifecycle." },
-  "/inventory/batches":    { title: "Batches",              subtitle: "Lots, expiry, FEFO picking." },
-  "/inventory/warehouses": { title: "Locations",            subtitle: "Warehouses, ports, forwarders, customer sites — anywhere stock can sit." },
+/* Each route maps to a translation key base; title/subtitle resolve via t()
+   so the page header follows the selected system language (en/zh/ar). */
+const ROUTE_KEY: Record<string, string> = {
+  "/inventory":            "ops",
+  "/inventory/items":      "items",
+  "/inventory/movements":  "movements",
+  "/inventory/transfers":  "transfers",
+  "/inventory/returns":    "returns",
+  "/inventory/balances":   "balances",
+  "/inventory/search":     "search",
+  "/inventory/serials":    "serials",
+  "/inventory/batches":    "batches",
+  "/inventory/warehouses": "warehouses",
 };
 
-function metaFor(pathname: string): RouteMeta {
-  if (ROUTE_META[pathname]) return ROUTE_META[pathname];
-  // Detail routes fall back to their list page's meta.
-  for (const prefix of Object.keys(ROUTE_META)) {
-    if (prefix !== "/inventory" && pathname.startsWith(prefix + "/")) return ROUTE_META[prefix];
+function keyFor(pathname: string): string {
+  if (ROUTE_KEY[pathname]) return ROUTE_KEY[pathname];
+  for (const prefix of Object.keys(ROUTE_KEY)) {
+    if (prefix !== "/inventory" && pathname.startsWith(prefix + "/")) return ROUTE_KEY[prefix];
   }
-  return ROUTE_META["/inventory"];
+  return ROUTE_KEY["/inventory"];
 }
 
 export default function InventoryLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "/inventory";
-  const meta = metaFor(pathname);
+  const { t } = useTranslation(inventoryT);
+  const k = keyFor(pathname);
+  const meta = { title: t(`inv.page.${k}.title`), subtitle: t(`inv.page.${k}.subtitle`) };
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] pb-16 text-[var(--text-primary)] md:pb-6">
       <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">

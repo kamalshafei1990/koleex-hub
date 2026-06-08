@@ -13,6 +13,28 @@ export const inventoryT: Translations = {
   "inv.title":              { en: "Inventory",                 zh: "库存",            ar: "المخزون" },
   "inv.tab.transfers":      { en: "Transfers",                 zh: "调拨",            ar: "التحويلات" },
 
+  /* ── Page headers (route title + subtitle, shown on every /inventory page) ── */
+  "inv.page.ops.title":          { en: "Inventory Operations", zh: "库存操作", ar: "عمليات المخزون" },
+  "inv.page.ops.subtitle":       { en: "What needs doing today — receive, ship, transfer, adjust.", zh: "今天需要做的事 — 收货、发货、调拨、调整。", ar: "ما الذي يجب إنجازه اليوم — استلام، شحن، تحويل، تسوية." },
+  "inv.page.items.title":        { en: "Items", zh: "物料", ar: "الأصناف" },
+  "inv.page.items.subtitle":     { en: "Every stocked SKU — quantities on hand, status, lifecycle.", zh: "每个库存SKU — 现有数量、状态、生命周期。", ar: "كل صنف مخزّن — الكميات المتاحة والحالة ودورة الحياة." },
+  "inv.page.movements.title":    { en: "Movements", zh: "库存移动", ar: "الحركات" },
+  "inv.page.movements.subtitle": { en: "Every in/out event posted against your stock.", zh: "针对库存登记的每一笔出入库事件。", ar: "كل عملية إدخال/إخراج مُسجّلة على مخزونك." },
+  "inv.page.transfers.title":    { en: "Transfers", zh: "调拨", ar: "التحويلات" },
+  "inv.page.transfers.subtitle": { en: "Move stock between warehouses with a single document.", zh: "通过单据在仓库之间调拨库存。", ar: "نقل المخزون بين المستودعات بمستند واحد." },
+  "inv.page.returns.title":      { en: "Returns", zh: "退货", ar: "المرتجعات" },
+  "inv.page.returns.subtitle":   { en: "Customer and supplier returns — reverses stock, issues credit.", zh: "客户与供应商退货 — 冲减库存并出具贷项。", ar: "مرتجعات العملاء والموردين — تعكس المخزون وتُصدر إشعار دائن." },
+  "inv.page.balances.title":     { en: "Stock Balances", zh: "库存余额", ar: "أرصدة المخزون" },
+  "inv.page.balances.subtitle":  { en: "Derived truth — never edited directly. One row per item × location.", zh: "派生数据 — 不可直接编辑。每个物料×库位一行。", ar: "بيانات مُشتقّة — لا تُعدّل مباشرة. صف لكل صنف × موقع." },
+  "inv.page.search.title":       { en: "Search", zh: "搜索", ar: "بحث" },
+  "inv.page.search.subtitle":    { en: "Find any item, serial, batch, transfer, return or movement across all warehouses.", zh: "在所有仓库中查找任何物料、序列号、批次、调拨、退货或移动。", ar: "ابحث عن أي صنف أو رقم تسلسلي أو دفعة أو تحويل أو مرتجع أو حركة عبر كل المستودعات." },
+  "inv.page.serials.title":      { en: "Serials", zh: "序列号", ar: "الأرقام التسلسلية" },
+  "inv.page.serials.subtitle":   { en: "Per-unit identity & lifecycle.", zh: "单件标识与生命周期。", ar: "هوية ودورة حياة لكل وحدة." },
+  "inv.page.batches.title":      { en: "Batches", zh: "批次", ar: "الدفعات" },
+  "inv.page.batches.subtitle":   { en: "Lots, expiry, FEFO picking.", zh: "批号、有效期、先到期先出。", ar: "اللوطات وتواريخ الانتهاء والصرف وفق الأقرب انتهاءً." },
+  "inv.page.warehouses.title":   { en: "Locations", zh: "库位", ar: "المواقع" },
+  "inv.page.warehouses.subtitle":{ en: "Warehouses, ports, forwarders, customer sites — anywhere stock can sit.", zh: "仓库、港口、货代、客户现场 — 任何可存放库存的地方。", ar: "المستودعات والموانئ وشركات الشحن ومواقع العملاء — أي مكان يمكن أن يوجد فيه المخزون." },
+
   /* ── Transfers list ────────────────────────────────────────── */
   "inv.transfers.title":    { en: "Warehouse Transfers",       zh: "仓库调拨",        ar: "تحويلات المستودعات" },
   "inv.transfers.subtitle": {
