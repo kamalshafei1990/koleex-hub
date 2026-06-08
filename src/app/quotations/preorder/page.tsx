@@ -7,6 +7,7 @@
    product photos and convert-to-quotation come next). */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import * as XLSX from "xlsx";
 import KoleexLogo from "@/components/layout/KoleexLogo";
 import { PREORDER_SECTIONS, PREORDER_BUYERS, PREORDER_META } from "./data";
 
@@ -140,6 +141,76 @@ export default function PreorderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Excel import — parse the customer's sheet into sections/buyers/items.
+  const importRef = useRef<HTMLInputElement | null>(null);
+  const onImportExcel = async (file?: File | null) => {
+    if (!file) return;
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, blankrows: false, defval: "" });
+      const norm = (c: unknown) => (c == null ? "" : String(c).trim());
+
+      let modelCol = 1, descCol = 2, firstBuyerCol = 3, totalCol = -1;
+      let buyers: string[] = [];
+      let headerSeen = false;
+      const sections: Section[] = [];
+      let cur: Section | null = null;
+
+      for (const r of rows) {
+        const cells = (r as unknown[]).map(norm);
+        if (!cells.some((x) => x)) continue;
+        const low = cells.map((c) => c.toLowerCase());
+
+        if (!headerSeen) {
+          const mi = low.findIndex((c) => c.includes("model"));
+          const di = low.findIndex((c) => c.includes("descrip") || c.includes("وصف") || c.includes("الصنف"));
+          if (mi >= 0 || di >= 0) {
+            headerSeen = true;
+            modelCol = mi >= 0 ? mi : 1;
+            descCol = di >= 0 ? di : modelCol + 1;
+            totalCol = cells.length - 1;
+            while (totalCol > 0 && !cells[totalCol]) totalCol--;
+            firstBuyerCol = descCol + 1;
+            buyers = cells.slice(firstBuyerCol, totalCol).filter((x) => x);
+            continue;
+          }
+        }
+
+        const model = cells[modelCol] || "";
+        const desc = cells[descCol] || "";
+        const qtyCells = totalCol > firstBuyerCol ? cells.slice(firstBuyerCol, totalCol) : [];
+        const hasQty = qtyCells.some((x) => x !== "" && Number.isFinite(Number(x)));
+
+        // Section header row (only a label in the first column).
+        if (cells[0] && !model && !desc && !hasQty && cells.filter((x) => x).length <= 1) {
+          if (low[0].includes("koleex order")) continue; // skip the title
+          cur = { ar: cells[0], en: cells[0], items: [] };
+          sections.push(cur);
+          continue;
+        }
+
+        if (model || desc || hasQty) {
+          if (!cur) { cur = { ar: "بنود", en: "Items", items: [] }; sections.push(cur); }
+          const bs = buyers.length ? buyers : [...PREORDER_BUYERS];
+          const q = bs.map((_, i) => { const v = Number(cells[firstBuyerCol + i]); return Number.isFinite(v) ? v : 0; });
+          cur.items.push({ model, desc, q, price: 0, photo: null });
+        }
+      }
+
+      if (sections.length === 0) { setSavedMsg("لم يتم العثور على بنود في الملف"); setTimeout(() => setSavedMsg(""), 3000); return; }
+      setDoc((d) => ({ ...d, buyers: buyers.length ? buyers : d.buyers, sections }));
+      setDocId(null);
+      try { window.history.replaceState(null, "", "/quotations/preorder"); } catch { /* ignore */ }
+      setSavedMsg("تم الاستيراد ✓ — راجع ثم احفظ");
+    } catch {
+      setSavedMsg("فشل استيراد الملف");
+    } finally {
+      setTimeout(() => setSavedMsg(""), 3500);
+    }
+  };
+
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const patchItem = (si: number, ii: number, patch: Partial<Item>) =>
@@ -220,6 +291,8 @@ export default function PreorderPage() {
             ))}
           </select>
           <button type="button" onClick={newDoc} className="h-9 rounded-lg border border-white/20 px-3 text-[12.5px] font-medium text-white transition-colors hover:bg-white/10">جديد</button>
+          <button type="button" onClick={() => importRef.current?.click()} className="h-9 rounded-lg border border-white/20 px-3 text-[12.5px] font-medium text-white transition-colors hover:bg-white/10">استيراد Excel</button>
+          <input ref={importRef} type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(e) => { onImportExcel(e.target.files?.[0]); e.target.value = ""; }} />
           <button
             type="button"
             onClick={save}
