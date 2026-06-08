@@ -372,6 +372,29 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       watcherEvt ??= { type: "qa_issue_duplicate_marked", title: "Marked as duplicate", body: dmsg };
     }
 
+    // Every super admin is notified on a status change (incl. reopen) — Kamal's
+    // standing rule: whatever the new status is, saving it pings the reporter
+    // (already added above) AND all super admins. notifyIssue dedupes per
+    // recipient and suppresses the actor, so no self/double notifications.
+    const statusChanged = body.action === "reopen" || (!!patch.status && patch.status !== cur.status);
+    if (statusChanged && watcherEvt) {
+      const { data: admins } = await supabaseServer
+        .from("accounts")
+        .select("id")
+        .eq("tenant_id", auth.tenant_id)
+        .eq("is_super_admin", true);
+      for (const a of admins ?? []) {
+        targets.push({
+          recipientId: a.id as string,
+          type: watcherEvt.type,
+          title: watcherEvt.title,
+          body: watcherEvt.body,
+          alert: watcherEvt.alert,
+          link: `/database/issues?issue=${id}`,
+        });
+      }
+    }
+
     // Fan out the primary change to watchers (workflow events are never
     // internal). Appended last so notifyIssue keeps the more specific
     // reporter/assignee target for anyone who is also a watcher.
