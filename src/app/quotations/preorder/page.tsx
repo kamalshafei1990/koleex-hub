@@ -161,11 +161,14 @@ export default function PreorderPage() {
 
   const totals = useMemo(() => {
     let units = 0, value = 0, lines = 0;
+    const bq = doc.buyers.map(() => 0);
+    const bv = doc.buyers.map(() => 0);
     doc.sections.forEach((s) => s.items.forEach((it) => {
       const q = it.q.reduce((a, b) => a + b, 0);
       units += q; value += q * it.price; lines += 1;
+      it.q.forEach((v, i) => { bq[i] += v; bv[i] += v * it.price; });
     }));
-    return { units, value, lines };
+    return { units, value, lines, bq, bv };
   }, [doc]);
 
   // Shared input styling — looks like text until focused, prints clean.
@@ -393,8 +396,28 @@ export default function PreorderPage() {
             </section>
           ))}
 
+          {/* ── Per-customer totals ── */}
+          <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {doc.buyers.map((b, bi) => (
+              <div key={bi} className="rounded-xl border p-3" style={{ borderColor: `${BUYER_COLORS[bi]}55` }}>
+                <div className="flex items-center gap-1.5 text-[12.5px] font-bold" style={{ color: BUYER_COLORS[bi] }}>
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: BUYER_COLORS[bi] }} />
+                  <span className="truncate">{b}</span>
+                </div>
+                <div className="mt-2 flex items-baseline justify-between">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">الكمية</span>
+                  <span className="text-[17px] font-black tabular-nums text-black">{totals.bq[bi].toLocaleString("en-US")}</span>
+                </div>
+                <div className="mt-0.5 flex items-baseline justify-between">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">القيمة</span>
+                  <span className="text-[14px] font-bold tabular-nums text-black">{money(totals.bv[bi])}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
           {/* ── Totals band ── */}
-          <div className="pre-band mt-7 flex flex-wrap items-center justify-between gap-6 rounded-2xl bg-black px-7 py-5 text-white">
+          <div className="pre-band mt-4 flex flex-wrap items-center justify-between gap-6 rounded-2xl bg-black px-7 py-5 text-white">
             <div className="flex items-baseline gap-3">
               <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">إجمالي الكميات</span>
               <span className="text-[26px] font-black tabular-nums leading-none">{totals.units.toLocaleString("en-US")}</span>
