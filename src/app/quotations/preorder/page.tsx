@@ -12,7 +12,7 @@ import KoleexLogo from "@/components/layout/KoleexLogo";
 import { PREORDER_SECTIONS, PREORDER_BUYERS, PREORDER_META } from "./data";
 
 // Each customer/buyer gets a distinct colour so their quantities read at a glance.
-const BUYER_COLORS = ["#0066FF", "#089a5b", "#E8710A", "#7C3AED"];
+const BUYER_COLORS = ["#0066FF", "#0F766E", "#B45309", "#6D28D9"];
 
 interface Item { model: string; desc: string; q: number[]; price: number; photo: string | null; }
 interface Section { ar: string; en: string; items: Item[]; }
@@ -363,9 +363,12 @@ export default function PreorderPage() {
           {/* ── Sections ── */}
           {doc.sections.map((sec, si) => (
             <section key={si} className="mt-6 overflow-hidden rounded-2xl border border-neutral-200">
-              <div className="pre-band flex items-center justify-between gap-3 bg-black px-4 py-2.5">
-                <input value={sec.ar} onChange={(e) => setDoc((d) => ({ ...d, sections: d.sections.map((s, i) => (i === si ? { ...s, ar: e.target.value } : s)) }))} className="flex-1 bg-transparent text-[14px] font-bold tracking-wide text-white outline-none placeholder-white/40 focus:bg-white/10 rounded px-1" />
-                <span className="text-[10.5px] font-semibold uppercase tracking-[0.18em] text-white/55" dir="ltr">{sec.en} · {sec.items.length}</span>
+              <div className="flex items-center justify-between gap-3 border-b-2 border-black bg-white px-4 py-2.5">
+                <div className="flex flex-1 items-center gap-2.5">
+                  <span className="h-4 w-1.5 rounded-sm bg-black" />
+                  <input value={sec.ar} onChange={(e) => setDoc((d) => ({ ...d, sections: d.sections.map((s, i) => (i === si ? { ...s, ar: e.target.value } : s)) }))} className="flex-1 rounded bg-transparent px-1 text-[15px] font-bold tracking-wide text-black outline-none placeholder:text-neutral-300 focus:bg-neutral-100" />
+                </div>
+                <span className="text-[10.5px] font-semibold uppercase tracking-[0.18em] text-neutral-400" dir="ltr">{sec.en} · {sec.items.length}</span>
               </div>
 
               <table className="w-full border-collapse text-[12.5px] [&_td]:align-middle [&_th]:align-middle [&_th]:border-s [&_th]:border-neutral-200 [&_td]:border-s [&_td]:border-neutral-200 [&_tr>:first-child]:!border-s-0">
@@ -519,10 +522,20 @@ export default function PreorderPage() {
             </div>
           </div>
 
+          {/* ── Signatures ── */}
+          <div className="mt-9 grid grid-cols-2 gap-12">
+            {["أعدّه", "اعتمده"].map((l) => (
+              <div key={l}>
+                <div className="h-9 border-b border-neutral-400" />
+                <div className="mt-1.5 text-[11px] font-semibold tracking-wide text-neutral-500">{l}</div>
+              </div>
+            ))}
+          </div>
+
           {/* ── Footer ── */}
-          <footer className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 pt-4 text-[10.5px] text-neutral-400" dir="ltr">
-            <span>KOLEEX — Preorder / price request. Indicative prices, subject to the official quotation.</span>
-            <span className="font-medium text-neutral-500">www.koleexgroup.com</span>
+          <footer className="mt-7 flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 pt-4 text-[10px] text-neutral-400" dir="ltr">
+            <span>KOLEEX International Group — Preorder / price request · indicative prices, subject to the official quotation.</span>
+            <span className="font-medium text-neutral-500">koleexgroup.com</span>
           </footer>
         </div>
       </div>
