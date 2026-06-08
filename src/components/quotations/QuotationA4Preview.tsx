@@ -1018,7 +1018,7 @@ export default function QuotationA4Preview({
                         .pq-sec-ctrl:disabled{opacity:.3;cursor:not-allowed;}
                         .pq-sec-ctrl--danger:hover:not(:disabled){background:rgba(239,68,68,0.3);border-color:rgba(239,68,68,0.7);color:#fff;}
                         .pq-sec-swatch{width:24px;height:24px;padding:0;border:2px solid rgba(255,255,255,0.7);border-radius:6px;cursor:pointer;box-shadow:0 0 0 1px rgba(0,0,0,0.35);}
-                        .pq-color-pop{position:absolute;top:calc(100% + 8px);right:0;z-index:50;width:168px;background:#1A1A1A;border:1px solid #2D2D2D;border-radius:10px;padding:10px;box-shadow:0 12px 34px rgba(0,0,0,0.55);}
+                        .pq-color-pop{position:absolute;top:calc(100% + 8px);right:0;z-index:1000;width:168px;background:#1A1A1A;border:1px solid #2D2D2D;border-radius:10px;padding:10px;box-shadow:0 12px 34px rgba(0,0,0,0.55);}
                         .pq-color-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;}
                         .pq-color-sw{width:20px;height:20px;border-radius:5px;border:1px solid rgba(255,255,255,0.25);cursor:pointer;padding:0;transition:transform .1s ease;}
                         .pq-color-sw:hover{transform:scale(1.14);border-color:rgba(255,255,255,0.7);}
@@ -1029,7 +1029,7 @@ export default function QuotationA4Preview({
                         .pq-sec-color::-webkit-color-swatch{border:none;border-radius:4px;}
                         .pq-sec-color::-moz-color-swatch{border:none;border-radius:4px;}
                       `}</style>
-                      <div style={{ position: "relative", background: headBg, padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s ease" }}>
+                      <div style={{ position: "relative", zIndex: colorPopIdx === idx ? 1000 : undefined, background: headBg, padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s ease" }}>
                         <div
                           className="pq-section-head"
                           data-ph="Section title…"
