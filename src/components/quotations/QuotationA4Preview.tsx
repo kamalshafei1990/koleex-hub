@@ -1229,9 +1229,8 @@ export default function QuotationA4Preview({
                       onClear={() => updateItem(idx, "image", "")}
                     />
                   </Td>
-                  <Td align="right">
+                  <Td align="center">
                     <div
-                      className="pq-in-r"
                       contentEditable
                       suppressContentEditableWarning
                       onBlur={(e) => {
@@ -1239,7 +1238,7 @@ export default function QuotationA4Preview({
                         updateItem(idx, "unitPrice", val);
                       }}
                       style={{
-                        textAlign: "right",
+                        textAlign: "center",
                         fontSize: 11,
                         fontVariantNumeric: "tabular-nums",
                         outline: "none",
@@ -7855,7 +7854,7 @@ function AddRowMenu({
     <>
       <style>{`.pq-add-item{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:transparent;border:none;color:#fff;font-size:12px;font-weight:600;padding:8px 10px;border-radius:7px;cursor:pointer;transition:background .12s ease;}
         .pq-add-item:hover{background:rgba(255,255,255,0.12);}
-        .pq-add-glyph{display:inline-flex;width:18px;justify-content:center;color:#0066FF;font-size:13px;}`}</style>
+        .pq-add-glyph{display:inline-flex;width:18px;justify-content:center;color:#FFFFFF;font-size:13px;}`}</style>
       <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 998 }} />
       <div
         style={{
