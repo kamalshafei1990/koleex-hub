@@ -933,6 +933,9 @@ export default function Quotations() {
      stay mounted across A4-page renders without each page mounting
      its own copy. */
   const [pickerOpen, setPickerOpen] = useState(false);
+  /* When the catalog picker is opened from a row's "+ → Product from catalog",
+     this holds the row index to insert AFTER. null = append at the end. */
+  const [insertAtIdx, setInsertAtIdx] = useState<number | null>(null);
   /* "Link customer" picker — same pattern as the product picker:
      parent owns the modal, the preview triggers it via prop. */
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
@@ -1547,6 +1550,21 @@ export default function Quotations() {
     setCurrent({ ...current, items });
   }, [current]);
 
+  /* Insert a section-header band directly below a given row. */
+  const insertHeaderBelow = useCallback((idx: number) => {
+    if (!current) return;
+    const items = current.items.slice();
+    const at = Math.min(Math.max(idx + 1, 0), items.length);
+    items.splice(at, 0, { ...EMPTY_ITEM, kind: "header", description: "", qty: 0, unitPrice: 0 });
+    setCurrent({ ...current, items });
+  }, [current]);
+
+  /* Open the catalog picker targeting an insert position (below row idx). */
+  const openCatalogAt = useCallback((idx: number) => {
+    setInsertAtIdx(idx);
+    setPickerOpen(true);
+  }, []);
+
   /* Apply a CRM customer pick to the QUOTATION TO card. Fills the
      editor's company / contact / phone / mobile / email / website
      fields and stores customerContactId in the doc so we can show
@@ -1591,19 +1609,25 @@ export default function Quotations() {
         qty: 1,
       };
       const items = current.items.slice();
-      const last = items[items.length - 1];
-      const lastIsEmpty =
-        last &&
-        !last.description &&
-        !last.model &&
-        !last.image &&
-        !last.unitPrice &&
-        last.qty === 1;
-      if (lastIsEmpty) items[items.length - 1] = fresh;
-      else items.push(fresh);
+      if (insertAtIdx != null && insertAtIdx >= 0 && insertAtIdx < items.length) {
+        /* Targeted insert: drop the picked product directly below that row. */
+        items.splice(insertAtIdx + 1, 0, fresh);
+      } else {
+        const last = items[items.length - 1];
+        const lastIsEmpty =
+          last &&
+          !last.description &&
+          !last.model &&
+          !last.image &&
+          !last.unitPrice &&
+          last.qty === 1;
+        if (lastIsEmpty) items[items.length - 1] = fresh;
+        else items.push(fresh);
+      }
       setCurrent({ ...current, items });
+      setInsertAtIdx(null);
     },
-    [current],
+    [current, insertAtIdx],
   );
 
   /* ── Stamp + Signature handlers ──
@@ -2183,6 +2207,8 @@ export default function Quotations() {
         moveItem={moveItem}
         duplicateItem={duplicateItem}
         insertItemBelow={insertItemBelow}
+        insertHeaderBelow={insertHeaderBelow}
+        onInsertProductBelow={openCatalogAt}
         handleImageUpload={handleImageUpload}
         fileInputRefs={fileInputRefs}
         subTotal={subTotal}
@@ -2192,7 +2218,7 @@ export default function Quotations() {
       />
       <ProductPickerModal
         open={pickerOpen}
-        onClose={() => setPickerOpen(false)}
+        onClose={() => { setPickerOpen(false); setInsertAtIdx(null); }}
         onPick={addItemFromCatalog}
       />
       <CustomerPickerModal

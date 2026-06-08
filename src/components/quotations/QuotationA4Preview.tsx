@@ -183,6 +183,10 @@ interface Props {
   duplicateItem?: (idx: number) => void;
   /* Insert a fresh blank row directly below the given row index. */
   insertItemBelow?: (idx: number) => void;
+  /* Insert a section-header band directly below the given row index. */
+  insertHeaderBelow?: (idx: number) => void;
+  /* Open the catalog picker to insert a product directly below the given row. */
+  onInsertProductBelow?: (idx: number) => void;
   handleImageUpload: (idx: number, file: File) => void;
   fileInputRefs: MutableRefObject<{ [key: number]: HTMLInputElement | null }>;
   subTotal: number;
@@ -289,6 +293,8 @@ export default function QuotationA4Preview({
   moveItem,
   duplicateItem,
   insertItemBelow,
+  insertHeaderBelow,
+  onInsertProductBelow,
   handleImageUpload,
   fileInputRefs,
   subTotal,
@@ -366,6 +372,8 @@ export default function QuotationA4Preview({
   const [focusedItemIdx, setFocusedItemIdx] = useState<number | null>(null);
   /* Which section-header row currently has its colour popover open. */
   const [colorPopIdx, setColorPopIdx] = useState<number | null>(null);
+  /* Which row currently has its "+ add" menu open (product / empty / header). */
+  const [addMenuIdx, setAddMenuIdx] = useState<number | null>(null);
   /* Set a section header's band colour (by row index). Goes through
      setCurrent (not updateItem) so the Invoice-doc parent is unaffected. */
   const setHeaderColor = useCallback((rowIdx: number, color: string) => {
@@ -1032,7 +1040,7 @@ export default function QuotationA4Preview({
                         .pq-sec-color::-webkit-color-swatch{border:none;border-radius:4px;}
                         .pq-sec-color::-moz-color-swatch{border:none;border-radius:4px;}
                       `}</style>
-                      <div style={{ position: "relative", zIndex: colorPopIdx === idx ? 1000 : undefined, background: headBg, padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s ease" }}>
+                      <div style={{ position: "relative", zIndex: (colorPopIdx === idx || addMenuIdx === idx) ? 1000 : undefined, background: headBg, padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s ease" }}>
                         <div
                           className="pq-section-head"
                           data-ph="Section title…"
@@ -1107,10 +1115,20 @@ export default function QuotationA4Preview({
                           </div>
                           <button type="button" className="pq-sec-ctrl" title="Move section up" disabled={idx === 0} onClick={() => moveItem(idx, -1)}><ArrowUpIcon size={13} /></button>
                           <button type="button" className="pq-sec-ctrl" title="Move section down" disabled={idx === current.items.length - 1} onClick={() => moveItem(idx, 1)}><ArrowDownIcon size={13} /></button>
-                          {insertItemBelow && (
-                            <button type="button" className="pq-sec-ctrl" title="Add a row below this section" onClick={() => insertItemBelow(idx)}>
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
-                            </button>
+                          {(insertItemBelow || insertHeaderBelow || onInsertProductBelow) && (
+                            <div style={{ position: "relative" }}>
+                              <button type="button" className="pq-sec-ctrl" title="Add a row below (product / empty / section)" onClick={() => setAddMenuIdx(addMenuIdx === idx ? null : idx)}>
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+                              </button>
+                              <AddRowMenu
+                                open={addMenuIdx === idx}
+                                onClose={() => setAddMenuIdx(null)}
+                                side="left"
+                                onProduct={onInsertProductBelow ? () => onInsertProductBelow(idx) : undefined}
+                                onEmpty={insertItemBelow ? () => insertItemBelow(idx) : undefined}
+                                onHeader={insertHeaderBelow ? () => insertHeaderBelow(idx) : undefined}
+                              />
+                            </div>
                           )}
                           {duplicateItem && (
                             <button type="button" className="pq-sec-ctrl" title="Duplicate section header" onClick={() => duplicateItem(idx)}><DuplicateGlyph /></button>
@@ -1303,7 +1321,7 @@ export default function QuotationA4Preview({
                         borderRadius: 10,
                         padding: 4,
                         boxShadow: "0 6px 20px rgba(0,0,0,0.45)",
-                        zIndex: 3,
+                        zIndex: addMenuIdx === idx ? 1000 : 3,
                       }}
                     >
                       <RowActionBtn
@@ -1318,12 +1336,22 @@ export default function QuotationA4Preview({
                         onClick={() => moveItem(idx, 1)}
                         icon={<ArrowDownIcon size={14} />}
                       />
-                      {insertItemBelow && (
-                        <RowActionBtn
-                          title="Add a blank row below this one"
-                          onClick={() => insertItemBelow(idx)}
-                          icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>}
-                        />
+                      {(insertItemBelow || insertHeaderBelow || onInsertProductBelow) && (
+                        <div style={{ position: "relative" }}>
+                          <RowActionBtn
+                            title="Add a row below (product / empty / section)"
+                            onClick={() => setAddMenuIdx(addMenuIdx === idx ? null : idx)}
+                            icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>}
+                          />
+                          <AddRowMenu
+                            open={addMenuIdx === idx}
+                            onClose={() => setAddMenuIdx(null)}
+                            side="left"
+                            onProduct={onInsertProductBelow ? () => onInsertProductBelow(idx) : undefined}
+                            onEmpty={insertItemBelow ? () => insertItemBelow(idx) : undefined}
+                            onHeader={insertHeaderBelow ? () => insertHeaderBelow(idx) : undefined}
+                          />
+                        </div>
                       )}
                       {duplicateItem && (
                         <RowActionBtn
@@ -7787,6 +7815,60 @@ function TotalsRow({
    narrow rectangles. Solid 32 × 32 square with clearly visible idle
    state (subtle surface background) — no more transparent hover-only
    buttons that disappear when not focused. */
+/* Dropdown shown when the "+" add button is clicked: choose what kind of row
+   to insert below the current one. Rendered with a fixed backdrop + high z-index
+   so it sits above the rows below (parent lifts its own stacking when open). */
+function AddRowMenu({
+  open,
+  onClose,
+  onProduct,
+  onEmpty,
+  onHeader,
+  side = "left",
+}: {
+  open: boolean;
+  onClose: () => void;
+  onProduct?: () => void;
+  onEmpty?: () => void;
+  onHeader?: () => void;
+  side?: "left" | "right";
+}) {
+  if (!open) return null;
+  const opts: { label: string; glyph: string; fn?: () => void }[] = [
+    { label: "Product from catalog", glyph: "▦", fn: onProduct },
+    { label: "Empty row", glyph: "＋", fn: onEmpty },
+    { label: "Section header", glyph: "▭", fn: onHeader },
+  ];
+  return (
+    <>
+      <style>{`.pq-add-item{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:transparent;border:none;color:#fff;font-size:12px;font-weight:600;padding:8px 10px;border-radius:7px;cursor:pointer;transition:background .12s ease;}
+        .pq-add-item:hover{background:rgba(255,255,255,0.12);}
+        .pq-add-glyph{display:inline-flex;width:18px;justify-content:center;color:#0066FF;font-size:13px;}`}</style>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 998 }} />
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          ...(side === "left" ? { right: "calc(100% + 8px)" } : { left: "calc(100% + 8px)" }),
+          zIndex: 1000,
+          width: 196,
+          background: "#1A1A1A",
+          border: "1px solid #2D2D2D",
+          borderRadius: 10,
+          padding: 6,
+          boxShadow: "0 12px 34px rgba(0,0,0,0.55)",
+        }}
+      >
+        {opts.filter((o) => o.fn).map((o) => (
+          <button key={o.label} type="button" className="pq-add-item" onClick={() => { onClose(); o.fn?.(); }}>
+            <span className="pq-add-glyph">{o.glyph}</span>{o.label}
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
+
 function RowActionBtn({
   icon,
   title,
