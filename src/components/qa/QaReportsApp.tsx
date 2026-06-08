@@ -750,10 +750,11 @@ export default function QaReportsApp({ embedded = false }: { embedded?: boolean 
                 /* Cluster definitions — keep them stable and exhaustive so a
                    new status doesn't silently disappear. */
                 const CLUSTERS: { key: string; label: string; statuses: IssueStatus[] }[] = [
-                  { key: "open",   label: t("qa.cluster.open",   "Open"),         statuses: ["new", "triaged", "reopened"]            as IssueStatus[] },
-                  { key: "active", label: t("qa.cluster.active", "In Progress"), statuses: ["in_progress", "needs_more_info"]       as IssueStatus[] },
-                  { key: "done",   label: t("qa.cluster.done",   "Done"),         statuses: ["fixed", "verified"]                    as IssueStatus[] },
-                  { key: "archive",label: t("qa.cluster.archive","Closed"),       statuses: ["closed", "rejected", "duplicate"]      as IssueStatus[] },
+                  { key: "open",   label: t("qa.cluster.open",   "Open"),                  statuses: ["new", "triaged", "reopened"]      as IssueStatus[] },
+                  { key: "active", label: t("qa.cluster.active", "In Progress"),           statuses: ["in_progress", "needs_more_info"]  as IssueStatus[] },
+                  { key: "review", label: t("qa.cluster.review", "Awaiting verification"), statuses: ["fixed"]                           as IssueStatus[] },
+                  { key: "done",   label: t("qa.cluster.done",   "Verified"),              statuses: ["verified"]                        as IssueStatus[] },
+                  { key: "archive",label: t("qa.cluster.archive","Closed"),                statuses: ["closed", "rejected", "duplicate"] as IssueStatus[] },
                 ];
                 const byCluster = new Map<string, typeof sorted>();
                 for (const c of CLUSTERS) byCluster.set(c.key, []);
