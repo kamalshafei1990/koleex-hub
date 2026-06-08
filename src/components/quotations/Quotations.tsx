@@ -1565,6 +1565,19 @@ export default function Quotations() {
     setPickerOpen(true);
   }, []);
 
+  /* Clear a row's contents in place — keeps the row, resets it to blank. A
+     section header clears back to an empty header band. */
+  const clearItem = useCallback((idx: number) => {
+    if (!current) return;
+    const items = current.items.slice();
+    if (idx < 0 || idx >= items.length) return;
+    const wasHeader = items[idx]?.kind === "header";
+    items[idx] = wasHeader
+      ? { ...EMPTY_ITEM, kind: "header", description: "", qty: 0, unitPrice: 0 }
+      : { ...EMPTY_ITEM };
+    setCurrent({ ...current, items });
+  }, [current]);
+
   /* Apply a CRM customer pick to the QUOTATION TO card. Fills the
      editor's company / contact / phone / mobile / email / website
      fields and stores customerContactId in the doc so we can show
@@ -2209,6 +2222,7 @@ export default function Quotations() {
         insertItemBelow={insertItemBelow}
         insertHeaderBelow={insertHeaderBelow}
         onInsertProductBelow={openCatalogAt}
+        clearItem={clearItem}
         handleImageUpload={handleImageUpload}
         fileInputRefs={fileInputRefs}
         subTotal={subTotal}

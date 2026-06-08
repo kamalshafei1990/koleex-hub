@@ -187,6 +187,8 @@ interface Props {
   insertHeaderBelow?: (idx: number) => void;
   /* Open the catalog picker to insert a product directly below the given row. */
   onInsertProductBelow?: (idx: number) => void;
+  /* Clear a row's contents (keep the row in place). */
+  clearItem?: (idx: number) => void;
   handleImageUpload: (idx: number, file: File) => void;
   fileInputRefs: MutableRefObject<{ [key: number]: HTMLInputElement | null }>;
   subTotal: number;
@@ -295,6 +297,7 @@ export default function QuotationA4Preview({
   insertItemBelow,
   insertHeaderBelow,
   onInsertProductBelow,
+  clearItem,
   handleImageUpload,
   fileInputRefs,
   subTotal,
@@ -374,6 +377,8 @@ export default function QuotationA4Preview({
   const [colorPopIdx, setColorPopIdx] = useState<number | null>(null);
   /* Which row currently has its "+ add" menu open (product / empty / header). */
   const [addMenuIdx, setAddMenuIdx] = useState<number | null>(null);
+  /* Pending destructive action awaiting confirmation (clear or delete a row). */
+  const [confirm, setConfirm] = useState<{ type: "delete" | "clear"; idx: number } | null>(null);
   /* Set a section header's band colour (by row index). Goes through
      setCurrent (not updateItem) so the Invoice-doc parent is unaffected. */
   const setHeaderColor = useCallback((rowIdx: number, color: string) => {
@@ -1145,7 +1150,7 @@ export default function QuotationA4Preview({
                           {duplicateItem && (
                             <button type="button" className="pq-sec-ctrl" title="Duplicate section header" onClick={() => duplicateItem(idx)}><DuplicateGlyph /></button>
                           )}
-                          <button type="button" className="pq-sec-ctrl pq-sec-ctrl--danger" title="Remove section header" disabled={current.items.length <= 1} onClick={() => removeItem(idx)}><TrashIcon size={12} /></button>
+                          <button type="button" className="pq-sec-ctrl pq-sec-ctrl--danger" title="Remove section header" disabled={current.items.length <= 1} onClick={() => setConfirm({ type: "delete", idx })}><TrashIcon size={12} /></button>
                         </div>
                       </div>
                     </td>
@@ -1265,7 +1270,7 @@ export default function QuotationA4Preview({
                       {item.qty}
                     </div>
                   </Td>
-                  <Td align="right" style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+                  <Td align="center" style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
                     {lineTotal > 0 ? `${fmt(lineTotal)} $` : "0"}
 
                     {/* Floating row actions — ↑ / ↓ / ✕ rendered as
@@ -1371,10 +1376,17 @@ export default function QuotationA4Preview({
                           icon={<DuplicateGlyph />}
                         />
                       )}
+                      {clearItem && (
+                        <RowActionBtn
+                          title="Clear this row's contents"
+                          onClick={() => setConfirm({ type: "clear", idx })}
+                          icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 20H8.5L3.7 15.2a2 2 0 0 1 0-2.8l7.6-7.6a2 2 0 0 1 2.8 0l5 5a2 2 0 0 1 0 2.8L14 20" /><path d="M6.5 11.5l6 6" /></svg>}
+                        />
+                      )}
                       <RowActionBtn
                         title="Remove row"
                         disabled={current.items.length <= 1}
-                        onClick={() => removeItem(idx)}
+                        onClick={() => setConfirm({ type: "delete", idx })}
                         icon={<TrashIcon size={13} />}
                         destructive
                       />
@@ -2257,6 +2269,48 @@ export default function QuotationA4Preview({
     </div>
       );
     })}
+
+    {/* Confirm dialog for destructive row actions (clear / delete). */}
+    {confirm && (
+      <div
+        onClick={() => setConfirm(null)}
+        style={{ position: "fixed", inset: 0, zIndex: 4000, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{ width: 360, maxWidth: "100%", background: "#fff", borderRadius: 14, padding: 22, boxShadow: "0 24px 60px rgba(0,0,0,0.4)" }}
+        >
+          <div style={{ fontSize: 16, fontWeight: 800, color: "#111", marginBottom: 6 }}>
+            {confirm.type === "delete" ? "Delete this row?" : "Clear this row?"}
+          </div>
+          <div style={{ fontSize: 13, color: "#555", lineHeight: 1.5 }}>
+            {confirm.type === "delete"
+              ? "This row will be removed from the quotation. This can't be undone."
+              : "This row's contents (item, model, photo, price, qty) will be emptied. The row stays in place."}
+          </div>
+          <div style={{ marginTop: 20, display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            <button
+              type="button"
+              onClick={() => setConfirm(null)}
+              style={{ height: 38, padding: "0 16px", borderRadius: 9, border: "1px solid #D0D0D0", background: "#fff", color: "#111", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm.type === "delete") removeItem(confirm.idx);
+                else clearItem?.(confirm.idx);
+                setConfirm(null);
+              }}
+              style={{ height: 38, padding: "0 16px", borderRadius: 9, border: "none", background: confirm.type === "delete" ? "#DC2626" : "#111", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+            >
+              {confirm.type === "delete" ? "Delete" : "Clear"}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
   );
 }
