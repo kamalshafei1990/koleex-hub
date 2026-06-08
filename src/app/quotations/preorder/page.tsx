@@ -211,6 +211,39 @@ export default function PreorderPage() {
     }
   };
 
+  // Pull machine photos from the Products app by model code (sku/model_name).
+  const [linking, setLinking] = useState(false);
+  const linkProductPhotos = async () => {
+    const models = Array.from(new Set(doc.sections.flatMap((s) => s.items.map((i) => i.model).filter(Boolean))));
+    if (models.length === 0) { setSavedMsg("لا توجد أكواد موديل"); setTimeout(() => setSavedMsg(""), 2500); return; }
+    setLinking(true);
+    setSavedMsg("جارٍ جلب صور المنتجات…");
+    try {
+      const r = await fetch("/api/quotations/preorders/match-products", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ models }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error();
+      const map: Record<string, string> = j.matches || {};
+      let n = 0;
+      setDoc((d) => ({
+        ...d,
+        sections: d.sections.map((s) => ({
+          ...s,
+          items: s.items.map((it) => {
+            const url = it.model ? map[it.model.trim().toUpperCase()] : undefined;
+            if (url && !it.photo) { n++; return { ...it, photo: url }; }
+            return it;
+          }),
+        })),
+      }));
+      setSavedMsg(n > 0 ? `تم ربط ${n} صورة من المنتجات` : "لا توجد صور مطابقة");
+    } catch {
+      setSavedMsg("فشل جلب الصور");
+    } finally {
+      setLinking(false);
+      setTimeout(() => setSavedMsg(""), 3000);
+    }
+  };
+
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const patchItem = (si: number, ii: number, patch: Partial<Item>) =>
@@ -293,6 +326,7 @@ export default function PreorderPage() {
           <button type="button" onClick={newDoc} className="h-9 rounded-lg border border-white/20 px-3 text-[12.5px] font-medium text-white transition-colors hover:bg-white/10">جديد</button>
           <button type="button" onClick={() => importRef.current?.click()} className="h-9 rounded-lg border border-white/20 px-3 text-[12.5px] font-medium text-white transition-colors hover:bg-white/10">استيراد Excel</button>
           <input ref={importRef} type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(e) => { onImportExcel(e.target.files?.[0]); e.target.value = ""; }} />
+          <button type="button" onClick={linkProductPhotos} disabled={linking} className="h-9 rounded-lg border border-white/20 px-3 text-[12.5px] font-medium text-white transition-colors hover:bg-white/10 disabled:opacity-50">{linking ? "جارٍ…" : "جلب صور المنتجات"}</button>
           <button
             type="button"
             onClick={save}
@@ -372,10 +406,10 @@ export default function PreorderPage() {
                 <thead>
                   <tr className="sticky top-0 z-10 border-b-2 border-black bg-neutral-200 text-[10px] font-bold uppercase tracking-wider text-neutral-600">
                     <th className="w-[44px] px-1 py-2.5 text-center">بند</th>
-                    <th className="w-[124px] px-2 py-2.5 text-center">صورة</th>
-                    <th className="px-3 py-2.5 text-right">الصنف</th>
+                    <th className="w-[96px] px-2 py-2.5 text-center">صورة</th>
+                    <th className="min-w-[340px] px-3 py-2.5 text-right">الصنف</th>
                     {doc.buyers.map((b, bi) => (
-                      <th key={bi} className="w-[58px] px-1 py-2.5 text-center font-bold normal-case" style={{ color: BUYER_COLORS[bi] }}>{b}</th>
+                      <th key={bi} className="w-[50px] px-1 py-2.5 text-center font-bold normal-case" style={{ color: BUYER_COLORS[bi] }}>{b}</th>
                     ))}
                     <th className="w-[112px] border-s-2 border-neutral-400 bg-neutral-300 px-2 py-2.5 text-center text-black">السعر</th>
                     <th className="w-[62px] border-x-2 border-neutral-400 bg-neutral-300 px-1 py-2.5 text-center text-black">الكمية</th>
@@ -395,7 +429,7 @@ export default function PreorderPage() {
                         </td>
                         {/* Photo — fits without crop, replace / remove */}
                         <td className="px-2 py-2.5 text-center">
-                          <div className="pre-photo relative mx-auto h-[108px] w-[108px]">
+                          <div className="pre-photo relative mx-auto h-[84px] w-[84px]">
                             <button
                               type="button"
                               onClick={() => fileRefs.current[fkey]?.click()}
@@ -431,7 +465,7 @@ export default function PreorderPage() {
                           />
                         </td>
                         {/* Item: model + description (editable) */}
-                        <td className="px-2 py-2.5 text-right">
+                        <td className="min-w-[340px] px-2 py-2.5 text-right">
                           <input dir="ltr" value={it.model} placeholder="موديل" onChange={(e) => patchItem(si, ii, { model: e.target.value })} className={`${cell} text-right font-mono text-[12.5px] font-bold`} />
                           <AutoText value={it.desc} placeholder="الوصف" onChange={(v) => patchItem(si, ii, { desc: v })} className={`${cell} block resize-none overflow-hidden text-right text-[12.5px] leading-snug text-neutral-600`} />
                         </td>
