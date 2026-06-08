@@ -181,6 +181,8 @@ interface Props {
      (e.g. read-only print pages, the invoice-doc editor) the duplicate
      control simply isn't shown. */
   duplicateItem?: (idx: number) => void;
+  /* Insert a fresh blank row directly below the given row index. */
+  insertItemBelow?: (idx: number) => void;
   handleImageUpload: (idx: number, file: File) => void;
   fileInputRefs: MutableRefObject<{ [key: number]: HTMLInputElement | null }>;
   subTotal: number;
@@ -286,6 +288,7 @@ export default function QuotationA4Preview({
   removeItem,
   moveItem,
   duplicateItem,
+  insertItemBelow,
   handleImageUpload,
   fileInputRefs,
   subTotal,
@@ -1104,6 +1107,11 @@ export default function QuotationA4Preview({
                           </div>
                           <button type="button" className="pq-sec-ctrl" title="Move section up" disabled={idx === 0} onClick={() => moveItem(idx, -1)}><ArrowUpIcon size={13} /></button>
                           <button type="button" className="pq-sec-ctrl" title="Move section down" disabled={idx === current.items.length - 1} onClick={() => moveItem(idx, 1)}><ArrowDownIcon size={13} /></button>
+                          {insertItemBelow && (
+                            <button type="button" className="pq-sec-ctrl" title="Add a row below this section" onClick={() => insertItemBelow(idx)}>
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+                            </button>
+                          )}
                           {duplicateItem && (
                             <button type="button" className="pq-sec-ctrl" title="Duplicate section header" onClick={() => duplicateItem(idx)}><DuplicateGlyph /></button>
                           )}
@@ -1310,6 +1318,13 @@ export default function QuotationA4Preview({
                         onClick={() => moveItem(idx, 1)}
                         icon={<ArrowDownIcon size={14} />}
                       />
+                      {insertItemBelow && (
+                        <RowActionBtn
+                          title="Add a blank row below this one"
+                          onClick={() => insertItemBelow(idx)}
+                          icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>}
+                        />
+                      )}
                       {duplicateItem && (
                         <RowActionBtn
                           title="Duplicate row"

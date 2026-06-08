@@ -1536,6 +1536,17 @@ export default function Quotations() {
     setCurrent({ ...current, items });
   }, [current]);
 
+  /* Insert a fresh blank row DIRECTLY BELOW a given row, so the user can
+     add a line exactly where they want instead of appending at the end and
+     dragging it up. */
+  const insertItemBelow = useCallback((idx: number) => {
+    if (!current) return;
+    const items = current.items.slice();
+    const at = Math.min(Math.max(idx + 1, 0), items.length);
+    items.splice(at, 0, { ...EMPTY_ITEM });
+    setCurrent({ ...current, items });
+  }, [current]);
+
   /* Apply a CRM customer pick to the QUOTATION TO card. Fills the
      editor's company / contact / phone / mobile / email / website
      fields and stores customerContactId in the doc so we can show
@@ -2171,6 +2182,7 @@ export default function Quotations() {
         removeItem={removeItem}
         moveItem={moveItem}
         duplicateItem={duplicateItem}
+        insertItemBelow={insertItemBelow}
         handleImageUpload={handleImageUpload}
         fileInputRefs={fileInputRefs}
         subTotal={subTotal}
