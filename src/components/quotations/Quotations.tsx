@@ -1338,7 +1338,13 @@ export default function Quotations() {
          once images + fonts have loaded. We watch for it, then
          invoke the iframe's print(). */
       const prevTitle = document.title;
-      document.title = `${current.customerName} - ${current.companyName} - ${current.invoiceNo}`;
+      /* Clean filename: skip empty parts so a draft (no company / no quote no)
+         doesn't produce "Customer -  - ". Order: quote-no first when present. */
+      document.title =
+        [working.invoiceNo, working.customerName || working.companyName]
+          .map((s) => (typeof s === "string" ? s.trim() : ""))
+          .filter(Boolean)
+          .join(" - ") || "Quotation";
       const restore = () => {
         document.title = prevTitle;
         window.removeEventListener("afterprint", restore);
