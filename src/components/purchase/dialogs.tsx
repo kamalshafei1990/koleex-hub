@@ -166,6 +166,17 @@ export function NewRequisitionDialog({ open, onClose, onCreated }: DialogProps) 
   const [justification, setJustification] = useState("");
   const [currency, setCurrency] = useState("USD");
 
+  /* Requesting department is an INTERNAL company department — picked from the
+     company's department list, not free text (QA issue 6244c4c1). */
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => {
+    if (!open) return;
+    fetch("/api/management/departments", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : { departments: [] }))
+      .then((j) => setDepartments(Array.isArray(j.departments) ? j.departments : []))
+      .catch(() => setDepartments([]));
+  }, [open]);
+
   const [productId, setProductId] = useState("");      // optional
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -242,8 +253,13 @@ export function NewRequisitionDialog({ open, onClose, onCreated }: DialogProps) 
             <input value={prNo} onChange={(e) => setPrNo(e.target.value)} className={inputCls} placeholder="PR-2026-0001" />
           </div>
           <div>
-            <label className={labelCls}>Department</label>
-            <input value={department} onChange={(e) => setDepartment(e.target.value)} className={inputCls} placeholder="e.g. Operations" />
+            <label className={labelCls}>Requesting department</label>
+            <select value={department} onChange={(e) => setDepartment(e.target.value)} className={inputCls}>
+              <option value="">Select department…</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.name}>{d.name}</option>
+              ))}
+            </select>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
