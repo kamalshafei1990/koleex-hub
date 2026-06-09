@@ -21,6 +21,10 @@ import {
   getViewAsRoleId,
 } from "./session";
 import type { ScopeContext } from "../scope";
+import {
+  runDualReadShadow,
+  sessionStatefulValidateShadowEnabled,
+} from "./session-validate-shadow";
 
 export interface ServerAuthContext extends ScopeContext {
   /** Present for convenience — some routes want extra account fields. */
@@ -172,6 +176,16 @@ export async function getServerAuth(): Promise<ServerAuthContext | null> {
           | null)
       : null;
   const roleModeActive = !!(viewingAs && overrideTargetRoleId && targetRoleRow);
+
+  /* P1 · S2 — dual-read session validator, SHADOW-ONLY. Flag-gated
+     (SESSION_STATEFUL_VALIDATE_SHADOW); compares the (authoritative) legacy
+     result against what a stateful session would decide and logs [session-s2].
+     Keyed on the REAL account id (never the view-as target). Read-only,
+     self-guarded; the return object below is UNCHANGED and remains the sole
+     auth context. Never denies/mutates/logs-out. Inert when the flag is off. */
+  if (sessionStatefulValidateShadowEnabled()) {
+    await runDualReadShadow({ realAccountId, legacyValid: true }).catch(() => undefined);
+  }
 
   return {
     account_id: data.id,
