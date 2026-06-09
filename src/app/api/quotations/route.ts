@@ -4,6 +4,13 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { resolveBaseCurrency } from "@/lib/finance/currency";
+import {
+  applyScope,
+  recordScopeShadow,
+  resolveEffectiveScope,
+  toScopeContext,
+} from "@/lib/server/apply-scope";
+import { getScopeMode } from "@/lib/server/scope-flags";
 
 /* GET  /api/quotations — list (tenant-scoped)
      Query:
@@ -92,8 +99,10 @@ export async function GET(req: Request) {
   let q = supabaseServer
     .from("quotations")
     .select(
+      // created_by is selected for DS1a shadow scope evaluation only and is
+      // STRIPPED from the response below (response shape unchanged).
       `id, tenant_id, quote_no, customer_id, status, currency, discount_percent,
-       notes, doc, issue_date, valid_till, total, created_at, updated_at,
+       notes, doc, issue_date, valid_till, total, created_at, updated_at, created_by,
        customer:customer_id ( id, name, company_name )`,
     )
     .eq("tenant_id", auth.tenant_id);
@@ -112,10 +121,35 @@ export async function GET(req: Request) {
 
   q = q.order("updated_at", { ascending: false }).order("created_at", { ascending: false });
 
-  const { data, error } = await q;
+  /* DS1a — data_scope SHADOW/OFF only. applyScope NEVER modifies the query
+     (the enforce path is not built here), so rows + order + payload are
+     byte-identical to before. When the Quotations flag is "shadow", we log
+     counts-only after the fetch. Default flag is "off" → no logging. */
+  const scopeMode = getScopeMode("Quotations");
+  const scopeCtx = toScopeContext(auth);
+  const effectiveScope =
+    scopeMode === "off"
+      ? "all"
+      : await resolveEffectiveScope(scopeCtx, "Quotations", supabaseServer);
+  const { query: scopedQ } = await applyScope(q, scopeCtx, "Quotations", {
+    mode: scopeMode,
+    effectiveScope,
+  });
+
+  const { data, error } = await scopedQ;
   if (error) {
     console.error("[api/quotations GET]", error.message);
     return NextResponse.json({ error: "Failed to load quotations" }, { status: 500 });
+  }
+
+  if (scopeMode === "shadow") {
+    recordScopeShadow({
+      module: "Quotations",
+      endpoint: "GET /api/quotations",
+      ctx: scopeCtx,
+      rows: (data ?? []) as Record<string, unknown>[],
+      effectiveScope,
+    });
   }
 
   /* Strip the heavy `items` array (with base64 images) before
@@ -125,7 +159,10 @@ export async function GET(req: Request) {
   const slim = (data ?? []).map((row) => {
     const full = (row as { doc?: Record<string, unknown> }).doc ?? {};
     const { items: _items, ...rest } = full;
-    return { ...(row as Record<string, unknown>), doc: rest };
+    // Strip created_by (selected only for DS1a shadow eval) so the response
+    // shape is byte-identical to before DS1a.
+    const { created_by: _createdBy, ...rowOut } = row as Record<string, unknown>;
+    return { ...rowOut, doc: rest };
   });
 
   return NextResponse.json({ quotations: slim }, {
