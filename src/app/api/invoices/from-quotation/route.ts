@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { calcInvoiceTotals, type LineInput } from "@/lib/server/invoice-totals";
+import { assertScopeShadowForRow, toScopeContext } from "@/lib/server/apply-scope";
+import { getScopeMode } from "@/lib/server/scope-flags";
 
 /* POST /api/invoices/from-quotation
    body: { quotation_id: string, due_date?: string }
@@ -43,7 +45,10 @@ export async function POST(req: Request) {
   const [quoteRes, itemsRes] = await Promise.all([
     supabaseServer
       .from("quotations")
-      .select("id, quote_no, customer_id, currency, discount_percent, notes")
+      // created_by is selected for DS1b-2a shadow scope evaluation only; it is
+      // NOT echoed (the response is the new invoice). Used to read the source
+      // quote's owner for the scope-shadow log.
+      .select("id, quote_no, customer_id, currency, discount_percent, notes, created_by")
       .eq("id", body.quotation_id)
       .eq("tenant_id", auth.tenant_id)
       .maybeSingle(),
@@ -57,6 +62,32 @@ export async function POST(req: Request) {
   }
 
   const quote = quoteRes.data;
+
+  /* DS1b-2a — invoice-conversion data_scope SHADOW (log-only). Runs only when
+     the Quotations flag is "shadow"; evaluates the SOURCE quotation against the
+     user's Quotations data_scope. The Invoices gate above already passed; this
+     additionally observes whether the user holds Quotations view (the
+     conversion leak surface). The verdict NEVER affects control flow —
+     conversion proceeds exactly as today regardless of would_allow. */
+  if (getScopeMode("Quotations") === "shadow") {
+    const quotationsPermPresent =
+      (await requireModuleAccess(auth, "Quotations")) === null;
+    await assertScopeShadowForRow({
+      row: quote as unknown as Record<string, unknown>,
+      ctx: toScopeContext(auth),
+      module: "Quotations",
+      endpoint: "POST /api/invoices/from-quotation",
+      db: supabaseServer,
+      mode: "shadow",
+      extra: {
+        source_route: "invoice_from_quotation",
+        quotation_id: quote.id,
+        invoice_permission_present: true,
+        quotations_permission_present: quotationsPermPresent,
+      },
+    });
+  }
+
   const lines: LineInput[] = (itemsRes.data ?? []).map((row, i) => ({
     product_id: row.product_id as string,
     qty: Number(row.qty),
