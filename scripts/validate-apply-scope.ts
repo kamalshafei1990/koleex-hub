@@ -119,6 +119,18 @@ async function run() {
   check("extra passthrough keeps verdict (non-owner would_allow false)", rec.would_allow === false && rec.quotation_id === "q-1");
   check("assertScopeShadowForRow forwards extra into log", captured.length === 2 && captured[1].includes("invoice_from_quotation"));
 
+  /* ── DS1b-2b: doc/from-quotation metadata passthrough ──────────────── */
+  const cap2: string[] = [];
+  console.info = (...a: unknown[]) => { cap2.push(a.map(String).join(" ")); };
+  recordScopeShadowForSingleRow({
+    module: "Quotations", endpoint: "POST /api/invoices/doc/from-quotation", ctx: ctxA,
+    row: ownerRow, effectiveScope: "own",
+    extra: { source_route: "invoice_doc_from_quotation", quotation_id: "q-2", invoice_permission_present: true, quotations_permission_present: true },
+  });
+  console.info = origInfo;
+  const rec2 = JSON.parse(cap2[0].replace("[scope-shadow] ", ""));
+  check("doc/from-quotation metadata passthrough", rec2.source_route === "invoice_doc_from_quotation" && rec2.quotations_permission_present === true && rec2.would_allow === true);
+
   console.log(`\napply-scope: ${pass} passed, ${fail} failed.`);
   process.exit(fail === 0 ? 0 : 1);
 }
