@@ -28,6 +28,9 @@ import "server-only";
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
+import { parseSessionValue, type ParsedSession } from "./session-codec";
+
+export type { ParsedSession } from "./session-codec";
 
 const COOKIE_NAME = "koleex_session";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
@@ -314,4 +317,21 @@ export async function getSessionAccountId(): Promise<string | null> {
   if (!verifySignature(accountId, signature)) return null;
 
   return accountId;
+}
+
+/**
+ * Dual-read session reader (B1c-2a). Returns the full ParsedSession for either
+ * a v1 (`accountId.HMAC`) or a forward-compatible v2 (`payload.HMAC`) cookie,
+ * or null if missing / malformed / tampered.
+ *
+ * ADDITIVE + read-only: this does NOT change how cookies are minted (still v1,
+ * see setSessionCookie) and does NOT replace getSessionAccountId — existing
+ * call sites are untouched. Later sub-stages (B1c-2c+) can migrate requireAuth
+ * to this to read active_tenant_id from the session. Today it's available but
+ * unused by production flows.
+ */
+export async function getSession(): Promise<ParsedSession | null> {
+  const store = await cookies();
+  const raw = store.get(COOKIE_NAME)?.value;
+  return parseSessionValue(raw, getSecret());
 }
