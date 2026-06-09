@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "validate:session-codec": "tsx scripts/validate-session-codec.ts",
     "validate:intelligence": "tsx scripts/validate-intelligence.ts",
     "validate:races": "tsx scripts/race-conditions.ts",
     "validate:tenant-isolation": "tsx scripts/tenant-isolation.ts",
