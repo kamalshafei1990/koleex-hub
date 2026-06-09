@@ -3,6 +3,8 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { assertScopeShadowForRow, toScopeContext } from "@/lib/server/apply-scope";
+import { getScopeMode } from "@/lib/server/scope-flags";
 
 /* POST /api/invoices/doc/from-quotation
      body: { quotation_id: string, due_date?: string }
@@ -43,12 +45,37 @@ export async function POST(req: Request) {
 
   const { data: quote, error: qErr } = await supabaseServer
     .from("quotations")
-    .select("id, customer_id, currency, total, doc")
+    // created_by is selected for DS1b-2b shadow scope evaluation only; it is
+    // NOT echoed (the response is the new invoice). Used to read the source
+    // quote's owner for the scope-shadow log.
+    .select("id, customer_id, currency, total, doc, created_by")
     .eq("id", body.quotation_id)
     .eq("tenant_id", auth.tenant_id)
     .maybeSingle();
   if (qErr || !quote) {
     return NextResponse.json({ error: "Quotation not found" }, { status: 404 });
+  }
+
+  /* DS1b-2b — invoice-conversion data_scope SHADOW (log-only). Runs only when
+     the Quotations flag is "shadow"; evaluates the SOURCE quotation against the
+     user's Quotations data_scope. This route already gates BOTH Invoices and
+     Quotations view, so both permission flags are true. The verdict NEVER
+     affects control flow — conversion proceeds exactly as today. */
+  if (getScopeMode("Quotations") === "shadow") {
+    await assertScopeShadowForRow({
+      row: quote as unknown as Record<string, unknown>,
+      ctx: toScopeContext(auth),
+      module: "Quotations",
+      endpoint: "POST /api/invoices/doc/from-quotation",
+      db: supabaseServer,
+      mode: "shadow",
+      extra: {
+        source_route: "invoice_doc_from_quotation",
+        quotation_id: quote.id,
+        invoice_permission_present: true,
+        quotations_permission_present: true,
+      },
+    });
   }
 
   const inv_no = await nextInvoiceNumber(auth.tenant_id);
