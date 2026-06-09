@@ -99,15 +99,30 @@ export default function OverviewTab({ account }: Props) {
               {t("acc.overview.forcePasswordChange")}
             </span>
           )}
-          {account.password_hash ? (
-            <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border-subtle)]">
-              {t("acc.overview.tempPasswordSet")}
-            </span>
-          ) : (
-            <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border bg-red-500/15 text-red-300 border-red-500/25">
-              {t("acc.overview.noPasswordSet")}
-            </span>
-          )}
+          {(() => {
+            /* Server-derived, secret-free password state (never the hash). */
+            const state =
+              account.password_state ??
+              (account.has_password ? "ACTIVE" : "NO_PASSWORD");
+            const NEUTRAL = "bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border-subtle)]";
+            const AMBER = "bg-amber-500/15 text-amber-300 border-amber-500/25";
+            const RED = "bg-red-500/15 text-red-300 border-red-500/25";
+            const GREEN = "bg-emerald-500/15 text-emerald-300 border-emerald-500/25";
+            const map: Record<string, { key: string; cls: string }> = {
+              ACTIVE: { key: "acc.security.pwActive", cls: GREEN },
+              TEMPORARY: { key: "acc.overview.tempPasswordSet", cls: AMBER },
+              RESET_REQUIRED: { key: "acc.security.pwResetRequired", cls: AMBER },
+              NO_PASSWORD: { key: "acc.overview.noPasswordSet", cls: RED },
+              EXTERNAL_PROVIDER: { key: "acc.security.pwExternal", cls: NEUTRAL },
+              PENDING_SETUP: { key: "acc.overview.noPasswordSet", cls: RED },
+            };
+            const m = map[state] ?? map.NO_PASSWORD;
+            return (
+              <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${m.cls}`}>
+                {t(m.key)}
+              </span>
+            );
+          })()}
         </div>
       </section>
 
