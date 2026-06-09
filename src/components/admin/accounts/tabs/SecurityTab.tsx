@@ -224,16 +224,29 @@ export default function SecurityTab({ account }: Props) {
           {t("acc.security.passwordSignIn")}
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <InfoTile
-            icon={<KeyIcon className="h-4 w-4" />}
-            label={t("acc.security.password")}
-            value={
-              account.password_hash
-                ? t("acc.security.pwSet")
-                : t("acc.security.pwNotSet")
-            }
-            tone={account.password_hash ? "neutral" : "warn"}
-          />
+          {(() => {
+            /* Server-derived, secret-free password state (never the hash). */
+            const state =
+              account.password_state ??
+              (account.has_password ? "ACTIVE" : "NO_PASSWORD");
+            const map: Record<string, { key: string; tone: "ok" | "warn" | "neutral" }> = {
+              ACTIVE: { key: "acc.security.pwActive", tone: "ok" },
+              TEMPORARY: { key: "acc.security.pwTemporary", tone: "warn" },
+              RESET_REQUIRED: { key: "acc.security.pwResetRequired", tone: "warn" },
+              NO_PASSWORD: { key: "acc.security.pwNone", tone: "warn" },
+              EXTERNAL_PROVIDER: { key: "acc.security.pwExternal", tone: "neutral" },
+              PENDING_SETUP: { key: "acc.security.pwNone", tone: "warn" },
+            };
+            const m = map[state] ?? map.NO_PASSWORD;
+            return (
+              <InfoTile
+                icon={<KeyIcon className="h-4 w-4" />}
+                label={t("acc.security.password")}
+                value={t(m.key)}
+                tone={m.tone}
+              />
+            );
+          })()}
           <InfoTile
             icon={<RefreshCcwIcon className="h-4 w-4" />}
             label={t("acc.security.forceChange")}
@@ -243,8 +256,8 @@ export default function SecurityTab({ account }: Props) {
           <InfoTile
             icon={<FingerprintIcon className="h-4 w-4" />}
             label={t("acc.security.twoFactor")}
-            value={t("acc.security.notConfigured")}
-            tone="neutral"
+            value={account.two_factor_enabled ? t("acc.security.twoFactorOn") : t("acc.security.notConfigured")}
+            tone={account.two_factor_enabled ? "ok" : "neutral"}
           />
         </div>
         <p className="text-[11px] text-[var(--text-dim)] mt-4 leading-relaxed">

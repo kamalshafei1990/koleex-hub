@@ -858,6 +858,16 @@ export interface AccountWithLinks extends AccountRow {
   preset: AccessPresetRow | null;
   employee: EmployeeRow | null;
   overrides: AccountPermissionOverrideRow[];
+  /* Display-only password facts derived server-side by GET /api/accounts/[id].
+     The password hash itself is NEVER sent to the client. */
+  password_state?:
+    | "ACTIVE"
+    | "TEMPORARY"
+    | "RESET_REQUIRED"
+    | "NO_PASSWORD"
+    | "EXTERNAL_PROVIDER"
+    | "PENDING_SETUP";
+  has_password?: boolean;
 }
 
 /* ── Security infrastructure (Project C: Security tab) ── */
