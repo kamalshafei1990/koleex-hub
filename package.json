@@ -9,6 +9,7 @@
     "lint": "eslint",
     "validate:session-codec": "tsx scripts/validate-session-codec.ts",
     "validate:apply-scope": "tsx scripts/validate-apply-scope.ts",
+    "validate:ai-quotation-guard": "tsx scripts/validate-ai-quotation-guard.ts",
     "validate:intelligence": "tsx scripts/validate-intelligence.ts",
     "validate:races": "tsx scripts/race-conditions.ts",
     "validate:tenant-isolation": "tsx scripts/tenant-isolation.ts",

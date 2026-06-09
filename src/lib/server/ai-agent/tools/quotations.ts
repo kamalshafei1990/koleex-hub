@@ -16,6 +16,15 @@ import "server-only";
      calculateQuotationPricing, which runs pure TS.
    - Cost price / supplier cost / margin values are filtered out before
      data reaches the LLM. They stay server-side only.
+   - DATA_SCOPE INVARIANT (DS1b-3): the AI has NO quotation read/list/show
+     tool. createQuotationDraft is the ONLY tool that touches the quotations
+     table, and only to (a) count for numbering [head:true], (b) insert a
+     user-owned draft [created_by: ctx.auth.account_id], (c) rollback-delete
+     its own just-created draft. ANY future tool that READS existing
+     quotations MUST route results through assertScopeShadowForRow /
+     applyScope (src/lib/server/apply-scope.ts) so the AI is never broader
+     than the requesting user. scripts/validate-ai-quotation-guard.ts fails
+     the build if a non-scoped reader appears here.
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "../../supabase-server";
