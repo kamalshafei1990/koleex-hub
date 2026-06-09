@@ -7,11 +7,19 @@ import type { ReactNode } from "react";
 export type EmptyVariant = "all_clear" | "low_traffic" | "no_anomalies" | "inactive" | "error";
 
 const COPY: Record<EmptyVariant, { title: string; message: string }> = {
-  all_clear: { title: "All clear", message: "No suspicious sign-in activity in this window." },
-  low_traffic: { title: "Building a baseline", message: "Limited sign-in activity so far — keep observing to gain confidence." },
-  no_anomalies: { title: "No anomalies", message: "Nothing here needs your attention right now." },
-  inactive: { title: "No activity", message: "No sign-in attempts were recorded in this window." },
+  all_clear: { title: "All clear", message: "No suspicious sign-in activity in this window. Nothing needs your attention." },
+  low_traffic: { title: "Building a baseline", message: "Sign-in activity is light so far — observe mode keeps learning. Readiness firms up as more data arrives." },
+  no_anomalies: { title: "Nothing unusual", message: "Sign-ins are behaving normally right now." },
+  inactive: { title: "Quiet window", message: "No sign-in attempts were recorded here — a calm, healthy default." },
   error: { title: "Couldn’t load", message: "Something went wrong fetching this data. Please try again." },
+};
+
+/* Calm default glyph so a positive empty never reads as a broken/blank card. */
+const GLYPH: Partial<Record<EmptyVariant, string>> = {
+  all_clear: "✓",
+  no_anomalies: "✓",
+  low_traffic: "◷",
+  inactive: "—",
 };
 
 export interface EmptyStateProps {
@@ -28,13 +36,20 @@ export default function EmptyState({ variant, title, message, icon, progress, cl
   const copy = COPY[variant];
   const isError = variant === "error";
   const pct = typeof progress === "number" ? Math.max(0, Math.min(1, progress)) : null;
+  const glyph = GLYPH[variant];
 
   return (
     <div
       role={isError ? "alert" : "status"}
       className={`flex flex-col items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--bg-surface)]/40 px-6 py-10 text-center ${className}`}
     >
-      {icon && <div className="mb-3 text-[var(--text-dim)]">{icon}</div>}
+      {icon ? (
+        <div className="mb-3 text-[var(--text-dim)]">{icon}</div>
+      ) : glyph ? (
+        <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg-surface-hover)] text-[var(--text-dim)]" aria-hidden="true">
+          {glyph}
+        </div>
+      ) : null}
       <p className={`text-sm font-semibold ${isError ? "text-rose-300" : "text-[var(--text-primary)]"}`}>
         {title ?? copy.title}
       </p>

@@ -23,19 +23,26 @@ export interface TrendPanelProps {
 export default function TrendPanel({ trend, outcome, window }: TrendPanelProps) {
   const successPct = (outcome.successPct * 100).toFixed(0);
   const failurePct = (outcome.failurePct * 100).toFixed(0);
+  const totalAttempts = trend.attempts.reduce((a, b) => a + b, 0);
+  const totalFailures = trend.failures.reduce((a, b) => a + b, 0);
 
   return (
     <SectionCard title="Attempts over time">
       {trend.hasData ? (
-        <AreaChart
-          height={200}
-          currency=""
-          labels={trend.labels.map((l) => formatLabel(l, window))}
-          series={[
-            { name: "Attempts", values: trend.attempts, tone: "info" },
-            { name: "Failures", values: trend.failures, tone: "warning" },
-          ]}
-        />
+        <div
+          role="img"
+          aria-label={`Attempts over time across ${trend.labels.length} intervals: ${totalAttempts} attempts, ${totalFailures} of them failures.`}
+        >
+          <AreaChart
+            height={200}
+            currency=""
+            labels={trend.labels.map((l) => formatLabel(l, window))}
+            series={[
+              { name: "Attempts", values: trend.attempts, tone: "info" },
+              { name: "Failures", values: trend.failures, tone: "warning" },
+            ]}
+          />
+        </div>
       ) : (
         <p className="py-10 text-center text-sm text-[var(--text-dim)]">No sign-in activity to chart in this window.</p>
       )}

@@ -91,7 +91,8 @@ export default function SecurityCenter() {
 
   const goTab = useCallback((t: TabId) => {
     setActiveTab(t);
-    tabsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const reduce = typeof globalThis !== "undefined" && globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    tabsRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
   }, []);
 
   const onAttention = useCallback(
@@ -195,12 +196,12 @@ function AccessDenied() {
 }
 function Skeleton() {
   return (
-    <div className="space-y-5">
-      <div className="h-28 animate-pulse rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)]/40" />
-      <div className="h-12 animate-pulse rounded-xl border border-[var(--border)] bg-[var(--bg-surface)]/40" />
+    <div className="space-y-5" role="status" aria-label="Loading security analytics">
+      <div className="h-28 animate-pulse rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)]/40 motion-reduce:animate-none" />
+      <div className="h-12 animate-pulse rounded-xl border border-[var(--border)] bg-[var(--bg-surface)]/40 motion-reduce:animate-none" />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="h-24 animate-pulse rounded-xl border border-[var(--border)] bg-[var(--bg-surface)]/40" />
+          <div key={i} className="h-24 animate-pulse rounded-xl border border-[var(--border)] bg-[var(--bg-surface)]/40 motion-reduce:animate-none" />
         ))}
       </div>
     </div>

@@ -18,6 +18,7 @@ export interface InvestigationDrawerProps {
 
 export default function InvestigationDrawer({ entity, report, onClose }: InvestigationDrawerProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<Element | null>(null);
 
   useEffect(() => {
@@ -25,7 +26,32 @@ export default function InvestigationDrawer({ entity, report, onClose }: Investi
     triggerRef.current = document.activeElement;
     closeRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      // Focus trap: keep Tab cycling inside the dialog.
+      if (e.key === "Tab" && panelRef.current) {
+        const f = Array.from(
+          panelRef.current.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+          ),
+        ).filter((el) => !el.hasAttribute("disabled"));
+        if (f.length === 0) return;
+        const first = f[0];
+        const last = f[f.length - 1];
+        const active = document.activeElement;
+        if (!panelRef.current.contains(active)) {
+          e.preventDefault();
+          first.focus();
+        } else if (e.shiftKey && active === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && active === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => {
@@ -41,6 +67,7 @@ export default function InvestigationDrawer({ entity, report, onClose }: Investi
     <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden="true" />
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label={model ? `${model.subtitle}: ${model.title}` : "Investigation"}

@@ -323,6 +323,13 @@ export default function AccountsList() {
             </h1>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            <Link
+              href="/accounts/login-security"
+              className="h-10 px-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-secondary)] text-[13px] font-semibold flex items-center gap-2 hover:text-[var(--text-primary)] transition-colors"
+              title="Login Security — observe-mode rate-limit analytics"
+            >
+              Security
+            </Link>
             <Link href="/accounts/new" className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg">
               <PlusIcon className="h-4 w-4" /> {t("acc.newAccount")}
             </Link>
