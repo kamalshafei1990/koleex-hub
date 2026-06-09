@@ -22,6 +22,7 @@ import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { assertScopeShadowForRow, toScopeContext } from "@/lib/server/apply-scope";
 import { getScopeMode } from "@/lib/server/scope-flags";
+import { isCustomerEnforced, ownsQuotation } from "@/lib/server/customer-quotation-guard";
 
 export const runtime = "nodejs";
 /* PDF rendering on Vercel needs headroom: the chromium binary download
@@ -105,6 +106,21 @@ export async function GET(req: Request, { params }: RouteCtx) {
   if (deny) return deny;
 
   const { id } = await params;
+
+  /* CQE — Customer-only enforcement: block the PDF of a quote an external
+     customer doesn't own, BEFORE any headless-browser work. Same 404 as
+     "not found". Inert when the flag is off → internal/SA unchanged. */
+  if (await isCustomerEnforced(auth, supabaseServer)) {
+    const { data: owner } = await supabaseServer
+      .from("quotations")
+      .select("created_by")
+      .eq("id", id)
+      .eq("tenant_id", auth.tenant_id)
+      .maybeSingle();
+    if (!ownsQuotation(owner as { created_by?: string | null } | null, auth.account_id)) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+  }
 
   /* DS1b-1 — single-row data_scope SHADOW (log-only) for the PDF endpoint.
      The PDF itself is rendered by a headless browser hitting the print page

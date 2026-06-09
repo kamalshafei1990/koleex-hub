@@ -5,6 +5,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { assertScopeShadowForRow, toScopeContext } from "@/lib/server/apply-scope";
 import { getScopeMode } from "@/lib/server/scope-flags";
+import { isCustomerEnforced, ownsQuotation } from "@/lib/server/customer-quotation-guard";
 
 /* POST /api/invoices/doc/from-quotation
      body: { quotation_id: string, due_date?: string }
@@ -76,6 +77,16 @@ export async function POST(req: Request) {
         quotations_permission_present: true,
       },
     });
+  }
+
+  /* CQE — Customer-only enforcement: external customer may not convert a
+     quotation it doesn't own. 403 before any invoice is created. Inert when
+     the flag is off → internal/SA unchanged. */
+  if (
+    await isCustomerEnforced(auth, supabaseServer) &&
+    !ownsQuotation(quote as { created_by?: string | null }, auth.account_id)
+  ) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const inv_no = await nextInvoiceNumber(auth.tenant_id);

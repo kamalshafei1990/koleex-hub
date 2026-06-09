@@ -11,6 +11,7 @@ import {
   toScopeContext,
 } from "@/lib/server/apply-scope";
 import { getScopeMode } from "@/lib/server/scope-flags";
+import { isCustomerEnforced } from "@/lib/server/customer-quotation-guard";
 
 /* GET  /api/quotations — list (tenant-scoped)
      Query:
@@ -120,6 +121,16 @@ export async function GET(req: Request) {
   }
 
   q = q.order("updated_at", { ascending: false }).order("created_at", { ascending: false });
+
+  /* CQE — Customer-only Quotations Enforcement (real filter, customer-only).
+     When CUSTOMER_QUOTATIONS_ENFORCE is ON and this is an external/customer
+     account (not super-admin), restrict to rows they created. This hides
+     internal/SA-created AND null-owner quotes. Inert (no DB read) when the
+     flag is off → internal/SA behaviour unchanged. Independent of the DS1a
+     shadow flag below. */
+  if (await isCustomerEnforced(auth, supabaseServer)) {
+    q = q.eq("created_by", auth.account_id);
+  }
 
   /* DS1a — data_scope SHADOW/OFF only. applyScope NEVER modifies the query
      (the enforce path is not built here), so rows + order + payload are
