@@ -82,9 +82,16 @@ export default function OverviewTab({ account }: Props) {
             icon={<ClockIcon className="h-3.5 w-3.5" />}
             label={t("acc.overview.lastLogin")}
             value={
-              account.last_login_at
-                ? new Date(account.last_login_at).toLocaleString()
-                : t("acc.overview.never")
+              account.last_login_at ? (
+                new Date(account.last_login_at).toLocaleString()
+              ) : (
+                <span
+                  title={t("acc.overview.neverHint")}
+                  className="cursor-help border-b border-dotted border-[var(--border-subtle)] text-[var(--text-muted)]"
+                >
+                  {t("acc.overview.never")}
+                </span>
+              )
             }
           />
           <InfoField

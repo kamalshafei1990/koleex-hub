@@ -32,6 +32,21 @@ export function isSupabaseAuthEnabled(): boolean {
   return process.env.NEXT_PUBLIC_USE_SUPABASE_AUTH === "true";
 }
 
+/**
+ * Stamp accounts.last_login_at on a successful Supabase sign-in, matching the
+ * custom /api/auth/signin behaviour. The Supabase user id maps to
+ * accounts.auth_user_id. Best-effort: callers wrap this in allSettled/try-catch
+ * so a tracking-write hiccup can NEVER block an already-successful login. This
+ * path is dormant (flag-gated) today — wired now so last_login_at is recorded
+ * if Supabase Auth is ever enabled. Does NOT touch password or session logic.
+ */
+function stampLastLogin(authUserId: string) {
+  return supabase
+    .from("accounts")
+    .update({ last_login_at: new Date().toISOString() })
+    .eq("auth_user_id", authUserId);
+}
+
 export type SignInResult =
   | { ok: true; session: Session; user: User; mfaRequired: false }
   | {
@@ -86,18 +101,25 @@ export async function signInWithPassword(
   // No MFA challenge outstanding — log the successful sign-in and create
   // an account_sessions row for the Security tab.
   if (data.session) {
-    await Promise.all([
-      logEvent(data.user.id, "login_success", {
-        email: data.user.email,
-      }),
-      createSession(data.user.id, data.session.access_token, {
-        user_agent:
-          typeof navigator !== "undefined" ? navigator.userAgent : null,
-        expires_at: data.session.expires_at
-          ? new Date(data.session.expires_at * 1000).toISOString()
-          : null,
-      }),
-    ]);
+    // Best-effort, AWAITED + self-guarded: tracking writes must never block an
+    // already-successful login (same pattern as /api/auth/signin).
+    try {
+      await Promise.allSettled([
+        logEvent(data.user.id, "login_success", {
+          email: data.user.email,
+        }),
+        createSession(data.user.id, data.session.access_token, {
+          user_agent:
+            typeof navigator !== "undefined" ? navigator.userAgent : null,
+          expires_at: data.session.expires_at
+            ? new Date(data.session.expires_at * 1000).toISOString()
+            : null,
+        }),
+        stampLastLogin(data.user.id),
+      ]);
+    } catch {
+      /* never block a successful login on a tracking write */
+    }
   }
 
   return {
