@@ -12,6 +12,7 @@
     "validate:ai-quotation-guard": "tsx scripts/validate-ai-quotation-guard.ts",
     "validate:customer-quotation-guard": "tsx scripts/validate-customer-quotation-guard.ts",
     "validate:password-state": "tsx scripts/validate-password-state.ts",
+    "validate:session-shadow": "tsx scripts/validate-session-shadow.ts",
     "validate:intelligence": "tsx scripts/validate-intelligence.ts",
     "validate:races": "tsx scripts/race-conditions.ts",
     "validate:tenant-isolation": "tsx scripts/tenant-isolation.ts",
