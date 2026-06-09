@@ -26,6 +26,7 @@ import {
   recordAttempt,
   type WouldBlockResult,
 } from "@/lib/server/rate-limit";
+import { recordSessionShadow } from "@/lib/server/session-shadow";
 
 export async function POST(req: Request) {
   // Outer try/catch so an unexpected throw (missing env var, DB outage,
@@ -188,6 +189,17 @@ export async function POST(req: Request) {
         outcome: "success", reason: "login_success", wouldBlock, mode: rlMode,
       });
     }
+
+    /* P1 · S1 — stateful-session SHADOW (write + comparator). SUCCESS ONLY.
+       Flag-gated (SESSION_STATEFUL_SHADOW); log-only; never authoritative.
+       The legacy cookie set above remains the ONLY auth source. Self-guarded
+       so a shadow-write/comparator/DB hiccup can NEVER block an already-
+       successful login. No token is ever returned to the client. */
+    await recordSessionShadow({
+      accountId: account.id,
+      accountStatus: account.status,
+      req,
+    }).catch(() => undefined);
 
     return NextResponse.json({
       ok: true,
