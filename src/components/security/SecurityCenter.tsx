@@ -7,12 +7,16 @@
    Super-admin gated (useMeBootstrap → access-denied; the API also 403s). */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+import { useSearchParams } from "next/navigation";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import {
   deriveViewModel,
   type SecurityReport,
   type AnalyticsWindow,
+  type AttentionItem,
 } from "@/lib/security/view-model";
+import { TAB_IDS, type TabId, type Entity } from "@/components/security/investigation";
 import SecurityHeader from "./SecurityHeader";
 import StatusHero from "./StatusHero";
 import NeedsAttention from "./NeedsAttention";
@@ -22,6 +26,10 @@ import ReadinessPanel from "./ReadinessPanel";
 import ThreatList from "./ThreatList";
 import EmptyState from "./EmptyState";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+
+/* L3 is lazy — the hero + KPIs paint first; tabs + drawer load on demand. */
+const DeepDiveTabs = dynamic(() => import("./DeepDiveTabs"), { ssr: false, loading: () => null });
+const InvestigationDrawer = dynamic(() => import("./InvestigationDrawer"), { ssr: false });
 
 type Status = "loading" | "ready" | "refreshing" | "error" | "forbidden";
 
@@ -33,6 +41,11 @@ export default function SecurityCenter() {
   const [window, setWindow] = useState<AnalyticsWindow>("24h");
   const [report, setReport] = useState<SecurityReport | null>(null);
   const [status, setStatus] = useState<Status>("loading");
+  const [activeTab, setActiveTab] = useState<TabId>("identifiers");
+  const [entity, setEntity] = useState<Entity | null>(null);
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const sp = useSearchParams();
+  const didInit = useRef(false);
 
   const load = useCallback(async (w: AnalyticsWindow, force = false) => {
     if (!force && cache.current.has(w)) {
@@ -64,12 +77,52 @@ export default function SecurityCenter() {
 
   const vm = useMemo(() => (report ? deriveViewModel(report, window) : null), [report, window]);
 
+  // Deep-link (read-only, once): ?tab= and ?ip= / ?identifier=.
+  useEffect(() => {
+    if (!report || didInit.current) return;
+    didInit.current = true;
+    const t = sp.get("tab");
+    if (t && (TAB_IDS as string[]).includes(t)) setActiveTab(t as TabId);
+    const ip = sp.get("ip");
+    const id = sp.get("identifier");
+    if (ip) setEntity({ kind: "ip", id: ip });
+    else if (id) setEntity({ kind: "identifier", id });
+  }, [report, sp]);
+
+  const goTab = useCallback((t: TabId) => {
+    setActiveTab(t);
+    tabsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
+  const onAttention = useCallback(
+    (item: AttentionItem) => {
+      switch (item.target.kind) {
+        case "false_positives":
+          goTab("false_positives");
+          break;
+        case "threats": {
+          const ip = report?.topOffendingIps.find((i) => i.failures > 0)?.ipAddress;
+          if (ip) setEntity({ kind: "ip", id: ip });
+          else goTab("identifiers");
+          break;
+        }
+        case "readiness":
+          goTab("rules");
+          break;
+        default:
+          break;
+      }
+    },
+    [report, goTab],
+  );
+
   if (boot.loading) return <Center><SpinnerIcon className="h-6 w-6 animate-spin text-[var(--text-dim)]" /></Center>;
   if (!isSuperAdmin || status === "forbidden") return <AccessDenied />;
 
   const refreshing = status === "refreshing";
 
   return (
+    <>
     <div className="mx-auto max-w-[1400px] px-4 py-6 md:px-8 md:py-8">
       <SecurityHeader
         window={window}
@@ -90,7 +143,7 @@ export default function SecurityCenter() {
         <div className="space-y-5">
           {/* L1 */}
           <StatusHero posture={vm.posture} threat={vm.threat} readiness={vm.readiness} />
-          <NeedsAttention items={vm.attention} />
+          <NeedsAttention items={vm.attention} onAction={onAttention} />
 
           {/* L2 */}
           {vm.flags.empty ? (
@@ -106,15 +159,24 @@ export default function SecurityCenter() {
                   <ReadinessPanel readiness={vm.readiness} reasons={report!.readiness.reasons} />
                 </div>
               </div>
-              <ThreatList ips={report!.topOffendingIps} />
+              <ThreatList ips={report!.topOffendingIps} onSelect={(ip) => setEntity({ kind: "ip", id: ip })} />
               {vm.flags.lowTraffic && (
                 <p className="text-xs text-[var(--text-dim)]">Limited activity — readiness needs more data before enforcement can be trusted.</p>
               )}
+
+              {/* L3 — deep dive (lazy) */}
+              <div ref={tabsRef}>
+                <DeepDiveTabs report={report!} activeTab={activeTab} onTab={goTab} onSelect={setEntity} />
+              </div>
             </>
           )}
         </div>
       )}
     </div>
+    {entity && report && (
+      <InvestigationDrawer entity={entity} report={report} onClose={() => setEntity(null)} />
+    )}
+    </>
   );
 }
 

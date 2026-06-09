@@ -7,9 +7,10 @@ import SeverityChip from "./SeverityChip";
 
 export interface NeedsAttentionProps {
   items: AttentionItem[];
+  onAction?: (item: AttentionItem) => void;
 }
 
-export default function NeedsAttention({ items }: NeedsAttentionProps) {
+export default function NeedsAttention({ items, onAction }: NeedsAttentionProps) {
   if (items.length === 0) {
     return (
       <div className="flex items-center gap-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)]/40 px-4 py-3">
@@ -22,15 +23,33 @@ export default function NeedsAttention({ items }: NeedsAttentionProps) {
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-surface)]/60">
       <ul className="divide-y divide-[var(--border)]">
-        {items.map((it) => (
-          <li key={it.id} className="flex items-start gap-3 px-4 py-3">
-            <SeverityChip severity={it.severity} className="mt-0.5 shrink-0" />
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-[var(--text-primary)]">{it.title}</p>
-              <p className="mt-0.5 text-sm text-[var(--text-dim)]">{it.detail}</p>
-            </div>
-          </li>
-        ))}
+        {items.map((it) => {
+          const actionable = !!onAction && it.target.kind !== "none";
+          const body = (
+            <>
+              <SeverityChip severity={it.severity} className="mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-[var(--text-primary)]">{it.title}</p>
+                <p className="mt-0.5 text-sm text-[var(--text-dim)]">{it.detail}</p>
+              </div>
+              {actionable && <span className="ml-auto shrink-0 self-center text-xs text-blue-400">{it.actionLabel} →</span>}
+            </>
+          );
+          return (
+            <li key={it.id}>
+              {actionable ? (
+                <button
+                  onClick={() => onAction?.(it)}
+                  className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-[var(--bg-surface-hover)] focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500"
+                >
+                  {body}
+                </button>
+              ) : (
+                <div className="flex items-start gap-3 px-4 py-3">{body}</div>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

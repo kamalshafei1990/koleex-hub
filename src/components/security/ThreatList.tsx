@@ -8,6 +8,7 @@ import DataTable, { type Column } from "./DataTable";
 
 export interface ThreatListProps {
   ips: ReportIp[];
+  onSelect?: (ip: string) => void;
 }
 
 const COLUMNS: Column<ReportIp>[] = [
@@ -17,7 +18,7 @@ const COLUMNS: Column<ReportIp>[] = [
   { key: "idents", header: "Identities", align: "right", render: (r) => r.distinctIdentifiers },
 ];
 
-export default function ThreatList({ ips }: ThreatListProps) {
+export default function ThreatList({ ips, onSelect }: ThreatListProps) {
   const ranked = [...ips].filter((i) => i.failures > 0).sort((a, b) => b.failures - a.failures);
   return (
     <SectionCard title="Top offending IPs">
@@ -25,6 +26,8 @@ export default function ThreatList({ ips }: ThreatListProps) {
         columns={COLUMNS}
         rows={ranked}
         getRowKey={(r) => r.ipAddress}
+        onRowClick={onSelect ? (r) => onSelect(r.ipAddress) : undefined}
+        rowLabel={(r) => `Investigate IP ${r.ipAddress}`}
         maxRows={5}
         caption="IP addresses with the most failed sign-in attempts"
         emptyText="No failing IPs in this window."
