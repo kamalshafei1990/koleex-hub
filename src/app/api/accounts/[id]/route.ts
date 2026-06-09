@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { derivePasswordState } from "@/lib/server/password-state";
 
 /* GET    /api/accounts/[id] — fetch single account with person, company,
                                  role, employee, overrides joined.
@@ -80,9 +81,19 @@ export async function GET(
         : Promise.resolve({ data: null }),
     ]);
 
+  // Derive the display-only password state BEFORE stripping the hash, so the
+  // Security tab can show the correct status without ever receiving a secret.
+  const { password_state, has_password } = derivePasswordState({
+    auth_user_id: acc.auth_user_id as string | null | undefined,
+    password_hash: acc.password_hash as string | null | undefined,
+    password_algo: acc.password_algo as string | null | undefined,
+    force_password_change: acc.force_password_change as boolean | null | undefined,
+  });
+
   // Strip password_hash from the response. Every consumer already
   // uses dedicated endpoints for password reset / force-change — the
-  // account detail view never needs the hash.
+  // account detail view never needs the hash. The derived enum above
+  // replaces any need to inspect the hash client-side.
   const { password_hash: _ph, ...safeAcc } = acc as {
     password_hash?: string;
   } & Record<string, unknown>;
@@ -90,6 +101,9 @@ export async function GET(
   return NextResponse.json({
     account: {
       ...safeAcc,
+      // Safe, display-only password facts (no hash ever):
+      password_state,
+      has_password,
       person: personRes.data,
       company: companyRes.data,
       role: roleRes.data,
