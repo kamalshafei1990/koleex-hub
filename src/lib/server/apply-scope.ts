@@ -233,3 +233,110 @@ export function recordScopeShadow(params: {
   // eslint-disable-next-line no-console
   console.info("[scope-shadow]", JSON.stringify(record));
 }
+
+/* ===========================================================================
+   DS1b-1 — single-row shadow (detail / PDF). Same semantics as the list
+   evaluator, for routes that fetch ONE quotation. Pure; logs counts only;
+   NEVER changes a response. enforce throws (no hide-path).
+   ========================================================================== */
+
+export interface SingleRowVerdict {
+  would_allow: boolean;
+  row_owner: string | null;
+  null_owner: boolean;
+  effectiveScope: EffectiveScope;
+  degraded?: "dept_to_own" | "no_owner" | "no_config";
+}
+
+/** Pure: would ENFORCE allow this single row? n=1 analogue of
+ *  evaluateScopeOverRows (allow ⇔ the row would be kept). */
+export function evaluateSingleRowScope(
+  row: Record<string, unknown> | null | undefined,
+  ctx: ScopeContext,
+  policy: ScopePolicy,
+  effectiveScope: EffectiveScope,
+): SingleRowVerdict {
+  const owner = (row?.[policy.owner_field] ?? null) as string | null;
+  const nullOwner = owner == null;
+
+  let eff = effectiveScope;
+  let degraded: SingleRowVerdict["degraded"];
+  if (eff === "department" && !policy.has_department) {
+    eff = "own";
+    degraded = "dept_to_own";
+  }
+
+  let would_allow: boolean;
+  if (eff === "bypass" || eff === "all") {
+    would_allow = true;
+  } else {
+    // own | private | department(→own)
+    would_allow =
+      owner === ctx.account_id ||
+      (nullOwner && policy.null_owner_policy === "tenant");
+  }
+
+  return { would_allow, row_owner: owner, null_owner: nullOwner, effectiveScope: eff, degraded };
+}
+
+/** Counts-only structured log for a single-row read. No quote content. */
+export function recordScopeShadowForSingleRow(params: {
+  module: string;
+  endpoint: string;
+  ctx: ScopeContext;
+  row: Record<string, unknown> | null | undefined;
+  effectiveScope: EffectiveScope;
+  source?: "ui" | "ai";
+}): void {
+  const policy = SCOPE_POLICY[params.module];
+  if (!policy) return;
+  const v = evaluateSingleRowScope(params.row, params.ctx, policy, params.effectiveScope);
+  const record = {
+    ts: new Date().toISOString(),
+    module: params.module,
+    endpoint: params.endpoint,
+    source: params.source ?? "ui",
+    account_id: params.ctx.account_id,
+    effective_scope: v.effectiveScope,
+    row_current: 1,
+    would_allow: v.would_allow,
+    row_owner: v.row_owner,
+    null_owner: v.null_owner,
+    degraded: v.degraded ?? null,
+  };
+  // eslint-disable-next-line no-console
+  console.info("[scope-shadow]", JSON.stringify(record));
+}
+
+/**
+ * Resolve effective scope, log the single-row shadow verdict, and return it.
+ * DS1b-1 invariant: the CALLER ignores the verdict for control flow (log-only)
+ * — it NEVER throws, blocks, or changes the response. `off` is a true no-op
+ * (no scope resolution, no DB read); `enforce` throws (no hide-path exists).
+ */
+export async function assertScopeShadowForRow(params: {
+  row: Record<string, unknown> | null | undefined;
+  ctx: ScopeContext;
+  module: string;
+  endpoint: string;
+  db: ScopeDb;
+  mode: ScopeMode;
+  source?: "ui" | "ai";
+}): Promise<SingleRowVerdict | null> {
+  if (params.mode === "enforce") {
+    throw new Error("[assertScopeShadowForRow] enforce not enabled (DS1b-1 is shadow/off only)");
+  }
+  if (params.mode !== "shadow") return null; // off → no-op, no scope resolution
+  const policy = SCOPE_POLICY[params.module];
+  if (!policy) return null;
+  const effectiveScope = await resolveEffectiveScope(params.ctx, params.module, params.db);
+  recordScopeShadowForSingleRow({
+    module: params.module,
+    endpoint: params.endpoint,
+    ctx: params.ctx,
+    row: params.row,
+    effectiveScope,
+    source: params.source,
+  });
+  return evaluateSingleRowScope(params.row, params.ctx, policy, effectiveScope);
+}

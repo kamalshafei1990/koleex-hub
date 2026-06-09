@@ -17,6 +17,8 @@ import {
   applyScope,
   computeWouldApplyClause,
   evaluateScopeOverRows,
+  evaluateSingleRowScope,
+  assertScopeShadowForRow,
   toScopeContext,
   SCOPE_POLICY,
   type EffectiveScope,
@@ -81,6 +83,19 @@ async function run() {
   catch { threw = true; }
   check("enforce mode THROWS (no hide-path)", threw);
 
+  /* ── single-row assert helper (off / enforce / shadow) ─────────────── */
+  const fakeDb = {
+    from: () => ({ select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { data_scope: "own" } }) }) }) }) }),
+  };
+  const offV = await assertScopeShadowForRow({ row: ownerRow, ctx: ctxA, module: "Quotations", endpoint: "t", db: fakeDb as never, mode: "off" });
+  check("assertScopeShadowForRow off → null (no-op, no scope resolution)", offV === null);
+  let threwRow = false;
+  try { await assertScopeShadowForRow({ row: ownerRow, ctx: ctxA, module: "Quotations", endpoint: "t", db: fakeDb as never, mode: "enforce" as never }); }
+  catch { threwRow = true; }
+  check("assertScopeShadowForRow enforce THROWS (no hide-path)", threwRow);
+  const shV = await assertScopeShadowForRow({ row: otherRow, ctx: ctxA, module: "Quotations", endpoint: "t", db: fakeDb as never, mode: "shadow" });
+  check("assertScopeShadowForRow shadow → verdict, non-owner would_allow false", shV !== null && shV.would_allow === false);
+
   console.log(`\napply-scope: ${pass} passed, ${fail} failed.`);
   process.exit(fail === 0 ? 0 : 1);
 }
@@ -93,6 +108,24 @@ const evAll = evaluateScopeOverRows(rows, ctxA, POL, "all");
 check("eval all: keeps everything", evAll.kept === 3 && evAll.dropped === 0);
 const evZero = evaluateScopeOverRows([{ created_by: B }], ctxA, POL, "own");
 check("eval would_zero detection", evZero.kept === 0 && evZero.would_zero === true);
+
+/* ── DS1b-1 single-row scope ─────────────────────────────────────────── */
+const ownerRow = { created_by: A };
+const otherRow = { created_by: B };
+const nullRow = { created_by: null };
+check("single-row own: owner would_allow true", evaluateSingleRowScope(ownerRow, ctxA, POL, "own").would_allow === true);
+check("single-row own: non-owner would_allow false", evaluateSingleRowScope(otherRow, ctxA, POL, "own").would_allow === false);
+check("single-row own: null-owner would_allow true (policy tenant)", evaluateSingleRowScope(nullRow, ctxA, POL, "own").would_allow === true);
+check("single-row bypass: would_allow true", evaluateSingleRowScope(otherRow, ctxA, POL, "bypass").would_allow === true);
+check("single-row all: would_allow true", evaluateSingleRowScope(otherRow, ctxA, POL, "all").would_allow === true);
+check("single-row private: owner only", evaluateSingleRowScope(ownerRow, ctxA, POL, "private").would_allow === true && evaluateSingleRowScope(otherRow, ctxA, POL, "private").would_allow === false);
+const sDept = evaluateSingleRowScope(otherRow, ctxA, POL, "department");
+check("single-row dept degrades to own", sDept.degraded === "dept_to_own" && sDept.effectiveScope === "own" && sDept.would_allow === false);
+check("single-row row_owner + null_owner fields", evaluateSingleRowScope(nullRow, ctxA, POL, "own").null_owner === true && evaluateSingleRowScope(ownerRow, ctxA, POL, "own").row_owner === A);
+// single-row matches list eval (n=1)
+const listOne = evaluateScopeOverRows([otherRow], ctxA, POL, "own");
+const rowOne = evaluateSingleRowScope(otherRow, ctxA, POL, "own");
+check("single-row matches list eval (non-owner dropped)", (listOne.kept === 1) === rowOne.would_allow && listOne.kept === 0);
 
 /* ── flags ───────────────────────────────────────────────────────────── */
 delete process.env.SCOPE_MODE_QUOTATIONS;

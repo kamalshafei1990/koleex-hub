@@ -19,6 +19,9 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { supabaseServer } from "@/lib/server/supabase-server";
+import { assertScopeShadowForRow, toScopeContext } from "@/lib/server/apply-scope";
+import { getScopeMode } from "@/lib/server/scope-flags";
 
 export const runtime = "nodejs";
 /* PDF rendering on Vercel needs headroom: the chromium binary download
@@ -102,6 +105,35 @@ export async function GET(req: Request, { params }: RouteCtx) {
   if (deny) return deny;
 
   const { id } = await params;
+
+  /* DS1b-1 — single-row data_scope SHADOW (log-only) for the PDF endpoint.
+     The PDF itself is rendered by a headless browser hitting the print page
+     (which calls /api/quotations/[id]); this route never reads the quote
+     server-side. So, ONLY when the flag is "shadow", do a tiny created_by-only
+     read purely to emit the shadow log. Wrapped so it can NEVER affect the
+     PDF output or status code; skipped entirely when the flag is off. */
+  if (getScopeMode("Quotations") === "shadow") {
+    try {
+      const { data: scopeRow } = await supabaseServer
+        .from("quotations")
+        .select("created_by")
+        .eq("id", id)
+        .eq("tenant_id", auth.tenant_id)
+        .maybeSingle();
+      if (scopeRow) {
+        await assertScopeShadowForRow({
+          row: scopeRow as Record<string, unknown>,
+          ctx: toScopeContext(auth),
+          module: "Quotations",
+          endpoint: "GET /api/quotations/[id]/pdf",
+          db: supabaseServer,
+          mode: "shadow",
+        });
+      }
+    } catch {
+      /* shadow logging must never break PDF rendering */
+    }
+  }
 
   /* Pull the session cookie value off the incoming request so the
      headless browser can authenticate as the same user. Cookie is
