@@ -5,6 +5,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { assertScopeShadowForRow, toScopeContext } from "@/lib/server/apply-scope";
 import { getScopeMode } from "@/lib/server/scope-flags";
+import { isCustomerEnforced, ownsQuotation } from "@/lib/server/customer-quotation-guard";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
@@ -32,6 +33,16 @@ export async function GET(_req: Request, { params }: RouteCtx) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   if (!data) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  /* CQE — Customer-only enforcement: an external/customer account may only
+     open a quotation it created. Returns the same 404 as "not found" (no
+     existence leak). Inert when the flag is off → internal/SA unchanged. */
+  if (
+    await isCustomerEnforced(auth, supabaseServer) &&
+    !ownsQuotation(data as { created_by?: string | null }, auth.account_id)
+  ) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
   /* DS1b-1 — single-row data_scope SHADOW (log-only). Runs only when the
      Quotations flag is "shadow"; never alters the response or status code,
