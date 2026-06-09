@@ -19,6 +19,7 @@ import {
   evaluateScopeOverRows,
   evaluateSingleRowScope,
   assertScopeShadowForRow,
+  recordScopeShadowForSingleRow,
   toScopeContext,
   SCOPE_POLICY,
   type EffectiveScope,
@@ -95,6 +96,28 @@ async function run() {
   check("assertScopeShadowForRow enforce THROWS (no hide-path)", threwRow);
   const shV = await assertScopeShadowForRow({ row: otherRow, ctx: ctxA, module: "Quotations", endpoint: "t", db: fakeDb as never, mode: "shadow" });
   check("assertScopeShadowForRow shadow → verdict, non-owner would_allow false", shV !== null && shV.would_allow === false);
+
+  /* ── DS1b-2a: extra-field passthrough (invoice conversion shadow) ───── */
+  const captured: string[] = [];
+  const origInfo = console.info;
+  console.info = (...a: unknown[]) => { captured.push(a.map(String).join(" ")); };
+  recordScopeShadowForSingleRow({
+    module: "Quotations", endpoint: "POST /api/invoices/from-quotation", ctx: ctxA,
+    row: otherRow, effectiveScope: "own",
+    extra: { source_route: "invoice_from_quotation", quotation_id: "q-1", invoice_permission_present: true, quotations_permission_present: false },
+  });
+  // assertScopeShadowForRow should also forward extra into the log
+  await assertScopeShadowForRow({
+    row: otherRow, ctx: ctxA, module: "Quotations", endpoint: "POST /api/invoices/from-quotation",
+    db: fakeDb as never, mode: "shadow",
+    extra: { source_route: "invoice_from_quotation", invoice_permission_present: true, quotations_permission_present: false },
+  });
+  console.info = origInfo;
+  const rec = JSON.parse(captured[0].replace("[scope-shadow] ", ""));
+  check("extra fields passthrough (source_route)", rec.source_route === "invoice_from_quotation");
+  check("extra fields passthrough (permission flags)", rec.invoice_permission_present === true && rec.quotations_permission_present === false);
+  check("extra passthrough keeps verdict (non-owner would_allow false)", rec.would_allow === false && rec.quotation_id === "q-1");
+  check("assertScopeShadowForRow forwards extra into log", captured.length === 2 && captured[1].includes("invoice_from_quotation"));
 
   console.log(`\napply-scope: ${pass} passed, ${fail} failed.`);
   process.exit(fail === 0 ? 0 : 1);

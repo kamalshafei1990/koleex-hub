@@ -279,7 +279,10 @@ export function evaluateSingleRowScope(
   return { would_allow, row_owner: owner, null_owner: nullOwner, effectiveScope: eff, degraded };
 }
 
-/** Counts-only structured log for a single-row read. No quote content. */
+/** Counts-only structured log for a single-row read. No quote content.
+ *  `extra` lets a caller attach route-specific, NON-sensitive metadata
+ *  (e.g. source_route, permission-present flags). Additive — callers that
+ *  omit it are unaffected. */
 export function recordScopeShadowForSingleRow(params: {
   module: string;
   endpoint: string;
@@ -287,6 +290,7 @@ export function recordScopeShadowForSingleRow(params: {
   row: Record<string, unknown> | null | undefined;
   effectiveScope: EffectiveScope;
   source?: "ui" | "ai";
+  extra?: Record<string, unknown>;
 }): void {
   const policy = SCOPE_POLICY[params.module];
   if (!policy) return;
@@ -303,6 +307,7 @@ export function recordScopeShadowForSingleRow(params: {
     row_owner: v.row_owner,
     null_owner: v.null_owner,
     degraded: v.degraded ?? null,
+    ...(params.extra ?? {}),
   };
   // eslint-disable-next-line no-console
   console.info("[scope-shadow]", JSON.stringify(record));
@@ -322,6 +327,7 @@ export async function assertScopeShadowForRow(params: {
   db: ScopeDb;
   mode: ScopeMode;
   source?: "ui" | "ai";
+  extra?: Record<string, unknown>;
 }): Promise<SingleRowVerdict | null> {
   if (params.mode === "enforce") {
     throw new Error("[assertScopeShadowForRow] enforce not enabled (DS1b-1 is shadow/off only)");
@@ -337,6 +343,7 @@ export async function assertScopeShadowForRow(params: {
     row: params.row,
     effectiveScope,
     source: params.source,
+    extra: params.extra,
   });
   return evaluateSingleRowScope(params.row, params.ctx, policy, effectiveScope);
 }
