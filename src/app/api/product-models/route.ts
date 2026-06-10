@@ -119,6 +119,13 @@ export async function POST(req: Request) {
   if (!body.product_id || typeof body.product_id !== "string") {
     return NextResponse.json({ error: "product_id required" }, { status: 400 });
   }
+  /* product_models.slug is NOT NULL; the legacy client generated it from the
+     model name. Default it here (with a random suffix — slug is UNIQUE) so
+     API consumers don't have to. */
+  if (!body.slug && typeof body.model_name === "string") {
+    const base = body.model_name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    body.slug = `${base || "model"}-${crypto.randomUUID().slice(0, 8)}`;
+  }
   const { data, error } = await supabaseServer
     .from("product_models")
     .insert(body)
