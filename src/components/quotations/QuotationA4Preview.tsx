@@ -8339,7 +8339,7 @@ function DocSettingsCard({
     <div
       className="no-print"
       style={{
-        position: "absolute", top: 24, right: -324, width: 200,
+        position: "absolute", top: 24, left: "calc(100% + 12px)", width: 200,
         boxSizing: "border-box", background: "#1A1A1A",
         border: "1px solid #2D2D2D", borderRadius: 10, padding: 10,
         display: "flex", flexDirection: "column", gap: 8,
@@ -8439,12 +8439,19 @@ function CostPricePanel({
       className="no-print pq-row-note"
       style={{
         position: "absolute", top: "50%", transform: "translateY(-50%)",
-        /* Mirror of the right-side note panel: same 200-px card, same
-           gap, on the LEFT of the paper. */
-        left: -324, width: 200, boxSizing: "border-box",
+        /* Mirror of the right-side Internal-note panel, but hugging the
+           A4 LEFT edge: the card's right edge sits 12 px to the left of
+           the No. cell (i.e. just outside the paper), so it's never
+           pushed off behind the nav rail. `right: calc(100% + 12px)`
+           always lands 12 px left of the cell's LEFT edge regardless of
+           the cell's width. Fixed height locks every row's cost card to
+           the same size so they line up row-for-row exactly like the
+           Internal notes on the right. */
+        right: "calc(100% + 12px)", width: 144, height: 112,
+        boxSizing: "border-box", overflow: "hidden",
         background: "#1A1A1A", border: "1px solid #2D2D2D",
         borderRadius: 10, padding: 10, display: "flex",
-        flexDirection: "column", gap: 6, textAlign: "left",
+        flexDirection: "column", gap: 5, textAlign: "left",
         boxShadow: "0 6px 20px rgba(0,0,0,0.45)",
       }}
     >
