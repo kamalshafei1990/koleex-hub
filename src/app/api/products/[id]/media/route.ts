@@ -93,3 +93,33 @@ export async function GET(
     headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=120" },
   });
 }
+
+/* P0-A: create a product_media row (the binary already went through the
+   /api/storage proxy — this records it). Product Data / SA only. */
+export async function POST(
+  req: Request,
+  ctx: { params: Promise<{ id: string }> },
+) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const deny = await requireModuleAccess(auth, "Product Data");
+  if (deny) return deny;
+
+  const { id } = await ctx.params;
+  if (!UUID_RE.test(id)) {
+    return NextResponse.json({ error: "id must be a UUID" }, { status: 400 });
+  }
+  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  delete body.id;
+  body.product_id = id; // path wins over body
+  const { data, error } = await supabaseServer
+    .from("product_media")
+    .insert(body)
+    .select()
+    .single();
+  if (error) {
+    console.error("[api/products media POST]", error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  return NextResponse.json({ media: data });
+}
