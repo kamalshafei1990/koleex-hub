@@ -52,6 +52,13 @@ export interface QuotationItem {
   /* Section-band background colour (hex). Defaults to black when unset.
      Only meaningful on header rows. */
   headerColor?: string;
+  /* INTERNAL cost tracking — rendered only in the editor's left gutter
+     (mirror of the Internal-note panel), never on the printed page.
+     costHead = supplier cost of the machine head alone.
+     costMode: "head" (head only) | "complete" (head + the doc-level
+     stand & table cost) | "full" (full machine — no stand needed). */
+  costHead?: number;
+  costMode?: "head" | "complete" | "full";
 }
 
 export interface Quotation {
@@ -81,6 +88,13 @@ export interface Quotation {
   tax: number;
   shipping: number;
   others: number;
+  /* Document currency code. Drives the unit-price column subtitle, the
+     symbol on every money cell and the amount-in-words line. Optional
+     for back-compat; missing = USD. */
+  currency?: string;
+  /* INTERNAL: shared Stand & Table cost applied to every "complete set"
+     line. Set once per quotation; editor gutter only — never printed. */
+  standTablePrice?: number;
   terms: string;
   /* Same enum as the parent's Quotation type (Quotations.tsx). The
      preview doesn't itself dispatch transitions — it only reads
@@ -126,6 +140,15 @@ export interface Quotation {
   leadTimeDays?: number;
   leadTimeBasis?: "after_deposit" | "after_order" | "after_lc_opening";
 }
+
+/* Currencies the quotation editor offers. USD stays the default — the
+   selector simply lets the operator quote in the customer's currency.
+   Symbol falls back to the code itself for anything unmapped. */
+export const QUOTE_CURRENCIES = ["USD", "EUR", "GBP", "CNY", "JPY", "AED", "SAR", "EGP", "TRY"] as const;
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: "$", EUR: "€", GBP: "£", CNY: "¥", JPY: "¥",
+  AED: "AED", SAR: "SAR", EGP: "E£", TRY: "₺",
+};
 
 interface Props {
   current: Quotation;
@@ -194,7 +217,7 @@ interface Props {
   subTotal: number;
   grandTotal: number;
   fmt: (n: number) => string;
-  numberToWords: (num: number) => string;
+  numberToWords: (num: number, currency?: string) => string;
 }
 
 /* Token strip — single source of truth for the polished palette. */
@@ -356,17 +379,20 @@ export default function QuotationA4Preview({
      loading port, CFR/CIF/DAP/DPU/DDP/CPT/CIP reference the
      discharge port. Falls back to a plain 'USD' when nothing is
      picked yet so the column still reads sensibly. */
+  const cur = (current.currency || "USD").toUpperCase();
+  const curSym = CURRENCY_SYMBOLS[cur] ?? cur;
+
   const priceTypeSubtitle = useMemo(() => {
     const code = current.incotermCode?.toUpperCase();
-    if (!code) return "(USD)";
+    if (!code) return `(${cur})`;
     /* Which port does this term name? */
     const dischargeBased = new Set(["CFR", "CIF", "CPT", "CIP", "DAP", "DPU", "DDP"]);
     const port = dischargeBased.has(code)
       ? current.dischargePort
       : current.loadingPort;
     const locationPart = port ? ` ${port}` : "";
-    return `(${code}${locationPart}, USD)`;
-  }, [current.incotermCode, current.loadingPort, current.dischargePort]);
+    return `(${code}${locationPart}, ${cur})`;
+  }, [current.incotermCode, current.loadingPort, current.dischargePort, cur]);
 
   /* Which item-description cell currently has the user's focus.
      The rich-text toolbar renders right above that cell so the user
@@ -524,6 +550,10 @@ export default function QuotationA4Preview({
       }}
     >
       <div className="quot-doc-inner">
+
+        {isFirstPage && (
+          <DocSettingsCard current={current} setCurrent={setCurrent} />
+        )}
 
         {isFirstPage && (<>
         {/* ═══════════════════════════════════════════════════════════════
@@ -1023,6 +1053,12 @@ export default function QuotationA4Preview({
                  master items array regardless of which page rendered
                  the row. */
               const idx = startItemIdx + localIdx;
+              /* Visible row number counts PRODUCT rows only — section
+                 headers occupy an items[] slot but must not consume a
+                 number, so "No." stays 1,2,3… across sections. */
+              const rowNo = current.items
+                .slice(0, idx)
+                .reduce((n, it) => n + (it.kind === "header" ? 0 : 1), 0) + 1;
               const lineTotal = (Number(item.unitPrice) || 0) * (Number(item.qty) || 0);
 
               /* ── Section header row ──────────────────────────────
@@ -1167,7 +1203,17 @@ export default function QuotationA4Preview({
                       row. minHeight on <tr> itself is unreliable
                       across browsers due to table layout. */}
                   <Td align="center" style={{ color: T.inkSoft, fontVariantNumeric: "tabular-nums", height: 112 }}>
-                    {idx + 1}
+                    {rowNo}
+                    {/* INTERNAL cost-price panel — left-gutter twin of the
+                        Internal-note panel on the right. .no-print + outside
+                        the A4 width, so the customer never sees it. */}
+                    <CostPricePanel
+                      item={item}
+                      idx={idx}
+                      standTablePrice={Number(current.standTablePrice) || 0}
+                      curSym={curSym}
+                      setCurrent={setCurrent}
+                    />
                   </Td>
                   <Td>
                     {/* Floating rich-text toolbar — only rendered for
@@ -1249,7 +1295,7 @@ export default function QuotationA4Preview({
                         outline: "none",
                       }}
                     >
-                      {item.unitPrice > 0 ? `${fmt(item.unitPrice)} $` : "0"}
+                      {item.unitPrice > 0 ? `${fmt(item.unitPrice)} ${curSym}` : "0"}
                     </div>
                   </Td>
                   <Td align="center">
@@ -1271,7 +1317,7 @@ export default function QuotationA4Preview({
                     </div>
                   </Td>
                   <Td align="center" style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-                    {lineTotal > 0 ? `${fmt(lineTotal)} $` : "0"}
+                    {lineTotal > 0 ? `${fmt(lineTotal)} ${curSym}` : "0"}
 
                     {/* Floating row actions — ↑ / ↓ / ✕ rendered as
                         children of the TOTAL cell (not extra <td>s)
@@ -1654,7 +1700,7 @@ export default function QuotationA4Preview({
                     borderBottomRightRadius: 12,
                   }}
                 >
-                  {fmt(subTotal)} $
+                  {fmt(subTotal)} {curSym}
                 </td>
               </tr>
             </tfoot>
@@ -1689,7 +1735,7 @@ export default function QuotationA4Preview({
                 <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
                 <table cellSpacing={0} style={{ width: "100%", borderCollapse: "collapse", border: "none" }}>
                   <tbody>
-                    <TotalsRow label="Subtotal" value={`${fmt(subTotal)} $`} muted />
+                    <TotalsRow label="Subtotal" value={`${fmt(subTotal)} ${curSym}`} muted />
                     <TotalsRow
                       label="Tax"
                       editable
@@ -1714,6 +1760,7 @@ export default function QuotationA4Preview({
                         amount in red so the operator sees the
                         impact of the % they typed. */}
                     <DiscountRow
+                      curSym={curSym}
                       pct={current.discountPct ?? 0}
                       base={subTotal + current.tax + current.shipping + current.others}
                       onCommit={(v) => setMeta("discountPct", v)}
@@ -1749,7 +1796,7 @@ export default function QuotationA4Preview({
                           fontVariantNumeric: "tabular-nums",
                         }}
                       >
-                        {fmt(grandTotal)} $
+                        {fmt(grandTotal)} {curSym}
                       </td>
                     </tr>
                   </tbody>
@@ -1797,7 +1844,7 @@ export default function QuotationA4Preview({
                           padding: "6px 12px",
                         }}
                       >
-                        {numberToWords(grandTotal)}
+                        {numberToWords(grandTotal, cur)}
                       </td>
                     </tr>
                   </tbody>
@@ -7739,11 +7786,13 @@ function DiscountRow({
   base,
   onCommit,
   fmt,
+  curSym = "$",
 }: {
   pct: number;
   base: number;
   onCommit: (val: number) => void;
   fmt: (n: number) => string;
+  curSym?: string;
 }) {
   const amount = +(base * (Math.max(0, Math.min(100, pct)) / 100)).toFixed(2);
   return (
@@ -7797,7 +7846,7 @@ function DiscountRow({
               fontWeight: amount > 0 ? 600 : 400,
             }}
           >
-            {amount > 0 ? `− ${fmt(amount)} $` : "—"}
+            {amount > 0 ? `− ${fmt(amount)} ${curSym}` : "—"}
           </span>
         </span>
       </td>
@@ -8260,5 +8309,194 @@ function BankRow({
         {value}
       </td>
     </tr>
+  );
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   DOC SETTINGS CARD — editor-only chrome on the FIRST page's right gutter,
+   above the per-row Internal-note panels. Holds the document-level knobs
+   that must never print: the quotation currency (default USD) and the
+   shared Stand & Table cost used by every "complete set" line.
+   ═══════════════════════════════════════════════════════════════════════ */
+function DocSettingsCard({
+  current,
+  setCurrent,
+}: {
+  current: Quotation;
+  setCurrent: Dispatch<SetStateAction<Quotation | null>>;
+}) {
+  const labelCss: React.CSSProperties = {
+    fontSize: 9, fontWeight: 600, letterSpacing: "0.08em",
+    textTransform: "uppercase", color: "rgba(255,255,255,0.5)",
+  };
+  const fieldCss: React.CSSProperties = {
+    width: "100%", boxSizing: "border-box", background: "#111",
+    border: "1px solid #2D2D2D", borderRadius: 7, padding: "6px 8px",
+    color: "rgba(255,255,255,0.9)", fontSize: 11, outline: "none",
+  };
+  return (
+    <div
+      className="no-print"
+      style={{
+        position: "absolute", top: 24, right: -324, width: 200,
+        boxSizing: "border-box", background: "#1A1A1A",
+        border: "1px solid #2D2D2D", borderRadius: 10, padding: 10,
+        display: "flex", flexDirection: "column", gap: 8,
+        boxShadow: "0 6px 20px rgba(0,0,0,0.45)", zIndex: 5,
+      }}
+    >
+      <div style={labelCss}>Document settings</div>
+      <label style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+        <span style={{ ...labelCss, color: "rgba(255,255,255,0.38)" }}>Currency</span>
+        <select
+          value={(current.currency || "USD").toUpperCase()}
+          onChange={(e) =>
+            setCurrent((prev) => (prev ? { ...prev, currency: e.target.value } : prev))
+          }
+          style={{ ...fieldCss, cursor: "pointer" }}
+        >
+          {QUOTE_CURRENCIES.map((c) => (
+            <option key={c} value={c}>{c}{CURRENCY_SYMBOLS[c] && CURRENCY_SYMBOLS[c] !== c ? ` — ${CURRENCY_SYMBOLS[c]}` : ""}</option>
+          ))}
+        </select>
+      </label>
+      <label style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+        <span style={{ ...labelCss, color: "rgba(255,255,255,0.38)" }}>Stand &amp; table cost</span>
+        <input
+          type="number"
+          min={0}
+          value={current.standTablePrice ?? 0}
+          onChange={(e) =>
+            setCurrent((prev) =>
+              prev ? { ...prev, standTablePrice: Math.max(0, Number(e.target.value) || 0) } : prev,
+            )
+          }
+          style={fieldCss}
+        />
+        <span style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", lineHeight: 1.4 }}>
+          Set once — added to every line marked “Complete set”.
+        </span>
+      </label>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   COST PRICE PANEL — left-gutter twin of the Internal-note panel. Tracks
+   the SUPPLIER cost for one line, internal-only (.no-print + outside A4):
+     · Head     — cost of the machine head alone (the price we quote)
+     · mode     — Head only / Complete set (+ stand & table) / Full machine
+     · total    — head (+ stand & table when "complete")
+   Stand & table cost is the shared doc-level value (same for every
+   machine), editable from the Document settings card.
+   ═══════════════════════════════════════════════════════════════════════ */
+function CostPricePanel({
+  item,
+  idx,
+  standTablePrice,
+  curSym,
+  setCurrent,
+}: {
+  item: QuotationItem;
+  idx: number;
+  standTablePrice: number;
+  curSym: string;
+  setCurrent: Dispatch<SetStateAction<Quotation | null>>;
+}) {
+  const mode = item.costMode ?? "head";
+  const head = Number(item.costHead) || 0;
+  const total = mode === "complete" ? head + standTablePrice : head;
+  const fmtN = (n: number) =>
+    n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+
+  const setItemField = (patch: Partial<QuotationItem>) =>
+    setCurrent((prev) =>
+      prev
+        ? { ...prev, items: prev.items.map((it, i) => (i === idx ? { ...it, ...patch } : it)) }
+        : prev,
+    );
+
+  const modeBtn = (m: "head" | "complete" | "full", label: string, title: string) => (
+    <button
+      type="button"
+      title={title}
+      onClick={() => setItemField({ costMode: m })}
+      style={{
+        flex: 1, padding: "3px 0", fontSize: 9, fontWeight: 600,
+        letterSpacing: "0.04em", borderRadius: 6, cursor: "pointer",
+        border: mode === m ? "1px solid #0066FF" : "1px solid #2D2D2D",
+        background: mode === m ? "rgba(0,102,255,0.18)" : "transparent",
+        color: mode === m ? "#7FB2FF" : "rgba(255,255,255,0.55)",
+      }}
+    >
+      {label}
+    </button>
+  );
+
+  return (
+    <div
+      className="no-print pq-row-note"
+      style={{
+        position: "absolute", top: "50%", transform: "translateY(-50%)",
+        /* Mirror of the right-side note panel: same 200-px card, same
+           gap, on the LEFT of the paper. */
+        left: -324, width: 200, boxSizing: "border-box",
+        background: "#1A1A1A", border: "1px solid #2D2D2D",
+        borderRadius: 10, padding: 10, display: "flex",
+        flexDirection: "column", gap: 6, textAlign: "left",
+        boxShadow: "0 6px 20px rgba(0,0,0,0.45)",
+      }}
+    >
+      <div
+        style={{
+          fontSize: 9, fontWeight: 600, letterSpacing: "0.08em",
+          textTransform: "uppercase", color: "rgba(255,255,255,0.5)",
+        }}
+      >
+        Cost price
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", width: 34 }}>Head</span>
+        <input
+          type="number"
+          min={0}
+          value={item.costHead ?? ""}
+          placeholder="0"
+          onChange={(e) =>
+            setItemField({ costHead: e.target.value === "" ? undefined : Math.max(0, Number(e.target.value) || 0) })
+          }
+          style={{
+            flex: 1, minWidth: 0, background: "#111",
+            border: "1px solid #2D2D2D", borderRadius: 6,
+            padding: "4px 6px", color: "rgba(255,255,255,0.9)",
+            fontSize: 11, outline: "none",
+          }}
+        />
+      </div>
+      <div style={{ display: "flex", gap: 4 }}>
+        {modeBtn("head", "Head", "Head only — quoting the machine head alone")}
+        {modeBtn("complete", "+Set", "Complete set — head + stand & table")}
+        {modeBtn("full", "Full", "Full machine / device — no stand & table needed")}
+      </div>
+      <div
+        style={{
+          display: "flex", justifyContent: "space-between", alignItems: "baseline",
+          borderTop: "1px solid #2D2D2D", paddingTop: 5,
+          fontSize: 10, color: "rgba(255,255,255,0.55)",
+        }}
+      >
+        {mode === "complete" ? (
+          <span style={{ fontVariantNumeric: "tabular-nums" }}>
+            {fmtN(head)} + {fmtN(standTablePrice)} S&amp;T
+          </span>
+        ) : (
+          <span>{mode === "full" ? "Full machine" : "Head only"}</span>
+        )}
+        <span style={{ fontWeight: 700, color: "rgba(255,255,255,0.92)", fontVariantNumeric: "tabular-nums" }}>
+          {fmtN(total)} {curSym}
+        </span>
+      </div>
+    </div>
   );
 }

@@ -49,6 +49,17 @@ interface QuotationItem {
   kind?: "header";
   /* Section-band background colour (hex); defaults to black when unset. */
   headerColor?: string;
+  /* INTERNAL cost tracking (never printed — lives in the editor's left
+     gutter, mirroring the Internal-note panel on the right).
+     `costHead` is the supplier cost of the machine head alone.
+     `costMode`:
+       "head"     → quoting head only; cost = costHead
+       "complete" → head + stand & table; cost = costHead + the doc-level
+                    standTablePrice (S&T cost is the same for every
+                    machine, so it's set once per quotation)
+       "full"     → full machine / device — no stand & table applies */
+  costHead?: number;
+  costMode?: "head" | "complete" | "full";
 }
 
 export type QuoteStatus = "draft" | "sent" | "accepted" | "rejected" | "expired";
@@ -85,6 +96,17 @@ export interface Quotation {
   tax: number;
   shipping: number;
   others: number;
+  /* Document currency code (ISO 4217-ish). Drives the unit-price
+     column subtitle, the currency symbol on every money cell, and the
+     amount-in-words line. Optional for back-compat — older docs
+     without it render as USD, which is also the default for new
+     quotes. */
+  currency?: string;
+  /* INTERNAL: shared Stand & Table cost used by every line whose
+     costMode is "complete". One machine stand/table costs the same
+     regardless of the head on it, so the operator sets this once per
+     quotation. Editor-gutter only — never printed. */
+  standTablePrice?: number;
   terms: string;
   /* Optional stamp + signature URLs stamped on this quote. Both
      stored as public Supabase Storage URLs. The doc-builder lets a
@@ -277,6 +299,10 @@ export function fromRow(row: RemoteDocRow): Quotation {
     tax: Number(doc.tax ?? 0),
     shipping: Number(doc.shipping ?? 0),
     others: Number(doc.others ?? 0),
+    /* Doc payload wins; fall back to the row column (older docs were
+       always saved with row.currency = USD), then USD. */
+    currency: doc.currency ?? ((row as { currency?: string | null }).currency || "USD"),
+    standTablePrice: Number(doc.standTablePrice ?? 0),
     terms: doc.terms ?? DEFAULT_TERMS,
     stampUrl: doc.stampUrl,
     signatureUrl: doc.signatureUrl,
@@ -383,7 +409,7 @@ async function saveQuotationRemote(q: Quotation): Promise<Quotation | null> {
     id: q.id.length === 36 ? q.id : undefined, // if it's our old local hex id, let server mint a new UUID
     quote_no: q.invoiceNo || undefined,
     status: q.status,
-    currency: "USD",
+    currency: q.currency || "USD",
     issue_date: ddmmyyyyToISO(q.date),
     valid_till: ddmmyyyyToISO(q.validTill),
     total: computeGrandTotal(q),
@@ -454,8 +480,8 @@ function compressImage(file: File): Promise<string> {
   });
 }
 
-export function numberToWords(num: number): string {
-  if (!num || num === 0) return "ZERO USD ONLY";
+export function numberToWords(num: number, currency: string = "USD"): string {
+  if (!num || num === 0) return `ZERO ${currency} ONLY`.toUpperCase();
   const ones = [
     "",
     "One",
@@ -492,7 +518,7 @@ export function numberToWords(num: number): string {
   ];
   const scales = ["", "Thousand", "Million", "Billion"];
   const n = Math.floor(Math.abs(num));
-  if (n === 0) return "ZERO USD ONLY";
+  if (n === 0) return `ZERO ${currency} ONLY`.toUpperCase();
   function chunk(c: number): string {
     if (c === 0) return "";
     if (c < 20) return ones[c];
@@ -519,7 +545,7 @@ export function numberToWords(num: number): string {
     s++;
   }
   const cents = Math.round((Math.abs(num) - n) * 100);
-  let result = str.trim() + " USD";
+  let result = str.trim() + " " + currency;
   if (cents > 0) result += " AND " + chunk(cents) + " CENTS";
   result += " ONLY";
   return result.toUpperCase();
@@ -990,6 +1016,8 @@ export default function Quotations() {
       tax: 0,
       shipping: 0,
       others: 0,
+      currency: "USD",
+      standTablePrice: 0,
       terms: DEFAULT_TERMS,
       status: "draft",
       createdAt: new Date().toISOString(),
