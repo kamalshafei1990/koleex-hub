@@ -15,8 +15,8 @@
      6. search escapes ilike wildcards.
    ========================================================================== */
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
 
 const ROOT = join(__dirname, "..");
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
@@ -118,6 +118,45 @@ check("list-view populates suppliers only behind canSeeSecrets",
 /* ── 6. search escapes ilike wildcards ───────────────────────────────── */
 const search = read("src/app/api/products/search/route.ts");
 check("search escapes % and _ in query", /replace\(\/\[%_\]\/g/.test(search));
+
+/* ── 7. P0-B client direct-access guard ──────────────────────────────────
+   No client-bundle file (under src/, not under src/app/api/, NOT marked
+   `import "server-only"`) may call `.from("<product master table>")`.
+   Server-only files + API routes legitimately use the service-role client. */
+const FORBIDDEN_TABLES = [
+  "products", "product_models", "product_media", "related_products",
+  "product_translations", "model_translations", "product_market_prices",
+  "product_sewing_specs", "divisions", "categories", "subcategories",
+];
+const fromRe = new RegExp(`\\.from\\(\\s*["'\`](${FORBIDDEN_TABLES.join("|")})["'\`]`);
+
+function walk(dir: string, out: string[]) {
+  for (const name of readdirSync(dir)) {
+    const full = join(dir, name);
+    const st = statSync(full);
+    if (st.isDirectory()) {
+      if (name === "node_modules" || name === ".next") continue;
+      walk(full, out);
+    } else if (/\.(ts|tsx)$/.test(name)) {
+      out.push(full);
+    }
+  }
+}
+
+const srcFiles: string[] = [];
+walk(join(ROOT, "src"), srcFiles);
+const offenders: string[] = [];
+for (const full of srcFiles) {
+  const rel = relative(ROOT, full).replace(/\\/g, "/");
+  if (rel.startsWith("src/app/api/")) continue;          // API routes = server
+  const src = readFileSync(full, "utf8");
+  if (/^\s*import\s+["']server-only["']/m.test(src)) continue; // server-only OK
+  if (fromRe.test(src)) offenders.push(rel);
+}
+check(
+  `no client file calls .from("<product table>") (offenders: ${offenders.join(", ") || "none"})`,
+  offenders.length === 0,
+);
 
 console.log(`\nproduct-access: ${pass} passed, ${fail} failed.`);
 process.exit(fail === 0 ? 0 : 1);

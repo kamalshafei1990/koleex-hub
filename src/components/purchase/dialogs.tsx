@@ -120,17 +120,20 @@ function useProducts(open: boolean): ProductOption[] {
     if (!open) return;
     let cancelled = false;
     (async () => {
-      const r = await supabase
-        .from("products")
-        .select("id,product_name,slug")
-        .order("product_name", { ascending: true })
-        .limit(500);
+      /* P0-B: products read goes through /api/products (auth + projection)
+         instead of the anon client. */
+      let rows: { id: string; product_name: string }[] = [];
+      try {
+        const res = await fetch("/api/products", { credentials: "include" });
+        if (res.ok) {
+          const json = (await res.json()) as { products?: { id: string; product_name: string }[] };
+          rows = (json.products ?? [])
+            .slice()
+            .sort((a, b) => (a.product_name || "").localeCompare(b.product_name || ""));
+        }
+      } catch { /* leave empty on failure */ }
       if (cancelled) return;
-      const opts = (r.data ?? []).map((p: { id: string; product_name: string; slug: string | null }) => ({
-        id: p.id,
-        label: p.product_name,
-      }));
-      setList(opts);
+      setList(rows.map((p) => ({ id: p.id, label: p.product_name })));
     })();
     return () => { cancelled = true; };
   }, [open]);

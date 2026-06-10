@@ -4,13 +4,23 @@
    Images stored in media/attributes/{type}/{slug}.{ext}
    --------------------------------------------------------------------------- */
 
-import { supabaseAdmin as supabase } from "./supabase-admin";
 import {
   uploadToStorage,
   removeFromStorage,
   listStorage,
   publicUrl,
 } from "./storage-client";
+
+/* P0-B: product-table reads/writes go through /api/products/attributes
+   (auth + Product-Data gated server-side). Config JSON + attribute images
+   still use the storage proxy (./storage-client → /api/storage). */
+async function jget<T>(url: string, fallback: T): Promise<T> {
+  try {
+    const res = await fetch(url, { credentials: "include" });
+    if (!res.ok) return fallback;
+    return (await res.json()) as T;
+  } catch { return fallback; }
+}
 
 const BUCKET = "media";
 const CONFIG_PATH = "config/product-attributes.json";
@@ -163,20 +173,11 @@ export type AttributeUsage = {
 };
 
 export async function fetchAttributeUsage(): Promise<AttributeUsage> {
-  const { data } = await supabase.from("products").select("tags, plug_types, colors, voltage, watt, level, brand");
-  const result: AttributeUsage = {
+  const empty: AttributeUsage = {
     tags: {}, plug_types: {}, colors: {}, voltage: {}, watt: {}, levels: {}, brands: {},
   };
-  for (const row of (data || []) as Record<string, unknown>[]) {
-    for (const t of (row.tags as string[] | null) || []) result.tags[t] = (result.tags[t] || 0) + 1;
-    for (const p of (row.plug_types as string[] | null) || []) result.plug_types[p] = (result.plug_types[p] || 0) + 1;
-    for (const c of (row.colors as string[] | null) || []) result.colors[c] = (result.colors[c] || 0) + 1;
-    for (const v of (row.voltage as string[] | null) || []) result.voltage[v] = (result.voltage[v] || 0) + 1;
-    if (row.watt) result.watt[row.watt as string] = (result.watt[row.watt as string] || 0) + 1;
-    if (row.level) result.levels[row.level as string] = (result.levels[row.level as string] || 0) + 1;
-    if (row.brand) result.brands[row.brand as string] = (result.brands[row.brand as string] || 0) + 1;
-  }
-  return result;
+  const json = await jget<{ usage?: AttributeUsage }>("/api/products/attributes?usage=1", {});
+  return json.usage ?? empty;
 }
 
 // ── Merge config with actual product values ──
@@ -214,31 +215,15 @@ export async function renameAttributeInProducts(
   oldValue: string,
   newValue: string,
 ): Promise<boolean> {
-  if (["tags", "plug_types", "colors", "voltage"].includes(attrType)) {
-    const { data: products } = await supabase
-      .from("products")
-      .select(`id, ${attrType}`)
-      .contains(attrType, [oldValue]);
-    for (const p of (products || []) as unknown as Record<string, unknown>[]) {
-      const arr = (p[attrType] as string[]) || [];
-      const updated = arr.map(v => (v === oldValue ? newValue : v));
-      await supabase.from("products").update({ [attrType]: updated }).eq("id", p.id as string);
-    }
-    return true;
-  }
-  if (attrType === "watt") {
-    const { error } = await supabase.from("products").update({ watt: newValue }).eq("watt", oldValue);
-    return !error;
-  }
-  if (attrType === "levels") {
-    const { error } = await supabase.from("products").update({ level: newValue }).eq("level", oldValue);
-    return !error;
-  }
-  if (attrType === "brands") {
-    const { error } = await supabase.from("products").update({ brand: newValue }).eq("brand", oldValue);
-    return !error;
-  }
-  return false;
+  try {
+    const res = await fetch("/api/products/attributes", {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ op: "rename", attrType, oldValue, newValue }),
+    });
+    return res.ok;
+  } catch { return false; }
 }
 
 // ── Delete value from all products ──
@@ -247,31 +232,15 @@ export async function deleteAttributeFromProducts(
   attrType: string,
   value: string,
 ): Promise<boolean> {
-  if (["tags", "plug_types", "colors", "voltage"].includes(attrType)) {
-    const { data: products } = await supabase
-      .from("products")
-      .select(`id, ${attrType}`)
-      .contains(attrType, [value]);
-    for (const p of (products || []) as unknown as Record<string, unknown>[]) {
-      const arr = (p[attrType] as string[]) || [];
-      const updated = arr.filter(v => v !== value);
-      await supabase.from("products").update({ [attrType]: updated }).eq("id", p.id as string);
-    }
-    return true;
-  }
-  if (attrType === "watt") {
-    const { error } = await supabase.from("products").update({ watt: null }).eq("watt", value);
-    return !error;
-  }
-  if (attrType === "levels") {
-    const { error } = await supabase.from("products").update({ level: null }).eq("level", value);
-    return !error;
-  }
-  if (attrType === "brands") {
-    const { error } = await supabase.from("products").update({ brand: null }).eq("brand", value);
-    return !error;
-  }
-  return false;
+  try {
+    const res = await fetch("/api/products/attributes", {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ op: "delete", attrType, oldValue: value }),
+    });
+    return res.ok;
+  } catch { return false; }
 }
 
 // ── Product counts by classification slug ──
@@ -281,14 +250,7 @@ export async function fetchProductCountsByClassification(): Promise<{
   byCategory: Record<string, number>;
   bySubcategory: Record<string, number>;
 }> {
-  const { data } = await supabase.from("products").select("division_slug, category_slug, subcategory_slug");
-  const byDivision: Record<string, number> = {};
-  const byCategory: Record<string, number> = {};
-  const bySubcategory: Record<string, number> = {};
-  for (const row of (data || []) as Record<string, string>[]) {
-    if (row.division_slug) byDivision[row.division_slug] = (byDivision[row.division_slug] || 0) + 1;
-    if (row.category_slug) byCategory[row.category_slug] = (byCategory[row.category_slug] || 0) + 1;
-    if (row.subcategory_slug) bySubcategory[row.subcategory_slug] = (bySubcategory[row.subcategory_slug] || 0) + 1;
-  }
-  return { byDivision, byCategory, bySubcategory };
+  return jget("/api/products/attributes?classification=1", {
+    byDivision: {}, byCategory: {}, bySubcategory: {},
+  });
 }
