@@ -588,6 +588,21 @@ export const PRINT_AND_DOC_STYLES = `
 }
 .quot-doc-inner { padding: 0; }
 
+/* On-screen, the editor surface reserves symmetric gutter space on BOTH
+   sides of the A4 paper so the off-paper editor cards — Cost Price on the
+   left, Document Settings + Internal notes on the right — always have room
+   and sit the same distance from the page. fit-content + min-width:100%
+   keeps the paper centred when the window is wide, and lets the whole
+   stack scroll horizontally (instead of clipping a gutter) when it's
+   narrow. The @media print block below resets this to 0. */
+.quot-a4-stack {
+  width: fit-content;
+  min-width: 100%;
+  margin-inline: auto;
+  padding-inline: 360px;
+  box-sizing: border-box;
+}
+
 /* Force black text on white for all children */
 /* Set a sensible default text colour on the A4 surface, but do NOT
    use a wildcard !important rule here — the multi-page editor relies
@@ -618,6 +633,19 @@ export const PRINT_AND_DOC_STYLES = `
   -webkit-text-fill-color: rgba(255, 255, 255, 0.92) !important;
 }
 .quot-a4-doc .quot-row-notes textarea::placeholder {
+  color: rgba(255, 255, 255, 0.40) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.40) !important;
+}
+/* Gutter cards (Cost Price + Document Settings) also live OUTSIDE the
+   printed A4 in the dark editor area, so their inputs/selects need WHITE
+   text — the .quot-a4-doc input rule above otherwise forces them black
+   and they become invisible on the dark card. */
+.quot-a4-doc .pq-gutter-card input,
+.quot-a4-doc .pq-gutter-card select {
+  color: rgba(255, 255, 255, 0.92) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.92) !important;
+}
+.quot-a4-doc .pq-gutter-card input::placeholder {
   color: rgba(255, 255, 255, 0.40) !important;
   -webkit-text-fill-color: rgba(255, 255, 255, 0.40) !important;
 }

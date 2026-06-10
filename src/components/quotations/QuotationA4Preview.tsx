@@ -8337,9 +8337,13 @@ function DocSettingsCard({
   };
   return (
     <div
-      className="no-print"
+      className="no-print pq-gutter-card"
       style={{
-        position: "absolute", top: 24, left: "calc(100% + 12px)", width: 200,
+        /* 93px (not 122) because this card anchors to the A4 page edge,
+           whereas the per-row Cost cards anchor to the table cell that
+           sits 28px inside the page's padding — 122 − 28 ≈ 93 keeps this
+           card's left edge in the SAME column as the Cost cards below. */
+        position: "absolute", top: 24, right: "calc(100% + 93px)", width: 200,
         boxSizing: "border-box", background: "#1A1A1A",
         border: "1px solid #2D2D2D", borderRadius: 10, padding: 10,
         display: "flex", flexDirection: "column", gap: 8,
@@ -8425,9 +8429,9 @@ function CostPricePanel({
       style={{
         flex: 1, padding: "3px 0", fontSize: 9, fontWeight: 600,
         letterSpacing: "0.04em", borderRadius: 6, cursor: "pointer",
-        border: mode === m ? "1px solid #0066FF" : "1px solid #2D2D2D",
-        background: mode === m ? "rgba(0,102,255,0.18)" : "transparent",
-        color: mode === m ? "#7FB2FF" : "rgba(255,255,255,0.55)",
+        border: mode === m ? "1px solid rgba(255,255,255,0.9)" : "1px solid #2D2D2D",
+        background: mode === m ? "rgba(255,255,255,0.16)" : "transparent",
+        color: mode === m ? "#fff" : "rgba(255,255,255,0.55)",
       }}
     >
       {label}
@@ -8436,22 +8440,21 @@ function CostPricePanel({
 
   return (
     <div
-      className="no-print pq-row-note"
+      className="no-print pq-row-note pq-gutter-card"
       style={{
         position: "absolute", top: "50%", transform: "translateY(-50%)",
-        /* Mirror of the right-side Internal-note panel, but hugging the
-           A4 LEFT edge: the card's right edge sits 12 px to the left of
-           the No. cell (i.e. just outside the paper), so it's never
-           pushed off behind the nav rail. `right: calc(100% + 12px)`
-           always lands 12 px left of the cell's LEFT edge regardless of
-           the cell's width. Fixed height locks every row's cost card to
-           the same size so they line up row-for-row exactly like the
-           Internal notes on the right. */
-        right: "calc(100% + 12px)", width: 144, height: 112,
+        /* TRUE mirror of the right-side Internal-note panel: same 200-px
+           width, same 100-px height, and the same 122-px gap from the A4
+           edge (the note sits 122 px right of the paper; this sits 122 px
+           left of it). `right: calc(100% + 122px)` puts the card's right
+           edge 122 px left of the No. cell's LEFT edge ( = the paper
+           edge). Equal height + vertical-centre ⇒ identical row-to-row
+           spacing to the notes opposite. */
+        right: "calc(100% + 122px)", width: 200, height: 100,
         boxSizing: "border-box", overflow: "hidden",
         background: "#1A1A1A", border: "1px solid #2D2D2D",
-        borderRadius: 10, padding: 10, display: "flex",
-        flexDirection: "column", gap: 5, textAlign: "left",
+        borderRadius: 10, padding: "8px 10px", display: "flex",
+        flexDirection: "column", gap: 4, textAlign: "left",
         boxShadow: "0 6px 20px rgba(0,0,0,0.45)",
       }}
     >
