@@ -61,6 +61,11 @@ export async function POST(req: Request) {
   }
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  delete body.id;
+  /* products.tenant_id is NOT NULL; the legacy client always sent it
+     explicitly. Default to the caller's tenant so API consumers don't
+     have to know about tenancy. */
+  if (!body.tenant_id) body.tenant_id = auth.tenant_id;
   const { data, error } = await supabaseServer
     .from("products")
     .insert(body)

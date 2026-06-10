@@ -102,3 +102,38 @@ export async function GET(req: Request) {
     { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300" } },
   );
 }
+
+/* P0-A: create a model. Internal operation — Product Data (or SA) only.
+   Body is the insert payload and must carry product_id. */
+export async function POST(req: Request) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  if (!(await hasProductDataAccess(auth))) {
+    return NextResponse.json(
+      { error: "Only Product Data admins can create models." },
+      { status: 403 },
+    );
+  }
+  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  delete body.id;
+  if (!body.product_id || typeof body.product_id !== "string") {
+    return NextResponse.json({ error: "product_id required" }, { status: 400 });
+  }
+  /* product_models.slug is NOT NULL; the legacy client generated it from the
+     model name. Default it here (with a random suffix — slug is UNIQUE) so
+     API consumers don't have to. */
+  if (!body.slug && typeof body.model_name === "string") {
+    const base = body.model_name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    body.slug = `${base || "model"}-${crypto.randomUUID().slice(0, 8)}`;
+  }
+  const { data, error } = await supabaseServer
+    .from("product_models")
+    .insert(body)
+    .select()
+    .single();
+  if (error) {
+    console.error("[api/product-models POST]", error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  return NextResponse.json({ model: data });
+}
