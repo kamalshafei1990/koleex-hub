@@ -8450,11 +8450,11 @@ function CostPricePanel({
            (no cluster to fill it) reads as a much larger gap than the
            notes side. `right: calc(100% + 46px)` puts the card's right
            edge 46 px left of the No. cell's LEFT edge ( = the paper edge). */
-        right: "calc(100% + 46px)", width: 200, minHeight: 112,
+        right: "calc(100% + 46px)", width: 200,
         boxSizing: "border-box",
         background: "#1A1A1A", border: "1px solid #2D2D2D",
-        borderRadius: 10, padding: "8px 10px", display: "flex",
-        flexDirection: "column", gap: 4, textAlign: "left",
+        borderRadius: 10, padding: "6px 10px", display: "flex",
+        flexDirection: "column", gap: 3, textAlign: "left",
         boxShadow: "0 6px 20px rgba(0,0,0,0.45)",
       }}
     >
@@ -8479,7 +8479,7 @@ function CostPricePanel({
           style={{
             flex: 1, minWidth: 0, background: "#111",
             border: "1px solid #2D2D2D", borderRadius: 6,
-            padding: "4px 6px", color: "rgba(255,255,255,0.9)",
+            padding: "3px 6px", color: "rgba(255,255,255,0.9)",
             fontSize: 11, outline: "none",
           }}
         />
@@ -8492,7 +8492,7 @@ function CostPricePanel({
       <div
         style={{
           display: "flex", justifyContent: "space-between", alignItems: "baseline",
-          borderTop: "1px solid #2D2D2D", paddingTop: 5,
+          borderTop: "1px solid #2D2D2D", paddingTop: 4,
           fontSize: 10, color: "rgba(255,255,255,0.55)",
         }}
       >
