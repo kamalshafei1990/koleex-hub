@@ -8339,11 +8339,11 @@ function DocSettingsCard({
     <div
       className="no-print pq-gutter-card"
       style={{
-        /* 93px (not 122) because this card anchors to the A4 page edge,
+        /* 17px (not 46) because this card anchors to the A4 page edge,
            whereas the per-row Cost cards anchor to the table cell that
-           sits 28px inside the page's padding — 122 − 28 ≈ 93 keeps this
+           sits ~28px inside the page's padding — 46 − 28 ≈ 17 keeps this
            card's left edge in the SAME column as the Cost cards below. */
-        position: "absolute", top: 24, right: "calc(100% + 93px)", width: 200,
+        position: "absolute", top: 24, right: "calc(100% + 17px)", width: 200,
         boxSizing: "border-box", background: "#1A1A1A",
         border: "1px solid #2D2D2D", borderRadius: 10, padding: 10,
         display: "flex", flexDirection: "column", gap: 8,
