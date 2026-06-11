@@ -12,6 +12,8 @@ import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import CopyIcon from "@/components/icons/ui/CopyIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
+import EyeIcon from "@/components/icons/ui/EyeIcon";
+import EyeOffIcon from "@/components/icons/ui/EyeOffIcon";
 import { useTranslation } from "@/lib/i18n";
 import { docsT } from "@/lib/translations/docs";
 import PageHeader from "@/components/ui/PageHeader";
@@ -162,6 +164,10 @@ export interface Quotation {
      reduces the Grand Total live. Stored as a number, not a
      fraction; 5 means 5%. */
   discountPct?: number;
+  /* Tax as a PERCENTAGE (0-100) of the subtotal. 10 means 10%, which
+     adds subtotal*10% to the bill. Replaces the old flat `tax` value;
+     `tax` is kept on the type only for back-compat with old payloads. */
+  taxPct?: number;
   /* Timing block — Lead Time + auto-computed ETD/ETA. The picker
      writes 'Lead time: 30 days after receipt of deposit' + an ETD/
      ETA chip into the terms. The basis is one of 'after_deposit',
@@ -321,6 +327,7 @@ export function fromRow(row: RemoteDocRow): Quotation {
     governingLaw: doc.governingLaw,
     documentsProvided: Array.isArray(doc.documentsProvided) ? doc.documentsProvided : undefined,
     discountPct: typeof doc.discountPct === "number" ? doc.discountPct : undefined,
+    taxPct: typeof doc.taxPct === "number" ? doc.taxPct : undefined,
     leadTimeDays: doc.leadTimeDays,
     leadTimeBasis: doc.leadTimeBasis,
     /* Status normalisation. "final" is the legacy name for "sent" —
@@ -355,7 +362,8 @@ export function fromRow(row: RemoteDocRow): Quotation {
  *  bill, not just the line items. */
 function computeGrandTotal(q: Quotation): number {
   const subtotal = q.items.reduce((s, i) => s + (Number(i.unitPrice) || 0) * (Number(i.qty) || 0), 0);
-  const base = subtotal + (Number(q.tax) || 0) + (Number(q.shipping) || 0) + (Number(q.others) || 0);
+  const taxAmt = subtotal * (Math.max(0, Math.min(100, Number(q.taxPct) || 0)) / 100);
+  const base = subtotal + taxAmt + (Number(q.shipping) || 0) + (Number(q.others) || 0);
   const pct = Math.max(0, Math.min(100, Number(q.discountPct) || 0));
   return +(base * (1 - pct / 100)).toFixed(2);
 }
@@ -480,8 +488,17 @@ function compressImage(file: File): Promise<string> {
   });
 }
 
+/* Spell the currency out in full for the amount-in-words line
+   ("Chinese Yuan" reads better than "CNY"). Falls back to the raw
+   code for anything unmapped. */
+const CURRENCY_WORD: Record<string, string> = {
+  USD: "US Dollars", EUR: "Euros", GBP: "Pounds Sterling", CNY: "Chinese Yuan",
+  JPY: "Japanese Yen", AED: "UAE Dirhams", SAR: "Saudi Riyals",
+  EGP: "Egyptian Pounds", TRY: "Turkish Lira",
+};
 export function numberToWords(num: number, currency: string = "USD"): string {
-  if (!num || num === 0) return `ZERO ${currency} ONLY`.toUpperCase();
+  const unit = CURRENCY_WORD[currency.toUpperCase()] || currency;
+  if (!num || num === 0) return `ZERO ${unit} ONLY`.toUpperCase();
   const ones = [
     "",
     "One",
@@ -518,7 +535,7 @@ export function numberToWords(num: number, currency: string = "USD"): string {
   ];
   const scales = ["", "Thousand", "Million", "Billion"];
   const n = Math.floor(Math.abs(num));
-  if (n === 0) return `ZERO ${currency} ONLY`.toUpperCase();
+  if (n === 0) return `ZERO ${unit} ONLY`.toUpperCase();
   function chunk(c: number): string {
     if (c === 0) return "";
     if (c < 20) return ones[c];
@@ -545,7 +562,7 @@ export function numberToWords(num: number, currency: string = "USD"): string {
     s++;
   }
   const cents = Math.round((Math.abs(num) - n) * 100);
-  let result = str.trim() + " " + currency;
+  let result = str.trim() + " " + unit;
   if (cents > 0) result += " AND " + chunk(cents) + " CENTS";
   result += " ONLY";
   return result.toUpperCase();
@@ -602,6 +619,11 @@ export const PRINT_AND_DOC_STYLES = `
   padding-inline: 360px;
   box-sizing: border-box;
 }
+/* Focus view — the header toggle hides every editor-only gutter card
+   (Cost Price + Internal notes share .pq-row-note; Document Settings +
+   Cost Price share .pq-gutter-card) so only the A4 document shows. */
+.quot-a4-stack.gutters-hidden .pq-row-note,
+.quot-a4-stack.gutters-hidden .pq-gutter-card { display: none !important; }
 
 /* Force black text on white for all children */
 /* Set a sensible default text colour on the A4 surface, but do NOT
@@ -982,6 +1004,9 @@ export default function Quotations() {
   /* When set, the "unsaved changes" modal is open and this callback runs
      once the user chooses to leave (after an optional save). */
   const [exitPromptOpen, setExitPromptOpen] = useState(false);
+  /* Focus view — hides the editor-only gutter cards (cost price,
+     internal notes, document settings). Editor-only, never persisted. */
+  const [hidePanels, setHidePanels] = useState(false);
   const fileInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
   /* "+ From catalog" picker. Owned by the parent so the modal can
      stay mounted across A4-page renders without each page mounting
@@ -1835,7 +1860,8 @@ export default function Quotations() {
     : 0;
   const grandTotal = current
     ? (() => {
-        const base = subTotal + current.tax + current.shipping + current.others;
+        const taxAmt = subTotal * (Math.max(0, Math.min(100, Number(current.taxPct) || 0)) / 100);
+        const base = subTotal + taxAmt + current.shipping + current.others;
         const pct = Math.max(0, Math.min(100, Number(current.discountPct) || 0));
         return +(base * (1 - pct / 100)).toFixed(2);
       })()
@@ -2095,6 +2121,18 @@ export default function Quotations() {
           <ArrowLeftIcon size={15} />
           {t("btn.back")}
         </button>
+        <button
+          onClick={() => setHidePanels((v) => !v)}
+          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
+          title={
+            hidePanels
+              ? "Show the internal panels (Cost Price, Internal notes, Document settings)"
+              : "Hide the internal panels (Cost Price, Internal notes, Document settings) for a clean focus view"
+          }
+        >
+          {hidePanels ? <EyeIcon size={15} /> : <EyeOffIcon size={15} />}
+          {hidePanels ? "Show panels" : "Hide panels"}
+        </button>
         <div style={{ flex: 1 }} />
         {/* Clickable status pill — opens a menu of transitions. The
             colour map mirrors the list-view row badge so the same
@@ -2289,6 +2327,7 @@ export default function Quotations() {
         fileInputRefs={fileInputRefs}
         subTotal={subTotal}
         grandTotal={grandTotal}
+        hidePanels={hidePanels}
         fmt={fmt}
         numberToWords={numberToWords}
       />

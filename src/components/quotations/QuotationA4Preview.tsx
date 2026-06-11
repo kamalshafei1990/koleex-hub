@@ -137,6 +137,8 @@ export interface Quotation {
   governingLaw?: string;
   documentsProvided?: string[];
   discountPct?: number;
+  /* Tax as a percentage of subtotal (10 = 10%). */
+  taxPct?: number;
   leadTimeDays?: number;
   leadTimeBasis?: "after_deposit" | "after_order" | "after_lc_opening";
 }
@@ -218,6 +220,9 @@ interface Props {
   grandTotal: number;
   fmt: (n: number) => string;
   numberToWords: (num: number, currency?: string) => string;
+  /* When true, hides all editor-only gutter cards (cost price, internal
+     notes, document settings) for a clean focus view. */
+  hidePanels?: boolean;
 }
 
 /* Token strip — single source of truth for the polished palette. */
@@ -327,6 +332,7 @@ export default function QuotationA4Preview({
   grandTotal,
   fmt,
   numberToWords,
+  hidePanels,
 }: Props) {
   const setMeta = <K extends keyof Quotation>(key: K, value: Quotation[K]) =>
     setCurrent((prev) => (prev ? { ...prev, [key]: value } : prev));
@@ -381,6 +387,10 @@ export default function QuotationA4Preview({
      picked yet so the column still reads sensibly. */
   const cur = (current.currency || "USD").toUpperCase();
   const curSym = CURRENCY_SYMBOLS[cur] ?? cur;
+  /* Tax is a PERCENTAGE of the subtotal. taxAmount feeds both the Tax
+     row (computed value display) and the discount base. */
+  const taxPctVal = Math.max(0, Math.min(100, Number(current.taxPct) || 0));
+  const taxAmount = +(subTotal * (taxPctVal / 100)).toFixed(2);
 
   const priceTypeSubtitle = useMemo(() => {
     const code = current.incotermCode?.toUpperCase();
@@ -504,7 +514,7 @@ export default function QuotationA4Preview({
   }, [current.items]);
 
   return (
-    <div className="quot-a4-stack">
+    <div className={"quot-a4-stack" + (hidePanels ? " gutters-hidden" : "")}>
     {pages.map((page, pageIdx) => {
       const isFirstPage  = pageIdx === 0;
       const isLastPage   = pageIdx === pages.length - 1;
@@ -1736,11 +1746,12 @@ export default function QuotationA4Preview({
                 <table cellSpacing={0} style={{ width: "100%", borderCollapse: "collapse", border: "none" }}>
                   <tbody>
                     <TotalsRow label="Subtotal" value={`${fmt(subTotal)} ${curSym}`} muted />
-                    <TotalsRow
-                      label="Tax"
-                      editable
-                      rawValue={current.tax}
-                      onCommit={(v) => setMeta("tax", v)}
+                    <TaxRow
+                      curSym={curSym}
+                      pct={current.taxPct ?? 0}
+                      amount={taxAmount}
+                      onCommit={(v) => setMeta("taxPct", v)}
+                      fmt={fmt}
                     />
                     <TotalsRow
                       label="Shipping"
@@ -1762,7 +1773,7 @@ export default function QuotationA4Preview({
                     <DiscountRow
                       curSym={curSym}
                       pct={current.discountPct ?? 0}
-                      base={subTotal + current.tax + current.shipping + current.others}
+                      base={subTotal + taxAmount + current.shipping + current.others}
                       onCommit={(v) => setMeta("discountPct", v)}
                       fmt={fmt}
                     />
@@ -7781,6 +7792,69 @@ function Td({
    Picks land via onCommit which stores the percentage on the doc
    (current.discountPct). The grand total prop already includes the
    discount because the parent computes it that way. */
+/* Tax row — a PERCENTAGE of the subtotal (10 = 10%). Mirrors DiscountRow
+   but ADDS to the bill: the right cell shows the computed tax amount with
+   a "+". The % is the editable field; the amount is derived. */
+function TaxRow({
+  pct,
+  amount,
+  onCommit,
+  fmt,
+  curSym = "$",
+}: {
+  pct: number;
+  amount: number;
+  onCommit: (val: number) => void;
+  fmt: (n: number) => string;
+  curSym?: string;
+}) {
+  return (
+    <tr>
+      <td
+        className="pq-tl"
+        style={{
+          fontWeight: 700, background: "#fff", width: 110, fontSize: 10,
+          letterSpacing: "0.05em", textTransform: "uppercase",
+          border: `1px solid ${T.border}`, padding: "6px 12px", color: T.ink,
+        }}
+      >
+        Tax
+      </td>
+      <td
+        className="pq-tv"
+        style={{
+          fontSize: 11, textAlign: "right", border: `1px solid ${T.border}`,
+          padding: "6px 12px", fontWeight: 400, fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8, justifyContent: "flex-end", width: "100%" }}>
+          <span
+            contentEditable
+            suppressContentEditableWarning
+            onBlur={(e) => {
+              const raw = (e.currentTarget.textContent || "0").replace(/[^0-9.]/g, "");
+              onCommit(Math.max(0, Math.min(100, parseFloat(raw) || 0)));
+            }}
+            style={{ outline: "none", minWidth: 24, textAlign: "right" }}
+          >
+            {pct > 0 ? pct : "0"}
+          </span>
+          <span style={{ color: T.inkGhost, fontWeight: 400 }}>%</span>
+          <span
+            style={{
+              minWidth: 90, textAlign: "right",
+              color: amount > 0 ? T.ink : T.inkGhost,
+              fontWeight: amount > 0 ? 600 : 400,
+            }}
+          >
+            {amount > 0 ? `+ ${fmt(amount)} ${curSym}` : "—"}
+          </span>
+        </span>
+      </td>
+    </tr>
+  );
+}
+
 function DiscountRow({
   pct,
   base,
