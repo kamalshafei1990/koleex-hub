@@ -1915,7 +1915,7 @@ export default function Quotations() {
               setCurrent({ ...current, customerName: e.target.value })
             }
             placeholder="e.g. Mr. Ahmed"
-            className="w-full bg-[#1a1a1a] border border-white/[0.06] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder-gray-600 focus:outline-none focus:border-emerald-500/50 transition"
+            className="w-full bg-[#1a1a1a] border border-white/[0.06] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder-gray-600 focus:outline-none focus:border-white/40 transition"
           />
         </div>
         <div style={{ flex: 1, minWidth: 200 }}>
@@ -1939,7 +1939,7 @@ export default function Quotations() {
               setCurrent({ ...current, companyName: e.target.value })
             }
             placeholder="e.g. ABC Trading Co."
-            className="w-full bg-[#1a1a1a] border border-white/[0.06] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder-gray-600 focus:outline-none focus:border-emerald-500/50 transition"
+            className="w-full bg-[#1a1a1a] border border-white/[0.06] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder-gray-600 focus:outline-none focus:border-white/40 transition"
           />
         </div>
       </div>
