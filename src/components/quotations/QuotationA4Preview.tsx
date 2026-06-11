@@ -8450,8 +8450,8 @@ function CostPricePanel({
            (no cluster to fill it) reads as a much larger gap than the
            notes side. `right: calc(100% + 46px)` puts the card's right
            edge 46 px left of the No. cell's LEFT edge ( = the paper edge). */
-        right: "calc(100% + 46px)", width: 200, height: 100,
-        boxSizing: "border-box", overflow: "hidden",
+        right: "calc(100% + 46px)", width: 200, minHeight: 112,
+        boxSizing: "border-box",
         background: "#1A1A1A", border: "1px solid #2D2D2D",
         borderRadius: 10, padding: "8px 10px", display: "flex",
         flexDirection: "column", gap: 4, textAlign: "left",
