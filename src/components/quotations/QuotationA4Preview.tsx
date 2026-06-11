@@ -8443,14 +8443,14 @@ function CostPricePanel({
       className="no-print pq-row-note pq-gutter-card"
       style={{
         position: "absolute", top: "50%", transform: "translateY(-50%)",
-        /* TRUE mirror of the right-side Internal-note panel: same 200-px
-           width, same 100-px height, and the same 122-px gap from the A4
-           edge (the note sits 122 px right of the paper; this sits 122 px
-           left of it). `right: calc(100% + 122px)` puts the card's right
-           edge 122 px left of the No. cell's LEFT edge ( = the paper
-           edge). Equal height + vertical-centre ⇒ identical row-to-row
-           spacing to the notes opposite. */
-        right: "calc(100% + 122px)", width: 200, height: 100,
+        /* Mirror of the right-side Internal-note panel: same 200-px width
+           and 100-px height. The right gutter visually STARTS at the
+           action-cluster (~46 px off the paper), so we hug the cost card
+           to the same ~46 px on the left — otherwise the empty left gutter
+           (no cluster to fill it) reads as a much larger gap than the
+           notes side. `right: calc(100% + 46px)` puts the card's right
+           edge 46 px left of the No. cell's LEFT edge ( = the paper edge). */
+        right: "calc(100% + 46px)", width: 200, height: 100,
         boxSizing: "border-box", overflow: "hidden",
         background: "#1A1A1A", border: "1px solid #2D2D2D",
         borderRadius: 10, padding: "8px 10px", display: "flex",
