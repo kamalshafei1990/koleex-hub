@@ -39,3 +39,27 @@ export async function GET(_req: Request, { params }: RouteCtx) {
   if (!data) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ invoice: data });
 }
+
+/* DELETE a doc-builder invoice. The front-end's `deleteDoc` helper issues
+   DELETE `${listPath}/${id}` = "/api/invoices/doc/<id>" — without this
+   handler Next.js answered 405, so the row reappeared on the next list
+   read and deletes silently failed. Child rows (invoice_items,
+   invoice_payments) are ON DELETE CASCADE, so they go with the parent. */
+export async function DELETE(_req: Request, { params }: RouteCtx) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const deny = await requireModuleAccess(auth, "Invoices");
+  if (deny) return deny;
+  const { id } = await params;
+
+  const { error } = await supabaseServer
+    .from("invoices")
+    .delete()
+    .eq("id", id)
+    .eq("tenant_id", auth.tenant_id);
+  if (error) {
+    console.error("[api/invoices/doc/[id] DELETE]", error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  return NextResponse.json({ ok: true });
+}
