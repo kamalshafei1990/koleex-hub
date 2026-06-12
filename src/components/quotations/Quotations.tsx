@@ -1104,9 +1104,25 @@ export default function Quotations() {
         const hydrated = fromRow(full);
         setCurrent((prev) => {
           if (prev?.id && prev.id !== requestedId) return prev;
-          const next = { ...hydrated, items: hydrated.items.map((i) => ({ ...i })) };
-          markSaved(next);   // re-baseline to the fully-hydrated doc
-          return next;
+          const serverView = { ...hydrated, items: hydrated.items.map((i) => ({ ...i })) };
+          /* Did the operator edit anything during the hydration window?
+             The optimistic mount set baselineRef to the list-row snapshot,
+             so any divergence means a live edit (e.g. switching the
+             currency the instant the editor opened). Without this check the
+             late detail-fetch clobbered that edit back to the saved value —
+             the currency would visibly snap back to USD and never reach a
+             save or the exported PDF. Preserve the operator's in-flight
+             scalar edits and only fill in the field the list view strips
+             (items). Baseline stays the server truth so the edit still
+             registers as unsaved (dirty). */
+          const userTouched =
+            !!prev && !!baselineRef.current && JSON.stringify(prev) !== baselineRef.current;
+          if (userTouched && prev) {
+            markSaved(serverView);
+            return { ...serverView, ...prev, items: serverView.items };
+          }
+          markSaved(serverView);   // untouched → adopt the fully-hydrated doc
+          return serverView;
         });
       }
     }

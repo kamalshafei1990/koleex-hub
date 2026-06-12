@@ -953,11 +953,16 @@ export default function Quotations() {
      otherwise the items table renders as a single empty placeholder. */
   const handleOpen = useCallback(async (q: Invoice) => {
     // Optimistic mount so the editor opens immediately with header data…
-    setCurrent({ ...q, items: q.items.map((i) => ({ ...i })) });
+    const optimistic = { ...q, items: q.items.map((i) => ({ ...i })) };
+    setCurrent(optimistic);
     setView("editor");
     // …then hydrate the full doc (with items) from the detail endpoint.
     if (q.id.length === 36) {
       const requestedId = q.id;
+      /* Snapshot the optimistic mount so we can tell if the operator
+         edited anything (e.g. switched the currency) during the
+         hydration window. */
+      const openSnapshot = JSON.stringify(optimistic);
       const full = await fetchDocOne(INVOICES_DOC_SYNC, q.id);
       /* Skip the hydration if the operator switched to a different
          row before our fetch resolved (otherwise A's late response
@@ -966,7 +971,17 @@ export default function Quotations() {
         const hydrated = fromRow(full);
         setCurrent((prev) => {
           if (prev?.id && prev.id !== requestedId) return prev;
-          return { ...hydrated, items: hydrated.items.map((i) => ({ ...i })) };
+          const serverView = { ...hydrated, items: hydrated.items.map((i) => ({ ...i })) };
+          /* Preserve any in-flight edit the operator made before this
+             late detail-fetch resolved — otherwise the currency (and any
+             other doc-settings change) would snap back to the saved value
+             and never reach a save or the exported PDF. Only fill in the
+             field the list view strips (items). */
+          const userTouched = !!prev && JSON.stringify(prev) !== openSnapshot;
+          if (userTouched && prev) {
+            return { ...serverView, ...prev, items: serverView.items };
+          }
+          return serverView;
         });
       }
     }
