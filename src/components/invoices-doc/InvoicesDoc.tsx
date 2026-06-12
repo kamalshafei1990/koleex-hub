@@ -74,6 +74,10 @@ export interface Invoice {
   toWebsite?: string;
   items: InvoiceItem[];
   tax: number;
+  /* Tax as a PERCENTAGE of the subtotal (10 = 10%). Mirrors the
+     Quotation model — the shared Tax row writes this. Legacy flat
+     `tax` above is kept for round-trip but no longer feeds the total. */
+  taxPct?: number;
   shipping: number;
   others: number;
   terms: string;
@@ -233,6 +237,7 @@ export function fromRow(row: RemoteDocRow): Invoice {
     toWebsite: doc.toWebsite ?? "",
     items: Array.isArray(doc.items) && doc.items.length > 0 ? doc.items : [{ ...EMPTY_ITEM }],
     tax: Number(doc.tax ?? 0),
+    taxPct: typeof doc.taxPct === "number" ? doc.taxPct : undefined,
     shipping: Number(doc.shipping ?? 0),
     others: Number(doc.others ?? 0),
     terms: doc.terms ?? DEFAULT_TERMS,
@@ -283,7 +288,8 @@ export function fromRow(row: RemoteDocRow): Invoice {
  *  Applies discountPct after summing subtotal + tax + shipping + others. */
 function computeGrandTotal(q: Invoice): number {
   const subtotal = q.items.reduce((s, i) => s + (Number(i.unitPrice) || 0) * (Number(i.qty) || 0), 0);
-  const base = subtotal + (Number(q.tax) || 0) + (Number(q.shipping) || 0) + (Number(q.others) || 0);
+  const taxAmt = subtotal * (Math.max(0, Math.min(100, Number(q.taxPct) || 0)) / 100);
+  const base = subtotal + taxAmt + (Number(q.shipping) || 0) + (Number(q.others) || 0);
   const pct = Math.max(0, Math.min(100, Number(q.discountPct) || 0));
   return +(base * (1 - pct / 100)).toFixed(2);
 }
@@ -1576,7 +1582,8 @@ export default function Quotations() {
     : 0;
   const grandTotal = current
     ? (() => {
-        const base = subTotal + current.tax + current.shipping + current.others;
+        const taxAmt = subTotal * (Math.max(0, Math.min(100, Number(current.taxPct) || 0)) / 100);
+        const base = subTotal + taxAmt + current.shipping + current.others;
         const pct = Math.max(0, Math.min(100, Number(current.discountPct) || 0));
         return +(base * (1 - pct / 100)).toFixed(2);
       })()
@@ -1684,10 +1691,13 @@ export default function Quotations() {
                    Prefer the server-side `serverTotal` (the row's total
                    column). Fall back to local compute for unsaved
                    drafts where serverTotal hasn't been set yet. */
-                const computed = q.items.reduce(
+                const computedSub = q.items.reduce(
                   (s, i) => s + i.unitPrice * i.qty,
                   0
-                ) + q.tax + q.shipping + q.others;
+                );
+                const computed = computedSub
+                  + computedSub * (Math.max(0, Math.min(100, Number(q.taxPct) || 0)) / 100)
+                  + q.shipping + q.others;
                 const gt = q.serverTotal != null && q.serverTotal > 0 ? q.serverTotal : computed;
                 return (
                   <div
