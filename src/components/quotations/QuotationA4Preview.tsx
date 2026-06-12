@@ -2247,7 +2247,9 @@ export default function QuotationA4Preview({
               color: "#fff",
             }}
           >
-            Receiving U.S Dollar Payment At
+            {cur === "CNY"
+              ? "开票资料 · Receiving Chinese Yuan Payment At"
+              : "Receiving U.S Dollar Payment At"}
           </div>
           <table
             className="pq-bank"
@@ -2255,15 +2257,30 @@ export default function QuotationA4Preview({
             style={{ width: "100%", borderCollapse: "collapse", border: "none" }}
           >
             <tbody>
-              <BankRow label="Beneficiary Bank" value="AGRICULTURAL BANK OF CHINA, ZHEJIANG BRANCH" />
-              <BankRow label="SWIFT Code" value="ABOCCNBJ110" mono />
-              <BankRow label="Beneficiary Name" value="KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO. LTD." />
-              <BankRow label="Beneficiary A/C No." value="19905814040007205" mono />
-              <BankRow label="Bank Address" value="100 JIANGJIN ROAD, SHANGCHENG DISTRICT, HANGZHOU, ZHEJIANG, CHINA" />
-              <BankRow
-                label="Beneficiary Address"
-                value="ROOM 206, BUILDING 88, WEST FEIYUE TECHNOLOGICAL INNOVATIVE PARK, JINGSHUI AN COMMUNITY, XIACHEN STREET, JIAOJIANG DISTRICT, TAIZHOU CITY, ZHEJIANG PROVINCE, CHINA"
-              />
+              {cur === "CNY" ? (
+                <>
+                  {/* Domestic CNY collection info (开票资料). Same ladder
+                      design as the USD block — only the data differs. */}
+                  <BankRow label="Company Name / 名称" value="科莱恪斯国际商业管理（台州）有限公司" />
+                  <BankRow label="Tax No. / 税号" value="9133 1000 MADE Q1RC 8C" mono />
+                  <BankRow label="Address / 地址" value="浙江省台州市椒江区下陈街道泾水岸社区飞跃科创园西区88幢206室" />
+                  <BankRow label="Phone / 电话" value="13073800720" mono />
+                  <BankRow label="Bank / 开户银行" value="中国农业银行股份有限公司台州分行" />
+                  <BankRow label="Bank Account / 银行账户" value="19-900001040043795" mono />
+                </>
+              ) : (
+                <>
+                  <BankRow label="Beneficiary Bank" value="AGRICULTURAL BANK OF CHINA, ZHEJIANG BRANCH" />
+                  <BankRow label="SWIFT Code" value="ABOCCNBJ110" mono />
+                  <BankRow label="Beneficiary Name" value="KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO. LTD." />
+                  <BankRow label="Beneficiary A/C No." value="19905814040007205" mono />
+                  <BankRow label="Bank Address" value="100 JIANGJIN ROAD, SHANGCHENG DISTRICT, HANGZHOU, ZHEJIANG, CHINA" />
+                  <BankRow
+                    label="Beneficiary Address"
+                    value="ROOM 206, BUILDING 88, WEST FEIYUE TECHNOLOGICAL INNOVATIVE PARK, JINGSHUI AN COMMUNITY, XIACHEN STREET, JIAOJIANG DISTRICT, TAIZHOU CITY, ZHEJIANG PROVINCE, CHINA"
+                  />
+                </>
+              )}
             </tbody>
           </table>
         </div>
