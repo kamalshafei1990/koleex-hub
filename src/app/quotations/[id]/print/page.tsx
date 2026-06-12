@@ -148,9 +148,13 @@ export default function QuotationPrintPage({
       (s, it) => s + (Number(it.unitPrice) || 0) * (Number(it.qty) || 0),
       0,
     );
+    /* Tax is a PERCENTAGE of the subtotal — mirror the editor's
+       computeGrandTotal so the printed/exported PDF total matches. */
+    const taxAmt =
+      sub * (Math.max(0, Math.min(100, Number((quote as { taxPct?: number }).taxPct) || 0)) / 100);
     const base =
       sub +
-      (Number(quote.tax) || 0) +
+      taxAmt +
       (Number(quote.shipping) || 0) +
       (Number(quote.others) || 0);
     const pct = Math.max(
