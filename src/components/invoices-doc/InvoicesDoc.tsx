@@ -73,6 +73,9 @@ export interface Invoice {
   toEmail?: string;
   toWebsite?: string;
   items: InvoiceItem[];
+  /* Document currency code (ISO 4217-ish). Drives the money symbols,
+     the amount-in-words, and the currency-conditional bank block. */
+  currency?: string;
   tax: number;
   /* Tax as a PERCENTAGE of the subtotal (10 = 10%). Mirrors the
      Quotation model — the shared Tax row writes this. Legacy flat
@@ -236,6 +239,10 @@ export function fromRow(row: RemoteDocRow): Invoice {
     toEmail: doc.toEmail ?? "",
     toWebsite: doc.toWebsite ?? "",
     items: Array.isArray(doc.items) && doc.items.length > 0 ? doc.items : [{ ...EMPTY_ITEM }],
+    /* Currency: prefer the doc snapshot, fall back to the row column,
+       then USD. Without this the editor dropped the saved currency on
+       every load and reverted to USD. */
+    currency: doc.currency ?? ((row as { currency?: string | null }).currency || "USD"),
     tax: Number(doc.tax ?? 0),
     taxPct: typeof doc.taxPct === "number" ? doc.taxPct : undefined,
     shipping: Number(doc.shipping ?? 0),
@@ -337,7 +344,7 @@ async function saveInvoiceRemote(q: Invoice): Promise<Invoice | null> {
     id: q.id.length === 36 ? q.id : undefined, // if it's our old local hex id, let server mint a new UUID
     inv_no: q.invoiceNo || undefined,
     status: q.status,
-    currency: "USD",
+    currency: q.currency || "USD",
     issue_date: ddmmyyyyToISO(q.date),
     due_date: ddmmyyyyToISO(q.validTill),
     total: computeGrandTotal(q),
