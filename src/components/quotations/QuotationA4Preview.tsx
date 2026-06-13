@@ -95,6 +95,10 @@ export interface Quotation {
   /* INTERNAL: shared Stand & Table cost applied to every "complete set"
      line. Set once per quotation; editor gutter only — never printed. */
   standTablePrice?: number;
+  /* INTERNAL: quotation-level RMB→quote-currency exchange rate used by the
+     cost panel's price math. Per-quotation (old quotes unaffected); missing
+     = 7.20 default. Editor gutter only — never printed. */
+  fxRate?: number;
   terms: string;
   /* Same enum as the parent's Quotation type (Quotations.tsx). The
      preview doesn't itself dispatch transitions — it only reads
@@ -8473,6 +8477,24 @@ function DocSettingsCard({
           Set once — added to every line marked “Complete set”.
         </span>
       </label>
+      <label style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+        <span style={{ ...labelCss, color: "rgba(255,255,255,0.38)" }}>Exchange rate (RMB → {(current.currency || "USD").toUpperCase()})</span>
+        <input
+          type="number"
+          min={0}
+          step="0.01"
+          value={current.fxRate ?? 7.2}
+          onChange={(e) =>
+            setCurrent((prev) =>
+              prev ? { ...prev, fxRate: Math.max(0, Number(e.target.value) || 0) } : prev,
+            )
+          }
+          style={fieldCss}
+        />
+        <span style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", lineHeight: 1.4 }}>
+          Used by the cost panel’s price math. Affects this quotation only.
+        </span>
+      </label>
     </div>
   );
 }
@@ -8512,53 +8534,46 @@ function CostPricePanel({
         : prev,
     );
 
-  const modeBtn = (m: "head" | "complete" | "full", label: string, title: string) => (
-    <button
-      type="button"
-      title={title}
-      onClick={() => setItemField({ costMode: m })}
-      style={{
-        flex: 1, padding: "3px 0", fontSize: 9, fontWeight: 600,
-        letterSpacing: "0.04em", borderRadius: 6, cursor: "pointer",
-        border: mode === m ? "1px solid rgba(255,255,255,0.9)" : "1px solid #2D2D2D",
-        background: mode === m ? "rgba(255,255,255,0.16)" : "transparent",
-        color: mode === m ? "#fff" : "rgba(255,255,255,0.55)",
-      }}
-    >
-      {label}
-    </button>
-  );
+  const micro: React.CSSProperties = {
+    fontSize: 9, fontWeight: 600, letterSpacing: "0.08em",
+    textTransform: "uppercase", color: "rgba(255,255,255,0.5)",
+  };
+  const rowLabel: React.CSSProperties = {
+    fontSize: 9.5, fontWeight: 600, letterSpacing: "0.04em",
+    textTransform: "uppercase", color: "rgba(255,255,255,0.4)", flexShrink: 0,
+  };
 
   return (
     <div
       className="no-print pq-row-note pq-gutter-card"
       style={{
+        /* Vertically centred on its row, same as the right-side Internal-note
+           panel. Kept compact (≈ one row tall, ~95px) so adjacent rows' panels
+           never overlap. `right: calc(100% + 46px)` aligns the gutter column.
+           The calculated cost lives in the header row to save vertical space. */
         position: "absolute", top: "50%", transform: "translateY(-50%)",
-        /* Mirror of the right-side Internal-note panel: same 200-px width
-           and 100-px height. The right gutter visually STARTS at the
-           action-cluster (~46 px off the paper), so we hug the cost card
-           to the same ~46 px on the left — otherwise the empty left gutter
-           (no cluster to fill it) reads as a much larger gap than the
-           notes side. `right: calc(100% + 46px)` puts the card's right
-           edge 46 px left of the No. cell's LEFT edge ( = the paper edge). */
-        right: "calc(100% + 46px)", width: 200,
+        right: "calc(100% + 46px)", width: 210,
         boxSizing: "border-box",
         background: "#1A1A1A", border: "1px solid #2D2D2D",
-        borderRadius: 10, padding: "6px 10px", display: "flex",
-        flexDirection: "column", gap: 3, textAlign: "left",
+        borderRadius: 10, padding: "9px 11px", display: "flex",
+        flexDirection: "column", gap: 7, textAlign: "left",
         boxShadow: "0 6px 20px rgba(0,0,0,0.45)",
       }}
     >
-      <div
-        style={{
-          fontSize: 9, fontWeight: 600, letterSpacing: "0.08em",
-          textTransform: "uppercase", color: "rgba(255,255,255,0.5)",
-        }}
-      >
-        Cost price
+      {/* Header: title + live calculated cost */}
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 6 }}>
+        <span style={micro}>Cost management</span>
+        <span
+          title="Calculated cost"
+          style={{ fontWeight: 700, fontSize: 12, color: "rgba(255,255,255,0.95)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}
+        >
+          {fmtN(total)} RMB
+        </span>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", width: 34 }}>Head</span>
+
+      {/* Head Cost (RMB) — inline label + input */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ ...rowLabel, width: 78 }}>Head Cost (RMB)</span>
         <input
           type="number"
           min={0}
@@ -8568,35 +8583,31 @@ function CostPricePanel({
             setItemField({ costHead: e.target.value === "" ? undefined : Math.max(0, Number(e.target.value) || 0) })
           }
           style={{
-            flex: 1, minWidth: 0, background: "#111",
-            border: "1px solid #2D2D2D", borderRadius: 6,
-            padding: "3px 6px", color: "rgba(255,255,255,0.9)",
-            fontSize: 11, outline: "none",
+            flex: 1, minWidth: 0, boxSizing: "border-box", background: "#111",
+            border: "1px solid #2D2D2D", borderRadius: 7, padding: "5px 8px",
+            color: "rgba(255,255,255,0.92)", fontSize: 12, fontWeight: 600,
+            outline: "none", fontVariantNumeric: "tabular-nums", textAlign: "right",
           }}
         />
       </div>
-      <div style={{ display: "flex", gap: 4 }}>
-        {modeBtn("head", "Head", "Head only — quoting the machine head alone")}
-        {modeBtn("complete", "+Set", "Complete set — head + stand & table")}
-        {modeBtn("full", "Full", "Full machine / device — no stand & table needed")}
-      </div>
-      <div
-        style={{
-          display: "flex", justifyContent: "space-between", alignItems: "baseline",
-          borderTop: "1px solid #2D2D2D", paddingTop: 4,
-          fontSize: 10, color: "rgba(255,255,255,0.55)",
-        }}
-      >
-        {mode === "complete" ? (
-          <span style={{ fontVariantNumeric: "tabular-nums" }}>
-            {fmtN(head)} + {fmtN(standTablePrice)} S&amp;T
-          </span>
-        ) : (
-          <span>{mode === "full" ? "Full machine" : "Head only"}</span>
-        )}
-        <span style={{ fontWeight: 700, color: "rgba(255,255,255,0.92)", fontVariantNumeric: "tabular-nums" }}>
-          {fmtN(total)} {curSym}
-        </span>
+
+      {/* Configuration — dropdown keeps the full "No Stand Required" label
+          while staying one line tall. costMode value is unchanged. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ ...rowLabel, width: 78 }}>Configuration</span>
+        <select
+          value={mode}
+          onChange={(e) => setItemField({ costMode: e.target.value as "head" | "complete" | "full" })}
+          style={{
+            flex: 1, minWidth: 0, boxSizing: "border-box", background: "#111",
+            border: "1px solid #2D2D2D", borderRadius: 7, padding: "5px 8px",
+            color: "rgba(255,255,255,0.92)", fontSize: 11, outline: "none", cursor: "pointer",
+          }}
+        >
+          <option value="head">Head Only</option>
+          <option value="complete">Complete Set</option>
+          <option value="full">No Stand Required</option>
+        </select>
       </div>
     </div>
   );

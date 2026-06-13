@@ -109,6 +109,9 @@ export interface Quotation {
      regardless of the head on it, so the operator sets this once per
      quotation. Editor-gutter only — never printed. */
   standTablePrice?: number;
+  /* INTERNAL: quotation-level RMB→quote-currency exchange rate for the cost
+     panel's price math. Per-quotation; missing = 7.20 default. Editor only. */
+  fxRate?: number;
   terms: string;
   /* Optional stamp + signature URLs stamped on this quote. Both
      stored as public Supabase Storage URLs. The doc-builder lets a
@@ -309,6 +312,7 @@ export function fromRow(row: RemoteDocRow): Quotation {
        always saved with row.currency = USD), then USD. */
     currency: doc.currency ?? ((row as { currency?: string | null }).currency || "USD"),
     standTablePrice: Number(doc.standTablePrice ?? 0),
+    fxRate: typeof doc.fxRate === "number" ? doc.fxRate : undefined,
     terms: doc.terms ?? DEFAULT_TERMS,
     stampUrl: doc.stampUrl,
     signatureUrl: doc.signatureUrl,
@@ -1071,6 +1075,7 @@ export default function Quotations() {
       others: 0,
       currency: "USD",
       standTablePrice: 0,
+      fxRate: 7.2,
       terms: DEFAULT_TERMS,
       status: "draft",
       createdAt: new Date().toISOString(),
