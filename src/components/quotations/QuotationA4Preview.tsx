@@ -8566,7 +8566,10 @@ function CostPricePanel({
   const [status, setStatus] = useState<LinkStatus>("idle");
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [pricingOpen, setPricingOpen] = useState(false);
   const model = (item.model || "").trim();
+  /* Base cost converted to the quote currency (before margin / fixed). */
+  const costConverted = +(total / (fx || 7.2)).toFixed(2);
 
   useEffect(() => {
     if (status === "new") return; // keep "New Product" until the model text changes
@@ -8681,126 +8684,209 @@ function CostPricePanel({
     );
   };
 
-  return (
-    <div
-      className="no-print pq-row-note pq-gutter-card pq-cost-card"
-      style={{
-        /* Vertically centred on its row. RESTING height ≈ one row (header +
-           head + config); the Selling-price/Save block (.cost-expand) only
-           unfurls on hover/focus so adjacent rows never overlap at rest.
-           Width comes from .pq-cost-card (300 desktop / 264 tablet). */
-        position: "absolute", top: "50%", transform: "translateY(-50%)",
-        right: "calc(100% + 46px)", width: 300,
-        boxSizing: "border-box",
-        background: "#1A1A1A", border: "1px solid #2D2D2D",
-        borderRadius: 10, padding: "10px 12px", display: "flex",
-        flexDirection: "column", gap: 8, textAlign: "left",
-        boxShadow: "0 6px 20px rgba(0,0,0,0.45)",
-      }}
-    >
-      {/* Header: title + status badge + live calculated cost */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-          <span style={micro}>Cost management</span>
-          {badge}
-        </span>
-        <span
-          title="Calculated cost (RMB)"
-          style={{ fontWeight: 700, fontSize: 12.5, color: "rgba(255,255,255,0.95)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}
-        >
-          {fmtN(total)} RMB
-        </span>
-      </div>
-
-      {/* Head Cost (RMB) */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <span style={{ ...rowLabel, width: 92 }}>Head Cost (RMB)</span>
-        <input
-          type="number"
-          min={0}
-          value={item.costHead ?? ""}
-          placeholder="0"
-          onChange={(e) =>
-            setItemField({ costHead: e.target.value === "" ? undefined : Math.max(0, Number(e.target.value) || 0) })
-          }
-          style={{ ...inputCss, fontWeight: 600, textAlign: "right" }}
-        />
-      </div>
-
-      {/* Configuration */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <span style={{ ...rowLabel, width: 92 }}>Configuration</span>
-        <select
-          value={mode}
-          onChange={(e) => setItemField({ costMode: e.target.value as "head" | "complete" | "full" })}
-          style={{ ...inputCss, fontSize: 11, cursor: "pointer" }}
-        >
-          <option value="head">Head Only</option>
-          <option value="complete">Complete Set</option>
-          <option value="full">No Stand Required</option>
-        </select>
-      </div>
-
-      {/* Selling price + Save — revealed on focus/hover (.cost-expand) */}
-      <div className="cost-expand" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={{ borderTop: "1px solid #2D2D2D", paddingTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-            <span style={micro}>Selling price</span>
-            <span style={{ fontSize: 9, color: "rgba(255,255,255,0.4)" }}>FX {fmtN(fx)}</span>
-          </div>
-          {/* Method */}
-          <div style={{ display: "flex", gap: 6 }}>
-            {sellBtn("margin", "Margin %")}
-            {sellBtn("fixed", "Fixed Value")}
-          </div>
-          {/* Value + Result */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ ...rowLabel, width: 92 }}>{sellMethod === "margin" ? "Margin (%)" : `Fixed (${curCode})`}</span>
-            <input
-              type="number"
-              min={0}
-              value={item.sellValue ?? ""}
-              placeholder="0"
-              onChange={(e) =>
-                setItemField({ sellValue: e.target.value === "" ? undefined : Math.max(0, Number(e.target.value) || 0) })
-              }
-              style={{ ...inputCss, textAlign: "right" }}
-            />
-          </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={micro}>Result price</span>
-            <span style={{ fontWeight: 700, fontSize: 13, color: "#fff", fontVariantNumeric: "tabular-nums" }}>
-              {fmtN(resultPrice)} {curSym}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={applyPrice}
-            style={{
-              width: "100%", padding: "7px 0", fontSize: 11, fontWeight: 700, borderRadius: 7,
-              cursor: "pointer", border: "1px solid rgba(255,255,255,0.9)",
-              background: "rgba(255,255,255,0.92)", color: "#000",
-            }}
-          >Apply Price → Unit Price</button>
-        </div>
-
-        {/* Save Cost to Product Data */}
-        <div style={{ borderTop: "1px solid #2D2D2D", paddingTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => saveCost(false)}
-            style={{
-              width: "100%", padding: "7px 0", fontSize: 11, fontWeight: 700, borderRadius: 7,
-              cursor: saving ? "default" : "pointer", border: "1px solid #2D2D2D",
-              background: "transparent", color: "rgba(255,255,255,0.85)", opacity: saving ? 0.6 : 1,
-            }}
-          >{saving ? "Saving…" : "Save Cost to Product Data"}</button>
-          {saveMsg && (
-            <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", lineHeight: 1.4 }}>{saveMsg}</span>
-          )}
-        </div>
-      </div>
+  const figure = (label: string, value: string, accent = false) => (
+    <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
+      <span style={{ ...rowLabel, width: "auto" }}>{label}</span>
+      <span style={{
+        fontSize: 12, fontWeight: accent ? 700 : 600,
+        color: accent ? "#fff" : "rgba(255,255,255,0.82)",
+        fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap",
+      }}>{value}</span>
     </div>
+  );
+
+  return (
+    <>
+      <div
+        className="no-print pq-row-note pq-gutter-card pq-cost-card"
+        style={{
+          /* Vertically centred on its row, compact (≈ one row tall) so adjacent
+             rows' cards never overlap. Width from .pq-cost-card (320 / 264).
+             Advanced pricing + save live in a modal (the Pricing button). */
+          position: "absolute", top: "50%", transform: "translateY(-50%)",
+          right: "calc(100% + 46px)", width: 320,
+          boxSizing: "border-box",
+          background: "#1A1A1A", border: "1px solid #2D2D2D",
+          borderRadius: 10, padding: "9px 12px", display: "flex",
+          flexDirection: "column", gap: 7, textAlign: "left",
+          boxShadow: "0 6px 20px rgba(0,0,0,0.45)",
+        }}
+      >
+        {/* Head Cost (RMB) + Configuration — side by side, label as placeholder
+            to keep the card ≈ one row tall (no overlap with the next row). */}
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            type="number"
+            min={0}
+            value={item.costHead ?? ""}
+            placeholder="Head Cost (RMB)"
+            title="Head Cost (RMB)"
+            onChange={(e) =>
+              setItemField({ costHead: e.target.value === "" ? undefined : Math.max(0, Number(e.target.value) || 0) })
+            }
+            style={{ ...inputCss, flex: 1, fontWeight: 600 }}
+          />
+          <select
+            value={mode}
+            title="Configuration"
+            onChange={(e) => setItemField({ costMode: e.target.value as "head" | "complete" | "full" })}
+            style={{ ...inputCss, flex: 1, fontSize: 11, cursor: "pointer" }}
+          >
+            <option value="head">Head Only</option>
+            <option value="complete">Complete Set</option>
+            <option value="full">No Stand Required</option>
+          </select>
+        </div>
+
+        {/* Cost readout — Head · Stand & Table · Total RMB · Cost {currency}.
+            Single compact wrapping line so the card stays ≈ one row tall. */}
+        <div style={{
+          borderTop: "1px solid #2D2D2D", paddingTop: 6,
+          display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "2px 10px",
+          fontSize: 10, fontVariantNumeric: "tabular-nums", color: "rgba(255,255,255,0.55)",
+        }}>
+          <span>Head <b style={{ color: "rgba(255,255,255,0.85)", fontWeight: 600 }}>{fmtN(head)}</b></span>
+          <span>· S&amp;T <b style={{ color: "rgba(255,255,255,0.85)", fontWeight: 600 }}>{fmtN(mode === "complete" ? standTablePrice : 0)}</b></span>
+          <span>· Total <b style={{ color: "#fff", fontWeight: 700 }}>{fmtN(total)}</b> RMB</span>
+          <span>· <b style={{ color: "#fff", fontWeight: 700 }}>{fmtN(costConverted)}</b> {curCode}</span>
+        </div>
+
+        {/* badge + open advanced pricing/save modal */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ flex: 1, minWidth: 0 }}>{badge}</span>
+          <button
+            type="button"
+            onClick={() => setPricingOpen(true)}
+            style={{
+              flexShrink: 0, padding: "6px 12px", fontSize: 11, fontWeight: 700, borderRadius: 7,
+              cursor: "pointer", border: "1px solid rgba(255,255,255,0.22)",
+              background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.9)",
+            }}
+          >Pricing &amp; Save →</button>
+        </div>
+      </div>
+
+      {/* ── Pricing modal (advanced controls) ───────────────────────────── */}
+      {pricingOpen && (
+        <div
+          className="no-print"
+          onClick={() => setPricingOpen(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 9999, display: "flex",
+            alignItems: "center", justifyContent: "center", padding: 20,
+            background: "rgba(0,0,0,0.6)", backdropFilter: "blur(2px)",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 380, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto",
+              boxSizing: "border-box", background: "#161616", color: "#fff",
+              border: "1px solid #2D2D2D", borderRadius: 14, padding: 18,
+              display: "flex", flexDirection: "column", gap: 14,
+              boxShadow: "0 24px 60px rgba(0,0,0,0.6)",
+            }}
+          >
+            {/* Modal header */}
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+                <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.01em" }}>Pricing &amp; Cost</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {model || "No model"}
+                  </span>
+                  {badge}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPricingOpen(false)}
+                aria-label="Close"
+                style={{
+                  flexShrink: 0, width: 28, height: 28, borderRadius: 7, cursor: "pointer",
+                  border: "1px solid #2D2D2D", background: "transparent",
+                  color: "rgba(255,255,255,0.7)", fontSize: 15, lineHeight: 1,
+                }}
+              >×</button>
+            </div>
+
+            {/* Cost recap */}
+            <div style={{
+              display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10,
+              border: "1px solid #2D2D2D", borderRadius: 10, padding: 12, background: "#1A1A1A",
+            }}>
+              {figure("Head Cost (RMB)", fmtN(head))}
+              {figure("Stand & Table (RMB)", fmtN(mode === "complete" ? standTablePrice : 0))}
+              {figure("Total Cost (RMB)", fmtN(total), true)}
+              {figure(`Cost (${curCode})`, fmtN(costConverted), true)}
+            </div>
+
+            {/* Selling method */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={micro}>Selling method</span>
+                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.45)" }}>Exchange rate {fmtN(fx)}</span>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                {sellBtn("margin", "Margin %")}
+                {sellBtn("fixed", "Fixed Value")}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ ...rowLabel, width: 110 }}>{sellMethod === "margin" ? "Margin (%)" : `Fixed (${curCode})`}</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={item.sellValue ?? ""}
+                  placeholder="0"
+                  onChange={(e) =>
+                    setItemField({ sellValue: e.target.value === "" ? undefined : Math.max(0, Number(e.target.value) || 0) })
+                  }
+                  style={{ ...inputCss, textAlign: "right" }}
+                />
+              </div>
+            </div>
+
+            {/* Result + Apply */}
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              border: "1px solid #2D2D2D", borderRadius: 10, padding: "10px 12px", background: "#1A1A1A",
+            }}>
+              <span style={micro}>Result selling price</span>
+              <span style={{ fontWeight: 800, fontSize: 18, fontVariantNumeric: "tabular-nums" }}>
+                {fmtN(resultPrice)} {curSym}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => { applyPrice(); setPricingOpen(false); }}
+              style={{
+                width: "100%", padding: "10px 0", fontSize: 12, fontWeight: 700, borderRadius: 9,
+                cursor: "pointer", border: "1px solid #fff", background: "#fff", color: "#000",
+              }}
+            >Apply Price → Unit Price</button>
+
+            {/* Save to Product Data */}
+            <div style={{ borderTop: "1px solid #2D2D2D", paddingTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => saveCost(false)}
+                style={{
+                  width: "100%", padding: "10px 0", fontSize: 12, fontWeight: 700, borderRadius: 9,
+                  cursor: saving ? "default" : "pointer", border: "1px solid #2D2D2D",
+                  background: "transparent", color: "rgba(255,255,255,0.9)", opacity: saving ? 0.6 : 1,
+                }}
+              >{saving ? "Saving…" : "Save Cost to Product Data"}</button>
+              {saveMsg && (
+                <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.6)", lineHeight: 1.5 }}>{saveMsg}</span>
+              )}
+              <span style={{ fontSize: 9.5, color: "rgba(255,255,255,0.35)", lineHeight: 1.5 }}>
+                Saves the Head Cost ({fmtN(head)} RMB) only — Stand &amp; Table stays separate.
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

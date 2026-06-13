@@ -682,20 +682,8 @@ export const PRINT_AND_DOC_STYLES = `
    input + Configuration dropdown; a touch narrower on tablet. Height stays
    driven by content (≈ one quotation row). Overrides the component's inline
    width via !important. */
-.pq-cost-card { width: 300px !important; }
+.pq-cost-card { width: 320px !important; }
 @media (max-width: 1180px) { .pq-cost-card { width: 264px !important; } }
-/* Selling-price + Save section is revealed on focus/hover so the card's
-   RESTING height stays ≈ one quotation row (no overlap between rows). When
-   the operator clicks into the card it expands downward to price + save. */
-.pq-cost-card .cost-expand {
-  max-height: 0; opacity: 0; overflow: hidden; pointer-events: none;
-  transition: max-height .18s ease, opacity .18s ease, margin-top .18s ease;
-  margin-top: 0;
-}
-.pq-cost-card:hover .cost-expand,
-.pq-cost-card:focus-within .cost-expand {
-  max-height: 320px; opacity: 1; pointer-events: auto; margin-top: 2px;
-}
 .quot-a4-doc .pq-gutter-card input::placeholder {
   color: rgba(255, 255, 255, 0.40) !important;
   -webkit-text-fill-color: rgba(255, 255, 255, 0.40) !important;
