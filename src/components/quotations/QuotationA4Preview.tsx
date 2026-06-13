@@ -8749,9 +8749,14 @@ function CostPricePanel({
     if (!b) return null;
     return (
       <span style={{
-        fontSize: 8.5, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase",
-        color: b.c, background: b.bg, borderRadius: 5, padding: "2px 6px", whiteSpace: "nowrap",
-      }}>{b.t}</span>
+        display: "inline-flex", alignItems: "center", gap: 5,
+        fontSize: 10, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase",
+        color: b.c, background: b.bg, border: `1px solid ${b.c}44`,
+        borderRadius: 6, padding: "3px 9px", whiteSpace: "nowrap",
+      }}>
+        <span style={{ width: 6, height: 6, borderRadius: "50%", background: b.c, flexShrink: 0 }} />
+        {b.t}
+      </span>
     );
   })();
 
@@ -8799,88 +8804,58 @@ function CostPricePanel({
           boxShadow: "0 6px 20px rgba(0,0,0,0.45)",
         }}
       >
-        {/* Head Cost (RMB) + Configuration — side by side, label as placeholder
-            to keep the card ≈ one row tall (no overlap with the next row). */}
-        <div style={{ display: "flex", gap: 8 }}>
-          <input
-            type="number"
-            min={0}
-            value={item.costHead ?? ""}
-            placeholder="Head Cost (RMB)"
-            title="Head Cost (RMB)"
-            onChange={(e) =>
-              setItemField({ costHead: e.target.value === "" ? undefined : Math.max(0, Number(e.target.value) || 0) })
-            }
-            style={{ ...inputCss, flex: 1, fontWeight: 600 }}
-          />
-          <select
-            value={mode}
-            title="Configuration"
-            onChange={(e) => setItemField({ costMode: e.target.value as "head" | "complete" | "full" })}
-            style={{ ...inputCss, flex: 1, fontSize: 11, cursor: "pointer" }}
-          >
-            <option value="head">Head Only</option>
-            <option value="complete">Complete Set</option>
-            <option value="full">No Stand Required</option>
-          </select>
-        </div>
+        {/* ── SUMMARY CARD (3 rows, ≈ one quotation row tall). Answers only:
+              linked? · what's the cost? · manage pricing? All editing lives in
+              the Manage Pricing modal. ── */}
 
-        {/* Resting readout — Total Cost RMB + Cost (currency) only.
-            Head / Stand & Table breakdown lives in the Manage Pricing modal. */}
-        <div style={{
-          borderTop: "1px solid #2D2D2D", paddingTop: 6,
-          display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8,
-          fontSize: 11, fontVariantNumeric: "tabular-nums", color: "rgba(255,255,255,0.6)",
-        }}>
-          <span>Total <b style={{ color: "#fff", fontWeight: 700 }}>{fmtN(total)}</b> RMB</span>
-          <span><b style={{ color: "#fff", fontWeight: 700 }}>{fmtN(costConverted)}</b> {curCode}</span>
-        </div>
-
-        {/* Auto-load suggestion — subtle inline pill, only when saved data
-            differs from a field the user already filled (never overwrites). */}
-        {pdSuggestion && (
-          <div style={{
-            display: "flex", alignItems: "center", gap: 6,
-            border: "1px solid rgba(255,255,255,0.12)", background: "rgba(51,133,255,0.08)",
-            borderRadius: 6, padding: "3px 4px 3px 8px",
-          }}>
-            <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#3385FF", flexShrink: 0 }} />
-            <span style={{ flex: 1, minWidth: 0, fontSize: 9, color: "rgba(255,255,255,0.65)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              Product Data available
+        {/* Row 1 — status badge + prominent cost (RMB) */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, minHeight: 22 }}>
+          {badge}
+          {total > 0 && (
+            <span style={{ fontWeight: 800, fontSize: 15, color: "#fff", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
+              ¥{fmtN(total)}
             </span>
-            <button
-              type="button"
-              onClick={applySuggestion}
-              style={{
-                flexShrink: 0, padding: "2px 8px", fontSize: 9, fontWeight: 700, borderRadius: 5,
-                cursor: "pointer", border: "1px solid rgba(51,133,255,0.5)", background: "transparent", color: "#3385FF",
-              }}
-            >Apply</button>
-            <button
-              type="button"
-              onClick={() => setPdSuggestion(null)}
-              aria-label="Dismiss"
-              style={{
-                flexShrink: 0, width: 16, height: 16, borderRadius: 4, cursor: "pointer",
-                border: "none", background: "transparent", color: "rgba(255,255,255,0.45)", fontSize: 12, lineHeight: 1,
-              }}
-            >×</button>
-          </div>
-        )}
-
-        {/* badge + open advanced pricing/save modal */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ flex: 1, minWidth: 0 }}>{badge}</span>
-          <button
-            type="button"
-            onClick={() => setPricingOpen(true)}
-            style={{
-              flexShrink: 0, padding: "6px 12px", fontSize: 11, fontWeight: 700, borderRadius: 7,
-              cursor: "pointer", border: "1px solid rgba(255,255,255,0.22)",
-              background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.9)",
-            }}
-          >Manage Pricing →</button>
+          )}
         </div>
+
+        {/* Row 2 — model (left) + cost-USD or status sub-text (right) */}
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
+          <span style={{
+            fontSize: 11, fontWeight: 600, fontFamily: T.mono, letterSpacing: "0.02em",
+            color: "rgba(255,255,255,0.5)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0,
+          }}>
+            {model || "No model"}
+          </span>
+          <span style={{ flexShrink: 0, fontSize: 10.5, fontVariantNumeric: "tabular-nums" }}>
+            {status === "notfound" ? (
+              <span style={{ color: "rgba(255,255,255,0.5)" }}>No Product Data</span>
+            ) : status === "new" ? (
+              <span style={{ color: "rgba(255,255,255,0.5)" }}>Draft product</span>
+            ) : status === "checking" ? (
+              <span style={{ color: "rgba(255,255,255,0.4)" }}>Checking…</span>
+            ) : total > 0 ? (
+              <span style={{ color: "rgba(255,255,255,0.7)" }}><b style={{ color: "#fff", fontWeight: 700 }}>{fmtN(costConverted)}</b> {curCode}</span>
+            ) : (
+              <span style={{ color: "rgba(255,255,255,0.38)" }}>no cost yet</span>
+            )}
+          </span>
+        </div>
+
+        {/* Row 3 — Manage Pricing (operational workspace). Subtle dot when
+            saved Product Data is available to apply. */}
+        <button
+          type="button"
+          onClick={() => setPricingOpen(true)}
+          style={{
+            width: "100%", padding: "7px 0", fontSize: 11, fontWeight: 700, borderRadius: 7,
+            cursor: "pointer", border: "1px solid rgba(255,255,255,0.22)",
+            background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.9)",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+          }}
+        >
+          {pdSuggestion && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#3385FF" }} />}
+          Manage Pricing →
+        </button>
       </div>
 
       {/* ── Pricing modal (advanced controls) ───────────────────────────── */}
@@ -8925,6 +8900,68 @@ function CostPricePanel({
                   color: "rgba(255,255,255,0.7)", fontSize: 15, lineHeight: 1,
                 }}
               >×</button>
+            </div>
+
+            {/* Auto-load suggestion — saved Product Data differs from a field
+                the user already filled; applying is explicit (never silent). */}
+            {pdSuggestion && (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 10,
+                border: "1px solid rgba(51,133,255,0.4)", background: "rgba(51,133,255,0.10)",
+                borderRadius: 10, padding: "8px 12px",
+              }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#3385FF", flexShrink: 0 }} />
+                <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: "rgba(255,255,255,0.8)" }}>
+                  Product Data found for this model. Apply saved data?
+                </span>
+                <button
+                  type="button"
+                  onClick={applySuggestion}
+                  style={{
+                    flexShrink: 0, padding: "4px 12px", fontSize: 11, fontWeight: 700, borderRadius: 7,
+                    cursor: "pointer", border: "1px solid #3385FF", background: "rgba(51,133,255,0.18)", color: "#3385FF",
+                  }}
+                >Apply</button>
+                <button
+                  type="button"
+                  onClick={() => setPdSuggestion(null)}
+                  aria-label="Dismiss"
+                  style={{
+                    flexShrink: 0, width: 22, height: 22, borderRadius: 6, cursor: "pointer",
+                    border: "1px solid #2D2D2D", background: "transparent", color: "rgba(255,255,255,0.6)", fontSize: 13, lineHeight: 1,
+                  }}
+                >×</button>
+              </div>
+            )}
+
+            {/* Editable inputs — Head Cost (RMB) + Configuration (moved here
+                from the card so the card stays a clean summary). */}
+            <div style={{ display: "flex", gap: 10 }}>
+              <label style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 5 }}>
+                <span style={rowLabel}>Head Cost (RMB)</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={item.costHead ?? ""}
+                  placeholder="0"
+                  onChange={(e) =>
+                    setItemField({ costHead: e.target.value === "" ? undefined : Math.max(0, Number(e.target.value) || 0) })
+                  }
+                  style={{ ...inputCss, fontWeight: 600, textAlign: "right" }}
+                />
+              </label>
+              <label style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 5 }}>
+                <span style={rowLabel}>Configuration</span>
+                <select
+                  value={mode}
+                  onChange={(e) => setItemField({ costMode: e.target.value as "head" | "complete" | "full" })}
+                  style={{ ...inputCss, fontSize: 11, cursor: "pointer" }}
+                >
+                  <option value="head">Head Only</option>
+                  <option value="complete">Complete Set</option>
+                  <option value="full">No Stand Required</option>
+                </select>
+              </label>
             </div>
 
             {/* Cost recap */}
