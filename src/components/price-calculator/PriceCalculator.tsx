@@ -170,7 +170,25 @@ export default function PriceCalculator() {
       const countryAdjusted = initialBase * (1 + country.adjustmentPct);
       const finalBase = countryAdjusted * (1 - discFrac);
       const channelPrices: Record<string, number> = { base: finalBase };
-      for (const rule of custs) channelPrices[rule.id] = channelPrices[rule.rel] * (1 + rule.markupPct);
+      /* Resolve each channel by following its `rel` chain instead of relying on
+         array order. This is robust to any customer ordering, a `rel` that points
+         at a hidden/removed channel, and accidental cycles — each falls back to
+         the base price rather than producing NaN. (The default config lists OEM,
+         whose rel is "agent", BEFORE agent — the old single-pass loop produced
+         NaN for OEM and anything downstream of it.) */
+      const channelById = new Map(custs.map((c) => [c.id, c]));
+      const resolveChannel = (id: string, seen: Set<string> = new Set()): number => {
+        if (id === "base") return finalBase;
+        const cached = channelPrices[id];
+        if (cached !== undefined) return cached;
+        const rule = channelById.get(id);
+        if (!rule || seen.has(id)) return finalBase; // missing rel or cycle → base
+        seen.add(id);
+        const price = resolveChannel(rule.rel, seen) * (1 + rule.markupPct);
+        channelPrices[id] = price;
+        return price;
+      };
+      for (const rule of custs) resolveChannel(rule.id);
       const taxRefundPerUnit = costUsd * taxRate;
       const channelProfits: Record<string, number> = {};
       const channelProfitsWithTax: Record<string, number> = {};
@@ -486,10 +504,10 @@ export default function PriceCalculator() {
                       <tbody className="divide-y divide-[var(--border-subtle)]">
                         {rowOrder.map(row => {
                           let totalTotal = 0, totalProfit = 0, totalProfitTax = 0;
-                          for (const item of result.items) { totalTotal += item.channelPrices[row.id] * item.qty; totalProfit += item.channelProfits[row.id]; totalProfitTax += item.channelProfitsWithTax[row.id]; }
+                          for (const item of result.items) { totalTotal += item.channelPrices[row.id] * item.qty; totalProfit += item.channelProfits[row.id] * item.qty; totalProfitTax += item.channelProfitsWithTax[row.id] * item.qty; }
                           const unitPrice = result.items.length === 1 ? result.items[0].channelPrices[row.id] : result.items.reduce((s, i) => s + i.channelPrices[row.id], 0);
-                          const profit = result.items.length === 1 ? result.items[0].channelProfits[row.id] : totalProfit;
-                          const profitTax = result.items.length === 1 ? result.items[0].channelProfitsWithTax[row.id] : totalProfitTax;
+                          const profit = result.items.length === 1 ? result.items[0].channelProfits[row.id] * result.items[0].qty : totalProfit;
+                          const profitTax = result.items.length === 1 ? result.items[0].channelProfitsWithTax[row.id] * result.items[0].qty : totalProfitTax;
                           const isTarget = row.id === result.customerType;
                           return (
                             <tr key={row.id} className={`transition-colors ${isTarget ? "bg-blue-500/[0.06]" : "hover:bg-[var(--bg-surface-subtle)]"}`}>
@@ -577,8 +595,8 @@ function ChannelTable({ item, result, rows }: { item: ItemResult; result: CalcRe
                 <td className="px-6 py-2 font-medium">{row.name}{isTarget && <span className="ml-2 text-[7px] bg-blue-600 text-white px-1 py-0.5 rounded font-semibold uppercase">Target</span>}</td>
                 <td className="text-right px-4 py-2 font-mono text-[var(--text-highlight)]">${fmt(up)}</td>
                 <td className="text-right px-4 py-2 font-mono text-[var(--text-highlight)]">${fmt(up * item.qty)}</td>
-                <td className={`text-right px-4 py-2 font-mono ${pr >= 0 ? "text-green-400" : "text-red-400"}`}>{pr >= 0 ? "+" : ""}${fmt(pr)}</td>
-                {result.includeTaxRefund && <td className={`text-right px-6 py-2 font-mono ${pt >= 0 ? "text-emerald-400" : "text-red-400"}`}>{pt >= 0 ? "+" : ""}${fmt(pt)}</td>}
+                <td className={`text-right px-4 py-2 font-mono ${pr >= 0 ? "text-green-400" : "text-red-400"}`}>{pr >= 0 ? "+" : ""}${fmt(pr * item.qty)}</td>
+                {result.includeTaxRefund && <td className={`text-right px-6 py-2 font-mono ${pt >= 0 ? "text-emerald-400" : "text-red-400"}`}>{pt >= 0 ? "+" : ""}${fmt(pt * item.qty)}</td>}
               </tr>
             );
           })}
