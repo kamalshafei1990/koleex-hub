@@ -8762,7 +8762,7 @@ function CostPricePanel({
               cursor: "pointer", border: "1px solid rgba(255,255,255,0.22)",
               background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.9)",
             }}
-          >Pricing &amp; Save →</button>
+          >Manage Pricing →</button>
         </div>
       </div>
 
