@@ -8514,6 +8514,12 @@ function DocSettingsCard({
    Stand & table cost is the shared doc-level value (same for every
    machine), editable from the Document settings card.
    ═══════════════════════════════════════════════════════════════════════ */
+
+/* Session cache for Product-Data model lookups (P8). Keyed by lower(model);
+   same tenant for the whole session. Avoids repeat API calls for the same
+   model across rows/re-checks. Invalidated for a model after a Save. */
+const PD_MODEL_CACHE = new Map<string, { found?: boolean; model?: Record<string, unknown> } | null>();
+
 function CostPricePanel({
   item,
   idx,
@@ -8559,23 +8565,81 @@ function CostPricePanel({
         : prev,
     );
 
-  /* ── Product Data link status badge ──────────────────────────────────
+  /* ── Product Data link status + auto-load (P8) ───────────────────────
      Looks up the typed model in THIS tenant (P2 read API). Shows Linked /
-     Not Found; flips to "New Product" right after a create. Read-only. */
+     Not Found (and "New Product" right after a create). When a match is
+     found it AUTO-LOADS saved Head Cost / Description / Photo into EMPTY
+     row fields only; non-empty fields are never overwritten silently —
+     instead a small "Apply saved data?" prompt is offered. Read-only API. */
   type LinkStatus = "idle" | "checking" | "linked" | "notfound" | "new";
   const [status, setStatus] = useState<LinkStatus>("idle");
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [pricingOpen, setPricingOpen] = useState(false);
+  const [pdSuggestion, setPdSuggestion] = useState<
+    { headCostRmb: number | null; description: string | null; photo: string | null } | null
+  >(null);
   const model = (item.model || "").trim();
   /* Base cost converted to the quote currency (before margin / fixed). */
   const costConverted = +(total / (fx || 7.2)).toFixed(2);
 
+  // Latest item snapshot for the debounced lookup (avoids stale closure when
+  // deciding which fields are empty vs already filled).
+  const itemRef = useRef(item);
+  itemRef.current = item;
+
+  // Auto-FILL only fires for USER edits, never on open. The editor hydrates an
+  // existing quote shortly after mount; filling during that window would
+  // silently change a historical quotation. We flip "settled" after a short
+  // delay — model lookups before then update the status badge only. */
+  const mountSettledRef = useRef(false);
+  useEffect(() => {
+    const t = setTimeout(() => { mountSettledRef.current = true; }, 1500);
+    return () => clearTimeout(t);
+  }, []);
+
   useEffect(() => {
     if (status === "new") return; // keep "New Product" until the model text changes
-    if (!model) { setStatus("idle"); return; }
+    if (!model) { setStatus("idle"); setPdSuggestion(null); return; }
     let cancelled = false;
     setStatus("checking");
+    const key = model.toLowerCase();
+
+    // Apply a found result: fill empty fields, flag conflicts for the prompt.
+    const apply = (j: { found?: boolean; model?: Record<string, unknown> } | null) => {
+      if (cancelled) return;
+      if (!j || !j.found) { setStatus("notfound"); setPdSuggestion(null); return; }
+      setStatus("linked");
+      // Status badge updates on open; auto-fill waits for the settle window so
+      // an opening (existing) quotation is never silently modified.
+      if (!mountSettledRef.current) return;
+      const m = j.model || {};
+      const cur = itemRef.current;
+      const savedCost = m.headCostRmb == null ? null : Number(m.headCostRmb);
+      const savedDesc = typeof m.description === "string" ? m.description : null;
+      const savedPhoto = typeof m.photo === "string" ? m.photo : null;
+      const patch: Partial<QuotationItem> = {};
+      let conflict = false;
+      if (savedCost != null) {
+        if (cur.costHead == null) patch.costHead = savedCost;
+        else if (Number(cur.costHead) !== savedCost) conflict = true;
+      }
+      if (savedDesc) {
+        if (!(cur.description || "").trim()) patch.description = savedDesc;
+        else if ((cur.description || "").trim() !== savedDesc.trim()) conflict = true;
+      }
+      if (savedPhoto) {
+        if (!(cur.image || "").trim()) patch.image = savedPhoto;
+        else if (cur.image !== savedPhoto) conflict = true;
+      }
+      if (Object.keys(patch).length) setItemField(patch);
+      setPdSuggestion(conflict ? { headCostRmb: savedCost, description: savedDesc, photo: savedPhoto } : null);
+    };
+
+    // Session cache — skip the network call for models already looked up.
+    const cached = PD_MODEL_CACHE.get(key);
+    if (cached) { apply(cached); return () => { cancelled = true; }; }
+
     const t = setTimeout(async () => {
       try {
         const res = await fetch(`/api/products/model-by-number?model=${encodeURIComponent(model)}`, {
@@ -8584,7 +8648,8 @@ function CostPricePanel({
         if (cancelled) return;
         if (!res.ok) { setStatus("idle"); return; }
         const j = await res.json();
-        setStatus(j?.found ? "linked" : "notfound");
+        PD_MODEL_CACHE.set(key, j);
+        apply(j);
       } catch {
         if (!cancelled) setStatus("idle");
       }
@@ -8592,6 +8657,18 @@ function CostPricePanel({
     return () => { cancelled = true; clearTimeout(t); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [model]);
+
+  /* Apply the offered saved data over the user's current values (explicit). */
+  const applySuggestion = () => {
+    const s = pdSuggestion;
+    if (!s) return;
+    const patch: Partial<QuotationItem> = {};
+    if (s.headCostRmb != null) patch.costHead = s.headCostRmb;
+    if (s.description) patch.description = s.description;
+    if (s.photo) patch.image = s.photo;
+    setItemField(patch);
+    setPdSuggestion(null);
+  };
 
   const applyPrice = () => setItemField({ unitPrice: resultPrice });
 
@@ -8626,6 +8703,10 @@ function CostPricePanel({
         return;
       }
       if (!res.ok) { setSaveMsg(j?.error || "Save failed."); setSaving(false); return; }
+      // The model's saved data just changed — drop its cached lookup so any
+      // later auto-load reflects the new/updated product.
+      PD_MODEL_CACHE.delete(model.toLowerCase());
+      setPdSuggestion(null);
       if (j?.status === "new") { setStatus("new"); setSaveMsg("New draft product created."); }
       else { setStatus("linked"); setSaveMsg(j?.changed ? "Cost saved to Product Data." : "Already up to date."); }
     } catch {
@@ -8750,6 +8831,38 @@ function CostPricePanel({
           <span>· Total <b style={{ color: "#fff", fontWeight: 700 }}>{fmtN(total)}</b> RMB</span>
           <span>· <b style={{ color: "#fff", fontWeight: 700 }}>{fmtN(costConverted)}</b> {curCode}</span>
         </div>
+
+        {/* Auto-load suggestion (only when saved data differs from a field the
+            user already filled — never overwrites silently). */}
+        {pdSuggestion && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8,
+            border: "1px solid rgba(255,204,0,0.4)", background: "rgba(255,204,0,0.10)",
+            borderRadius: 7, padding: "5px 8px",
+          }}>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 9.5, color: "rgba(255,255,255,0.8)", lineHeight: 1.35 }}>
+              Product Data found. Apply saved data?
+            </span>
+            <button
+              type="button"
+              onClick={applySuggestion}
+              style={{
+                flexShrink: 0, padding: "3px 10px", fontSize: 9.5, fontWeight: 700, borderRadius: 6,
+                cursor: "pointer", border: "1px solid #FFCC00", background: "rgba(255,204,0,0.18)", color: "#FFCC00",
+              }}
+            >Apply</button>
+            <button
+              type="button"
+              onClick={() => setPdSuggestion(null)}
+              aria-label="Dismiss"
+              style={{
+                flexShrink: 0, width: 20, height: 20, borderRadius: 5, cursor: "pointer",
+                border: "1px solid #2D2D2D", background: "transparent", color: "rgba(255,255,255,0.6)",
+                fontSize: 12, lineHeight: 1,
+              }}
+            >×</button>
+          </div>
+        )}
 
         {/* badge + open advanced pricing/save modal */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
