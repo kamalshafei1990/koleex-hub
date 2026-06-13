@@ -8626,7 +8626,7 @@ function PricingSettingsCard({
         type="button"
         onClick={() => setGlobal({ defaultPricingMethod: m })}
         style={{
-          flex: 1, padding: "5px 0", fontSize: 10, fontWeight: 700, borderRadius: 6, cursor: "pointer",
+          flex: 1, padding: "4px 0", fontSize: 9.5, fontWeight: 700, borderRadius: 6, cursor: "pointer",
           border: on ? "1px solid rgba(255,255,255,0.85)" : "1px solid #2D2D2D",
           background: on ? "rgba(255,255,255,0.12)" : "transparent",
           color: on ? "#fff" : "rgba(255,255,255,0.55)",
@@ -8640,15 +8640,15 @@ function PricingSettingsCard({
       style={{
         boxSizing: "border-box", background: "#1A1A1A",
         border: "1px solid #2D2D2D", borderRadius: 10, padding: 10,
-        display: "flex", flexDirection: "column", gap: 8,
+        display: "flex", flexDirection: "column", gap: 7,
         boxShadow: "0 6px 20px rgba(0,0,0,0.45)",
       }}
     >
       <div style={labelCss}>Pricing settings</div>
 
-      <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <label style={{ display: "flex", flexDirection: "column", gap: 3 }}>
         <span style={{ ...labelCss, color: "rgba(255,255,255,0.38)" }}>Pricing method</span>
-        <div style={{ display: "flex", gap: 6 }}>
+        <div style={{ display: "flex", gap: 5 }}>
           {methodBtn("margin", "Margin %")}
           {methodBtn("fixed", `Fixed ${cur}`)}
         </div>
@@ -8656,7 +8656,7 @@ function PricingSettingsCard({
 
       <label style={{ display: "flex", flexDirection: "column", gap: 3 }}>
         <span style={{ ...labelCss, color: "rgba(255,255,255,0.38)" }}>
-          {method === "margin" ? "Global margin (%)" : `Global fixed value (${cur})`}
+          {method === "margin" ? "Global margin (%)" : `Global fixed (${cur})`}
         </span>
         <input
           type="number"
@@ -8666,7 +8666,7 @@ function PricingSettingsCard({
           onChange={(e) =>
             setGlobal({ defaultPricingValue: e.target.value === "" ? undefined : Math.max(0, Number(e.target.value) || 0) })
           }
-          style={fieldCss}
+          style={{ ...fieldCss, padding: "5px 8px" }}
         />
       </label>
 
@@ -8674,7 +8674,7 @@ function PricingSettingsCard({
         type="button"
         onClick={applyToAll}
         style={{
-          width: "100%", padding: "8px 0", fontSize: 11, fontWeight: 700, borderRadius: 8,
+          width: "100%", padding: "6px 0", fontSize: 10.5, fontWeight: 700, borderRadius: 7,
           cursor: "pointer", border: "1px solid #fff", background: "#fff", color: "#0D0D0D",
         }}
       >Apply To All Products</button>
@@ -8685,15 +8685,15 @@ function PricingSettingsCard({
         disabled={overrideCount === 0}
         title={overrideCount === 0 ? "No product overrides to clear" : `Clear ${overrideCount} override(s)`}
         style={{
-          width: "100%", padding: "7px 0", fontSize: 11, fontWeight: 600, borderRadius: 8,
+          width: "100%", padding: "5px 0", fontSize: 10.5, fontWeight: 600, borderRadius: 7,
           cursor: overrideCount === 0 ? "not-allowed" : "pointer",
           border: "1px solid #2D2D2D", background: "transparent",
           color: overrideCount === 0 ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.8)",
         }}
-      >Clear Product Overrides{overrideCount ? ` (${overrideCount})` : ""}</button>
+      >Clear Overrides{overrideCount ? ` (${overrideCount})` : ""}</button>
 
-      <span style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", lineHeight: 1.45 }}>
-        Applies to products without a custom price. Product-level pricing always wins.
+      <span style={{ fontSize: 8.5, color: "rgba(255,255,255,0.35)", lineHeight: 1.4 }}>
+        Applies to products without a custom price.
       </span>
     </div>
   );
