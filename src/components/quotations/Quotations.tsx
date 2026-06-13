@@ -674,9 +674,18 @@ export const PRINT_AND_DOC_STYLES = `
    text — the .quot-a4-doc input rule above otherwise forces them black
    and they become invisible on the dark card. */
 .quot-a4-doc .pq-gutter-card input,
-.quot-a4-doc .pq-gutter-card select {
+.quot-a4-doc .pq-gutter-card select,
+.pq-cost-modal input,
+.pq-cost-modal select {
   color: rgba(255, 255, 255, 0.92) !important;
   -webkit-text-fill-color: rgba(255, 255, 255, 0.92) !important;
+}
+/* The pricing modal renders as a fixed overlay; its inputs need the same
+   white-on-dark text as the gutter cards (the .quot-a4-doc input rule above
+   otherwise forces them black and invisible on the dark modal). */
+.pq-cost-modal input::placeholder {
+  color: rgba(255, 255, 255, 0.40) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.40) !important;
 }
 /* Cost Management card width — wider on desktop for a roomier Head Cost
    input + Configuration dropdown; a touch narrower on tablet. Height stays

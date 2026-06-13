@@ -8769,7 +8769,7 @@ function CostPricePanel({
       {/* ── Pricing modal (advanced controls) ───────────────────────────── */}
       {pricingOpen && (
         <div
-          className="no-print"
+          className="no-print pq-cost-modal"
           onClick={() => setPricingOpen(false)}
           style={{
             position: "fixed", inset: 0, zIndex: 9999, display: "flex",
