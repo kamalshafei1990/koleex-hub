@@ -59,6 +59,9 @@ export interface QuotationItem {
      stand & table cost) | "full" (full machine — no stand needed). */
   costHead?: number;
   costMode?: "head" | "complete" | "full";
+  /* INTERNAL selling-price automation (editor only). See Quotations.tsx. */
+  sellMethod?: "margin" | "fixed";
+  sellValue?: number;
 }
 
 export interface Quotation {
@@ -1226,6 +1229,9 @@ export default function QuotationA4Preview({
                       idx={idx}
                       standTablePrice={Number(current.standTablePrice) || 0}
                       curSym={curSym}
+                      fxRate={Number(current.fxRate) || 7.2}
+                      curCode={cur}
+                      quotationId={current.id}
                       setCurrent={setCurrent}
                     />
                   </Td>
@@ -8513,19 +8519,38 @@ function CostPricePanel({
   idx,
   standTablePrice,
   curSym,
+  fxRate,
+  curCode,
+  quotationId,
   setCurrent,
 }: {
   item: QuotationItem;
   idx: number;
   standTablePrice: number;
   curSym: string;
+  fxRate: number;
+  curCode: string;
+  quotationId: string;
   setCurrent: Dispatch<SetStateAction<Quotation | null>>;
 }) {
   const mode = item.costMode ?? "head";
   const head = Number(item.costHead) || 0;
+  /* Calculated COST in RMB: head, head + Stand&Table (complete), or head
+     (no stand). Stand & Table is NEVER folded into the stored Head Cost. */
   const total = mode === "complete" ? head + standTablePrice : head;
-  const fmtN = (n: number) =>
-    n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  const fx = fxRate > 0 ? fxRate : 7.2;
+  const sellMethod = item.sellMethod ?? "margin";
+  const sellValue = Number(item.sellValue) || 0;
+  /* Selling price in the quote currency (USD by FX). Margin: cost grown by
+     % then converted. Fixed: cost converted then a flat amount added. */
+  const resultPrice =
+    total > 0 || sellValue > 0
+      ? sellMethod === "margin"
+        ? +((total * (1 + sellValue / 100)) / fx).toFixed(2)
+        : +(total / fx + sellValue).toFixed(2)
+      : 0;
+
+  const fmtN = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 
   const setItemField = (patch: Partial<QuotationItem>) =>
     setCurrent((prev) =>
@@ -8533,6 +8558,79 @@ function CostPricePanel({
         ? { ...prev, items: prev.items.map((it, i) => (i === idx ? { ...it, ...patch } : it)) }
         : prev,
     );
+
+  /* ── Product Data link status badge ──────────────────────────────────
+     Looks up the typed model in THIS tenant (P2 read API). Shows Linked /
+     Not Found; flips to "New Product" right after a create. Read-only. */
+  type LinkStatus = "idle" | "checking" | "linked" | "notfound" | "new";
+  const [status, setStatus] = useState<LinkStatus>("idle");
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const model = (item.model || "").trim();
+
+  useEffect(() => {
+    if (status === "new") return; // keep "New Product" until the model text changes
+    if (!model) { setStatus("idle"); return; }
+    let cancelled = false;
+    setStatus("checking");
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/products/model-by-number?model=${encodeURIComponent(model)}`, {
+          credentials: "include",
+        });
+        if (cancelled) return;
+        if (!res.ok) { setStatus("idle"); return; }
+        const j = await res.json();
+        setStatus(j?.found ? "linked" : "notfound");
+      } catch {
+        if (!cancelled) setStatus("idle");
+      }
+    }, 400);
+    return () => { cancelled = true; clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [model]);
+
+  const applyPrice = () => setItemField({ unitPrice: resultPrice });
+
+  const saveCost = async (overwrite = false) => {
+    if (!model) { setSaveMsg("Enter a model number first."); return; }
+    if (head <= 0) { setSaveMsg("Enter the Head Cost first."); return; }
+    setSaving(true);
+    setSaveMsg(null);
+    try {
+      const res = await fetch("/api/products/save-cost-from-quotation", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model,
+          headCostRmb: head, // HEAD COST ONLY — never the complete-set figure
+          description: item.description || undefined,
+          photo: item.image || undefined,
+          productName: item.description || model,
+          quotationId,
+          overwrite,
+        }),
+      });
+      const j = await res.json().catch(() => null);
+      if (res.ok && j?.status === "needs_confirm") {
+        const ok = window.confirm(
+          `This model already has a saved Head Cost of ${fmtN(Number(j.currentCost))} RMB.\nOverwrite it with ${fmtN(head)} RMB?`,
+        );
+        setSaving(false);
+        if (ok) return saveCost(true);
+        setSaveMsg("Kept the existing cost.");
+        return;
+      }
+      if (!res.ok) { setSaveMsg(j?.error || "Save failed."); setSaving(false); return; }
+      if (j?.status === "new") { setStatus("new"); setSaveMsg("New draft product created."); }
+      else { setStatus("linked"); setSaveMsg(j?.changed ? "Cost saved to Product Data." : "Already up to date."); }
+    } catch {
+      setSaveMsg("Network error.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const micro: React.CSSProperties = {
     fontSize: 9, fontWeight: 600, letterSpacing: "0.08em",
@@ -8542,38 +8640,81 @@ function CostPricePanel({
     fontSize: 9.5, fontWeight: 600, letterSpacing: "0.04em",
     textTransform: "uppercase", color: "rgba(255,255,255,0.4)", flexShrink: 0,
   };
+  const inputCss: React.CSSProperties = {
+    flex: 1, minWidth: 0, boxSizing: "border-box", background: "#111",
+    border: "1px solid #2D2D2D", borderRadius: 7, padding: "6px 9px",
+    color: "rgba(255,255,255,0.92)", fontSize: 12, outline: "none",
+    fontVariantNumeric: "tabular-nums",
+  };
+
+  const badge = (() => {
+    const map: Record<LinkStatus, { t: string; c: string; bg: string } | null> = {
+      idle: null,
+      checking: { t: "Checking…", c: "rgba(255,255,255,0.5)", bg: "rgba(255,255,255,0.06)" },
+      linked: { t: "Linked", c: "#00CC66", bg: "rgba(0,204,102,0.12)" },
+      notfound: { t: "Not Found", c: "#FFCC00", bg: "rgba(255,204,0,0.12)" },
+      new: { t: "New Product", c: "#3385FF", bg: "rgba(51,133,255,0.14)" },
+    };
+    const b = map[status];
+    if (!b) return null;
+    return (
+      <span style={{
+        fontSize: 8.5, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase",
+        color: b.c, background: b.bg, borderRadius: 5, padding: "2px 6px", whiteSpace: "nowrap",
+      }}>{b.t}</span>
+    );
+  })();
+
+  const sellBtn = (m: "margin" | "fixed", label: string) => {
+    const on = sellMethod === m;
+    return (
+      <button
+        type="button"
+        onClick={() => setItemField({ sellMethod: m })}
+        style={{
+          flex: 1, padding: "5px 0", fontSize: 10, fontWeight: 600, borderRadius: 6, cursor: "pointer",
+          border: on ? "1px solid rgba(255,255,255,0.85)" : "1px solid #2D2D2D",
+          background: on ? "rgba(255,255,255,0.12)" : "transparent",
+          color: on ? "#fff" : "rgba(255,255,255,0.55)",
+        }}
+      >{label}</button>
+    );
+  };
 
   return (
     <div
-      className="no-print pq-row-note pq-gutter-card"
+      className="no-print pq-row-note pq-gutter-card pq-cost-card"
       style={{
-        /* Vertically centred on its row, same as the right-side Internal-note
-           panel. Kept compact (≈ one row tall, ~95px) so adjacent rows' panels
-           never overlap. `right: calc(100% + 46px)` aligns the gutter column.
-           The calculated cost lives in the header row to save vertical space. */
+        /* Vertically centred on its row. RESTING height ≈ one row (header +
+           head + config); the Selling-price/Save block (.cost-expand) only
+           unfurls on hover/focus so adjacent rows never overlap at rest.
+           Width comes from .pq-cost-card (300 desktop / 264 tablet). */
         position: "absolute", top: "50%", transform: "translateY(-50%)",
-        right: "calc(100% + 46px)", width: 210,
+        right: "calc(100% + 46px)", width: 300,
         boxSizing: "border-box",
         background: "#1A1A1A", border: "1px solid #2D2D2D",
-        borderRadius: 10, padding: "9px 11px", display: "flex",
-        flexDirection: "column", gap: 7, textAlign: "left",
+        borderRadius: 10, padding: "10px 12px", display: "flex",
+        flexDirection: "column", gap: 8, textAlign: "left",
         boxShadow: "0 6px 20px rgba(0,0,0,0.45)",
       }}
     >
-      {/* Header: title + live calculated cost */}
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 6 }}>
-        <span style={micro}>Cost management</span>
+      {/* Header: title + status badge + live calculated cost */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+          <span style={micro}>Cost management</span>
+          {badge}
+        </span>
         <span
-          title="Calculated cost"
-          style={{ fontWeight: 700, fontSize: 12, color: "rgba(255,255,255,0.95)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}
+          title="Calculated cost (RMB)"
+          style={{ fontWeight: 700, fontSize: 12.5, color: "rgba(255,255,255,0.95)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}
         >
           {fmtN(total)} RMB
         </span>
       </div>
 
-      {/* Head Cost (RMB) — inline label + input */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ ...rowLabel, width: 78 }}>Head Cost (RMB)</span>
+      {/* Head Cost (RMB) */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ ...rowLabel, width: 92 }}>Head Cost (RMB)</span>
         <input
           type="number"
           min={0}
@@ -8582,32 +8723,83 @@ function CostPricePanel({
           onChange={(e) =>
             setItemField({ costHead: e.target.value === "" ? undefined : Math.max(0, Number(e.target.value) || 0) })
           }
-          style={{
-            flex: 1, minWidth: 0, boxSizing: "border-box", background: "#111",
-            border: "1px solid #2D2D2D", borderRadius: 7, padding: "5px 8px",
-            color: "rgba(255,255,255,0.92)", fontSize: 12, fontWeight: 600,
-            outline: "none", fontVariantNumeric: "tabular-nums", textAlign: "right",
-          }}
+          style={{ ...inputCss, fontWeight: 600, textAlign: "right" }}
         />
       </div>
 
-      {/* Configuration — dropdown keeps the full "No Stand Required" label
-          while staying one line tall. costMode value is unchanged. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ ...rowLabel, width: 78 }}>Configuration</span>
+      {/* Configuration */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ ...rowLabel, width: 92 }}>Configuration</span>
         <select
           value={mode}
           onChange={(e) => setItemField({ costMode: e.target.value as "head" | "complete" | "full" })}
-          style={{
-            flex: 1, minWidth: 0, boxSizing: "border-box", background: "#111",
-            border: "1px solid #2D2D2D", borderRadius: 7, padding: "5px 8px",
-            color: "rgba(255,255,255,0.92)", fontSize: 11, outline: "none", cursor: "pointer",
-          }}
+          style={{ ...inputCss, fontSize: 11, cursor: "pointer" }}
         >
           <option value="head">Head Only</option>
           <option value="complete">Complete Set</option>
           <option value="full">No Stand Required</option>
         </select>
+      </div>
+
+      {/* Selling price + Save — revealed on focus/hover (.cost-expand) */}
+      <div className="cost-expand" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ borderTop: "1px solid #2D2D2D", paddingTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <span style={micro}>Selling price</span>
+            <span style={{ fontSize: 9, color: "rgba(255,255,255,0.4)" }}>FX {fmtN(fx)}</span>
+          </div>
+          {/* Method */}
+          <div style={{ display: "flex", gap: 6 }}>
+            {sellBtn("margin", "Margin %")}
+            {sellBtn("fixed", "Fixed Value")}
+          </div>
+          {/* Value + Result */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ ...rowLabel, width: 92 }}>{sellMethod === "margin" ? "Margin (%)" : `Fixed (${curCode})`}</span>
+            <input
+              type="number"
+              min={0}
+              value={item.sellValue ?? ""}
+              placeholder="0"
+              onChange={(e) =>
+                setItemField({ sellValue: e.target.value === "" ? undefined : Math.max(0, Number(e.target.value) || 0) })
+              }
+              style={{ ...inputCss, textAlign: "right" }}
+            />
+          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={micro}>Result price</span>
+            <span style={{ fontWeight: 700, fontSize: 13, color: "#fff", fontVariantNumeric: "tabular-nums" }}>
+              {fmtN(resultPrice)} {curSym}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={applyPrice}
+            style={{
+              width: "100%", padding: "7px 0", fontSize: 11, fontWeight: 700, borderRadius: 7,
+              cursor: "pointer", border: "1px solid rgba(255,255,255,0.9)",
+              background: "rgba(255,255,255,0.92)", color: "#000",
+            }}
+          >Apply Price → Unit Price</button>
+        </div>
+
+        {/* Save Cost to Product Data */}
+        <div style={{ borderTop: "1px solid #2D2D2D", paddingTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => saveCost(false)}
+            style={{
+              width: "100%", padding: "7px 0", fontSize: 11, fontWeight: 700, borderRadius: 7,
+              cursor: saving ? "default" : "pointer", border: "1px solid #2D2D2D",
+              background: "transparent", color: "rgba(255,255,255,0.85)", opacity: saving ? 0.6 : 1,
+            }}
+          >{saving ? "Saving…" : "Save Cost to Product Data"}</button>
+          {saveMsg && (
+            <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", lineHeight: 1.4 }}>{saveMsg}</span>
+          )}
+        </div>
       </div>
     </div>
   );
