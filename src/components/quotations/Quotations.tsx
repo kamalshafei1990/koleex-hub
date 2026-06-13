@@ -212,6 +212,11 @@ export interface Quotation {
      rows fetched in the list view. Use this for the per-row badge
      and the TOTAL VALUE KPI tile. Undefined for unsaved drafts. */
   serverTotal?: number;
+  /* Quotation-level DEFAULT pricing (global). Applied by "Apply To All" to
+     rows WITHOUT a product-level override (item.sellMethod). Persists in doc;
+     missing = margin / 0 (old quotes unaffected). */
+  defaultPricingMethod?: "margin" | "fixed";
+  defaultPricingValue?: number;
   /* Optimistic-lock revision the editor loaded this row at. Sent back as
      base_version on save; the server rejects (409) if the DB moved past it.
      Undefined for never-saved local drafts (treated as no-guard). */
@@ -328,6 +333,8 @@ export function fromRow(row: RemoteDocRow): Quotation {
     currency: doc.currency ?? ((row as { currency?: string | null }).currency || "USD"),
     standTablePrice: Number(doc.standTablePrice ?? 0),
     fxRate: typeof doc.fxRate === "number" ? doc.fxRate : undefined,
+    defaultPricingMethod: doc.defaultPricingMethod === "fixed" ? "fixed" : doc.defaultPricingMethod === "margin" ? "margin" : undefined,
+    defaultPricingValue: typeof doc.defaultPricingValue === "number" ? doc.defaultPricingValue : undefined,
     terms: doc.terms ?? DEFAULT_TERMS,
     stampUrl: doc.stampUrl,
     signatureUrl: doc.signatureUrl,

@@ -102,6 +102,12 @@ export interface Quotation {
      cost panel's price math. Per-quotation (old quotes unaffected); missing
      = 7.20 default. Editor gutter only — never printed. */
   fxRate?: number;
+  /* INTERNAL: quotation-level DEFAULT pricing, applied to rows that have no
+     product-level override (item.sellMethod). "Apply To All" computes unit
+     prices from this; a row's own sellMethod/sellValue always wins. Optional
+     for back-compat (missing = margin / 0). Editor gutter only — never printed. */
+  defaultPricingMethod?: "margin" | "fixed";
+  defaultPricingValue?: number;
   terms: string;
   /* Same enum as the parent's Quotation type (Quotations.tsx). The
      preview doesn't itself dispatch transitions — it only reads
@@ -569,7 +575,19 @@ export default function QuotationA4Preview({
       <div className="quot-doc-inner">
 
         {isFirstPage && (
-          <DocSettingsCard current={current} setCurrent={setCurrent} />
+          /* Left-gutter settings column — Document settings + Pricing settings
+             stacked. 17px offset keeps the column's left edge aligned with the
+             per-row Cost cards below it. */
+          <div
+            className="no-print pq-gutter-card"
+            style={{
+              position: "absolute", top: 24, right: "calc(100% + 17px)", width: 200,
+              display: "flex", flexDirection: "column", gap: 10, zIndex: 5,
+            }}
+          >
+            <DocSettingsCard current={current} setCurrent={setCurrent} />
+            <PricingSettingsCard current={current} setCurrent={setCurrent} />
+          </div>
         )}
 
         {isFirstPage && (<>
@@ -1233,6 +1251,8 @@ export default function QuotationA4Preview({
                       curCode={cur}
                       quotationId={current.id}
                       setCurrent={setCurrent}
+                      globalMethod={current.defaultPricingMethod}
+                      globalValue={current.defaultPricingValue}
                     />
                   </Td>
                   <Td>
@@ -8438,17 +8458,11 @@ function DocSettingsCard({
   };
   return (
     <div
-      className="no-print pq-gutter-card"
       style={{
-        /* 17px (not 46) because this card anchors to the A4 page edge,
-           whereas the per-row Cost cards anchor to the table cell that
-           sits ~28px inside the page's padding — 46 − 28 ≈ 17 keeps this
-           card's left edge in the SAME column as the Cost cards below. */
-        position: "absolute", top: 24, right: "calc(100% + 17px)", width: 200,
         boxSizing: "border-box", background: "#1A1A1A",
         border: "1px solid #2D2D2D", borderRadius: 10, padding: 10,
         display: "flex", flexDirection: "column", gap: 8,
-        boxShadow: "0 6px 20px rgba(0,0,0,0.45)", zIndex: 5,
+        boxShadow: "0 6px 20px rgba(0,0,0,0.45)",
       }}
     >
       <div style={labelCss}>Document settings</div>
@@ -8506,6 +8520,186 @@ function DocSettingsCard({
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
+   PRICING SETTINGS — quotation-level GLOBAL default pricing. Lets the user
+   price 20–100 rows in one click instead of opening each product. A product
+   with its own override (item.sellMethod) is NEVER touched by "Apply To All"
+   — product-level pricing always wins. "Clear Product Overrides" removes all
+   per-row overrides (pricing only — no product data) so every row falls back
+   to the global default. Gutter card, internal-only (.no-print).
+   ═══════════════════════════════════════════════════════════════════════ */
+function PricingSettingsCard({
+  current,
+  setCurrent,
+}: {
+  current: Quotation;
+  setCurrent: Dispatch<SetStateAction<Quotation | null>>;
+}) {
+  const labelCss: React.CSSProperties = {
+    fontSize: 9, fontWeight: 600, letterSpacing: "0.08em",
+    textTransform: "uppercase", color: "rgba(255,255,255,0.5)",
+  };
+  const fieldCss: React.CSSProperties = {
+    width: "100%", boxSizing: "border-box", background: "#111",
+    border: "1px solid #2D2D2D", borderRadius: 7, padding: "6px 8px",
+    color: "rgba(255,255,255,0.9)", fontSize: 11, outline: "none",
+  };
+  const method: "margin" | "fixed" = current.defaultPricingMethod === "fixed" ? "fixed" : "margin";
+  const value = Number(current.defaultPricingValue) || 0;
+  const cur = (current.currency || "USD").toUpperCase();
+  const fx = (Number(current.fxRate) || 7.2) > 0 ? (Number(current.fxRate) || 7.2) : 7.2;
+  const stp = Number(current.standTablePrice) || 0;
+
+  /* Selling price (quote currency) for one item under a given method/value.
+     Returns undefined when the row has nothing to price (no cost, no value)
+     so "Apply To All" leaves blank rows untouched. Mirrors CostPricePanel. */
+  const priceFor = (it: QuotationItem, mth: "margin" | "fixed", val: number): number | undefined => {
+    const mode = it.costMode ?? "head";
+    const head = Number(it.costHead) || 0;
+    const total = mode === "complete" ? head + stp : head;
+    if (!(total > 0 || val > 0)) return undefined;
+    return mth === "margin"
+      ? +((total * (1 + val / 100)) / fx).toFixed(2)
+      : +(total / fx + val).toFixed(2);
+  };
+
+  const isProductRow = (it: QuotationItem) => it.kind !== "header";
+  /* A row has a product-level override when it carries its own method OR value. */
+  const isOverridden = (it: QuotationItem) => it.sellMethod != null || it.sellValue != null;
+
+  const setGlobal = (patch: Partial<Pick<Quotation, "defaultPricingMethod" | "defaultPricingValue">>) =>
+    setCurrent((prev) => (prev ? { ...prev, ...patch } : prev));
+
+  /* Apply the GLOBAL price to every product row that has NO override. Rows
+     with a custom override (it.sellMethod != null) are left exactly as-is. */
+  const applyToAll = () => {
+    setCurrent((prev) => {
+      if (!prev) return prev;
+      const eligible = prev.items.filter((it) => isProductRow(it) && !isOverridden(it));
+      const willPrice = eligible.filter((it) => priceFor(it, method, value) !== undefined).length;
+      const overrides = prev.items.filter((it) => isProductRow(it) && isOverridden(it)).length;
+      if (typeof window !== "undefined") {
+        const ok = window.confirm(
+          `Apply global ${method === "margin" ? `${value}% margin` : `${value} ${cur} fixed`} to ${willPrice} product${willPrice === 1 ? "" : "s"}?` +
+          (overrides ? `\n\n${overrides} product${overrides === 1 ? "" : "s"} with a custom override will be left unchanged.` : "") +
+          `\n\nThis overwrites the Unit Price on those rows.`,
+        );
+        if (!ok) return prev;
+      }
+      const items = prev.items.map((it) => {
+        if (!isProductRow(it) || isOverridden(it)) return it; // header or override → untouched
+        const p = priceFor(it, method, value);
+        return p === undefined ? it : { ...it, unitPrice: p };
+      });
+      return { ...prev, defaultPricingMethod: method, defaultPricingValue: value, items };
+    });
+  };
+
+  /* Remove every per-row pricing override (sellMethod/sellValue only — no
+     product data) and re-price all rows to the global default. */
+  const clearOverrides = () => {
+    setCurrent((prev) => {
+      if (!prev) return prev;
+      const overrides = prev.items.filter((it) => isProductRow(it) && isOverridden(it)).length;
+      if (typeof window !== "undefined") {
+        const ok = window.confirm(
+          `Clear ${overrides} product pricing override${overrides === 1 ? "" : "s"} and return every product to the global default?` +
+          `\n\nOnly pricing overrides are removed — no product data is deleted.`,
+        );
+        if (!ok) return prev;
+      }
+      const items = prev.items.map((it) => {
+        if (!isProductRow(it)) return it;
+        const cleared = { ...it, sellMethod: undefined, sellValue: undefined };
+        const p = priceFor(cleared, method, value);
+        return p === undefined ? cleared : { ...cleared, unitPrice: p };
+      });
+      return { ...prev, defaultPricingMethod: method, defaultPricingValue: value, items };
+    });
+  };
+
+  const overrideCount = current.items.filter((it) => isProductRow(it) && isOverridden(it)).length;
+
+  const methodBtn = (m: "margin" | "fixed", label: string) => {
+    const on = method === m;
+    return (
+      <button
+        type="button"
+        onClick={() => setGlobal({ defaultPricingMethod: m })}
+        style={{
+          flex: 1, padding: "5px 0", fontSize: 10, fontWeight: 700, borderRadius: 6, cursor: "pointer",
+          border: on ? "1px solid rgba(255,255,255,0.85)" : "1px solid #2D2D2D",
+          background: on ? "rgba(255,255,255,0.12)" : "transparent",
+          color: on ? "#fff" : "rgba(255,255,255,0.55)",
+        }}
+      >{label}</button>
+    );
+  };
+
+  return (
+    <div
+      style={{
+        boxSizing: "border-box", background: "#1A1A1A",
+        border: "1px solid #2D2D2D", borderRadius: 10, padding: 10,
+        display: "flex", flexDirection: "column", gap: 8,
+        boxShadow: "0 6px 20px rgba(0,0,0,0.45)",
+      }}
+    >
+      <div style={labelCss}>Pricing settings</div>
+
+      <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <span style={{ ...labelCss, color: "rgba(255,255,255,0.38)" }}>Pricing method</span>
+        <div style={{ display: "flex", gap: 6 }}>
+          {methodBtn("margin", "Margin %")}
+          {methodBtn("fixed", `Fixed ${cur}`)}
+        </div>
+      </label>
+
+      <label style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+        <span style={{ ...labelCss, color: "rgba(255,255,255,0.38)" }}>
+          {method === "margin" ? "Global margin (%)" : `Global fixed value (${cur})`}
+        </span>
+        <input
+          type="number"
+          min={0}
+          value={current.defaultPricingValue ?? ""}
+          placeholder="0"
+          onChange={(e) =>
+            setGlobal({ defaultPricingValue: e.target.value === "" ? undefined : Math.max(0, Number(e.target.value) || 0) })
+          }
+          style={fieldCss}
+        />
+      </label>
+
+      <button
+        type="button"
+        onClick={applyToAll}
+        style={{
+          width: "100%", padding: "8px 0", fontSize: 11, fontWeight: 700, borderRadius: 8,
+          cursor: "pointer", border: "1px solid #fff", background: "#fff", color: "#0D0D0D",
+        }}
+      >Apply To All Products</button>
+
+      <button
+        type="button"
+        onClick={clearOverrides}
+        disabled={overrideCount === 0}
+        title={overrideCount === 0 ? "No product overrides to clear" : `Clear ${overrideCount} override(s)`}
+        style={{
+          width: "100%", padding: "7px 0", fontSize: 11, fontWeight: 600, borderRadius: 8,
+          cursor: overrideCount === 0 ? "not-allowed" : "pointer",
+          border: "1px solid #2D2D2D", background: "transparent",
+          color: overrideCount === 0 ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.8)",
+        }}
+      >Clear Product Overrides{overrideCount ? ` (${overrideCount})` : ""}</button>
+
+      <span style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", lineHeight: 1.45 }}>
+        Applies to products without a custom price. Product-level pricing always wins.
+      </span>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
    COST PRICE PANEL — left-gutter twin of the Internal-note panel. Tracks
    the SUPPLIER cost for one line, internal-only (.no-print + outside A4):
      · Head     — cost of the machine head alone (the price we quote)
@@ -8529,6 +8723,8 @@ function CostPricePanel({
   curCode,
   quotationId,
   setCurrent,
+  globalMethod,
+  globalValue,
 }: {
   item: QuotationItem;
   idx: number;
@@ -8538,6 +8734,8 @@ function CostPricePanel({
   curCode: string;
   quotationId: string;
   setCurrent: Dispatch<SetStateAction<Quotation | null>>;
+  globalMethod?: "margin" | "fixed";
+  globalValue?: number;
 }) {
   const mode = item.costMode ?? "head";
   const head = Number(item.costHead) || 0;
@@ -8545,8 +8743,12 @@ function CostPricePanel({
      (no stand). Stand & Table is NEVER folded into the stored Head Cost. */
   const total = mode === "complete" ? head + standTablePrice : head;
   const fx = fxRate > 0 ? fxRate : 7.2;
-  const sellMethod = item.sellMethod ?? "margin";
-  const sellValue = Number(item.sellValue) || 0;
+  /* EFFECTIVE pricing — a product-level override (item.sellMethod) always
+     wins; otherwise inherit the quotation's global Default Pricing. The
+     resting card, the modal, and the price math all read these. */
+  const hasOverride = item.sellMethod != null || item.sellValue != null;
+  const sellMethod: "margin" | "fixed" = item.sellMethod ?? globalMethod ?? "margin";
+  const sellValue = item.sellValue != null ? Number(item.sellValue) : (Number(globalValue) || 0);
   /* Selling price in the quote currency (USD by FX). Margin: cost grown by
      % then converted. Fixed: cost converted then a flat amount added. */
   const resultPrice =
@@ -8808,9 +9010,25 @@ function CostPricePanel({
               linked? · what's the cost? · manage pricing? All editing lives in
               the Manage Pricing modal. ── */}
 
-        {/* Row 1 — status badge + prominent cost (RMB) */}
+        {/* Row 1 — status badge (+ custom-price chip) + prominent cost (RMB) */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, minHeight: 22 }}>
-          {badge}
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+            {badge}
+            {hasOverride && (
+              <span
+                title={`Custom price override — ${sellMethod === "margin" ? `${sellValue}% margin` : `+${sellValue} ${curCode}`} (ignores global pricing)`}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0,
+                  fontSize: 9, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase",
+                  color: "#3385FF", background: "rgba(51,133,255,0.14)", border: "1px solid #3385FF44",
+                  borderRadius: 5, padding: "2px 6px", whiteSpace: "nowrap",
+                }}
+              >
+                <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#3385FF" }} />
+                Custom
+              </span>
+            )}
+          </span>
           {total > 0 && (
             <span style={{ fontWeight: 800, fontSize: 15, color: "#fff", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
               ¥{fmtN(total)}
@@ -8991,12 +9209,35 @@ function CostPricePanel({
                   type="number"
                   min={0}
                   value={item.sellValue ?? ""}
-                  placeholder="0"
+                  placeholder={String(Number(globalValue) || 0)}
                   onChange={(e) =>
-                    setItemField({ sellValue: e.target.value === "" ? undefined : Math.max(0, Number(e.target.value) || 0) })
+                    /* Typing a value makes this a full product-level override —
+                       capture the current method too so it no longer inherits. */
+                    setItemField(
+                      e.target.value === ""
+                        ? { sellValue: undefined }
+                        : { sellValue: Math.max(0, Number(e.target.value) || 0), sellMethod: item.sellMethod ?? sellMethod },
+                    )
                   }
                   style={{ ...inputCss, textAlign: "right" }}
                 />
+              </div>
+              {/* Override status — inheriting global vs. custom (with reset). */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: 10 }}>
+                {hasOverride ? (
+                  <>
+                    <span style={{ color: "#3385FF", fontWeight: 700 }}>● Custom override for this product</span>
+                    <button
+                      type="button"
+                      onClick={() => setItemField({ sellMethod: undefined, sellValue: undefined })}
+                      style={{ border: "none", background: "transparent", color: "rgba(255,255,255,0.6)", textDecoration: "underline", cursor: "pointer", fontSize: 10, padding: 0 }}
+                    >Reset to global default</button>
+                  </>
+                ) : (
+                  <span style={{ color: "rgba(255,255,255,0.45)" }}>
+                    Inheriting global default ({globalMethod === "fixed" ? `+${Number(globalValue) || 0} ${curCode}` : `${Number(globalValue) || 0}% margin`}) — edit to set a custom price
+                  </span>
+                )}
               </div>
             </div>
 
