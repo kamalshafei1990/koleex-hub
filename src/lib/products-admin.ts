@@ -1,9 +1,15 @@
 /* ---------------------------------------------------------------------------
-   Product Admin — All Supabase CRUD operations for the product catalog.
-   Uses the untyped admin client for flexible insert/update.
+   Product Admin — client-side product catalog access.
+
+   P0-B: ALL product-table reads/writes now go through the server /api/*
+   routes (auth + Product-Data gating + secret stripping happen server-side).
+   This file no longer touches Supabase tables directly — only the storage
+   PROXY (`./storage-client` → /api/storage) for logo files, which carry no
+   secrets. Exported function names + return shapes are unchanged so every
+   existing consumer (ProductForm, ProductList, settings, modals) keeps working
+   without edits.
    --------------------------------------------------------------------------- */
 
-import { supabaseAdmin as supabase } from "./supabase-admin";
 import {
   uploadToStorage,
   removeFromStorage,
@@ -20,24 +26,41 @@ import type {
 
 const BUCKET = "media";
 
-/* ─── Taxonomy in-flight + session cache ─────────────────────────────
-   Divisions / Categories / Subcategories are read on EVERY product
-   page mount (admin list, detail page, edit form). They almost
-   never change in a session. We cache twice:
+/* ── tiny fetch helpers (credentials always included) ────────────────── */
+async function jget<T>(url: string, fallback: T): Promise<T> {
+  try {
+    const res = await fetch(url, { credentials: "include" });
+    if (!res.ok) return fallback;
+    return (await res.json()) as T;
+  } catch (e) {
+    console.error("[products-admin GET]", url, e);
+    return fallback;
+  }
+}
+async function jsend(
+  url: string,
+  method: "POST" | "PATCH" | "PUT" | "DELETE",
+  body?: unknown,
+): Promise<{ ok: boolean; json: Record<string, unknown> }> {
+  try {
+    const res = await fetch(url, {
+      method,
+      credentials: "include",
+      headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+    const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!res.ok) console.error(`[products-admin ${method}]`, url, json.error || res.status);
+    return { ok: res.ok, json };
+  } catch (e) {
+    console.error(`[products-admin ${method}]`, url, e);
+    return { ok: false, json: {} };
+  }
+}
 
-     1. In-flight promise dedupe — if two callers ask at the same
-        time, only one network round-trip happens.
-     2. sessionStorage with a 60s TTL — instant return on subsequent
-        navigations within the session, while still picking up real
-        changes within ~a minute.
-
-   Mutations (create/update/delete) call `invalidateTaxonomyCache()`
-   so the next read is fresh. Zero behavior change for callers —
-   they still await the same Promise<Row[]>. */
-
+/* ─── Taxonomy in-flight + session cache (unchanged) ─────────────────── */
 const TAXO_TTL_MS = 60_000;
 type Cached<T> = { data: T; expiresAt: number };
-
 const inflight = new Map<string, Promise<unknown>>();
 
 function readSessionCache<T>(key: string): T | null {
@@ -53,22 +76,19 @@ function readSessionCache<T>(key: string): T | null {
     return parsed.data;
   } catch { return null; }
 }
-
 function writeSessionCache<T>(key: string, data: T): void {
   if (typeof window === "undefined") return;
   try {
     const payload: Cached<T> = { data, expiresAt: Date.now() + TAXO_TTL_MS };
     window.sessionStorage.setItem(key, JSON.stringify(payload));
-  } catch { /* quota exceeded — fine, fall through */ }
+  } catch { /* quota exceeded — fine */ }
 }
-
 function clearSessionKey(key: string): void {
   if (typeof window === "undefined") return;
   try { window.sessionStorage.removeItem(key); } catch { /* noop */ }
 }
 
-/** Call this from every taxonomy mutation so the next read pulls
- *  fresh data instead of a stale cache. */
+/** Call this from every taxonomy mutation so the next read pulls fresh data. */
 export function invalidateTaxonomyCache(): void {
   clearSessionKey("kx:taxo:divisions");
   clearSessionKey("kx:taxo:categories");
@@ -78,10 +98,7 @@ export function invalidateTaxonomyCache(): void {
   inflight.delete("subcategories");
 }
 
-async function memoFetch<T>(
-  key: string,
-  loader: () => Promise<T>,
-): Promise<T> {
+async function memoFetch<T>(key: string, loader: () => Promise<T>): Promise<T> {
   const cached = readSessionCache<T>(`kx:taxo:${key}`);
   if (cached !== null) return cached;
   const existing = inflight.get(key);
@@ -98,466 +115,274 @@ async function memoFetch<T>(
   return p;
 }
 
-// ── Divisions CRUD ──
+/* ── Taxonomy CRUD → /api/taxonomy/[kind] ─────────────────────────────── */
+async function fetchTaxonomy<T>(kind: string): Promise<T[]> {
+  const json = await jget<{ rows?: T[] }>(`/api/taxonomy/${kind}`, {});
+  return json.rows ?? [];
+}
 
 export async function fetchDivisions(): Promise<DivisionRow[]> {
-  return memoFetch("divisions", async () => {
-    const { data } = await supabase.from("divisions").select("*").order("order");
-    return (data as DivisionRow[]) || [];
-  });
+  return memoFetch("divisions", () => fetchTaxonomy<DivisionRow>("divisions"));
 }
-
 export async function createDivision(d: Record<string, unknown>): Promise<DivisionRow | null> {
-  const { data, error } = await supabase.from("divisions").insert(d).select().single();
-  if (error) { console.error("[Divisions] Create:", error.message); return null; }
+  const { ok, json } = await jsend("/api/taxonomy/divisions", "POST", d);
+  if (!ok) return null;
   invalidateTaxonomyCache();
-  return data as DivisionRow;
+  return (json.row as DivisionRow) ?? null;
 }
-
 export async function updateDivision(id: string, d: Record<string, unknown>): Promise<boolean> {
-  const { error } = await supabase.from("divisions").update(d).eq("id", id);
-  if (error) { console.error("[Divisions] Update:", error.message); return false; }
-  invalidateTaxonomyCache();
-  return true;
+  const { ok } = await jsend(`/api/taxonomy/divisions/${id}`, "PATCH", d);
+  if (ok) invalidateTaxonomyCache();
+  return ok;
 }
-
 export async function deleteDivision(id: string): Promise<boolean> {
-  const { error } = await supabase.from("divisions").delete().eq("id", id);
-  if (error) { console.error("[Divisions] Delete:", error.message); return false; }
-  invalidateTaxonomyCache();
-  return true;
+  const { ok } = await jsend(`/api/taxonomy/divisions/${id}`, "DELETE");
+  if (ok) invalidateTaxonomyCache();
+  return ok;
 }
-
-// ── Categories CRUD ──
 
 export async function fetchCategories(): Promise<CategoryRow[]> {
-  return memoFetch("categories", async () => {
-    const { data } = await supabase.from("categories").select("*").order("order");
-    return (data as CategoryRow[]) || [];
-  });
+  return memoFetch("categories", () => fetchTaxonomy<CategoryRow>("categories"));
 }
-
 export async function createCategory(c: Record<string, unknown>): Promise<CategoryRow | null> {
-  const { data, error } = await supabase.from("categories").insert(c).select().single();
-  if (error) { console.error("[Categories] Create:", error.message); return null; }
+  const { ok, json } = await jsend("/api/taxonomy/categories", "POST", c);
+  if (!ok) return null;
   invalidateTaxonomyCache();
-  return data as CategoryRow;
+  return (json.row as CategoryRow) ?? null;
 }
-
 export async function updateCategory(id: string, c: Record<string, unknown>): Promise<boolean> {
-  const { error } = await supabase.from("categories").update(c).eq("id", id);
-  if (error) { console.error("[Categories] Update:", error.message); return false; }
-  invalidateTaxonomyCache();
-  return true;
+  const { ok } = await jsend(`/api/taxonomy/categories/${id}`, "PATCH", c);
+  if (ok) invalidateTaxonomyCache();
+  return ok;
 }
-
 export async function deleteCategory(id: string): Promise<boolean> {
-  const { error } = await supabase.from("categories").delete().eq("id", id);
-  if (error) { console.error("[Categories] Delete:", error.message); return false; }
-  invalidateTaxonomyCache();
-  return true;
+  const { ok } = await jsend(`/api/taxonomy/categories/${id}`, "DELETE");
+  if (ok) invalidateTaxonomyCache();
+  return ok;
 }
-
-// ── Subcategories CRUD ──
 
 export async function fetchSubcategories(): Promise<SubcategoryRow[]> {
-  return memoFetch("subcategories", async () => {
-    const { data } = await supabase.from("subcategories").select("*").order("order");
-    return (data as SubcategoryRow[]) || [];
-  });
+  return memoFetch("subcategories", () => fetchTaxonomy<SubcategoryRow>("subcategories"));
 }
-
 export async function createSubcategory(s: Record<string, unknown>): Promise<SubcategoryRow | null> {
-  const { data, error } = await supabase.from("subcategories").insert(s).select().single();
-  if (error) { console.error("[Subcategories] Create:", error.message); return null; }
+  const { ok, json } = await jsend("/api/taxonomy/subcategories", "POST", s);
+  if (!ok) return null;
   invalidateTaxonomyCache();
-  return data as SubcategoryRow;
+  return (json.row as SubcategoryRow) ?? null;
 }
-
 export async function updateSubcategory(id: string, s: Record<string, unknown>): Promise<boolean> {
-  const { error } = await supabase.from("subcategories").update(s).eq("id", id);
-  if (error) { console.error("[Subcategories] Update:", error.message); return false; }
-  invalidateTaxonomyCache();
-  return true;
+  const { ok } = await jsend(`/api/taxonomy/subcategories/${id}`, "PATCH", s);
+  if (ok) invalidateTaxonomyCache();
+  return ok;
 }
-
 export async function deleteSubcategory(id: string): Promise<boolean> {
-  const { error } = await supabase.from("subcategories").delete().eq("id", id);
-  if (error) { console.error("[Subcategories] Delete:", error.message); return false; }
-  invalidateTaxonomyCache();
-  return true;
+  const { ok } = await jsend(`/api/taxonomy/subcategories/${id}`, "DELETE");
+  if (ok) invalidateTaxonomyCache();
+  return ok;
 }
 
-// ── Category/Subcategory counts ──
-
+// ── Category/Subcategory counts (derived from taxonomy rows) ──
 export async function fetchCategoryCounts(): Promise<Record<string, number>> {
-  const { data } = await supabase.from("categories").select("division_id");
+  const cats = await fetchTaxonomy<{ division_id: string }>("categories");
   const counts: Record<string, number> = {};
-  for (const row of (data || []) as { division_id: string }[]) {
-    counts[row.division_id] = (counts[row.division_id] || 0) + 1;
+  for (const row of cats) {
+    if (row.division_id) counts[row.division_id] = (counts[row.division_id] || 0) + 1;
   }
   return counts;
 }
-
 export async function fetchSubcategoryCounts(): Promise<Record<string, number>> {
-  const { data } = await supabase.from("subcategories").select("category_id");
+  const subs = await fetchTaxonomy<{ category_id: string }>("subcategories");
   const counts: Record<string, number> = {};
-  for (const row of (data || []) as { category_id: string }[]) {
-    counts[row.category_id] = (counts[row.category_id] || 0) + 1;
+  for (const row of subs) {
+    if (row.category_id) counts[row.category_id] = (counts[row.category_id] || 0) + 1;
   }
   return counts;
 }
 
-// ── Products ──
-
-/* All four product reads/writes now go through /api/products* so
-   secret fields (cost_price, supplier, hs_code, moq, etc.) are
-   stripped server-side when the caller doesn't have Product Data
-   access. The UI on /products used to just HIDE those fields
-   cosmetically; now they never reach the browser for customer
-   sessions. Mutations are SA/Product-Data-only at the API layer. */
-
+// ── Products (already API-backed) ──
 export async function fetchProducts(): Promise<ProductRow[]> {
-  try {
-    const res = await fetch("/api/products", { credentials: "include" });
-    if (!res.ok) return [];
-    const json = (await res.json()) as { products: ProductRow[] };
-    return json.products ?? [];
-  } catch (e) {
-    console.error("[Products] fetchProducts:", e);
-    return [];
-  }
+  const json = await jget<{ products?: ProductRow[] }>("/api/products", {});
+  return json.products ?? [];
 }
-
 export async function fetchProductById(id: string): Promise<ProductRow | null> {
   if (!id) return null;
-  try {
-    const res = await fetch(`/api/products/${encodeURIComponent(id)}`, { credentials: "include" });
-    if (!res.ok) return null;
-    const json = (await res.json()) as { product: ProductRow };
-    return json.product ?? null;
-  } catch (e) {
-    console.error("[Products] fetchProductById:", e);
-    return null;
-  }
+  const json = await jget<{ product?: ProductRow }>(`/api/products/${encodeURIComponent(id)}`, {});
+  return json.product ?? null;
 }
-
-/**
- * Fetch a product by slug first, falling back to UUID lookup.
- * Lets routes accept either "/products/my-machine" or "/products/<uuid>".
- * The API handles the slug/UUID disambiguation server-side.
- */
 export async function fetchProductByIdOrSlug(handle: string): Promise<ProductRow | null> {
   return fetchProductById(handle);
 }
-
 export async function createProduct(product: Record<string, unknown>): Promise<ProductRow | null> {
-  try {
-    const res = await fetch("/api/products", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(product),
-    });
-    if (!res.ok) {
-      const json = (await res.json().catch(() => ({}))) as { error?: string };
-      console.error("[Products] Create error:", json.error || res.status);
-      return null;
-    }
-    const json = (await res.json()) as { product: ProductRow };
-    return json.product ?? null;
-  } catch (e) {
-    console.error("[Products] Create error:", e);
-    return null;
-  }
+  const { ok, json } = await jsend("/api/products", "POST", product);
+  return ok ? ((json.product as ProductRow) ?? null) : null;
 }
-
 export async function updateProduct(id: string, updates: Record<string, unknown>): Promise<boolean> {
-  try {
-    const res = await fetch(`/api/products/${encodeURIComponent(id)}`, {
-      method: "PATCH",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updates),
-    });
-    return res.ok;
-  } catch (e) {
-    console.error("[Products] Update error:", e);
-    return false;
-  }
+  const { ok } = await jsend(`/api/products/${encodeURIComponent(id)}`, "PATCH", updates);
+  return ok;
 }
-
 export async function deleteProduct(id: string): Promise<boolean> {
-  try {
-    const res = await fetch(`/api/products/${encodeURIComponent(id)}`, {
-      method: "DELETE",
-      credentials: "include",
-    });
-    return res.ok;
-  } catch (e) {
-    console.error("[Products] Delete error:", e);
-    return false;
-  }
+  const { ok } = await jsend(`/api/products/${encodeURIComponent(id)}`, "DELETE");
+  return ok;
 }
 
-// ── Models ──
-
+// ── Models → /api/product-models ──
 export async function fetchModelsByProductId(productId: string): Promise<ProductModelRow[]> {
-  /* Goes through /api/product-models which strips cost_price and
-     supplier server-side for non-Product-Data callers. */
   if (!productId) return [];
-  try {
-    const res = await fetch(
-      `/api/product-models?product_id=${encodeURIComponent(productId)}`,
-      { credentials: "include" },
-    );
-    if (!res.ok) return [];
-    const json = (await res.json()) as { models: ProductModelRow[] };
-    return json.models ?? [];
-  } catch (e) {
-    console.error("[Models] fetchByProductId:", e);
-    return [];
-  }
+  const json = await jget<{ models?: ProductModelRow[] }>(
+    `/api/product-models?product_id=${encodeURIComponent(productId)}`, {},
+  );
+  return json.models ?? [];
 }
-
 export async function createModel(model: Record<string, unknown>): Promise<ProductModelRow | null> {
-  const { data, error } = await supabase.from("product_models").insert(model).select().single();
-  if (error) { console.error("[Models] Create error:", error.message); return null; }
-  return data as ProductModelRow;
+  const { ok, json } = await jsend("/api/product-models", "POST", model);
+  return ok ? ((json.model as ProductModelRow) ?? null) : null;
 }
-
 export async function updateModel(id: string, updates: Record<string, unknown>): Promise<boolean> {
-  const { error } = await supabase.from("product_models").update(updates).eq("id", id);
-  if (error) { console.error("[Models] Update error:", error.message); return false; }
-  return true;
+  const { ok } = await jsend(`/api/product-models/${id}`, "PATCH", updates);
+  return ok;
 }
-
 export async function deleteModel(id: string): Promise<boolean> {
-  const { error } = await supabase.from("product_models").delete().eq("id", id);
-  if (error) { console.error("[Models] Delete error:", error.message); return false; }
-  return true;
+  const { ok } = await jsend(`/api/product-models/${id}`, "DELETE");
+  return ok;
 }
 
-// ── Media ──
-
+// ── Media → /api/product-media ──
 export async function fetchMediaByProductId(productId: string): Promise<ProductMediaRow[]> {
-  const { data } = await supabase.from("product_media").select("*").eq("product_id", productId).order("order");
-  return (data as ProductMediaRow[]) || [];
+  if (!productId) return [];
+  const json = await jget<{ media?: ProductMediaRow[] }>(
+    `/api/product-media?product_id=${encodeURIComponent(productId)}`, {},
+  );
+  return json.media ?? [];
 }
-
 export async function uploadProductFile(file: File): Promise<{ url: string; file_path: string } | null> {
   const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
   const filePath = `products/${Date.now()}_${safeName}`;
   const result = await uploadToStorage(BUCKET, filePath, file, { cacheControl: "3600" });
-  if (!result.ok) {
-    console.error("[Media] Upload error:", result.error);
-    return null;
-  }
+  if (!result.ok) { console.error("[Media] Upload error:", result.error); return null; }
   return { url: result.data.publicUrl, file_path: result.data.path };
 }
-
 export async function createProductMedia(media: Record<string, unknown>): Promise<ProductMediaRow | null> {
-  const { data, error } = await supabase.from("product_media").insert(media).select().single();
-  if (error) { console.error("[Media] Create error:", error.message); return null; }
-  return data as ProductMediaRow;
+  const { ok, json } = await jsend("/api/product-media", "POST", media);
+  return ok ? ((json.media as ProductMediaRow) ?? null) : null;
 }
-
 export async function deleteProductMedia(id: string): Promise<boolean> {
-  const { error } = await supabase.from("product_media").delete().eq("id", id);
-  if (error) { console.error("[Media] Delete error:", error.message); return false; }
-  return true;
+  const { ok } = await jsend(`/api/product-media/${id}`, "DELETE");
+  return ok;
 }
 
-// ── Translations ──
-
+// ── Translations → /api/product-translations ──
 export async function fetchTranslationsByProductId(productId: string): Promise<ProductTranslationRow[]> {
-  const { data } = await supabase.from("product_translations").select("*").eq("product_id", productId);
-  return (data as ProductTranslationRow[]) || [];
+  if (!productId) return [];
+  const json = await jget<{ translations?: ProductTranslationRow[] }>(
+    `/api/product-translations?product_id=${encodeURIComponent(productId)}`, {},
+  );
+  return json.translations ?? [];
 }
-
 export async function upsertTranslation(t: Record<string, unknown>): Promise<boolean> {
-  const { error } = await supabase.from("product_translations").upsert(t, { onConflict: "product_id,locale" });
-  if (error) { console.error("[Translations] Upsert error:", error.message); return false; }
-  return true;
+  const { ok } = await jsend("/api/product-translations", "POST", t);
+  return ok;
 }
-
 export async function deleteTranslation(id: string): Promise<boolean> {
-  const { error } = await supabase.from("product_translations").delete().eq("id", id);
-  if (error) return false;
-  return true;
+  const { ok } = await jsend(`/api/product-translations/${id}`, "DELETE");
+  return ok;
 }
 
-// ── Model Translations ──
-
+// ── Model Translations → /api/model-translations ──
 export async function fetchModelTranslations(modelIds: string[]): Promise<ModelTranslationRow[]> {
   if (!modelIds.length) return [];
-  const { data } = await supabase.from("model_translations").select("*").in("model_id", modelIds);
-  return (data as ModelTranslationRow[]) || [];
+  const json = await jget<{ translations?: ModelTranslationRow[] }>(
+    `/api/model-translations?model_ids=${encodeURIComponent(modelIds.join(","))}`, {},
+  );
+  return json.translations ?? [];
 }
-
 export async function upsertModelTranslation(t: Record<string, unknown>): Promise<boolean> {
-  const { error } = await supabase.from("model_translations").upsert(t, { onConflict: "model_id,locale" });
-  if (error) { console.error("[ModelTranslations] Upsert error:", error.message); return false; }
-  return true;
+  const { ok } = await jsend("/api/model-translations", "POST", t);
+  return ok;
 }
-
 export async function deleteModelTranslation(id: string): Promise<boolean> {
-  const { error } = await supabase.from("model_translations").delete().eq("id", id);
-  if (error) return false;
-  return true;
+  const { ok } = await jsend(`/api/model-translations/${id}`, "DELETE");
+  return ok;
 }
 
-// ── Market Prices ──
-
+// ── Market Prices → /api/product-market-prices ──
 export async function fetchMarketPricesByModelIds(modelIds: string[]): Promise<ProductMarketPriceRow[]> {
   if (!modelIds.length) return [];
-  const { data } = await supabase.from("product_market_prices").select("*").in("model_id", modelIds);
-  return (data as ProductMarketPriceRow[]) || [];
+  const json = await jget<{ prices?: ProductMarketPriceRow[] }>(
+    `/api/product-market-prices?model_ids=${encodeURIComponent(modelIds.join(","))}`, {},
+  );
+  return json.prices ?? [];
 }
-
 export async function upsertMarketPrice(p: Record<string, unknown>): Promise<boolean> {
-  const { error } = await supabase.from("product_market_prices").upsert(p, { onConflict: "model_id,country_code" });
-  if (error) { console.error("[MarketPrices] Upsert error:", error.message); return false; }
-  return true;
+  const { ok } = await jsend("/api/product-market-prices", "POST", p);
+  return ok;
 }
-
 export async function deleteMarketPrice(id: string): Promise<boolean> {
-  const { error } = await supabase.from("product_market_prices").delete().eq("id", id);
-  if (error) return false;
-  return true;
+  const { ok } = await jsend(`/api/product-market-prices/${id}`, "DELETE");
+  return ok;
 }
 
-// ── Related Products ──
-
+// ── Related Products → /api/products/[id]/related ──
 export async function fetchRelatedProducts(productId: string): Promise<(RelatedProductRow & { product_name?: string })[]> {
-  const { data } = await supabase
-    .from("related_products")
-    .select("*, products!related_products_related_id_fkey(product_name)")
-    .eq("product_id", productId)
-    .order("order");
-  return (data || []).map((r: Record<string, unknown>) => ({
-    product_id: r.product_id as string,
-    related_id: r.related_id as string,
-    order: r.order as number,
-    product_name: (r.products as Record<string, unknown>)?.product_name as string | undefined,
-  }));
+  if (!productId) return [];
+  const json = await jget<{ related?: (RelatedProductRow & { product_name?: string })[] }>(
+    `/api/products/${encodeURIComponent(productId)}/related`, {},
+  );
+  return json.related ?? [];
 }
-
 export async function setRelatedProducts(productId: string, relatedIds: string[]): Promise<boolean> {
-  await supabase.from("related_products").delete().eq("product_id", productId);
-  if (!relatedIds.length) return true;
-  const rows = relatedIds.map((rid, i) => ({ product_id: productId, related_id: rid, order: i }));
-  const { error } = await supabase.from("related_products").insert(rows);
-  if (error) { console.error("[Related] Insert error:", error.message); return false; }
-  return true;
+  const { ok } = await jsend(`/api/products/${encodeURIComponent(productId)}/related`, "PUT", { relatedIds });
+  return ok;
 }
 
-// ── Search ──
-
+// ── Search → /api/products/search ──
 export async function searchProducts(query: string, excludeId?: string): Promise<Pick<ProductRow, "id" | "product_name" | "slug">[]> {
-  let q = supabase.from("products").select("id,product_name,slug").ilike("product_name", `%${query}%`).limit(10);
-  if (excludeId) q = q.neq("id", excludeId);
-  const { data } = await q;
-  return (data || []) as Pick<ProductRow, "id" | "product_name" | "slug">[];
+  const params = new URLSearchParams({ q: query });
+  if (excludeId) params.set("exclude", excludeId);
+  const json = await jget<{ results?: Pick<ProductRow, "id" | "product_name" | "slug">[] }>(
+    `/api/products/search?${params.toString()}`, {},
+  );
+  return json.results ?? [];
 }
 
-// ── Model counts + supplier mapping ──
-
+// ── Model counts + supplier mapping (already API-backed) ──
 export async function fetchModelSummaries(): Promise<{
   counts: Record<string, number>;
   suppliers: Record<string, string[]>;
   allSuppliers: string[];
-  /* product_id → primary model name (first row by order asc).
-     Lets ProductList show the model code on each card without a
-     second round-trip. */
   primaryModelNames: Record<string, string>;
 }> {
-  /* Supplier data is stripped server-side when the caller lacks
-     Product Data access — customers get populated counts but
-     empty suppliers + allSuppliers. */
-  try {
-    const res = await fetch("/api/product-models?summary=1", { credentials: "include" });
-    if (!res.ok) return { counts: {}, suppliers: {}, allSuppliers: [], primaryModelNames: {} };
-    return (await res.json()) as {
-      counts: Record<string, number>;
-      suppliers: Record<string, string[]>;
-      allSuppliers: string[];
-      primaryModelNames: Record<string, string>;
-    };
-  } catch (e) {
-    console.error("[Models] fetchSummaries:", e);
-    return { counts: {}, suppliers: {}, allSuppliers: [], primaryModelNames: {} };
-  }
+  return jget("/api/product-models?summary=1", {
+    counts: {}, suppliers: {}, allSuppliers: [], primaryModelNames: {},
+  });
 }
 
-// ── Fetch main images for all products ──
-
+// ── Main images for all products → /api/product-media?main_images=1 ──
 export async function fetchProductMainImages(): Promise<Record<string, string>> {
-  const { data } = await supabase
-    .from("product_media")
-    .select("product_id, url")
-    .eq("type", "main_image")
-    .order("order", { ascending: true });
-  const map: Record<string, string> = {};
-  for (const row of (data || []) as { product_id: string; url: string }[]) {
-    if (!map[row.product_id]) map[row.product_id] = row.url;
-  }
-  return map;
+  const json = await jget<{ mainImages?: Record<string, string> }>(
+    "/api/product-media?main_images=1", {},
+  );
+  return json.mainImages ?? {};
 }
 
-// ── Supplier names + logos ──
-// Goes through /api/suppliers because the contacts table has RLS
-// locked to service-role only. Querying with the anon client
-// returned [] even when suppliers existed — that was the "I saved
-// a supplier but can't find it in the dropdown" bug. The route
-// enforces Product Data OR Suppliers module access so we don't
-// leak the directory to unrelated roles.
-
+// ── Supplier names + logos (already API-backed) ──
 export async function fetchSupplierNames(): Promise<{ id: string; name: string; logo: string | null }[]> {
-  try {
-    const res = await fetch("/api/suppliers", { credentials: "include" });
-    if (!res.ok) {
-      console.error("[Suppliers] fetch list:", res.status);
-      return [];
-    }
-    const json = (await res.json()) as { suppliers: { id: string; name: string; logo: string | null }[] };
-    return json.suppliers ?? [];
-  } catch (e) {
-    console.error("[Suppliers] fetch error:", e);
-    return [];
-  }
+  const json = await jget<{ suppliers?: { id: string; name: string; logo: string | null }[] }>(
+    "/api/suppliers", {},
+  );
+  return json.suppliers ?? [];
 }
 
-// ── Unique brand names (from products table) ──
-
+// ── Unique brand names + tags → /api/products/facets ──
 export async function fetchUniqueBrands(): Promise<string[]> {
-  const { data } = await supabase.from("products").select("brand");
-  const brands = new Set<string>();
-  for (const row of (data || []) as { brand: string | null }[]) {
-    if (row.brand) brands.add(row.brand);
-  }
-  return Array.from(brands).sort();
+  const json = await jget<{ brands?: string[] }>("/api/products/facets", {});
+  return json.brands ?? [];
 }
-
-// ── Unique tags (from products table) ──
-
 export async function fetchUniqueTags(): Promise<string[]> {
-  const { data } = await supabase.from("products").select("tags");
-  const tags = new Set<string>();
-  for (const row of (data || []) as { tags: string[] | null }[]) {
-    for (const t of row.tags || []) tags.add(t);
-  }
-  return Array.from(tags).sort();
+  const json = await jget<{ tags?: string[] }>("/api/products/facets", {});
+  return json.tags ?? [];
 }
 
-// ── Taxonomy logos (stored in media/divisions/ and media/categories/ folders) ──
-
-/* Taxonomy logos are static SVGs that change at most a few times a year, yet
-   they were being re-listed from storage (a ~2s storage API call) on EVERY
-   SupplierDetail / product-page mount, with no caching and no in-flight dedup,
-   and a per-call `?t=` buster that also defeated browser image caching. Route
-   through memoFetch (in-flight dedupe + 60s session cache) and drop the buster
-   so the list runs once per session and the SVGs cache normally. */
+// ── Taxonomy logos (storage proxy — no secrets, unchanged) ──
 async function fetchTaxonomyLogos(folder: string): Promise<Record<string, string>> {
   return memoFetch(`logos:${folder}`, async () => {
     const result = await listStorage(BUCKET, folder, { limit: 500 });
@@ -571,12 +396,10 @@ async function fetchTaxonomyLogos(folder: string): Promise<Record<string, string
     return map;
   });
 }
-
 function invalidateTaxonomyLogoCache(folder: string): void {
   clearSessionKey(`kx:taxo:logos:${folder}`);
   inflight.delete(`logos:${folder}`);
 }
-
 async function uploadTaxonomyLogo(folder: string, slug: string, file: File): Promise<string | null> {
   const ext = file.name.split(".").pop() || "png";
   const filePath = `${folder}/${slug}.${ext}`;
@@ -585,7 +408,6 @@ async function uploadTaxonomyLogo(folder: string, slug: string, file: File): Pro
   invalidateTaxonomyLogoCache(folder);
   return result.data.publicUrl;
 }
-
 async function deleteTaxonomyLogo(folder: string, slug: string): Promise<boolean> {
   const result = await listStorage(BUCKET, folder, { limit: 500 });
   if (!result.ok) return false;
@@ -596,7 +418,6 @@ async function deleteTaxonomyLogo(folder: string, slug: string): Promise<boolean
   invalidateTaxonomyLogoCache(folder);
   return true;
 }
-
 export const fetchDivisionLogos = () => fetchTaxonomyLogos("divisions");
 export const fetchCategoryLogos = () => fetchTaxonomyLogos("categories");
 export const fetchSubcategoryLogos = () => fetchTaxonomyLogos("subcategories");
@@ -607,8 +428,7 @@ export const deleteDivisionLogo = (slug: string) => deleteTaxonomyLogo("division
 export const deleteCategoryLogo = (slug: string) => deleteTaxonomyLogo("categories", slug);
 export const deleteSubcategoryLogo = (slug: string) => deleteTaxonomyLogo("subcategories", slug);
 
-// ── Brand logos (stored in media/brands/ folder) ──
-
+// ── Brand logos (storage proxy — unchanged) ──
 export async function fetchBrandLogos(): Promise<Record<string, string>> {
   const result = await listStorage(BUCKET, "brands", { limit: 200 });
   const map: Record<string, string> = {};
@@ -620,7 +440,6 @@ export async function fetchBrandLogos(): Promise<Record<string, string>> {
   }
   return map;
 }
-
 export async function uploadBrandLogo(brandSlug: string, file: File): Promise<string | null> {
   const ext = file.name.split(".").pop() || "png";
   const filePath = `brands/${brandSlug}.${ext}`;
@@ -630,17 +449,6 @@ export async function uploadBrandLogo(brandSlug: string, file: File): Promise<st
 }
 
 // ── Brand Management ──
-// Brands live in a dedicated `brands` table (created 2026-04-24).
-// products.brand is still a text column — the `brands` row is the
-// canonical record an admin created, with name / slug / logo_url.
-// Creating a brand via the admin modal now POSTs to /api/brands so
-// the record persists immediately, independent of product save.
-
-/** Fetch all brands with product counts + logo URLs. Goes through
- *  /api/brands which merges the brands table with a product-count
- *  rollup and returns a storage-public logo_url per brand.
- *  Falls back to the legacy "distinct from products" method if the
- *  API is unavailable, so an older build doesn't break the form. */
 export async function fetchBrandsWithDetails(): Promise<{
   name: string;
   slug: string;
@@ -654,101 +462,48 @@ export async function fetchBrandsWithDetails(): Promise<{
         brands: { name: string; slug: string; logo_url: string | null; productCount: number }[];
       };
       return (json.brands ?? []).map((b) => ({
-        name: b.name,
-        slug: b.slug,
-        logoUrl: b.logo_url,
-        productCount: b.productCount,
+        name: b.name, slug: b.slug, logoUrl: b.logo_url, productCount: b.productCount,
       }));
     }
   } catch (e) {
-    console.warn("[Brands] /api/brands unavailable, falling back to product-derived list:", e);
+    console.warn("[Brands] /api/brands unavailable, falling back to facets:", e);
   }
-
-  // Legacy fallback — derive the list from DISTINCT products.brand.
-  const { data: products } = await supabase.from("products").select("brand");
+  // Fallback — derive from facets + product-count rollup (no direct DB).
+  const facets = await jget<{ brands?: string[]; counts?: Record<string, number> }>("/api/products/brands", {});
   const logos = await fetchBrandLogos();
-  const counts: Record<string, number> = {};
-  for (const row of (products || []) as { brand: string | null }[]) {
-    if (row.brand) counts[row.brand] = (counts[row.brand] || 0) + 1;
-  }
-  const brands = Object.keys(counts).sort();
-  return brands.map(name => {
+  const names = facets.brands ?? [];
+  return names.map((name) => {
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-    return { name, slug, logoUrl: logos[slug] || null, productCount: counts[name] || 0 };
+    return { name, slug, logoUrl: logos[slug] || null, productCount: facets.counts?.[name] ?? 0 };
   });
 }
-
-/** Create a brand record in the brands table. Called by the
- *  CreateBrandModal so the brand persists the moment the modal
- *  commits — even if the admin navigates away without saving the
- *  product. Returns the canonical brand row. */
 export async function createBrand(
   name: string,
   logoUrl: string | null,
 ): Promise<{ name: string; slug: string; logo_url: string | null } | null> {
-  try {
-    const res = await fetch("/api/brands", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, logoUrl }),
-    });
-    if (!res.ok) {
-      const json = (await res.json().catch(() => ({}))) as { error?: string };
-      console.error("[Brands] Create error:", json.error || res.status);
-      return null;
-    }
-    const json = (await res.json()) as { brand: { name: string; slug: string; logo_url: string | null } };
-    return json.brand ?? null;
-  } catch (e) {
-    console.error("[Brands] Create network error:", e);
-    return null;
-  }
+  const { ok, json } = await jsend("/api/brands", "POST", { name, logoUrl });
+  return ok ? ((json.brand as { name: string; slug: string; logo_url: string | null }) ?? null) : null;
 }
 
-/** Rename a brand across all products */
+/** Rename a brand across all products (+ move its logo file). */
 export async function renameBrand(oldName: string, newName: string): Promise<boolean> {
-  // Get all products with the old brand name
-  const { data: products } = await supabase
-    .from("products")
-    .select("id")
-    .eq("brand", oldName);
+  const { ok } = await jsend("/api/products/brands", "PATCH", { from: oldName, to: newName });
+  if (!ok) return false;
 
-  if (!products?.length) return true;
-
-  // Update each product
-  const { error } = await supabase
-    .from("products")
-    .update({ brand: newName })
-    .eq("brand", oldName);
-
-  if (error) {
-    console.error("[Brand] Rename error:", error.message);
-    return false;
-  }
-
-  // Also rename the logo file in storage if it exists
+  // Move the logo file in storage (proxy) if the slug changed.
   const oldSlug = oldName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   const newSlug = newName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-
   if (oldSlug !== newSlug) {
-    // List files in brands/ to find the old logo
     const list = await listStorage(BUCKET, "brands", { limit: 200 });
-    const oldFile = list.ok
-      ? list.files.find(f => f.name.replace(/\.[^.]+$/, "") === oldSlug)
-      : null;
+    const oldFile = list.ok ? list.files.find(f => f.name.replace(/\.[^.]+$/, "") === oldSlug) : null;
     if (oldFile) {
       const ext = oldFile.name.split(".").pop() || "png";
-      // Fetch old file via public URL, re-upload with new name, delete old
       const oldUrl = publicUrl(BUCKET, `brands/${oldFile.name}`);
       try {
         const resp = await fetch(oldUrl);
         if (resp.ok) {
           const blob = await resp.blob();
-          await uploadToStorage(BUCKET, `brands/${newSlug}.${ext}`, blob, {
-            cacheControl: "3600",
-            upsert: true,
-          });
+          await uploadToStorage(BUCKET, `brands/${newSlug}.${ext}`, blob, { cacheControl: "3600", upsert: true });
           await removeFromStorage(BUCKET, [`brands/${oldFile.name}`]);
         }
       } catch (e) {
@@ -756,42 +511,24 @@ export async function renameBrand(oldName: string, newName: string): Promise<boo
       }
     }
   }
-
   return true;
 }
 
-/** Delete a brand — clear it from all products and remove logo */
+/** Delete a brand — clear it from all products + remove logo. */
 export async function deleteBrand(brandName: string): Promise<boolean> {
-  // Clear brand from all products
-  const { error } = await supabase
-    .from("products")
-    .update({ brand: null })
-    .eq("brand", brandName);
-
-  if (error) {
-    console.error("[Brand] Delete error:", error.message);
-    return false;
-  }
-
-  // Remove logo from storage
+  const { ok } = await jsend("/api/products/brands", "DELETE", { name: brandName });
+  if (!ok) return false;
   const slug = brandName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   const list = await listStorage(BUCKET, "brands", { limit: 200 });
-  const logoFile = list.ok
-    ? list.files.find(f => f.name.replace(/\.[^.]+$/, "") === slug)
-    : null;
-  if (logoFile) {
-    await removeFromStorage(BUCKET, [`brands/${logoFile.name}`]);
-  }
-
+  const logoFile = list.ok ? list.files.find(f => f.name.replace(/\.[^.]+$/, "") === slug) : null;
+  if (logoFile) await removeFromStorage(BUCKET, [`brands/${logoFile.name}`]);
   return true;
 }
 
-/** Delete only the logo for a brand */
+/** Delete only the logo for a brand (storage proxy). */
 export async function deleteBrandLogo(brandSlug: string): Promise<boolean> {
   const list = await listStorage(BUCKET, "brands", { limit: 200 });
-  const logoFile = list.ok
-    ? list.files.find(f => f.name.replace(/\.[^.]+$/, "") === brandSlug)
-    : null;
+  const logoFile = list.ok ? list.files.find(f => f.name.replace(/\.[^.]+$/, "") === brandSlug) : null;
   if (logoFile) {
     const rm = await removeFromStorage(BUCKET, [`brands/${logoFile.name}`]);
     if (!rm.ok) { console.error("[BrandLogo] Delete:", rm.error); return false; }
@@ -799,41 +536,26 @@ export async function deleteBrandLogo(brandSlug: string): Promise<boolean> {
   return true;
 }
 
-// ── Sewing Machine Specs ──
-
+// ── Sewing Machine Specs → /api/products/[id]/sewing-specs ──
 export async function fetchSewingSpecsByProductId(productId: string): Promise<SewingMachineSpecsRow | null> {
-  const { data } = await supabase
-    .from("product_sewing_specs")
-    .select("*")
-    .eq("product_id", productId)
-    .single();
-  return data as SewingMachineSpecsRow | null;
+  if (!productId) return null;
+  const json = await jget<{ specs?: SewingMachineSpecsRow | null }>(
+    `/api/products/${encodeURIComponent(productId)}/sewing-specs`, {},
+  );
+  return json.specs ?? null;
 }
-
 export async function upsertSewingSpecs(specs: {
   product_id: string;
   template_slug: string;
   common_specs: Record<string, unknown>;
   template_specs: Record<string, unknown>;
 }): Promise<boolean> {
-  const { error } = await supabase
-    .from("product_sewing_specs")
-    .upsert(specs, { onConflict: "product_id" });
-  if (error) {
-    console.error("[SewingSpecs] Upsert error:", error.message);
-    return false;
-  }
-  return true;
+  const { ok } = await jsend(
+    `/api/products/${encodeURIComponent(specs.product_id)}/sewing-specs`, "PUT", specs,
+  );
+  return ok;
 }
-
 export async function deleteSewingSpecs(productId: string): Promise<boolean> {
-  const { error } = await supabase
-    .from("product_sewing_specs")
-    .delete()
-    .eq("product_id", productId);
-  if (error) {
-    console.error("[SewingSpecs] Delete error:", error.message);
-    return false;
-  }
-  return true;
+  const { ok } = await jsend(`/api/products/${encodeURIComponent(productId)}/sewing-specs`, "DELETE");
+  return ok;
 }
