@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
 import QuotationIcon from "@/components/icons/QuotationIcon";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
@@ -32,8 +32,10 @@ import {
   upsertDoc,
   deleteDoc,
   convertQuotationToInvoice,
+  DocConflictError,
   type RemoteDocRow,
 } from "@/lib/docs-sync";
+import { useQuotationCollab } from "@/lib/quotation-collab";
 
 /* ══════════════════════════════════════════════════════════
    Types
@@ -210,6 +212,12 @@ export interface Quotation {
      rows fetched in the list view. Use this for the per-row badge
      and the TOTAL VALUE KPI tile. Undefined for unsaved drafts. */
   serverTotal?: number;
+  /* Optimistic-lock revision the editor loaded this row at. Sent back as
+     base_version on save; the server rejects (409) if the DB moved past it.
+     Undefined for never-saved local drafts (treated as no-guard). */
+  version?: number;
+  /* Last saver (denormalized) — used for the conflict / "updated by" UX. */
+  updatedByName?: string;
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -361,6 +369,8 @@ export function fromRow(row: RemoteDocRow): Quotation {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     serverTotal: typeof row.total === "number" ? row.total : (row.total != null ? Number(row.total) : undefined),
+    version: typeof row.version === "number" ? row.version : 1,
+    updatedByName: typeof row.updated_by_name === "string" ? row.updated_by_name : undefined,
   };
 }
 
@@ -433,6 +443,33 @@ async function saveQuotationRemote(q: Quotation): Promise<Quotation | null> {
     valid_till: ddmmyyyyToISO(q.validTill),
     total: computeGrandTotal(q),
     doc: q, // stash the whole UI snapshot
+    /* Optimistic lock: guard against the version we loaded. Omitted for a
+       brand-new local row (no server UUID) so the insert path is unaffected.
+       upsertDoc throws DocConflictError on a 409 — callers handle it. */
+    base_version: q.id.length === 36 ? q.version : undefined,
+  });
+  return row ? fromRow(row) : null;
+}
+
+/** Save as a brand-new copy (used to escape a conflict without losing the
+ *  user's edits). Strips the server id + version so the server mints a fresh
+ *  row, and tags the quote number so it's recognizable as a copy. */
+async function saveQuotationAsCopy(q: Quotation): Promise<Quotation | null> {
+  const copy: Quotation = {
+    ...q,
+    id: "local-" + Math.random().toString(36).slice(2),
+    version: undefined,
+    invoiceNo: q.invoiceNo ? `${q.invoiceNo}-COPY` : "",
+  };
+  const row = await upsertDoc(QUOTATIONS_SYNC, {
+    id: undefined, // force insert → new UUID + fresh quote_no if blank
+    quote_no: copy.invoiceNo || undefined,
+    status: copy.status,
+    currency: copy.currency || "USD",
+    issue_date: ddmmyyyyToISO(copy.date),
+    valid_till: ddmmyyyyToISO(copy.validTill),
+    total: computeGrandTotal(copy),
+    doc: copy,
   });
   return row ? fromRow(row) : null;
 }
@@ -1019,6 +1056,19 @@ export default function Quotations() {
      whether a click was registered or whether the save succeeded. */
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveError, setSaveError] = useState<string>("");
+  /* ── Collaboration safety ──
+     `conflict` holds the latest server version info when a save was rejected
+     because another user saved first (optimistic-lock 409). Drives the
+     "updated by another user" blocking dialog (Load Latest / Save as Copy).
+     `hydrating` is true while the full doc (with items) is being fetched on
+     open, so we can show a loading state instead of a half-empty document. */
+  const [conflict, setConflict] = useState<null | { version: number | null; updated_by_name: string | null; updated_at: string | null }>(null);
+  const [conflictBusy, setConflictBusy] = useState(false);
+  const [hydrating, setHydrating] = useState(false);
+  /* announceSaved comes from the realtime hook (declared lower, after `dirty`),
+     but handleSave (declared above it) needs to call it on a successful save.
+     A ref breaks the ordering cycle without re-creating handleSave. */
+  const announceSavedRef = useRef<(version: number) => void>(() => {});
   /* Unsaved-changes guard. `baselineRef` holds a JSON snapshot of the quote
      as it was last loaded / saved; the working copy is "dirty" once it
      diverges. Drives both the in-app exit confirm modal and the native
@@ -1122,7 +1172,13 @@ export default function Quotations() {
     // …then hydrate the full doc (with items) from the detail endpoint.
     if (q.id.length === 36) {
       const requestedId = q.id;
-      const full = await fetchDocOne(QUOTATIONS_SYNC, q.id);
+      setHydrating(true);
+      let full: RemoteDocRow | null = null;
+      try {
+        full = await fetchDocOne(QUOTATIONS_SYNC, q.id);
+      } finally {
+        setHydrating(false);
+      }
       /* Guard against a late response overwriting a NEWER open.
          If the operator clicked row A then quickly clicked row B,
          A's fetch can resolve after B's setCurrent — without this
@@ -1272,6 +1328,8 @@ export default function Quotations() {
         if (saved) {
           setCurrent(saved);
           markSaved(saved);   // clears the dirty flag — editor matches server
+          // Tell anyone else viewing this quotation that it just changed.
+          if (typeof saved.version === "number") announceSavedRef.current(saved.version);
           const list = await loadQuotationsRemote({ fresh: true });
           setQuotations(list);
           setSaveState("saved");
@@ -1289,6 +1347,14 @@ export default function Quotations() {
           return false;
         }
       } catch (e) {
+        /* Optimistic-lock conflict — another user saved since we loaded. NEVER
+           overwrite: show the blocking dialog so the user can Load Latest or
+           Save as Copy. This is the core data-loss prevention. */
+        if (e instanceof DocConflictError) {
+          setConflict(e.current);
+          setSaveState("idle");
+          return false;
+        }
         setSaveState("error");
         setSaveError(humanizeError(e));
         setTimeout(() => setSaveState("idle"), 4000);
@@ -1502,6 +1568,13 @@ export default function Quotations() {
       };
       iframe.addEventListener("load", onLoad);
     } catch (e) {
+      /* A conflict during the pre-export save: don't export a stale doc —
+         surface the conflict dialog so the user resolves it first. */
+      if (e instanceof DocConflictError) {
+        setConflict(e.current);
+        setPdfState("idle");
+        return;
+      }
       setPdfState("error");
       alert(`Export failed: ${humanizeError(e)}`);
       setTimeout(() => setPdfState("idle"), 2_000);
@@ -1919,6 +1992,39 @@ export default function Quotations() {
       ? JSON.stringify(current) !== baselineRef.current
       : false;
 
+  /* ── Realtime collaboration (presence + save broadcast) ──
+     Identity for presence + updated_by display comes from the bootstrap
+     cache. Status is "editing" when there are unsaved edits, else "viewing".
+     The hook no-ops for unsaved local drafts (id is not a server UUID). */
+  const collabMe = useMemo(() => {
+    const a = meBootstrap?.auth as { account_id?: string; username?: string } | undefined;
+    if (!a?.account_id) return null;
+    const person = (meBootstrap as { header?: { person?: { full_name?: string } } } | undefined)?.header?.person;
+    const name = person?.full_name || a.username || "User";
+    return { id: a.account_id, name };
+  }, [meBootstrap]);
+
+  const { peers, saveNotice, announceSaved, clearNotice } = useQuotationCollab({
+    quotationId: view === "editor" ? current?.id ?? null : null,
+    me: collabMe,
+    status: dirty ? "editing" : "viewing",
+  });
+  // Expose announceSaved to handleSave (declared earlier) via the ref.
+  useEffect(() => { announceSavedRef.current = announceSaved; }, [announceSaved]);
+
+  /* Pull the latest server version into the editor without losing edits.
+     Used by the "Load Latest" actions in the conflict dialog + save notice. */
+  const loadLatest = useCallback(async () => {
+    if (!current || current.id.length !== 36) return null;
+    const full = await fetchDocOne(QUOTATIONS_SYNC, current.id);
+    if (!full) return null;
+    const fresh = fromRow(full);
+    const serverView = { ...fresh, items: fresh.items.map((i) => ({ ...i })) };
+    setCurrent(serverView);
+    markSaved(serverView);
+    return serverView;
+  }, [current, markSaved]);
+
   useEffect(() => {
     if (!dirty) return;
     /* Browser-native "Leave site?" prompt for tab close / refresh /
@@ -2177,6 +2283,38 @@ export default function Quotations() {
           {hidePanels ? "Show panels" : "Hide panels"}
         </button>
         <div style={{ flex: 1 }} />
+        {/* ── Presence — who else is on this quotation right now ── */}
+        {peers.length > 0 && (
+          <div title="People viewing this quotation now" style={{ display: "flex", alignItems: "center", gap: 6, marginRight: 2 }}>
+            {peers.slice(0, 3).map((p) => (
+              <span
+                key={p.id}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 5,
+                  fontSize: 11, fontWeight: 600, padding: "4px 9px", borderRadius: 999,
+                  background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.82)",
+                  border: "1px solid rgba(255,255,255,0.10)", whiteSpace: "nowrap",
+                }}
+              >
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: p.status === "editing" ? "#FFCC00" : "#00CC66", flexShrink: 0 }} />
+                {p.name.split(" ")[0]} {p.status === "editing" ? "editing" : "viewing"}
+              </span>
+            ))}
+            {peers.length > 3 && (
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.55)" }}>+{peers.length - 3}</span>
+            )}
+          </div>
+        )}
+        {/* Unsaved-changes indicator (calm, only when idle + dirty). */}
+        {dirty && saveState === "idle" && (
+          <span
+            title="You have unsaved changes"
+            style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, padding: "4px 9px", borderRadius: 999, background: "rgba(255,204,0,0.12)", color: "#FFCC00", border: "1px solid rgba(255,204,0,0.28)" }}
+          >
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#FFCC00" }} />
+            Unsaved
+          </span>
+        )}
         {/* Clickable status pill — opens a menu of transitions. The
             colour map mirrors the list-view row badge so the same
             quote reads the same in both views. */}
@@ -2270,6 +2408,63 @@ export default function Quotations() {
           <TrashIcon size={14} />
         </button>
       </div>
+
+      {/* ── Loading bar — full doc (items) is hydrating from the server ── */}
+      {hydrating && (
+        <div
+          className="no-print"
+          style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "8px 16px", background: "#0d0d0d",
+            borderBottom: "1px solid rgba(255,255,255,0.06)",
+            fontSize: 12, color: "rgba(255,255,255,0.6)",
+          }}
+        >
+          <SpinnerIcon size={14} />
+          Loading quotation… fetching items, customer & products
+        </div>
+      )}
+
+      {/* ── Realtime "updated by another user" notice (non-blocking) ──
+          Shown when a peer saved while we're viewing. We NEVER auto-refresh
+          if there are unsaved edits — the user chooses Load Latest or dismiss. */}
+      {saveNotice && (
+        <div
+          className="no-print"
+          style={{
+            display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+            padding: "10px 16px", background: "rgba(51,133,255,0.10)",
+            borderBottom: "1px solid rgba(51,133,255,0.30)",
+            fontSize: 13, color: "rgba(255,255,255,0.88)",
+          }}
+        >
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#3385FF", flexShrink: 0 }} />
+          <span style={{ flex: 1, minWidth: 180 }}>
+            <b>{saveNotice.byName}</b> updated this quotation just now
+            {dirty ? " — you have unsaved edits, so it was not refreshed." : "."}
+          </span>
+          <button
+            type="button"
+            onClick={async () => {
+              if (dirty && !window.confirm("Load the latest version? Your unsaved edits will be replaced.")) return;
+              await loadLatest();
+              clearNotice();
+            }}
+            className="px-3 py-1.5 text-xs font-bold rounded-lg"
+            style={{ border: "1px solid #3385FF", background: "rgba(51,133,255,0.18)", color: "#3385FF" }}
+          >
+            Load Latest
+          </button>
+          <button
+            type="button"
+            onClick={clearNotice}
+            className="px-3 py-1.5 text-xs font-semibold rounded-lg"
+            style={{ border: "1px solid rgba(255,255,255,0.18)", background: "transparent", color: "rgba(255,255,255,0.7)" }}
+          >
+            Ignore for now
+          </button>
+        </div>
+      )}
 
       {/* ── Customer fields (dark row, above A4, not inside document) ── */}
       <div
@@ -2427,6 +2622,77 @@ export default function Quotations() {
               </button>
               <button type="button" className="qz-btn qz-btn--primary" disabled={saveState === "saving"} onClick={saveAndExit}>
                 {saveState === "saving" ? t("quot.saving", "Saving…") : t("quot.saveLeave", "Save & leave")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Conflict dialog — save was BLOCKED because the quotation changed
+            on the server since we loaded it. The stale write was rejected
+            (never overwrote newer data). User chooses how to proceed. ── */}
+      {conflict && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200, padding: 16 }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Quotation updated by another user"
+            style={{ width: "100%", maxWidth: 460, background: "#1A1A1A", color: "#fff", border: "1px solid #2E2E2E", borderRadius: 14, boxShadow: "0 24px 70px rgba(0,0,0,0.6)", overflow: "hidden" }}
+          >
+            <div style={{ padding: "20px 22px 6px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                <span style={{ width: 9, height: 9, borderRadius: "50%", background: "#FFCC00", flexShrink: 0 }} />
+                <div style={{ fontSize: 16, fontWeight: 700 }}>Quotation was updated by another user</div>
+              </div>
+              <p style={{ marginTop: 10, fontSize: 13.5, lineHeight: 1.6, color: "#AAAAAA" }}>
+                {conflict.updated_by_name ? <><b style={{ color: "#fff" }}>{conflict.updated_by_name}</b> saved a newer version</> : "A newer version was saved"}
+                {conflict.updated_at ? ` (${new Date(conflict.updated_at).toLocaleString()})` : ""}. To protect their changes, your save was not applied. Please load the latest version before saving — or save your edits as a separate copy.
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center", padding: "14px 22px 18px", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                disabled={conflictBusy}
+                onClick={() => setConflict(null)}
+                style={{ height: 38, padding: "0 16px", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "1px solid #2E2E2E", background: "transparent", color: "#cbd5e1", opacity: conflictBusy ? 0.55 : 1 }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={conflictBusy}
+                onClick={async () => {
+                  if (!current) return;
+                  setConflictBusy(true);
+                  try {
+                    const copy = await saveQuotationAsCopy(current);
+                    if (copy) {
+                      setCurrent(copy);
+                      markSaved(copy);
+                      if (typeof copy.version === "number") announceSavedRef.current(copy.version);
+                      const list = await loadQuotationsRemote({ fresh: true });
+                      setQuotations(list);
+                    }
+                    setConflict(null);
+                  } finally { setConflictBusy(false); }
+                }}
+                style={{ height: 38, padding: "0 16px", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "1px solid rgba(255,255,255,0.22)", background: "rgba(255,255,255,0.06)", color: "#fff", opacity: conflictBusy ? 0.55 : 1 }}
+              >
+                Save as Copy
+              </button>
+              <button
+                type="button"
+                disabled={conflictBusy}
+                onClick={async () => {
+                  setConflictBusy(true);
+                  try { await loadLatest(); setConflict(null); }
+                  finally { setConflictBusy(false); }
+                }}
+                style={{ height: 38, padding: "0 16px", borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: "pointer", border: "1px solid #fff", background: "#fff", color: "#0D0D0D", opacity: conflictBusy ? 0.55 : 1 }}
+              >
+                {conflictBusy ? "Working…" : "Load Latest Version"}
               </button>
             </div>
           </div>

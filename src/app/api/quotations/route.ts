@@ -104,6 +104,7 @@ export async function GET(req: Request) {
       // STRIPPED from the response below (response shape unchanged).
       `id, tenant_id, quote_no, customer_id, status, currency, discount_percent,
        notes, doc, issue_date, valid_till, total, created_at, updated_at, created_by,
+       version, updated_by, updated_by_name,
        customer:customer_id ( id, name, company_name )`,
     )
     .eq("tenant_id", auth.tenant_id);
@@ -201,6 +202,12 @@ export async function POST(req: Request) {
     valid_till?: string | null;
     total?: number;
     doc: Record<string, unknown>;
+    /* Optimistic lock — the version the client loaded. When present, the
+       update only succeeds if the DB row is still at this version; a mismatch
+       means another user saved in the meantime → reject (409) so the stale
+       client can never overwrite newer data. Omitted by legacy callers, in
+       which case we fall back to last-write (but still increment version). */
+    base_version?: number;
   };
 
   /* Server fallback for currency — tenant base instead of hardcoded
@@ -210,6 +217,40 @@ export async function POST(req: Request) {
 
   // Upsert by id if given; else mint a new record with a fresh quote_no.
   if (body.id) {
+    /* Read the current row first (tenant-scoped) so we can (a) detect a
+       version conflict before overwriting, and (b) compute the next version.
+       This does NOT modify any data. */
+    const { data: cur, error: curErr } = await supabaseServer
+      .from("quotations")
+      .select("version, updated_by_name, updated_at")
+      .eq("id", body.id)
+      .eq("tenant_id", auth.tenant_id)
+      .maybeSingle();
+    if (curErr) return NextResponse.json({ error: curErr.message }, { status: 500 });
+    if (!cur) return NextResponse.json({ error: "Quotation not found" }, { status: 404 });
+
+    const currentVersion = typeof cur.version === "number" ? cur.version : 1;
+
+    // Optimistic-lock check: reject a stale save before it can overwrite.
+    if (typeof body.base_version === "number" && body.base_version !== currentVersion) {
+      return NextResponse.json(
+        {
+          status: "conflict",
+          current: {
+            version: currentVersion,
+            updated_by_name: cur.updated_by_name ?? null,
+            updated_at: cur.updated_at ?? null,
+          },
+        },
+        { status: 409 },
+      );
+    }
+
+    // The version we guard against: the one the client loaded, or (legacy
+    // caller) the row's current version. The .eq("version", guard) makes the
+    // write atomic against a concurrent writer slipping in between read & write.
+    const guardVersion = typeof body.base_version === "number" ? body.base_version : currentVersion;
+
     const { data, error } = await supabaseServer
       .from("quotations")
       .update({
@@ -221,12 +262,37 @@ export async function POST(req: Request) {
         valid_till: body.valid_till ?? null,
         total: body.total ?? 0,
         doc: body.doc ?? {},
+        version: guardVersion + 1,
+        updated_by: auth.account_id,
+        updated_by_name: auth.username,
       })
       .eq("id", body.id)
       .eq("tenant_id", auth.tenant_id)
+      .eq("version", guardVersion)
       .select("*")
-      .single();
+      .maybeSingle();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    // 0 rows updated → a concurrent writer changed the version between our
+    // read and write. Re-report as a conflict (never a silent overwrite).
+    if (!data) {
+      const { data: latest } = await supabaseServer
+        .from("quotations")
+        .select("version, updated_by_name, updated_at")
+        .eq("id", body.id)
+        .eq("tenant_id", auth.tenant_id)
+        .maybeSingle();
+      return NextResponse.json(
+        {
+          status: "conflict",
+          current: {
+            version: latest?.version ?? currentVersion,
+            updated_by_name: latest?.updated_by_name ?? null,
+            updated_at: latest?.updated_at ?? null,
+          },
+        },
+        { status: 409 },
+      );
+    }
     return NextResponse.json({ quotation: data });
   }
 
@@ -246,6 +312,8 @@ export async function POST(req: Request) {
       total: body.total ?? 0,
       doc: body.doc ?? {},
       created_by: auth.account_id,
+      updated_by: auth.account_id,
+      updated_by_name: auth.username,
     })
     .select("*")
     .single();

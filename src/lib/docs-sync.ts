@@ -25,6 +25,11 @@ export interface RemoteDocRow<TDoc = Record<string, unknown>> {
   created_at: string;
   updated_at: string;
   doc: TDoc;
+  // Optimistic-lock + provenance (quotations). Optional so invoice rows,
+  // which don't carry these, still satisfy the type.
+  version?: number;
+  updated_by?: string | null;
+  updated_by_name?: string | null;
   // quote/invoice-specific
   quote_no?: string | null;
   inv_no?: string | null;
@@ -40,6 +45,20 @@ interface DocBindings<TList extends string, TOne extends string> {
   listPath: string;      // e.g. "/api/quotations"
   oneKey: TOne;          // "quotation" or "invoice"
   listKey: TList;        // "quotations" or "invoices"
+}
+
+/* Thrown by upsertDoc when the server rejects a save because the row was
+   changed by another user since this client loaded it (HTTP 409). Carries
+   the latest version + who/when so the editor can show the conflict dialog
+   and offer Load Latest / Save as Copy. */
+export class DocConflictError extends Error {
+  readonly conflict = true as const;
+  readonly current: { version: number | null; updated_by_name: string | null; updated_at: string | null };
+  constructor(current: DocConflictError["current"]) {
+    super("This quotation was updated by another user.");
+    this.name = "DocConflictError";
+    this.current = current;
+  }
 }
 
 export const QUOTATIONS_SYNC: DocBindings<"quotations", "quotation"> = {
@@ -108,6 +127,17 @@ export async function upsertDoc<T = Record<string, unknown>>(
     body: JSON.stringify(body),
   });
   if (!res.ok) {
+    // 409 = optimistic-lock conflict. Surface a typed error carrying the
+    // latest version so the caller can show the "updated by another user"
+    // dialog (Load Latest / Save as Copy / Cancel) instead of a generic alert.
+    if (res.status === 409) {
+      let current = { version: null as number | null, updated_by_name: null as string | null, updated_at: null as string | null };
+      try {
+        const j = await res.json();
+        if (j && j.current) current = { version: j.current.version ?? null, updated_by_name: j.current.updated_by_name ?? null, updated_at: j.current.updated_at ?? null };
+      } catch { /* ignore */ }
+      throw new DocConflictError(current);
+    }
     // Pull the server's error message and THROW with a human-friendly
     // sentence. Raw Postgres FK / 422 / 500 strings were leaking into
     // the operator's alert modal (e.g. "violates foreign key
