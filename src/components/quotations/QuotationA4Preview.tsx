@@ -8618,15 +8618,21 @@ function CostPricePanel({
       const savedCost = m.headCostRmb == null ? null : Number(m.headCostRmb);
       const savedDesc = typeof m.description === "string" ? m.description : null;
       const savedPhoto = typeof m.photo === "string" ? m.photo : null;
+      /* The description cell is rich-text (HTML), so an "empty" row may still
+         hold markup like "<br>" / "&nbsp;". Strip tags before deciding if it's
+         truly empty, otherwise an empty row would wrongly look filled. */
+      const stripHtml = (s: string) =>
+        (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim();
+      const curDescText = stripHtml(cur.description);
       const patch: Partial<QuotationItem> = {};
       let conflict = false;
       if (savedCost != null) {
-        if (cur.costHead == null) patch.costHead = savedCost;
+        if (!cur.costHead) patch.costHead = savedCost; // empty OR 0 → fill
         else if (Number(cur.costHead) !== savedCost) conflict = true;
       }
       if (savedDesc) {
-        if (!(cur.description || "").trim()) patch.description = savedDesc;
-        else if ((cur.description || "").trim() !== savedDesc.trim()) conflict = true;
+        if (!curDescText) patch.description = savedDesc;
+        else if (curDescText !== savedDesc.trim()) conflict = true;
       }
       if (savedPhoto) {
         if (!(cur.image || "").trim()) patch.image = savedPhoto;
@@ -8819,36 +8825,35 @@ function CostPricePanel({
           </select>
         </div>
 
-        {/* Cost readout — Head · Stand & Table · Total RMB · Cost {currency}.
-            Single compact wrapping line so the card stays ≈ one row tall. */}
+        {/* Resting readout — Total Cost RMB + Cost (currency) only.
+            Head / Stand & Table breakdown lives in the Manage Pricing modal. */}
         <div style={{
           borderTop: "1px solid #2D2D2D", paddingTop: 6,
-          display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "2px 10px",
-          fontSize: 10, fontVariantNumeric: "tabular-nums", color: "rgba(255,255,255,0.55)",
+          display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8,
+          fontSize: 11, fontVariantNumeric: "tabular-nums", color: "rgba(255,255,255,0.6)",
         }}>
-          <span>Head <b style={{ color: "rgba(255,255,255,0.85)", fontWeight: 600 }}>{fmtN(head)}</b></span>
-          <span>· S&amp;T <b style={{ color: "rgba(255,255,255,0.85)", fontWeight: 600 }}>{fmtN(mode === "complete" ? standTablePrice : 0)}</b></span>
-          <span>· Total <b style={{ color: "#fff", fontWeight: 700 }}>{fmtN(total)}</b> RMB</span>
-          <span>· <b style={{ color: "#fff", fontWeight: 700 }}>{fmtN(costConverted)}</b> {curCode}</span>
+          <span>Total <b style={{ color: "#fff", fontWeight: 700 }}>{fmtN(total)}</b> RMB</span>
+          <span><b style={{ color: "#fff", fontWeight: 700 }}>{fmtN(costConverted)}</b> {curCode}</span>
         </div>
 
-        {/* Auto-load suggestion (only when saved data differs from a field the
-            user already filled — never overwrites silently). */}
+        {/* Auto-load suggestion — subtle inline pill, only when saved data
+            differs from a field the user already filled (never overwrites). */}
         {pdSuggestion && (
           <div style={{
-            display: "flex", alignItems: "center", gap: 8,
-            border: "1px solid rgba(255,204,0,0.4)", background: "rgba(255,204,0,0.10)",
-            borderRadius: 7, padding: "5px 8px",
+            display: "flex", alignItems: "center", gap: 6,
+            border: "1px solid rgba(255,255,255,0.12)", background: "rgba(51,133,255,0.08)",
+            borderRadius: 6, padding: "3px 4px 3px 8px",
           }}>
-            <span style={{ flex: 1, minWidth: 0, fontSize: 9.5, color: "rgba(255,255,255,0.8)", lineHeight: 1.35 }}>
-              Product Data found. Apply saved data?
+            <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#3385FF", flexShrink: 0 }} />
+            <span style={{ flex: 1, minWidth: 0, fontSize: 9, color: "rgba(255,255,255,0.65)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              Product Data available
             </span>
             <button
               type="button"
               onClick={applySuggestion}
               style={{
-                flexShrink: 0, padding: "3px 10px", fontSize: 9.5, fontWeight: 700, borderRadius: 6,
-                cursor: "pointer", border: "1px solid #FFCC00", background: "rgba(255,204,0,0.18)", color: "#FFCC00",
+                flexShrink: 0, padding: "2px 8px", fontSize: 9, fontWeight: 700, borderRadius: 5,
+                cursor: "pointer", border: "1px solid rgba(51,133,255,0.5)", background: "transparent", color: "#3385FF",
               }}
             >Apply</button>
             <button
@@ -8856,9 +8861,8 @@ function CostPricePanel({
               onClick={() => setPdSuggestion(null)}
               aria-label="Dismiss"
               style={{
-                flexShrink: 0, width: 20, height: 20, borderRadius: 5, cursor: "pointer",
-                border: "1px solid #2D2D2D", background: "transparent", color: "rgba(255,255,255,0.6)",
-                fontSize: 12, lineHeight: 1,
+                flexShrink: 0, width: 16, height: 16, borderRadius: 4, cursor: "pointer",
+                border: "none", background: "transparent", color: "rgba(255,255,255,0.45)", fontSize: 12, lineHeight: 1,
               }}
             >×</button>
           </div>
