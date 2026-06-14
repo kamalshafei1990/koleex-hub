@@ -1,6 +1,7 @@
 # KOLEEX — P0-UX Product Knowledge Experience Blueprint
 **Mode:** read-only **experience architecture** audit. **NOT** UI design / frontend redesign / feature implementation / coding. **No code · no schema · no migration · no visual redesign.**
 **Date:** 2026-06-15. **Frozen:** P0-A Naming · P0-B Graph · P0-C Completeness · P0-D Product Type Library · P0-E Controlled Vocabulary.
+**Status:** 🟢 **RATIFIED — APPROVE WITH MINOR NOTES** (independent architecture review, 2026-06-15). One minor note folded in (§4 / §8: Maturity = Knowledge Signal, Publish Status = Operational Signal — keep both). **Verdict: freeze P0-UX as the experience contract before P0-F.** Confirmed gate order: `P0-UX → P0-F → Product Type Knowledge Authoring → Pilot → Population`. Full ratification in §Ratification. *(Awaiting owner go to actually open P0-F.)*
 **Evidence base:** the live walkthroughs + code reads from the [Product Knowledge Audit](product-knowledge-audit.md) and [observations](product-knowledge-audit-observations.md). This audit reframes them as an **experience model**, not a feature list.
 
 > **The one question:** *When a user opens KOLEEX Hub, does it feel like they are managing PRODUCTS, or managing PRODUCT KNOWLEDGE?*
@@ -70,7 +71,8 @@ Consequences (experience-level, not UI):
 | **Missing Knowledge** | The top gaps (the next best action). |
 | **Inheritance Status** | How much is inherited from the Type vs product-specific. |
 
-→ The list becomes a **knowledge-health roster**, not a record table. **`Status` = knowledge maturity, not publish lifecycle.** *(IA only — no layout prescribed.)*
+→ The list becomes a **knowledge-health roster**, not a record table. **`Status` becomes knowledge maturity** as the primary signal.
+> **[Ratification minor note]** Maturity does **not** delete the publish state — keep **two distinct signals**: **Maturity = Knowledge Signal** (L1–L5) and **Publish Status = Operational Signal** (Draft/Active/…). They coexist; maturity leads, publish remains. *(Implementation-time, non-blocking.)* *(IA only — no layout prescribed.)*
 
 ---
 
@@ -127,7 +129,7 @@ Five levels, tied to the frozen contracts (indicative bands; exact thresholds ar
 - **P0-1** Completeness is **invisible** where users browse (list/cards/preview). Knowledge quality isn't felt.
 - **P0-2** Relationships **untyped + unrendered** → no graph feeling; products are islands.
 - **P0-3** Workspace is **Create/Fill/Save linear form** — no inheritance shown, no live object forming, no measure-as-you-go.
-- **P0-4** **No maturity language** — `Status` = publish enum, not L1–L5. Users can't see where an object is on the journey.
+- **P0-4** **No maturity language** — `Status` = publish enum, not L1–L5. Users can't see where an object is on the journey. *(Ratification note: introduce Maturity as a Knowledge Signal **alongside** Publish Status as an Operational Signal — don't replace one with the other.)*
 
 **P1 — should fix:**
 - **P1-1** No **Knowledge Dashboard** (catalog-level knowledge health absent).
@@ -153,7 +155,21 @@ Freezing P0-UX now is the same logic that made Naming/Graph/Completeness freeze 
 
 ---
 
-## ChatGPT Ratification Summary (send for independent review)
+## Ratification — APPROVE WITH MINOR NOTES ✅ (independent review, 2026-06-15)
+The independent architecture review **approved** the blueprint and answered the Final Question **YES**.
+
+- **Headline:** *"This is the first contract that links everything previously frozen (P0-A Identity · P0-B Graph · P0-C Completeness · P0-D Product Types · P0-E Vocabulary). Without it, Population would begin with no clear definition of what the system is trying to become from the user's perspective."*
+- **Section verdicts:** §1 Current-State **APPROVED** (numbers consistent with all prior audits; *"users consume knowledge but manage records"*) · §2 Experience Model **APPROVED** (Build←P0-B · Enrich←P0-E · Connect←Graph · Measure←P0-C · Publish←Publish-Rules — *"fully consistent"*) · §3 Workspace **APPROVED** · §5 Dashboard **APPROVED** (*"one of the strongest parts"*; commerce-exclusion confirmed) · §6 Search **APPROVED** (*"natural result of P0-B"*) · §7 Maturity **APPROVED** (*"logical, progressive"*) · §8 Gaps **APPROVED** (P0-2 relationships untyped+unrendered = the biggest gap between *Knowledge Record* and *Knowledge Graph*).
+- **The single minor note (§4 Product List):** *Publish Status must not disappear entirely.* → **Maturity = Knowledge Signal · Publish Status = Operational Signal** (keep both). Explicitly **"not an architectural problem — a later implementation note."** Folded into §4 and §8.
+- **Final Question — YES.** Rationale: **P0-F defines the data** (Materials · Compatibility Classes · Spare-Part Classes); **P0-UX defines** *why these things exist · how users see them · how completeness measures them · how maturity depends on them.* Therefore the correct order is:
+```
+P0-UX → P0-F → Product Type Knowledge Authoring → Pilot → Population
+```
+**Both architects ratified.** P0-UX is adopted as the experience contract; opening P0-F awaits owner go.
+
+---
+
+## ChatGPT Ratification Summary (sent for independent review — APPROVED)
 ```
 KOLEEX — P0-UX Product Knowledge Experience Blueprint — Ratification Review
 
