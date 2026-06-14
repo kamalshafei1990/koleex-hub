@@ -1,5 +1,7 @@
 # Facet Dictionary Master
 
+> **Visual requirement (SoT):** see [Visual Product Experience](../architecture/visual-product-experience.md). Every facet must define presentation metadata — `presentation_group`, `spec_card_priority`, a display style (chip / meter / boolean-icon / value-unit / swatch), `comparison_display`, and `icon_key` for enumerated options — before approval. Specs render as visual cards, not a flat table.
+
 Reference dataset for Product Data V2. **Documentation only.** Canonical, deduped facet vocabulary governing all categories.
 **Data types:** `text` · `number` · `boolean` · `single_select` · `multi_select` · `range` · `measurement`.
 New facets are added **here only** (governance). Categories *reference* facets; no private synonyms.

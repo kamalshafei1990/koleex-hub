@@ -55,8 +55,18 @@ A coding change is complete **only** when:
 - [ ] All affected architecture docs updated.
 - [ ] Change-log entry added.
 - [ ] Conflict scan returns clean (no stale/duplicate codes).
+- [ ] **Visual Presentation Metadata defined** (§7) for any new Product Type / Facet / Device / Compatibility rule.
 
 ## 6. Authority & approval
 - **Prefix / name / grammar / reserved-token** changes require **Kamal sign-off** (governance-gated).
 - Operators fill product *values*; they do **not** invent prefixes, types, families, or grammar.
 - The Code Registry enforces **global uniqueness** and **no recycling** (retired codes are never reissued).
+
+## 7. Visual Presentation Metadata (required before approval)
+Per [`../architecture/visual-product-experience.md`](../architecture/visual-product-experience.md) — the Visual Product Experience is a **core source-of-truth requirement**, not a UI detail. Therefore **any new Product Type, Facet, Device, or Compatibility rule must define its Visual Presentation Metadata before approval**:
+- **Product Type** → `icon_key` (+ `icon_style`), default `presentation_group` ordering, diagram/placeholder plan.
+- **Facet** → `presentation_group`, `spec_card_priority`, display style (chip / meter / boolean-icon / value-unit / swatch), `comparison_display`; `icon_key` for enumerated options where it aids recognition.
+- **Device / Spare Part** → `icon_key` and an `image_role` plan (photo and/or exploded-diagram callout).
+- **Compatibility rule** → the `presentation_group` (section) its result renders in.
+
+The approval matrix (`product-type-approval-matrix.md`) carries a **"visual metadata defined?"** gate; an entry is **not import-ready** until it passes. Data stays structured and normalized — visuals are an additive, metadata-driven layer, never hardcoded per product.
