@@ -30,7 +30,7 @@ import ShieldIcon from "@/components/icons/ui/ShieldIcon";
 import UserIcon from "@/components/icons/ui/UserIcon";
 import InboxRawIcon from "@/components/icons/ui/InboxRawIcon";
 import Settings2Icon from "@/components/icons/ui/Settings2Icon";
-import { fetchUnreadCount } from "@/lib/inbox";
+import { useInboxUnread } from "@/lib/inbox-unread-store";
 import {
   getCurrentUser,
   isSupabaseAuthEnabled,
@@ -96,27 +96,12 @@ export default function UserMenu({ dk }: { dk: boolean }) {
      resolves in both auth modes (see src/lib/identity.ts). */
   const { account } = useCurrentAccount();
 
-  /* Inbox unread count — shown as a badge next to the Inbox menu
-     entry. Refreshes when the menu opens + once per minute in the
-     background. Non-blocking; menu renders fine while this loads. */
-  const [unread, setUnread] = useState<number>(0);
-  useEffect(() => {
-    if (!account?.id) return;
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const n = await fetchUnreadCount(account.id);
-        if (!cancelled) setUnread(n);
-      } catch { /* swallow — badge just stays */ }
-    };
-    void load();
-    const timer = setInterval(() => {
-      // Don't poll while the tab is hidden; the menu also refreshes on open.
-      if (document.visibilityState !== "visible") return;
-      void load();
-    }, 60_000);
-    return () => { cancelled = true; clearInterval(timer); };
-  }, [account?.id]);
+  /* Inbox unread count — shown as a badge next to the Inbox menu entry.
+     Consumed from the shared inbox-unread store, which the global header
+     NotificationBell keeps current (single poll + realtime). This avoids
+     a second, duplicate 60 s poll for the same account. Account-scoped:
+     returns 0 for any account other than the published one. */
+  const unread = useInboxUnread(account?.id ?? null);
 
   const profile = useMemo(() => {
     if (!account) return null;
