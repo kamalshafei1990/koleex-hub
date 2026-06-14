@@ -3,6 +3,8 @@
 > **Visual requirement (SoT):** see [Visual Product Experience](../architecture/visual-product-experience.md). Every Product Type must define its visual identity — `icon_key` (+ `icon_style`), default `presentation_group` ordering, and a diagram/placeholder plan — before approval. Visuals are part of "done".
 
 Reference dataset for Product Data V2. **Documentation only.**
+> ⚠️ **Pre-freeze review (CL-0010):** the Industrial Sewing section below is **under taxonomy audit** — see [`industrial-sewing-taxonomy-audit.md`](./industrial-sewing-taxonomy-audit.md). The audit recommends **NOT freezing as-is**: downgrade `XSH`/`XSD`/`XSM` to attributes, explode `XSS` (Special), recode `XSPA`, rename `XSI`→Coverstitch, and adopt a **two-axis model** (stitch-class Product Types × shared attribute facets; Machine Kinds = derived overlay). Do not treat the current XS subcategory list as final until that audit is signed off.
+
 Legend for **Code Prefix**: ✅ = live KOLEEX code in production today · ▲ = *proposed*, needs governance sign-off (see gap analysis).
 Facets reference `facet-dictionary-master.md`; devices reference `device-dictionary-master.md`.
 
