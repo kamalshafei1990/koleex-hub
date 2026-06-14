@@ -84,7 +84,15 @@ Two renderers exist for "the product as seen by a customer/operator", and they a
 - **Deliberately NOT translated (schema/data-driven — deferred multilingual-content layer):** all `section.title`/`section.description` and `field.field_label`/`f.label` (TemplateView dl + ProductPreview Layer-3 group titles `group.title` + spec rows), repeater **column labels** (`c.label`), highlight **titles/blurbs** (`h.title`/`h.blurb`), `formatScalar`/`formatCell` **option labels + spec values + units**, knowledge content (overview/selling points/advantages/buyer Q&A/package contents/warranty notes), Smart-Intelligence `it.label`/`it.headline`/`it.insight`, material/application **option labels + descriptions**, product name, tagline, brand, primary model, and the document filename label. These already vary per product and are DATA, not chrome.
 
 ## 5e — RTL pass
-_pending_
+
+Live-verified the wizard (`/product-data/new`) and list (`/product-data`) under Arabic at 1280×900.
+
+- **[KO] PASS** — Global RTL works: `documentElement.dir="rtl"` flips the whole app (set by MainHeader on `koleex-lang=ar`). Wizard renders fully mirrored — StepNav right-anchored with steps flowing right→left (1 التصنيف → … → المراجعة), chevrons + lock icons mirrored, the P0 #3 draft-recovery banner localized (تم استرجاع مسودة غير محفوظة · استرجاع المسودة / تجاهل), Save/Cancel + Next/Previous + "Step 1 of 7" all localized and correctly placed. **Zero horizontal overflow** (`scrollWidth − clientWidth = 0`); buttons not cramped; text not broken. RTL is **production-ready** for the wired surfaces — NOT a P0/P1 architectural risk.
+- **[DB-ish] P2 / remaining-English** — The **Classify step's division/category picker** (a separate sub-component, not in the 5a–5d files) still shows English chrome: "Select Division", "New Division", category-grid labels. Division NAMES (Lifestyle / Garment Machinery / …) are data and correctly stay as-is, but the picker's UI furniture is a remaining English-only area → quick follow-up "5f", P2.
+- Note: the headless preview window must be explicitly sized (it defaulted to a 1px-wide viewport); at 1px everything looks cramped but that is a harness artifact, not an app RTL bug — at real widths the layout is clean.
+
+### RTL architectural-risk verdict (ChatGPT asked to log if not ready)
+RTL is **ready** — no P0/P1 risk. The only RTL-adjacent debt is component-level logical-property hygiene (occasional `ml-`/`mr-` vs `ms-`/`me-`) which the global flip already handles acceptably; track as P2 polish, not a blocker.
 
 ---
 
