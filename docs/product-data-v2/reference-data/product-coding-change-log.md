@@ -42,4 +42,12 @@ Authoritative, append-only log of every Source-of-Truth coding change (see `codi
 - **Required sync before Stage 2:** promote the ⊕ facets into `facet-dictionary-master.md` (governance §3) with their own CL entry; reconcile the auto-function names. Not done in this pass (kept the deliverable focused on the template).
 - **Status:** **Applied-to-docs.** No schema/migration; no Stage 2 started; production untouched.
 
+### CL-0004 · 2026-06-14 · Lockstitch real-catalog extraction & gap analysis
+- **Approved by:** — (evidence report; facet additions pending Kamal sign-off — the dictionary was NOT modified)
+- **Change:** NEW analysis doc — `dictionaries/lockstitch-catalog-extraction-report.md`. Validated the Lockstitch Golden Template against **real supplier catalogs** (`~/Documents/Supplier Catalogs/`). Wave 1 = 12 catalogs read; 7 lockstitch (MAQI, Bote, Goldsew, Jaki, Durkopp Adler, Yongxing, FDK).
+- **Findings:** template covers ~95% of mainstream single-needle lockstitch; **22 recommended new facets** (top: `needle_bar_stroke` seen in 5/7), **6 improvements** (richer `lubrication_type` enum, `arm_clearance` W×H + `max_sewing_thickness`, inch `needle_gauge`, ISO 301 class, expanded `needle_system` list, ball-bearing table option), a **CNC/template lockstitch sub-profile** (sewing_field_xy, pattern count/storage/format/scaling, RFID, controller_brand), application **fabric_weight_class** + vocab expansion, and **5 new visual roles** (stitch_sample, process_diagram, symbol_legend, parts_chart, code_builder).
+- **Conflict scan:** n/a (no codes/prefixes changed; dictionary unmodified). Recommended additions to be applied via a future governed CL entry (promote to `facet-dictionary-master.md` + Golden Template).
+- **Coverage note (no silent truncation):** ~40 supplier PDFs unread (Wave 2 available); spec vocabulary saturated within Wave 1.
+- **Status:** **Analysis complete; additions PENDING approval.** No schema/migration; no Stage 2; production untouched; dictionary unchanged.
+
 > **Next entries** will be created when Kamal approves the prefix decisions (each becomes a CL-#### entry that freezes the affected prefixes and propagates per the governance SOP).
