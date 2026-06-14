@@ -9,7 +9,8 @@ This folder captures the frozen architecture decisions (previously only in desig
 ## Document map
 | Area | Document |
 |---|---|
-| **Complete Product Knowledge Object** (58 domains · ownership/visibility/visual/AI/commercial/supplier matrices · full hierarchy) | [`product-knowledge-architecture.md`](./product-knowledge-architecture.md) |
+| **Product Knowledge Universe V2.0** (69 domains + 3 cross-cutting layers · connected-machine · channel/lifecycle · multi-language/graph/AI · missing-domain audit) | [`product-knowledge-architecture-v2.md`](./product-knowledge-architecture-v2.md) |
+| **Complete Product Knowledge Object** (V1.0 base · 58 domains · ownership/visibility/visual/AI/commercial/supplier matrices · full hierarchy) | [`product-knowledge-architecture.md`](./product-knowledge-architecture.md) |
 | Frozen decisions (identity model · refinements · KEEP/MODIFY/REMOVE) | [`architecture-freeze-v1.0.md`](./architecture-freeze-v1.0.md) |
 | Technical schema (pd_ entities · Mermaid ERD · inheritance · projections) | [`product-data-v2-schema.md`](./product-data-v2-schema.md) |
 | Reference datasets (Source of Truth for codes/types/facets) | [`../reference-data/`](../reference-data/) |
