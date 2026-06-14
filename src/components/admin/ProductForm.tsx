@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "@/lib/i18n";
+import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import ArrowUpRightIcon from "@/components/icons/ui/ArrowUpRightIcon";
@@ -152,6 +154,32 @@ interface WizardStep {
   conditional?: boolean;
 }
 
+/* P0 #5b · i18n — getSteps runs OUTSIDE the component (no hook scope), so
+   it keeps emitting stable English label / shortLabel for type-safety +
+   any non-translated consumer. Translation happens at RENDER time by
+   mapping the stable step `id` → dictionary keys via these maps, so the
+   StepNav + jump chips localize without `getSteps` ever calling a hook. */
+const STEP_LABEL_KEY: Record<string, string> = {
+  classify: "step.classification",
+  identity: "step.identity",
+  description: "step.description",
+  "sewing-specs": "step.machineSpecs",
+  commercial: "step.modelsVariants",
+  technical: "step.technical",
+  media: "step.media",
+  finalize: "step.reviewPublish",
+};
+const STEP_SHORT_KEY: Record<string, string> = {
+  classify: "step.classify",
+  identity: "step.hero",
+  description: "step.description",
+  "sewing-specs": "step.specs",
+  commercial: "step.models",
+  technical: "step.technical",
+  media: "step.media",
+  finalize: "step.review",
+};
+
 function getSteps(isSewing: boolean): WizardStep[] {
   /* Machine Kind used to be its own step (id: "machine-type") but
      it's really a 4th-tier classification decision — Division →
@@ -179,7 +207,7 @@ function getSteps(isSewing: boolean): WizardStep[] {
 /* ═══════════════════════════════════════════════════════════════════
    STEP NAVIGATION BAR
    ═══════════════════════════════════════════════════════════════════ */
-function StepNav({ steps, currentStep, onStepChange, completedSteps, lockedSteps, issueCounts }: {
+function StepNav({ steps, currentStep, onStepChange, completedSteps, lockedSteps, issueCounts, t }: {
   steps: WizardStep[];
   currentStep: number;
   onStepChange: (i: number) => void;
@@ -187,6 +215,8 @@ function StepNav({ steps, currentStep, onStepChange, completedSteps, lockedSteps
   lockedSteps?: Set<number>;
   /* P0 #3 · per-step count of unmet required fields → red badge */
   issueCounts?: Map<number, number>;
+  /* P0 #5b · translator passed down so step labels localize at render */
+  t: (key: string, fallback?: string) => string;
 }) {
   return (
     <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] px-2 py-2 mb-6">
@@ -208,10 +238,10 @@ function StepNav({ steps, currentStep, onStepChange, completedSteps, lockedSteps
               disabled={isLocked}
               title={
                 isLocked
-                  ? "Complete classification first"
+                  ? t("wizard.completeClassificationFirst", "Complete classification first")
                   : hasIssue
-                  ? `${issueCount} required field${issueCount === 1 ? "" : "s"} missing`
-                  : step.label
+                  ? t("validation.missingCount", `${issueCount} required field(s) missing`).replace("{n}", String(issueCount))
+                  : t(STEP_LABEL_KEY[step.id] ?? "", step.label)
               }
               className={`group relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-[12px] font-medium transition-all shrink-0 ${
                 isLocked
@@ -238,7 +268,7 @@ function StepNav({ steps, currentStep, onStepChange, completedSteps, lockedSteps
                   ? "!"
                   : (isCompleted && !isActive ? <CheckIcon className="h-3 w-3" /> : i + 1)}
               </div>
-              <span className="hidden md:inline">{step.shortLabel}</span>
+              <span className="hidden md:inline">{t(STEP_SHORT_KEY[step.id] ?? "", step.shortLabel)}</span>
               {hasIssue && (
                 <span className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-bold text-black">
                   {issueCount}
@@ -278,16 +308,17 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
 /* ═══════════════════════════════════════════════════════════════════
    STATUS BADGE
    ═══════════════════════════════════════════════════════════════════ */
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, t }: { status: string; t: (key: string, fallback?: string) => string }) {
   const colors: Record<string, string> = {
     draft: "text-amber-400 bg-amber-400/10 border-amber-400/20",
     active: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
     archived: "text-red-400 bg-red-400/10 border-red-400/20",
   };
+  const s = status || "draft";
   return (
     <span className={`inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full border text-[10px] font-semibold uppercase tracking-wider ${colors[status] || colors.draft}`}>
       <CircleDotIcon className="h-2.5 w-2.5" />
-      {status || "draft"}
+      {t(`status.${s}`, s)}
     </span>
   );
 }
@@ -301,6 +332,7 @@ interface Props {
 
 export default function ProductForm({ productId }: Props) {
   const router = useRouter();
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
   const isEdit = !!productId;
 
   /* P0 #3 · Draft Autosave — one localStorage slot per product
@@ -464,9 +496,9 @@ export default function ProductForm({ productId }: Props) {
       setDirty(true);
       setDraftMeta(null);
       setError("");
-      setSuccess("Draft restored — review the fields, then Save when you're ready.");
+      setSuccess(t("draft.restored", "Draft restored — review the fields, then Save when you're ready."));
     } catch {
-      setError("That saved draft couldn't be read — it may be from an older version. Discarding it is safe.");
+      setError(t("save.draftReadError", "That saved draft couldn't be read — it may be from an older version. Discarding it is safe."));
     }
   };
 
@@ -483,7 +515,7 @@ export default function ProductForm({ productId }: Props) {
   const handleCancel = () => {
     if (dirty) {
       const ok = window.confirm(
-        "Discard your changes and leave this page? Anything you've edited that hasn't been saved will be lost."
+        t("wizard.confirmDiscard", "Discard your changes and leave this page? Anything you've edited that hasn't been saved will be lost.")
       );
       if (!ok) return;
     }
@@ -720,12 +752,17 @@ export default function ProductForm({ productId }: Props) {
        (image type · 8 MB). */
     const MAIN_IMAGE_MAX_MB = 8;
     if (!/^image\//.test(file.type)) {
-      setError(`"${file.name}" isn't an image — the main photo must be a JPG, PNG, WebP or similar file.`);
+      setError(t("media.mainNotImage").replace("{name}", file.name));
       return;
     }
     if (file.size > MAIN_IMAGE_MAX_MB * 1024 * 1024) {
       const mb = (file.size / (1024 * 1024)).toFixed(1);
-      setError(`"${file.name}" is ${mb} MB — the main photo limit is ${MAIN_IMAGE_MAX_MB} MB. Please choose a smaller file.`);
+      setError(
+        t("media.mainTooBig")
+          .replace("{name}", file.name)
+          .replace("{size}", mb)
+          .replace("{max}", String(MAIN_IMAGE_MAX_MB)),
+      );
       return;
     }
     setError("");
@@ -891,9 +928,9 @@ export default function ProductForm({ productId }: Props) {
      surface (parking work), Active = green (going live),
      Archived = neutral dark (record-keeping). */
   const saveLabel =
-    product.status === "active" ? "Save & Publish"
-    : product.status === "archived" ? "Save Changes"
-    : "Save as Draft";
+    product.status === "active" ? t("action.savePublish", "Save & Publish")
+    : product.status === "archived" ? t("action.saveChanges", "Save Changes")
+    : t("action.saveAsDraft", "Save as Draft");
   const saveBtnCls =
     product.status === "active"
       ? "bg-emerald-600 text-white hover:bg-emerald-500"
@@ -933,9 +970,9 @@ export default function ProductForm({ productId }: Props) {
     if (lockedSteps.has(safeIdx)) {
       const target = steps[safeIdx];
       if (target?.id === "sewing-specs") {
-        setError("Select a machine type before entering specs");
+        setError(t("wizard.selectMachineTypeFirst", "Select a machine type before entering specs"));
       } else {
-        setError("Complete the classification first to unlock this step");
+        setError(t("wizard.unlockStepHint", "Complete the classification first to unlock this step"));
       }
       return;
     }
@@ -969,12 +1006,12 @@ export default function ProductForm({ productId }: Props) {
     const add = (step: string, label: string) => {
       (byStep[step] ||= []).push(label);
     };
-    if (!product.product_name.trim()) add("identity", "Product name");
-    if (!product.division_slug) add("classify", "Division");
-    if (!product.category_slug) add("classify", "Category");
-    if (!product.subcategory_slug) add("classify", "Subcategory");
-    if (isSewing && !machineKindChosen) add("classify", "Machine kind");
-    if (!(primaryModel?.primary_model || "").trim()) add("commercial", "Primary model");
+    if (!product.product_name.trim()) add("identity", t("field.productName", "Product name"));
+    if (!product.division_slug) add("classify", t("field.division", "Division"));
+    if (!product.category_slug) add("classify", t("field.category", "Category"));
+    if (!product.subcategory_slug) add("classify", t("field.subcategory", "Subcategory"));
+    if (isSewing && !machineKindChosen) add("classify", t("field.machineKind", "Machine kind"));
+    if (!(primaryModel?.primary_model || "").trim()) add("commercial", t("field.primaryModel", "Primary model"));
     return byStep;
   }, [
     product.product_name,
@@ -984,6 +1021,7 @@ export default function ProductForm({ productId }: Props) {
     isSewing,
     machineKindChosen,
     primaryModel?.primary_model,
+    t,
   ]);
 
   /* Map of step index → count of unmet required fields, for the
@@ -1012,8 +1050,8 @@ export default function ProductForm({ productId }: Props) {
     const issues = stepId ? requiredIssues[stepId] : undefined;
     if (issues && issues.length > 0) {
       return issues.length === 1
-        ? `${issues[0]} is required before continuing`
-        : `Complete required fields before continuing: ${issues.join(", ")}`;
+        ? t("validation.fieldRequiredToContinue").replace("{field}", issues[0])
+        : t("validation.completeRequiredList").replace("{fields}", issues.join(", "));
     }
     return null;
   };
@@ -1033,12 +1071,12 @@ export default function ProductForm({ productId }: Props) {
      ═══════════════════════════════════════════════ */
   const save = async () => {
     if (!product.product_name) {
-      setError("Product name is required");
+      setError(t("save.productNameRequired", "Product name is required"));
       setCurrentStep(0);
       return;
     }
     if (!product.division_slug || !product.category_slug || !product.subcategory_slug) {
-      setError("Classification is required");
+      setError(t("save.classificationRequired", "Classification is required"));
       setCurrentStep(0);
       return;
     }
@@ -1050,13 +1088,15 @@ export default function ProductForm({ productId }: Props) {
        message instead of surfacing a raw Postgres error toast. */
     if (codeCheck.status === "taken") {
       setError(
-        `Primary Model "${codeCheck.conflict.primary_model}" is already used by "${codeCheck.conflict.product_name}". Pick a different code.`,
+        t("model.takenBlock")
+          .replace("{code}", codeCheck.conflict.primary_model)
+          .replace("{product}", codeCheck.conflict.product_name),
       );
       setCurrentStep(0);
       return;
     }
     if (codeCheck.status === "checking") {
-      setError("Still checking if the Primary Model code is available — try again in a moment.");
+      setError(t("model.stillChecking", "Still checking if the Primary Model code is available — try again in a moment."));
       setCurrentStep(0);
       return;
     }
@@ -1071,8 +1111,9 @@ export default function ProductForm({ productId }: Props) {
       const firstIdx = steps.findIndex((s) => (requiredIssues[s.id]?.length || 0) > 0);
       const n = missingRequiredLabels.length;
       setError(
-        `Can't publish yet — ${n} required field${n === 1 ? "" : "s"} still empty: ` +
-          `${missingRequiredLabels.join(", ")}. Switch status to Draft to save your work for now.`,
+        t("save.cantPublishList")
+          .replace("{n}", String(n))
+          .replace("{fields}", missingRequiredLabels.join(", ")),
       );
       if (firstIdx >= 0) setCurrentStep(firstIdx);
       return;
@@ -1106,7 +1147,9 @@ export default function ProductForm({ productId }: Props) {
           const payload = await res.json();
           if (payload?.available === false && payload?.conflict) {
             setError(
-              `Primary Model "${payload.conflict.primary_model}" is already used by "${payload.conflict.product_name}". Pick a different code before saving.`,
+              t("model.takenBlockSave")
+                .replace("{code}", payload.conflict.primary_model)
+                .replace("{product}", payload.conflict.product_name),
             );
             setSaving(false);
             setCurrentStep(0);
@@ -1271,9 +1314,7 @@ export default function ProductForm({ productId }: Props) {
             throw new Error(`Couldn't upload "${fileLabel}": ${humanizeError(upErr)}`);
           }
           if (!uploaded) {
-            throw new Error(
-              `Couldn't upload "${fileLabel}" — the file didn't reach storage. Please try again, or use a smaller file.`,
-            );
+            throw new Error(t("media.uploadFailed").replace("{name}", fileLabel));
           }
           await createProductMedia({
             product_id: pid,
@@ -1335,7 +1376,7 @@ export default function ProductForm({ productId }: Props) {
         });
       }
 
-      setSuccess("Product saved successfully!");
+      setSuccess(t("save.success", "Product saved successfully!"));
       /* Save succeeded → form is in sync with DB. Clear the dirty
          flag so the post-save router.push doesn't trip the
          beforeunload "leave this page?" warning. */
@@ -1390,27 +1431,27 @@ export default function ProductForm({ productId }: Props) {
               type="button"
               onClick={handleCancel}
               className="h-9 w-9 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all shrink-0 cursor-pointer"
-              title={dirty ? "You have unsaved changes" : "Back to products"}
+              title={dirty ? t("wizard.unsavedChangesTitle", "You have unsaved changes") : t("wizard.backToProducts", "Back to products")}
             >
               <ArrowLeftIcon className="h-4 w-4" />
             </button>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl md:text-[26px] font-bold text-[var(--text-primary)] truncate">
-                  {product.product_name || "New Product"}
+                  {product.product_name || t("wizard.newProductHeading", "New Product")}
                 </h1>
-                {product.product_name && <StatusBadge status={product.status} />}
+                {product.product_name && <StatusBadge status={product.status} t={t} />}
                 {dirty && (
                   <span className="inline-flex items-center gap-1 h-5 px-2 rounded-full bg-amber-500/10 border border-amber-500/30 text-[9px] font-bold uppercase tracking-wider text-amber-400">
                     <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-                    Unsaved
+                    {t("wizard.unsaved", "Unsaved")}
                   </span>
                 )}
               </div>
               <p className="text-[12px] md:text-[13px] text-[var(--text-dim)] mt-0.5">
                 {product.product_name
-                  ? "Edit product details."
-                  : "Create a new product in your catalogue."}
+                  ? t("wizard.editSubtitle", "Edit product details.")
+                  : t("wizard.createSubtitle", "Create a new product in your catalogue.")}
               </p>
             </div>
           </div>
@@ -1420,7 +1461,7 @@ export default function ProductForm({ productId }: Props) {
               onClick={handleCancel}
               className="hidden sm:inline-flex h-9 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all cursor-pointer"
             >
-              Cancel
+              {t("action.cancel", "Cancel")}
             </button>
             <button
               onClick={save}
@@ -1428,7 +1469,7 @@ export default function ProductForm({ productId }: Props) {
               className="h-9 px-4 md:px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-50 shadow-lg shrink-0"
             >
               {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <DiskIcon className="h-4 w-4" />}
-              <span className="hidden sm:inline">{saving ? "Saving..." : "Save Product"}</span>
+              <span className="hidden sm:inline">{saving ? t("action.saving", "Saving...") : t("action.saveProduct", "Save Product")}</span>
             </button>
           </div>
         </div>
@@ -1459,12 +1500,10 @@ export default function ProductForm({ productId }: Props) {
               </span>
               <div className="min-w-0 flex-1">
                 <h4 className="text-[13px] font-semibold leading-tight text-[var(--text-primary)]">
-                  Unsaved draft recovered
+                  {t("draft.recovered", "Unsaved draft recovered")}
                 </h4>
                 <p className="mt-0.5 text-[11px] text-[var(--text-ghost)]">
-                  We kept work you didn&apos;t save from{" "}
-                  {new Date(draftMeta.savedAt).toLocaleString()}. Restore it, or discard
-                  to keep what&apos;s loaded now.
+                  {t("draft.recoveredBodyAt").replace("{when}", new Date(draftMeta.savedAt).toLocaleString())}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
@@ -1473,14 +1512,14 @@ export default function ProductForm({ productId }: Props) {
                   onClick={discardDraft}
                   className="h-9 rounded-xl border border-[var(--border-subtle)] px-3 text-[12px] font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-subtle)]"
                 >
-                  Discard
+                  {t("draft.discard", "Discard")}
                 </button>
                 <button
                   type="button"
                   onClick={restoreDraft}
                   className="h-9 rounded-xl bg-[var(--bg-inverted)] px-4 text-[12px] font-semibold text-[var(--text-inverted)] transition-opacity hover:opacity-90"
                 >
-                  Restore draft
+                  {t("draft.restore", "Restore draft")}
                 </button>
               </div>
             </div>
@@ -1495,12 +1534,13 @@ export default function ProductForm({ productId }: Props) {
           completedSteps={completedSteps}
           lockedSteps={lockedSteps}
           issueCounts={stepIssueCount}
+          t={t}
         />
 
         {/* ═══ GLOBAL CLASSIFICATION BREADCRUMB (shown once classification is set, across all steps) ═══ */}
         {divisionName && steps[currentStep]?.id !== "classify" && (
           <div className="flex items-center gap-2 text-[11px] text-[var(--text-ghost)] mb-4 px-1">
-            <span className="font-bold uppercase tracking-wider text-[var(--text-dim)]">Classification:</span>
+            <span className="font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("wizard.classificationLabel", "Classification:")}</span>
             <span>{divisionName}</span>
             {categoryName && <><AngleRightIcon className="h-3 w-3" /><span>{categoryName}</span></>}
             {subcategoryName && <><AngleRightIcon className="h-3 w-3" /><span className="text-emerald-400 font-medium">{subcategoryName}</span></>}
@@ -1527,7 +1567,7 @@ export default function ProductForm({ productId }: Props) {
                     <div className="h-6 w-6 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
                       <CameraIcon className="h-3 w-3 text-[var(--text-ghost)]" />
                     </div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">Main Product Photo</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">{t("hero.mainPhotoLabel", "Main Product Photo")}</span>
                   </div>
 
                   <input
@@ -1548,7 +1588,7 @@ export default function ProductForm({ productId }: Props) {
                         <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
                           <div className="flex items-center gap-2.5 bg-white/20 px-5 py-2.5 rounded-xl text-white text-[13px] font-medium backdrop-blur-sm">
                             <CameraIcon className="h-4 w-4" />
-                            Change Photo
+                            {t("media.changePhoto", "Change Photo")}
                           </div>
                         </div>
                       </>
@@ -1558,8 +1598,8 @@ export default function ProductForm({ productId }: Props) {
                           <ImageRawIcon className="h-9 w-9 text-[var(--text-ghost)]" />
                         </div>
                         <div className="text-center">
-                          <p className="text-[14px] font-semibold text-[var(--text-dim)]">Upload Product Photo</p>
-                          <p className="text-[11px] text-[var(--text-ghost)] mt-1">Click to browse or drag &amp; drop</p>
+                          <p className="text-[14px] font-semibold text-[var(--text-dim)]">{t("hero.uploadPhoto", "Upload Product Photo")}</p>
+                          <p className="text-[11px] text-[var(--text-ghost)] mt-1">{t("hero.dropHint", "Click to browse or drag & drop")}</p>
                         </div>
                       </div>
                     )}
@@ -1577,9 +1617,9 @@ export default function ProductForm({ productId }: Props) {
                     {/* Status pills — 3-way toggle (Draft / Active / Archived) */}
                     <div className="flex gap-1 p-0.5 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)]">
                       {([
-                        { v: "draft", label: "Draft", cls: "text-amber-400 bg-amber-400/15" },
-                        { v: "active", label: "Active", cls: "text-emerald-400 bg-emerald-400/15" },
-                        { v: "archived", label: "Archived", cls: "text-red-400 bg-red-400/15" },
+                        { v: "draft", label: t("status.draft", "Draft"), cls: "text-amber-400 bg-amber-400/15" },
+                        { v: "active", label: t("status.active", "Active"), cls: "text-emerald-400 bg-emerald-400/15" },
+                        { v: "archived", label: t("status.archived", "Archived"), cls: "text-red-400 bg-red-400/15" },
                       ] as const).map(s => {
                         const active = product.status === s.v;
                         return (
@@ -1606,10 +1646,10 @@ export default function ProductForm({ productId }: Props) {
                           ? "bg-amber-500/15 text-amber-400 border-amber-500/40"
                           : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)] border-[var(--border-subtle)] hover:text-[var(--text-muted)]"
                       }`}
-                      title={product.featured ? "Featured on homepage" : "Click to feature on homepage"}
+                      title={product.featured ? t("hero.featuredOnHome", "Featured on homepage") : t("hero.clickToFeature", "Click to feature on homepage")}
                     >
                       <StarIcon className="h-3 w-3" />
-                      {product.featured ? "Featured" : "Feature"}
+                      {product.featured ? t("hero.featured", "Featured") : t("hero.feature", "Feature")}
                     </button>
 
                     {/* Visibility toggle — gatekeeper for whether this
@@ -1623,20 +1663,20 @@ export default function ProductForm({ productId }: Props) {
                           ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/40"
                           : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)] border-[var(--border-subtle)] hover:text-[var(--text-muted)]"
                       }`}
-                      title={product.visible ? "Visible on public catalog" : "Hidden from public catalog"}
+                      title={product.visible ? t("hero.visibleOnCatalog", "Visible on public catalog") : t("hero.hiddenFromCatalog", "Hidden from public catalog")}
                     >
                       {product.visible ? <EyeIcon className="h-3 w-3" /> : <EyeOffIcon className="h-3 w-3" />}
-                      {product.visible ? "Visible" : "Hidden"}
+                      {product.visible ? t("hero.visible", "Visible") : t("hero.hidden", "Hidden")}
                     </button>
 
                     {/* Level pills — shopper-facing tier. Drives price
                         tier + catalog filtering. */}
                     <div className="flex items-center gap-1 ml-auto">
                       {([
-                        { v: "entry", label: "Entry", cls: "text-blue-400 bg-blue-500/15 border-blue-500/40" },
-                        { v: "mid", label: "Mid", cls: "text-emerald-400 bg-emerald-500/15 border-emerald-500/40" },
-                        { v: "premium", label: "Premium", cls: "text-amber-400 bg-amber-500/15 border-amber-500/40" },
-                        { v: "enterprise", label: "Enterprise", cls: "text-purple-400 bg-purple-500/15 border-purple-500/40" },
+                        { v: "entry", label: t("hero.levelEntry", "Entry"), cls: "text-blue-400 bg-blue-500/15 border-blue-500/40" },
+                        { v: "mid", label: t("hero.levelMid", "Mid"), cls: "text-emerald-400 bg-emerald-500/15 border-emerald-500/40" },
+                        { v: "premium", label: t("hero.levelPremium", "Premium"), cls: "text-amber-400 bg-amber-500/15 border-amber-500/40" },
+                        { v: "enterprise", label: t("hero.levelEnterprise", "Enterprise"), cls: "text-purple-400 bg-purple-500/15 border-purple-500/40" },
                       ] as const).map(l => {
                         const active = product.level === l.v;
                         return (
@@ -1658,10 +1698,10 @@ export default function ProductForm({ productId }: Props) {
                   {/* Product Name — XL prominent */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <label className="block text-[10px] font-bold text-[var(--text-ghost)] uppercase tracking-wider">Product Name *</label>
+                      <label className="block text-[10px] font-bold text-[var(--text-ghost)] uppercase tracking-wider">{t("hero.productNameLabel", "Product Name *")}</label>
                       {product.product_name && (
                         <span className="text-[10px] text-[var(--text-ghost)]">
-                          {product.product_name.length} chars
+                          {t("hero.charsCount", `${product.product_name.length} chars`).replace("{n}", String(product.product_name.length))}
                         </span>
                       )}
                     </div>
@@ -1673,7 +1713,7 @@ export default function ProductForm({ productId }: Props) {
                         if (!slugEdited) updates.slug = slugify(e.target.value);
                         updateProduct_(updates);
                       }}
-                      placeholder="e.g. KX Lockstitch Industrial 9500"
+                      placeholder={t("hero.productNamePlaceholder", "e.g. KX Lockstitch Industrial 9500")}
                       className="w-full h-14 px-5 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-xl md:text-2xl font-bold text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all"
                     />
                   </div>
@@ -1687,10 +1727,10 @@ export default function ProductForm({ productId }: Props) {
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <label className="block text-[10px] font-bold text-[var(--text-ghost)] uppercase tracking-wider">
-                        <span className="inline-flex items-center gap-1.5"><SparklesIcon className="h-3 w-3" /> Tagline</span>
+                        <span className="inline-flex items-center gap-1.5"><SparklesIcon className="h-3 w-3" /> {t("hero.tagline", "Tagline")}</span>
                       </label>
                       <span className="text-[10px] text-[var(--text-ghost)]">
-                        {(primaryModel?.tagline || "").length} / 80 · shown big on public page
+                        {t("hero.taglineMeta").replace("{n}", String((primaryModel?.tagline || "").length))}
                       </span>
                     </div>
                     {/* Tagline is rendered at 32px on the public hero and
@@ -1703,7 +1743,7 @@ export default function ProductForm({ productId }: Props) {
                       type="text"
                       value={primaryModel?.tagline || ""}
                       onChange={(e) => updatePrimaryModel({ tagline: e.target.value })}
-                      placeholder="e.g. Precision jetted pockets at 3-second cycle."
+                      placeholder={t("hero.taglinePlaceholder", "e.g. Precision jetted pockets at 3-second cycle.")}
                       maxLength={80}
                       className="w-full h-12 px-5 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[15px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all"
                     />
@@ -1737,10 +1777,10 @@ export default function ProductForm({ productId }: Props) {
                     const canReset = !!suggestedPrimaryModel && code !== suggestedPrimaryModel && status !== "locked";
                     const isLocked = status === "locked";
                     const statusLabel =
-                      status === "edited" ? "Edited" :
-                      status === "approved" ? "Approved" :
-                      status === "locked" ? "Locked" :
-                      status === "auto_suggested" ? "Auto" :
+                      status === "edited" ? t("hero.statusEdited", "Edited") :
+                      status === "approved" ? t("hero.statusApproved", "Approved") :
+                      status === "locked" ? t("hero.statusLocked", "Locked") :
+                      status === "auto_suggested" ? t("hero.statusAuto", "Auto") :
                       null;
                     const statusCls =
                       status === "approved" || status === "locked"
@@ -1754,12 +1794,12 @@ export default function ProductForm({ productId }: Props) {
                         {/* Label row — title + suggested hint + status pill */}
                         <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
                           <label className="block text-[10px] font-bold text-[var(--text-ghost)] uppercase tracking-wider">
-                            <span className="inline-flex items-center gap-1.5"><TagsIcon className="h-3 w-3" /> Primary Model · KOLEEX Code</span>
+                            <span className="inline-flex items-center gap-1.5"><TagsIcon className="h-3 w-3" /> {t("hero.primaryModelLabel", "Primary Model · KOLEEX Code")}</span>
                           </label>
                           <div className="flex items-center gap-2">
                             {suggestedPrimaryModel && code && code !== suggestedPrimaryModel && (
                               <span className="text-[10px] text-[var(--text-ghost)]">
-                                Suggested: <span className="font-mono font-semibold text-[var(--text-primary)]">{suggestedPrimaryModel}</span>
+                                {t("hero.suggested", "Suggested:")} <span className="font-mono font-semibold text-[var(--text-primary)]">{suggestedPrimaryModel}</span>
                               </span>
                             )}
                             {statusLabel && (
@@ -1779,16 +1819,16 @@ export default function ProductForm({ productId }: Props) {
                           {resolvedPrefix ? (
                             <div
                               className="h-12 px-3.5 rounded-xl border border-[var(--text-primary)] bg-[var(--bg-surface)] flex items-center font-mono text-[14px] font-bold tracking-[0.06em] text-[var(--text-primary)] shrink-0"
-                              title="Classification prefix — inherited from the selected subcategory."
+                              title={t("hero.prefixChipTitle", "Classification prefix — inherited from the selected subcategory.")}
                             >
                               {resolvedPrefix}
                             </div>
                           ) : (
                             <div
                               className="h-12 px-3.5 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] flex items-center text-[10.5px] text-[var(--text-faint)] shrink-0"
-                              title="Pick a subcategory to inherit a classification prefix."
+                              title={t("hero.pickSubcategoryTitle", "Pick a subcategory to inherit a classification prefix.")}
                             >
-                              PICK SUBCATEGORY
+                              {t("hero.pickSubcategory", "PICK SUBCATEGORY")}
                             </div>
                           )}
 
@@ -1822,7 +1862,7 @@ export default function ProductForm({ productId }: Props) {
                             }}
                             placeholder={
                               suggestedPrimaryModel ||
-                              (resolvedPrefix ? `${resolvedPrefix}-…` : "e.g. XCS-7800")
+                              (resolvedPrefix ? `${resolvedPrefix}-…` : t("hero.codePlaceholder", "e.g. XCS-7800"))
                             }
                             className={`flex-1 min-w-[180px] h-12 px-5 rounded-xl bg-[var(--bg-surface-subtle)]/70 border ${
                               isTaken
@@ -1847,10 +1887,10 @@ export default function ProductForm({ productId }: Props) {
                             }}
                             disabled={!canReset}
                             className="h-12 px-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[11.5px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 shrink-0"
-                            title="Reset to the auto-suggested code"
+                            title={t("hero.resetToAuto", "Reset to the auto-suggested code")}
                           >
                             <span aria-hidden>↺</span>
-                            Reset
+                            {t("hero.reset", "Reset")}
                           </button>
 
                           {/* Approve — locks the code as commercially blessed.
@@ -1863,10 +1903,10 @@ export default function ProductForm({ productId }: Props) {
                             }}
                             disabled={!canApprove}
                             className="h-12 px-3.5 rounded-xl border border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-primary)] text-[11.5px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 shrink-0"
-                            title={status === "approved" ? "Already approved" : status === "locked" ? "Locked" : "Mark as approved"}
+                            title={status === "approved" ? t("hero.alreadyApproved", "Already approved") : status === "locked" ? t("hero.statusLocked", "Locked") : t("hero.markApproved", "Mark as approved")}
                           >
                             <span aria-hidden>✓</span>
-                            {status === "approved" ? "Approved" : status === "locked" ? "Locked" : "Approve"}
+                            {status === "approved" ? t("hero.statusApproved", "Approved") : status === "locked" ? t("hero.statusLocked", "Locked") : t("hero.approve", "Approve")}
                           </button>
                         </div>
 
@@ -1883,9 +1923,9 @@ export default function ProductForm({ productId }: Props) {
                           <p className="text-[11px] text-red-500 mt-2">{validationError}</p>
                         ) : isTaken && codeCheck.status === "taken" ? (
                           <p className="text-[11px] text-red-500 mt-2 leading-relaxed">
-                            <span className="font-semibold">Code already in use.</span>{" "}
+                            <span className="font-semibold">{t("model.codeInUseInline", "Code already in use.")}</span>{" "}
                             <span className="font-mono font-bold">{codeCheck.conflict.primary_model}</span>{" "}
-                            belongs to{" "}
+                            {t("model.codeBelongsTo", "belongs to")}{" "}
                             {codeCheck.conflict.product_slug ? (
                               <a
                                 href={`/admin/products/${codeCheck.conflict.product_id}`}
@@ -1900,28 +1940,28 @@ export default function ProductForm({ productId }: Props) {
                                 {codeCheck.conflict.product_name} · {codeCheck.conflict.model_name}
                               </span>
                             )}
-                            . Pick a different number after the prefix.
+                            . {t("model.pickDifferentNumber", "Pick a different number after the prefix.")}
                           </p>
                         ) : isChecking ? (
                           <p className="text-[11px] text-[var(--text-ghost)] mt-2">
-                            Checking if this code is available…
+                            {t("model.checking", "Checking if this code is available…")}
                           </p>
                         ) : codeCheck.status === "available" && code && code !== suggestedPrimaryModel ? (
                           <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-2">
-                            ✓ Available — no other product uses this code.
+                            ✓ {t("model.availableInline", "Available — no other product uses this code.")}
                           </p>
                         ) : codeCheck.status === "error" && code ? (
                           /* P0 #4 · the live check couldn't reach the server.
                              Be honest, and reassure that Save still verifies
                              (the save-time re-check + DB unique index). */
                           <p className="text-[11px] text-amber-500 mt-2">
-                            Couldn&apos;t verify this code right now — we&apos;ll re-check it when you save.
+                            {t("model.unableToVerify", "Couldn't verify this code right now — we'll re-check it when you save.")}
                           </p>
                         ) : validationWarning ? (
                           <p className="text-[11px] text-amber-500 mt-2">{validationWarning}</p>
                         ) : (
                           <p className="text-[10px] text-[var(--text-ghost)] mt-2 leading-relaxed">
-                            KOLEEX commercial code — auto-suggested from the classification prefix + supplier model below, freely editable. Codes are unique across the catalog. Supplier model stays untouched as the factory reference.
+                            {t("model.helperText", "KOLEEX commercial code — auto-suggested from the classification prefix + supplier model below, freely editable. Codes are unique across the catalog. Supplier model stays untouched as the factory reference.")}
                           </p>
                         )}
                       </div>
@@ -1941,6 +1981,7 @@ export default function ProductForm({ productId }: Props) {
                       setSlugEdited(false);
                       updateProduct_({ slug: slugify(product.product_name) });
                     }}
+                    t={t}
                   />
 
                   {/* Brand · Family · Origin · Warranty
@@ -1951,7 +1992,7 @@ export default function ProductForm({ productId }: Props) {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div>
                       <label className={lbl}>
-                        <span className="inline-flex items-center gap-1.5"><StarIcon className="h-3 w-3" /> Brand</span>
+                        <span className="inline-flex items-center gap-1.5"><StarIcon className="h-3 w-3" /> {t("hero.brand", "Brand")}</span>
                       </label>
                       <SelectWithCreate
                         value={product.brand}
@@ -1961,25 +2002,25 @@ export default function ProductForm({ productId }: Props) {
                         })}
                         onChange={(val) => updateProduct_({ brand: val })}
                         onClickCreate={() => setShowBrandModal(true)}
-                        placeholder="Select brand..."
-                        createLabel="Create Brand"
+                        placeholder={t("hero.selectBrand", "Select brand...")}
+                        createLabel={t("hero.createBrand", "Create Brand")}
                       />
                     </div>
                     <div>
                       <label className={lbl}>
-                        <span className="inline-flex items-center gap-1.5"><PackageIcon className="h-3 w-3" /> Family / Series</span>
+                        <span className="inline-flex items-center gap-1.5"><PackageIcon className="h-3 w-3" /> {t("hero.familySeries", "Family / Series")}</span>
                       </label>
                       <input
                         type="text"
                         value={product.family}
                         onChange={(e) => updateProduct_({ family: e.target.value })}
-                        placeholder="e.g. Pro Line"
+                        placeholder={t("hero.familyPlaceholder", "e.g. Pro Line")}
                         className={inp}
                       />
                     </div>
                     <div>
                       <label className={lbl}>
-                        <span className="inline-flex items-center gap-1.5"><GlobeIcon className="h-3 w-3" /> Made in</span>
+                        <span className="inline-flex items-center gap-1.5"><GlobeIcon className="h-3 w-3" /> {t("hero.madeIn", "Made in")}</span>
                       </label>
                       <select
                         value={product.country_of_origin}
@@ -1994,13 +2035,13 @@ export default function ProductForm({ productId }: Props) {
                     </div>
                     <div>
                       <label className={lbl}>
-                        <span className="inline-flex items-center gap-1.5"><ShieldCheckIcon className="h-3 w-3" /> Warranty</span>
+                        <span className="inline-flex items-center gap-1.5"><ShieldCheckIcon className="h-3 w-3" /> {t("hero.warranty", "Warranty")}</span>
                       </label>
                       <input
                         type="text"
                         value={product.warranty}
                         onChange={(e) => updateProduct_({ warranty: e.target.value })}
-                        placeholder="e.g. 2 years parts &amp; labour"
+                        placeholder={t("hero.warrantyPlaceholder", "e.g. 2 years parts & labour")}
                         className={inp}
                       />
                     </div>
@@ -2014,40 +2055,40 @@ export default function ProductForm({ productId }: Props) {
                   <div className="h-6 w-6 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
                     <DollarSignIcon className="h-3 w-3 text-[var(--text-ghost)]" />
                   </div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">Primary Commercial · Supplier &amp; Pricing</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">{t("hero.commercialStrip", "Primary Commercial · Supplier & Pricing")}</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div>
                     <label className={lbl}>
-                      <span className="inline-flex items-center gap-1.5"><FactoryIcon className="h-3 w-3" /> Supplier</span>
+                      <span className="inline-flex items-center gap-1.5"><FactoryIcon className="h-3 w-3" /> {t("hero.supplier", "Supplier")}</span>
                     </label>
                     <SelectWithCreate
                       value={primaryModel?.supplier || ""}
                       options={suppliers.map(s => ({ value: s.name, label: s.name, icon: s.logo }))}
                       onChange={(val) => updatePrimaryModel({ supplier: val })}
                       onClickCreate={() => { setSupplierTarget("hero"); setShowSupplierModal(true); }}
-                      placeholder="Select supplier..."
-                      createLabel="Create Supplier"
+                      placeholder={t("hero.selectSupplier", "Select supplier...")}
+                      createLabel={t("hero.createSupplier", "Create Supplier")}
                     />
                   </div>
                   <div>
-                    <label className={lbl}>Supplier Model</label>
+                    <label className={lbl}>{t("hero.supplierModel", "Supplier Model")}</label>
                     <input
                       type="text"
                       value={primaryModel?.reference_model || ""}
                       onChange={(e) => updatePrimaryModel({ reference_model: e.target.value })}
-                      placeholder="e.g. JUKI DDL-8700H"
+                      placeholder={t("hero.supplierModelPlaceholder", "e.g. JUKI DDL-8700H")}
                       className={inp}
                     />
                     <p className="text-[10px] text-[var(--text-ghost)] mt-1">
-                      The factory&apos;s own model code. Helps operations match invoices + spare parts.
+                      {t("hero.supplierModelHint", "The factory's own model code. Helps operations match invoices + spare parts.")}
                     </p>
                   </div>
                   <div>
                     {/* Cost is what Koleex pays the Chinese factory —
                         stored + entered in CNY (¥). The selling price
                         below stays in USD since we sell globally. */}
-                    <label className={lbl}>Cost Price (CNY)</label>
+                    <label className={lbl}>{t("hero.costPrice", "Cost Price (CNY)")}</label>
                     <div className="relative">
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[12px] font-semibold text-[var(--text-ghost)]">¥</span>
                       <input
@@ -2061,7 +2102,7 @@ export default function ProductForm({ productId }: Props) {
                     </div>
                   </div>
                   <div>
-                    <label className={lbl}>Global Selling Price (USD)</label>
+                    <label className={lbl}>{t("hero.globalPrice", "Global Selling Price (USD)")}</label>
                     <div className="relative">
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[12px] font-semibold text-[var(--text-ghost)]">$</span>
                       <input
@@ -2082,7 +2123,7 @@ export default function ProductForm({ productId }: Props) {
                 {primaryModel?.model_name && (
                   <div className="mt-5 pt-5 border-t border-[var(--border-subtle)]">
                     <div className="flex items-center gap-2 mb-3">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">Auto-Generated Codes</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">{t("hero.autoCodes", "Auto-Generated Codes")}</span>
                     </div>
                     <BarcodeQRDisplay
                       value={
@@ -2112,20 +2153,20 @@ export default function ProductForm({ productId }: Props) {
             <Section
               id="excerpt"
               icon={<DocumentIcon className="h-4 w-4" />}
-              title="Short Description"
-              badge="Cards · SEO · Quotes"
+              title={t("hero.shortDescription", "Short Description")}
+              badge={t("hero.shortDescBadge", "Cards · SEO · Quotes")}
             >
               <div>
                 <textarea
                   value={product.excerpt}
                   onChange={(e) => updateProduct_({ excerpt: e.target.value })}
-                  placeholder="One or two sentences that summarise this product — shown on product cards and used as the SEO meta description."
+                  placeholder={t("hero.excerptPlaceholder", "One or two sentences that summarise this product — shown on product cards and used as the SEO meta description.")}
                   rows={3}
                   maxLength={320}
                   className="w-full px-4 py-3 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all resize-none"
                 />
                 <p className="text-[10px] text-[var(--text-ghost)] mt-1.5 flex items-center justify-between">
-                  <span>Aim for under 160 characters for best SEO display.</span>
+                  <span>{t("hero.excerptSeoHint", "Aim for under 160 characters for best SEO display.")}</span>
                   <span>{product.excerpt.length} / 320</span>
                 </p>
               </div>
@@ -2139,21 +2180,23 @@ export default function ProductForm({ productId }: Props) {
             <Section
               id="highlights"
               icon={<StarIcon className="h-4 w-4" />}
-              title="Key Highlights"
+              title={t("hero.keyHighlights", "Key Highlights")}
               badge={`${product.highlights.length} / 5`}
             >
               <HighlightsEditor
                 highlights={product.highlights}
                 onChange={(highlights) => updateProduct_({ highlights })}
+                t={t}
               />
             </Section>
 
             {/* Tags */}
-            <Section id="tags" icon={<TagsIcon className="h-4 w-4" />} title="Tags & Keywords">
+            <Section id="tags" icon={<TagsIcon className="h-4 w-4" />} title={t("hero.tagsTitle", "Tags & Keywords")}>
               <TagsInput
                 tags={product.tags}
                 onChange={(tags) => updateProduct_({ tags })}
                 suggestions={allTags}
+                t={t}
               />
             </Section>
 
@@ -2175,15 +2218,15 @@ export default function ProductForm({ productId }: Props) {
                   className="inline-flex items-center gap-1.5 h-9 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
                 >
                   <ExternalLinkIcon className="h-3.5 w-3.5" />
-                  Preview as customer
+                  {t("hero.previewAsCustomer", "Preview as customer")}
                 </a>
               ) : (
                 <span
                   className="inline-flex items-center gap-1.5 h-9 px-4 rounded-xl bg-[var(--bg-surface-subtle)]/50 border border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-ghost)] cursor-not-allowed"
-                  title="Save the product first to preview its public page"
+                  title={t("hero.previewAfterSaveTitle", "Save the product first to preview its public page")}
                 >
                   <ExternalLinkIcon className="h-3.5 w-3.5" />
-                  Preview (available after save)
+                  {t("hero.previewAfterSave", "Preview (available after save)")}
                 </span>
               )}
             </div>
@@ -2198,8 +2241,8 @@ export default function ProductForm({ productId }: Props) {
             <Section
               id="classification"
               icon={<FolderTreeIcon className="h-4 w-4" />}
-              title="Classification"
-              badge={isSewing ? "Division · Category · Subcategory · Kind" : "Division · Category · Subcategory"}
+              title={t("classify.title", "Classification")}
+              badge={isSewing ? t("classify.badgeWithKind", "Division · Category · Subcategory · Kind") : t("classify.badge", "Division · Category · Subcategory")}
             >
               <ClassificationSection
                 data={product}
@@ -2262,7 +2305,7 @@ export default function ProductForm({ productId }: Props) {
                 noise — the StepNav's "Classify ✓" badge already
                 signals the admin they're past classification. */}
 
-            <Section id="description" icon={<DocumentIcon className="h-4 w-4" />} title="Product Description" badge="Rich text">
+            <Section id="description" icon={<DocumentIcon className="h-4 w-4" />} title={t("description.title", "Product Description")} badge={t("description.badgeRichText", "Rich text")}>
               {/* Pass the classification down so Quick Start Blocks
                   return lockstitch / overlock / automatic copy
                   tailored to the admin's choice. The machine-kind
@@ -2313,8 +2356,8 @@ export default function ProductForm({ productId }: Props) {
                 <Section
                   id="schema-specs"
                   icon={<Settings2Icon className="h-4 w-4" />}
-                  title="Product Specs"
-                  badge="Structured · Multi-surface"
+                  title={t("specs.productSpecs", "Product Specs")}
+                  badge={t("specs.badgeStructured", "Structured · Multi-surface")}
                 >
                   <SchemaSpecsSection
                     schema={specsSchema}
@@ -2327,7 +2370,7 @@ export default function ProductForm({ productId }: Props) {
               <Section
                 id="sewing"
                 icon={<Settings2Icon className="h-4 w-4" />}
-                title={specsSchema ? "Additional / Legacy Specs" : "Machine Specs"}
+                title={specsSchema ? t("specs.additionalLegacy", "Additional / Legacy Specs") : t("specs.machineSpecs", "Machine Specs")}
                 badge={sewingSpecs.template_slug ? sewingSpecs.template_slug.replace(/-/g, " ") : undefined}
                 defaultOpen={!specsSchema}
               >
@@ -2361,11 +2404,10 @@ export default function ProductForm({ productId }: Props) {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[12px] font-medium text-[var(--text-primary)]">
-                  Publishing &amp; marketing fields live on the Hero step.
+                  {t("technical.heroNoticeTitle", "Publishing & marketing fields live on the Hero step.")}
                 </p>
                 <p className="text-[10px] text-[var(--text-ghost)] mt-0.5 leading-relaxed">
-                  Visibility, Featured, Level, Warranty, Slug, and Made-in are edited on Hero — the single source of truth for customer-facing identity.
-                  This step focuses on electrical / physical specs and internal operations.
+                  {t("technical.heroNoticeBody", "Visibility, Featured, Level, Warranty, Slug, and Made-in are edited on Hero — the single source of truth for customer-facing identity. This step focuses on electrical / physical specs and internal operations.")}
                 </p>
                 <button
                   type="button"
@@ -2376,25 +2418,25 @@ export default function ProductForm({ productId }: Props) {
                   className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-semibold text-amber-300 bg-amber-500/10 hover:bg-amber-500/15 border border-amber-500/30 transition-colors mt-2"
                 >
                   <ArrowUpRightIcon className="h-3 w-3" />
-                  Jump to Hero
+                  {t("technical.jumpToHero", "Jump to Hero")}
                 </button>
               </div>
             </div>
 
-            <Section id="technical" icon={<ZapIcon className="h-4 w-4" />} title="Technical Details" badge="Electrical · Physical">
+            <Section id="technical" icon={<ZapIcon className="h-4 w-4" />} title={t("technical.title", "Technical Details")} badge={t("technical.badge", "Electrical · Physical")}>
               <TechnicalSection data={product} onChange={updateProduct_} suggestions={attrSuggestions} />
             </Section>
 
             {/* Purchase Options — unique to this step (not on Hero).
                 Visibility / Featured / Warranty / Level moved up to
                 Hero when we redesigned Hero as the publishing hub. */}
-            <Section id="config" icon={<Settings2Icon className="h-4 w-4" />} title="Purchase Options" badge="Head-only · Complete set">
+            <Section id="config" icon={<Settings2Icon className="h-4 w-4" />} title={t("technical.purchaseOptions", "Purchase Options")} badge={t("technical.purchaseBadge", "Head-only · Complete set")}>
               <div className="space-y-3">
                 <p className="text-[11px] text-[var(--text-ghost)] italic">
-                  Which configurations can customers actually order for this product.
+                  {t("technical.purchaseHint", "Which configurations can customers actually order for this product.")}
                 </p>
-                <Toggle checked={product.supports_head_only} onChange={(v) => updateProduct_({ supports_head_only: v })} label="Supports head-only purchase" />
-                <Toggle checked={product.supports_complete_set} onChange={(v) => updateProduct_({ supports_complete_set: v })} label="Supports complete set purchase" />
+                <Toggle checked={product.supports_head_only} onChange={(v) => updateProduct_({ supports_head_only: v })} label={t("technical.supportsHeadOnly", "Supports head-only purchase")} />
+                <Toggle checked={product.supports_complete_set} onChange={(v) => updateProduct_({ supports_complete_set: v })} label={t("technical.supportsCompleteSet", "Supports complete set purchase")} />
               </div>
             </Section>
 
@@ -2402,30 +2444,30 @@ export default function ProductForm({ productId }: Props) {
                 Country of Origin moved to Hero; this section now
                 only holds the product-level MOQ + Lead Time that
                 cascade to new variants. */}
-            <Section id="advanced" icon={<WrenchIcon className="h-4 w-4" />} title="Fulfillment Defaults" badge="MOQ · Lead Time" defaultOpen={false}>
+            <Section id="advanced" icon={<WrenchIcon className="h-4 w-4" />} title={t("technical.fulfillmentDefaults", "Fulfillment Defaults")} badge={t("technical.fulfillmentBadge", "MOQ · Lead Time")} defaultOpen={false}>
               <div className="space-y-5">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className={lbl}>Default MOQ (Product-level)</label>
+                    <label className={lbl}>{t("technical.defaultMoq", "Default MOQ (Product-level)")}</label>
                     <input
                       type="number"
                       value={product.moq}
                       onChange={(e) => updateProduct_({ moq: e.target.value })}
-                      placeholder="e.g. 10"
+                      placeholder={t("technical.moqPlaceholder", "e.g. 10")}
                       className={inp}
                     />
-                    <p className="text-[10px] text-[var(--text-ghost)] mt-1">Per-model MOQ in the Models step overrides this.</p>
+                    <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("technical.moqOverrideHint", "Per-model MOQ in the Models step overrides this.")}</p>
                   </div>
                   <div>
-                    <label className={lbl}>Default Lead Time</label>
+                    <label className={lbl}>{t("technical.defaultLeadTime", "Default Lead Time")}</label>
                     <input
                       type="text"
                       value={product.lead_time}
                       onChange={(e) => updateProduct_({ lead_time: e.target.value })}
-                      placeholder="e.g. 7-14 days"
+                      placeholder={t("technical.leadTimePlaceholder", "e.g. 7-14 days")}
                       className={inp}
                     />
-                    <p className="text-[10px] text-[var(--text-ghost)] mt-1">Per-model Lead Time in the Models step overrides this.</p>
+                    <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("technical.leadTimeOverrideHint", "Per-model Lead Time in the Models step overrides this.")}</p>
                   </div>
                 </div>
               </div>
@@ -2433,7 +2475,7 @@ export default function ProductForm({ productId }: Props) {
 
             {/* INV-H1 — Stock Profile (tenant-scoped inventory_items row). */}
             {productId && (
-              <Section id="stock-profile" icon={<BoxIcon className="h-4 w-4" />} title="Stock Profile" badge="Inventory" defaultOpen={false}>
+              <Section id="stock-profile" icon={<BoxIcon className="h-4 w-4" />} title={t("technical.stockProfile", "Stock Profile")} badge={t("technical.stockBadge", "Inventory")} defaultOpen={false}>
                 <ProductStockProfile productId={productId} />
               </Section>
             )}
@@ -2456,8 +2498,8 @@ export default function ProductForm({ productId }: Props) {
             <Section
               id="models"
               icon={<BoxesIcon className="h-4 w-4" />}
-              title="Models &amp; Variants"
-              badge={`${models.length} model${models.length !== 1 ? "s" : ""}`}
+              title={t("models.title", "Models & Variants")}
+              badge={t("models.countBadge", `${models.length} models`).replace("{n}", String(models.length))}
             >
               <ModelsSection
                 models={models}
@@ -2473,7 +2515,7 @@ export default function ProductForm({ productId }: Props) {
             </Section>
 
             {/* Market Prices */}
-            <Section id="prices" icon={<DollarSignIcon className="h-4 w-4" />} title="Market Prices" badge="Per country" defaultOpen={false}>
+            <Section id="prices" icon={<DollarSignIcon className="h-4 w-4" />} title={t("models.marketPrices", "Market Prices")} badge={t("models.perCountry", "Per country")} defaultOpen={false}>
               <MarketPricesSection prices={prices} models={models} onChange={setPrices} />
             </Section>
           </div>
@@ -2484,7 +2526,7 @@ export default function ProductForm({ productId }: Props) {
            ═══════════════════════════════════════════════════════════ */}
         {steps[currentStep]?.id === "media" && (
           <div className="space-y-5 animate-in fade-in duration-300">
-            <Section id="media" icon={<ImageRawIcon className="h-4 w-4" />} title="Media & Files">
+            <Section id="media" icon={<ImageRawIcon className="h-4 w-4" />} title={t("media.filesTitle", "Media & Files")}>
               <MediaSection
                 media={media.filter(m => m.type !== "main_image")}
                 excludeTypes={["main_image"]}
@@ -2525,12 +2567,12 @@ export default function ProductForm({ productId }: Props) {
              required fields we marked on Hero + Specs. Each issue
              carries the step id so the banner can offer a jump. */
           const missing: { label: string; step: string }[] = [];
-          if (!product.product_name.trim()) missing.push({ label: "Product Name", step: "identity" });
-          if (!product.division_slug) missing.push({ label: "Division", step: "classify" });
-          if (!product.category_slug) missing.push({ label: "Category", step: "classify" });
-          if (!product.subcategory_slug) missing.push({ label: "Subcategory", step: "classify" });
+          if (!product.product_name.trim()) missing.push({ label: t("field.productName", "Product Name"), step: "identity" });
+          if (!product.division_slug) missing.push({ label: t("field.division", "Division"), step: "classify" });
+          if (!product.category_slug) missing.push({ label: t("field.category", "Category"), step: "classify" });
+          if (!product.subcategory_slug) missing.push({ label: t("field.subcategory", "Subcategory"), step: "classify" });
           if (isSewing && !kindSlug && !sewingSpecs.template_slug) {
-            missing.push({ label: "Machine Kind", step: "classify" });
+            missing.push({ label: t("field.machineKind", "Machine Kind"), step: "classify" });
           }
           if (isSewing) {
             const cs = sewingSpecs.common_specs as Record<string, unknown>;
@@ -2638,10 +2680,10 @@ export default function ProductForm({ productId }: Props) {
 
           /* Status meaning for the publish card. */
           const statusCopy = product.status === "active"
-            ? { headline: "Ready to publish", body: "Status is Active — this product will go live on the public catalog as soon as you save." }
+            ? { headline: t("review.publishReadyHeadline", "Ready to publish"), body: t("review.publishReadyBody", "Status is Active — this product will go live on the public catalog as soon as you save.") }
             : product.status === "archived"
-            ? { headline: "Archive on save", body: "Status is Archived — the product stays in the catalog history but won't appear in the public shop." }
-            : { headline: "Save as draft", body: "Status is Draft — saved internally, not shown on the public catalog. Switch to Active on the Hero step when ready to publish." };
+            ? { headline: t("review.archiveHeadline", "Archive on save"), body: t("review.archiveBody", "Status is Archived — the product stays in the catalog history but won't appear in the public shop.") }
+            : { headline: t("review.draftHeadline", "Save as draft"), body: t("review.draftBody", "Status is Draft — saved internally, not shown on the public catalog. Switch to Active on the Hero step when ready to publish.") };
 
           return (
             <div className="space-y-5 animate-in fade-in duration-300">
@@ -2656,9 +2698,9 @@ export default function ProductForm({ productId }: Props) {
                 <div className="px-5 py-3 border-b border-[var(--border-subtle)] bg-[#F5F5F7] dark:bg-white/[0.02] flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 text-[#86868B] dark:text-white/40">
                     <EyeIcon className="h-3.5 w-3.5" />
-                    <span className="text-[10px] font-bold uppercase tracking-[0.1em]">Live preview</span>
+                    <span className="text-[10px] font-bold uppercase tracking-[0.1em]">{t("review.livePreview", "Live preview")}</span>
                   </div>
-                  <span className="text-[10px] text-[#86868B] dark:text-white/40">How customers see this product</span>
+                  <span className="text-[10px] text-[#86868B] dark:text-white/40">{t("review.howCustomersSee", "How customers see this product")}</span>
                 </div>
                 <div className="p-7 md:p-10">
                   <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_280px] gap-6 md:gap-8 items-center">
@@ -2669,7 +2711,7 @@ export default function ProductForm({ productId }: Props) {
                         </p>
                       )}
                       <h2 className="text-[24px] md:text-[30px] font-semibold tracking-[-0.01em] text-[#1D1D1F] dark:text-white leading-[1.1]">
-                        {product.product_name || "Untitled product"}
+                        {product.product_name || t("review.untitledProduct", "Untitled product")}
                       </h2>
                       {primaryModel?.tagline && (
                         <p className="mt-2 text-[15px] md:text-[17px] text-[#1D1D1F] dark:text-white/85 leading-snug">
@@ -2686,21 +2728,21 @@ export default function ProductForm({ productId }: Props) {
                       <div className="mt-4 flex flex-wrap items-center gap-1.5">
                         {priceDisplay !== "—" && (
                           <ReviewPill icon={<DollarSignIcon className="h-3 w-3" />}>
-                            From {priceDisplay}
+                            {t("review.from", "From {price}").replace("{price}", priceDisplay)}
                           </ReviewPill>
                         )}
                         {templateName && (
                           <ReviewPill icon={<Settings2Icon className="h-3 w-3" />}>{templateName}</ReviewPill>
                         )}
                         {product.warranty && (
-                          <ReviewPill icon={<ShieldCheckIcon className="h-3 w-3" />}>{product.warranty} warranty</ReviewPill>
+                          <ReviewPill icon={<ShieldCheckIcon className="h-3 w-3" />}>{t("review.warrantyPill", "{warranty} warranty").replace("{warranty}", product.warranty)}</ReviewPill>
                         )}
                         {originName && (
-                          <ReviewPill icon={<GlobeIcon className="h-3 w-3" />}>Made in {originName}</ReviewPill>
+                          <ReviewPill icon={<GlobeIcon className="h-3 w-3" />}>{t("review.madeInPill", "Made in {country}").replace("{country}", originName)}</ReviewPill>
                         )}
                         {models.length > 0 && (
                           <ReviewPill icon={<BoxesIcon className="h-3 w-3" />}>
-                            {models.length} variant{models.length === 1 ? "" : "s"}
+                            {t("review.variantsPill", "{n} variants").replace("{n}", String(models.length))}
                           </ReviewPill>
                         )}
                       </div>
@@ -2712,7 +2754,7 @@ export default function ProductForm({ productId }: Props) {
                       ) : (
                         <div className="flex flex-col items-center gap-2 text-[#86868B] dark:text-white/30">
                           <ImageRawIcon className="h-9 w-9" />
-                          <span className="text-[10px] uppercase tracking-wider">No image yet</span>
+                          <span className="text-[10px] uppercase tracking-wider">{t("review.noImageYet", "No image yet")}</span>
                         </div>
                       )}
                     </div>
@@ -2733,10 +2775,10 @@ export default function ProductForm({ productId }: Props) {
                 <div className="flex items-start justify-between gap-3 mb-4">
                   <div>
                     <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">
-                      Product Intelligence Readiness
+                      {t("review.intelTitle", "Product Intelligence Readiness")}
                     </h3>
                     <p className="text-[11px] text-[var(--text-faint)] mt-1">
-                      Schema-driven completeness across data, media, commercial, and AI dimensions.
+                      {t("review.intelSubtitle", "Schema-driven completeness across data, media, commercial, and AI dimensions.")}
                     </p>
                   </div>
                   <div className="text-3xl font-bold font-mono text-[var(--text-primary)] tabular-nums leading-none">
@@ -2746,20 +2788,20 @@ export default function ProductForm({ productId }: Props) {
                 <div className="space-y-2">
                   {readinessReport.dimensions.map((dim) => {
                     const labelMap: Record<string, string> = {
-                      data: "Data",
-                      media: "Media",
-                      commercial: "Commercial",
-                      technical: "Technical",
-                      website: "Website",
-                      ai: "AI",
-                      brochure: "Brochure",
+                      data: t("review.dimData", "Data"),
+                      media: t("review.dimMedia", "Media"),
+                      commercial: t("review.dimCommercial", "Commercial"),
+                      technical: t("review.dimTechnical", "Technical"),
+                      website: t("review.dimWebsite", "Website"),
+                      ai: t("review.dimAi", "AI"),
+                      brochure: t("review.dimBrochure", "Brochure"),
                     };
                     const statusLabel =
                       dim.status === "ready"
-                        ? "Ready"
+                        ? t("review.statusReady", "Ready")
                         : dim.status === "incomplete"
-                          ? "Incomplete"
-                          : "Empty";
+                          ? t("review.statusIncomplete", "Incomplete")
+                          : t("review.statusEmpty", "Empty");
                     const statusCls =
                       dim.status === "ready"
                         ? "border-emerald-500/40 text-emerald-400 bg-emerald-500/5"
@@ -2792,7 +2834,7 @@ export default function ProductForm({ productId }: Props) {
                 {readinessReport.topMissing.length > 0 && (
                   <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]">
                     <div className="text-[10px] uppercase tracking-wider text-[var(--text-faint)] mb-2">
-                      Top missing
+                      {t("review.topMissing", "Top missing")}
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {readinessReport.topMissing.slice(0, 5).map((m, i) => (
@@ -2817,10 +2859,10 @@ export default function ProductForm({ productId }: Props) {
               <div className="mb-5">
                 <div className="flex items-baseline justify-between gap-3 mb-3">
                   <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">
-                    Public Preview
+                    {t("review.publicPreview", "Public Preview")}
                   </h3>
                   <p className="text-[11px] text-[var(--text-faint)]">
-                    This is what customers will see on the website.
+                    {t("review.publicPreviewSubtitle", "This is what customers will see on the website.")}
                   </p>
                 </div>
                 <ProductPreview
@@ -2849,10 +2891,10 @@ export default function ProductForm({ productId }: Props) {
               <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] px-5 py-4">
                 <div className="flex items-center justify-between gap-3 mb-2.5">
                   <div className="flex items-baseline gap-2">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-faint)]">Readiness</span>
+                    <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-faint)]">{t("review.readiness", "Readiness")}</span>
                     <span className="text-[15px] font-semibold text-[var(--text-primary)] tabular-nums">{completionPct}%</span>
                     <span className="text-[11px] text-[var(--text-ghost)] tabular-nums">
-                      · {essentialFilled} of {essentialTotal} essential fields
+                      {t("review.essentialFields", "· {filled} of {total} essential fields").replace("{filled}", String(essentialFilled)).replace("{total}", String(essentialTotal))}
                     </span>
                   </div>
                   <span
@@ -2863,7 +2905,7 @@ export default function ProductForm({ productId }: Props) {
                     }`}
                   >
                     <span className={`h-1.5 w-1.5 rounded-full ${missing.length === 0 ? "bg-emerald-400" : "bg-amber-400"}`} />
-                    {missing.length === 0 ? "Ready to publish" : `${missing.length} required field${missing.length === 1 ? "" : "s"}`}
+                    {missing.length === 0 ? t("review.readyToPublish", "Ready to publish") : t("review.requiredCount", "{n} required fields").replace("{n}", String(missing.length))}
                   </span>
                 </div>
                 <div className="h-1.5 rounded-full bg-[var(--bg-inverted)]/[0.08] overflow-hidden">
@@ -2887,9 +2929,9 @@ export default function ProductForm({ productId }: Props) {
                       <TriangleWarningIcon className="h-3.5 w-3.5" />
                     </span>
                     <div>
-                      <h4 className="text-[13px] font-semibold text-[var(--text-primary)] leading-tight">Missing required fields</h4>
+                      <h4 className="text-[13px] font-semibold text-[var(--text-primary)] leading-tight">{t("review.missingTitle", "Missing required fields")}</h4>
                       <p className="text-[11px] text-[var(--text-ghost)] mt-0.5">
-                        Save as Draft anytime, but the product won&apos;t publish until these are filled.
+                        {t("review.missingBody", "Save as Draft anytime, but the product won't publish until these are filled.")}
                       </p>
                     </div>
                   </div>
@@ -2903,7 +2945,7 @@ export default function ProductForm({ productId }: Props) {
                         >
                           <span className="text-[12px] text-[var(--text-primary)]">{m.label}</span>
                           <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-amber-400 group-hover:text-amber-300">
-                            {steps.find((s) => s.id === m.step)?.shortLabel || m.step}
+                            {t(STEP_SHORT_KEY[m.step] ?? "", steps.find((s) => s.id === m.step)?.shortLabel || m.step)}
                             <ArrowUpRightIcon className="h-3 w-3" />
                           </span>
                         </button>
@@ -2921,55 +2963,58 @@ export default function ProductForm({ productId }: Props) {
                     pages. */}
               <ReviewGroup
                 icon={<TagsIcon className="h-3.5 w-3.5" />}
-                title="Identity & classification"
+                title={t("review.groupIdentity", "Identity & classification")}
                 onJump={() => jumpTo("identity")}
+                t={t}
               >
-                <SummaryItem label="Name" value={product.product_name || "—"} dim={!product.product_name} onClick={() => jumpTo("identity")} />
-                <SummaryItem label="Brand" value={product.brand || "—"} dim={!product.brand} onClick={() => jumpTo("identity")} />
-                <SummaryItem label="Subcategory" value={subcategoryName || "—"} dim={!subcategoryName} onClick={() => jumpTo("classify")} />
-                <SummaryItem label="Status" value={<StatusBadge status={product.status} />} onClick={() => jumpTo("identity")} />
+                <SummaryItem label={t("review.name", "Name")} value={product.product_name || "—"} dim={!product.product_name} onClick={() => jumpTo("identity")} />
+                <SummaryItem label={t("review.brand", "Brand")} value={product.brand || "—"} dim={!product.brand} onClick={() => jumpTo("identity")} />
+                <SummaryItem label={t("review.subcategory", "Subcategory")} value={subcategoryName || "—"} dim={!subcategoryName} onClick={() => jumpTo("classify")} />
+                <SummaryItem label={t("review.status", "Status")} value={<StatusBadge status={product.status} t={t} />} onClick={() => jumpTo("identity")} />
                 {isSewing && (
-                  <SummaryItem label="Machine Kind" value={templateName || "—"} dim={!templateName} onClick={() => jumpTo("classify")} />
+                  <SummaryItem label={t("review.machineKind", "Machine Kind")} value={templateName || "—"} dim={!templateName} onClick={() => jumpTo("classify")} />
                 )}
-                <SummaryItem label="Level" value={product.level ? product.level.charAt(0).toUpperCase() + product.level.slice(1) : "—"} dim={!product.level} onClick={() => jumpTo("identity")} />
-                <SummaryItem label="Featured" value={product.featured ? "Yes" : "No"} dim={!product.featured} onClick={() => jumpTo("identity")} />
-                <SummaryItem label="Visible" value={product.visible ? "Public" : "Hidden"} dim={!product.visible} onClick={() => jumpTo("identity")} />
+                <SummaryItem label={t("review.level", "Level")} value={product.level ? product.level.charAt(0).toUpperCase() + product.level.slice(1) : "—"} dim={!product.level} onClick={() => jumpTo("identity")} />
+                <SummaryItem label={t("review.featured", "Featured")} value={product.featured ? t("review.yes", "Yes") : t("review.no", "No")} dim={!product.featured} onClick={() => jumpTo("identity")} />
+                <SummaryItem label={t("review.visible", "Visible")} value={product.visible ? t("review.public", "Public") : t("review.hidden", "Hidden")} dim={!product.visible} onClick={() => jumpTo("identity")} />
               </ReviewGroup>
 
               <ReviewGroup
                 icon={<DollarSignIcon className="h-3.5 w-3.5" />}
-                title="Commercial & primary model"
+                title={t("review.groupCommercial", "Commercial & primary model")}
                 onJump={() => jumpTo("commercial")}
+                t={t}
               >
-                <SummaryItem label="Tagline" value={primaryModel?.tagline || "—"} dim={!primaryModel?.tagline} onClick={() => jumpTo("commercial")} />
-                <SummaryItem label="Cost (CNY)" value={costDisplay} dim={costDisplay === "—"} onClick={() => jumpTo("commercial")} />
-                <SummaryItem label="Selling price (USD)" value={priceDisplay} dim={priceDisplay === "—"} onClick={() => jumpTo("commercial")} />
-                <SummaryItem label="Warranty" value={product.warranty || "—"} dim={!product.warranty} onClick={() => jumpTo("identity")} />
-                <SummaryItem label="Made in" value={originName || "—"} dim={!originName} onClick={() => jumpTo("identity")} />
-                <SummaryItem label="Variants" value={`${models.length} variant${models.length !== 1 ? "s" : ""}`} onClick={() => jumpTo("commercial")} />
+                <SummaryItem label={t("review.tagline", "Tagline")} value={primaryModel?.tagline || "—"} dim={!primaryModel?.tagline} onClick={() => jumpTo("commercial")} />
+                <SummaryItem label={t("review.costCny", "Cost (CNY)")} value={costDisplay} dim={costDisplay === "—"} onClick={() => jumpTo("commercial")} />
+                <SummaryItem label={t("review.sellingUsd", "Selling price (USD)")} value={priceDisplay} dim={priceDisplay === "—"} onClick={() => jumpTo("commercial")} />
+                <SummaryItem label={t("review.warranty", "Warranty")} value={product.warranty || "—"} dim={!product.warranty} onClick={() => jumpTo("identity")} />
+                <SummaryItem label={t("review.madeIn", "Made in")} value={originName || "—"} dim={!originName} onClick={() => jumpTo("identity")} />
+                <SummaryItem label={t("review.variants", "Variants")} value={t("review.variantsCount", "{n} variants").replace("{n}", String(models.length))} onClick={() => jumpTo("commercial")} />
               </ReviewGroup>
 
               <ReviewGroup
                 icon={<BoxesIcon className="h-3.5 w-3.5" />}
-                title="Content & catalog"
+                title={t("review.groupContent", "Content & catalog")}
                 onJump={() => jumpTo("media")}
+                t={t}
               >
-                <SummaryItem label="Excerpt" value={product.excerpt ? "Filled" : "—"} dim={!product.excerpt} onClick={() => jumpTo("identity")} />
-                <SummaryItem label="Highlights" value={product.highlights && product.highlights.length > 0 ? `${product.highlights.length} items` : "—"} dim={!product.highlights || product.highlights.length === 0} onClick={() => jumpTo("identity")} />
-                <SummaryItem label="Description" value={product.description ? "Filled" : "—"} dim={!product.description} onClick={() => jumpTo("description")} />
-                <SummaryItem label="Media" value={`${media.length} file${media.length !== 1 ? "s" : ""}`} dim={media.length === 0} onClick={() => jumpTo("media")} />
-                <SummaryItem label="Translations" value={`${translations.length} locale${translations.length !== 1 ? "s" : ""}`} dim={translations.length === 0} />
-                <SummaryItem label="Related" value={`${related.length} link${related.length !== 1 ? "s" : ""}`} dim={related.length === 0} />
+                <SummaryItem label={t("review.excerpt", "Excerpt")} value={product.excerpt ? t("review.filled", "Filled") : "—"} dim={!product.excerpt} onClick={() => jumpTo("identity")} />
+                <SummaryItem label={t("review.highlights", "Highlights")} value={product.highlights && product.highlights.length > 0 ? t("review.highlightsCount", "{n} items").replace("{n}", String(product.highlights.length)) : "—"} dim={!product.highlights || product.highlights.length === 0} onClick={() => jumpTo("identity")} />
+                <SummaryItem label={t("review.description", "Description")} value={product.description ? t("review.filled", "Filled") : "—"} dim={!product.description} onClick={() => jumpTo("description")} />
+                <SummaryItem label={t("review.mediaLabel", "Media")} value={t("review.mediaCount", "{n} files").replace("{n}", String(media.length))} dim={media.length === 0} onClick={() => jumpTo("media")} />
+                <SummaryItem label={t("review.translations", "Translations")} value={t("review.translationsCount", "{n} locales").replace("{n}", String(translations.length))} dim={translations.length === 0} />
+                <SummaryItem label={t("review.related", "Related")} value={t("review.relatedCount", "{n} links").replace("{n}", String(related.length))} dim={related.length === 0} />
               </ReviewGroup>
 
               {/* Translations + Related editors stay collapsed below
                   so the review remains scannable, but power-users can
                   still adjust them inline. */}
-              <Section id="translations" icon={<LanguagesIcon className="h-4 w-4" />} title="Translations" defaultOpen={false}>
+              <Section id="translations" icon={<LanguagesIcon className="h-4 w-4" />} title={t("review.translationsSection", "Translations")} defaultOpen={false}>
                 <TranslationsSection translations={translations} onChange={setTranslations} />
               </Section>
 
-              <Section id="related" icon={<Link2Icon className="h-4 w-4" />} title="Related Products" defaultOpen={false}>
+              <Section id="related" icon={<Link2Icon className="h-4 w-4" />} title={t("review.relatedSection", "Related Products")} defaultOpen={false}>
                 <RelatedProductsSection related={related} onChange={setRelated} currentProductId={productId} />
               </Section>
 
@@ -3007,7 +3052,7 @@ export default function ProductForm({ productId }: Props) {
                   className={`h-11 px-6 rounded-xl text-[13px] font-semibold transition-all disabled:opacity-50 inline-flex items-center gap-2 shadow-lg shrink-0 ${saveBtnCls}`}
                 >
                   {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <DiskIcon className="h-4 w-4" />}
-                  {saving ? "Saving..." : saveLabel}
+                  {saving ? t("action.saving", "Saving...") : saveLabel}
                 </button>
               </div>
             </div>
@@ -3021,11 +3066,11 @@ export default function ProductForm({ productId }: Props) {
             disabled={currentStep === 0}
             className="h-10 px-5 rounded-xl border border-[var(--border-subtle)] text-[13px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            <ArrowLeftIcon className="h-4 w-4" /> Previous
+            <ArrowLeftIcon className="h-4 w-4" /> {t("wizard.previous", "Previous")}
           </button>
 
           <div className="text-[11px] text-[var(--text-ghost)]">
-            Step {currentStep + 1} of {steps.length}
+            {t("wizard.stepOf", "Step {current} of {total}").replace("{current}", String(currentStep + 1)).replace("{total}", String(steps.length))}
           </div>
 
           {currentStep < steps.length - 1 ? (
@@ -3033,7 +3078,7 @@ export default function ProductForm({ productId }: Props) {
               onClick={handleNext}
               className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all flex items-center gap-2 shadow-lg"
             >
-              Next <ArrowRightIcon className="h-4 w-4" />
+              {t("action.next", "Next")} <ArrowRightIcon className="h-4 w-4" />
             </button>
           ) : (
             /* Smart Save: label + colour driven by the chosen
@@ -3046,7 +3091,7 @@ export default function ProductForm({ productId }: Props) {
               className={`h-10 px-6 rounded-xl text-[13px] font-semibold transition-all disabled:opacity-50 flex items-center gap-2 shadow-lg ${saveBtnCls}`}
             >
               {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <DiskIcon className="h-4 w-4" />}
-              {saving ? "Saving..." : saveLabel}
+              {saving ? t("action.saving", "Saving...") : saveLabel}
             </button>
           )}
         </div>
@@ -3127,12 +3172,13 @@ export default function ProductForm({ productId }: Props) {
    Visual cousin of the SubCard pattern used on Technical / Specs
    so the wizard reads as one coherent app. */
 function ReviewGroup({
-  icon, title, onJump, children,
+  icon, title, onJump, children, t,
 }: {
   icon: React.ReactNode;
   title: string;
   onJump?: () => void;
   children: React.ReactNode;
+  t: (key: string, fallback?: string) => string;
 }) {
   return (
     <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
@@ -3149,7 +3195,7 @@ function ReviewGroup({
             onClick={onJump}
             className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-ghost)] hover:text-[var(--text-primary)] transition-colors"
           >
-            Edit
+            {t("review.editLink", "Edit")}
             <ArrowUpRightIcon className="h-3 w-3" />
           </button>
         )}
@@ -3225,10 +3271,12 @@ function SlugEditor({
   slug,
   onChange,
   onResetToAuto,
+  t,
 }: {
   slug: string;
   onChange: (v: string) => void;
   onResetToAuto: () => void;
+  t: (key: string, fallback?: string) => string;
 }) {
   const [editing, setEditing] = useState(false);
 
@@ -3236,7 +3284,7 @@ function SlugEditor({
     return (
       <div>
         <label className="block text-[10px] font-bold text-[var(--text-ghost)] uppercase tracking-wider mb-2">
-          <span className="inline-flex items-center gap-1.5"><Link2Icon className="h-3 w-3" /> Public URL</span>
+          <span className="inline-flex items-center gap-1.5"><Link2Icon className="h-3 w-3" /> {t("hero.publicUrl", "Public URL")}</span>
         </label>
         <div className="flex items-center gap-2">
           <span className="text-[12px] text-[var(--text-ghost)] font-mono shrink-0">/products/</span>
@@ -3245,7 +3293,7 @@ function SlugEditor({
             value={slug}
             onChange={(e) => onChange(e.target.value)}
             autoFocus
-            placeholder="lockstitch-9500"
+            placeholder={t("hero.slugPlaceholder", "lockstitch-9500")}
             className="flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] font-mono text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
           />
           <button
@@ -3253,19 +3301,19 @@ function SlugEditor({
             onClick={() => setEditing(false)}
             className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
           >
-            Done
+            {t("hero.done", "Done")}
           </button>
           <button
             type="button"
             onClick={() => { onResetToAuto(); setEditing(false); }}
             className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors"
-            title="Regenerate slug from product name"
+            title={t("hero.regenerateSlug", "Regenerate slug from product name")}
           >
-            Reset
+            {t("hero.reset", "Reset")}
           </button>
         </div>
         <p className="text-[10px] text-[var(--text-ghost)] mt-1.5">
-          Lower-case, letters / numbers / hyphens only. Used in the public URL.
+          {t("hero.slugHint", "Lower-case, letters / numbers / hyphens only. Used in the public URL.")}
         </p>
       </div>
     );
@@ -3274,19 +3322,19 @@ function SlugEditor({
   return (
     <div>
       <label className="block text-[10px] font-bold text-[var(--text-ghost)] uppercase tracking-wider mb-2">
-        <span className="inline-flex items-center gap-1.5"><Link2Icon className="h-3 w-3" /> Public URL</span>
+        <span className="inline-flex items-center gap-1.5"><Link2Icon className="h-3 w-3" /> {t("hero.publicUrl", "Public URL")}</span>
       </label>
       <div className="flex items-center gap-2 px-4 h-11 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)]">
         <span className="text-[12px] text-[var(--text-ghost)] font-mono">/products/</span>
         <span className={`text-[12px] font-mono truncate ${slug ? "text-[var(--text-primary)]" : "text-[var(--text-ghost)] italic"}`}>
-          {slug || "auto-generated from product name"}
+          {slug || t("hero.slugAutoHint", "auto-generated from product name")}
         </span>
         <button
           type="button"
           onClick={() => setEditing(true)}
           className="ml-auto inline-flex items-center gap-1 h-7 px-2 rounded-lg text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
         >
-          <PencilIcon className="h-3 w-3" /> Edit
+          <PencilIcon className="h-3 w-3" /> {t("hero.edit", "Edit")}
         </button>
       </div>
     </div>
@@ -3304,9 +3352,11 @@ function SlugEditor({
 function HighlightsEditor({
   highlights,
   onChange,
+  t,
 }: {
   highlights: string[];
   onChange: (next: string[]) => void;
+  t: (key: string, fallback?: string) => string;
 }) {
   const [input, setInput] = useState("");
   const atCap = highlights.length >= 5;
@@ -3330,7 +3380,7 @@ function HighlightsEditor({
     <div className="space-y-2">
       {highlights.length === 0 && (
         <p className="text-[11px] text-[var(--text-ghost)] italic px-1">
-          Add 3–5 short bullets that describe what makes this product stand out.
+          {t("hero.highlightsEmptyHint", "Add 3–5 short bullets that describe what makes this product stand out.")}
         </p>
       )}
       {highlights.map((h, i) => (
@@ -3350,7 +3400,7 @@ function HighlightsEditor({
             type="button"
             onClick={() => remove(i)}
             className="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
-            aria-label={`Remove highlight ${i + 1}`}
+            aria-label={t("hero.removeHighlight", `Remove highlight ${i + 1}`).replace("{n}", String(i + 1))}
           >
             <CrossIcon className="h-3 w-3" />
           </button>
@@ -3368,7 +3418,7 @@ function HighlightsEditor({
                 add();
               }
             }}
-            placeholder={highlights.length === 0 ? "e.g. Max 5000 SPM" : "Add another highlight..."}
+            placeholder={highlights.length === 0 ? t("hero.highlightPlaceholderFirst", "e.g. Max 5000 SPM") : t("hero.highlightPlaceholderMore", "Add another highlight...")}
             maxLength={80}
             className="flex-1 h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all"
           />
@@ -3378,13 +3428,13 @@ function HighlightsEditor({
             disabled={!input.trim()}
             className="h-11 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
           >
-            <PlusIcon className="h-3.5 w-3.5" /> Add
+            <PlusIcon className="h-3.5 w-3.5" /> {t("hero.add", "Add")}
           </button>
         </div>
       )}
       {atCap && (
         <p className="text-[10px] text-[var(--text-ghost)] italic px-1">
-          You&apos;ve reached the 5-bullet cap. Remove one to add another.
+          {t("hero.highlightCap", "You've reached the 5-bullet cap. Remove one to add another.")}
         </p>
       )}
     </div>
@@ -3394,7 +3444,7 @@ function HighlightsEditor({
 /* ═══════════════════════════════════════════════════════════════════
    TAGS INPUT — with suggestions dropdown
    ═══════════════════════════════════════════════════════════════════ */
-function TagsInput({ tags, onChange, suggestions = [] }: { tags: string[]; onChange: (t: string[]) => void; suggestions?: string[] }) {
+function TagsInput({ tags, onChange, suggestions = [], t }: { tags: string[]; onChange: (t: string[]) => void; suggestions?: string[]; t: (key: string, fallback?: string) => string }) {
   const [input, setInput] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -3443,7 +3493,7 @@ function TagsInput({ tags, onChange, suggestions = [] }: { tags: string[]; onCha
           onChange={(e) => { setInput(e.target.value); setShowDropdown(true); }}
           onFocus={() => setShowDropdown(true)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(input); } }}
-          placeholder="Type or choose tags..."
+          placeholder={t("hero.tagsPlaceholder", "Type or choose tags...")}
           className="w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all"
         />
         {showDropdown && (filtered.length > 0 || canCreate) && (
@@ -3465,7 +3515,7 @@ function TagsInput({ tags, onChange, suggestions = [] }: { tags: string[]; onCha
                 className="w-full px-4 py-2 text-left text-[12px] font-medium text-blue-400 hover:bg-blue-500/10 flex items-center gap-2 border-t border-[var(--border-subtle)] transition-colors"
               >
                 <span className="h-4 w-4 rounded bg-blue-500/20 flex items-center justify-center text-[10px]">+</span>
-                Create &quot;{input.trim()}&quot;
+                {t("hero.createTag", "Create \"{tag}\"").replace("{tag}", input.trim())}
               </button>
             )}
           </div>
