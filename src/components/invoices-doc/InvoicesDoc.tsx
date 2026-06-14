@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
@@ -15,7 +16,7 @@ import SharedKpiCard from "@/components/ui/KpiCard";
 import { useTranslation } from "@/lib/i18n";
 import { docsT } from "@/lib/translations/docs";
 import { dialog } from "@/lib/ui-dialog";
-import QuotationA4Preview from "@/components/quotations/QuotationA4Preview";
+import QuotationPreviewSkeleton from "@/components/quotations/QuotationPreviewSkeleton";
 import ProductPickerModal, { type PickResult } from "@/components/quotations/ProductPickerModal";
 import CustomerPickerModal, { type CustomerPickResult } from "@/components/quotations/CustomerPickerModal";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
@@ -27,6 +28,15 @@ import {
   deleteDoc,
   type RemoteDocRow,
 } from "@/lib/docs-sync";
+
+/* The invoice editor reuses QuotationA4Preview (~9k LOC). Lazy-load it
+   client-side so it stays out of the invoice list/initial bundle; props
+   and behavior are unchanged once loaded. The invoice print/PDF route
+   (src/app/invoices/[id]/print) imports it eagerly and is untouched. */
+const QuotationA4Preview = dynamic(() => import("@/components/quotations/QuotationA4Preview"), {
+  ssr: false,
+  loading: () => <QuotationPreviewSkeleton />,
+});
 
 /* ══════════════════════════════════════════════════════════
    Types

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import QuotationIcon from "@/components/icons/QuotationIcon";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -20,7 +21,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import { dialog } from "@/lib/ui-dialog";
-import QuotationA4Preview from "./QuotationA4Preview";
+import QuotationPreviewSkeleton from "./QuotationPreviewSkeleton";
 import ProductPickerModal, { type PickResult } from "./ProductPickerModal";
 import CustomerPickerModal, { type CustomerPickResult } from "./CustomerPickerModal";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
@@ -36,6 +37,17 @@ import {
   type RemoteDocRow,
 } from "@/lib/docs-sync";
 import { useQuotationCollab } from "@/lib/quotation-collab";
+
+/* QuotationA4Preview is ~9k LOC (+ large embedded port-geo data tables)
+   and only renders inside the editor view, so load it lazily on the
+   client to keep the Quotations list/initial bundle small. Props and
+   behavior are unchanged once the chunk loads. The print/PDF route
+   (src/app/quotations/[id]/print) imports it eagerly and is untouched,
+   so export output is unaffected. */
+const QuotationA4Preview = dynamic(() => import("./QuotationA4Preview"), {
+  ssr: false,
+  loading: () => <QuotationPreviewSkeleton />,
+});
 
 /* ══════════════════════════════════════════════════════════
    Types
