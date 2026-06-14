@@ -29,6 +29,8 @@ import {
   collectAnchors,
 } from "@/lib/product-schema";
 import VisualGlyph from "./VisualGlyph";
+import { useTranslation } from "@/lib/i18n";
+import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 
 interface ProductPreviewProps {
   productName: string;
@@ -170,6 +172,7 @@ const Disclosure = ({
 };
 
 export const ProductPreview = (props: ProductPreviewProps) => {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
   const {
     productName,
     primaryModel,
@@ -358,8 +361,10 @@ export const ProductPreview = (props: ProductPreviewProps) => {
     return (
       <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]/40 p-6 md:p-8">
         <p className="text-sm text-[var(--text-secondary)]">
-          No schema for this classification. The public preview will appear once
-          a schema is registered for this subcategory.
+          {t(
+            "preview.emptyState",
+            "No schema for this classification. The public preview will appear once a schema is registered for this subcategory.",
+          )}
         </p>
       </div>
     );
@@ -384,7 +389,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
               </div>
             ) : null}
             <h1 className="text-[2.75rem] leading-[1.02] md:text-6xl md:leading-[0.98] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
-              {productName || "Untitled product"}
+              {productName || t("preview.untitledProduct", "Untitled product")}
             </h1>
             {tagline ? (
               <p className="text-xl md:text-2xl font-light text-[var(--text-secondary)] leading-snug max-w-xl">
@@ -411,13 +416,13 @@ export const ProductPreview = (props: ProductPreviewProps) => {
             <div className="flex flex-wrap gap-x-8 gap-y-3 pt-2">
               {warranty ? (
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-faint)]">Warranty</div>
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-faint)]">{t("preview.warranty", "Warranty")}</div>
                   <div className="mt-0.5 text-sm font-medium text-[var(--text-primary)]">{warranty}</div>
                 </div>
               ) : null}
               {countryOfOrigin ? (
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-faint)]">Origin</div>
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-faint)]">{t("preview.origin", "Origin")}</div>
                   <div className="mt-0.5 text-sm font-medium text-[var(--text-primary)]">{countryOfOrigin}</div>
                 </div>
               ) : null}
@@ -432,7 +437,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
               // eslint-disable-next-line @next/next/no-img-element
               <img src={mainImageUrl} alt={productName} className="h-full w-full object-contain drop-shadow-[0_30px_60px_rgba(0,0,0,0.25)]" />
             ) : (
-              <span className="text-sm text-[var(--text-faint)]">No main image</span>
+              <span className="text-sm text-[var(--text-faint)]">{t("preview.noMainImage", "No main image")}</span>
             )}
           </div>
         </div>
@@ -507,7 +512,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                 const raw = values[f.key];
                 let label = f.label ?? f.key;
                 if (kind === "boolean") {
-                  label = "Yes";
+                  label = t("preview.yes", "Yes");
                 } else if (kind === "badge") {
                   const single = typeof raw === "string" ? raw : selectedValuesOf(raw)[0] ?? "";
                   const option = f.options?.find((o) => o.value === single);
@@ -539,7 +544,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
       {/* ═══ 4. MATERIALS ═══ */}
       {materialPicks.length > 0 ? (
         <section className="space-y-6">
-          <SectionHead eyebrow="Capability" title="Suitable Materials" />
+          <SectionHead eyebrow={t("preview.eyebrowCapability", "Capability")} title={t("preview.suitableMaterials", "Suitable Materials")} />
           {/* Filmstrip — large material swatches, horizontally scrollable. */}
           <div className="flex gap-5 overflow-x-auto pb-2 -mx-1 px-1 snap-x">
             {materialPicks.map(({ field, value: val, label }) => {
@@ -586,7 +591,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
       {/* ═══ 5. APPLICATIONS ═══ */}
       {applicationPicks.length > 0 ? (
         <section className="space-y-6">
-          <SectionHead eyebrow="Built for" title="Applications" />
+          <SectionHead eyebrow={t("preview.eyebrowBuiltFor", "Built for")} title={t("preview.applications", "Applications")} />
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {applicationPicks.map(({ field, value: val, label }) => {
                 const option = field.options?.find((o) => o.value === val);
@@ -615,7 +620,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
       {/* ═══ 6. AUTOMATION — workflow row (connected nodes) ═══ */}
       {automationFeatures.length > 0 ? (
         <section className="space-y-5">
-          <SectionHead eyebrow="Hands-off" title="Automation workflow" />
+          <SectionHead eyebrow={t("preview.eyebrowHandsOff", "Hands-off")} title={t("preview.automationWorkflow", "Automation workflow")} />
           <div className="relative overflow-x-auto pb-1">
             <div className="relative min-w-[460px]">
               {/* connector line running through the node centers (h-14 → 28px) */}
@@ -643,7 +648,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
       {/* ═══ 7. SELLING POINTS / TECHNICAL ADVANTAGES (knowledge cards) ═══ */}
       {(firstKb("selling_points") || firstKb("technical_advantages")) ? (
         <section className="space-y-4">
-          <SectionHead eyebrow="Why it wins" title="Advantages" />
+          <SectionHead eyebrow={t("preview.eyebrowWhyItWins", "Why it wins")} title={t("preview.advantages", "Advantages")} />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[
               ...asKnowledgeList(firstKb("selling_points")?.content),
@@ -665,7 +670,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           Interpreted, benefit-oriented summaries (schema-driven via insight). */}
       {intelligence.length > 0 ? (
         <section className="space-y-4">
-          <SectionHead eyebrow="What it means for you" title="Product Intelligence" />
+          <SectionHead eyebrow={t("preview.eyebrowWhatItMeans", "What it means for you")} title={t("preview.productIntelligence", "Product Intelligence")} />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {intelligence.map((it) => (
               <div
@@ -694,13 +699,13 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           page reads simple-first, deep-on-demand. */}
       {specGroups.length > 0 ? (
         <div>
-          <SectionHead eyebrow="Layer 3" title="Technical Specifications" />
+          <SectionHead eyebrow={t("preview.eyebrowLayer3", "Layer 3")} title={t("preview.technicalSpecifications", "Technical Specifications")} />
           <div className="mt-3 border-t border-[var(--border-subtle)]">
           {specGroups.map(({ group, fields, emphasis }) => (
             <Disclosure
               key={group.id}
               title={group.title}
-              eyebrow={emphasis === "primary" ? "Core" : undefined}
+              eyebrow={emphasis === "primary" ? t("preview.eyebrowCore", "Core") : undefined}
               defaultOpen={emphasis === "primary"}
             >
               <table className="w-full border-collapse text-sm">
@@ -717,7 +722,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                     } else if (typeof raw === "string") {
                       display = f.options?.find((o) => o.value === raw)?.label ?? raw;
                     } else if (typeof raw === "boolean") {
-                      display = raw ? "Yes" : "No";
+                      display = raw ? t("preview.yes", "Yes") : t("preview.no", "No");
                     } else {
                       display = displayScalar(raw);
                     }
@@ -749,7 +754,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
       {/* ═══ 9. APPLICATIONS DETAIL / OTHER FEATURES ═══ */}
       {otherFeatures.length > 0 ? (
         <section className="space-y-4">
-          <SectionHead title="Features" />
+          <SectionHead title={t("preview.features", "Features")} />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {otherFeatures.map((f) => (
               <div
@@ -776,7 +781,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         if (qs.length === 0) return null;
         return (
           <section className="space-y-4">
-            <SectionHead eyebrow="Good to know" title="Buyer Questions" />
+            <SectionHead eyebrow={t("preview.eyebrowGoodToKnow", "Good to know")} title={t("preview.buyerQuestions", "Buyer Questions")} />
             <div className="space-y-3">
               {qs.map((q, i) => (
                 <div key={i} className="flex items-start gap-4 rounded-2xl bg-[var(--bg-surface-subtle)] p-6">
@@ -797,7 +802,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {firstKb("package_contents") ? (
             <div className="space-y-3">
-              <SectionHead title="What's Included" />
+              <SectionHead title={t("preview.whatsIncluded", "What's Included")} />
               <ul className="space-y-2">
                 {asKnowledgeList(firstKb("package_contents")!.content).map((item, i) => (
                   <li key={i} className="flex items-start gap-2.5 text-sm text-[var(--text-primary)]">
@@ -812,7 +817,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           ) : null}
           {firstKb("warranty_notes") ? (
             <div className="space-y-3">
-              <SectionHead title="Warranty" />
+              <SectionHead title={t("preview.warranty", "Warranty")} />
               <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
                 {asKnowledgeList(firstKb("warranty_notes")!.content).join(" ")}
               </p>
@@ -824,7 +829,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
       {/* ═══ 12. GALLERY ═══ */}
       {hasGallery ? (
         <section className="space-y-4">
-          <SectionHead title="Gallery" />
+          <SectionHead title={t("view.gallery", "Gallery")} />
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {galleryUrls!.map((url, i) => (
               <div key={`${url}-${i}`} className="aspect-square overflow-hidden rounded-2xl bg-[var(--bg-surface-subtle)]">
@@ -839,7 +844,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
       {/* ═══ 13. VIDEO + AR ═══ */}
       {(hasVideos || ar3dUrl) ? (
         <section className="space-y-4">
-          <SectionHead title="Media" />
+          <SectionHead title={t("preview.media", "Media")} />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {hasVideos
               ? videoUrls!.map((url, i) => (
@@ -857,7 +862,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                 className="group flex aspect-video flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl bg-[var(--bg-surface-subtle)] transition-colors hover:bg-[var(--bg-surface-hover)]"
               >
                 <VisualGlyph token="spark" className="h-6 w-6 text-[var(--text-secondary)]" />
-                <span className="text-xs uppercase tracking-[0.16em] text-[var(--text-ghost)] group-hover:text-[var(--text-secondary)]">View in 3D / AR</span>
+                <span className="text-xs uppercase tracking-[0.16em] text-[var(--text-ghost)] group-hover:text-[var(--text-secondary)]">{t("preview.viewIn3dAr", "View in 3D / AR")}</span>
               </a>
             ) : null}
           </div>
@@ -867,7 +872,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
       {/* ═══ 14. DOWNLOADS ═══ */}
       {hasManuals ? (
         <section className="space-y-4">
-          <SectionHead title="Documents" />
+          <SectionHead title={t("preview.documents", "Documents")} />
           <div className="space-y-2">
             {manuals!.map((m, i) => (
               <a
@@ -880,7 +885,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                 <span className="text-sm font-medium text-[var(--text-primary)] truncate">
                   {m.label || fileNameFromUrl(m.url)}
                 </span>
-                <span className="text-[11px] uppercase tracking-wider text-[var(--text-ghost)] shrink-0">Download</span>
+                <span className="text-[11px] uppercase tracking-wider text-[var(--text-ghost)] shrink-0">{t("preview.download", "Download")}</span>
               </a>
             ))}
           </div>
@@ -890,7 +895,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
       {/* ═══ 15. COMPLIANCE (quiet) ═══ */}
       {complianceFeatures.length > 0 ? (
         <section className="flex flex-wrap items-center gap-2 border-t border-[var(--border-subtle)] pt-6">
-          <span className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-faint)] me-1">Compliance</span>
+          <span className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-faint)] me-1">{t("preview.compliance", "Compliance")}</span>
           {complianceFeatures.map((f) => (
             <span
               key={f.key}
@@ -907,9 +912,15 @@ export const ProductPreview = (props: ProductPreviewProps) => {
       {mediaCounts && (mediaCounts.photos || mediaCounts.videos || mediaCounts.manuals) ? (
         <div className="text-xs text-[var(--text-ghost)]">
           {[
-            mediaCounts.photos ? `${mediaCounts.photos} photos` : null,
-            mediaCounts.videos ? `${mediaCounts.videos} videos` : null,
-            mediaCounts.manuals ? `${mediaCounts.manuals} documents` : null,
+            mediaCounts.photos
+              ? t("preview.countPhotos", "{n} photos").replace("{n}", String(mediaCounts.photos))
+              : null,
+            mediaCounts.videos
+              ? t("preview.countVideos", "{n} videos").replace("{n}", String(mediaCounts.videos))
+              : null,
+            mediaCounts.manuals
+              ? t("preview.countDocuments", "{n} documents").replace("{n}", String(mediaCounts.manuals))
+              : null,
           ]
             .filter(Boolean)
             .join(" · ")}

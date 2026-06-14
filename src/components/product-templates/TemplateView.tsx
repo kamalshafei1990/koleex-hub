@@ -20,6 +20,8 @@ import type {
 } from "@/lib/product-templates/types";
 import { getFieldOptions, getRepeaterSchema } from "@/lib/product-templates/types";
 import { humanizeError } from "@/lib/ui/humanize-error";
+import { useTranslation } from "@/lib/i18n";
+import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 
 interface ProductHeader {
   id: string;
@@ -62,18 +64,24 @@ interface Props {
 }
 
 export default function TemplateView({ productSlug }: Props) {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
   const [product, setProduct] = useState<ProductHeader | null>(null);
   const [tree, setTree] = useState<TemplateTree | null>(null);
   const [values, setValues] = useState<FieldValueMap>({});
   const [media, setMedia] = useState<MediaBundle | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /* When the load aborts on timeout we surface a localized message rather
+     than a raw humanizeError string; tracked separately so the render can
+     translate it (the effect can't call t() without re-running on lang). */
+  const [timedOut, setTimedOut] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setTimedOut(false);
     /* Abort the whole load if the network stalls — prevents an eternal
        spinner. 10s budget across all product fetches. */
     const ctrl = new AbortController();
@@ -132,11 +140,13 @@ export default function TemplateView({ productSlug }: Props) {
       } catch (e) {
         if (!cancelled) {
           const aborted = e instanceof DOMException && e.name === "AbortError";
-          setError(
-            aborted
-              ? "The server took too long to respond. Please retry."
-              : humanizeError(e),
-          );
+          if (aborted) {
+            setTimedOut(true);
+            setError(null);
+          } else {
+            setTimedOut(false);
+            setError(humanizeError(e));
+          }
         }
       } finally {
         clearTimeout(timeoutId);
@@ -153,20 +163,24 @@ export default function TemplateView({ productSlug }: Props) {
   if (loading) {
     return (
       <div className="text-[12.5px] text-black/50 dark:text-white/50">
-        Loading product…
+        {t("view.loadingProduct", "Loading product…")}
       </div>
     );
   }
-  if (error) {
+  if (error || timedOut) {
     return (
       <div className="flex items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-3 text-[12px] text-red-600 dark:text-red-300">
-        <span>{error}</span>
+        <span>
+          {timedOut
+            ? t("state.serverTimeout", "The server took too long to respond. Please retry.")
+            : error}
+        </span>
         <button
           type="button"
           onClick={() => setRetryKey((k) => k + 1)}
           className="shrink-0 rounded-md border border-red-500/40 px-2.5 py-1 text-[11.5px] font-medium transition-colors hover:bg-red-500/15"
         >
-          Retry
+          {t("action.retry", "Retry")}
         </button>
       </div>
     );
@@ -242,7 +256,7 @@ export default function TemplateView({ productSlug }: Props) {
       {media && media.gallery.length > 0 && (
         <section className="rounded-2xl border border-black/[0.06] dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-4 sm:p-5">
           <h2 className="text-[15px] font-semibold tracking-tight text-black dark:text-white mb-3">
-            Gallery
+            {t("view.gallery", "Gallery")}
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {media.gallery.map((m) => (
@@ -306,7 +320,7 @@ export default function TemplateView({ productSlug }: Props) {
       {media && media.detail.length > 0 && (
         <section className="rounded-2xl border border-black/[0.06] dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-4 sm:p-5">
           <h2 className="text-[15px] font-semibold tracking-tight text-black dark:text-white mb-3">
-            Detail views
+            {t("view.detailViews", "Detail views")}
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {media.detail.map((m) => (

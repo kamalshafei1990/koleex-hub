@@ -616,4 +616,55 @@ export const PRODUCTS_UI_I18N: Translations = {
   "action.savePublish": { en: "Save & Publish", zh: "保存并发布", ar: "حفظ ونشر" },
   "action.saveChanges": { en: "Save Changes", zh: "保存更改", ar: "حفظ التغييرات" },
   "action.saveAsDraft": { en: "Save as Draft", zh: "保存为草稿", ar: "حفظ كمسودة" },
+
+  /* ── TemplateView: read-mode renderer chrome (P0 #5d) ───────────────
+     Only UI furniture is translated here. Section titles, field labels,
+     highlight titles/blurbs, descriptions and spec values come from the
+     template/schema or product data and are intentionally left as-is. */
+  "view.loadingProduct": { en: "Loading product…", zh: "正在加载产品…", ar: "جارٍ تحميل المنتج…" },
+  "view.gallery": { en: "Gallery", zh: "图库", ar: "معرض الصور" },
+  "view.detailViews": { en: "Detail views", zh: "细节视图", ar: "اللقطات التفصيلية" },
+
+  /* ── ProductPreview: schema-driven product page chrome (P0 #5d) ─────
+     Hardcoded section eyebrows/titles, generic labels, empty/placeholder
+     states, and buttons only. Per-product section/group/field titles,
+     option labels, knowledge headlines, taglines and spec values are
+     schema/content-driven and stay untranslated (deferred multilingual
+     content layer). */
+  "preview.emptyState": {
+    en: "No schema for this classification. The public preview will appear once a schema is registered for this subcategory.",
+    zh: "此分类暂无模式。为该子类别注册模式后，公开预览将会出现。",
+    ar: "لا يوجد مخطط لهذا التصنيف. ستظهر المعاينة العامة بمجرد تسجيل مخطط لهذه الفئة الفرعية.",
+  },
+  "preview.untitledProduct": { en: "Untitled product", zh: "未命名产品", ar: "منتج بلا عنوان" },
+  "preview.warranty": { en: "Warranty", zh: "保修", ar: "الضمان" },
+  "preview.origin": { en: "Origin", zh: "原产地", ar: "المنشأ" },
+  "preview.noMainImage": { en: "No main image", zh: "暂无主图", ar: "لا توجد صورة رئيسية" },
+  "preview.yes": { en: "Yes", zh: "是", ar: "نعم" },
+  "preview.no": { en: "No", zh: "否", ar: "لا" },
+  "preview.eyebrowCapability": { en: "Capability", zh: "能力", ar: "القدرات" },
+  "preview.suitableMaterials": { en: "Suitable Materials", zh: "适用材料", ar: "المواد المناسبة" },
+  "preview.eyebrowBuiltFor": { en: "Built for", zh: "适用于", ar: "مصمَّم لـ" },
+  "preview.applications": { en: "Applications", zh: "应用", ar: "التطبيقات" },
+  "preview.eyebrowHandsOff": { en: "Hands-off", zh: "免手动", ar: "تشغيل آلي" },
+  "preview.automationWorkflow": { en: "Automation workflow", zh: "自动化流程", ar: "سير العمل الآلي" },
+  "preview.eyebrowWhyItWins": { en: "Why it wins", zh: "优势所在", ar: "لماذا يتفوّق" },
+  "preview.advantages": { en: "Advantages", zh: "优势", ar: "المزايا" },
+  "preview.eyebrowWhatItMeans": { en: "What it means for you", zh: "对您的意义", ar: "ماذا يعني لك" },
+  "preview.productIntelligence": { en: "Product Intelligence", zh: "产品智能", ar: "ذكاء المنتج" },
+  "preview.eyebrowLayer3": { en: "Layer 3", zh: "第三层", ar: "الطبقة 3" },
+  "preview.technicalSpecifications": { en: "Technical Specifications", zh: "技术规格", ar: "المواصفات التقنية" },
+  "preview.eyebrowCore": { en: "Core", zh: "核心", ar: "أساسي" },
+  "preview.features": { en: "Features", zh: "功能特性", ar: "الميزات" },
+  "preview.eyebrowGoodToKnow": { en: "Good to know", zh: "须知", ar: "معلومات مفيدة" },
+  "preview.buyerQuestions": { en: "Buyer Questions", zh: "买家问题", ar: "أسئلة المشترين" },
+  "preview.whatsIncluded": { en: "What's Included", zh: "包装清单", ar: "محتويات العبوة" },
+  "preview.media": { en: "Media", zh: "媒体", ar: "الوسائط" },
+  "preview.viewIn3dAr": { en: "View in 3D / AR", zh: "查看 3D / AR", ar: "العرض ثلاثي الأبعاد / الواقع المعزز" },
+  "preview.documents": { en: "Documents", zh: "文档", ar: "المستندات" },
+  "preview.download": { en: "Download", zh: "下载", ar: "تنزيل" },
+  "preview.compliance": { en: "Compliance", zh: "合规", ar: "الامتثال" },
+  "preview.countPhotos": { en: "{n} photos", zh: "{n} 张照片", ar: "{n} صورة" },
+  "preview.countVideos": { en: "{n} videos", zh: "{n} 个视频", ar: "{n} فيديو" },
+  "preview.countDocuments": { en: "{n} documents", zh: "{n} 个文档", ar: "{n} مستند" },
 };
