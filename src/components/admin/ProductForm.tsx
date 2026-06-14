@@ -179,12 +179,14 @@ function getSteps(isSewing: boolean): WizardStep[] {
 /* ═══════════════════════════════════════════════════════════════════
    STEP NAVIGATION BAR
    ═══════════════════════════════════════════════════════════════════ */
-function StepNav({ steps, currentStep, onStepChange, completedSteps, lockedSteps }: {
+function StepNav({ steps, currentStep, onStepChange, completedSteps, lockedSteps, issueCounts }: {
   steps: WizardStep[];
   currentStep: number;
   onStepChange: (i: number) => void;
   completedSteps: Set<number>;
   lockedSteps?: Set<number>;
+  /* P0 #3 · per-step count of unmet required fields → red badge */
+  issueCounts?: Map<number, number>;
 }) {
   return (
     <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] px-2 py-2 mb-6">
@@ -194,31 +196,54 @@ function StepNav({ steps, currentStep, onStepChange, completedSteps, lockedSteps
           const isCompleted = completedSteps.has(i);
           const isPast = i < currentStep;
           const isLocked = !!lockedSteps?.has(i);
+          /* P0 #3 · this step has unmet required fields. We only
+             surface it as an error AWAY from the active step — while
+             you're filling a step, a red badge on it is just noise. */
+          const issueCount = issueCounts?.get(i) || 0;
+          const hasIssue = issueCount > 0 && !isLocked && !isActive;
           return (
             <button
               key={step.id}
               onClick={() => { if (!isLocked) onStepChange(i); }}
               disabled={isLocked}
-              title={isLocked ? "Complete classification first" : step.label}
+              title={
+                isLocked
+                  ? "Complete classification first"
+                  : hasIssue
+                  ? `${issueCount} required field${issueCount === 1 ? "" : "s"} missing`
+                  : step.label
+              }
               className={`group relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-[12px] font-medium transition-all shrink-0 ${
                 isLocked
                   ? "text-[var(--text-ghost)]/60 cursor-not-allowed"
                   : isActive
                   ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] shadow-lg"
+                  : hasIssue
+                  ? "text-amber-500 hover:bg-amber-500/[0.06]"
                   : isPast || isCompleted
                   ? "text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)]"
                   : "text-[var(--text-ghost)] hover:text-[var(--text-dim)] hover:bg-[var(--bg-surface-subtle)]"
               }`}
             >
-              <div className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+              <div className={`relative h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
                 isLocked ? "bg-[var(--bg-surface)]/60 text-[var(--text-ghost)]/50" :
                 isActive ? "bg-white/20" :
+                hasIssue ? "bg-amber-500/15 text-amber-500 ring-1 ring-amber-500/40" :
                 isCompleted ? "bg-emerald-500/20 text-emerald-400" :
                 "bg-[var(--bg-surface)] text-[var(--text-ghost)]"
               }`}>
-                {isLocked ? <LockIcon className="h-3 w-3" /> : (isCompleted && !isActive ? <CheckIcon className="h-3 w-3" /> : i + 1)}
+                {isLocked
+                  ? <LockIcon className="h-3 w-3" />
+                  : hasIssue
+                  ? "!"
+                  : (isCompleted && !isActive ? <CheckIcon className="h-3 w-3" /> : i + 1)}
               </div>
               <span className="hidden md:inline">{step.shortLabel}</span>
+              {hasIssue && (
+                <span className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-bold text-black">
+                  {issueCount}
+                </span>
+              )}
               {i < steps.length - 1 && (
                 <AngleRightIcon className="h-3 w-3 text-[var(--text-ghost)] ml-1 hidden lg:block" />
               )}
@@ -278,6 +303,12 @@ export default function ProductForm({ productId }: Props) {
   const router = useRouter();
   const isEdit = !!productId;
 
+  /* P0 #3 · Draft Autosave — one localStorage slot per product
+     (or "new" for a not-yet-saved product). Bumped key version (v1)
+     so a future shape change can't try to restore an incompatible
+     old draft. */
+  const draftKey = useMemo(() => `koleex:pd:draft:v1:${productId || "new"}`, [productId]);
+
   /* ── Lookup data ── */
   const [divisions, setDivisions] = useState<DivisionRow[]>([]);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
@@ -317,6 +348,13 @@ export default function ProductForm({ productId }: Props) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  /* P0 #3 · recovered-draft banner. Holds the timestamp of an
+     autosaved draft found on mount so we can offer Restore / Discard.
+     We NEVER auto-apply it — the saved product is left untouched until
+     the operator explicitly chooses to restore (no dumb overwrite). */
+  const [draftMeta, setDraftMeta] = useState<{ savedAt: number } | null>(null);
+  const draftCheckedRef = useRef(false);
+
   /* ── Track original IDs for diff in edit mode ── */
   const [originalModelIds, setOriginalModelIds] = useState<string[]>([]);
   const [originalMediaIds, setOriginalMediaIds] = useState<string[]>([]);
@@ -355,6 +393,90 @@ export default function ProductForm({ productId }: Props) {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [dirty]);
+
+  /* ── P0 #3 · Draft Autosave ──────────────────────────────────────
+     Once the form is dirty, mirror the whole working state into
+     localStorage on a short debounce so an accidental close / refresh
+     / crash can't lose work. The raw File handles on pending media
+     can't be serialised (and blob URLs don't survive a reload), so we
+     drop `_file` — already-uploaded media keep their url. Writes are
+     wrapped so a quota error can never break the form. */
+  useEffect(() => {
+    if (loading || !dirty) return;
+    if (typeof window === "undefined") return;
+    const id = window.setTimeout(() => {
+      try {
+        const snapshot = {
+          v: 1,
+          savedAt: Date.now(),
+          product,
+          models,
+          media: media.map((m) => ({ ...m, _file: undefined })),
+          translations,
+          prices,
+          related,
+          sewingSpecs,
+        };
+        window.localStorage.setItem(draftKey, JSON.stringify(snapshot));
+      } catch {
+        /* storage full / serialisation issue — drafting is best-effort */
+      }
+    }, 800);
+    return () => window.clearTimeout(id);
+  }, [loading, dirty, product, models, media, translations, prices, related, sewingSpecs, draftKey]);
+
+  /* ── P0 #3 · Draft recovery detection ──
+     After the server load settles, look for a saved draft for this
+     slot. If one exists we surface the Restore / Discard banner — we
+     do NOT apply it automatically. Runs once per mount. */
+  useEffect(() => {
+    if (loading || draftCheckedRef.current) return;
+    if (typeof window === "undefined") return;
+    draftCheckedRef.current = true;
+    try {
+      const raw = window.localStorage.getItem(draftKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed.savedAt === "number") {
+        setDraftMeta({ savedAt: parsed.savedAt });
+      }
+    } catch {
+      /* corrupt draft — ignore it rather than block the form */
+    }
+  }, [loading, draftKey]);
+
+  /* Apply a recovered draft into the live form. This is an explicit
+     user action, so we mark the form dirty and let them review before
+     saving — nothing is written to the database here. */
+  const restoreDraft = () => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(draftKey);
+      if (!raw) { setDraftMeta(null); return; }
+      const d = JSON.parse(raw);
+      if (d.product) setProduct(d.product);
+      if (Array.isArray(d.models)) setModels(d.models);
+      if (Array.isArray(d.media)) setMedia(d.media);
+      if (Array.isArray(d.translations)) setTranslations(d.translations);
+      if (Array.isArray(d.prices)) setPrices(d.prices);
+      if (Array.isArray(d.related)) setRelated(d.related);
+      if (d.sewingSpecs) setSewingSpecs(d.sewingSpecs);
+      setDirty(true);
+      setDraftMeta(null);
+      setError("");
+      setSuccess("Draft restored — review the fields, then Save when you're ready.");
+    } catch {
+      setError("That saved draft couldn't be read — it may be from an older version. Discarding it is safe.");
+    }
+  };
+
+  /* Throw the saved draft away (keeps whatever is currently loaded). */
+  const discardDraft = () => {
+    if (typeof window !== "undefined") {
+      try { window.localStorage.removeItem(draftKey); } catch { /* noop */ }
+    }
+    setDraftMeta(null);
+  };
 
   /* Smart cancel — confirms with the user when there are unsaved
      edits, otherwise just routes back to the list. */
@@ -590,6 +712,23 @@ export default function ProductForm({ productId }: Props) {
   const handleMainImage = (files: FileList | null) => {
     if (!files?.length) return;
     const file = files[0];
+    /* ── P0 #3 · Media upload feedback ──
+       The hero input's accept="image/*" only filters the file picker,
+       not drag-and-drop, and doesn't guard size. Validate here so the
+       operator gets a clear reason up-front instead of a silent failure
+       at save time. Limits mirror the Media step's main-image slot
+       (image type · 8 MB). */
+    const MAIN_IMAGE_MAX_MB = 8;
+    if (!/^image\//.test(file.type)) {
+      setError(`"${file.name}" isn't an image — the main photo must be a JPG, PNG, WebP or similar file.`);
+      return;
+    }
+    if (file.size > MAIN_IMAGE_MAX_MB * 1024 * 1024) {
+      const mb = (file.size / (1024 * 1024)).toFixed(1);
+      setError(`"${file.name}" is ${mb} MB — the main photo limit is ${MAIN_IMAGE_MAX_MB} MB. Please choose a smaller file.`);
+      return;
+    }
+    setError("");
     const filtered = media.filter(m => m.type !== "main_image");
     const newItem: MediaFormState = {
       _tempId: crypto.randomUUID(),
@@ -812,19 +951,69 @@ export default function ProductForm({ productId }: Props) {
   const nextStep = () => goToStep(currentStep + 1);
   const prevStep = () => goToStep(currentStep - 1);
 
-  /* ── Validation per step ── */
+  /* ── P0 #3 · Wizard Data Integrity — required-field source of truth ──
+     ONE authoritative map of stepId → missing required-field labels.
+     It drives four consumers so they can never disagree:
+       1. the per-step "Next" gate (validateCurrentStep)
+       2. the StepNav error badges (visual-first count per step)
+       3. the publish guard inside save()
+       4. the finalize readiness banner
+     Data-safety rule: this set is the *identity-critical* core only
+     (name · classification · machine kind · primary model). Draft
+     saves are never blocked on it — only publishing to `active` is
+     gated — so editing any of the 710 legacy products stays safe.
+     Media / specs remain advisory (shown on the finalize step) so we
+     don't hard-block re-saving older products that predate them. */
+  const requiredIssues = useMemo(() => {
+    const byStep: Record<string, string[]> = {};
+    const add = (step: string, label: string) => {
+      (byStep[step] ||= []).push(label);
+    };
+    if (!product.product_name.trim()) add("identity", "Product name");
+    if (!product.division_slug) add("classify", "Division");
+    if (!product.category_slug) add("classify", "Category");
+    if (!product.subcategory_slug) add("classify", "Subcategory");
+    if (isSewing && !machineKindChosen) add("classify", "Machine kind");
+    if (!(primaryModel?.primary_model || "").trim()) add("commercial", "Primary model");
+    return byStep;
+  }, [
+    product.product_name,
+    product.division_slug,
+    product.category_slug,
+    product.subcategory_slug,
+    isSewing,
+    machineKindChosen,
+    primaryModel?.primary_model,
+  ]);
+
+  /* Map of step index → count of unmet required fields, for the
+     StepNav badge. Indexed by position so the nav can render it
+     without re-deriving anything. */
+  const stepIssueCount = useMemo(() => {
+    const m = new Map<number, number>();
+    steps.forEach((s, i) => {
+      const n = requiredIssues[s.id]?.length || 0;
+      if (n > 0) m.set(i, n);
+    });
+    return m;
+  }, [steps, requiredIssues]);
+
+  const missingRequiredLabels = useMemo(
+    () => Object.values(requiredIssues).flat(),
+    [requiredIssues],
+  );
+
+  /* ── Validation per step ──
+     Generalised over the required-set above: leaving a step is
+     blocked only by that step's OWN unmet required fields, so the
+     admin can still skip ahead past steps whose gaps live elsewhere. */
   const validateCurrentStep = (): string | null => {
     const stepId = steps[currentStep]?.id;
-    if (stepId === "classify") {
-      if (!product.division_slug || !product.category_slug || !product.subcategory_slug)
-        return "Pick division, category and subcategory before continuing";
-      /* Machine kind is the 4th classification tier for sewing
-         products — don't let the admin leave Classify without it. */
-      if (isSewing && !machineKindChosen)
-        return "Pick a machine kind to finish classification";
-    }
-    if (stepId === "identity") {
-      if (!product.product_name.trim()) return "Product name is required";
+    const issues = stepId ? requiredIssues[stepId] : undefined;
+    if (issues && issues.length > 0) {
+      return issues.length === 1
+        ? `${issues[0]} is required before continuing`
+        : `Complete required fields before continuing: ${issues.join(", ")}`;
     }
     return null;
   };
@@ -869,6 +1058,23 @@ export default function ProductForm({ productId }: Props) {
     if (codeCheck.status === "checking") {
       setError("Still checking if the Primary Model code is available — try again in a moment.");
       setCurrentStep(0);
+      return;
+    }
+
+    /* ── P0 #3 · Publish gate ──────────────────────────────────────
+       Going live (status = active) requires the full identity-critical
+       set. Draft / archived saves skip this entirely so work is never
+       blocked — data-safety first. On a miss we jump to the first
+       offending step and name every gap, and point to "Save as Draft"
+       as the escape hatch. */
+    if (product.status === "active" && missingRequiredLabels.length > 0) {
+      const firstIdx = steps.findIndex((s) => (requiredIssues[s.id]?.length || 0) > 0);
+      const n = missingRequiredLabels.length;
+      setError(
+        `Can't publish yet — ${n} required field${n === 1 ? "" : "s"} still empty: ` +
+          `${missingRequiredLabels.join(", ")}. Switch status to Draft to save your work for now.`,
+      );
+      if (firstIdx >= 0) setCurrentStep(firstIdx);
       return;
     }
 
@@ -1014,18 +1220,32 @@ export default function ProductForm({ productId }: Props) {
 
       for (const item of media) {
         if (item._file && !item.id) {
-          const uploaded = await uploadProductFile(item._file);
-          if (uploaded) {
-            await createProductMedia({
-              product_id: pid,
-              model_id: item.model_id,
-              type: item.type,
-              url: uploaded.url,
-              file_path: uploaded.file_path,
-              alt_text: item.alt_text || null,
-              order: item.order,
-            });
+          /* ── P0 #3 · Media upload feedback ──
+             Name the file in any failure so the operator knows exactly
+             which upload broke and can retry — instead of a generic
+             error, or (worse) the product saving with the image
+             silently dropped. */
+          const fileLabel = item._file.name || `${item.type.replace(/_/g, " ")} file`;
+          let uploaded;
+          try {
+            uploaded = await uploadProductFile(item._file);
+          } catch (upErr) {
+            throw new Error(`Couldn't upload "${fileLabel}": ${humanizeError(upErr)}`);
           }
+          if (!uploaded) {
+            throw new Error(
+              `Couldn't upload "${fileLabel}" — the file didn't reach storage. Please try again, or use a smaller file.`,
+            );
+          }
+          await createProductMedia({
+            product_id: pid,
+            model_id: item.model_id,
+            type: item.type,
+            url: uploaded.url,
+            file_path: uploaded.file_path,
+            alt_text: item.alt_text || null,
+            order: item.order,
+          });
         }
       }
 
@@ -1082,6 +1302,12 @@ export default function ProductForm({ productId }: Props) {
          flag so the post-save router.push doesn't trip the
          beforeunload "leave this page?" warning. */
       setDirty(false);
+      /* P0 #3 · the autosaved draft is now redundant — the DB holds the
+         truth. Drop it so we don't offer to "restore" a stale copy. */
+      setDraftMeta(null);
+      if (typeof window !== "undefined") {
+        try { window.localStorage.removeItem(draftKey); } catch { /* noop */ }
+      }
       if (!isEdit) {
         setTimeout(() => router.push(`/products/${pid}/edit`), 800);
       }
@@ -1182,6 +1408,47 @@ export default function ProductForm({ productId }: Props) {
           </div>
         )}
 
+        {/* ═══ P0 #3 · DRAFT RECOVERY ═══
+            Shown when an autosaved draft for this slot was found on
+            mount. Restore loads it into the form (review-then-save);
+            Discard throws it away and keeps whatever is loaded. The
+            saved product is never touched automatically. */}
+        {draftMeta && (
+          <div className="mb-5 rounded-2xl border border-amber-500/30 bg-amber-500/[0.06] p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/15 text-amber-500">
+                <DocumentIcon className="h-4 w-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h4 className="text-[13px] font-semibold leading-tight text-[var(--text-primary)]">
+                  Unsaved draft recovered
+                </h4>
+                <p className="mt-0.5 text-[11px] text-[var(--text-ghost)]">
+                  We kept work you didn&apos;t save from{" "}
+                  {new Date(draftMeta.savedAt).toLocaleString()}. Restore it, or discard
+                  to keep what&apos;s loaded now.
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={discardDraft}
+                  className="h-9 rounded-xl border border-[var(--border-subtle)] px-3 text-[12px] font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-subtle)]"
+                >
+                  Discard
+                </button>
+                <button
+                  type="button"
+                  onClick={restoreDraft}
+                  className="h-9 rounded-xl bg-[var(--bg-inverted)] px-4 text-[12px] font-semibold text-[var(--text-inverted)] transition-opacity hover:opacity-90"
+                >
+                  Restore draft
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ═══ STEP NAVIGATION ═══ */}
         <StepNav
           steps={steps}
@@ -1189,6 +1456,7 @@ export default function ProductForm({ productId }: Props) {
           onStepChange={goToStep}
           completedSteps={completedSteps}
           lockedSteps={lockedSteps}
+          issueCounts={stepIssueCount}
         />
 
         {/* ═══ GLOBAL CLASSIFICATION BREADCRUMB (shown once classification is set, across all steps) ═══ */}
