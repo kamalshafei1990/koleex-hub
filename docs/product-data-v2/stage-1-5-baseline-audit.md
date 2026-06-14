@@ -2,7 +2,8 @@
 
 **Project:** KOLEEX HUB · Supabase `yxyizbnfjrwrnmwhkvme` (Koleex Master Database, Pro plan, PG 17.6)
 **Date:** 2026-06-14
-**Status:** Files created. **Nothing applied. Production untouched. Not merged to main.**
+**Status:** Files created. **Nothing applied. Production untouched.**
+**Baseline validation (2026-06-14, read-only):** live production object counts **match the documented target exactly — 310 tables / 83 functions / 115 triggers / 250 policies / 14 enums / 5 app schemas, zero drift** (verified via read-only Supabase MCP catalog query — no mutation, no branch). The authoritative `pg_dump` body and the `MIGRATIONS_FAILED → FUNCTIONS_DEPLOYED` branch-replay proof remain **owner actions** (no CLI/link/DB-password in the agent environment; branch creation is paid/approval-gated). **Stage 2 remains BLOCKED.** Full result: [`baseline/baseline-validation-report.md`](baseline/baseline-validation-report.md).
 
 ---
 
@@ -224,5 +225,6 @@ Squash (recommended): make the completed baseline the single foundation migratio
 
 ## Files created / updated
 - `docs/product-data-v2/baseline/baseline_existing_production_schema_SCAFFOLD_DO_NOT_EXECUTE.sql` (scaffold + fenced completion block — **moved out of `supabase/migrations/` so CI/CLI cannot execute it**)
-- `docs/product-data-v2/stage-1-5-baseline-audit.md` (this file; **updated** with "Required Manual Baseline Completion Steps")
+- `docs/product-data-v2/baseline/baseline-validation-report.md` (**new, 2026-06-14** — read-only count validation: all 8 acceptance counts match, zero drift; dump + branch-replay remain owner actions; Stage 2 stays BLOCKED)
+- `docs/product-data-v2/stage-1-5-baseline-audit.md` (this file; **updated** with "Required Manual Baseline Completion Steps" + the 2026-06-14 read-only validation result)
 - Temporary branch `pd-v2-stage1` (`jpbbibctheatdkpmtzqs`) — **deleted 2026-06-14**.
