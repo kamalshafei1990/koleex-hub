@@ -19,6 +19,7 @@ import type {
   FieldValueMap,
 } from "@/lib/product-templates/types";
 import { getFieldOptions, getRepeaterSchema } from "@/lib/product-templates/types";
+import { humanizeError } from "@/lib/ui/humanize-error";
 
 interface ProductHeader {
   id: string;
@@ -67,17 +68,22 @@ export default function TemplateView({ productSlug }: Props) {
   const [media, setMedia] = useState<MediaBundle | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
+    /* Abort the whole load if the network stalls — prevents an eternal
+       spinner. 10s budget across all product fetches. */
+    const ctrl = new AbortController();
+    const timeoutId = setTimeout(() => ctrl.abort(), 10_000);
     (async () => {
       try {
         /* 1. Resolve product by slug. */
         const prodRes = await fetch(
           `/api/products/by-slug/${encodeURIComponent(productSlug)}`,
-          { credentials: "include" },
+          { credentials: "include", signal: ctrl.signal },
         );
         if (!prodRes.ok) throw new Error(`Product fetch: HTTP ${prodRes.status}`);
         const prodJson = (await prodRes.json()) as {
@@ -96,12 +102,13 @@ export default function TemplateView({ productSlug }: Props) {
           slug
             ? fetch(`/api/product-templates/${encodeURIComponent(slug)}`, {
                 credentials: "include",
+                signal: ctrl.signal,
               })
             : Promise.resolve(null),
           slug
             ? fetch(
                 `/api/product-templates/${encodeURIComponent(slug)}/values/${encodeURIComponent(productId)}`,
-                { credentials: "include" },
+                { credentials: "include", signal: ctrl.signal },
               )
             : Promise.resolve(null),
           fetch(`/api/products/${encodeURIComponent(productId)}/media`, {
@@ -123,15 +130,25 @@ export default function TemplateView({ productSlug }: Props) {
           if (!cancelled) setValues(valuesJson.values ?? {});
         }
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load");
+        if (!cancelled) {
+          const aborted = e instanceof DOMException && e.name === "AbortError";
+          setError(
+            aborted
+              ? "The server took too long to respond. Please retry."
+              : humanizeError(e),
+          );
+        }
       } finally {
+        clearTimeout(timeoutId);
         if (!cancelled) setLoading(false);
       }
     })();
     return () => {
       cancelled = true;
+      clearTimeout(timeoutId);
+      ctrl.abort();
     };
-  }, [productSlug]);
+  }, [productSlug, retryKey]);
 
   if (loading) {
     return (
@@ -142,8 +159,15 @@ export default function TemplateView({ productSlug }: Props) {
   }
   if (error) {
     return (
-      <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12px] text-red-600 dark:text-red-300">
-        {error}
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-3 text-[12px] text-red-600 dark:text-red-300">
+        <span>{error}</span>
+        <button
+          type="button"
+          onClick={() => setRetryKey((k) => k + 1)}
+          className="shrink-0 rounded-md border border-red-500/40 px-2.5 py-1 text-[11.5px] font-medium transition-colors hover:bg-red-500/15"
+        >
+          Retry
+        </button>
       </div>
     );
   }
