@@ -1,4 +1,5 @@
 import "server-only";
+import { humanizeError } from "@/lib/ui/humanize-error";
 
 /* ---------------------------------------------------------------------------
    /api/products/[id]/market-prices — P0-A.
@@ -49,7 +50,7 @@ export async function GET(
     .from("product_market_prices")
     .select("*")
     .in("model_id", modelIds);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   return NextResponse.json({ prices: data ?? [] });
 }
 

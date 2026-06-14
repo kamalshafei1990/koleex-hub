@@ -1,4 +1,5 @@
 import "server-only";
+import { humanizeError } from "@/lib/ui/humanize-error";
 
 /* ---------------------------------------------------------------------------
    /api/products/[id]
@@ -94,7 +95,7 @@ export async function PATCH(
     .eq("id", targetId);
   if (error) {
     console.error("[api/products/[id] PATCH]", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }
@@ -119,7 +120,7 @@ export async function DELETE(
     .eq("id", id);
   if (error) {
     console.error("[api/products/[id] DELETE]", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }

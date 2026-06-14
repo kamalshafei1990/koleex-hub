@@ -1,4 +1,5 @@
 import "server-only";
+import { humanizeError } from "@/lib/ui/humanize-error";
 
 /* ---------------------------------------------------------------------------
    GET /api/products/model-by-number?model=<string>
@@ -98,7 +99,7 @@ export async function GET(req: Request) {
 
     if (error) {
       console.error("[model-by-number]", tier.column, error.message);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
     }
     const row = (data?.[0] as unknown as ModelRow | undefined) ?? null;
     if (row) {

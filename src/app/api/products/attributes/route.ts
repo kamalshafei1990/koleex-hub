@@ -1,4 +1,5 @@
 import "server-only";
+import { humanizeError } from "@/lib/ui/humanize-error";
 
 /* ---------------------------------------------------------------------------
    /api/products/attributes — P0-A.
@@ -32,7 +33,7 @@ export async function GET(req: Request) {
     const { data, error } = await supabaseServer
       .from("products")
       .select("tags, plug_types, colors, voltage, watt, level, brand");
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
     const usage = {
       tags: {} as Record<string, number>,
       plug_types: {} as Record<string, number>,
@@ -59,7 +60,7 @@ export async function GET(req: Request) {
     const { data, error } = await supabaseServer
       .from("products")
       .select("division_slug, category_slug, subcategory_slug");
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
     const byDivision: Record<string, number> = {};
     const byCategory: Record<string, number> = {};
     const bySubcategory: Record<string, number> = {};
@@ -125,7 +126,7 @@ export async function PATCH(req: Request) {
           .from("products")
           .update({ [attrType]: updated })
           .eq("id", p.id as string);
-        if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+        if (error) return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
       }
       return NextResponse.json({ ok: true });
     }
@@ -135,7 +136,7 @@ export async function PATCH(req: Request) {
       .from("products")
       .update({ [col]: newValue })
       .eq(col, oldValue);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[api/products attributes PATCH]", e instanceof Error ? e.message : String(e));
@@ -162,7 +163,7 @@ export async function PUT(req: Request) {
     .upload(CONFIG_PATH, blob, { upsert: true, cacheControl: "0", contentType: "application/json" });
   if (error) {
     console.error("[api/products attributes PUT]", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }

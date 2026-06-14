@@ -1,4 +1,5 @@
 import "server-only";
+import { humanizeError } from "@/lib/ui/humanize-error";
 
 /* /api/products/facets — P0-B.
    GET → { brands: string[], tags: string[] } distinct facet values for the
@@ -14,7 +15,7 @@ export async function GET() {
   const { data, error } = await supabaseServer.from("products").select("brand, tags");
   if (error) {
     console.error("[api/products/facets]", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   }
   const brands = new Set<string>();
   const tags = new Set<string>();

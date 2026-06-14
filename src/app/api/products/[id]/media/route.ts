@@ -1,4 +1,5 @@
 import "server-only";
+import { humanizeError } from "@/lib/ui/humanize-error";
 
 import { NextResponse } from "next/server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
@@ -55,7 +56,7 @@ export async function GET(
     .eq("product_id", id)
     .order("order", { ascending: true });
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   }
 
   type Row = {
@@ -119,7 +120,7 @@ export async function POST(
     .single();
   if (error) {
     console.error("[api/products media POST]", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   }
   return NextResponse.json({ media: data });
 }

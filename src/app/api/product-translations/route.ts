@@ -1,4 +1,5 @@
 import "server-only";
+import { humanizeError } from "@/lib/ui/humanize-error";
 
 /* /api/product-translations — P0-B flat resource.
    GET  ?product_id=<uuid> → rows. Public catalog text → any authed user.
@@ -23,7 +24,7 @@ export async function GET(req: Request) {
     .from("product_translations")
     .select("*")
     .eq("product_id", productId);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   return NextResponse.json({ translations: data ?? [] });
 }
 
@@ -37,6 +38,6 @@ export async function POST(req: Request) {
   const { error } = await supabaseServer
     .from("product_translations")
     .upsert(body, { onConflict: "product_id,locale" });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   return NextResponse.json({ ok: true });
 }
