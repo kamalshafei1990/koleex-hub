@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { humanizeError } from "@/lib/ui/humanize-error";
+import { useTranslation } from "@/lib/i18n";
+import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { IMG } from "@/lib/cdn";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
@@ -61,6 +63,7 @@ const stColors: Record<string, string> = {
 export default function ProductList() {
   const router = useRouter();
   const pathname = usePathname();
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
   /* "internal" when the same component is rendered under /product-data.
      Under /products the view is the PUBLIC catalog: no supplier
      column, no Add button, no Edit/Delete actions, no cost hints. */
@@ -565,7 +568,7 @@ export default function ProductList() {
               {isInternal ? <ProductDataIcon size={16} /> : <ProductsIcon size={16} />}
             </div>
             <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
-              {isInternal ? "Product Data" : "Products"}
+              {isInternal ? t("list.productData") : t("list.products")}
             </h1>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -576,17 +579,17 @@ export default function ProductList() {
               <>
                 <Link href={`${baseRoute}/settings`} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
                   <SettingsIcon2 className="h-4 w-4" />
-                  <span className="hidden sm:inline">Control Panel</span>
+                  <span className="hidden sm:inline">{t("list.controlPanel")}</span>
                 </Link>
                 <Link href={`${baseRoute}/new`} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg">
-                  <PlusIcon className="h-4 w-4" /> Add Product
+                  <PlusIcon className="h-4 w-4" /> {t("action.addProduct")}
                 </Link>
               </>
             )}
           </div>
         </div>
         <p className="text-[12px] text-[var(--text-dim)] mb-6 md:mb-8 ml-0 md:ml-11">
-          {products.length} products in catalog
+          {products.length} {t("list.countInCatalog")}
         </p>
 
         {/* Search + Filters — sticky to the top of the viewport so
@@ -618,8 +621,8 @@ export default function ProductList() {
                     setSearchOpen(false);
                   }
                 }}
-                placeholder="Search by name, model code, brand, category, tags…"
-                aria-label="Search products"
+                placeholder={t("list.searchPlaceholder")}
+                aria-label={t("list.searchAria")}
                 aria-autocomplete="list"
                 aria-expanded={searchOpen && suggestions.length > 0}
                 className="w-full h-10 pl-10 pr-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors [&::-webkit-search-cancel-button]:hidden"
@@ -631,7 +634,7 @@ export default function ProductList() {
                 <button
                   type="button"
                   onClick={() => { setSearch(""); setSearchOpen(false); }}
-                  aria-label="Clear search"
+                  aria-label={t("list.clearSearch")}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 h-6 w-6 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
                 >
                   <span className="text-[16px] leading-none">×</span>
@@ -654,10 +657,10 @@ export default function ProductList() {
                     const subs = suggestions.filter(s => s.kind === "subcategory");
                     const brs  = suggestions.filter(s => s.kind === "brand");
                     const prs  = suggestions.filter(s => s.kind === "product");
-                    if (cats.length) groups.push({ title: "Categories", items: cats });
-                    if (subs.length) groups.push({ title: "Subcategories", items: subs });
-                    if (brs.length)  groups.push({ title: "Brands", items: brs });
-                    if (prs.length)  groups.push({ title: "Products", items: prs });
+                    if (cats.length) groups.push({ title: t("search.groupCategories"), items: cats });
+                    if (subs.length) groups.push({ title: t("search.groupSubcategories"), items: subs });
+                    if (brs.length)  groups.push({ title: t("search.groupBrands"), items: brs });
+                    if (prs.length)  groups.push({ title: t("search.groupProducts"), items: prs });
 
                     let idx = -1;
                     return groups.map((g) => (
@@ -710,7 +713,7 @@ export default function ProductList() {
                                 </div>
                                 {s.kind === "subcategory" && (
                                   <div className="text-[11px] text-[var(--text-dim)] truncate">
-                                    in {catNameBySlug[s.categorySlug] || s.categorySlug}
+                                    {t("search.inCategory")} {catNameBySlug[s.categorySlug] || s.categorySlug}
                                   </div>
                                 )}
                               </div>
@@ -722,7 +725,7 @@ export default function ProductList() {
                                 </span>
                               ) : (
                                 <span className="shrink-0 text-[10px] uppercase tracking-wider text-[var(--text-ghost)] font-semibold">
-                                  Open →
+                                  {t("search.open")}
                                 </span>
                               )}
                             </button>
@@ -787,23 +790,23 @@ export default function ProductList() {
             <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
-                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">Division</label>
+                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.division")}</label>
                   <select value={filterDiv} onChange={(e) => { setFilterDiv(e.target.value); setFilterCat(""); setFilterSub(""); }} className={selectClass + " w-full"}>
-                    <option value="">All</option>
+                    <option value="">{t("list.allOption")}</option>
                     {orderedDivisions.map(d => <option key={d.slug} value={d.slug}>{d.name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">Category</label>
+                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.category")}</label>
                   <select value={filterCat} onChange={(e) => { setFilterCat(e.target.value); setFilterSub(""); }} className={selectClass + " w-full"} disabled={!filterDiv}>
-                    <option value="">All</option>
+                    <option value="">{t("list.allOption")}</option>
                     {filteredCats.map(c => <option key={c.slug} value={c.slug}>{c.name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">Subcategory</label>
+                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.subcategory")}</label>
                   <select value={filterSub} onChange={(e) => setFilterSub(e.target.value)} className={selectClass + " w-full"} disabled={!filterCat}>
-                    <option value="">All</option>
+                    <option value="">{t("list.allOption")}</option>
                     {filteredSubs.map(s => <option key={s.slug} value={s.slug}>{s.name}</option>)}
                   </select>
                 </div>
@@ -811,50 +814,50 @@ export default function ProductList() {
                     the public /products catalog. */}
                 {isInternal && (
                   <div>
-                    <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">Supplier</label>
+                    <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.supplier")}</label>
                     <select value={filterSupplier} onChange={(e) => setFilterSupplier(e.target.value)} className={selectClass + " w-full"}>
-                      <option value="">All</option>
+                      <option value="">{t("list.allOption")}</option>
                       {allSuppliers.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
                 )}
                 <div>
-                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">Brand</label>
+                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.brand")}</label>
                   <select value={filterBrand} onChange={(e) => setFilterBrand(e.target.value)} className={selectClass + " w-full"}>
-                    <option value="">All</option>
+                    <option value="">{t("list.allOption")}</option>
                     {allBrands.map(b => <option key={b} value={b}>{b}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">Level</label>
+                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.level")}</label>
                   <select value={filterLevel} onChange={(e) => setFilterLevel(e.target.value)} className={selectClass + " w-full"}>
-                    <option value="">All</option>
+                    <option value="">{t("list.allOption")}</option>
                     {allLevels.map(l => <option key={l} value={l}>{l.charAt(0).toUpperCase() + l.slice(1)}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">Visibility</label>
+                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.visibility")}</label>
                   <select value={filterVisible} onChange={(e) => setFilterVisible(e.target.value)} className={selectClass + " w-full"}>
-                    <option value="">All</option>
-                    <option value="visible">Visible</option>
-                    <option value="hidden">Hidden</option>
+                    <option value="">{t("list.allOption")}</option>
+                    <option value="visible">{t("filter.visible")}</option>
+                    <option value="hidden">{t("filter.hidden")}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">Status</label>
+                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.status")}</label>
                   <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className={selectClass + " w-full"}>
-                    <option value="">All</option>
-                    <option value="draft">Draft</option>
-                    <option value="active">Active</option>
-                    <option value="archived">Archived</option>
+                    <option value="">{t("list.allOption")}</option>
+                    <option value="draft">{t("status.draft")}</option>
+                    <option value="active">{t("status.active")}</option>
+                    <option value="archived">{t("status.archived")}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">Featured</label>
+                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.featured")}</label>
                   <select value={filterFeatured} onChange={(e) => setFilterFeatured(e.target.value)} className={selectClass + " w-full"}>
-                    <option value="">All</option>
-                    <option value="yes">Featured</option>
-                    <option value="no">Not Featured</option>
+                    <option value="">{t("list.allOption")}</option>
+                    <option value="yes">{t("filter.isFeatured")}</option>
+                    <option value="no">{t("filter.notFeatured")}</option>
                   </select>
                 </div>
               </div>
@@ -868,26 +871,26 @@ export default function ProductList() {
               its own filter. Only renders when at least one is set. */}
           {(activeFilterCount > 0 || search) && (
             <div className="mt-3 pt-3 border-t border-[var(--border-subtle)] flex items-center gap-2 flex-wrap">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-ghost)]">Active:</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-ghost)]">{t("list.activeFilters")}</span>
               {(() => {
                 const chips: { label: string; onClear: () => void }[] = [];
                 if (search) chips.push({ label: `"${search}"`, onClear: () => setSearch("") });
-                if (filterDiv) chips.push({ label: `Division: ${divNameBySlug[filterDiv] || filterDiv}`, onClear: () => { setFilterDiv(""); setFilterCat(""); setFilterSub(""); } });
-                if (filterCat) chips.push({ label: `Category: ${catNameBySlug[filterCat] || filterCat}`, onClear: () => { setFilterCat(""); setFilterSub(""); } });
-                if (filterSub) chips.push({ label: `Subcategory: ${subNameBySlug[filterSub] || filterSub}`, onClear: () => setFilterSub("") });
-                if (filterBrand) chips.push({ label: `Brand: ${filterBrand}`, onClear: () => setFilterBrand("") });
-                if (filterLevel) chips.push({ label: `Level: ${filterLevel}`, onClear: () => setFilterLevel("") });
-                if (filterSupplier) chips.push({ label: `Supplier: ${filterSupplier}`, onClear: () => setFilterSupplier("") });
-                if (filterVisible) chips.push({ label: filterVisible === "visible" ? "Visible" : "Hidden", onClear: () => setFilterVisible("") });
-                if (filterFeatured) chips.push({ label: filterFeatured === "yes" ? "Featured" : "Not featured", onClear: () => setFilterFeatured("") });
-                if (filterStatus) chips.push({ label: `Status: ${filterStatus}`, onClear: () => setFilterStatus("") });
+                if (filterDiv) chips.push({ label: `${t("filter.division")}: ${divNameBySlug[filterDiv] || filterDiv}`, onClear: () => { setFilterDiv(""); setFilterCat(""); setFilterSub(""); } });
+                if (filterCat) chips.push({ label: `${t("filter.category")}: ${catNameBySlug[filterCat] || filterCat}`, onClear: () => { setFilterCat(""); setFilterSub(""); } });
+                if (filterSub) chips.push({ label: `${t("filter.subcategory")}: ${subNameBySlug[filterSub] || filterSub}`, onClear: () => setFilterSub("") });
+                if (filterBrand) chips.push({ label: `${t("filter.brand")}: ${filterBrand}`, onClear: () => setFilterBrand("") });
+                if (filterLevel) chips.push({ label: `${t("filter.level")}: ${filterLevel}`, onClear: () => setFilterLevel("") });
+                if (filterSupplier) chips.push({ label: `${t("filter.supplier")}: ${filterSupplier}`, onClear: () => setFilterSupplier("") });
+                if (filterVisible) chips.push({ label: filterVisible === "visible" ? t("filter.visible") : t("filter.hidden"), onClear: () => setFilterVisible("") });
+                if (filterFeatured) chips.push({ label: filterFeatured === "yes" ? t("filter.isFeatured") : t("filter.notFeatured"), onClear: () => setFilterFeatured("") });
+                if (filterStatus) chips.push({ label: `${t("filter.status")}: ${filterStatus}`, onClear: () => setFilterStatus("") });
                 return chips.map((c, i) => (
                   <span key={i} className="inline-flex items-center gap-1.5 h-7 pl-3 pr-1.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-focus)] text-[11px] font-medium text-[var(--text-primary)]">
                     {c.label}
                     <button
                       type="button"
                       onClick={c.onClear}
-                      aria-label={`Remove filter ${c.label}`}
+                      aria-label={t("list.removeFilter").replace("{label}", c.label)}
                       className="h-5 w-5 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
                     >
                       <span className="text-[14px] leading-none">×</span>
@@ -969,9 +972,9 @@ export default function ProductList() {
         {(activeFilterCount > 0 || search) && (
           <p className="text-[12px] text-[var(--text-dim)] mb-4 px-1">
             {filtered.length === 0 ? (
-              <span className="text-amber-400">No matches for <strong className="text-[var(--text-primary)]">"{search}"</strong></span>
+              <span className="text-amber-400">{t("list.noMatchesFor")} <strong className="text-[var(--text-primary)]">"{search}"</strong></span>
             ) : (
-              <>Showing <strong className="text-[var(--text-primary)] tabular-nums">{filtered.length}</strong> of {products.length} products{search ? <> matching <strong className="text-[var(--text-primary)]">"{search}"</strong></> : null}</>
+              <>{t("list.showing")} <strong className="text-[var(--text-primary)] tabular-nums">{filtered.length}</strong> {t("list.ofProducts").replace("{total}", String(products.length))}{search ? <> {t("list.matching")} <strong className="text-[var(--text-primary)]">"{search}"</strong></> : null}</>
             )}
           </p>
         )}
@@ -980,14 +983,14 @@ export default function ProductList() {
         {loadError ? (
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-red-500/30 p-16 text-center">
             <ProductsIcon size={48} className="text-red-400/70 mx-auto mb-4" />
-            <p className="text-[var(--text-primary)] text-[15px] font-semibold">Couldn&apos;t load products</p>
+            <p className="text-[var(--text-primary)] text-[15px] font-semibold">{t("state.loadFailedTitle")}</p>
             <p className="text-[var(--text-muted)] text-[13px] mt-1">{loadError}</p>
             <button
               type="button"
               onClick={() => setRetryKey((k) => k + 1)}
               className="inline-flex items-center gap-2 mt-4 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all"
             >
-              Retry
+              {t("action.retry")}
             </button>
           </div>
         ) : loading ? (
@@ -1021,14 +1024,14 @@ export default function ProductList() {
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-16 text-center">
             <ProductsIcon size={48} className="text-[var(--text-barely)] mx-auto mb-4" />
             <p className="text-[var(--text-dim)] text-[15px] font-medium">
-              {products.length === 0 ? "No products yet" : "No products match your filters"}
+              {products.length === 0 ? t("state.noProducts") : t("state.noResults")}
             </p>
             <p className="text-[var(--text-ghost)] text-[13px] mt-1">
-              {products.length === 0 ? "Add your first product to get started." : "Try adjusting your search or filters."}
+              {products.length === 0 ? t("list.noProductsYetHint") : t("list.noResultsHint")}
             </p>
             {products.length === 0 && isInternal && (
               <Link href={`${baseRoute}/new`} className="inline-flex items-center gap-2 mt-4 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all">
-                <PlusIcon className="h-4 w-4" /> Add Product
+                <PlusIcon className="h-4 w-4" /> {t("action.addProduct")}
               </Link>
             )}
           </div>
@@ -1194,14 +1197,14 @@ export default function ProductList() {
                         href={`${baseRoute}/${p.id}/edit`}
                         onClick={(e) => e.stopPropagation()}
                         className="h-8 w-8 rounded-lg bg-[var(--bg-primary)]/80 border border-[var(--border-subtle)] backdrop-blur-sm flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-                        title="Edit product"
+                        title={t("card.editProduct")}
                       >
                         <PencilIcon className="h-3.5 w-3.5" />
                       </Link>
                       <button
                         onClick={(e) => askDelete(e, p.id, p.product_name)}
                         className="h-8 w-8 rounded-lg bg-[var(--bg-primary)]/80 border border-[var(--border-subtle)] backdrop-blur-sm flex items-center justify-center text-[var(--text-muted)] hover:text-red-400 transition-colors"
-                        title="Delete product"
+                        title={t("card.deleteProduct")}
                       >
                         <TrashIcon className="h-3.5 w-3.5" />
                       </button>
@@ -1315,11 +1318,11 @@ export default function ProductList() {
             {/* List header */}
             <div className="hidden md:grid grid-cols-[56px_1fr_140px_120px_100px_80px_80px] gap-4 items-center px-5 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
               <span />
-              <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Product</span>
-              <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Category</span>
-              <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Brand</span>
-              <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Models</span>
-              <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Status</span>
+              <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("list.colProduct")}</span>
+              <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("list.colCategory")}</span>
+              <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("list.colBrand")}</span>
+              <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("list.colModels")}</span>
+              <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("list.colStatus")}</span>
               <span />
             </div>
             <div className="divide-y divide-[var(--border-subtle)]" style={{ contentVisibility: "auto", containIntrinsicSize: "1px 1200px" }}>
@@ -1475,14 +1478,14 @@ export default function ProductList() {
                             href={`${baseRoute}/${p.id}/edit`}
                             onClick={(e) => e.stopPropagation()}
                             className="h-8 w-8 rounded-lg hover:bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
-                            title="Edit product"
+                            title={t("card.editProduct")}
                           >
                             <PencilIcon className="h-3.5 w-3.5" />
                           </Link>
                           <button
                             onClick={(e) => askDelete(e, p.id, p.product_name)}
                             className="h-8 w-8 rounded-lg hover:bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-dim)] hover:text-red-400 transition-colors"
-                            title="Delete product"
+                            title={t("card.deleteProduct")}
                           >
                             <TrashIcon className="h-3.5 w-3.5" />
                           </button>
