@@ -16,6 +16,8 @@ import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import Modal from "./Modal";
+import { useTranslation } from "@/lib/i18n";
+import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import type { MediaFormState } from "@/types/product-form";
 import type { ProductMediaType } from "@/types/supabase";
 
@@ -148,6 +150,30 @@ function fmtMB(bytes: number): string {
   return (bytes / MB).toFixed(1);
 }
 
+/* P0 #5c · i18n — MEDIA_TYPES lives at module scope (no hook), so it
+   keeps emitting stable English label/description for type-safety + any
+   non-translated consumer. Translation happens at RENDER time by mapping
+   the stable `type` → dictionary keys (same pattern as ProductForm.getSteps),
+   so MediaSlot never calls a hook at module scope. */
+const SLOT_LABEL_KEY: Partial<Record<ProductMediaType, string>> = {
+  main_image: "media.slot.main_image.label",
+  gallery: "media.slot.gallery.label",
+  packing_photo: "media.slot.packing_photo.label",
+  label: "media.slot.label.label",
+  manual: "media.slot.manual.label",
+  ar_3d: "media.slot.ar_3d.label",
+  video: "media.slot.video.label",
+};
+const SLOT_DESC_KEY: Partial<Record<ProductMediaType, string>> = {
+  main_image: "media.slot.main_image.desc",
+  gallery: "media.slot.gallery.desc",
+  packing_photo: "media.slot.packing_photo.desc",
+  label: "media.slot.label.desc",
+  manual: "media.slot.manual.desc",
+  ar_3d: "media.slot.ar_3d.desc",
+  video: "media.slot.video.desc",
+};
+
 /* ═══════════════════════════════════════════════════════════════════════════
    MediaSlot — a single media-type upload zone with tiles for its items.
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -156,7 +182,7 @@ function MediaSlot({
   type, label, description, icon, accentColor, multiple, accept,
   maxSizeMB, mimeCheck, suggestedCount,
   items, onAdd, onRemove, onEdit, onMoveLeft, onMoveRight, onPreview,
-  videoPreviews,
+  videoPreviews, t,
 }: MediaTypeDef & {
   items: MediaFormState[];
   onAdd: (files: FileList) => void;
@@ -166,10 +192,16 @@ function MediaSlot({
   onMoveRight: (tempId: string) => void;
   onPreview: (item: MediaFormState) => void;
   videoPreviews: Record<string, string>;
+  t: (key: string, fallback?: string) => string;
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+
+  /* Resolve the slot's display label/description at render time from the
+     stable `type` (MEDIA_TYPES stays English at module scope). */
+  const slotLabel = t(SLOT_LABEL_KEY[type] ?? "", label);
+  const slotDescription = t(SLOT_DESC_KEY[type] ?? "", description);
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -190,9 +222,18 @@ function MediaSlot({
           ? AR_EXT.test(f.name) // extension-based for 3D
           : mimeCheck.test(f.type);
       if (!sizeOk) {
-        rejected.push(`"${f.name}" is ${fmtMB(f.size)} MB — limit is ${maxSizeMB} MB.`);
+        rejected.push(
+          t("media.rejectTooBig", `"${f.name}" is ${fmtMB(f.size)} MB — limit is ${maxSizeMB} MB.`)
+            .replace("{name}", f.name)
+            .replace("{size}", fmtMB(f.size))
+            .replace("{max}", String(maxSizeMB)),
+        );
       } else if (!mimeOk) {
-        rejected.push(`"${f.name}" is the wrong type for ${label}.`);
+        rejected.push(
+          t("media.rejectWrongType", `"${f.name}" is the wrong type for ${slotLabel}.`)
+            .replace("{name}", f.name)
+            .replace("{label}", slotLabel),
+        );
       } else {
         accepted.push(f);
       }
@@ -221,13 +262,13 @@ function MediaSlot({
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h4 className="text-[13px] font-semibold text-[var(--text-primary)]">{label}</h4>
+              <h4 className="text-[13px] font-semibold text-[var(--text-primary)]">{slotLabel}</h4>
               <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[10px] font-bold text-[var(--text-muted)] flex items-center justify-center">
                 {items.length}
               </span>
             </div>
             <p className="text-[10px] text-[var(--text-ghost)] mt-0.5 truncate">
-              {description} · Max {maxSizeMB} MB per file
+              {slotDescription} · {t("media.maxPerFile", `Max ${maxSizeMB} MB per file`).replace("{n}", String(maxSizeMB))}
             </p>
           </div>
         </div>
@@ -236,7 +277,7 @@ function MediaSlot({
             onClick={() => ref.current?.click()}
             className="h-8 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] flex items-center gap-1.5 transition-colors shrink-0"
           >
-            <UploadIcon className="h-3 w-3" /> Upload
+            <UploadIcon className="h-3 w-3" /> {t("media.uploadAction", "Upload")}
           </button>
         )}
         <input
@@ -278,10 +319,14 @@ function MediaSlot({
               <PlusIcon className="h-4 w-4 text-[var(--text-ghost)]" />
             </div>
             <p className="text-[11px] font-medium text-[var(--text-dim)]">
-              Click to upload{multiple ? " or drag files" : ""}
+              {multiple
+                ? t("media.clickToUploadOrDrag", "Click to upload or drag files")
+                : t("media.clickToUpload", "Click to upload")}
             </p>
             <p className="text-[10px] text-[var(--text-ghost)] mt-0.5">
-              {accept.replace(/[.,]/g, " ").trim()} · max {maxSizeMB} MB
+              {t("media.acceptMaxHint", `${accept.replace(/[.,]/g, " ").trim()} · max ${maxSizeMB} MB`)
+                .replace("{accept}", accept.replace(/[.,]/g, " ").trim())
+                .replace("{n}", String(maxSizeMB))}
             </p>
           </div>
         ) : (
@@ -313,7 +358,7 @@ function MediaSlot({
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={objectSrc}
-                      alt={item.alt_text || "Product media"}
+                      alt={item.alt_text || t("media.productMediaAlt", "Product media")}
                       className="w-full h-full object-cover"
                     />
                   ) : showAsVideoThumb ? (
@@ -321,7 +366,7 @@ function MediaSlot({
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={thumbSrc}
-                        alt={item.alt_text || "Video thumbnail"}
+                        alt={item.alt_text || t("media.videoThumbAlt", "Video thumbnail")}
                         className="w-full h-full object-cover"
                       />
                       <div className="absolute inset-0 flex items-center justify-center bg-black/30">
@@ -340,7 +385,7 @@ function MediaSlot({
                         <BoxIcon className="h-8 w-8 mb-1" />
                       )}
                       <span className="text-[9px] truncate max-w-full text-center">
-                        {item._file?.name || (item.url ? item.url.split("/").pop() : "File")}
+                        {item._file?.name || (item.url ? item.url.split("/").pop() : t("media.fileFallback", "File"))}
                       </span>
                     </div>
                   )}
@@ -355,7 +400,7 @@ function MediaSlot({
                       <button
                         onClick={(e) => { e.stopPropagation(); onMoveLeft(item._tempId); }}
                         className="h-7 w-7 rounded-md bg-black/60 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/80 transition-colors"
-                        title="Move earlier in order"
+                        title={t("media.moveEarlier", "Move earlier in order")}
                       >
                         <ArrowLeftIcon className="h-3 w-3" />
                       </button>
@@ -364,7 +409,7 @@ function MediaSlot({
                       <button
                         onClick={(e) => { e.stopPropagation(); onMoveRight(item._tempId); }}
                         className="h-7 w-7 rounded-md bg-black/60 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/80 transition-colors"
-                        title="Move later in order"
+                        title={t("media.moveLater", "Move later in order")}
                       >
                         <ArrowRightIcon className="h-3 w-3" />
                       </button>
@@ -373,7 +418,7 @@ function MediaSlot({
                       <button
                         onClick={(e) => { e.stopPropagation(); onEdit(item); }}
                         className="h-7 w-7 rounded-md bg-black/60 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/80 transition-colors"
-                        title="Edit alt text"
+                        title={t("media.editAltText", "Edit alt text")}
                       >
                         <PencilIcon className="h-3 w-3" />
                       </button>
@@ -381,7 +426,7 @@ function MediaSlot({
                     <button
                       onClick={(e) => { e.stopPropagation(); onRemove(item._tempId); }}
                       className="h-7 w-7 rounded-md bg-red-500/80 backdrop-blur-sm text-white flex items-center justify-center hover:bg-red-500 transition-colors"
-                      title="Remove"
+                      title={t("media.remove", "Remove")}
                     >
                       <TrashIcon className="h-3 w-3" />
                     </button>
@@ -416,7 +461,7 @@ function MediaSlot({
                 className="aspect-square rounded-xl border border-dashed border-[var(--border-subtle)] flex flex-col items-center justify-center gap-1 text-[var(--text-ghost)] hover:text-[var(--text-dim)] hover:border-[var(--border-focus)]/60 hover:bg-[var(--bg-surface-subtle)]/30 transition-all"
               >
                 <PlusIcon className="h-5 w-5" />
-                <span className="text-[10px] font-medium">Add more</span>
+                <span className="text-[10px] font-medium">{t("media.addMore", "Add more")}</span>
               </button>
             )}
           </div>
@@ -427,12 +472,21 @@ function MediaSlot({
             Never blocks save; it's a nudge toward better product pages. */}
         {suggestedCount > 0 && items.length < suggestedCount && (
           <p className="mt-3 text-[10px] text-amber-400/80">
-            Suggested: at least {suggestedCount} {label.toLowerCase()} item{suggestedCount !== 1 ? "s" : ""}
-            {items.length > 0 ? ` (currently ${items.length})` : ""}.
-            {type === "gallery" && " More angles / details = better conversion."}
-            {type === "packing_photo" && " Buyers rely on packing photos to estimate shipping + inspection."}
-            {type === "manual" && " Datasheets help engineering buyers shortlist faster."}
-            {type === "video" && " A 30-60s demo video dramatically improves engagement."}
+            {t(
+              "media.suggestedAtLeast",
+              `Suggested: at least ${suggestedCount} ${slotLabel.toLowerCase()} item${suggestedCount !== 1 ? "s" : ""}`,
+            )
+              .replace("{n}", String(suggestedCount))
+              .replace("{label}", slotLabel.toLowerCase())
+              .replace("{plural}", suggestedCount !== 1 ? "s" : "")}
+            {items.length > 0
+              ? t("media.suggestedCurrently", ` (currently ${items.length})`).replace("{n}", String(items.length))
+              : ""}
+            .
+            {type === "gallery" && t("media.nudgeGallery", " More angles / details = better conversion.")}
+            {type === "packing_photo" && t("media.nudgePacking", " Buyers rely on packing photos to estimate shipping + inspection.")}
+            {type === "manual" && t("media.nudgeManual", " Datasheets help engineering buyers shortlist faster.")}
+            {type === "video" && t("media.nudgeVideo", " A 30-60s demo video dramatically improves engagement.")}
           </p>
         )}
       </div>
@@ -445,6 +499,8 @@ function MediaSlot({
    ═══════════════════════════════════════════════════════════════════════════ */
 
 export default function MediaSection({ media, onChange, excludeTypes = [] }: Props) {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
+
   /* Alt-text editor state — which media item is being edited and
      the draft value. Shared across all slots via the Modal rendered
      at the bottom of the component. */
@@ -597,6 +653,7 @@ export default function MediaSection({ media, onChange, excludeTypes = [] }: Pro
           onMoveRight={moveRight}
           onPreview={(item) => setPreviewing(item)}
           videoPreviews={videoPreviews}
+          t={t}
         />
       ))}
 
@@ -608,8 +665,8 @@ export default function MediaSection({ media, onChange, excludeTypes = [] }: Pro
       <Modal
         open={editing !== null}
         onClose={() => setEditing(null)}
-        title="Edit media metadata"
-        subtitle="Alt text describes the image for search engines and screen readers."
+        title={t("media.editMetaTitle", "Edit media metadata")}
+        subtitle={t("media.editMetaSubtitle", "Alt text describes the image for search engines and screen readers.")}
         width="max-w-md"
         footer={
           <>
@@ -618,20 +675,20 @@ export default function MediaSection({ media, onChange, excludeTypes = [] }: Pro
               onClick={() => setEditing(null)}
               className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
             >
-              Cancel
+              {t("action.cancel", "Cancel")}
             </button>
             <button
               type="button"
               onClick={saveEdit}
               className="h-10 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all"
             >
-              Save
+              {t("action.save", "Save")}
             </button>
           </>
         }
       >
         <label className="block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5">
-          Alt text
+          {t("media.altTextLabel", "Alt text")}
         </label>
         <input
           type="text"
@@ -643,13 +700,15 @@ export default function MediaSection({ media, onChange, excludeTypes = [] }: Pro
               saveEdit();
             }
           }}
-          placeholder="e.g. Close-up of the walking-foot mechanism"
+          placeholder={t("media.altTextPlaceholder", "e.g. Close-up of the walking-foot mechanism")}
           autoFocus
           className="w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all"
         />
         <p className="text-[10px] text-[var(--text-ghost)] mt-2">
-          Describe what the image shows in a short phrase. Keep it descriptive but concise —
-          around 10–15 words works best for Google image search.
+          {t(
+            "media.altTextHelp",
+            "Describe what the image shows in a short phrase. Keep it descriptive but concise — around 10–15 words works best for Google image search.",
+          )}
         </p>
       </Modal>
 
@@ -675,7 +734,7 @@ export default function MediaSection({ media, onChange, excludeTypes = [] }: Pro
             type="button"
             onClick={(e) => { e.stopPropagation(); setPreviewing(null); }}
             className="absolute top-4 right-4 h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
-            aria-label="Close preview"
+            aria-label={t("media.closePreview", "Close preview")}
           >
             <CrossIcon className="h-5 w-5" />
           </button>
@@ -694,7 +753,7 @@ export default function MediaSection({ media, onChange, excludeTypes = [] }: Pro
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={previewSrc(previewing)}
-                alt={previewing.alt_text || "Preview"}
+                alt={previewing.alt_text || t("media.previewAlt", "Preview")}
                 className="max-w-full max-h-[80vh] rounded-xl shadow-2xl object-contain"
               />
             )}

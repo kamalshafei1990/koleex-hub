@@ -42,7 +42,26 @@ Two **separate, non-reconciled** completeness meters live on the Review step:
    - **Two meters disagree** (different inputs, weights, and even media thresholds — legacy ignores manual/video, schema requires gallery≥3 vs brochure gallery≥4). P1: collapse to one source of truth.
 
 ## 5c — MediaSection
-_pending_
+
+### Knowledge-Object vs file-CRUD reading
+- **[KO] P1** — The media step is genuinely **role-aware**, not a flat dropzone. It renders **7 first-class, typed slots** — each with its own icon, accent color, accept-mask, size limit, MIME guard, and `suggestedCount` — so the operator is prompted to assemble a *complete visual story* (main → gallery → packing → labels → manual → AR/3D → video), not just "attach files." Most KO-shaped of the file surfaces.
+- **[KO] P1** — **Thumbnails, not filenames.** Images render as real cover-cropped previews, videos get a client-captured first-frame JPEG thumbnail (canvas seek), and a click opens a full-bleed preview modal. The operator sees the actual asset — reinforces "this is the product's visual identity" over "this is a row with a file path."
+- **[KO] P2** — **Ordering is a first-class authoring act**: per-slot move-earlier/move-later with a live `#1/#2…` order chip, kept in sync with the persisted `order` field so the public page mirrors the operator's arrangement. Gallery/packing read as a *curated sequence*, not an unordered bag of files.
+- **[DB-ish] P1** — But slots are still **siloed per media-type CRUD widgets** with no cross-slot sense of "is this product's visual story complete?" The only completeness cue is the per-slot amber `suggestedCount` nudge ("still need X"); there is **no aggregate media-readiness signal** in this component (it lives only on the Review step's separate meters — see 5b). On the Media step the operator can't see how the whole visual narrative scores.
+- **[DB-ish] P2** — **Alt text is the only knowledge metadata** captured per asset (good for SEO/a11y), but there's no caption, no "what this shows" semantic role, no link to a spec/variant/model — each tile is an isolated file + alt string, not a knowledge node connected to the rest of the product.
+- **[DB-ish] P2** — `suggestedCount` nudges (main=1, gallery=4, packing=2, manual=1, video=1; labels/AR optional) are **hard-coded in `MEDIA_TYPES`** and *disagree with the Review meters' thresholds* (schema media wants gallery≥3, brochure≥4) — a third, non-reconciled set of media-completeness numbers. Feeds the "collapse to one completeness source of truth" finding.
+
+### First-class media ROLE slots (for the Completeness-Engine section)
+Typed, role-aware slots, each with its own size/MIME/suggested-count policy:
+1. **main_image** (Main Image · single · suggested 1) — hero/list primary photo.
+2. **gallery** (Gallery · multi · suggested 4) — angles/details.
+3. **packing_photo** (Packing Photos · multi · suggested 2) — crate/box/packaging dims.
+4. **label** (Labels & Logos · multi · suggested 0/optional) — brand/origin/cert stickers.
+5. **manual** (Manual / Datasheet · multi · suggested 1) — PDF/DOC datasheets.
+6. **ar_3d** (AR / 3D View · multi · suggested 0/optional) — GLB/GLTF/USDZ.
+7. **video** (Videos · multi · suggested 1) — demo/operation videos.
+
+Note: the `ProductMediaType` union also includes **`logo_detail`**, which has **no `MEDIA_TYPES` slot** here — a declared role with no authoring surface (silent gap; the i18n type→key map falls back to English if it's ever rendered).
 
 ## 5d — TemplateView + ProductPreview
 _pending_
