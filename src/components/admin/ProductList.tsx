@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
+import { humanizeError } from "@/lib/ui/humanize-error";
 import { IMG } from "@/lib/cdn";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
@@ -76,6 +77,11 @@ export default function ProductList() {
   const [primaryModelNames, setPrimaryModelNames] = useState<Record<string, string>>({});
   const [mainImages, setMainImages] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  /* Load-failure state — products are the critical fetch. On failure we
+     show a real error + Retry instead of the misleading "No products yet"
+     empty state. retryKey re-runs the load effect. */
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
 
   /* Filter state — persisted to sessionStorage so the back-button
@@ -122,18 +128,39 @@ export default function ProductList() {
   const searchBoxRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
     (async () => {
-      const [p, d, c, s, ms, imgs] = await Promise.all([
-        fetchProducts(), fetchDivisions(), fetchCategories(),
-        fetchSubcategories(), fetchModelSummaries(), fetchProductMainImages(),
-      ]);
-      setProducts(p); setDivisions(d); setCategories(c);
-      setSubcategories(s);
-      setModelCounts(ms.counts);
-      setProductSuppliers(ms.suppliers);
-      setAllSuppliers(ms.allSuppliers);
-      setPrimaryModelNames(ms.primaryModelNames || {});
-      setMainImages(imgs);
+      try {
+        /* Products are the CRITICAL fetch — if this fails we must surface a
+           real error + Retry, never a misleading "No products yet" state.
+           A 12s abort prevents an indefinite skeleton on a stalled network.
+           Filters/meta below stay tolerant (a missing filter list shouldn't
+           block the catalogue from rendering). */
+        const ctrl = new AbortController();
+        const timeoutId = setTimeout(() => ctrl.abort(), 12_000);
+        let p: ProductRow[];
+        try {
+          const res = await fetch("/api/products", { credentials: "include", signal: ctrl.signal });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const json = (await res.json()) as { products?: ProductRow[] };
+          p = json.products ?? [];
+        } finally {
+          clearTimeout(timeoutId);
+        }
+        const [d, c, s, ms, imgs] = await Promise.all([
+          fetchDivisions(), fetchCategories(),
+          fetchSubcategories(), fetchModelSummaries(), fetchProductMainImages(),
+        ]);
+        if (cancelled) return;
+        setProducts(p); setDivisions(d); setCategories(c);
+        setSubcategories(s);
+        setModelCounts(ms.counts);
+        setProductSuppliers(ms.suppliers);
+        setAllSuppliers(ms.allSuppliers);
+        setPrimaryModelNames(ms.primaryModelNames || {});
+        setMainImages(imgs);
       /* Public catalog lands on Garment Machinery by default — it's
          the flagship. Customers browsing /products should see the
          primary line first; they can click "All divisions" or any
@@ -143,17 +170,29 @@ export default function ProductList() {
          Only apply the flagship default when the user has NO stored
          filter from a previous visit — otherwise we'd overwrite
          their persisted choice on every data refresh. */
-      if (
-        !isInternal &&
-        !initialFilters.div &&
-        d.some(x => x.slug === FLAGSHIP_DIVISION_SLUG)
-      ) {
-        setFilterDiv(FLAGSHIP_DIVISION_SLUG);
+        if (
+          !isInternal &&
+          !initialFilters.div &&
+          d.some(x => x.slug === FLAGSHIP_DIVISION_SLUG)
+        ) {
+          setFilterDiv(FLAGSHIP_DIVISION_SLUG);
+        }
+        setLoading(false);
+      } catch (e) {
+        if (!cancelled) {
+          const aborted = e instanceof DOMException && e.name === "AbortError";
+          setLoadError(
+            aborted
+              ? "The server took too long to respond. Please retry."
+              : humanizeError(e),
+          );
+          setLoading(false);
+        }
       }
-      setLoading(false);
     })();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isInternal]);
+  }, [isInternal, retryKey]);
 
   /* Persist the filter snapshot to sessionStorage on every change.
      Back-button from a detail page returns to the same view. Stays
@@ -938,7 +977,20 @@ export default function ProductList() {
         )}
 
         {/* Product Grid / List */}
-        {loading ? (
+        {loadError ? (
+          <div className="bg-[var(--bg-secondary)] rounded-2xl border border-red-500/30 p-16 text-center">
+            <ProductsIcon size={48} className="text-red-400/70 mx-auto mb-4" />
+            <p className="text-[var(--text-primary)] text-[15px] font-semibold">Couldn&apos;t load products</p>
+            <p className="text-[var(--text-muted)] text-[13px] mt-1">{loadError}</p>
+            <button
+              type="button"
+              onClick={() => setRetryKey((k) => k + 1)}
+              className="inline-flex items-center gap-2 mt-4 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all"
+            >
+              Retry
+            </button>
+          </div>
+        ) : loading ? (
           viewMode === "grid" ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {[...Array(8)].map((_, i) => (
