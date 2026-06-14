@@ -55,7 +55,7 @@ New facets are added **here only** (governance). Categories *reference* facets; 
 |---|---|---|---|
 | part_class | single_select | — | spare · attachment · consumable · tool · hardware · electronic · pneumatic |
 | function_token | text | — | NDL · LPR · HOK · BBN · FDG · NPL · PSF · KNF · MTR · PCB · BLT · FLD · BND · GGS · SEQ · OIL · FLT … |
-| needle_system | text | — | DBx1 · DPx5 · DCx27 · UYx128 · TVx7 … (controlled list) |
+| needle_system | text | — | DBx1 · DPx5 · **DPx17** · DCx27 · **DYx3** · **CPx5** · TVx7 · **TVx5** · **TVx64** · **TQx1** · **LWx6T** · UYx128 · **DVx57** · **7x23/7x25/7x30** (extra-heavy leather) … (controlled list; expanded Lockstitch v1.1) |
 | needle_size | measurement | Nm / № | numeric |
 | point_type | single_select | — | R · SES · SUK · ballpoint · cutting … |
 | left_right | single_select | — | Left · Right · N/A |
@@ -104,4 +104,57 @@ New facets are added **here only** (governance). Categories *reference* facets; 
 | industry | multi_select | — | Apparel · Home Textile · Automotive · Medical · Military · Safety · Leather · Technical · Hospitality |
 | fabric_type | multi_select | — | Woven · Knit · Denim · Leather · Nonwoven · Technical |
 
-> **Governance:** `automation_level`, `bed_type`, `needle_count`, `thread_count`, `gauge`, `drive_type`, `heating_method`, `steam_source`, `detection_coverage`, `working_width`, `working_field` recur across many categories — defined once here and reused. Voltage/plug are **options/facets**, not SKU-creators by default (see `sku-strategy.md`).
+## 8. Lockstitch v1.1 promoted facets (real-catalog validated · CL-0005)
+Promoted from the [Lockstitch Master Spec Dictionary v1.1](./dictionaries/lockstitch-master-spec-dictionary.md) (extraction report CL-0004). Defined **once here**; reusable by Overlock/Interlock/etc. `T` column = lockstitch tier (Core/Adv/HD/Cyl/Post/LA/CNC).
+
+### 8a · Mechanics & geometry
+| Facet | Type | Unit | Allowed / Notes | T |
+|---|---|---|---|---|
+| needle_bar_stroke | measurement | mm | numeric (33.4–58 typical) | Core |
+| presser_foot_stroke | measurement | mm | numeric (walking/unison foot lift travel) | HD |
+| thread_take_up_stroke | measurement | mm | numeric | Adv |
+| max_sewing_thickness | measurement | mm | numeric (feeding/clamp space) | HD |
+| cylinder_diameter | measurement | mm | numeric (cylinder bed) | Cyl |
+| cylinder_circumference | measurement | mm | numeric | Cyl |
+| post_height | measurement | mm | numeric (post bed) | Post |
+| arm_length | measurement | mm | numeric (long-arm) | LA |
+| lubrication_type | single_select | — | Dry-head(oil-free) · Semi-dry(hook-only) · Micro-oil · Sealed-oil-pan · Auto-lube · Manual | Core |
+| table_mount_type | single_select | — | Ordinary · Ball-bearing(钢珠) · Air-float | Core |
+
+### 8b · Electronics, monitoring & performance
+| Facet | Type | Unit | Allowed / Notes | T |
+|---|---|---|---|---|
+| electronic_thread_clamp | boolean | — | true/false (electronic tension/clamp) | Adv |
+| stitch_condensing | boolean | — | true/false (end-of-seam condensing back-tack) | Adv |
+| piece_counter | boolean | — | true/false | Adv |
+| bobbin_thread_counter | number | stitches | numeric (remaining-thread estimate) | Adv |
+| bobbin_thread_monitor | boolean | — | true/false | Adv |
+| needle_thread_monitor | boolean | — | true/false (thread-break detection) | Adv |
+| acceleration_time | measurement | ms | numeric (0→max) | Adv |
+| productivity | measurement | pcs/h · s/pc | numeric (cycle output) | CNC |
+
+### 8c · CNC / pattern-sewing
+| Facet | Type | Unit | Allowed / Notes | T |
+|---|---|---|---|---|
+| sewing_field_xy | text | mm | X×Y (e.g. 220×100) | CNC |
+| max_stitches_per_pattern | number | — | numeric | CNC |
+| pattern_storage_count | number | — | numeric (patterns in memory) | CNC |
+| pattern_file_format | multi_select | — | DXF · PLT · DST · NTP · DHP · SLW | CNC |
+| pattern_scaling_range | range | % | numeric pair | CNC |
+| template_recognition | single_select | — | RFID · none | CNC |
+| side_cutter_edge_width | measurement | mm | numeric (margin from seam to edge) | CNC |
+| cloth_cutting_thickness | measurement | mm | numeric | CNC |
+| air_consumption | measurement | L/min | numeric | CNC |
+
+### 8d · Application & compatibility
+| Facet | Type | Unit | Allowed / Notes | T |
+|---|---|---|---|---|
+| fabric_weight_class | single_select | — | Light · Medium · Heavy · Extra-heavy (duty grade) | Core |
+| hook_model | text | — | e.g. KSP-204N · KRT132 (rotary-hook part code) | — |
+| hook_brand | text | — | e.g. Hirose · KSP · (OEM hook maker) | — |
+| mountable_head_compat | multi_select | — | JUKI · SIRUBA · PEGASUS · HIKARI · LIJIA · KANSAI (heads a CNC frame accepts) | CNC |
+| controller_brand | text | — | DAHAO(大豪) · 誉财 · 星火 · SYSTEMTOP | CNC |
+
+> **Improvements applied to existing facets:** `needle_system` list expanded (§3) · `gauge`/`needle_gauge` now mm **or** inch · `stitch_type` carries `iso_stitch_class` (301) · `table_surface_type` may pair with `table_mount_type` ball-bearing.
+
+> **Governance:** `automation_level`, `bed_type`, `needle_count`, `thread_count`, `gauge`, `drive_type`, `heating_method`, `steam_source`, `detection_coverage`, `working_width`, `working_field` recur across many categories — defined once here and reused. Voltage/plug are **options/facets**, not SKU-creators by default (see `sku-strategy.md`). The §8 facets are reusable cross-type (sewing family) — never re-defined per category.
