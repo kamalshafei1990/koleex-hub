@@ -1,7 +1,7 @@
 # KOLEEX Product Knowledge — Architecture Freeze
-**Status:** 🟠 LOCKED-BY-OWNER (Kamal, 2026-06-15) — the 3 core decisions are closed. Awaiting **ChatGPT Ratification Review** (review for contradictions / scalability / population risk — NOT redesign). On APPROVE (or approve-with-minor-notes) → flips to 🟢 FROZEN + Architecture Status = **READY FOR POPULATION**.
-**Constraints that remain regardless:** no Schema Migration and no PD-V2 cutover until their proper time. **Nothing here is implemented** — contracts only, no code/schema/migration.
-**Verdict basis:** both architects ruled **B) Product Database with Knowledge Attached**. These 3 contracts are the foundation that must be frozen before loading thousands of products; everything after is enhancement, not reshaping.
+**Status:** 🟢 **FROZEN v1.0** (2026-06-15) — ratified by both architects. **Architecture Gate = CLOSED · Architecture Status = READY FOR POPULATION.**
+**Ratification:** owner-locked by Kamal → **ChatGPT Ratification Review returned APPROVE with minor notes** (verbatim verdict + the 3 minor notes in §Ratification below). Both architects ruled **B) Product Database with Knowledge Attached**; these 3 contracts are now frozen as the foundation.
+**Constraints that remain regardless (still gated, each separately):** no **Schema Migration**, no **PD-V2 cutover**, no **Production DB changes** until their proper time. **Nothing here is implemented** — contracts only, no code/schema/migration. Freezing the gate does NOT authorize building the contracts.
 **Mental-model shift to encode everywhere:** *Create → Edit → Save Product* ⟶ **Build → Enrich → Connect → Measure Product Knowledge.**
 
 > Legend: **[LOCKED]** = closed by owner · **[minor]** = non-blocking detail to settle during build · facts are from the live schema.
@@ -75,6 +75,8 @@ The graph's primary shared node is **Product Type**, and the knowledge attaches 
 
 ### Remaining [minor]
 - Inheritance resolution union vs override when product + its kind both declare an edge (rec: union + product-level suppress). · Concept nodes (Application/Industry/…) as thin controlled-vocabulary reference tables now (rec) vs shadow-IDs. · One canonical edge model vs bespoke tables (rec: one).
+- **[ChatGPT ratification note #1 — Machine-Kind Governance]** Because Product Type = Machine Kind, an ungoverned Machine-Kind list will sprawl. A **Machine Kind Approval Rule** is required at build time: a new Machine Kind is admitted only if it (a) carries a clear knowledge meaning, (b) has a visual identity, (c) has applications/operations/fabric logic, and (d) is not merely an ordinary feature. *Non-blocking to the freeze; build-time governance.*
+- **[ChatGPT ratification note #2 — Concept nodes start thin]** When the Application/Industry/Operation/Fabric/Material apps are eventually built, start them as **thin reference tables (reference nodes), not shadow-IDs** — this reduces rework and makes Completeness + AI easier. *Non-blocking to the freeze.*
 
 ---
 
@@ -112,14 +114,30 @@ Final Completeness = (Structural × 50%) + (Knowledge × 50%)
 
 ### Remaining [minor]
 - Per-group "done" thresholds (e.g. Media: hero required + gallery N images = 100%). · Hard publish floor (e.g. block < 60% final). · How much inherited type-knowledge counts vs product-specific enrichment.
+- **[ChatGPT ratification note #3 — Publish floor starts low]** With ~**710 legacy products** to backfill, do **not** set a high hard publish floor initially. Recommended phasing: **Draft = no floor · Active = minimum (Identity + Type + Model) only · Knowledge completeness = advisory first** → raise the floor after backfill. *Build-time decision, non-blocking to the freeze.*
 
 ---
 
-## Ratification & Freeze process
-1. **ChatGPT Ratification Review** — review for logical contradictions, taxonomy conflicts, scalability risks, future-population risks. **Do not redesign.** Output: APPROVE / approve-with-minor-notes / blocking-issues list.
-2. On APPROVE (or approve-with-minor-notes) → flip this doc to **🟢 FROZEN v1.0**, log in the product-coding change-log, set **Architecture Status = READY FOR POPULATION**.
-3. **Still gated regardless:** no Schema Migration, no PD-V2 cutover, until their proper time.
+## Ratification & Freeze — CLOSED ✅
+**Owner-locked (Kamal, 2026-06-15):** P0-A name set (8) · P0-B Product Type = Machine Kind · P0-C two-layer weights with AI excluded from core.
+**ChatGPT Ratification Review (2026-06-15): APPROVE with minor notes.** Verbatim:
 
-**Owner-locked this pass (Kamal):** P0-A name set (8) · P0-B Product Type = Machine Kind · P0-C two-layer weights with AI excluded from core. Remaining items are [minor] build-time details, non-blocking to the freeze.
+> **APPROVE with minor notes.**
+> لا أرى أي Blocking issue يمنع Freeze أو Population بعد هذه العقود الثلاثة.
+>
+> **الحكم** — `Architecture Gate = APPROVED · Status = FROZEN for population planning`
+>
+> **القرار النهائي — APPROVED.** لا توجد تناقضات كبيرة · لا أرى scalability risk يمنع · لا أرى population risk إذا تم الالتزام بالعقود الثلاثة.
+> الـ Architecture Gate يمكن إغلاقه الآن كـ:
+> `P0-A Naming = FROZEN · P0-B Graph Contract = FROZEN · P0-C Completeness Contract = FROZEN`
+> وبعدها يمكن الانتقال إلى: **Population Planning** — مع بقاء (gated بشكل منفصل): **Schema migration · PD-V2 cutover · Production DB changes.**
 
-*No implementation begins until the freeze is signed. Contracts, not code.*
+**ChatGPT's 3 minor notes (all explicitly NOT blockers — folded into the [minor] sections above):**
+1. **Machine-Kind Governance** — needs a Machine Kind Approval Rule (clear knowledge meaning + visual identity + applications/operations/fabric logic + not merely a feature). → P0-B [minor].
+2. **Concept nodes start thin** — Application/Industry/Operation/Fabric/Material as thin reference tables, not shadow-IDs, when eventually built. → P0-B [minor].
+3. **Publish floor starts low** — ~710 legacy products; Draft=no floor / Active=Identity+Type+Model only / Knowledge=advisory first → raise after backfill. → P0-C [minor].
+
+**Freeze outcome:** the 3 contracts are **FROZEN v1.0**. Architecture Gate is **CLOSED**; Architecture Status = **READY FOR POPULATION**.
+**Still gated regardless (each separately, require explicit sign-off):** Schema Migration · PD-V2 cutover · Production DB changes. **Freezing the gate ≠ authorization to build the contracts** — building is a separate, future step.
+
+*The freeze is signed by both architects. No implementation begins on the strength of this freeze alone. Contracts, not code.*
