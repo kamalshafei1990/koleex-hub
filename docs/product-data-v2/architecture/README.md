@@ -1,5 +1,7 @@
 # Product Data V2 — Architecture Index
 
+> **Visual requirement (SoT):** Product Data V2 is **visual-first** — see [Visual Product Experience](./visual-product-experience.md). Every entity must define its Visual Presentation Metadata (icons, photos, spec cards, comparison, AI / website / quote / catalog visuals); visuals are part of "done".
+
 Status: **Architecture Freeze v1.0 (approved in principle).** Implementation **gated** on production baseline validation (Stage 1.5) + prefix-freeze sign-off.
 
 This folder captures the frozen architecture decisions (previously only in design sessions) so they are version-controlled and covered by the coding-change governance conflict-scan.

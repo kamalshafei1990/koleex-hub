@@ -1,5 +1,7 @@
 # SKU Strategy
 
+> **Visual requirement (SoT):** see [Visual Product Experience](../architecture/visual-product-experience.md). Each SKU has a visual configuration card (resolved hero/gallery + config chips + logistics) and a `quotation_display_hint`; photos/icons resolve `SKU ► Model ► Family ► Type`. Visuals are part of "done".
+
 Reference dataset for Product Data V2. **Documentation only.** Defines when a variation becomes a SKU. Aligns with Architecture Freeze v1.0 (SKU = operational anchor; Primary Model = commercial).
 
 ## The one rule

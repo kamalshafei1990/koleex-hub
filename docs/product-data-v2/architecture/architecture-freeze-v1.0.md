@@ -1,5 +1,7 @@
 # Product Data V2 — Architecture Freeze v1.0
 
+> **Visual requirement (SoT):** Product Data V2 is **visual-first** — see [Visual Product Experience](./visual-product-experience.md). The identity spine (Type → Family → Primary Model → SKU) also carries Visual Presentation Metadata (icons, photos, spec cards), resolved by the same inheritance order. Visuals are part of "done".
+
 Status: **Approved in principle.** This is the canonical record of frozen decisions. Changes follow `../reference-data/coding-change-governance.md`.
 
 ## 1. Identity model (frozen)

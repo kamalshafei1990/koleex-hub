@@ -1,5 +1,7 @@
 # Product Type Master Registry — Garment Machinery (Division X)
 
+> **Visual requirement (SoT):** see [Visual Product Experience](../architecture/visual-product-experience.md). Every Product Type must define its visual identity — `icon_key` (+ `icon_style`), default `presentation_group` ordering, and a diagram/placeholder plan — before approval. Visuals are part of "done".
+
 Reference dataset for Product Data V2. **Documentation only.**
 Legend for **Code Prefix**: ✅ = live KOLEEX code in production today · ▲ = *proposed*, needs governance sign-off (see gap analysis).
 Facets reference `facet-dictionary-master.md`; devices reference `device-dictionary-master.md`.

@@ -1,5 +1,7 @@
 # Compatibility Rulebook
 
+> **Visual requirement (SoT):** see [Visual Product Experience](../architecture/visual-product-experience.md). Compatibility results render **visually** — Fits / Requires / Pairs / Alternative / Supersedes as linked cards with the partner's icon + photo. Each rule must define the `presentation_group` (section) its result renders in before approval.
+
 Reference dataset for Product Data V2. **Documentation only.** Formal rules for how parts / devices / consumables fit machines. Aligns with Architecture Freeze v1.0 + the resolver pseudo-code.
 
 ## 1. Compatibility types

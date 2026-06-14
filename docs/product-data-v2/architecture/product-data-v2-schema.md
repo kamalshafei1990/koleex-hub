@@ -1,5 +1,7 @@
 # Product Data V2 — Technical Schema (design)
 
+> **Visual requirement (SoT):** see [Visual Product Experience](./visual-product-experience.md). `product_media` (image roles), `pd_facets` (presentation hints), and the read-model projections (`pd_search_doc`, `pd_ai_doc`) carry the Visual Presentation Metadata layer (icon_key, image_role, hero/gallery/diagram, spec_card_priority, presentation_group, display hints). Visuals are metadata-driven, never hardcoded per product.
+
 **Design only — not applied.** All new structural tables use a `pd_` namespace (zero collision with the 3 existing taxonomy families). Reuse: `product_models` (→ Primary Model), `product_media`, `product_translations`, `model_translations`, `product_market_prices`, `related_products`. Conventions: `uuid` PK, `tenant_id`, `created_at/updated_at`, RLS = **service-role-only** (mirrors the P0-C lockdown; anon denied; app reads via server APIs).
 
 ## Entity map

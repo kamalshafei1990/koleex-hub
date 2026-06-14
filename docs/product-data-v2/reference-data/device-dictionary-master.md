@@ -1,5 +1,7 @@
 # Device Dictionary Master
 
+> **Visual requirement (SoT):** see [Visual Product Experience](../architecture/visual-product-experience.md). Every Device (and its attachable spare parts) must define `icon_key` and an `image_role` plan (photo and/or exploded-diagram callout) before approval. Devices render as visual cards in compatibility and BOM views.
+
 Reference dataset for Product Data V2. **Documentation only.** A **Device** = a reusable functional add-on that can be (a) a factory-fitted option on a machine and (b) mapped to attachable spare parts. **Devices are options/facets, never Product Types.**
 **SKU-affecting?** = does fitting it create a distinct stock-keeping unit (different cost/stock)? Default **No** unless it changes cost or stock (see `sku-strategy.md`).
 Fields legend: every device row lists its **Required Fields** (the data captured when the option is configured).
