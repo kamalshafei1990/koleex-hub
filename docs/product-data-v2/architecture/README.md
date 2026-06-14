@@ -9,6 +9,7 @@ This folder captures the frozen architecture decisions (previously only in desig
 ## Document map
 | Area | Document |
 |---|---|
+| **Cross-App Knowledge Federation** (every domain's owner: existing app / table / PD-V2 / future module / external / manual · reference-vs-copy · the product knowledge graph) | [`cross-app-knowledge-federation.md`](./cross-app-knowledge-federation.md) |
 | **Product Knowledge Universe V2.0** (69 domains + 3 cross-cutting layers · connected-machine · channel/lifecycle · multi-language/graph/AI · missing-domain audit) | [`product-knowledge-architecture-v2.md`](./product-knowledge-architecture-v2.md) |
 | **Complete Product Knowledge Object** (V1.0 base · 58 domains · ownership/visibility/visual/AI/commercial/supplier matrices · full hierarchy) | [`product-knowledge-architecture.md`](./product-knowledge-architecture.md) |
 | Frozen decisions (identity model · refinements · KEEP/MODIFY/REMOVE) | [`architecture-freeze-v1.0.md`](./architecture-freeze-v1.0.md) |
