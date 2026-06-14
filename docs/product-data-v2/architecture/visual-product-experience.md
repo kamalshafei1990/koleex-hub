@@ -135,7 +135,7 @@ Product Data V2 must support a **visual presentation metadata layer** alongside 
 |---|---|---|
 | `icon_key` | Product Type, Family, Model, SKU, Device, Spare Part, Facet (+ facet options) | Stable token → Visual Library icon asset. Identity + fallback. |
 | `icon_style` | same as `icon_key` | `line` \| `solid` \| `duotone` (default `line`, per brand). |
-| `image_role` | `product_media` rows | `hero` \| `gallery` \| `diagram` \| `thumbnail` \| `swatch` \| `badge` \| `dimension` \| `in_use`. |
+| `image_role` | `product_media` rows | `hero` \| `gallery` \| `diagram` \| `thumbnail` \| `swatch` \| `badge` \| `dimension` \| `in_use` \| `detail` \| `application` \| `spare_part` \| `packing` \| `video` \| `stitch_sample` \| `process_diagram` \| `symbol_legend` \| `parts_chart` \| `code_builder`. *(last 5 added Lockstitch v1.1 / CL-0005)* |
 | `hero_image` | Model / SKU / Type (resolved) | The primary image reference (a `product_media` hero row). |
 | `gallery_images` | Model / SKU | Ordered set of gallery image references. |
 | `diagram_image` | Type / Model / Spare Part / BOM kit | Exploded view / line diagram reference. |
