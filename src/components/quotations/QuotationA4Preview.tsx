@@ -370,6 +370,41 @@ export default function QuotationA4Preview({
       return n;
     });
   }, [current.items]);
+
+  /* Paste hygiene. The item description / section title / detail cells are
+     contentEditable, so pasting from Word, a web page, or another quote drags
+     the SOURCE's inline font-size / family / color in with it — it looks
+     nothing like the cell's default. Intercept paste anywhere inside the A4
+     stack and insert PLAIN text instead, so it inherits the cell's own
+     styling. Toolbar bold/italic/underline the operator applies still work;
+     only the incoming clipboard is stripped. One capturing listener covers
+     every editable cell (and InvoicesDoc, which reuses this component). */
+  const stackRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const root = stackRef.current;
+    if (!root) return;
+    const onPaste = (e: ClipboardEvent) => {
+      const node = e.target as Node | null;
+      const el = node instanceof Element ? node : node?.parentElement ?? null;
+      const editable = el?.closest?.('[contenteditable="true"]');
+      if (!editable || !root.contains(editable)) return;
+      e.preventDefault();
+      const text = e.clipboardData?.getData("text/plain") ?? "";
+      if (!text) return;
+      /* insertText drops the text at the caret with the cell's own style. */
+      if (!document.execCommand("insertText", false, text)) {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount) {
+          const range = sel.getRangeAt(0);
+          range.deleteContents();
+          range.insertNode(document.createTextNode(text));
+          range.collapse(false);
+        }
+      }
+    };
+    root.addEventListener("paste", onPaste, true);
+    return () => root.removeEventListener("paste", onPaste, true);
+  }, []);
   /* Bumped every time something OUTSIDE the rich-text terms area
      changes the terms — Quick Fill picks, future 'apply customer
      defaults' button, etc. TermsArea force-syncs its innerHTML on
@@ -540,7 +575,7 @@ export default function QuotationA4Preview({
   }, [current.items]);
 
   return (
-    <div className={"quot-a4-stack" + (hidePanels ? " gutters-hidden" : "")}>
+    <div ref={stackRef} className={"quot-a4-stack" + (hidePanels ? " gutters-hidden" : "")}>
     {pages.map((page, pageIdx) => {
       const isFirstPage  = pageIdx === 0;
       const isLastPage   = pageIdx === pages.length - 1;
