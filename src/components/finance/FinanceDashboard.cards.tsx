@@ -6,13 +6,17 @@
    Extracted from FinanceDashboard.tsx (Fix #6) — the three "leaf"
    visual cards that the Operational + Executive views both render
    near the bottom of the page. They depend only on props (no closures
-   into the parent's state), so they're a clean cut.
+   into the parent's state), so they're a clean cut — and a clean
+   React.memo target: the dashboard re-renders on every period toggle,
+   intelligence rebuild, and copilot-context effect, but these cards
+   only need to re-render when their own props change.
 
      · ProfitFlow         — 7-step waterfall: revenue → … → net profit
      · TopOrdersCard      — ranked list of most-profitable orders
      · TopCategoriesCard  — biggest expense buckets with share-bar
    ========================================================================== */
 
+import { memo } from "react";
 import { ChartCard, formatCompact, type Tone } from "@/components/finance/FinanceUiX";
 import { styleForCategory } from "@/components/finance/categoryStyles";
 import { fmtPct } from "@/lib/finance/calc";
@@ -22,7 +26,7 @@ import type { DashboardKpi } from "@/lib/finance/types";
 import { useTranslation } from "@/lib/i18n";
 import { financeT } from "@/lib/translations/finance";
 
-export function ProfitFlow({
+export const ProfitFlow = memo(function ProfitFlow({
   revenue, supplierCost, expenses, taxRefund, finCharges, gross, net, currency,
 }: {
   revenue: number; supplierCost: number; expenses: number; taxRefund: number;
@@ -70,9 +74,9 @@ export function ProfitFlow({
       })}
     </div>
   );
-}
+});
 
-export function TopOrdersCard({ kpi, currency }: { kpi: DashboardKpi | null; currency: string }) {
+export const TopOrdersCard = memo(function TopOrdersCard({ kpi, currency }: { kpi: DashboardKpi | null; currency: string }) {
   const { t } = useTranslation(financeT);
   const rows = kpi?.top_orders ?? [];
   return (
@@ -106,9 +110,9 @@ export function TopOrdersCard({ kpi, currency }: { kpi: DashboardKpi | null; cur
       )}
     </ChartCard>
   );
-}
+});
 
-export function TopCategoriesCard({ kpi, currency }: { kpi: DashboardKpi | null; currency: string }) {
+export const TopCategoriesCard = memo(function TopCategoriesCard({ kpi, currency }: { kpi: DashboardKpi | null; currency: string }) {
   const { t } = useTranslation(financeT);
   const rows = kpi?.top_expense_categories ?? [];
   return (
@@ -141,4 +145,4 @@ export function TopCategoriesCard({ kpi, currency }: { kpi: DashboardKpi | null;
       )}
     </ChartCard>
   );
-}
+});

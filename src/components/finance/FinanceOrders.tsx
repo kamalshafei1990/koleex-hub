@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
@@ -272,7 +272,9 @@ export default function FinanceOrders() {
    collected-vs-outstanding progress bar so the operator gets a
    read at a glance.
    ──────────────────────────────────────────────────────────────── */
-function OrderRowCard({ order, onEdit, onDelete }: { order: FinanceOrder; onEdit: () => void; onDelete: () => void }) {
+/* memo: the order list re-renders on unrelated parent state (delete-dialog
+   open/close, loading flips). With props unchanged, skip the row's re-render. */
+const OrderRowCard = memo(function OrderRowCard({ order, onEdit, onDelete }: { order: FinanceOrder; onEdit: () => void; onDelete: () => void }) {
   const { t } = useTranslation(financeT);
   const ccy = order.currency || "USD";
   const sellingPrice = order.selling_price ?? 0;
@@ -418,7 +420,7 @@ function OrderRowCard({ order, onEdit, onDelete }: { order: FinanceOrder; onEdit
       )}
     </div>
   );
-}
+});
 
 /* ── Zone primitives — used by the new 3-zone Order card ──
    They keep the BOOKED / REALIZED / EXPOSURE columns visually equal

@@ -30,7 +30,7 @@
    from data the existing endpoints already return.
    ========================================================================== */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import {
@@ -153,11 +153,24 @@ export default function FinanceDashboard() {
     }
   }, []);
 
-  const load = useCallback(async (p: DashboardPeriod) => {
-    setLoading(true);
+  /* Only `/api/finance/dashboard` is period-scoped. The other seven feeds
+     (orders/payments/expenses/treasury/reconciliation/bank-imports/plans)
+     return full datasets regardless of the selected period, so they're
+     fetched once on mount; switching the Week/Quarter/Year tab refetches
+     ONLY the KPI endpoint instead of re-pulling all eight every time. */
+  const loadDashboard = useCallback(async (p: DashboardPeriod) => {
     try {
-      const [dashRes, ordersRes, paymentsRes, expensesRes, treasuryRes, reconRes, importsRes, plansRes] = await Promise.all([
-        fetch(`/api/finance/dashboard?period=${p}`, { cache: "no-store" }),
+      const dashRes = await fetch(`/api/finance/dashboard?period=${p}`, { cache: "no-store" });
+      const j = (await dashRes.json().catch(() => ({}))) as { kpi?: DashboardKpi };
+      setKpi(j.kpi ?? null);
+    } catch {
+      setKpi(null);
+    }
+  }, []);
+
+  const loadStatic = useCallback(async () => {
+    try {
+      const [ordersRes, paymentsRes, expensesRes, treasuryRes, reconRes, importsRes, plansRes] = await Promise.all([
         fetch(`/api/finance/orders`, { cache: "no-store" }),
         fetch(`/api/finance/payments`, { cache: "no-store" }),
         fetch(`/api/finance/expenses`, { cache: "no-store" }),
@@ -166,8 +179,6 @@ export default function FinanceDashboard() {
         fetch(`/api/finance/bank-imports`, { cache: "no-store" }),
         fetch(`/api/finance/treasury-plans`, { cache: "no-store" }),
       ]);
-      const j = (await dashRes.json()) as { kpi?: DashboardKpi };
-      setKpi(j.kpi ?? null);
       const ordersBody = (await ordersRes.json().catch(() => ({}))) as { orders?: FinanceOrder[] };
       setOrders(Array.isArray(ordersBody.orders) ? ordersBody.orders : []);
       const paymentsBody = (await paymentsRes.json().catch(() => ({}))) as { payments?: FinancePayment[] };
@@ -184,7 +195,6 @@ export default function FinanceDashboard() {
       const plansBody = (await plansRes.json().catch(() => ({}))) as { plans?: TreasuryPlan[] };
       setTreasuryPlans(Array.isArray(plansBody.plans) ? plansBody.plans : []);
     } catch {
-      setKpi(null);
       setOrders([]);
       setPayments([]);
       setExpenses([]);
@@ -193,11 +203,22 @@ export default function FinanceDashboard() {
       setReconciliationCandidates([]);
       setBankStatementImports([]);
       setTreasuryPlans([]);
-    } finally {
-      setLoading(false);
     }
   }, []);
-  useEffect(() => { void load(period); }, [period, load]);
+
+  const didInitialLoad = useRef(false);
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    /* First mount loads everything; later period changes refetch only the
+       period-scoped KPI endpoint. */
+    const tasks = didInitialLoad.current
+      ? [loadDashboard(period)]
+      : [loadDashboard(period), loadStatic()];
+    didInitialLoad.current = true;
+    void Promise.all(tasks).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [period, loadDashboard, loadStatic]);
 
   /* Currency stabilization — read tenant base currency dynamically. */
   const currency = useBaseCurrency();

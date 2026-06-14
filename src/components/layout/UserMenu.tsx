@@ -110,7 +110,11 @@ export default function UserMenu({ dk }: { dk: boolean }) {
       } catch { /* swallow — badge just stays */ }
     };
     void load();
-    const timer = setInterval(load, 60_000);
+    const timer = setInterval(() => {
+      // Don't poll while the tab is hidden; the menu also refreshes on open.
+      if (document.visibilityState !== "visible") return;
+      void load();
+    }, 60_000);
     return () => { cancelled = true; clearInterval(timer); };
   }, [account?.id]);
 

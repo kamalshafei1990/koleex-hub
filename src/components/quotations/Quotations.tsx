@@ -1975,29 +1975,40 @@ export default function Quotations() {
      Number() coercion) can carry strings in unitPrice / qty; a
      string concatenation would produce "01.5" etc. and break
      the editor totals + the printed PDF. */
-  const subTotal = current
-    ? current.items.reduce(
-        (s, i) => s + (Number(i.unitPrice) || 0) * (Number(i.qty) || 0),
-        0,
-      )
-    : 0;
-  const grandTotal = current
-    ? (() => {
-        const taxAmt = subTotal * (Math.max(0, Math.min(100, Number(current.taxPct) || 0)) / 100);
-        const base = subTotal + taxAmt + current.shipping + current.others;
-        const pct = Math.max(0, Math.min(100, Number(current.discountPct) || 0));
-        return +(base * (1 - pct / 100)).toFixed(2);
-      })()
-    : 0;
+  const subTotal = useMemo(
+    () =>
+      current
+        ? current.items.reduce(
+            (s, i) => s + (Number(i.unitPrice) || 0) * (Number(i.qty) || 0),
+            0,
+          )
+        : 0,
+    [current],
+  );
+  const grandTotal = useMemo(() => {
+    if (!current) return 0;
+    const taxAmt = subTotal * (Math.max(0, Math.min(100, Number(current.taxPct) || 0)) / 100);
+    const base = subTotal + taxAmt + current.shipping + current.others;
+    const pct = Math.max(0, Math.min(100, Number(current.discountPct) || 0));
+    return +(base * (1 - pct / 100)).toFixed(2);
+  }, [current, subTotal]);
 
   /* ── Unsaved-changes guard ──────────────────────────────────────
      `dirty` = the working copy diverged from the last loaded/saved
      snapshot. Drives the native tab-close prompt + the styled in-app
      confirm modal shown when the operator presses Back. */
-  const dirty =
-    view === "editor" && current
-      ? JSON.stringify(current) !== baselineRef.current
-      : false;
+  /* Memoized: JSON.stringify over `current` (which embeds the full
+     items[] incl. base64 image data URLs) is expensive, and the editor
+     re-renders on every keystroke / collab-presence tick. The dirty
+     check only depends on view, current, and the saved baseline — so
+     skip the stringify when none of those changed. */
+  const dirty = useMemo(
+    () =>
+      view === "editor" && current
+        ? JSON.stringify(current) !== baselineRef.current
+        : false,
+    [view, current],
+  );
 
   /* ── Realtime collaboration (presence + save broadcast) ──
      Identity for presence + updated_by display comes from the bootstrap
@@ -2064,9 +2075,13 @@ export default function Quotations() {
   }, [handleSave, leaveEditor]);
 
   /* ── Sorted list ── */
-  const sortedQuotations = [...quotations].sort(
-    (a, b) =>
-      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  const sortedQuotations = useMemo(
+    () =>
+      [...quotations].sort(
+        (a, b) =>
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      ),
+    [quotations],
   );
 
   if (!loaded) {

@@ -339,7 +339,13 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
       }
     }
     void tick();
-    const t = window.setInterval(tick, POLL_INTERVAL_MS);
+    const t = window.setInterval(() => {
+      /* Skip background polling while the tab is hidden — the focus /
+         visibilitychange handler above re-syncs the count on resume, so
+         no update is missed. Mirrors the Discuss poll guard. */
+      if (document.visibilityState !== "visible") return;
+      void tick();
+    }, POLL_INTERVAL_MS);
     return () => {
       cancelled = true;
       window.clearInterval(t);

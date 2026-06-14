@@ -40,6 +40,23 @@ import ConfirmDialog from "./form-sections/ConfirmDialog";
    single-file change. */
 const FLAGSHIP_DIVISION_SLUG = "garment-machinery";
 
+/* Static tonal maps — hoisted to module scope so they aren't
+   re-allocated on every render (levelColors) or, worse, once per
+   product card on every render (stColors, previously rebuilt inside
+   each card's IIFE in both the grid and list views). With 600+ cards
+   mounted at once that was hundreds of throwaway objects per render. */
+const levelColors: Record<string, string> = {
+  entry: "text-blue-400 bg-blue-400/10 border-blue-400/20",
+  mid: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
+  premium: "text-amber-400 bg-amber-400/10 border-amber-400/20",
+  enterprise: "text-purple-400 bg-purple-400/10 border-purple-400/20",
+};
+const stColors: Record<string, string> = {
+  draft: "text-amber-400 bg-amber-400/10 border-amber-400/20",
+  active: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
+  archived: "text-red-400 bg-red-400/10 border-red-400/20",
+};
+
 export default function ProductList() {
   const router = useRouter();
   const pathname = usePathname();
@@ -494,13 +511,6 @@ export default function ProductList() {
   };
 
   const selectClass = "h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-secondary)] outline-none focus:border-[var(--border-focus)]";
-
-  const levelColors: Record<string, string> = {
-    entry: "text-blue-400 bg-blue-400/10 border-blue-400/20",
-    mid: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
-    premium: "text-amber-400 bg-amber-400/10 border-amber-400/20",
-    enterprise: "text-purple-400 bg-purple-400/10 border-purple-400/20",
-  };
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
@@ -1206,11 +1216,6 @@ export default function ProductList() {
                     <div className="flex items-center gap-2 mt-3 flex-wrap">
                       {(() => {
                         const st = (p.status || "draft");
-                        const stColors: Record<string, string> = {
-                          draft: "text-amber-400 bg-amber-400/10 border-amber-400/20",
-                          active: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
-                          archived: "text-red-400 bg-red-400/10 border-red-400/20",
-                        };
                         return (
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border ${stColors[st] || stColors.draft}`}>
                             {st}
@@ -1381,11 +1386,6 @@ export default function ProductList() {
                     <div className="hidden md:flex items-center justify-center">
                       {(() => {
                         const st = (p.status || "draft");
-                        const stColors: Record<string, string> = {
-                          draft: "text-amber-400 bg-amber-400/10 border-amber-400/20",
-                          active: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
-                          archived: "text-red-400 bg-red-400/10 border-red-400/20",
-                        };
                         return (
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-semibold uppercase tracking-wider ${stColors[st] || stColors.draft}`}>
                             {st}
