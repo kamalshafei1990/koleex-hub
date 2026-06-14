@@ -440,6 +440,84 @@ export const PRODUCTS_UI_I18N: Translations = {
   /* ── Media step (P0 #5b) ── */
   "media.filesTitle": { en: "Media & Files", zh: "媒体与文件", ar: "الوسائط والملفات" },
 
+  /* ── Media slots: per-type labels + descriptions (P0 #5c) ──────────
+     The MEDIA_TYPES array lives at module scope (no hook), so it keeps
+     stable English label/description; these keys are resolved at RENDER
+     time via a type→key map inside MediaSection (same pattern as
+     ProductForm.getSteps). Keys mirror the ProductMediaType union. */
+  "media.slot.main_image.label": { en: "Main Image", zh: "主图", ar: "الصورة الرئيسية" },
+  "media.slot.main_image.desc": { en: "Primary product photo used in hero and lists", zh: "用于主图区和列表的主要产品照片", ar: "الصورة الرئيسية للمنتج المستخدمة في الواجهة والقوائم" },
+  "media.slot.gallery.label": { en: "Gallery", zh: "图库", ar: "معرض الصور" },
+  "media.slot.gallery.desc": { en: "Additional product photos, angles and details", zh: "更多产品照片、角度和细节", ar: "صور إضافية للمنتج وزوايا وتفاصيل" },
+  "media.slot.packing_photo.label": { en: "Packing Photos", zh: "包装照片", ar: "صور التغليف" },
+  "media.slot.packing_photo.desc": { en: "Show crate, box, and packaging dimensions", zh: "展示木箱、纸箱和包装尺寸", ar: "تُظهر الصندوق والكرتون وأبعاد التغليف" },
+  "media.slot.label.label": { en: "Labels & Logos", zh: "标签与标志", ar: "الملصقات والشعارات" },
+  "media.slot.label.desc": { en: "Brand labels, origin stickers, certifications", zh: "品牌标签、原产地贴纸、认证", ar: "ملصقات العلامة التجارية وملصقات المنشأ والشهادات" },
+  "media.slot.manual.label": { en: "Manual / Datasheet", zh: "手册 / 数据表", ar: "الدليل / ورقة البيانات" },
+  "media.slot.manual.desc": { en: "PDF manuals, datasheets, spec sheets", zh: "PDF 手册、数据表、规格表", ar: "أدلة PDF وأوراق بيانات وأوراق مواصفات" },
+  "media.slot.ar_3d.label": { en: "AR / 3D View", zh: "AR / 3D 视图", ar: "عرض الواقع المعزز / ثلاثي الأبعاد" },
+  "media.slot.ar_3d.desc": { en: "GLB, GLTF, USDZ files for AR preview", zh: "用于 AR 预览的 GLB、GLTF、USDZ 文件", ar: "ملفات GLB وGLTF وUSDZ لمعاينة الواقع المعزز" },
+  "media.slot.video.label": { en: "Videos", zh: "视频", ar: "مقاطع الفيديو" },
+  "media.slot.video.desc": { en: "Product demo and operation videos", zh: "产品演示和操作视频", ar: "مقاطع عرض المنتج وتشغيله" },
+
+  /* ── Media slot chrome: header count, upload, dropzone (P0 #5c) ── */
+  "media.maxPerFile": { en: "Max {n} MB per file", zh: "每个文件最大 {n} MB", ar: "بحد أقصى {n} ميجابايت لكل ملف" },
+  "media.uploadAction": { en: "Upload", zh: "上传", ar: "رفع" },
+  "media.clickToUpload": { en: "Click to upload", zh: "点击上传", ar: "انقر للرفع" },
+  "media.clickToUploadOrDrag": { en: "Click to upload or drag files", zh: "点击上传或拖放文件", ar: "انقر للرفع أو اسحب الملفات" },
+  "media.acceptMaxHint": { en: "{accept} · max {n} MB", zh: "{accept} · 最大 {n} MB", ar: "{accept} · بحد أقصى {n} ميجابايت" },
+  "media.addMore": { en: "Add more", zh: "添加更多", ar: "إضافة المزيد" },
+  "media.fileFallback": { en: "File", zh: "文件", ar: "ملف" },
+
+  /* ── Media slot rejection messages (P0 #5c) ── */
+  "media.rejectTooBig": {
+    en: "\"{name}\" is {size} MB — limit is {max} MB.",
+    zh: "“{name}” 为 {size} MB — 上限为 {max} MB。",
+    ar: "‏«{name}» حجمه {size} ميجابايت — الحد الأقصى {max} ميجابايت.",
+  },
+  "media.rejectWrongType": {
+    en: "\"{name}\" is the wrong type for {label}.",
+    zh: "“{name}” 的类型不适用于 {label}。",
+    ar: "‏«{name}» نوعه غير مناسب لـ {label}.",
+  },
+
+  /* ── Media tile actions (titles / aria) (P0 #5c) ── */
+  "media.moveEarlier": { en: "Move earlier in order", zh: "在顺序中前移", ar: "تحريك إلى موضع أسبق" },
+  "media.moveLater": { en: "Move later in order", zh: "在顺序中后移", ar: "تحريك إلى موضع لاحق" },
+  "media.editAltText": { en: "Edit alt text", zh: "编辑替代文本", ar: "تعديل النص البديل" },
+  "media.remove": { en: "Remove", zh: "删除", ar: "إزالة" },
+  "media.productMediaAlt": { en: "Product media", zh: "产品媒体", ar: "وسائط المنتج" },
+  "media.videoThumbAlt": { en: "Video thumbnail", zh: "视频缩略图", ar: "صورة مصغّرة للفيديو" },
+  "media.previewAlt": { en: "Preview", zh: "预览", ar: "معاينة" },
+  "media.closePreview": { en: "Close preview", zh: "关闭预览", ar: "إغلاق المعاينة" },
+
+  /* ── Media suggested-count nudges (P0 #5c) ── */
+  "media.suggestedAtLeast": {
+    en: "Suggested: at least {n} {label} item{plural}",
+    zh: "建议：至少 {n} 项{label}",
+    ar: "مقترَح: ما لا يقل عن {n} من عناصر {label}",
+  },
+  "media.suggestedCurrently": { en: " (currently {n})", zh: "（当前 {n} 项）", ar: " (حاليًا {n})" },
+  "media.nudgeGallery": { en: " More angles / details = better conversion.", zh: " 更多角度 / 细节 = 更高转化率。", ar: " زوايا / تفاصيل أكثر = تحويل أفضل." },
+  "media.nudgePacking": { en: " Buyers rely on packing photos to estimate shipping + inspection.", zh: " 买家依靠包装照片来估算运输与验货。", ar: " يعتمد المشترون على صور التغليف لتقدير الشحن والفحص." },
+  "media.nudgeManual": { en: " Datasheets help engineering buyers shortlist faster.", zh: " 数据表帮助工程类买家更快筛选。", ar: " تساعد أوراق البيانات المشترين الهندسيين على الاختيار بسرعة أكبر." },
+  "media.nudgeVideo": { en: " A 30-60s demo video dramatically improves engagement.", zh: " 一段 30-60 秒的演示视频可显著提升参与度。", ar: " مقطع فيديو تجريبي مدته 30-60 ثانية يحسّن التفاعل بشكل كبير." },
+
+  /* ── Media alt-text editor modal (P0 #5c) ── */
+  "media.editMetaTitle": { en: "Edit media metadata", zh: "编辑媒体元数据", ar: "تعديل بيانات الوسائط الوصفية" },
+  "media.editMetaSubtitle": {
+    en: "Alt text describes the image for search engines and screen readers.",
+    zh: "替代文本用于向搜索引擎和屏幕阅读器描述图片。",
+    ar: "يصف النص البديل الصورة لمحركات البحث وقارئات الشاشة.",
+  },
+  "media.altTextLabel": { en: "Alt text", zh: "替代文本", ar: "النص البديل" },
+  "media.altTextPlaceholder": { en: "e.g. Close-up of the walking-foot mechanism", zh: "例如 综合送料机构的特写", ar: "مثال: لقطة مقرّبة لآلية القدم المتحركة" },
+  "media.altTextHelp": {
+    en: "Describe what the image shows in a short phrase. Keep it descriptive but concise — around 10–15 words works best for Google image search.",
+    zh: "用简短的短语描述图片内容。保持具体而简洁 — 约 10–15 个词最适合 Google 图片搜索。",
+    ar: "صِف ما تُظهره الصورة بعبارة قصيرة. اجعلها وصفية لكن موجزة — نحو 10–15 كلمة هو الأنسب لبحث صور جوجل.",
+  },
+
   /* ── Review & Publish (finalize) step (P0 #5b) ── */
   "review.livePreview": { en: "Live preview", zh: "实时预览", ar: "معاينة مباشرة" },
   "review.howCustomersSee": { en: "How customers see this product", zh: "客户如何看到此产品", ar: "كيف يرى العملاء هذا المنتج" },
