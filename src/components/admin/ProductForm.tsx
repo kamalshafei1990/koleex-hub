@@ -1082,6 +1082,44 @@ export default function ProductForm({ productId }: Props) {
     setError("");
     setSuccess("");
 
+    /* ── P0 #4 · Authoritative save-time Primary-Model uniqueness re-check ──
+       The live `codeCheck` can be stale: it sits "idle" for codes the
+       structural validator skipped, and "error" when the live ping was
+       offline — so a duplicate could slip past the UI. Before writing,
+       ask the server once more (the same edit-aware endpoint, so a
+       product never collides with itself). This blocks duplicates for
+       Draft / Active / Archived alike — drafts included, because a
+       duplicate primary_model becomes an SKU problem downstream. The DB
+       partial unique index on upper(primary_model) is still the ultimate
+       guarantee; this just turns a generic constraint error into a clear,
+       named message and catches the bypass case. */
+    const codeToVerify = (primaryModel?.primary_model || "").trim();
+    if (codeToVerify) {
+      try {
+        const params = new URLSearchParams({ code: codeToVerify });
+        if (productId) params.set("excludeProductId", productId);
+        const res = await fetch(
+          `/api/products/check-primary-model?${params.toString()}`,
+          { credentials: "include" },
+        );
+        if (res.ok) {
+          const payload = await res.json();
+          if (payload?.available === false && payload?.conflict) {
+            setError(
+              `Primary Model "${payload.conflict.primary_model}" is already used by "${payload.conflict.product_name}". Pick a different code before saving.`,
+            );
+            setSaving(false);
+            setCurrentStep(0);
+            return;
+          }
+        }
+        /* A failed check is NOT a hard block — the DB unique index still
+           guarantees correctness and the save catch humanizes any clash. */
+      } catch {
+        /* network hiccup — fall through; the DB index is the backstop */
+      }
+    }
+
     /* Product Schema Engine v1 — resolve the schema definition for the
        chosen classification so we can persist {schema_id, schema_version}
        alongside the form values. Resolution is pure / synchronous and
@@ -1871,6 +1909,13 @@ export default function ProductForm({ productId }: Props) {
                         ) : codeCheck.status === "available" && code && code !== suggestedPrimaryModel ? (
                           <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-2">
                             ✓ Available — no other product uses this code.
+                          </p>
+                        ) : codeCheck.status === "error" && code ? (
+                          /* P0 #4 · the live check couldn't reach the server.
+                             Be honest, and reassure that Save still verifies
+                             (the save-time re-check + DB unique index). */
+                          <p className="text-[11px] text-amber-500 mt-2">
+                            Couldn&apos;t verify this code right now — we&apos;ll re-check it when you save.
                           </p>
                         ) : validationWarning ? (
                           <p className="text-[11px] text-amber-500 mt-2">{validationWarning}</p>
