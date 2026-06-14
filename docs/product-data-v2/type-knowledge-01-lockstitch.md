@@ -3,6 +3,7 @@
 **Mode:** knowledge authoring at the **Product Type** level. **No products · no models · no machine records · no schema · no migration · no code.**
 **Date:** 2026-06-15. **Frozen inputs:** P0-A · P0-B · P0-C · P0-D (Type = Lockstitch) · P0-E (Applications/Industries/Operations/Fabrics) · P0-UX.
 **Vocabulary rule:** every value below is drawn **only** from the frozen [P0-E vocabulary](p0e-controlled-vocabulary-freeze.md). Anything a real Lockstitch needs that is *not* in the frozen vocabulary is **flagged, not invented** (see §Gaps + Final Question).
+**Status:** 🟢 **RATIFIED — APPROVE WITH MINOR NOTES** (independent review, 2026-06-15). **Lockstitch adopted as the Reference Type** for the remaining 9. Reviewer confirmed: no Application↔Industry confusion (*"one of the biggest P0-E risks"*), Operation exclusions consistent with P0-D, Leather/Vinyl/Foam correctly = Materials not Fabrics (*"exactly what P0-E revealed"*), and **endorsed pausing to open P0-F before types #2–#10.** Full record in §Ratification.
 
 > **Type identity (P0-D / P0-A):** **Lockstitch** — ISO-300 single-needle lockstitch. Aliases: SNLS · Single-Needle Lockstitch · Flat-bed Lockstitch. Distinguishing mechanism: needle thread + bobbin thread interlace in the **middle** of the material → a tight, identical-both-faces, non-stretch, unwind-resistant stitch.
 
@@ -123,7 +124,20 @@ Scored against the P0-C **Knowledge layer** groups, restricted to what is **auth
 
 ---
 
-## ChatGPT Ratification Summary (send for independent review)
+## Ratification — APPROVE WITH MINOR NOTES ✅ (independent review, 2026-06-15)
+Reviewed as a **Ratification Review** (not a design review). **No blocking issue** preventing adopting Lockstitch as the **Reference Type**, or pausing to open P0-F before the other nine.
+
+- **§1 Vocabulary Compliance — APPROVED.** Content adheres strongly to the P0-E freeze. **No confusion between Application and Industry** (e.g. *Footwear* = Application vs *Footwear Manufacturing* = Industry) — *"one of the biggest P0-E risks,"* avoided. Applications ✅ · Industries ✅.
+- **Operations — APPROVED.** Exclusions (Overedging · Coverstitching · Buttonholing · Bartacking · Blind Hemming) correctly attributed to other Product Types — *"fully consistent with the P0-D Product Type Freeze."*
+- **Fabrics — APPROVED.** Leather · Vinyl · Foam correctly handled **as Materials, not Fabrics** — *"exactly what P0-E revealed."* (Validates gap G1 → P0-F.)
+- **§2 Product-Type Logic — APPROVED.** The Lockstitch narrative (Foundational · General-Purpose · Most-Versatile · Largest-Ecosystem) *"matches industrial reality,"* and the stated limitations (no stretch handling · no edge finishing · finite bobbin) are *"correct."*
+- **Minor notes = the flagged gaps (G1–G5), confirmed as the P0-F scope** — no new blocking issues introduced. The reviewer endorses: **pause after Lockstitch, open P0-F (+ the small P0-E v1.1 Operation patch), then resume types #2–#10.**
+
+**Both architects ratified.** Lockstitch knowledge is adopted as the Reference Type; authoring the remaining 9 awaits **P0-F** (owner go).
+
+---
+
+## ChatGPT Ratification Summary (sent for independent review — APPROVED)
 ```
 KOLEEX — Type Knowledge Authoring Phase 1 — LOCKSTITCH — Ratification Review
 
