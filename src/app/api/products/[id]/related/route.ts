@@ -1,4 +1,5 @@
 import "server-only";
+import { humanizeError } from "@/lib/ui/humanize-error";
 
 /* ---------------------------------------------------------------------------
    /api/products/[id]/related — P0-A.
@@ -32,7 +33,7 @@ export async function GET(
     .order("order");
   if (error) {
     console.error("[api/products related GET]", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   }
   const related = (data ?? []).map((r: Record<string, unknown>) => ({
     product_id: r.product_id as string,

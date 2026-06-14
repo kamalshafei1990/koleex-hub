@@ -1,4 +1,5 @@
 import "server-only";
+import { humanizeError } from "@/lib/ui/humanize-error";
 
 /* /api/product-translations/[id] — P0-B. DELETE one row. PD/SA only. */
 
@@ -18,6 +19,6 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   }
   if (!UUID_RE.test(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   const { error } = await supabaseServer.from("product_translations").delete().eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

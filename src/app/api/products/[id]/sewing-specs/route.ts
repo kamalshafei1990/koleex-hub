@@ -1,4 +1,5 @@
 import "server-only";
+import { humanizeError } from "@/lib/ui/humanize-error";
 
 /* ---------------------------------------------------------------------------
    /api/products/[id]/sewing-specs — P0-A.
@@ -30,7 +31,7 @@ export async function GET(
     .select("*")
     .eq("product_id", id)
     .maybeSingle();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   return NextResponse.json({ specs: data ?? null });
 }
 
@@ -58,7 +59,7 @@ export async function PUT(
     .upsert(body, { onConflict: "product_id" });
   if (error) {
     console.error("[api/products sewing-specs PUT]", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }
@@ -83,6 +84,6 @@ export async function DELETE(
     .from("product_sewing_specs")
     .delete()
     .eq("product_id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

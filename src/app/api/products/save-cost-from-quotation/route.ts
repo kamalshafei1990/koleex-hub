@@ -1,4 +1,5 @@
 import "server-only";
+import { humanizeError } from "@/lib/ui/humanize-error";
 
 /* ---------------------------------------------------------------------------
    POST /api/products/save-cost-from-quotation
@@ -101,7 +102,7 @@ export async function POST(req: Request) {
       .limit(1);
     if (error) {
       console.error("[save-cost] lookup", col, error.message);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
     }
     const row = (data?.[0] as unknown as FoundModel | undefined) ?? null;
     if (row) { found = row; break; }

@@ -1,4 +1,5 @@
 import "server-only";
+import { humanizeError } from "@/lib/ui/humanize-error";
 
 /* ---------------------------------------------------------------------------
    GET /api/products/cost-history?model_id=<uuid>   (or ?product_id=<uuid>)
@@ -69,7 +70,7 @@ export async function GET(req: Request) {
   const { data, error } = await q;
   if (error) {
     console.error("[cost-history]", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   }
 
   return NextResponse.json({ history: data ?? [] });

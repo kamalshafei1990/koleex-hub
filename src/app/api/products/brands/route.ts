@@ -1,4 +1,5 @@
 import "server-only";
+import { humanizeError } from "@/lib/ui/humanize-error";
 
 /* ---------------------------------------------------------------------------
    /api/products/brands — P0-A.
@@ -23,7 +24,7 @@ export async function GET() {
     .from("products")
     .select("brand")
     .not("brand", "is", null);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   const counts: Record<string, number> = {};
   for (const row of (data ?? []) as { brand: string | null }[]) {
     const b = (row.brand ?? "").trim();
@@ -61,7 +62,7 @@ export async function PATCH(req: Request) {
     .eq("brand", from);
   if (error) {
     console.error("[api/products brands PATCH]", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }
@@ -78,7 +79,7 @@ export async function DELETE(req: Request) {
     .eq("brand", name);
   if (error) {
     console.error("[api/products brands DELETE]", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }
