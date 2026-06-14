@@ -334,14 +334,40 @@ export async function fetchMyChannels(
     });
   }
 
-  /* 5. Unread counts. Head-only count queries per channel — Postgres
-        serves these from the (channel_id, created_at DESC) index so
-        each one is essentially free. Issued in parallel via
-        Promise.all so the whole step finishes in one round-trip window. */
+  /* 5. Unread counts. A channel can only have unread messages if its
+        newest activity (`last_message_at` — the same canonical marker
+        that drives the sidebar ordering in step 2) is strictly newer
+        than our read cursor. So we skip the count query entirely for
+        any channel we've already read to the bottom — the common case
+        on a 10 s background poll where nothing changed. The channels we
+        skip are exactly the ones whose count query would have returned
+        0 (every message has created_at <= last_message_at <= cursor, so
+        none satisfy `created_at > cursor`), so unread totals are
+        identical. This turns the old N+1 (one head-count per channel,
+        every poll) into a count query ONLY for channels with genuinely
+        newer activity. Remaining counts use the same head-only query
+        (served from the (channel_id, created_at DESC) index), run in
+        parallel. Skipped channels issue zero queries. */
   const unreadCounts = await Promise.all(
     chanRows.map(async (ch) => {
       const readCursor = readState.get(ch.id)?.last_read_at;
       if (!readCursor) return [ch.id, 0] as const;
+      /* Provably-zero shortcut. Compare as epoch millis (robust to
+         timestamp string formatting). Skip ONLY when we're certain the
+         newest activity is at/before the cursor; any unparseable value
+         falls through to the exact count query so we never hide an
+         unread. */
+      const lastActivityMs = ch.last_message_at
+        ? new Date(ch.last_message_at).getTime()
+        : NaN;
+      const cursorMs = new Date(readCursor).getTime();
+      if (
+        Number.isFinite(lastActivityMs) &&
+        Number.isFinite(cursorMs) &&
+        lastActivityMs <= cursorMs
+      ) {
+        return [ch.id, 0] as const;
+      }
       const { count } = await supabase
         .from(MESSAGES)
         .select("id", { count: "exact", head: true })
