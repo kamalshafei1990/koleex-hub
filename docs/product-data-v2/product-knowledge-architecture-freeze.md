@@ -1,7 +1,17 @@
 # KOLEEX Product Knowledge — Architecture Freeze
-**Status:** 🟢 **FROZEN v1.0** (2026-06-15) — ratified by both architects. **Architecture Gate = CLOSED · Architecture Status = READY FOR POPULATION.**
+**Status:** 🟢 **FROZEN v1.0** (2026-06-15) — ratified by both architects. **Architecture Gate = CLOSED · Architecture Status = READY FOR POPULATION *PLANNING*.**
+
+> ### ⚠️ Critical distinction (owner-locked, Kamal 2026-06-15)
+> ```
+> READY FOR POPULATION  ≠  READY FOR IMPLEMENTATION
+> ```
+> What is frozen here is only the **3 contracts** (Identity · Graph · Completeness). That makes the system **READY FOR POPULATION *PLANNING*** — **not** ready to start adding products, and **not** ready to implement.
+> **The next step is NOT `Start Adding Products`. The next step is `Design Population Strategy`** — an intermediate phase called **Population Architecture Planning**. Only after that plan is itself locked + ratified does a separate **Green Light → Product Population** apply.
+> → Deliverable: [population-architecture-plan.md](population-architecture-plan.md).
+
 **Ratification:** owner-locked by Kamal → **ChatGPT Ratification Review returned APPROVE with minor notes** (verbatim verdict + the 3 minor notes in §Ratification below). Both architects ruled **B) Product Database with Knowledge Attached**; these 3 contracts are now frozen as the foundation.
-**Constraints that remain regardless (still gated, each separately):** no **Schema Migration**, no **PD-V2 cutover**, no **Production DB changes** until their proper time. **Nothing here is implemented** — contracts only, no code/schema/migration. Freezing the gate does NOT authorize building the contracts.
+**Constraints that remain regardless (still gated, each separately):** no **Schema Migration**, no **PD-V2 cutover**, no **Production DB changes** until their proper time. **Nothing here is implemented** — contracts only, no code/schema/migration. Freezing the gate does NOT authorize building the contracts, nor starting population.
+**The headline result of this whole journey** (Kamal): not the Graph, not the Naming, not the Completeness — but the shift from **`Product Database` → `Product Knowledge System`**. That is the real outcome being locked.
 **Mental-model shift to encode everywhere:** *Create → Edit → Save Product* ⟶ **Build → Enrich → Connect → Measure Product Knowledge.**
 
 > Legend: **[LOCKED]** = closed by owner · **[minor]** = non-blocking detail to settle during build · facts are from the live schema.
