@@ -7,7 +7,6 @@
    product photos and convert-to-quotation come next). */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import * as XLSX from "xlsx";
 import KoleexLogo from "@/components/layout/KoleexLogo";
 import { PREORDER_SECTIONS, PREORDER_BUYERS, PREORDER_META } from "./data";
 
@@ -32,7 +31,7 @@ function AutoText({ value, onChange, placeholder, className }: { value: string; 
     if (!el) return;
     el.style.height = "0px";
     el.style.height = `${el.scrollHeight}px`;
-  });
+  }, [value]);
   return (
     <textarea
       ref={ref}
@@ -146,6 +145,9 @@ export default function PreorderPage() {
   const onImportExcel = async (file?: File | null) => {
     if (!file) return;
     try {
+      // Lazy-load SheetJS (~7 MB) only when the operator actually imports a
+      // sheet — keeps it out of the /quotations/preorder initial bundle.
+      const XLSX = await import("xlsx");
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
       const ws = wb.Sheets[wb.SheetNames[0]];
@@ -306,6 +308,19 @@ export default function PreorderPage() {
     return { units, value, lines, priced, bq, bv };
   }, [doc]);
 
+  /* Running row-number offset per section, precomputed once per doc
+     change. Replaces an O(sections²) `slice().reduce()` that ran for
+     every row on every render (all edits flow through setDoc). */
+  const sectionStartOffsets = useMemo(() => {
+    const offsets: number[] = [];
+    let acc = 0;
+    for (const s of doc.sections) {
+      offsets.push(acc);
+      acc += s.items.length;
+    }
+    return offsets;
+  }, [doc.sections]);
+
   // Shared input styling — looks like text until focused, prints clean.
   const cell = "w-full bg-transparent outline-none rounded-md px-1.5 py-1 transition-colors focus:bg-neutral-100 print:focus:bg-transparent";
 
@@ -455,7 +470,7 @@ export default function PreorderPage() {
                       <tr key={ii} className="pre-row align-middle border-b border-neutral-200 last:border-b-0">
                         {/* No. (running, 1,2,3…) */}
                         <td className="px-1 py-2.5 text-center text-[12.5px] font-bold tabular-nums text-neutral-500">
-                          {doc.sections.slice(0, si).reduce((a, s) => a + s.items.length, 0) + ii + 1}
+                          {sectionStartOffsets[si] + ii + 1}
                         </td>
                         {/* Photo — fits without crop, replace / remove */}
                         <td className="px-2 py-2.5 text-center">

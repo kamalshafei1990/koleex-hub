@@ -357,6 +357,19 @@ export default function QuotationA4Preview({
     () => current.items.reduce((sum, i) => sum + (Number(i.qty) || 0), 0),
     [current.items],
   );
+  /* Visible "No." per item, precomputed once per items change. The old
+     code did `items.slice(0, idx).reduce(...)` inside the row map — an
+     O(n²) scan (plus n array allocations) re-run on every preview
+     render, which fires on every keystroke. rowNumbers[idx] is the
+     exact same value (count of non-header rows before idx, +1). */
+  const rowNumbers = useMemo(() => {
+    let count = 0;
+    return current.items.map((it) => {
+      const n = count + 1;
+      if (it.kind !== "header") count += 1;
+      return n;
+    });
+  }, [current.items]);
   /* Bumped every time something OUTSIDE the rich-text terms area
      changes the terms — Quick Fill picks, future 'apply customer
      defaults' button, etc. TermsArea force-syncs its innerHTML on
@@ -1091,9 +1104,7 @@ export default function QuotationA4Preview({
               /* Visible row number counts PRODUCT rows only — section
                  headers occupy an items[] slot but must not consume a
                  number, so "No." stays 1,2,3… across sections. */
-              const rowNo = current.items
-                .slice(0, idx)
-                .reduce((n, it) => n + (it.kind === "header" ? 0 : 1), 0) + 1;
+              const rowNo = rowNumbers[idx];
               const lineTotal = (Number(item.unitPrice) || 0) * (Number(item.qty) || 0);
 
               /* ── Section header row ──────────────────────────────
