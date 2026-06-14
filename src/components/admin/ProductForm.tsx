@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { humanizeError } from "@/lib/ui/humanize-error";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import ArrowUpRightIcon from "@/components/icons/ui/ArrowUpRightIcon";
 import DiskIcon from "@/components/icons/ui/DiskIcon";
@@ -1085,7 +1086,10 @@ export default function ProductForm({ productId }: Props) {
         setTimeout(() => router.push(`/products/${pid}/edit`), 800);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      /* Humanize save failures — operators must never see raw Postgres /
+         HTTP text. The form keeps its state (no reset), so the Save button
+         doubles as Retry once the issue is addressed. */
+      setError(humanizeError(err));
     } finally {
       setSaving(false);
     }
