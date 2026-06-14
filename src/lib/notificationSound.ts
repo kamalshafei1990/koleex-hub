@@ -120,13 +120,6 @@ function decode(): Promise<AudioBuffer | null> {
         }
       });
       decodedBuffer = buf;
-      if (typeof console !== "undefined") {
-        console.log(
-          "[notificationSound] decoded",
-          buf.duration.toFixed(2),
-          "s",
-        );
-      }
       return buf;
     } catch (e) {
       if (typeof console !== "undefined") {
@@ -166,9 +159,6 @@ function attachUnlockListeners() {
     if (ctx.state === "suspended") {
       void ctx.resume().then(() => {
         unlocked = true;
-        if (typeof console !== "undefined") {
-          console.log("[notificationSound] unlocked");
-        }
         void decode().then(() => {
           if (pendingPlayOnUnlock) {
             pendingPlayOnUnlock = false;
@@ -235,10 +225,7 @@ export function playNotificationSound() {
 
   /* Hot path: context running and buffer ready → play immediately. */
   if (ctx.state === "running" && decodedBuffer) {
-    const ok = playBufferNow();
-    if (typeof console !== "undefined") {
-      console.log("[notificationSound]", ok ? "played" : "play failed");
-    }
+    playBufferNow();
     return;
   }
 
@@ -252,23 +239,7 @@ export function playNotificationSound() {
   ]).then(() => {
     if (audioCtx && audioCtx.state === "running" && decodedBuffer) {
       pendingPlayOnUnlock = false;
-      const ok = playBufferNow();
-      if (typeof console !== "undefined") {
-        console.log(
-          "[notificationSound]",
-          ok ? "played after unlock" : "play failed after unlock",
-        );
-      }
-    } else {
-      if (typeof console !== "undefined") {
-        console.log(
-          "[notificationSound] state",
-          audioCtx?.state,
-          "buffer",
-          !!decodedBuffer,
-          "— queued for next gesture",
-        );
-      }
+      playBufferNow();
     }
   });
 }
