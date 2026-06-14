@@ -1067,12 +1067,19 @@ export default function ProductList() {
               const lvl = levelColors[p.level || ""] || "";
 
               return (
-                <Link
+                <div
                   key={p.id}
-                  href={`${baseRoute}/${p.slug || p.id}`}
                   {...kxInspectAttrs({ component: "ProductCard", module: "Product Data", section: "Catalog", recordId: p.slug || p.id })}
                   className="group relative bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] overflow-hidden transition-all duration-300 hover:border-[var(--border-focus)] hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-12px_rgba(0,0,0,0.35)]"
                 >
+                  {/* Stretched navigation link — covers the whole card and
+                      is the ONLY card-level anchor, so the edit/delete actions
+                      below are siblings (not nested <a>) → no hydration error. */}
+                  <Link
+                    href={`${baseRoute}/${p.slug || p.id}`}
+                    aria-label={p.product_name}
+                    className="absolute inset-0 z-0"
+                  />
                   {/* Image — calm, clean. Background matches the
                       card surface so transparent product photos
                       blend in (no white box around the photo).
@@ -1130,7 +1137,7 @@ export default function ProductList() {
                        (no :hover) the card had no visible edit option. Show the
                        actions by default on small screens and keep the clean
                        hover-reveal on desktop (md+). */
-                    <div className="absolute bottom-2.5 right-2.5 flex gap-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200">
+                    <div className="absolute bottom-2.5 right-2.5 z-10 flex gap-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200">
                       <Link
                         href={`${baseRoute}/${p.id}/edit`}
                         onClick={(e) => e.stopPropagation()}
@@ -1239,7 +1246,7 @@ export default function ProductList() {
                       </p>
                     )}
                   </div>
-                </Link>
+                </div>
               );
             })}
               </div>
@@ -1271,11 +1278,17 @@ export default function ProductList() {
                 const lvl = levelColors[p.level || ""] || "";
 
                 return (
-                  <Link
+                  <div
                     key={p.id}
-                    href={`${baseRoute}/${p.slug || p.id}`}
-                    className="group flex items-center gap-3 md:grid md:grid-cols-[56px_1fr_140px_120px_100px_80px_80px] md:gap-4 px-4 md:px-5 py-3 hover:bg-[var(--bg-surface-subtle)] transition-colors"
+                    className="group relative flex items-center gap-3 md:grid md:grid-cols-[56px_1fr_140px_120px_100px_80px_80px] md:gap-4 px-4 md:px-5 py-3 hover:bg-[var(--bg-surface-subtle)] transition-colors"
                   >
+                    {/* Stretched navigation link — only card-level anchor;
+                        action links below are siblings (no nested <a>). */}
+                    <Link
+                      href={`${baseRoute}/${p.slug || p.id}`}
+                      aria-label={p.product_name}
+                      className="absolute inset-0 z-0"
+                    />
                     {/* Thumbnail — Supabase Storage transform downscales
                         the source photo to ~96px @ q75 (typically <30 KB
                         instead of multi-MB originals). loading="lazy"
@@ -1395,7 +1408,7 @@ export default function ProductList() {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="relative z-10 flex items-center gap-1.5 shrink-0">
                       {/* Mobile visibility indicator */}
                       <div className="md:hidden">
                         {p.visible ? (
@@ -1424,7 +1437,7 @@ export default function ProductList() {
                         </>
                       )}
                     </div>
-                  </Link>
+                  </div>
                 );
               })}
             </div>
