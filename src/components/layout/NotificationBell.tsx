@@ -50,6 +50,7 @@ import {
   subscribeToMyChannels,
 } from "@/lib/discuss";
 import { useCurrentAccount } from "@/lib/identity";
+import { publishInboxUnread } from "@/lib/inbox-unread-store";
 import {
   playNotificationSound,
   primeNotificationSound,
@@ -170,6 +171,14 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
     0,
   );
   const totalUnread = discussUnread + inboxUnread;
+
+  /* Publish the authoritative inbox count to the shared store so the
+     UserMenu badge consumes it instead of running its own duplicate
+     60 s poll. Additive only — the bell stays the single inbox poller
+     and all its realtime / chime / grace logic below is unchanged. */
+  useEffect(() => {
+    publishInboxUnread(accountId ?? null, inboxUnread);
+  }, [accountId, inboxUnread]);
 
   /* ── Discuss: seed channel list ──────────────────────────────────── */
   const recountDiscuss = useCallback(async () => {
