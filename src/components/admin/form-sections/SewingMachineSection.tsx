@@ -37,21 +37,24 @@ import {
 } from "@/lib/machine-specs";
 
 /* ── Icons and colors for each group ── */
+/* Group icons are monochrome per the Koleex system — the icon shape carries
+   the meaning, not a decorative colour. One neutral surface for every group. */
+const NEUTRAL_GROUP = "from-[var(--bg-surface)] to-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-muted)]";
 const GROUP_META: Record<string, { icon: React.ReactNode; color: string }> = {
-  Performance: { icon: <GaugeIcon className="h-3.5 w-3.5" />, color: "from-emerald-500/20 to-emerald-600/10 border-emerald-500/30 text-emerald-400" },
-  "Needle & Thread": { icon: <ScissorsIcon className="h-3.5 w-3.5" />, color: "from-blue-500/20 to-blue-600/10 border-blue-500/30 text-blue-400" },
-  Mechanical: { icon: <WrenchIcon className="h-3.5 w-3.5" />, color: "from-amber-500/20 to-amber-600/10 border-amber-500/30 text-amber-400" },
-  Physical: { icon: <RulerIcon className="h-3.5 w-3.5" />, color: "from-slate-500/20 to-slate-600/10 border-slate-500/30 text-slate-300" },
-  Application: { icon: <ShirtIcon className="h-3.5 w-3.5" />, color: "from-purple-500/20 to-purple-600/10 border-purple-500/30 text-purple-400" },
-  Automation: { icon: <WorkflowIcon className="h-3.5 w-3.5" />, color: "from-pink-500/20 to-pink-600/10 border-pink-500/30 text-pink-400" },
-  Stitch: { icon: <ScissorsIcon className="h-3.5 w-3.5" />, color: "from-blue-500/20 to-blue-600/10 border-blue-500/30 text-blue-400" },
-  Capacity: { icon: <GaugeIcon className="h-3.5 w-3.5" />, color: "from-emerald-500/20 to-emerald-600/10 border-emerald-500/30 text-emerald-400" },
-  Configuration: { icon: <CogIcon className="h-3.5 w-3.5" />, color: "from-slate-500/20 to-slate-600/10 border-slate-500/30 text-slate-300" },
-  "Needle Setup": { icon: <ScissorsIcon className="h-3.5 w-3.5" />, color: "from-blue-500/20 to-blue-600/10 border-blue-500/30 text-blue-400" },
-  "Thread Configuration": { icon: <ScissorsIcon className="h-3.5 w-3.5" />, color: "from-blue-500/20 to-blue-600/10 border-blue-500/30 text-blue-400" },
-  Feed: { icon: <WorkflowIcon className="h-3.5 w-3.5" />, color: "from-pink-500/20 to-pink-600/10 border-pink-500/30 text-pink-400" },
-  Cutting: { icon: <ScissorsIcon className="h-3.5 w-3.5" />, color: "from-red-500/20 to-red-600/10 border-red-500/30 text-red-400" },
-  "Needle Configuration": { icon: <ScissorsIcon className="h-3.5 w-3.5" />, color: "from-blue-500/20 to-blue-600/10 border-blue-500/30 text-blue-400" },
+  Performance: { icon: <GaugeIcon className="h-3.5 w-3.5" />, color: NEUTRAL_GROUP },
+  "Needle & Thread": { icon: <ScissorsIcon className="h-3.5 w-3.5" />, color: NEUTRAL_GROUP },
+  Mechanical: { icon: <WrenchIcon className="h-3.5 w-3.5" />, color: NEUTRAL_GROUP },
+  Physical: { icon: <RulerIcon className="h-3.5 w-3.5" />, color: NEUTRAL_GROUP },
+  Application: { icon: <ShirtIcon className="h-3.5 w-3.5" />, color: NEUTRAL_GROUP },
+  Automation: { icon: <WorkflowIcon className="h-3.5 w-3.5" />, color: NEUTRAL_GROUP },
+  Stitch: { icon: <ScissorsIcon className="h-3.5 w-3.5" />, color: NEUTRAL_GROUP },
+  Capacity: { icon: <GaugeIcon className="h-3.5 w-3.5" />, color: NEUTRAL_GROUP },
+  Configuration: { icon: <CogIcon className="h-3.5 w-3.5" />, color: NEUTRAL_GROUP },
+  "Needle Setup": { icon: <ScissorsIcon className="h-3.5 w-3.5" />, color: NEUTRAL_GROUP },
+  "Thread Configuration": { icon: <ScissorsIcon className="h-3.5 w-3.5" />, color: NEUTRAL_GROUP },
+  Feed: { icon: <WorkflowIcon className="h-3.5 w-3.5" />, color: NEUTRAL_GROUP },
+  Cutting: { icon: <ScissorsIcon className="h-3.5 w-3.5" />, color: NEUTRAL_GROUP },
+  "Needle Configuration": { icon: <ScissorsIcon className="h-3.5 w-3.5" />, color: NEUTRAL_GROUP },
 };
 
 function getGroupMeta(name: string) {
@@ -924,18 +927,20 @@ function SpecsProgressBar({
     }).length;
     const total = card.fields.length;
     const pct = total > 0 ? Math.round((filled / total) * 100) : 0;
+    /* Monochrome shades distinguish the spec layer (common → family → kind)
+       without decorative colour — per the Koleex system. */
     const fill =
       card.source === "common"
-        ? "bg-gradient-to-r from-emerald-500 to-emerald-400"
+        ? "bg-[var(--text-primary)]"
         : card.source === "family"
-        ? "bg-gradient-to-r from-blue-500 to-blue-400"
-        : "bg-gradient-to-r from-violet-500 to-violet-400";
+        ? "bg-[var(--text-muted)]"
+        : "bg-[var(--text-dim)]";
     const text =
       card.source === "common"
-        ? "text-emerald-400"
+        ? "text-[var(--text-primary)]"
         : card.source === "family"
-        ? "text-blue-400"
-        : "text-violet-400";
+        ? "text-[var(--text-muted)]"
+        : "text-[var(--text-dim)]";
     return { label: card.title, filled, total, pct, fill, text, source: card.source };
   });
 
@@ -944,7 +949,7 @@ function SpecsProgressBar({
   const overallPct = totalFields > 0 ? Math.round((totalFilled / totalFields) * 100) : 0;
 
   const dotColor = (source: "common" | "family" | "kind") =>
-    source === "common" ? "bg-emerald-400" : source === "family" ? "bg-blue-400" : "bg-violet-400";
+    source === "common" ? "bg-[var(--text-primary)]" : source === "family" ? "bg-[var(--text-muted)]" : "bg-[var(--text-dim)]";
 
   return (
     <div className="sticky top-0 z-20 -mx-1 px-1">
@@ -1055,15 +1060,15 @@ function NewSpecsRender({
      three-tier identity comes through the icon, the title, and the
      subtle dot. */
   const accentTextFor = (card: NewSpecCard) => {
-    if (card.source === "common") return "text-emerald-400";
-    if (card.source === "family") return "text-blue-400";
-    return "text-violet-400";
+    if (card.source === "common") return "text-[var(--text-primary)]";
+    if (card.source === "family") return "text-[var(--text-muted)]";
+    return "text-[var(--text-dim)]";
   };
 
   const accentEdgeFor = (card: NewSpecCard) => {
-    if (card.source === "common") return "bg-emerald-400";
-    if (card.source === "family") return "bg-blue-400";
-    return "bg-violet-400";
+    if (card.source === "common") return "bg-[var(--text-primary)]";
+    if (card.source === "family") return "bg-[var(--text-muted)]";
+    return "bg-[var(--text-dim)]";
   };
 
   const anchorIdFor = (card: NewSpecCard, idx: number) =>
@@ -1260,14 +1265,14 @@ export default function SewingMachineSection({ data, onChange, subcategorySlug, 
               {/* ── Common Fields Section ── */}
               <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5">
                 <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[var(--border-subtle)]">
-                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/30 flex items-center justify-center">
-                    <Settings2Icon className="h-4 w-4 text-emerald-400" />
+                  <div className="h-10 w-10 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-primary)]">
+                    <Settings2Icon className="h-4 w-4" />
                   </div>
                   <div className="flex-1">
                     <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">Common Sewing Specs</h3>
                     <p className="text-[11px] text-[var(--text-ghost)]">Performance · Needle &amp; Thread · Mechanical · Physical · Application · Automation</p>
                   </div>
-                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">
+                  <span className="text-[10px] font-bold text-[var(--text-muted)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-2.5 py-1 rounded-full">
                     {filledCommon} / {COMMON_SEWING_FIELDS.length}
                   </span>
                 </div>
@@ -1288,14 +1293,14 @@ export default function SewingMachineSection({ data, onChange, subcategorySlug, 
               {activeTemplate && templateGroups.length > 0 && (
                 <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5">
                   <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[var(--border-subtle)]">
-                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-600/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                    <div className="h-10 w-10 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-primary)]">
                       {activeKind ? <activeKind.icon size={18} /> : <Settings2Icon className="h-4 w-4" />}
                     </div>
                     <div className="flex-1">
                       <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">{activeTemplate.name} Specs</h3>
                       <p className="text-[11px] text-[var(--text-ghost)]">{activeTemplate.description}</p>
                     </div>
-                    <span className="text-[10px] font-bold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-full">
+                    <span className="text-[10px] font-bold text-[var(--text-muted)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-2.5 py-1 rounded-full">
                       {filledTemplate} / {activeTemplate.fields.length}
                     </span>
                   </div>
