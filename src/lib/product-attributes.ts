@@ -32,6 +32,10 @@ export interface AttributeItem {
   description?: string;
 }
 
+/* Representation mode for a value in the Visual Library:
+   how it should be shown to the customer. */
+export type VisualMode = "icon" | "photo" | "text" | "icon_text";
+
 export interface AttributeConfig {
   tags: string[];
   tag_colors: Record<string, string>;
@@ -40,6 +44,12 @@ export interface AttributeConfig {
   voltage: string[];
   watt: string[];
   levels: string[];
+  /* Visual Library overlay — keyed by `${attrType}:${value}`.
+     value_images: the icon/photo URL chosen for that value.
+     value_modes:  how to render it (icon / photo / text / icon+text).
+     Both are additive and optional — older configs simply omit them. */
+  value_images?: Record<string, string>;
+  value_modes?: Record<string, VisualMode>;
 }
 
 // ── Plug type SVG icons — socket face only, clean outline style ──
@@ -77,6 +87,8 @@ const DEFAULT_CONFIG: AttributeConfig = {
   voltage: [],
   watt: [],
   levels: ["Entry", "Mid", "Premium", "Enterprise"],
+  value_images: {},
+  value_modes: {},
 };
 
 // ── Config CRUD ──
@@ -107,6 +119,8 @@ export async function fetchAttributeConfig(): Promise<AttributeConfig> {
       voltage: (raw.voltage as string[]) || DEFAULT_CONFIG.voltage,
       watt: (raw.watt as string[]) || DEFAULT_CONFIG.watt,
       levels: (raw.levels as string[]) || DEFAULT_CONFIG.levels,
+      value_images: (raw.value_images as Record<string, string>) || {},
+      value_modes: (raw.value_modes as Record<string, VisualMode>) || {},
     };
   } catch {
     return { ...DEFAULT_CONFIG };
