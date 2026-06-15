@@ -206,6 +206,73 @@ function getSteps(isSewing: boolean): WizardStep[] {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   SINGLE-PAGE SECTION NAV — clean sticky index for the one-page editor.
+   Replaces the numbered wizard stepper: just section labels that scroll to
+   their section and highlight the one currently in view (no step / lock /
+   completed semantics, which don't apply when everything is on one page).
+   ═══════════════════════════════════════════════════════════════════ */
+function SinglePageNav({ items }: { items: { id: string; label: string }[] }) {
+  const [active, setActive] = useState(items[0]?.id);
+  const idsKey = items.map((i) => i.id).join(",");
+  useEffect(() => {
+    const ids = idsKey ? idsKey.split(",") : [];
+    if (!ids.length) return;
+    let stop = false;
+    let raf = 0;
+    /* A rAF poll, not a scroll listener: the Hub shell scrolls an inner
+       element and scroll events from it don't reliably reach window, so a
+       per-frame position check is the robust driver. It's cheap (8 rect reads)
+       and only calls setActive when the value actually changes. */
+    const tick = () => {
+      if (stop) return;
+      /* Active = the LAST section whose top has scrolled above the line just
+         under the sticky nav (sections snap to ~168px below the top, so 220
+         sits just under that). */
+      let current = ids[0];
+      for (const id of ids) {
+        const el = document.getElementById(id);
+        if (el && el.getBoundingClientRect().top <= 220) current = id;
+      }
+      setActive((a) => (a === current ? a : current));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      stop = true;
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [idsKey]);
+  const go = (id: string) => {
+    setActive(id); // immediate, deterministic highlight for the click itself
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  return (
+    <nav className="sticky top-0 z-20 mb-6 -mx-4 md:-mx-8 lg:-mx-12 xl:-mx-16 border-b border-[var(--border-subtle)] bg-[var(--bg-primary)]/90 backdrop-blur-md">
+      <div className="flex items-center gap-1 overflow-x-auto px-4 md:px-8 lg:px-12 xl:px-16 py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {items.map((it) => {
+          const on = active === it.id;
+          return (
+            <button
+              key={it.id}
+              type="button"
+              onClick={() => go(it.id)}
+              aria-current={on ? "true" : undefined}
+              className={`shrink-0 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[12.5px] font-medium transition-colors ${
+                on
+                  ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                  : "text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              {it.label}
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    STEP NAVIGATION BAR
    ═══════════════════════════════════════════════════════════════════ */
 function StepNav({ steps, currentStep, onStepChange, completedSteps, lockedSteps, issueCounts, t }: {
@@ -1580,20 +1647,38 @@ export default function ProductForm({ productId }: Props) {
           </div>
         )}
 
-        {/* ═══ STEP NAVIGATION ═══ */}
-        <StepNav
-          steps={steps}
-          currentStep={currentStep}
-          onStepChange={goToStep}
-          completedSteps={completedSteps}
-          lockedSteps={lockedSteps}
-          issueCounts={stepIssueCount}
-          t={t}
-        />
+        {/* ═══ NAVIGATION ═══
+              Single page → clean sticky section index. Legacy step mode →
+              the numbered wizard stepper. */}
+        {onePage ? (
+          <SinglePageNav
+            items={[
+              { id: "sec-identity",    label: t("step.hero", "Hero & Identity") },
+              { id: "sec-classify",    label: t("step.classify", "Classification") },
+              { id: "sec-description", label: t("step.description", "Description") },
+              ...(isSewing ? [{ id: "sec-sewing", label: t("step.sewingSpecs", "Machine Specs") }] : []),
+              { id: "sec-technical",   label: t("step.technical", "Technical Details") },
+              { id: "sec-commercial",  label: t("step.models", "Models & Variants") },
+              { id: "sec-media",       label: t("step.media", "Media & Files") },
+              { id: "sec-finalize",    label: t("step.review", "Review & Publish") },
+            ]}
+          />
+        ) : (
+          <StepNav
+            steps={steps}
+            currentStep={currentStep}
+            onStepChange={goToStep}
+            completedSteps={completedSteps}
+            lockedSteps={lockedSteps}
+            issueCounts={stepIssueCount}
+            t={t}
+          />
+        )}
 
-        {/* ═══ PERSISTENT PRODUCT KNOWLEDGE PANEL — "Raise Product Maturity"
-               (completeness + maturity + what's missing, live on every step) ═══ */}
-        <WizardKnowledgePanel knowledge={wizardKnowledge} />
+        {/* "Raise Product Maturity" is a read-only meter, not an input. On the
+            single page it moves to the BOTTOM (near Save) so it never pushes
+            the real product fields down; legacy step mode keeps it on top. */}
+        {!onePage && <WizardKnowledgePanel knowledge={wizardKnowledge} />}
 
         {/* ═══ GLOBAL CLASSIFICATION BREADCRUMB (shown once classification is set, across all steps) ═══ */}
         {divisionName && steps[currentStep]?.id !== "classify" && (
@@ -2397,6 +2482,7 @@ export default function ProductForm({ productId }: Props) {
            so this step only renders the dynamic spec fields driven
            by the template the kind chose.
            ═══════════════════════════════════════════════════════════ */}
+        {onePage && isSewing && <div id="sec-sewing" className="scroll-mt-28" aria-hidden />}
         {(onePage ? isSewing : steps[currentStep]?.id === "sewing-specs") && (() => {
           /* Schema-driven specs — the canonical structured editor that
              writes product.schema_specs (the data that lights up the
@@ -2601,6 +2687,7 @@ export default function ProductForm({ productId }: Props) {
         {/* ═══════════════════════════════════════════════════════════
            STEP 6: REVIEW & PUBLISH
            ═══════════════════════════════════════════════════════════ */}
+        {onePage && <div id="sec-finalize" className="scroll-mt-28" aria-hidden />}
         {(onePage || steps[currentStep]?.id === "finalize") && (() => {
           /* ══════════════════════════════════════════════════════════
              REVIEW & PUBLISH — computed context for this step.
@@ -3118,6 +3205,9 @@ export default function ProductForm({ productId }: Props) {
           );
         })()}
         </div>
+
+        {/* Maturity meter lives at the bottom on the single page (read-only). */}
+        {onePage && <div className="mt-2"><WizardKnowledgePanel knowledge={wizardKnowledge} /></div>}
 
         {/* ═══ STEP NAVIGATION BUTTONS ═══ */}
         {!onePage && (
