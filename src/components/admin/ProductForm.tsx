@@ -986,12 +986,13 @@ export default function ProductForm({ productId }: Props) {
     const fabrics = productTags.filter((t) => fabricRe.test(t)).length;
     const rel = related.length;
     const defs = [
-      { key: "specifications", label: "Specs", present: specsCount > 0, w: 25 },
+      { key: "specifications", label: "Specs", present: specsCount > 0, w: 20 },
       { key: "media", label: "Media", present: imgVid > 0, w: 20 },
-      { key: "applications", label: "Applications", present: apps > 0, w: 20 },
-      { key: "documents", label: "Documents", present: docs > 0, w: 15 },
+      { key: "applications", label: "Applications", present: apps > 0, w: 15 },
+      { key: "documents", label: "Documents", present: docs > 0, w: 10 },
       { key: "fabrics", label: "Fabrics", present: fabrics > 0, w: 10 },
       { key: "operations", label: "Operations", present: false, w: 10 },
+      { key: "relationships", label: "Relationships", present: rel > 0, w: 15 },
     ];
     const pct = defs.reduce((a, s) => a + (s.present ? s.w : 0), 0);
     let level: 1 | 2 | 3 | 4 | 5 = pct < 25 ? 1 : pct < 50 ? 2 : pct < 75 ? 3 : 4;
@@ -999,7 +1000,7 @@ export default function ProductForm({ productId }: Props) {
     if (pct >= 85 && rel > 0) level = 5;
     const levelLabel = ["", "Record", "Structured", "Knowledge", "Connected", "Complete"][level];
     const tone: WizardKnowledge["tone"] = pct < 35 ? "low" : pct < 70 ? "mid" : "high";
-    return { pct, level, levelLabel, tone, missing: defs.filter((s) => !s.present).map((s) => s.label), sections: defs.map(({ w: _w, ...s }) => s) };
+    return { pct, level, levelLabel, tone, connected: rel > 0, missing: defs.filter((s) => !s.present).map((s) => s.label), sections: defs.map(({ w: _w, ...s }) => s) };
   })();
 
   /* ── Step navigation ── */

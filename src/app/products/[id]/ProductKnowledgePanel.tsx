@@ -30,6 +30,7 @@ import DropletsIcon from "@/components/icons/ui/DropletsIcon";
 import RulerIcon from "@/components/icons/ui/RulerIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
+import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
 
 export interface KnowledgeSectionState {
   key: string;
@@ -62,6 +63,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   specifications: RulerIcon,
   documents: DocumentIcon,
   media: ImageRawIcon,
+  relationships: ExternalLinkIcon,
 };
 
 export default function ProductKnowledgePanel({
