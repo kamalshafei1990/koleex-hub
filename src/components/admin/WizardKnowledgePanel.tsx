@@ -19,6 +19,7 @@ export interface WizardKnowledge {
   level: 1 | 2 | 3 | 4 | 5;
   levelLabel: string;
   tone: ProductSignal["tone"];
+  connected: boolean;
   missing: string[];
   sections: { key: string; label: string; present: boolean }[];
 }
@@ -30,7 +31,7 @@ const TONE: Record<ProductSignal["tone"], string> = {
 };
 
 export default function WizardKnowledgePanel({ knowledge }: { knowledge: WizardKnowledge }) {
-  const { pct, level, levelLabel, tone, missing, sections } = knowledge;
+  const { pct, level, levelLabel, tone, connected, missing, sections } = knowledge;
   const color = TONE[tone];
   return (
     <div className="sticky top-0 z-20 -mx-1 mb-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]/95 backdrop-blur-md shadow-[0_4px_20px_-8px_rgba(0,0,0,0.35)]">
@@ -45,6 +46,18 @@ export default function WizardKnowledgePanel({ knowledge }: { knowledge: WizardK
             <p className="text-[15px] font-bold tracking-tight text-[var(--text-primary)] leading-tight mt-0.5">
               {pct}% · <span style={{ color }}>L{level} {levelLabel}</span>
             </p>
+            {/* Connect status — Connected (linked to other products) vs Isolated */}
+            <span
+              className={`mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
+                connected
+                  ? "text-emerald-400 border border-emerald-400/30 bg-emerald-400/5"
+                  : "text-[var(--text-dim)] border border-[var(--border-subtle)] bg-[var(--bg-surface)]"
+              }`}
+              title={connected ? "Connected — linked to related products (L4)" : "Isolated — no related products linked yet"}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-emerald-400" : "bg-[var(--text-faint)]"}`} />
+              {connected ? "Connected" : "Isolated"}
+            </span>
           </div>
         </div>
 

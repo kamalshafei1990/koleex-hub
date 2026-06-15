@@ -1056,12 +1056,15 @@ export default function LegacyProductView() {
   const k_fabrics = tags.filter((t) => fabricRe.test(t)).length;
   const k_related = related.length;
   const k_defs = [
-    { key: "specifications", label: "Specifications", present: k_specs > 0, summary: `${k_specs} specifications`, task: "Add specifications", w: 25 },
+    { key: "specifications", label: "Specifications", present: k_specs > 0, summary: `${k_specs} specifications`, task: "Add specifications", w: 20 },
     { key: "media", label: "Media", present: k_media > 0, summary: `${k_media} ${k_media === 1 ? "image / video" : "images & videos"}`, task: "Add images & video", w: 20 },
-    { key: "applications", label: "Applications", present: k_apps > 0, summary: `${k_apps} ${k_apps === 1 ? "application" : "applications"}`, task: "Add applications", w: 20 },
-    { key: "documents", label: "Documents", present: k_docs > 0, summary: `${k_docs} ${k_docs === 1 ? "document" : "documents"}`, task: "Add manuals & documents", w: 15 },
+    { key: "applications", label: "Applications", present: k_apps > 0, summary: `${k_apps} ${k_apps === 1 ? "application" : "applications"}`, task: "Add applications", w: 15 },
+    { key: "documents", label: "Documents", present: k_docs > 0, summary: `${k_docs} ${k_docs === 1 ? "document" : "documents"}`, task: "Add manuals & documents", w: 10 },
     { key: "fabrics", label: "Fabrics & Materials", present: k_fabrics > 0, summary: `${k_fabrics} fabric ${k_fabrics === 1 ? "type" : "types"}`, task: "Add fabrics & materials", w: 10 },
     { key: "operations", label: "Operations", present: false, summary: "", task: "Add operations", w: 10 },
+    /* Relationships — the Connect layer. Existing related_products data
+       contributes to maturity and is the gate to L4 Connected. */
+    { key: "relationships", label: "Relationships", present: k_related > 0, summary: `${k_related} linked ${k_related === 1 ? "product" : "products"}`, task: "Connect related products", w: 15 },
   ];
   const k_pct = k_defs.reduce((a, s) => a + (s.present ? s.w : 0), 0);
   let k_level: 1 | 2 | 3 | 4 | 5 = k_pct < 25 ? 1 : k_pct < 50 ? 2 : k_pct < 75 ? 3 : 4;
@@ -1155,6 +1158,85 @@ export default function LegacyProductView() {
         internal={isInternal}
         editHref={`/product-data/${product.id}/edit`}
       />
+
+      {/* ── Relationships ("Connect") — turns the catalog from islands into
+              a graph. Renders the existing related_products links as cards;
+              an empty state becomes a task that explains how connecting
+              raises maturity (Connected → L4). Public hides the empty state. */}
+      {(related.length > 0 || isInternal) && (
+        <section className="mx-auto w-full max-w-[1200px] px-4 md:px-6 lg:px-10 xl:px-16 pt-4">
+          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div className="flex items-center gap-2">
+                <LayersIcon className="h-4 w-4 text-[var(--text-muted)]" />
+                <h2 className="text-[14px] font-bold tracking-tight text-[var(--text-primary)]">Relationships</h2>
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border"
+                  style={{
+                    color: related.length > 0 ? "#00CC66" : "var(--text-dim)",
+                    borderColor: "var(--border-subtle)",
+                  }}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: related.length > 0 ? "#00CC66" : "var(--text-dim)" }} />
+                  {related.length > 0 ? "Connected" : "Isolated"}
+                </span>
+              </div>
+              {isInternal && (
+                <Link
+                  href={`/product-data/${product.id}/edit`}
+                  className="text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] inline-flex items-center gap-1"
+                >
+                  <PencilIcon className="h-3 w-3" /> Manage
+                </Link>
+              )}
+            </div>
+
+            {related.length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {related.map((r) => {
+                  const d = relatedDetails[r.related_id];
+                  const img = relatedImages[r.related_id];
+                  const label = d?.product_name || r.product_name || "Linked product";
+                  const href = `${isInternal ? "/product-data" : "/products"}/${d?.slug || r.related_id}`;
+                  return (
+                    <Link
+                      key={r.related_id}
+                      href={href}
+                      className="group rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] overflow-hidden hover:border-[var(--border-focus)] transition-colors"
+                    >
+                      <div className="aspect-[4/3] bg-[var(--bg-surface)] flex items-center justify-center overflow-hidden">
+                        {img ? (
+                          <img src={img} alt={label} loading="lazy" className="w-full h-full object-contain p-3" />
+                        ) : (
+                          <ImageRawIcon className="h-8 w-8 text-[var(--text-ghost)]" />
+                        )}
+                      </div>
+                      <div className="p-2.5">
+                        <p className="text-[12px] font-semibold text-[var(--text-primary)] truncate group-hover:text-[var(--text-highlight)]">{label}</p>
+                        <p className="text-[10px] text-[var(--text-dim)] mt-0.5">Related product</p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : (
+              /* Isolated — empty state as a task (internal only). */
+              <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/50 p-5 text-center">
+                <p className="text-[13px] font-medium text-[var(--text-primary)]">This product is isolated</p>
+                <p className="text-[12px] text-[var(--text-muted)] mt-1 max-w-[460px] mx-auto leading-relaxed">
+                  Connect related, alternative, or upgrade products to turn this record into a <span className="text-[var(--text-primary)] font-medium">Connected Knowledge Object (L4)</span>. Relationships add 15% to product knowledge and let buyers navigate the catalog as a graph.
+                </p>
+                <Link
+                  href={`/product-data/${product.id}/edit`}
+                  className="mt-3 inline-flex items-center gap-1.5 h-9 px-4 rounded-lg text-[13px] font-semibold bg-[var(--text-primary)] text-[var(--bg-primary)] hover:opacity-90 transition-opacity"
+                >
+                  Connect products
+                </Link>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* ══════════════════════════════════════
           STICKY IN-PAGE NAV
