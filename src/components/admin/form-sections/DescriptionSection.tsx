@@ -182,7 +182,7 @@ export default function DescriptionSection({
   return (
     <div className="space-y-3">
       <div>
-        <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-2">Product Description</label>
+        <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-2">Full Description <span className="font-normal text-[var(--text-ghost)]">— long product-page content (the short summary lives on the Hero tab)</span></label>
 
         {/* Preset content blocks */}
         <div className="mb-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 p-3">
