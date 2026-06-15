@@ -32,6 +32,7 @@ const VL_PREFIXES = [
   "/database/review",
   "/database/brands",
   "/database/components",
+  "/database/product-specs",
 ];
 
 const VL_SUBTABS: Array<{ key: string; label: string; icon: RrIconName; i18nKey: string }> = [
@@ -39,6 +40,7 @@ const VL_SUBTABS: Array<{ key: string; label: string; icon: RrIconName; i18nKey:
   { key: "/database/brands",          label: "Brands",        icon: "award",            i18nKey: "db.nav.brands" },
   { key: "/database/collections",     label: "Collections",   icon: "books",            i18nKey: "db.nav.collections" },
   { key: "/database/visual-registry", label: "Classification", icon: "box-circle-check", i18nKey: "db.nav.registry" },
+  { key: "/database/product-specs",   label: "Specs & Attributes", icon: "tools",       i18nKey: "db.nav.specsAttributes" },
   { key: "/database/components",      label: "UI Components", icon: "box-open",         i18nKey: "db.nav.components" },
   { key: "/database/review",          label: "Review Board",  icon: "badge-check",      i18nKey: "db.nav.reviewBoard" },
 ];
@@ -52,6 +54,7 @@ const T: Translations = {
   "db.nav.collections":   { en: "Collections",    zh: "合集",     ar: "المجموعات" },
   "db.nav.reviewBoard":   { en: "Review Board",   zh: "审核台",   ar: "لوحة المراجعة" },
   "db.nav.registry":      { en: "Classification", zh: "分类",     ar: "التصنيف" },
+  "db.nav.specsAttributes": { en: "Specs & Attributes", zh: "规格与属性", ar: "المواصفات والسمات" },
   "db.nav.components":    { en: "UI Components",  zh: "界面组件", ar: "مكوّنات الواجهة" },
   "db.search.placeholder": { en: "Search the Visual Library…", zh: "搜索视觉库…", ar: "ابحث في مكتبة الصور…" },
   "db.search.issues":      { en: "Search issue reports…",     zh: "搜索问题报告…", ar: "ابحث في بلاغات المشاكل…" },
