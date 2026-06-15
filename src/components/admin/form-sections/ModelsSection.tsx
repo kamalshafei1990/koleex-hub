@@ -81,7 +81,7 @@ function ReadOnlyField({
 
 function ModelCard({
   model, idx, total, onUpdate, onRemove, onDuplicate, onMoveUp, onMoveDown,
-  suppliers, onClickCreateSupplier, defaultOpen = true, isPrimary = false,
+  suppliers, onClickCreateSupplier, defaultOpen = true, isPrimary = false, solo = false,
   onEditInHero,
 }: {
   model: ModelFormState; idx: number; total: number;
@@ -94,6 +94,9 @@ function ModelCard({
   onClickCreateSupplier?: () => void;
   defaultOpen?: boolean;
   isPrimary?: boolean;
+  /* solo = this is the only model. With a single model there's no "primary
+     vs variant" distinction to draw, so the crown + Primary badge are hidden. */
+  solo?: boolean;
   /* Callback for the primary model's "Edit in Hero" jump — see Props
      comment on ModelsSection. Ignored for non-primary variants. */
   onEditInHero?: () => void;
@@ -123,13 +126,10 @@ function ModelCard({
       >
         <div className="flex items-center gap-3 min-w-0">
           <div className="h-10 w-10 shrink-0 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] relative">
-            {isPrimary ? (
-              <CrownIcon className="h-4 w-4 text-amber-400" />
+            {isPrimary && !solo ? (
+              <CrownIcon className="h-4 w-4 text-[var(--text-muted)]" />
             ) : (
               <span className="text-[12px] font-bold tabular-nums">{idx + 1}</span>
-            )}
-            {isPrimary && (
-              <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-amber-400" />
             )}
           </div>
           <div className="min-w-0">
@@ -137,9 +137,9 @@ function ModelCard({
               <span className="text-[14px] font-semibold text-[var(--text-primary)] truncate">
                 {model.model_name || "Untitled Model"}
               </span>
-              {isPrimary && (
+              {isPrimary && !solo && (
                 <span className="inline-flex items-center gap-1 h-5 px-2 rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-[var(--text-primary)]" />
                   Primary
                 </span>
               )}
@@ -237,7 +237,7 @@ function ModelCard({
                   <button
                     type="button"
                     onClick={onEditInHero}
-                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[11px] font-semibold text-amber-300 bg-amber-500/10 hover:bg-amber-500/15 border border-amber-500/30 transition-colors"
+                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[11px] font-semibold text-[var(--text-primary)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] transition-colors"
                   >
                     <ArrowUpRightIcon className="h-3.5 w-3.5" />
                     Edit in Hero
@@ -625,6 +625,7 @@ export default function ModelsSection({ models, onChange, suppliers, onClickCrea
                 idx={trueIdx}
                 total={models.length}
                 isPrimary={!hidePrimary && trueIdx === 0}
+                solo={!hidePrimary && models.length === 1}
                 onUpdate={(u) => updateModel(m._tempId, u)}
                 onRemove={() => askRemove(m._tempId)}
                 onDuplicate={() => duplicateModel(m._tempId)}
