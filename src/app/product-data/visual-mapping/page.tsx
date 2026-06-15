@@ -1,18 +1,10 @@
-"use client";
-
 /* ---------------------------------------------------------------------------
-   Product Data › Visual Library
-   The single home for every product visual — grouped: Commercial · Classification
-   · Identity & Common · Specs (special per type) · Media. See ProductVisualLibrary.
+   The Product Visual Library now lives in the Database app's Visual Library
+   (single home for everything visual). This old route just forwards there.
    --------------------------------------------------------------------------- */
 
-import PermissionGate from "@/components/layout/PermissionGate";
-import ProductVisualLibrary from "@/components/admin/ProductVisualLibrary";
+import { redirect } from "next/navigation";
 
-export default function VisualLibraryPage() {
-  return (
-    <PermissionGate module="Product Data">
-      <ProductVisualLibrary />
-    </PermissionGate>
-  );
+export default function VisualMappingRedirect() {
+  redirect("/database/product-specs");
 }

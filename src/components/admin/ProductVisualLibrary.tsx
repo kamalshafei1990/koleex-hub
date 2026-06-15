@@ -25,9 +25,12 @@ import {
   type AttributeConfig, type VisualMode,
 } from "@/lib/product-attributes";
 
+/* Classification & Brands & the asset repository live in the Database app's
+   own Visual Library tabs — not duplicated here. This screen owns only the
+   product-specific layers: commercial value lists, common data, and the
+   special per-type specs. */
 const TABS = [
   { id: "commercial", label: "Commercial" },
-  { id: "classification", label: "Classification" },
   { id: "identity", label: "Identity & Common" },
   { id: "specs", label: "Specs (per type)" },
   { id: "media", label: "Media" },
@@ -60,20 +63,22 @@ function slugify(s: string) {
   return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
-export default function ProductVisualLibrary() {
+export default function ProductVisualLibrary({ embedded = false }: { embedded?: boolean }) {
   const [tab, setTab] = useState<TabId>("commercial");
 
   return (
-    <div className="mx-auto w-full max-w-[1240px] px-4 md:px-6 lg:px-10 py-6">
-      {/* Header */}
-      <div className="mb-5">
-        <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-dim)]">Product Data</p>
-        <h1 className="text-[26px] font-bold tracking-tight text-[var(--text-primary)] leading-tight">Visual Library</h1>
-        <p className="text-[13px] text-[var(--text-muted)] mt-1 max-w-[720px]">
-          The single home for every product data point and how it shows — Icon, Photo, Text, or Icon+Text. You pick from
-          the Visual Library or upload; nothing is auto-generated.
-        </p>
-      </div>
+    <div className={embedded ? "w-full" : "mx-auto w-full max-w-[1240px] px-4 md:px-6 lg:px-10 py-6"}>
+      {/* Header — hidden when embedded inside the Database app (its layout shows the title). */}
+      {!embedded && (
+        <div className="mb-5">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-dim)]">Product Data</p>
+          <h1 className="text-[26px] font-bold tracking-tight text-[var(--text-primary)] leading-tight">Visual Library</h1>
+          <p className="text-[13px] text-[var(--text-muted)] mt-1 max-w-[720px]">
+            The single home for every product data point and how it shows — Icon, Photo, Text, or Icon+Text. You pick from
+            the Visual Library or upload; nothing is auto-generated.
+          </p>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex flex-wrap gap-1.5 mb-6 border-b border-[var(--border-subtle)] pb-3">
@@ -94,9 +99,7 @@ export default function ProductVisualLibrary() {
 
       {tab === "commercial" && <CommercialTab />}
       {tab === "specs" && <SpecsTab />}
-      {(tab === "classification" || tab === "identity" || tab === "media") && (
-        <ComingNext tab={tab} />
-      )}
+      {(tab === "identity" || tab === "media") && <ComingNext tab={tab} />}
     </div>
   );
 }
@@ -428,7 +431,6 @@ function SpecsTab() {
 
 function ComingNext({ tab }: { tab: TabId }) {
   const copy: Record<string, string> = {
-    classification: "Divisions · Categories · Subcategories and their icons — building next on top of the existing classification logos.",
     identity: "The universal fields shared by all products (name · code · status · main image · the common specs) — mapped once here.",
     media: "Image · gallery · video · documents representation — building next.",
   };
