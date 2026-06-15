@@ -8,6 +8,8 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { IMG } from "@/lib/cdn";
+import { computeProductSignal } from "@/lib/product-knowledge-signal";
+import { KnowledgeRing, MaturityChip } from "@/components/admin/ProductKnowledgeBadge";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
@@ -1120,6 +1122,18 @@ export default function ProductList() {
               const models = modelCounts[p.id] || 0;
               const suppliers = productSuppliers[p.id] || [];
               const lvl = levelColors[p.level || ""] || "";
+              /* Phase 1 — first-visible Product Knowledge signal. Pure
+                 data-presence over the fields the list already has — no
+                 new API. Turns identical cards into a knowledge-health
+                 roster (completeness ring + maturity tier + what's missing). */
+              const mnSig = primaryModelNames[p.id];
+              const signal = computeProductSignal({
+                hasName: !!(mnSig && mnSig !== p.product_name),
+                hasImage: !!imgUrl,
+                hasType: !!(p.category_slug && p.subcategory_slug),
+                hasModels: models > 0,
+                hasCommercial: suppliers.length > 0 || !!p.brand,
+              });
 
               return (
                 <div
@@ -1169,8 +1183,10 @@ export default function ProductList() {
                       )}
                     </div>
 
-                    {/* Visibility indicator */}
-                    <div className="absolute top-2.5 right-2.5">
+                    {/* Knowledge completeness ring + visibility — the
+                        first-visible Product Knowledge signal. */}
+                    <div className="absolute top-2.5 right-2.5 z-[1] flex items-center gap-1.5">
+                      <KnowledgeRing pct={signal.pct} tone={signal.tone} />
                       {p.visible ? (
                         <span className="h-6 w-6 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center backdrop-blur-sm">
                           <EyeIcon className="h-3 w-3 text-emerald-400" />
@@ -1274,8 +1290,10 @@ export default function ProductList() {
                       </p>
                     )}
 
-                    {/* Meta row */}
+                    {/* Meta row — maturity (knowledge signal) leads, then
+                        the publish status (operational signal). */}
                     <div className="flex items-center gap-2 mt-3 flex-wrap">
+                      <MaturityChip signal={signal} />
                       {(() => {
                         const st = (p.status || "draft");
                         return (
@@ -1293,6 +1311,14 @@ export default function ProductList() {
                         <BoxesIcon className="h-2.5 w-2.5" /> {models} {models === 1 ? "model" : "models"}
                       </span>
                     </div>
+
+                    {/* Missing-knowledge cue — the next best action.
+                        Internal only; only when something is missing. */}
+                    {isInternal && signal.missing.length > 0 && (
+                      <p className="text-[10px] text-amber-400/80 mt-2 truncate" title={`Add: ${signal.missing.join(", ")}`}>
+                        Add: {signal.missing.slice(0, 3).join(" · ")}
+                      </p>
+                    )}
 
                     {/* Supplier — internal only */}
                     {isInternal && suppliers.length > 0 && (
