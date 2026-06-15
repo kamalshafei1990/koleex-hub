@@ -206,57 +206,31 @@ function getSteps(isSewing: boolean): WizardStep[] {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   SINGLE-PAGE SECTION NAV — clean sticky index for the one-page editor.
-   Replaces the numbered wizard stepper: just section labels that scroll to
-   their section and highlight the one currently in view (no step / lock /
-   completed semantics, which don't apply when everything is on one page).
+   SECTION TABS — clean sticky tab bar for the tabbed editor. Each tab is
+   its OWN screen (only the active section renders), navigated freely — no
+   step numbers, no lock/completed semantics, no forced Next/Back sequence.
+   Fully controlled by the parent's currentStep.
    ═══════════════════════════════════════════════════════════════════ */
-function SinglePageNav({ items }: { items: { id: string; label: string }[] }) {
-  const [active, setActive] = useState(items[0]?.id);
-  const idsKey = items.map((i) => i.id).join(",");
-  useEffect(() => {
-    const ids = idsKey ? idsKey.split(",") : [];
-    if (!ids.length) return;
-    let stop = false;
-    let raf = 0;
-    /* A rAF poll, not a scroll listener: the Hub shell scrolls an inner
-       element and scroll events from it don't reliably reach window, so a
-       per-frame position check is the robust driver. It's cheap (8 rect reads)
-       and only calls setActive when the value actually changes. */
-    const tick = () => {
-      if (stop) return;
-      /* Active = the LAST section whose top has scrolled above the line just
-         under the sticky nav (sections snap to ~168px below the top, so 220
-         sits just under that). */
-      let current = ids[0];
-      for (const id of ids) {
-        const el = document.getElementById(id);
-        if (el && el.getBoundingClientRect().top <= 220) current = id;
-      }
-      setActive((a) => (a === current ? a : current));
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => {
-      stop = true;
-      if (raf) cancelAnimationFrame(raf);
-    };
-  }, [idsKey]);
-  const go = (id: string) => {
-    setActive(id); // immediate, deterministic highlight for the click itself
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
+function SectionTabs({
+  items,
+  activeIndex,
+  onSelect,
+}: {
+  items: { index: number; id: string; label: string }[];
+  activeIndex: number;
+  onSelect: (i: number) => void;
+}) {
   return (
     <nav className="sticky top-0 z-20 mb-6 -mx-4 md:-mx-8 lg:-mx-12 xl:-mx-16 border-b border-[var(--border-subtle)] bg-[var(--bg-primary)]/90 backdrop-blur-md">
       <div className="flex items-center gap-1 overflow-x-auto px-4 md:px-8 lg:px-12 xl:px-16 py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map((it) => {
-          const on = active === it.id;
+          const on = it.index === activeIndex;
           return (
             <button
               key={it.id}
               type="button"
-              onClick={() => go(it.id)}
-              aria-current={on ? "true" : undefined}
+              onClick={() => onSelect(it.index)}
+              aria-current={on ? "page" : undefined}
               className={`shrink-0 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[12.5px] font-medium transition-colors ${
                 on
                   ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
@@ -1070,17 +1044,25 @@ export default function ProductForm({ productId }: Props) {
     return { pct, level, levelLabel, tone, connected: rel > 0, missing: defs.filter((s) => !s.present).map((s) => s.label), sections: defs.map(({ w: _w, ...s }) => s) };
   })();
 
-  /* ── Single-page mode ──
-     The product editor is now ONE clean scrolling page (not a 7-step
-     wizard). All sections render stacked; the step bar becomes a section
-     index that scrolls, and the footer Next/Back is hidden (the header
-     "Save Product" button saves from anywhere). The wizard code paths are
-     kept intact behind `!onePage` so we can fall back if ever needed. */
-  const onePage = true;
+  /* ── Editor mode ──
+     `tabbed`: each section is its OWN screen, navigated freely via a clean
+     tab bar (only the active section renders) — no step numbers, no locks,
+     no forced Next/Back. The header "Save Product" button saves from any tab.
+     `onePage` (the all-sections-stacked scroll variant) and the original
+     numbered wizard are both kept behind their flags for fallback. */
+  const tabbed = true;
+  const onePage = false;
 
-  /* ── Step navigation ── */
+  /* ── Step / tab navigation ── */
   const goToStep = (idx: number) => {
     const safeIdx = Math.max(0, Math.min(idx, steps.length - 1));
+    if (tabbed) {
+      // free navigation between tabs — no lock gate
+      setError("");
+      setCurrentStep(safeIdx);
+      if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
     if (onePage) {
       const id = steps[safeIdx]?.id;
       if (id && typeof document !== "undefined") {
@@ -1648,20 +1630,13 @@ export default function ProductForm({ productId }: Props) {
         )}
 
         {/* ═══ NAVIGATION ═══
-              Single page → clean sticky section index. Legacy step mode →
-              the numbered wizard stepper. */}
-        {onePage ? (
-          <SinglePageNav
-            items={[
-              { id: "sec-identity",    label: t("step.hero", "Hero & Identity") },
-              { id: "sec-classify",    label: t("step.classify", "Classification") },
-              { id: "sec-description", label: t("step.description", "Description") },
-              ...(isSewing ? [{ id: "sec-sewing", label: t("step.sewingSpecs", "Machine Specs") }] : []),
-              { id: "sec-technical",   label: t("step.technical", "Technical Details") },
-              { id: "sec-commercial",  label: t("step.models", "Models & Variants") },
-              { id: "sec-media",       label: t("step.media", "Media & Files") },
-              { id: "sec-finalize",    label: t("step.review", "Review & Publish") },
-            ]}
+              Tabbed → clean sticky tab bar (each tab is its own screen).
+              One-page → scrolling section index. Legacy → numbered stepper. */}
+        {tabbed ? (
+          <SectionTabs
+            items={steps.map((s, i) => ({ index: i, id: s.id, label: s.shortLabel || s.label }))}
+            activeIndex={currentStep}
+            onSelect={goToStep}
           />
         ) : (
           <StepNav
@@ -1675,10 +1650,13 @@ export default function ProductForm({ productId }: Props) {
           />
         )}
 
-        {/* "Raise Product Maturity" is a read-only meter, not an input. On the
-            single page it moves to the BOTTOM (near Save) so it never pushes
-            the real product fields down; legacy step mode keeps it on top. */}
-        {!onePage && <WizardKnowledgePanel knowledge={wizardKnowledge} />}
+        {/* "Raise Product Maturity" is a read-only meter, not an input. In the
+            tabbed editor it appears only on the Review tab (so it never crowds
+            the editing tabs); legacy step mode keeps it on top. */}
+        {!onePage && !tabbed && <WizardKnowledgePanel knowledge={wizardKnowledge} />}
+        {tabbed && steps[currentStep]?.id === "finalize" && (
+          <WizardKnowledgePanel knowledge={wizardKnowledge} />
+        )}
 
         {/* ═══ GLOBAL CLASSIFICATION BREADCRUMB (shown once classification is set, across all steps) ═══ */}
         {divisionName && steps[currentStep]?.id !== "classify" && (
@@ -3210,7 +3188,7 @@ export default function ProductForm({ productId }: Props) {
         {onePage && <div className="mt-2"><WizardKnowledgePanel knowledge={wizardKnowledge} /></div>}
 
         {/* ═══ STEP NAVIGATION BUTTONS ═══ */}
-        {!onePage && (
+        {!onePage && !tabbed && (
         <div className="flex items-center justify-between mt-8 mb-4">
           <button
             onClick={prevStep}
