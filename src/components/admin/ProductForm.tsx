@@ -1003,9 +1003,24 @@ export default function ProductForm({ productId }: Props) {
     return { pct, level, levelLabel, tone, connected: rel > 0, missing: defs.filter((s) => !s.present).map((s) => s.label), sections: defs.map(({ w: _w, ...s }) => s) };
   })();
 
+  /* ── Single-page mode ──
+     The product editor is now ONE clean scrolling page (not a 7-step
+     wizard). All sections render stacked; the step bar becomes a section
+     index that scrolls, and the footer Next/Back is hidden (the header
+     "Save Product" button saves from anywhere). The wizard code paths are
+     kept intact behind `!onePage` so we can fall back if ever needed. */
+  const onePage = true;
+
   /* ── Step navigation ── */
   const goToStep = (idx: number) => {
     const safeIdx = Math.max(0, Math.min(idx, steps.length - 1));
+    if (onePage) {
+      const id = steps[safeIdx]?.id;
+      if (id && typeof document !== "undefined") {
+        document.getElementById(`sec-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+      return;
+    }
     if (lockedSteps.has(safeIdx)) {
       const target = steps[safeIdx];
       if (target?.id === "sewing-specs") {
@@ -1593,8 +1608,9 @@ export default function ProductForm({ productId }: Props) {
         {/* ═══════════════════════════════════════════════════════════
            STEP: HERO (identity + primary model)
            ═══════════════════════════════════════════════════════════ */}
-        {steps[currentStep]?.id === "identity" && (
-          <div className="space-y-5 animate-in fade-in duration-300">
+        <div className={onePage ? "space-y-10" : ""}>
+        {(onePage || steps[currentStep]?.id === "identity") && (
+          <div id="sec-identity" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
             {/* ═══ HERO CARD ═══
                     overflow-visible (not hidden) so the SelectWithCreate
                     dropdowns inside the Primary Commercial strip —
@@ -2279,8 +2295,8 @@ export default function ProductForm({ productId }: Props) {
         {/* ═══════════════════════════════════════════════════════════
            STEP 2: CLASSIFICATION
            ═══════════════════════════════════════════════════════════ */}
-        {steps[currentStep]?.id === "classify" && (
-          <div className="space-y-5 animate-in fade-in duration-300">
+        {(onePage || steps[currentStep]?.id === "classify") && (
+          <div id="sec-classify" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
             <Section
               id="classification"
               icon={<FolderTreeIcon className="h-4 w-4" />}
@@ -2340,8 +2356,8 @@ export default function ProductForm({ productId }: Props) {
         {/* ═══════════════════════════════════════════════════════════
            STEP 3 (maybe): DESCRIPTION (rich text)
            ═══════════════════════════════════════════════════════════ */}
-        {steps[currentStep]?.id === "description" && (
-          <div className="space-y-5 animate-in fade-in duration-300">
+        {(onePage || steps[currentStep]?.id === "description") && (
+          <div id="sec-description" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
             {/* Classification breadcrumb used to repeat here, but the
                 same chips already appear in the Classify step and at
                 the top of the wizard. Showing them a third time was
@@ -2381,7 +2397,7 @@ export default function ProductForm({ productId }: Props) {
            so this step only renders the dynamic spec fields driven
            by the template the kind chose.
            ═══════════════════════════════════════════════════════════ */}
-        {steps[currentStep]?.id === "sewing-specs" && (() => {
+        {(onePage ? isSewing : steps[currentStep]?.id === "sewing-specs") && (() => {
           /* Schema-driven specs — the canonical structured editor that
              writes product.schema_specs (the data that lights up the
              public product page, quotes, brochures, AI). Resolved from
@@ -2431,8 +2447,8 @@ export default function ProductForm({ productId }: Props) {
         {/* ═══════════════════════════════════════════════════════════
            STEP N: TECHNICAL DETAILS
            ═══════════════════════════════════════════════════════════ */}
-        {steps[currentStep]?.id === "technical" && (
-          <div className="space-y-5 animate-in fade-in duration-300">
+        {(onePage || steps[currentStep]?.id === "technical") && (
+          <div id="sec-technical" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
             {/* ── Hero-ownership note ──
                   Visibility (Visible/Featured), Marketing (Level,
                   Warranty), and URL basics (Slug, Made-in) used to
@@ -2528,8 +2544,8 @@ export default function ProductForm({ productId }: Props) {
         {/* ═══════════════════════════════════════════════════════════
            STEP N: MODELS & VARIANTS
            ═══════════════════════════════════════════════════════════ */}
-        {steps[currentStep]?.id === "commercial" && (
-          <div className="space-y-5 animate-in fade-in duration-300">
+        {(onePage || steps[currentStep]?.id === "commercial") && (
+          <div id="sec-commercial" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
             {/* The redundant "Primary Model reminder" banner used to
                 live here. It said "Identity & pricing entered in the
                 Hero" — which was true but misleading, because the
@@ -2567,8 +2583,8 @@ export default function ProductForm({ productId }: Props) {
         {/* ═══════════════════════════════════════════════════════════
            STEP 5: MEDIA & FILES
            ═══════════════════════════════════════════════════════════ */}
-        {steps[currentStep]?.id === "media" && (
-          <div className="space-y-5 animate-in fade-in duration-300">
+        {(onePage || steps[currentStep]?.id === "media") && (
+          <div id="sec-media" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
             <Section id="media" icon={<ImageRawIcon className="h-4 w-4" />} title={t("media.filesTitle", "Media & Files")}>
               <MediaSection
                 media={media.filter(m => m.type !== "main_image")}
@@ -2585,7 +2601,7 @@ export default function ProductForm({ productId }: Props) {
         {/* ═══════════════════════════════════════════════════════════
            STEP 6: REVIEW & PUBLISH
            ═══════════════════════════════════════════════════════════ */}
-        {steps[currentStep]?.id === "finalize" && (() => {
+        {(onePage || steps[currentStep]?.id === "finalize") && (() => {
           /* ══════════════════════════════════════════════════════════
              REVIEW & PUBLISH — computed context for this step.
              All derived values + click-jump handlers live in this
@@ -3101,8 +3117,10 @@ export default function ProductForm({ productId }: Props) {
             </div>
           );
         })()}
+        </div>
 
         {/* ═══ STEP NAVIGATION BUTTONS ═══ */}
+        {!onePage && (
         <div className="flex items-center justify-between mt-8 mb-4">
           <button
             onClick={prevStep}
@@ -3138,6 +3156,7 @@ export default function ProductForm({ productId }: Props) {
             </button>
           )}
         </div>
+        )}
 
         <div className="h-12" />
       </div>
