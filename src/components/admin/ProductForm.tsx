@@ -2288,9 +2288,11 @@ export default function ProductForm({ productId }: Props) {
                   maxLength={320}
                   className="w-full px-4 py-3 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all resize-none"
                 />
-                <p className="text-[10px] text-[var(--text-ghost)] mt-1.5 flex items-center justify-between">
+                <p className="text-[10px] mt-1.5 flex items-center justify-between text-[var(--text-ghost)]">
                   <span>{t("hero.excerptSeoHint", "Aim for under 160 characters for best SEO display.")}</span>
-                  <span>{product.excerpt.length} / 320</span>
+                  <span className={product.excerpt.length > 160 ? "text-amber-400 font-semibold" : ""}>
+                    {product.excerpt.length} / 320{product.excerpt.length > 160 ? ` · ${t("hero.excerptOverSeo", "over SEO limit")}` : ""}
+                  </span>
                 </p>
               </div>
             </Section>
