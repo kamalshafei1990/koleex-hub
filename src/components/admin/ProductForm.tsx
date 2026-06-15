@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import WizardKnowledgePanel, { type WizardKnowledge } from "@/components/admin/WizardKnowledgePanel";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
@@ -964,6 +965,43 @@ export default function ProductForm({ productId }: Props) {
     return set;
   }, [steps, classificationComplete]);
 
+  /* ── Live Product Knowledge — the persistent "Raise Product Maturity"
+        signal shown above every step. Recomputed each render from the
+        working form state, so completeness/maturity move on every edit.
+        Same data-presence groups as the Product Detail Knowledge Object,
+        so the number the operator builds here matches what they'll see
+        on the product page. No new data. */
+  const wizardKnowledge: WizardKnowledge = (() => {
+    const cs = (sewingSpecs.common_specs || {}) as Record<string, unknown>;
+    const ts = (sewingSpecs.template_specs || {}) as Record<string, unknown>;
+    const gs = ((product as unknown as { specs?: Record<string, unknown> }).specs || {}) as Record<string, unknown>;
+    const nonEmpty = (o: Record<string, unknown>) =>
+      Object.values(o).filter((v) => v !== null && v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0)).length;
+    const specsCount = nonEmpty(cs) + nonEmpty(ts) + nonEmpty(gs);
+    const imgVid = media.filter((m) => ["main_image", "gallery", "video"].includes(m.type)).length;
+    const docs = media.filter((m) => !["main_image", "gallery", "video"].includes(m.type)).length;
+    const productTags = (product.tags || []) as string[];
+    const apps = productTags.length;
+    const fabricRe = /denim|jean|leather|canvas|tarp|knit|jersey|silk|satin|chiffon|cotton|polyester|nylon|wool|fleece|vinyl|pvc|mesh|spandex|elastane|twill|terry|velvet|corduroy|fabric|material/i;
+    const fabrics = productTags.filter((t) => fabricRe.test(t)).length;
+    const rel = related.length;
+    const defs = [
+      { key: "specifications", label: "Specs", present: specsCount > 0, w: 25 },
+      { key: "media", label: "Media", present: imgVid > 0, w: 20 },
+      { key: "applications", label: "Applications", present: apps > 0, w: 20 },
+      { key: "documents", label: "Documents", present: docs > 0, w: 15 },
+      { key: "fabrics", label: "Fabrics", present: fabrics > 0, w: 10 },
+      { key: "operations", label: "Operations", present: false, w: 10 },
+    ];
+    const pct = defs.reduce((a, s) => a + (s.present ? s.w : 0), 0);
+    let level: 1 | 2 | 3 | 4 | 5 = pct < 25 ? 1 : pct < 50 ? 2 : pct < 75 ? 3 : 4;
+    if (level >= 4 && rel === 0) level = 3;
+    if (pct >= 85 && rel > 0) level = 5;
+    const levelLabel = ["", "Record", "Structured", "Knowledge", "Connected", "Complete"][level];
+    const tone: WizardKnowledge["tone"] = pct < 35 ? "low" : pct < 70 ? "mid" : "high";
+    return { pct, level, levelLabel, tone, missing: defs.filter((s) => !s.present).map((s) => s.label), sections: defs.map(({ w: _w, ...s }) => s) };
+  })();
+
   /* ── Step navigation ── */
   const goToStep = (idx: number) => {
     const safeIdx = Math.max(0, Math.min(idx, steps.length - 1));
@@ -1536,6 +1574,10 @@ export default function ProductForm({ productId }: Props) {
           issueCounts={stepIssueCount}
           t={t}
         />
+
+        {/* ═══ PERSISTENT PRODUCT KNOWLEDGE PANEL — "Raise Product Maturity"
+               (completeness + maturity + what's missing, live on every step) ═══ */}
+        <WizardKnowledgePanel knowledge={wizardKnowledge} />
 
         {/* ═══ GLOBAL CLASSIFICATION BREADCRUMB (shown once classification is set, across all steps) ═══ */}
         {divisionName && steps[currentStep]?.id !== "classify" && (
