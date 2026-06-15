@@ -188,20 +188,21 @@ function getSteps(isSewing: boolean): WizardStep[] {
      Classify step. Keeping the wizard at 7 / 8 steps instead of
      8 / 9 and aligning the admin's mental model with how customers
      browse the catalog. */
+  /* Specs is now ONE tab. The old split — "Machine Specs" (schema/sewing) +
+     "Technical Details" (electrical/physical/compliance) — confused operators
+     and scattered the spec systems across two tabs. They render together under
+     this single "Specifications" tab. Always present (technical applies to
+     every product; the sewing block inside only shows for sewing machines). */
   const steps: WizardStep[] = [
     { id: "classify", label: "Classification", shortLabel: "Classify", icon: <FolderTreeIcon className="h-4 w-4" /> },
     { id: "identity", label: "Hero & Identity", shortLabel: "Hero", icon: <SparklesIcon className="h-4 w-4" /> },
     { id: "description", label: "Description", shortLabel: "Description", icon: <DocumentIcon className="h-4 w-4" /> },
-  ];
-  if (isSewing) {
-    steps.push({ id: "sewing-specs", label: "Machine Specs", shortLabel: "Specs", icon: <Settings2Icon className="h-4 w-4" />, conditional: true });
-  }
-  steps.push(
+    { id: "specs", label: "Specifications", shortLabel: "Specs", icon: <Settings2Icon className="h-4 w-4" /> },
     { id: "commercial", label: "Models & Variants", shortLabel: "Models", icon: <BoxesIcon className="h-4 w-4" /> },
-    { id: "technical", label: "Technical Details", shortLabel: "Technical", icon: <ZapIcon className="h-4 w-4" /> },
     { id: "media", label: "Media & Files", shortLabel: "Media", icon: <ImageRawIcon className="h-4 w-4" /> },
     { id: "finalize", label: "Review & Publish", shortLabel: "Review", icon: <CheckIcon className="h-4 w-4" /> },
-  );
+  ];
+  void ZapIcon; // retained import; the standalone Technical tab merged into Specs
   return steps;
 }
 
@@ -2461,7 +2462,7 @@ export default function ProductForm({ productId }: Props) {
            by the template the kind chose.
            ═══════════════════════════════════════════════════════════ */}
         {onePage && isSewing && <div id="sec-sewing" className="scroll-mt-28" aria-hidden />}
-        {(onePage ? isSewing : steps[currentStep]?.id === "sewing-specs") && (() => {
+        {steps[currentStep]?.id === "specs" && isSewing && (() => {
           /* Schema-driven specs — the canonical structured editor that
              writes product.schema_specs (the data that lights up the
              public product page, quotes, brochures, AI). Resolved from
@@ -2511,7 +2512,7 @@ export default function ProductForm({ productId }: Props) {
         {/* ═══════════════════════════════════════════════════════════
            STEP N: TECHNICAL DETAILS
            ═══════════════════════════════════════════════════════════ */}
-        {(onePage || steps[currentStep]?.id === "technical") && (
+        {steps[currentStep]?.id === "specs" && (
           <div id="sec-technical" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
             {/* ── Hero-ownership note ──
                   Visibility (Visible/Featured), Marketing (Level,
@@ -2700,10 +2701,28 @@ export default function ProductForm({ productId }: Props) {
           }
           if (isSewing) {
             const cs = sewingSpecs.common_specs as Record<string, unknown>;
-            if (!cs.max_sewing_speed) missing.push({ label: "Max Sewing Speed", step: "sewing-specs" });
-            if (!cs.needle_system) missing.push({ label: "Needle System", step: "sewing-specs" });
-            if (!cs.motor_type) missing.push({ label: "Motor Type", step: "sewing-specs" });
+            if (!cs.max_sewing_speed) missing.push({ label: "Max Sewing Speed", step: "specs" });
+            if (!cs.needle_system) missing.push({ label: "Needle System", step: "specs" });
+            if (!cs.motor_type) missing.push({ label: "Motor Type", step: "specs" });
           }
+          /* Every variant needs a price before publish — a model with no
+             price shows "price unavailable" on the catalog. */
+          models.forEach((m, i) => {
+            if (String(m.status) === "discontinued") return;
+            const hasPrice =
+              String(m.global_price ?? "").trim() !== "" ||
+              String(m.head_only_price ?? "").trim() !== "" ||
+              String(m.complete_set_price ?? "").trim() !== "";
+            if (!hasPrice) {
+              const who =
+                m.model_name && m.model_name.trim()
+                  ? `${m.model_name} — ${t("field.price", "price")}`
+                  : i === 0
+                    ? t("field.primaryPrice", "Primary model price")
+                    : t("field.variantPrice", "Variant price");
+              missing.push({ label: who, step: "commercial" });
+            }
+          });
 
           /* Primary model commercial info for the summary chips. */
           const priceDisplay = primaryModel?.global_price
@@ -3046,6 +3065,20 @@ export default function ProductForm({ productId }: Props) {
 
               {/* ── Missing-fields warning banner ──
                     Only when at least one required field is empty. */}
+              {product.status === "active" && missing.length > 0 && (
+                <div className="rounded-2xl bg-red-500/[0.06] border border-red-500/30 p-4 flex items-start gap-2.5">
+                  <span className="inline-flex items-center justify-center h-7 w-7 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 shrink-0">
+                    <TriangleWarningIcon className="h-3.5 w-3.5" />
+                  </span>
+                  <div>
+                    <h4 className="text-[13px] font-semibold text-[var(--text-primary)] leading-tight">{t("review.goLiveTitle", "This will go live with missing fields")}</h4>
+                    <p className="text-[11px] text-[var(--text-ghost)] mt-0.5">
+                      {t("review.goLiveBody", "Status is Active, so saving publishes this product to the public catalogue immediately. Switch to Draft on the Hero tab if it's not ready.")}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {missing.length > 0 && (
                 <div className="rounded-2xl bg-amber-500/[0.06] border border-amber-500/25 p-5">
                   <div className="flex items-center gap-2.5 mb-3">
@@ -3109,6 +3142,7 @@ export default function ProductForm({ productId }: Props) {
                 onJump={() => jumpTo("commercial")}
                 t={t}
               >
+                <SummaryItem label={t("review.primaryModelCode", "Primary model · KOLEEX code")} value={primaryModel?.primary_model || primaryModel?.model_name || "—"} dim={!(primaryModel?.primary_model || primaryModel?.model_name)} onClick={() => jumpTo("identity")} />
                 <SummaryItem label={t("review.tagline", "Tagline")} value={primaryModel?.tagline || "—"} dim={!primaryModel?.tagline} onClick={() => jumpTo("commercial")} />
                 <SummaryItem label={t("review.costCny", "Cost (CNY)")} value={costDisplay} dim={costDisplay === "—"} onClick={() => jumpTo("commercial")} />
                 <SummaryItem label={t("review.sellingUsd", "Selling price (USD)")} value={priceDisplay} dim={priceDisplay === "—"} onClick={() => jumpTo("commercial")} />
