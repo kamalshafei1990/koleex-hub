@@ -1796,10 +1796,10 @@ export default function ProductForm({ productId }: Props) {
                         tier + catalog filtering. */}
                     <div className="flex items-center gap-1 ml-auto">
                       {([
-                        { v: "entry", label: t("hero.levelEntry", "Entry"), cls: "text-blue-400 bg-blue-500/15 border-blue-500/40" },
-                        { v: "mid", label: t("hero.levelMid", "Mid"), cls: "text-emerald-400 bg-emerald-500/15 border-emerald-500/40" },
-                        { v: "premium", label: t("hero.levelPremium", "Premium"), cls: "text-amber-400 bg-amber-500/15 border-amber-500/40" },
-                        { v: "enterprise", label: t("hero.levelEnterprise", "Enterprise"), cls: "text-purple-400 bg-purple-500/15 border-purple-500/40" },
+                        { v: "entry", label: t("hero.levelEntry", "Entry") },
+                        { v: "mid", label: t("hero.levelMid", "Mid") },
+                        { v: "premium", label: t("hero.levelPremium", "Premium") },
+                        { v: "enterprise", label: t("hero.levelEnterprise", "Enterprise") },
                       ] as const).map(l => {
                         const active = product.level === l.v;
                         return (
@@ -1807,8 +1807,12 @@ export default function ProductForm({ productId }: Props) {
                             key={l.v}
                             type="button"
                             onClick={() => updateProduct_({ level: active ? "" : l.v })}
+                            /* Level is a tier, not a status — monochrome per the
+                               Koleex system (selected = inverted, no decorative colour). */
                             className={`h-7 px-2.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border transition-all ${
-                              active ? l.cls : "border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+                              active
+                                ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-[var(--bg-inverted)]"
+                                : "border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)] hover:border-[var(--border-focus)]"
                             }`}
                           >
                             {l.label}
