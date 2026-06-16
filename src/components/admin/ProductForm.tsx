@@ -183,6 +183,85 @@ const STEP_SHORT_KEY: Record<string, string> = {
   finalize: "step.review",
 };
 
+/* ═══════════════════════════════════════════════════════════════════
+   SCHEMA ↔ LEGACY-COLUMN MIRROR
+   ───────────────────────────────────────────────────────────────────
+   The schema-driven Specs editor (products.schema_specs jsonb) and the
+   legacy "Technical Details" block (typed products.* columns) historically
+   captured the SAME ~20 fields, so an operator entered e.g. plug_types
+   twice and the two copies could diverge.
+
+   Resolution (no migration): the schema editor is the SINGLE input; the
+   matching typed columns are hidden in the Technical block when the active
+   schema covers them, and mirrored from schema_specs → columns at save so
+   legacy readers (LegacyProductView, public API) keep working. Retiring the
+   columns entirely is a later, sign-off step once those readers move to
+   schema_specs.
+   ═══════════════════════════════════════════════════════════════════ */
+const SCHEMA_KEY_TO_COLUMN: Record<string, string> = {
+  voltage_options: "voltage",
+  frequency_hz: "frequency_hz",
+  motor_power_w: "motor_power_w",
+  power_consumption_w: "power_consumption_w",
+  phase: "phase",
+  plug_types: "plug_types",
+  pneumatic_supply_required: "pneumatic_supply",
+  machine_dimensions: "machine_dimensions",
+  machine_weight_kg: "machine_weight_kg",
+  hs_code: "hs_code",
+  ip_rating: "ip_rating",
+  operating_temperature: "operating_temp",
+  ce_certified: "ce_certified",
+  rohs_compliant: "rohs_compliant",
+  oil_mist_filter: "oil_mist_filter",
+  colors: "colors",
+  moq: "moq",
+  lead_time: "lead_time",
+  supports_head_only: "supports_head_only",
+  supports_complete_set: "supports_complete_set",
+};
+
+/* Build the set of typed columns the active schema covers (so the Technical
+   block can hide those fields). Empty set when no schema is resolved. */
+function computeSchemaCoveredColumns(
+  schema: { groups?: { fields?: { key: string }[] }[] } | null | undefined,
+): Set<string> {
+  if (!schema?.groups) return new Set();
+  const keys = new Set(schema.groups.flatMap((g) => (g.fields ?? []).map((f) => f.key)));
+  return new Set(
+    Object.entries(SCHEMA_KEY_TO_COLUMN)
+      .filter(([sk]) => keys.has(sk))
+      .map(([, col]) => col),
+  );
+}
+
+/* Derive typed-column values from schema_specs for the overlap set, with the
+   couple of shape conversions the columns need (dimension object → text,
+   temperature range object → text). Only emits keys that are actually present
+   in schema_specs so a partially-filled schema never nulls a legacy column. */
+function schemaColumnMirror(
+  schema: { groups?: { fields?: { key: string }[] }[] } | null | undefined,
+  specs: Record<string, unknown> | null | undefined,
+): Record<string, unknown> {
+  if (!schema || !specs) return {};
+  const out: Record<string, unknown> = {};
+  for (const [sk, col] of Object.entries(SCHEMA_KEY_TO_COLUMN)) {
+    const v = specs[sk];
+    if (v === undefined || v === null || v === "") continue;
+    if (col === "machine_dimensions" && typeof v === "object" && !Array.isArray(v)) {
+      const d = v as { length?: number; width?: number; height?: number };
+      const parts = [d.length, d.width, d.height].filter((n) => n != null);
+      out[col] = parts.length ? `${parts.join(" × ")} mm` : null;
+    } else if (col === "operating_temp" && typeof v === "object" && !Array.isArray(v)) {
+      const r = v as { min?: number; max?: number };
+      out[col] = `${r.min ?? ""}–${r.max ?? ""} °C`;
+    } else {
+      out[col] = v;
+    }
+  }
+  return out;
+}
+
 function getSteps(isSewing: boolean): WizardStep[] {
   /* Machine Kind used to be its own step (id: "machine-type") but
      it's really a 4th-tier classification decision — Division →
@@ -196,13 +275,18 @@ function getSteps(isSewing: boolean): WizardStep[] {
      this single "Specifications" tab. Always present (technical applies to
      every product; the sewing block inside only shows for sewing machines). */
   const steps: WizardStep[] = [
+    /* Priority order: identity → description → the structured specs → money →
+       shipping → media → knowledge enrichment → review. Knowledge sits late
+       (it enriches an already-described product); Logistics is its own step so
+       customs/shipping data stops scattering across Specs + Models. */
     { id: "classify", label: "Classification", shortLabel: "Classify", icon: <FolderTreeIcon className="h-4 w-4" /> },
-    { id: "identity", label: "Hero & Identity", shortLabel: "Hero", icon: <SparklesIcon className="h-4 w-4" /> },
+    { id: "identity", label: "Hero & Identity", shortLabel: "Identity", icon: <SparklesIcon className="h-4 w-4" /> },
     { id: "description", label: "Description", shortLabel: "Description", icon: <DocumentIcon className="h-4 w-4" /> },
-    { id: "knowledge", label: "Product Knowledge", shortLabel: "Knowledge", icon: <BookOpenIcon className="h-4 w-4" /> },
     { id: "specs", label: "Specifications", shortLabel: "Specs", icon: <Settings2Icon className="h-4 w-4" /> },
-    { id: "commercial", label: "Models & Variants", shortLabel: "Models", icon: <BoxesIcon className="h-4 w-4" /> },
+    { id: "commercial", label: "Models & Variants", shortLabel: "Commercial", icon: <BoxesIcon className="h-4 w-4" /> },
+    { id: "logistics", label: "Logistics", shortLabel: "Logistics", icon: <GlobeIcon className="h-4 w-4" /> },
     { id: "media", label: "Media & Files", shortLabel: "Media", icon: <ImageRawIcon className="h-4 w-4" /> },
+    { id: "knowledge", label: "Product Knowledge", shortLabel: "Knowledge", icon: <BookOpenIcon className="h-4 w-4" /> },
     { id: "finalize", label: "Review & Publish", shortLabel: "Review", icon: <CheckIcon className="h-4 w-4" /> },
   ];
   void ZapIcon; // retained import; the standalone Technical tab merged into Specs
@@ -848,6 +932,29 @@ export default function ProductForm({ productId }: Props) {
   );
   const resolvedPrefix = selectedSubcategory?.code ?? "";
 
+  /* Active schema for the current classification. Drives the Specs↔Technical
+     de-duplication: any typed column the schema covers is HIDDEN in the
+     Technical block (schema editor is the single input) and mirrored from
+     schema_specs → columns at save time. */
+  const activeSpecsSchema = resolveSchema({
+    divisionCode: product.division_slug || "",
+    categoryCode: product.category_slug || "",
+    subcategoryCode: selectedSubcategory?.code || "",
+  }).schema;
+  const schemaCoveredCols = computeSchemaCoveredColumns(activeSpecsSchema);
+  /* The legacy Technical block, Purchase Options + Fulfillment sub-sections are
+     hidden when the active schema already covers their fields (no double entry).
+     The schema editor is the single input; values mirror to columns on save. */
+  const TECH_BLOCK_COLS = [
+    "voltage", "frequency_hz", "motor_power_w", "power_consumption_w", "phase",
+    "plug_types", "pneumatic_supply", "machine_dimensions", "machine_weight_kg",
+    "hs_code", "ip_rating", "operating_temp", "ce_certified", "rohs_compliant",
+    "oil_mist_filter", "colors",
+  ];
+  const technicalHasVisibleField = TECH_BLOCK_COLS.some((c) => !schemaCoveredCols.has(c));
+  const purchaseCoveredBySchema = schemaCoveredCols.has("supports_head_only") && schemaCoveredCols.has("supports_complete_set");
+  const fulfillmentCoveredBySchema = schemaCoveredCols.has("moq") && schemaCoveredCols.has("lead_time");
+
   /* ── Primary model helpers (shown in Hero) ── */
   const primaryModel = models[0];
   const updatePrimaryModel = useCallback((updates: Partial<ModelFormState>) => {
@@ -1336,6 +1443,19 @@ export default function ProductForm({ productId }: Props) {
         schema_knowledge: product.schema_knowledge || [],
         schema_visibility: product.schema_visibility || {},
       };
+
+      /* De-dup mirror: when a schema is active it is the single source for the
+         overlapping electrical/physical/compliance/fulfillment fields. Copy
+         those schema_specs values into the matching legacy columns so
+         LegacyProductView + the public API keep rendering. Spread last so it
+         wins over the (now hidden) Technical-block column state. */
+      Object.assign(
+        productData,
+        schemaColumnMirror(
+          resolvedSchemaForSave.schema,
+          product.schema_specs as Record<string, unknown>,
+        ),
+      );
 
       let pid: string;
       if (isEdit && productId) {
@@ -2148,21 +2268,8 @@ export default function ProductForm({ productId }: Props) {
                         className={inp}
                       />
                     </div>
-                    <div>
-                      <label className={lbl}>
-                        <span className="inline-flex items-center gap-1.5"><GlobeIcon className="h-3 w-3" /> {t("hero.madeIn", "Made in")}</span>
-                      </label>
-                      <select
-                        value={product.country_of_origin}
-                        onChange={(e) => updateProduct_({ country_of_origin: e.target.value })}
-                        className={inp}
-                      >
-                        <option value="">—</option>
-                        {COUNTRIES.map((c) => (
-                          <option key={c.code} value={c.code}>{c.name}</option>
-                        ))}
-                      </select>
-                    </div>
+                    {/* Country of Origin moved to the dedicated Logistics tab —
+                        it's customs/shipping data, not hero identity. */}
                     <div>
                       <label className={lbl}>
                         <span className="inline-flex items-center gap-1.5"><ShieldCheckIcon className="h-3 w-3" /> {t("hero.warranty", "Warranty")}</span>
@@ -2579,13 +2686,23 @@ export default function ProductForm({ productId }: Props) {
               </div>
             </div>
 
-            <Section id="technical" icon={<ZapIcon className="h-4 w-4" />} title={t("technical.title", "Technical Details")} badge={t("technical.badge", "Electrical · Physical")}>
-              <TechnicalSection data={product} onChange={updateProduct_} suggestions={attrSuggestions} />
-            </Section>
+            {technicalHasVisibleField ? (
+              <Section id="technical" icon={<ZapIcon className="h-4 w-4" />} title={t("technical.title", "Technical Details")} badge={t("technical.badge", "Electrical · Physical")}>
+                <TechnicalSection data={product} onChange={updateProduct_} suggestions={attrSuggestions} hiddenFields={schemaCoveredCols} />
+              </Section>
+            ) : (
+              <div className="flex items-start gap-3 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
+                <ZapIcon className="mt-0.5 h-4 w-4 shrink-0 text-[var(--text-ghost)]" />
+                <p className="text-[11px] leading-relaxed text-[var(--text-ghost)]">
+                  {t("technical.coveredBySpecs", "Electrical, physical and compliance specs for this category are captured in the structured Product Specs above — entered once, no duplicate fields here.")}
+                </p>
+              </div>
+            )}
 
             {/* Purchase Options — unique to this step (not on Hero).
                 Visibility / Featured / Warranty / Level moved up to
                 Hero when we redesigned Hero as the publishing hub. */}
+            {!purchaseCoveredBySchema && (
             <Section id="config" icon={<Settings2Icon className="h-4 w-4" />} title={t("technical.purchaseOptions", "Purchase Options")} badge={t("technical.purchaseBadge", "Head-only · Complete set")}>
               <div className="space-y-3">
                 <p className="text-[11px] text-[var(--text-ghost)] italic">
@@ -2595,11 +2712,13 @@ export default function ProductForm({ productId }: Props) {
                 <Toggle checked={product.supports_complete_set} onChange={(v) => updateProduct_({ supports_complete_set: v })} label={t("technical.supportsCompleteSet", "Supports complete set purchase")} />
               </div>
             </Section>
+            )}
 
             {/* Fulfillment Defaults — collapsed by default. Slug and
                 Country of Origin moved to Hero; this section now
                 only holds the product-level MOQ + Lead Time that
                 cascade to new variants. */}
+            {!fulfillmentCoveredBySchema && (
             <Section id="advanced" icon={<WrenchIcon className="h-4 w-4" />} title={t("technical.fulfillmentDefaults", "Fulfillment Defaults")} badge={t("technical.fulfillmentBadge", "MOQ · Lead Time")} defaultOpen={false}>
               <div className="space-y-5">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2628,6 +2747,7 @@ export default function ProductForm({ productId }: Props) {
                 </div>
               </div>
             </Section>
+            )}
 
             {/* INV-H1 — Stock Profile (tenant-scoped inventory_items row). */}
             {productId && (
@@ -2680,6 +2800,68 @@ export default function ProductForm({ productId }: Props) {
         {/* ═══════════════════════════════════════════════════════════
            STEP 5: MEDIA & FILES
            ═══════════════════════════════════════════════════════════ */}
+        {/* ═══════════════════════════════════════════════════════════
+           STEP: LOGISTICS — product-level customs/origin. Per-model
+           packing, carton, CBM and container quantities live on the
+           Commercial step (they differ per variant); this tab points
+           there rather than duplicating them.
+           ═══════════════════════════════════════════════════════════ */}
+        {(onePage || steps[currentStep]?.id === "logistics") && (
+          <div id="sec-logistics" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+            <Section id="logistics-origin" icon={<GlobeIcon className="h-4 w-4" />} title={t("logistics.title", "Origin & Customs")} badge={t("logistics.badge", "Shipping · Customs")}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className={lbl}>
+                    <span className="inline-flex items-center gap-1.5"><GlobeIcon className="h-3 w-3" /> {t("logistics.countryOfOrigin", "Country of Origin")}</span>
+                  </label>
+                  <select
+                    value={product.country_of_origin}
+                    onChange={(e) => updateProduct_({ country_of_origin: e.target.value })}
+                    className={inp}
+                  >
+                    <option value="">—</option>
+                    {COUNTRIES.map((c) => (
+                      <option key={c.code} value={c.code}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                {!schemaCoveredCols.has("hs_code") ? (
+                  <div>
+                    <label className={lbl}>{t("logistics.hsCode", "HS Code")}</label>
+                    <input
+                      type="text"
+                      value={product.hs_code}
+                      onChange={(e) => updateProduct_({ hs_code: e.target.value })}
+                      placeholder="e.g. 8452.21"
+                      className={inp}
+                    />
+                    <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("logistics.hsHint", "Harmonized System tariff code.")}</p>
+                  </div>
+                ) : (
+                  <div className="flex items-end">
+                    <p className="text-[11px] leading-relaxed text-[var(--text-ghost)]">{t("logistics.hsInSpecs", "HS Code for this category is set in the Specifications tab (Compliance & Customs).")}</p>
+                  </div>
+                )}
+              </div>
+            </Section>
+
+            <div className="flex items-start gap-3 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
+              <BoxIcon className="mt-0.5 h-4 w-4 shrink-0 text-[var(--text-ghost)]" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[12px] font-medium text-[var(--text-primary)]">{t("logistics.packingTitle", "Packing & shipment are per-model")}</p>
+                <p className="text-[10px] text-[var(--text-ghost)] mt-0.5 leading-relaxed">{t("logistics.packingBody", "Packing type, carton dimensions, CBM, net/gross weight and 20ft/40ft container quantities are entered per variant on the Commercial tab.")}</p>
+                <button
+                  type="button"
+                  onClick={() => { const i = steps.findIndex((s) => s.id === "commercial"); if (i >= 0) goToStep(i); }}
+                  className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-semibold text-[var(--text-primary)] bg-[var(--bg-base)] hover:bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] transition-colors mt-2"
+                >
+                  <ArrowUpRightIcon className="h-3 w-3" /> {t("logistics.jumpCommercial", "Open Commercial")}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {(onePage || steps[currentStep]?.id === "media") && (
           <div id="sec-media" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
             <Section id="media" icon={<ImageRawIcon className="h-4 w-4" />} title={t("media.filesTitle", "Media & Files")}>

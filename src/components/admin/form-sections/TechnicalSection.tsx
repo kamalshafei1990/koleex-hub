@@ -61,6 +61,11 @@ interface Props {
     colors?: string[];
     watt?: string[];
   };
+  /* Column keys the active product schema already captures (schema_specs).
+     Those fields are hidden here so the operator enters them ONCE in the
+     schema-driven Specs editor; they are mirrored to these columns on save.
+     A card with all its fields hidden is skipped entirely. */
+  hiddenFields?: Set<string>;
 }
 
 /* ── ChipInput with dropdown suggestions ── */
@@ -556,8 +561,14 @@ function ToggleRow({
   );
 }
 
-export default function TechnicalSection({ data, onChange, suggestions }: Props) {
+export default function TechnicalSection({ data, onChange, suggestions, hiddenFields }: Props) {
   const hasPlugCards = suggestions?.plug_types && suggestions.plug_types.length > 0;
+  const hidden = (k: string) => hiddenFields?.has(k) ?? false;
+  const elecVisible = ["voltage", "frequency_hz", "motor_power_w", "power_consumption_w", "phase", "plug_types", "pneumatic_supply"].some((k) => !hidden(k));
+  const physVisible = ["machine_dimensions", "machine_weight_kg"].some((k) => !hidden(k));
+  const compTopVisible = ["hs_code", "ip_rating", "operating_temp"].some((k) => !hidden(k));
+  const compTogglesVisible = ["ce_certified", "rohs_compliant", "oil_mist_filter"].some((k) => !hidden(k));
+  const compVisible = compTopVisible || compTogglesVisible || !hidden("colors");
 
   // Per-card accents — only the digit inside the numbered badge and
   // a tiny dot get tinted. Whole-card chrome stays neutral so the
@@ -573,6 +584,7 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
             Voltage + plug types + motor power + power consumption.
             Plug types remain a card selector when admin has uploaded
             plug images, otherwise a chip input. */}
+      {elecVisible && (
       <SubCard
         number={1}
         title="Electrical"
@@ -581,6 +593,7 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
         icon={<ZapIcon className="h-4 w-4" />}
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {!hidden("voltage") && (
           <ChipInput
             label="Voltage Options"
             icon={<ZapIcon className="h-3.5 w-3.5" />}
@@ -589,6 +602,8 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
             placeholder={suggestions?.voltage?.length ? "Select or type voltage..." : "e.g. 220V (Enter to add)"}
             suggestions={suggestions?.voltage}
           />
+          )}
+          {!hidden("frequency_hz") && (
           <ChipInput
             label="Frequency (Hz)"
             icon={<RefreshCwIcon className="h-3.5 w-3.5" />}
@@ -597,8 +612,10 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
             placeholder="e.g. 50 (Enter to add)"
             suggestions={["50", "60", "50/60"]}
           />
+          )}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {!hidden("motor_power_w") && (
           <NumberUnit
             label="Motor Power"
             icon={<PowerIcon className="h-3.5 w-3.5" />}
@@ -608,6 +625,8 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
             onChange={(v) => onChange({ motor_power_w: v })}
             helpText="Replaces the old free-text Watt field."
           />
+          )}
+          {!hidden("power_consumption_w") && (
           <NumberUnit
             label="Power Consumption"
             icon={<GaugeIcon className="h-3.5 w-3.5" />}
@@ -617,6 +636,8 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
             onChange={(v) => onChange({ power_consumption_w: v })}
             helpText="Total draw under typical load."
           />
+          )}
+          {!hidden("phase") && (
           <div>
             <FieldLabel icon={<LayersIcon className="h-3.5 w-3.5" />}>Phase</FieldLabel>
             <select
@@ -632,8 +653,9 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
               Three phase typical for 380V industrial machines.
             </p>
           </div>
+          )}
         </div>
-        {hasPlugCards ? (
+        {!hidden("plug_types") && (hasPlugCards ? (
           <PlugTypeSelector
             values={data.plug_types}
             onChange={(v) => onChange({ plug_types: v })}
@@ -647,12 +669,13 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
             onChange={(v) => onChange({ plug_types: v })}
             placeholder="e.g. Type C (Enter to add)"
           />
-        )}
+        ))}
 
         {/* Pneumatic supply requirement — relevant for automatic
             stations and pneumatic presser-foot lifters. Sits at
             the bottom of the Electrical card because it's a power
             requirement, not a compliance flag. */}
+        {!hidden("pneumatic_supply") && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-[var(--border-subtle)]/40">
           <ToggleRow
             label="Pneumatic Supply Required"
@@ -662,12 +685,15 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
             onChange={(v) => onChange({ pneumatic_supply: v })}
           />
         </div>
+        )}
       </SubCard>
+      )}
 
       {/* ── 2. Physical (Bare Machine) ──
             Distinct from per-variant packed/shipment data which lives
             on the Models step. These describe the running machine,
             not the crate it ships in. */}
+      {physVisible && (
       <SubCard
         number={2}
         title="Physical (Bare Machine)"
@@ -676,6 +702,7 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
         icon={<RulerIcon className="h-4 w-4" />}
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {!hidden("machine_dimensions") && (
           <div>
             <FieldLabel icon={<RulerIcon className="h-3.5 w-3.5" />}>
               Machine Dimensions (L × W × H)
@@ -691,6 +718,8 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
               Footprint of the machine in operation. Free-text so you can use any unit / format.
             </p>
           </div>
+          )}
+          {!hidden("machine_weight_kg") && (
           <NumberUnit
             label="Machine Weight"
             icon={<ScaleIcon className="h-3.5 w-3.5" />}
@@ -700,14 +729,17 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
             onChange={(v) => onChange({ machine_weight_kg: v })}
             helpText="Bare-head weight. Packed crate weight is per-variant on Models."
           />
+          )}
         </div>
       </SubCard>
+      )}
 
       {/* ── 3. Compliance & Customs ──
             HS code, certifications, and product colors. These either
             constrain where the product can be sold (CE, RoHS) or
             classify it for customs (HS code). Colors land here as a
             product-level visual attribute used in catalog filtering. */}
+      {compVisible && (
       <SubCard
         number={3}
         title="Compliance & Customs"
@@ -715,7 +747,9 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
         accent={complianceAccent}
         icon={<ShieldCheckIcon className="h-4 w-4" />}
       >
+        {compTopVisible && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {!hidden("hs_code") && (
           <div>
             <FieldLabel icon={<HashtagIcon className="h-3.5 w-3.5" />}>HS Code</FieldLabel>
             <input
@@ -729,6 +763,8 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
               Harmonized System tariff code.
             </p>
           </div>
+          )}
+          {!hidden("ip_rating") && (
           <div>
             <FieldLabel icon={<DropletsIcon className="h-3.5 w-3.5" />}>IP Rating</FieldLabel>
             <input
@@ -742,6 +778,8 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
               Ingress protection (dust + water).
             </p>
           </div>
+          )}
+          {!hidden("operating_temp") && (
           <div>
             <FieldLabel icon={<SparklesIcon className="h-3.5 w-3.5" />}>Operating Temperature</FieldLabel>
             <input
@@ -755,9 +793,13 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
               Recommended operating range.
             </p>
           </div>
+          )}
         </div>
+        )}
 
+        {compTogglesVisible && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-[var(--border-subtle)]/40">
+          {!hidden("ce_certified") && (
           <ToggleRow
             label="CE Certified"
             icon={<BadgeCheckIcon className="h-3.5 w-3.5" />}
@@ -765,6 +807,8 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
             value={data.ce_certified}
             onChange={(v) => onChange({ ce_certified: v })}
           />
+          )}
+          {!hidden("rohs_compliant") && (
           <ToggleRow
             label="RoHS Compliant"
             icon={<AwardIcon className="h-3.5 w-3.5" />}
@@ -772,10 +816,12 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
             value={data.rohs_compliant}
             onChange={(v) => onChange({ rohs_compliant: v })}
           />
+          )}
           {/* Oil-mist filter — for cleanroom and light-fabric
               production. Independent of drive type so a non-air-
               purify head can still optionally have an after-market
               filter retrofit. */}
+          {!hidden("oil_mist_filter") && (
           <ToggleRow
             label="Oil-Mist Filter"
             icon={<DropletsIcon className="h-3.5 w-3.5" />}
@@ -783,8 +829,11 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
             value={data.oil_mist_filter}
             onChange={(v) => onChange({ oil_mist_filter: v })}
           />
+          )}
         </div>
+        )}
 
+        {!hidden("colors") && (
         <div className="pt-2 border-t border-[var(--border-subtle)]/40">
           <ColorChipInput
             values={data.colors}
@@ -792,7 +841,9 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
             suggestions={suggestions?.colors}
           />
         </div>
+        )}
       </SubCard>
+      )}
     </div>
   );
 }
