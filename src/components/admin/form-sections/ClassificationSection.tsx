@@ -2,7 +2,7 @@
 
 import type { DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase";
 import type { ProductFormState } from "@/types/product-form";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
@@ -110,7 +110,15 @@ export default function ClassificationSection({
     return [...flagship, ...rest];
   }, [divisions]);
 
-  const step = getStep(data, hasKindStage, machineKindSlug);
+  /* The machine-kind step is OPTIONAL. `kindSkipped` lets the operator
+     dismiss it and finish classification without choosing a kind. Reset
+     whenever the subcategory changes so a skip never leaks across
+     taxonomies. */
+  const [kindSkipped, setKindSkipped] = useState(false);
+  useEffect(() => { setKindSkipped(false); }, [data.subcategory_slug]);
+
+  const rawStep = getStep(data, hasKindStage, machineKindSlug);
+  const step = rawStep === 3 && kindSkipped ? 4 : rawStep;
 
   return (
     <div className="space-y-4">
@@ -410,12 +418,21 @@ export default function ClassificationSection({
                 Select Machine Kind in <span className="text-[var(--text-primary)]">{selectedSub?.name}</span>
               </p>
               <p className="text-[10px] text-[var(--text-ghost)] mt-0.5">
-                Specific sub-type. Drives the spec fields you&apos;ll fill in later.
+                Optional — refines the spec fields. Pick one, or skip.
               </p>
             </div>
-            <span className="text-[10px] font-medium text-[var(--text-ghost)] uppercase tracking-wider shrink-0">
-              {availableKinds.length} {availableKinds.length === 1 ? "option" : "options"}
-            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[10px] font-medium text-[var(--text-ghost)] uppercase tracking-wider">
+                {availableKinds.length} {availableKinds.length === 1 ? "option" : "options"}
+              </span>
+              <button
+                type="button"
+                onClick={() => setKindSkipped(true)}
+                className="text-[11px] font-medium px-2.5 py-1 rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]/50 transition-all"
+              >
+                Skip
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-3">
@@ -461,6 +478,18 @@ export default function ClassificationSection({
               <span className="text-[var(--text-dim)]">Machine Kind</span>{" "}
               doesn&apos;t apply to this subcategory — you can move on.
             </p>
+          )}
+          {/* Kinds exist for this subcategory but none was picked (skipped).
+              Offer a calm way back into the optional kind step. */}
+          {hasKindStage && !selectedKind && (
+            <button
+              type="button"
+              onClick={() => setKindSkipped(false)}
+              className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
+            >
+              <PlusIcon className="h-3 w-3" />
+              Add machine kind (optional)
+            </button>
           )}
         </div>
       )}
