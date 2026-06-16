@@ -77,6 +77,30 @@ function getStep(
   return 0;
 }
 
+/* Hub-override icons come from the Visual Library as fixed-colour (often
+   black) SVGs, which clash with the monochrome theme on dark/light cards.
+   Render them as a CSS mask painted in currentColor so they adopt the
+   surrounding text colour (white on dark, black on light) exactly like the
+   built-in code icons. */
+function MonoIcon({ src, className }: { src: string; className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={`inline-block bg-current ${className ?? ""}`}
+      style={{
+        WebkitMaskImage: `url("${src}")`,
+        maskImage: `url("${src}")`,
+        WebkitMaskRepeat: "no-repeat",
+        maskRepeat: "no-repeat",
+        WebkitMaskPosition: "center",
+        maskPosition: "center",
+        WebkitMaskSize: "contain",
+        maskSize: "contain",
+      }}
+    />
+  );
+}
+
 export default function ClassificationSection({
   data, onChange, divisions, categories, subcategories,
   divisionLogos, categoryLogos, subcategoryLogos,
@@ -143,7 +167,7 @@ export default function ClassificationSection({
             >
               {(() => {
                 const ovr = iconOverrides?.division?.[selectedDiv.slug];
-                if (ovr) return <Image src={ovr} alt="" width={14} height={14} className="rounded-sm object-contain" unoptimized />;
+                if (ovr) return <MonoIcon src={ovr} className="h-3.5 w-3.5" />;
                 const DivIcon = getDivisionIcon(selectedDiv.slug);
                 if (DivIcon) return <DivIcon className="h-3.5 w-3.5" />;
                 if (divisionLogos?.[selectedDiv.slug]) return <Image src={divisionLogos[selectedDiv.slug]} alt="" width={14} height={14} className="rounded-sm object-contain" unoptimized />;
@@ -228,7 +252,7 @@ export default function ClassificationSection({
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] font-semibold text-emerald-400 hover:bg-emerald-500/15 transition-all"
               >
                 {iconOverrides?.kind?.[selectedKind.slug]
-                  ? <Image src={iconOverrides.kind[selectedKind.slug]} alt="" width={12} height={12} className="object-contain" unoptimized />
+                  ? <MonoIcon src={iconOverrides.kind[selectedKind.slug]} className="h-3 w-3" />
                   : <selectedKind.icon size={12} />}
                 {selectedKind.name}
               </button>
@@ -265,7 +289,7 @@ export default function ClassificationSection({
                     </span>
                   )}
                   {iconOverrides?.division?.[div.slug] ? (
-                    <Image src={iconOverrides.division[div.slug]} alt={div.name} width={64} height={64} className={`${isFlagship ? "h-16 w-16" : "h-10 w-10"} object-contain`} unoptimized />
+                    <MonoIcon src={iconOverrides.division[div.slug]} className={isFlagship ? "h-16 w-16 text-[var(--text-primary)]" : "h-10 w-10 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]"} />
                   ) : DivIcon ? (
                     <DivIcon className={`transition-colors ${
                       isFlagship
@@ -318,14 +342,17 @@ export default function ClassificationSection({
           ) : (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-3">
               {filteredCats.map((cat) => {
-                const logo = iconOverrides?.category?.[cat.slug] || categoryLogos?.[cat.slug];
+                const ovr = iconOverrides?.category?.[cat.slug];
+                const logo = categoryLogos?.[cat.slug];
                 return (
                   <button
                     key={cat.id}
                     onClick={() => onChange({ category_slug: cat.slug, subcategory_slug: "" })}
                     className="group flex flex-col items-center justify-center gap-3 aspect-square p-4 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--border-focus)]/50 hover:bg-[var(--bg-surface-subtle)]/50 transition-all text-center"
                   >
-                    {logo ? (
+                    {ovr ? (
+                      <MonoIcon src={ovr} className="h-10 w-10 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]" />
+                    ) : logo ? (
                       <Image src={logo} alt={cat.name} width={48} height={48} className="h-12 w-12 object-contain" unoptimized />
                     ) : (
                       <FolderTreeIcon className="h-10 w-10 text-[var(--text-ghost)]" />
@@ -365,7 +392,8 @@ export default function ClassificationSection({
           ) : (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-3">
               {filteredSubs.map((sub) => {
-                const logo = iconOverrides?.subcategory?.[sub.slug] || subcategoryLogos?.[sub.slug];
+                const ovr = iconOverrides?.subcategory?.[sub.slug];
+                const logo = subcategoryLogos?.[sub.slug];
                 return (
                   <button
                     key={sub.id}
@@ -393,7 +421,9 @@ export default function ClassificationSection({
                     }}
                     className="group flex flex-col items-center justify-center gap-3 aspect-square p-4 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--border-focus)]/50 hover:bg-[var(--bg-surface-subtle)]/50 transition-all text-center"
                   >
-                    {logo ? (
+                    {ovr ? (
+                      <MonoIcon src={ovr} className="h-10 w-10 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]" />
+                    ) : logo ? (
                       <Image src={logo} alt={sub.name} width={48} height={48} className="h-12 w-12 object-contain" unoptimized />
                     ) : (
                       <TagsIcon className="h-8 w-8 text-[var(--text-ghost)]" />
@@ -463,7 +493,7 @@ export default function ClassificationSection({
                   className="group flex flex-col items-center justify-center gap-2 aspect-square p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 hover:border-[var(--border-focus)]/60 hover:bg-[var(--bg-surface-subtle)]/80 hover:-translate-y-0.5 transition-all text-center"
                 >
                   {kindOvr ? (
-                    <Image src={kindOvr} alt={k.name} width={28} height={28} className="mt-1 mb-1 h-7 w-7 object-contain" unoptimized />
+                    <MonoIcon src={kindOvr} className="mt-1 mb-1 h-7 w-7 text-[var(--text-muted)] group-hover:text-[var(--text-primary)]" />
                   ) : (
                     <Icon
                       size={28}
