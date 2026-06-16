@@ -133,4 +133,20 @@ Authoritative, append-only log of every Source-of-Truth coding change (see `codi
 - **Conflict scan:** **CLEAN.** No codes/prefixes changed; aligns with facet-dictionary-master (§2/§8), the Lockstitch v1.1 dictionary (bed/feed/duty already facets), and the CL-0010 two-axis recommendation; reinforces visual-first (value-icons) + reference-don't-duplicate. Not blocked by prefix freeze (attributes are prefix-independent).
 - **Status:** **Applied-to-docs.** Documentation only — no schema/migration/RLS/UI/code; no product population; no codes; no Stage 2; production untouched.
 
-> **Next entries** will be created when Kamal approves the prefix decisions (each becomes a CL-#### entry that freezes the affected prefixes and propagates per the governance SOP).
+### CL-0012 · 2026-06-17 · Garment Machinery classification audit + resolved decisions (catalog-evidenced)
+- **Approved by:** Kamal ("do the right" — 2026-06-17; delegated the open-decision calls). Documentation only — prod untouched per §2.1 (V2 frozen ⇒ document intended change, don't apply).
+- **Change (intended, not yet applied):** Catalog-evidenced audit of the Garment Machinery classification (11 categories / 77 subcategories) against the supplier catalog library (50/52 PDFs read), with the §9 open decisions now resolved:
+  - **NEW category — CAD / Marker-Making & Digitizing**, prefix **`XMK`** (deliberately NOT `XCAD`: `XC` is the Cutting head → prefix-of collision, same class as the logged XP↔XPC issue). Evidence: ATP plotter, Bangzheng CAD/digitizer/marker, iECHO/Sertol CAM. Must NOT sit under Printing (`XP`) — it prints paper markers, not fabric.
+  - **NEW category — Workshop Infrastructure & Material-Handling**, prefix **`XWI`** (sellable equipment only: spreading tables, fabric trolleys/carts, racks, busway, air systems). Evidence: KTEC.
+  - **SPLIT — Motors, Drives & Electronics** (prefix **`XMD`**) out of Spare Parts (`XSP`). Evidence: Hongyu (pure motors/drives), iYOU (utilities).
+  - **De-dup** the two "Fabric Inspection Machines" → *Incoming Fabric Inspection* (prep) vs *Final Garment/Fabric Inspection* (packing). Evidence: Stao, YILI.
+  - **Heat Press → attributes, not subcategories**: collapse Heat-Press/Double-Station/Pneumatic/Rotary into one subcategory + new facets `heat_press_station_count`, `heat_press_actuation`. Evidence: KILO matrix. (Aligns with North Star Type+Attributes and CL-0010.)
+  - **Template / Pattern Sewing** = the existing **Programmable / CNC Sewing** automation type (`XAPT`) from CL-0010 — reused, no new code; not duplicated under Industrial Sewing.
+  - **Seam-Sealing / Bonding** family (hot-air seam-seal, hot-cold bonding, ultrasonic) — proposed subcategory under Finishing (`XF`), tentative `XFSS`.
+  - **Retracted** the earlier "knitting machines" gap — false (translation trap: "针织特种机" = sewing machines *for* knit fabric; zero knitting machines sourced). Laundry/dyeing and overhead-hanger/UPS also not evidenced as product lines.
+  - **Out of scope:** FIBC / container-bag sewing (Dison, Yongxing) — park for a future Technical/Industrial Textiles division.
+- **Affected artifacts:** `audit/garment-machinery-classification-audit.md` (new) · `audit/garment-machinery-classification-decisions.md` (new) · this log. Full §3 propagation (`product-types-master`, `product-type-approval-matrix`, dictionaries, `compatibility-rulebook`, facet additions) **deferred to V2 implementation** per §2.1.
+- **Conflict scan:** Proposed prefixes `XMK` / `XWI` / `XMD` / `XFSS` → **0 existing hits** in `docs/product-data-v2/` (clean). `XCAD` rejected (prefix-of `XC`). `XAPT` reused from CL-0010 (no new code). Final freeze scan to run at implementation.
+- **Status:** **Logged — decisions resolved; NOT implemented** (blocked on Stage 1.5 baseline / V2 unfreeze). No schema/migration/UI/code; live `divisions`/`categories`/`subcategories` untouched.
+
+> **Next entries** will be created when V2 unfreezes and each resolved item (CL-0012) is implemented — each becomes a CL-#### entry that freezes the affected prefixes and propagates per the governance SOP.
