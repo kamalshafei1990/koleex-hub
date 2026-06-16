@@ -428,14 +428,19 @@ function IconPicker({ onClose, onPick }: { onClose: () => void; onPick: (icon: V
   const [results, setResults] = useState<VlIcon[]>([]);
   const [loading, setLoading] = useState(false);
   useEffect(() => {
-    if (q.trim().length < 2) { setResults([]); return; }
+    const term = q.trim();
+    // Empty box → show a default batch of icons so the library is visible on
+    // open (no need to type first); 2+ chars → search.
+    const url = term.length >= 2
+      ? `/api/visual-library?q=${encodeURIComponent(term)}&asset_type=icon&pageSize=60`
+      : `/api/visual-library?asset_type=icon&sort=usage&pageSize=60`;
     let alive = true; setLoading(true);
     const t = setTimeout(() => {
-      fetch(`/api/visual-library?q=${encodeURIComponent(q.trim())}&pageSize=24`, { credentials: "include", cache: "no-store" })
+      fetch(url, { credentials: "include", cache: "no-store" })
         .then((r) => r.ok ? r.json() : { assets: [] })
         .then((j) => { if (alive) setResults((j.assets ?? []).filter((a: VlIcon) => a.public_url)); })
         .catch(() => {}).finally(() => { if (alive) setLoading(false); });
-    }, 250);
+    }, term ? 250 : 0);
     return () => { alive = false; clearTimeout(t); };
   }, [q]);
   return (
@@ -447,9 +452,9 @@ function IconPicker({ onClose, onPick }: { onClose: () => void; onPick: (icon: V
         </div>
         <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search Visual Library icons…"
           className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-2 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] placeholder:text-[var(--text-dim)]" />
-        <div className="mt-2 min-h-[120px]">
+        <div className="mt-2 max-h-[280px] min-h-[120px] overflow-y-auto">
           {loading ? <div className="flex justify-center py-6 text-[var(--text-dim)]"><SpinnerIcon size={14} className="animate-spin" /></div>
-            : results.length === 0 ? <p className="py-6 text-center text-[11.5px] text-[var(--text-dim)]">{q.trim().length < 2 ? "Type to search the Visual Library…" : "No icons found."}</p>
+            : results.length === 0 ? <p className="py-6 text-center text-[11.5px] text-[var(--text-dim)]">{q.trim() ? "No icons found." : "No icons in the Visual Library yet."}</p>
             : (
               <div className="grid grid-cols-6 gap-1.5">
                 {results.map((a) => (
