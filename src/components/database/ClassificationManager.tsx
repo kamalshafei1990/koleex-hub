@@ -37,6 +37,10 @@ const PARENT_PARAM: Record<Exclude<LevelKey, "divisions">, string> = {
 };
 const CREATE_PARENT = PARENT_PARAM;
 const SINGULAR: Record<LevelKey, string> = { divisions: "division", categories: "category", subcategories: "subcategory", types: "type" };
+/* Maps this screen's level keys to the classification-icon HUB levels
+   (note: "types" → "kind"). Used to write /api/classification-icons so an
+   icon set here flows into the Add-Product Classify form by (level, slug). */
+const HUB_LEVEL: Record<LevelKey, string> = { divisions: "division", categories: "category", subcategories: "subcategory", types: "kind" };
 const childCount = (it: Item, level: LevelKey) =>
   level === "divisions" ? it.category_count : level === "categories" ? it.subcategory_count : level === "subcategories" ? it.type_count : undefined;
 
@@ -63,7 +67,7 @@ export default function ClassificationManager() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
-  const [picker, setPicker] = useState<{ base: string; id: string } | null>(null);
+  const [picker, setPicker] = useState<{ base: string; id: string; level: LevelKey; slug: string } | null>(null);
 
   const gridBase = `/api/visual-registry/${level}`;
   const divBase = "/api/visual-registry/divisions";
@@ -127,11 +131,28 @@ export default function ClassificationManager() {
   };
   const assignIcon = async (icon: VlIcon | null) => {
     if (!picker) return;
-    await fetch(`${picker.base}/${picker.id}`, {
-      method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ icon_asset_id: icon?.id ?? null, icon_url: icon?.public_url ?? null }),
-    });
-    setPicker(null); refresh();
+    const { base, id, level: pLevel, slug } = picker;
+    setBusyId(id);
+    try {
+      // 1) Visual Library row keeps the icon so THIS card shows it.
+      const r1 = await fetch(`${base}/${id}`, {
+        method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ icon_asset_id: icon?.id ?? null, icon_url: icon?.public_url ?? null }),
+      });
+      // 2) HUB write (classification_icons) keyed by (level, slug) — this is
+      //    what the Add-Product Classify form + the rest of the system read.
+      const r2 = await fetch("/api/classification-icons", {
+        method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ level: HUB_LEVEL[pLevel], slug, icon_asset_id: icon?.id ?? null, icon_url: icon?.public_url ?? null }),
+      });
+      if (!r1.ok || !r2.ok) {
+        alert("Couldn't save the icon. Please try again.");
+      }
+    } catch {
+      alert("Couldn't save the icon — network error. Please try again.");
+    } finally {
+      setBusyId(null); setPicker(null); refresh();
+    }
   };
 
   const drill = (it: Item) => {
@@ -224,7 +245,7 @@ export default function ClassificationManager() {
                 onDelete={() => remove(it.id)}
                 onMoveUp={!q && idx > 0 ? () => move(it.id, -1, filtered) : undefined}
                 onMoveDown={!q && idx < filtered.length - 1 ? () => move(it.id, 1, filtered) : undefined}
-                onOpenIcon={() => setPicker({ base: gridBase, id: it.id })}
+                onOpenIcon={() => setPicker({ base: gridBase, id: it.id, level, slug: it.slug })}
                 onDrill={level !== "types" ? () => drill(it) : undefined}
               />
             ))}
