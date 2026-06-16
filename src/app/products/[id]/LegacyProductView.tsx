@@ -420,6 +420,9 @@ export default function LegacyProductView() {
      /products/[id] (the PUBLIC page) we hide supplier names, cost
      info, and other admin-only fields. */
   const isInternal = (pathname || "").startsWith("/product-data");
+  /* Back link returns to the list of whichever app we're in, so the
+     internal /product-data detail never bounces to the public catalog. */
+  const backHref = isInternal ? "/product-data" : "/products";
   const handle = (params.id as string) || "";
 
   const [loading, setLoading] = useState(true);
@@ -1032,7 +1035,7 @@ export default function LegacyProductView() {
           We could not find a product matching <span className="font-mono text-[#1D1D1F] dark:text-white">{handle}</span>.
         </p>
         <Link
-          href="/products"
+          href={backHref}
           className="inline-flex items-center gap-2 h-[38px] px-[18px] rounded-full bg-[#06C] text-white text-[14px] font-normal hover:bg-[#0077ED] dark:bg-[#2997FF] dark:hover:bg-[#47A9FF] transition"
         >
           <ArrowLeftIcon className="h-4 w-4" /> Back to products
@@ -1099,7 +1102,7 @@ export default function LegacyProductView() {
       <div className="bg-[var(--bg-primary)] border-b border-[var(--border-subtle)]">
         <div className="mx-auto px-4 md:px-6 lg:px-10 xl:px-16 py-3 max-w-[1200px] flex items-center justify-between gap-3">
           <Link
-            href="/products"
+            href={backHref}
             aria-label="Back to products"
             className="flex items-center justify-center h-8 w-8 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
           >
