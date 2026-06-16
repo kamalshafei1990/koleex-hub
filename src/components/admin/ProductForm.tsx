@@ -49,7 +49,7 @@ import {
   setRelatedProducts,
   fetchSupplierNames, fetchUniqueBrands,
   fetchBrandLogos, uploadBrandLogo,
-  fetchDivisionLogos, fetchCategoryLogos, fetchSubcategoryLogos,
+  fetchDivisionLogos, fetchCategoryLogos, fetchSubcategoryLogos, fetchClassificationIcons,
   fetchSewingSpecsByProductId, upsertSewingSpecs,
 } from "@/lib/products-admin";
 import { fetchAttributeConfig } from "@/lib/product-attributes";
@@ -487,6 +487,9 @@ export default function ProductForm({ productId }: Props) {
   const [divisionLogos, setDivisionLogos] = useState<Record<string, string>>({});
   const [categoryLogos, setCategoryLogos] = useState<Record<string, string>>({});
   const [subcategoryLogos, setSubcategoryLogos] = useState<Record<string, string>>({});
+  /* Classification icon HUB overrides (DB) — { level: { slug: icon_url } }.
+     Empty = built-in icons; a set entry wins. See /api/classification-icons. */
+  const [classIcons, setClassIcons] = useState<Record<string, Record<string, string>>>({});
   const [allTags, setAllTags] = useState<string[]>([]);
   const [attrSuggestions, setAttrSuggestions] = useState<{ voltage: string[]; plug_types: { name: string; image?: string | null }[]; colors: string[]; watt: string[]; levels: string[] }>({ voltage: [], plug_types: [], colors: [], watt: [], levels: [] });
 
@@ -700,11 +703,12 @@ export default function ProductForm({ productId }: Props) {
   /* ── Load data ── */
   useEffect(() => {
     (async () => {
-      const [divs, cats, subs, supplierList, brandList, logoMap, attrCfg, divLogos, catLogos, subLogos] = await Promise.all([
+      const [divs, cats, subs, supplierList, brandList, logoMap, attrCfg, divLogos, catLogos, subLogos, classIconMap] = await Promise.all([
         fetchDivisions(), fetchCategories(), fetchSubcategories(),
         fetchSupplierNames(), fetchUniqueBrands(), fetchBrandLogos(),
         fetchAttributeConfig(),
         fetchDivisionLogos(), fetchCategoryLogos(), fetchSubcategoryLogos(),
+        fetchClassificationIcons(),
       ]);
       setDivisions(divs);
       setCategories(cats);
@@ -716,6 +720,7 @@ export default function ProductForm({ productId }: Props) {
       setDivisionLogos(divLogos);
       setCategoryLogos(catLogos);
       setSubcategoryLogos(subLogos);
+      setClassIcons(classIconMap);
       setAttrSuggestions({
         voltage: attrCfg.voltage,
         plug_types: attrCfg.plug_types,
@@ -2522,6 +2527,7 @@ export default function ProductForm({ productId }: Props) {
                 divisionLogos={divisionLogos}
                 categoryLogos={categoryLogos}
                 subcategoryLogos={subcategoryLogos}
+                iconOverrides={classIcons}
                 onClickCreateDivision={() => setShowDivisionModal(true)}
                 onClickCreateCategory={() => setShowCategoryModal(true)}
                 onClickCreateSubcategory={() => setShowSubcategoryModal(true)}

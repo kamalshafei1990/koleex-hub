@@ -31,6 +31,15 @@ interface Props {
   divisionLogos?: Record<string, string>;
   categoryLogos?: Record<string, string>;
   subcategoryLogos?: Record<string, string>;
+  /* Classification icon HUB overrides (DB), per level: { slug: icon_url }.
+     A present entry wins over the built-in code/storage icon. Empty = no
+     change to today's behavior. See /api/classification-icons. */
+  iconOverrides?: {
+    division?: Record<string, string>;
+    category?: Record<string, string>;
+    subcategory?: Record<string, string>;
+    kind?: Record<string, string>;
+  };
   onClickCreateDivision?: () => void;
   onClickCreateCategory?: () => void;
   onClickCreateSubcategory?: () => void;
@@ -71,6 +80,7 @@ function getStep(
 export default function ClassificationSection({
   data, onChange, divisions, categories, subcategories,
   divisionLogos, categoryLogos, subcategoryLogos,
+  iconOverrides,
   onClickCreateDivision, onClickCreateCategory, onClickCreateSubcategory,
   machineKindSlug = "",
   onMachineKindChange,
@@ -132,6 +142,8 @@ export default function ClassificationSection({
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]/50 transition-all"
             >
               {(() => {
+                const ovr = iconOverrides?.division?.[selectedDiv.slug];
+                if (ovr) return <Image src={ovr} alt="" width={14} height={14} className="rounded-sm object-contain" unoptimized />;
                 const DivIcon = getDivisionIcon(selectedDiv.slug);
                 if (DivIcon) return <DivIcon className="h-3.5 w-3.5" />;
                 if (divisionLogos?.[selectedDiv.slug]) return <Image src={divisionLogos[selectedDiv.slug]} alt="" width={14} height={14} className="rounded-sm object-contain" unoptimized />;
@@ -215,7 +227,9 @@ export default function ClassificationSection({
                 }}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] font-semibold text-emerald-400 hover:bg-emerald-500/15 transition-all"
               >
-                <selectedKind.icon size={12} />
+                {iconOverrides?.kind?.[selectedKind.slug]
+                  ? <Image src={iconOverrides.kind[selectedKind.slug]} alt="" width={12} height={12} className="object-contain" unoptimized />
+                  : <selectedKind.icon size={12} />}
                 {selectedKind.name}
               </button>
             </>
@@ -250,7 +264,9 @@ export default function ClassificationSection({
                       Flagship
                     </span>
                   )}
-                  {DivIcon ? (
+                  {iconOverrides?.division?.[div.slug] ? (
+                    <Image src={iconOverrides.division[div.slug]} alt={div.name} width={64} height={64} className={`${isFlagship ? "h-16 w-16" : "h-10 w-10"} object-contain`} unoptimized />
+                  ) : DivIcon ? (
                     <DivIcon className={`transition-colors ${
                       isFlagship
                         ? "h-16 w-16 text-[var(--text-primary)]"
@@ -302,7 +318,7 @@ export default function ClassificationSection({
           ) : (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-3">
               {filteredCats.map((cat) => {
-                const logo = categoryLogos?.[cat.slug];
+                const logo = iconOverrides?.category?.[cat.slug] || categoryLogos?.[cat.slug];
                 return (
                   <button
                     key={cat.id}
@@ -349,7 +365,7 @@ export default function ClassificationSection({
           ) : (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-3">
               {filteredSubs.map((sub) => {
-                const logo = subcategoryLogos?.[sub.slug];
+                const logo = iconOverrides?.subcategory?.[sub.slug] || subcategoryLogos?.[sub.slug];
                 return (
                   <button
                     key={sub.id}
@@ -438,6 +454,7 @@ export default function ClassificationSection({
           <div className="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-3">
             {availableKinds.map((k) => {
               const Icon = k.icon;
+              const kindOvr = iconOverrides?.kind?.[k.slug];
               return (
                 <button
                   key={k.slug}
@@ -445,10 +462,14 @@ export default function ClassificationSection({
                   onClick={() => onMachineKindChange?.(k)}
                   className="group flex flex-col items-center justify-center gap-2 aspect-square p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 hover:border-[var(--border-focus)]/60 hover:bg-[var(--bg-surface-subtle)]/80 hover:-translate-y-0.5 transition-all text-center"
                 >
-                  <Icon
-                    size={28}
-                    className="mt-1 mb-1 text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors"
-                  />
+                  {kindOvr ? (
+                    <Image src={kindOvr} alt={k.name} width={28} height={28} className="mt-1 mb-1 h-7 w-7 object-contain" unoptimized />
+                  ) : (
+                    <Icon
+                      size={28}
+                      className="mt-1 mb-1 text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors"
+                    />
+                  )}
                   <span className="text-[11px] font-semibold text-[var(--text-primary)] leading-tight">
                     {k.name}
                   </span>

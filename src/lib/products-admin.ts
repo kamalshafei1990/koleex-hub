@@ -421,6 +421,14 @@ async function deleteTaxonomyLogo(folder: string, slug: string): Promise<boolean
 export const fetchDivisionLogos = () => fetchTaxonomyLogos("divisions");
 export const fetchCategoryLogos = () => fetchTaxonomyLogos("categories");
 export const fetchSubcategoryLogos = () => fetchTaxonomyLogos("subcategories");
+
+/* Classification icon HUB (Phase 1) — DB icon overrides per (level, slug),
+   shaped { division|category|subcategory|kind : { slug: icon_url } }. A present
+   entry wins over the built-in code/storage icon everywhere; absent = fallback. */
+export async function fetchClassificationIcons(): Promise<Record<string, Record<string, string>>> {
+  const json = await jget<{ icons?: Record<string, Record<string, string>> }>("/api/classification-icons", {});
+  return json.icons ?? {};
+}
 export const uploadDivisionLogo = (slug: string, file: File) => uploadTaxonomyLogo("divisions", slug, file);
 export const uploadCategoryLogo = (slug: string, file: File) => uploadTaxonomyLogo("categories", slug, file);
 export const uploadSubcategoryLogo = (slug: string, file: File) => uploadTaxonomyLogo("subcategories", slug, file);
