@@ -1852,7 +1852,12 @@ export default function ProductForm({ productId }: Props) {
                   />
                   <div
                     onClick={() => mainImageRef.current?.click()}
-                    className="relative w-full aspect-square rounded-2xl overflow-hidden cursor-pointer group border-2 border-dashed border-[var(--border-subtle)] hover:border-[var(--border-focus)] transition-all bg-gradient-to-br from-[var(--bg-surface-subtle)] to-[var(--bg-surface)] flex-1"
+                    /* Compact on narrow/stacked layouts (a full-width
+                       aspect-square photo used to become a giant box that
+                       buried Name + Code below the fold); only goes square on
+                       lg where it sits in the 2/5 side column. No flex-1 so it
+                       never stretches to match the tall fields column. */
+                    className="relative w-full h-44 sm:h-52 lg:h-auto lg:aspect-square rounded-2xl overflow-hidden cursor-pointer group border-2 border-dashed border-[var(--border-subtle)] hover:border-[var(--border-focus)] transition-all bg-gradient-to-br from-[var(--bg-surface-subtle)] to-[var(--bg-surface)]"
                   >
                     {mainImageSrc ? (
                       <>
