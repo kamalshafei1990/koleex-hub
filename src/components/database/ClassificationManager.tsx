@@ -423,26 +423,64 @@ function Crumb({ label, active, onClick }: { label: string; active: boolean; onC
 }
 
 /* Pick / clear a Visual Library icon. */
+type PickerCollection = { id: string; name: string; asset_count?: number };
+
 function IconPicker({ onClose, onPick }: { onClose: () => void; onPick: (icon: VlIcon | null) => void }) {
   const [q, setQ] = useState("");
-  const [results, setResults] = useState<VlIcon[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [cols, setCols] = useState<PickerCollection[]>([]);
+  const [activeCol, setActiveCol] = useState<string | null>(null); // null = All icons
+  const [items, setItems] = useState<VlIcon[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);  // first page (replace)
+  const [more, setMore] = useState(false);         // appending next page
+  const PAGE = 60;
+
+  // Collections (with at least one asset) for the filter row — loaded once.
   useEffect(() => {
-    const term = q.trim();
-    // Empty box → show a default batch of icons so the library is visible on
-    // open (no need to type first); 2+ chars → search.
-    const url = term.length >= 2
-      ? `/api/visual-library?q=${encodeURIComponent(term)}&asset_type=icon&pageSize=60`
-      : `/api/visual-library?asset_type=icon&sort=usage&pageSize=60`;
-    let alive = true; setLoading(true);
-    const t = setTimeout(() => {
-      fetch(url, { credentials: "include", cache: "no-store" })
-        .then((r) => r.ok ? r.json() : { assets: [] })
-        .then((j) => { if (alive) setResults((j.assets ?? []).filter((a: VlIcon) => a.public_url)); })
-        .catch(() => {}).finally(() => { if (alive) setLoading(false); });
-    }, term ? 250 : 0);
+    fetch("/api/visual-library/collections", { credentials: "include", cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { collections: [] }))
+      .then((j) => setCols((j.collections ?? []).filter((c: PickerCollection) => (c.asset_count ?? 0) > 0)))
+      .catch(() => {});
+  }, []);
+
+  // Fetch one page from either the whole library (with optional search) or a
+  // single collection's members. Returns the icon assets + the server total.
+  const fetchPage = useCallback(async (pg: number, term: string, col: string | null) => {
+    const url = col
+      ? `/api/visual-library/collections/${col}/assets?page=${pg}&pageSize=${PAGE}`
+      : `/api/visual-library?asset_type=icon&sort=usage&pageSize=${PAGE}&page=${pg}${term.trim().length >= 2 ? `&q=${encodeURIComponent(term.trim())}` : ""}`;
+    const r = await fetch(url, { credentials: "include", cache: "no-store" });
+    const j = r.ok ? await r.json() : {};
+    const assets: VlIcon[] = col
+      ? (j.items ?? []).map((i: { asset: VlIcon | null }) => i.asset).filter((a: VlIcon | null): a is VlIcon => !!a && !!a.public_url)
+      : (j.assets ?? []).filter((a: VlIcon) => a.public_url);
+    return { assets, total: (j.total as number) ?? assets.length };
+  }, []);
+
+  // Reset + load page 1 whenever the search term or the active collection changes.
+  useEffect(() => {
+    let alive = true; setLoading(true); setPage(1);
+    const t = setTimeout(async () => {
+      const { assets, total: tot } = await fetchPage(1, q, activeCol);
+      if (!alive) return;
+      setItems(assets); setTotal(tot); setLoading(false);
+    }, q ? 250 : 0);
     return () => { alive = false; clearTimeout(t); };
-  }, [q]);
+  }, [q, activeCol, fetchPage]);
+
+  const loadMore = async () => {
+    if (more || loading || items.length >= total) return;
+    const next = page + 1; setMore(true);
+    const { assets } = await fetchPage(next, q, activeCol);
+    setItems((prev) => [...prev, ...assets]); setPage(next); setMore(false);
+  };
+
+  const onScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 80 && items.length < total && !more && !loading) loadMore();
+  };
+
   return (
     <div className="fixed inset-0 z-[140] flex items-start justify-center bg-black/60 pt-20" onClick={onClose}>
       <div className="w-full max-w-md rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4" onClick={(e) => e.stopPropagation()}>
@@ -450,28 +488,57 @@ function IconPicker({ onClose, onPick }: { onClose: () => void; onPick: (icon: V
           <span className="text-[12px] font-semibold text-[var(--text-primary)]">Choose an icon from the Visual Library</span>
           <button type="button" onClick={onClose} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]"><CrossIcon size={14} /></button>
         </div>
-        <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search Visual Library icons…"
+        {/* Typing searches across ALL icons (clears any active collection). */}
+        <input autoFocus value={q} onChange={(e) => { setQ(e.target.value); if (e.target.value) setActiveCol(null); }} placeholder="Search Visual Library icons…"
           className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-2 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] placeholder:text-[var(--text-dim)]" />
-        <div className="mt-2 max-h-[280px] min-h-[120px] overflow-y-auto">
+
+        {/* Collection filter row */}
+        {cols.length > 0 && (
+          <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
+            <PickerChip active={activeCol === null && !q} label="All icons" onClick={() => { setQ(""); setActiveCol(null); }} />
+            {cols.map((c) => (
+              <PickerChip key={c.id} active={activeCol === c.id} label={c.name} count={c.asset_count}
+                onClick={() => { setQ(""); setActiveCol(c.id); }} />
+            ))}
+          </div>
+        )}
+
+        <div className="mt-2 max-h-[280px] min-h-[120px] overflow-y-auto" onScroll={onScroll}>
           {loading ? <div className="flex justify-center py-6 text-[var(--text-dim)]"><SpinnerIcon size={14} className="animate-spin" /></div>
-            : results.length === 0 ? <p className="py-6 text-center text-[11.5px] text-[var(--text-dim)]">{q.trim() ? "No icons found." : "No icons in the Visual Library yet."}</p>
+            : items.length === 0 ? <p className="py-6 text-center text-[11.5px] text-[var(--text-dim)]">{q.trim() ? "No icons found." : "No icons here yet."}</p>
             : (
-              <div className="grid grid-cols-6 gap-1.5">
-                {results.map((a) => (
-                  <button key={a.id} type="button" title={a.title} onClick={() => onPick(a)}
-                    className="flex aspect-square items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-white hover:border-[var(--border-focus)]">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={a.public_url!} alt={a.title} className="h-6 w-6 object-contain" loading="lazy" />
-                  </button>
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-6 gap-1.5">
+                  {items.map((a, i) => (
+                    <button key={`${a.id}-${i}`} type="button" title={a.title} onClick={() => onPick(a)}
+                      className="flex aspect-square items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-white hover:border-[var(--border-focus)]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={a.public_url!} alt={a.title} className="h-6 w-6 object-contain" loading="lazy" />
+                    </button>
+                  ))}
+                </div>
+                {more && <div className="flex justify-center py-3 text-[var(--text-dim)]"><SpinnerIcon size={14} className="animate-spin" /></div>}
+              </>
             )}
         </div>
         <div className="mt-3 flex items-center justify-between border-t border-[var(--border-subtle)] pt-2.5">
-          <span className="text-[10.5px] text-[var(--text-dim)]">Icons live in the Visual Library.</span>
+          <span className="text-[10.5px] text-[var(--text-dim)]">{total > 0 ? `Showing ${items.length} of ${total}` : "Icons live in the Visual Library."}</span>
           <button type="button" onClick={() => onPick(null)} className="text-[11.5px] font-medium text-[var(--text-dim)] hover:text-rose-400">Clear icon</button>
         </div>
       </div>
     </div>
+  );
+}
+
+function PickerChip({ active, label, count, onClick }: { active: boolean; label: string; count?: number; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick}
+      className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+        active
+          ? "border-[var(--bg-inverted)] bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+          : "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:border-[var(--border-color)]"
+      }`}>
+      {label}{typeof count === "number" ? <span className="ml-1 opacity-60">{count}</span> : null}
+    </button>
   );
 }
