@@ -583,10 +583,10 @@ export default function ProductList() {
                   <SettingsIcon2 className="h-4 w-4" />
                   <span className="hidden sm:inline">{t("list.controlPanel")}</span>
                 </Link>
-                <Link href="/database/product-specs" className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
-                  <ImageRawIcon className="h-4 w-4" />
-                  <span className="hidden sm:inline">Visual Library</span>
-                </Link>
+                {/* "Visual Library" button removed — it now lives in the
+                    Database app (Database › Visual Library › Specs & Attributes;
+                    /product-data/visual-mapping already redirects there), so a
+                    duplicate entry point here was just header clutter. */}
                 <Link href={`${baseRoute}/new`} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg">
                   <PlusIcon className="h-4 w-4" /> {t("action.addProduct")}
                 </Link>
