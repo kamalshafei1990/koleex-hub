@@ -149,4 +149,14 @@ Authoritative, append-only log of every Source-of-Truth coding change (see `codi
 - **Conflict scan:** Proposed prefixes `XMK` / `XWI` / `XMD` / `XFSS` → **0 existing hits** in `docs/product-data-v2/` (clean). `XCAD` rejected (prefix-of `XC`). `XAPT` reused from CL-0010 (no new code). Final freeze scan to run at implementation.
 - **Status:** **Logged — decisions resolved; NOT implemented** (blocked on Stage 1.5 baseline / V2 unfreeze). No schema/migration/UI/code; live `divisions`/`categories`/`subcategories` untouched.
 
-> **Next entries** will be created when V2 unfreezes and each resolved item (CL-0012) is implemented — each becomes a CL-#### entry that freezes the affected prefixes and propagates per the governance SOP.
+### CL-0013 · 2026-06-17 · Propagated CL-0012 decisions into the coding reference datasets
+- **Approved by:** Kamal ("do it and don't forget to adjust and add the new things in Products coding system" — 2026-06-17). Reference-dataset propagation per governance §2.2/§3; prod still untouched.
+- **Change:** Applied the CL-0012 resolutions to the Source-of-Truth coding docs:
+  - **`product-type-approval-matrix.md`** — added 3 parent categories: **I · XMK** (CAD & Marker: XMKP/XMKD/XMKS), **J · XWI** (Workshop Infra: XWIC/XWIR/XWIB/XWIA), **K · XMD** (Motors & Drives: XMDS/XMDD/XMDC/XMDH/XMDN); added **XFSS** (Seam-Sealing/Bonding) to Finishing and **XPCI** (Final Garment/Fabric Inspection) to Packing; marked **XAPT** resolved (Programmable/CNC Sewing) + XSPA conflict #3 resolved; XSPC→XMDC migration path; updated §2 Proposed list, §3 (13→12), §4 conflicts, FINAL DECISION TABLE, and Counts (Total 87→101, Proposed 36→50, categories 8→11).
+  - **`product-types-master.md`** — added category sections I/J/K with full Product Type rows; annotated Spare-Parts note for the Motors/Electronics split.
+  - **`facet-dictionary-master.md`** — added `press_format` (Flat/Swing-away/Draw/Rotary-Calender) confirming **heat-press variants = attributes, not subcategories**; added `seam_seal_process` (Hot-Air/Hot-Cold/Ultrasonic) for XFSS.
+- **Affected artifacts:** product-type-approval-matrix · product-types-master · facet-dictionary-master · audit/garment-machinery-classification-{audit,decisions} · this log.
+- **Conflict scan:** **CLEAN** — `XMK*`/`XWI*`/`XMD*`/`XFSS`/`XPCI` = 0 prior hits across `docs/product-data-v2/`; new sub-prefixes live in fresh namespaces; no duplicate prefix introduced; counts reconcile (38 Confirmed + 50 Proposed + 12 Decision + 1 Resolved = 101).
+- **Status:** **Applied-to-docs.** Documentation only — no schema/migration/RLS/UI/code; live `divisions`/`categories`/`subcategories` untouched. Prefix freeze + prod sync deferred to V2 unfreeze (Stage 1.5) with Kamal sign-off.
+
+> **Next entries** will be created when V2 unfreezes and each resolved item is implemented — each becomes a CL-#### entry that freezes the affected prefixes and propagates per the governance SOP.

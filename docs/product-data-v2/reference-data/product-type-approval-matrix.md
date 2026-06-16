@@ -34,7 +34,7 @@ Facets/devices/applications are abbreviated; full lists in the sibling master fi
 > ⚠️ Block issue: live `XA*` codes were assigned to a *different* breakdown — full re-map required.
 | Product Type | Prefix | Status | Req / Cmp Facets | Devices | Applications | Notes |
 |---|---|---|---|---|---|---|
-| Programmable Pattern Sewing | XAPT | **Needs Decision** | working_field, head_type | stacker, laser | leather, bags, badges | live **XAPS=Pocket Setter**, live XSPA=Pattern Sewing → choose home/prefix |
+| Programmable / CNC ("Template") Sewing | XAPT | **Resolved (CL-0012)** | working_field, head_type | stacker, laser, rotary_loader, vision | leather, bags, badges, high-mix | **DECIDED:** home = Automatic, prefix **XAPT**; retires the XSPA=Pattern-Sewing ambiguity (XSPA stays = spare Attachments). Absorbs the "Template Sewing" line below. |
 | Template Sewing | XATM | Proposed | working_field, head_count | rotary_loader, vision | high-mix parts | new |
 | Auto Pocket Welting | XAPW | **Confirmed** | welt_type, length | flap, zipper | trousers, jackets | live |
 | Auto Patch Pocket Setter | XAPS | **Confirmed** | pocket_size, shape | creaser, label | shirts, jeans | live XAPS=Pocket Setter |
@@ -91,6 +91,7 @@ Facets/devices/applications are abbreviated; full lists in the sibling master fi
 | Steam Tunnel | XFST | Proposed | throughput, zones | multi_zone | knitwear | new |
 | Thread Sucking/Trimming | XFTS | **Confirmed** | format, suction | blow_gun | all | live |
 | Spotting/Stain Removal | XFSP | Proposed | gun_types, vacuum_table | heated_table | all | new |
+| Seam Sealing / Bonding | XFSS | Proposed (CL-0012) | process_type, working_width / +tape_feed | hot_air, hot_cold_press, ultrasonic | waterproof/seamless, PPE | new — Hank/中性款/Dison; ultrasonic stitch head = XSUS |
 
 ## F. Embroidery Equipment — Parent Category: **XE · Embroidery**
 | Product Type | Prefix | Status | Req / Cmp Facets | Devices | Applications | Notes |
@@ -126,22 +127,50 @@ Facets/devices/applications are abbreviated; full lists in the sibling master fi
 | Vacuum/Compression Packing | XPCV | Packing | Proposed | type, bag_size | gas_flush | new |
 | Carton Sealing | XPCC | Packing | **Confirmed** | sealing_mode, range | random_size | live |
 | Strapping | XPCP | Packing | **Needs Decision** | type, strap_material | side_seal | proposed XPCT **collides with live XPCT=Packing Tables** → use XPCP |
+| Final Garment/Fabric Inspection | XPCI | Inspection | Proposed (CL-0012) | width, method / +ai_defect | ai_defect, marking | final QC | **de-dup**: incoming inspection = `XPRI` (Fabric Prep); this is the final-stage one (Stao/YILI) |
+
+## I. CAD / Marker-Making & Digitizing — Parent Category: **XMK · CAD & Marker** *(new — CL-0012)*
+> Pre-cutting digital tooling. Prints **paper markers**, not fabric → deliberately NOT under Printing `XP`. Prefix `XMK` (not `XCAD` — `XC` is the Cutting head ⇒ prefix-of collision).
+| Product Type | Prefix | Status | Req / Cmp Facets | Devices | Applications | Notes |
+|---|---|---|---|---|---|---|
+| Marker Plotter (Inkjet/Pen) | XMKP | Proposed | plot_width, heads / +dpi | roll_takeup | cutting room | ATP inkjet plotter |
+| Pattern Digitizer / Scanner | XMKD | Proposed | format, table_size | scan_camera | pattern intake | Bangzheng digitizer |
+| CAD / Nesting Software & Workstation | XMKS | Proposed | seat_type, formats | — | marker-making, nesting | iECHO/Sertol/Bangzheng CAM |
+
+## J. Workshop Infrastructure & Material-Handling — Parent Category: **XWI · Workshop Infra** *(new — CL-0012)*
+> Sellable factory fit-out & handling equipment only (excludes building works). Prefix `XWI`.
+| Product Type | Prefix | Status | Req / Cmp Facets | Devices | Applications | Notes |
+|---|---|---|---|---|---|---|
+| Fabric / Cutting-Piece Trolley & Cart | XWIC | Proposed | cart_type, load | shelves | between-process handling | KTEC |
+| Storage Racking / Pallet System | XWIR | Proposed | system_type, capacity | auto_retrieval | warehouse | KTEC |
+| Power & Lighting Busway | XWIB | Proposed | busway_type, rating | sockets, lights | sewing/cutting lines | KTEC |
+| Compressed-Air Pipe System | XWIA | Proposed | pipe_dia, layout | drops, FRL | pneumatic machines | KTEC |
+
+## K. Motors, Drives & Electronics — Parent Category: **XMD · Motors & Drives** *(new — CL-0012; split from Spare Parts XSP)*
+> Drive & control components, previously crammed into Spare Parts. Prefix `XMD`.
+| Product Type | Prefix | Status | Req / Cmp Facets | Devices | Applications | Notes |
+|---|---|---|---|---|---|---|
+| Servo Motor (Energy-Saving) | XMDS | Proposed | power, mount / +integrated | needle_positioner | all sewing | Hongyu |
+| Direct-Drive Motor | XMDD | Proposed | power, machine_class | — | lockstitch/overlock/interlock | Hongyu |
+| Control Box / Panel | XMDC | Proposed | controller_brand, machine_class | — | all | migrates live spare **XSPC=Control Panels** → XMDC |
+| Touch Screen / HMI | XMDH | Proposed | size, brand | — | automated machines | Hongyu/controllers |
+| Needle Positioner / Sensor | XMDN | Proposed | type | — | clutch/servo retrofit | Hongyu |
 
 ---
 
 ## 1. Confirmed Product Types (38)
 XSL, XSO, XSC (sewing) · XAPW, XAPS, XAPP, XASL, XAHM (automatic) · XCS, XCR, XCB, XCE, XCT, XCP, XCD (cutting) · XPRR, XPRI, XPRL, XPRS, XPRT (fabric prep) · XFSI, XFSB, XFIT, XFCP, XFFP, XFFF, XFTS (finishing) · XES, XEM (embroidery) · XPSP, XPDT, XPSU, XPH (printing) · XPCN, XPCM, XPCX, XPCF, XPCC (packing).
 
-## 2. Proposed Product Types (36)
-XSF, XSBH, XSBA, XSBT, XSBL, XSZ, XSEA, XSWB, XSLP, XSSM, XSBG, XSMT, XSUS · XATM, XALB, XABL, XAWB, XADT · XCDP, XCCS, XCN · XPRK, XPRSR, XPRCF · XFPB, XFSH, XFTT, XFST, XFSP · XPDF, XPPS · XPCW, XPCB, XPCS, XPCK, XPCV.
+## 2. Proposed Product Types (50)
+XSF, XSBH, XSBA, XSBT, XSBL, XSZ, XSEA, XSWB, XSLP, XSSM, XSBG, XSMT, XSUS · XATM, XALB, XABL, XAWB, XADT · XCDP, XCCS, XCN · XPRK, XPRSR, XPRCF · XFPB, XFSH, XFTT, XFST, XFSP, **XFSS** · XPDF, XPPS · XPCW, XPCB, XPCS, XPCK, XPCV, **XPCI** · **XMKP, XMKD, XMKS** (CAD & Marker) · **XWIC, XWIR, XWIB, XWIA** (Workshop Infra) · **XMDS, XMDD, XMDC, XMDH, XMDN** (Motors & Drives).
 
-## 3. Product Types Requiring Kamal Decision (13)
+## 3. Product Types Requiring Kamal Decision (12 — was 13; XAPT resolved via CL-0012)
 | Type | Prefix | Issue |
 |---|---|---|
 | Interlock (Coverstitch) | XSI | Interlock vs Coverstitch naming |
 | Eyelet Buttonhole | XSYE | collides with leather XSEB |
 | Picoting | XSPI | collides with spare XSPC |
-| Programmable Pattern Sewing | XAPT | live XAPS=Pocket Setter / XSPA=Pattern Sewing |
+| ~~Programmable Pattern Sewing~~ | ~~XAPT~~ | ✅ **RESOLVED (CL-0012)** — home = Automatic, prefix XAPT; XSPA stays spare |
 | Auto Collar & Cuff | XACC | align with live XACL |
 | Buttonhole/Button Indexer | XAIX | base heads vs indexer prefix |
 | Automatic Multi-Ply Cutter | XCCM | replaces live XCC=CNC |
@@ -157,7 +186,7 @@ XSF, XSBH, XSBA, XSBT, XSBL, XSZ, XSEA, XSWB, XSLP, XSSM, XSBG, XSMT, XSUS · XA
 |---|---|---|---|
 | 1 | **XCL** | Laser Cutting appears as a **duplicate** subcategory code | Keep XCL = Laser Cutter; rename the other occurrence |
 | 2 | **XPRH** | Used for **both** Fabric Handling (XPR) **and** Rotary Heat Press / Calender (XP) | Retire XPRH for Handling (decomposed into XPRSR/XPRCF); assign Calender a clean transfer prefix (e.g., XPHR) |
-| 3 | **XSPA** | Used for **both** Pattern Sewing (XS) **and** Attachments & Folders (XSP) | Pattern Sewing → XAPT (automatic); keep XSPA = spare Attachments, or reassign |
+| 3 | **XSPA** | Used for **both** Pattern Sewing (XS) **and** Attachments & Folders (XSP) | ✅ **RESOLVED (CL-0012):** Pattern/CNC Sewing → **XAPT** (Automatic); **XSPA stays = spare Attachments & Folders** |
 | 4 | **XP vs XPC** | Printing prefix `XP*` is a **prefix of** Packing `XPC*` → ambiguous parsing (e.g., XPCD) | Rename Packing category prefix to **XK** (XKN, XKM, XKX…) to remove overlap |
 | 5 | XSI | **Interlock vs Coverstitch** naming | Pick the market label; keep XSI |
 | 6 | XSEB | Eyelet Buttonhole proposal collides with leather **Bag Sewing XSEB** | Eyelet → XSYE |
@@ -260,14 +289,33 @@ XSF, XSBH, XSBA, XSBT, XSBL, XSZ, XSEA, XSWB, XSLP, XSSM, XSBG, XSMT, XSUS · XA
 | Vacuum/Compression Packing | — | XPCV (→XKV) | Approve pending §4.4 | **Yes** |
 | Carton Sealing | XPCC | XPCC (→XKC) | Freeze pending §4.4 | **Yes** |
 | Strapping | XPCT(dup) | XPCP | Resolve XPCT clash | **Yes** |
+| Final Garment/Fabric Inspection | — | XPCI | Approve (de-dup vs incoming XPRI) | No |
+| Seam Sealing / Bonding | — | XFSS | Approve | No |
+| Marker Plotter | — | XMKP | Approve (new category XMK) | No |
+| Pattern Digitizer / Scanner | — | XMKD | Approve | No |
+| CAD / Nesting Software | — | XMKS | Approve | No |
+| Fabric/Piece Trolley & Cart | — | XWIC | Approve (new category XWI) | No |
+| Storage Racking / Pallet | — | XWIR | Approve | No |
+| Power & Lighting Busway | — | XWIB | Approve | No |
+| Compressed-Air Pipe System | — | XWIA | Approve | No |
+| Servo Motor | — | XMDS | Approve (new category XMD) | No |
+| Direct-Drive Motor | — | XMDD | Approve | No |
+| Control Box / Panel | XSPC | XMDC | Migrate from spare XSPC | **Yes** |
+| Touch Screen / HMI | — | XMDH | Approve | No |
+| Needle Positioner / Sensor | — | XMDN | Approve | No |
+| Programmable / CNC Sewing | XSPA? | **XAPT** | ✅ Resolved CL-0012 | No |
 
 > **Note on Packing (§4.4):** if the **XP↔XPC overlap** is resolved by renaming the Packing category to **XK**, all 11 packing prefixes shift (`XPC* → XK*`). They are therefore marked "Requires Kamal" pending that single category-level decision; if the overlap is accepted as-is, the live `XPC*` codes freeze unchanged.
 
 ---
 
 ## Counts
-- **Total Product Types:** 87
+- **Total Product Types:** 101  *(was 87; +14 from CL-0012: XFSS, XPCI, XMKP/D/S, XWIC/R/B/A, XMDS/D/C/H/N)*
 - **Confirmed:** 38
-- **Proposed:** 36
-- **Requiring Kamal decision:** 13
-- **Prefix conflicts:** 12 (4 explicitly requested — XCL, XPRH, XSPA, XP/XPC — + 8 discovered)
+- **Proposed:** 50  *(was 36; +14)*
+- **Requiring Kamal decision:** 12  *(was 13; XAPT resolved via CL-0012)*
+- **Resolved via CL-0012:** 1 (XAPT/XSPA)
+- **Prefix conflicts:** 12 logged — **1 resolved** (XSPA→XAPT); XSPC now has a path (→XMDC)
+- **Parent categories:** 11 *(added I·XMK CAD & Marker, J·XWI Workshop Infra, K·XMD Motors & Drives — was 8 coded groups A–H)*
+
+> **CL-0012 additions are doc-level only** (V2 frozen per coding-governance §2.1). New prefixes scanned clean (XMK/XWI/XMD/XFSS/XPCI = 0 prior hits). Prefix freeze + prod-DB sync deferred to V2 unfreeze with Kamal sign-off.

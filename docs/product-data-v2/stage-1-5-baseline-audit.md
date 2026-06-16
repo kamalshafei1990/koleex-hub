@@ -218,6 +218,21 @@ select
 | secret values in dump | **0** |
 | branch status | `FUNCTIONS_DEPLOYED` (not `MIGRATIONS_FAILED`) |
 
+### Step 5b — Live data snapshot (2026-06-17, read-only — informational)
+Captured via Supabase MCP (read-only) as a reference point for the **data-population** baseline (distinct from the schema-object counts above, which are structure-only). These are live row counts the V2 build will inherit:
+
+| Table | Live rows | Note |
+|---|---|---|
+| `divisions` | 9 | real taxonomy |
+| `categories` | 73 | real taxonomy |
+| `subcategories` | 359 | real taxonomy (Garment Machinery = 77) |
+| `products` | 716 | live catalogue |
+| `classification_icons` | 429 | hub backfill (cat+sub icons; divisions on code) |
+| `visual_icon_categories` | 0 | custom icon categories — none yet |
+| `visual_assets` | 5,061 | Visual Library icon pool |
+
+> These are **not** acceptance targets for the schema dump (which must contain 0 data rows). They document the production data reality so the CL-0012 classification/coding additions can be planned against the true taxonomy size when V2 unfreezes. **Blocker reminder:** completing the schema dump (Steps 1–4) requires the Supabase CLI link + DB password — an **owner-only manual step** (credentials must not be entered by the assistant). Until that runs and validates, Stage 2 / PD-V2 stays BLOCKED and the CL-0012 prefixes stay documented-but-unfrozen.
+
 ### Step 6 — Adopt (after validation passes)
 Squash (recommended): make the completed baseline the single foundation migration and `supabase migration repair` the remote history so future branches replay only the baseline. Then Stage 5+ can be branch-tested faithfully.
 

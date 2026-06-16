@@ -127,4 +127,31 @@ Facets reference `facet-dictionary-master.md`; devices reference `device-diction
 | ✅ XPCC | Carton Sealing Machine | Packing | sealing_mode, carton_range, tape_width | top_vs_topbottom, uniform_vs_random | random_autosize, flap_folder |
 | ▲ XPCT | Strapping Machine | Packing | type, strap_material, arch_size | automation, arch_size, strap_material | auto_carton_feed, side_seal |
 
-> **Spare Parts & Accessories** are not machine Product Types — they are catalogued in `device-dictionary-master.md` (devices) and the parts registry, with fitment in `compatibility-rulebook.md`.
+## I. CAD / Marker-Making & Digitizing  (Category XMK · *new — CL-0012*)
+> Pre-cutting digital tooling — outputs paper markers / nests, not fabric. NOT under Printing (XP). `XMK` avoids the `XC` (Cutting) prefix-of trap.
+| Prefix | Product Type | Group | Required Facets | Comparison Facets | Device Compatibility |
+|---|---|---|---|---|---|
+| ▲ XMKP | Marker Plotter (Inkjet/Pen) | CAD | plot_width, heads, resolution | plot_width, speed, dpi | roll_takeup, multi_roll |
+| ▲ XMKD | Pattern Digitizer / Scanner | CAD | format, table_size | accuracy, formats | scan_camera, flexible_arm |
+| ▲ XMKS | CAD / Nesting Software & Workstation | CAD | seat_type, supported_formats | nesting_engine, automation | cut_file_server |
+
+## J. Workshop Infrastructure & Material-Handling  (Category XWI · *new — CL-0012*)
+> Sellable factory fit-out & handling equipment only (excludes building works).
+| Prefix | Product Type | Group | Required Facets | Comparison Facets | Device Compatibility |
+|---|---|---|---|---|---|
+| ▲ XWIC | Fabric / Cutting-Piece Trolley & Cart | Handling | cart_type, load_capacity | cart_type, load, footprint | shelves, brakes |
+| ▲ XWIR | Storage Racking / Pallet System | Handling | system_type, capacity | system_type, capacity, footprint | auto_retrieval |
+| ▲ XWIB | Power & Lighting Busway | Infra | busway_type, current_rating | rating, modularity | sockets, luminaires |
+| ▲ XWIA | Compressed-Air Pipe System | Infra | pipe_diameter, layout | pipe_dia, max_pressure | drops, FRL_units |
+
+## K. Motors, Drives & Electronics  (Category XMD · *new — CL-0012; split from Spare Parts XSP*)
+> Drive & control components previously crammed into Spare Parts.
+| Prefix | Product Type | Group | Required Facets | Comparison Facets | Device Compatibility |
+|---|---|---|---|---|---|
+| ▲ XMDS | Servo Motor (Energy-Saving) | Drives | power, mount_type, integrated | power, energy_class | needle_positioner |
+| ▲ XMDD | Direct-Drive Motor | Drives | power, machine_class | power, machine_class | — |
+| ▲ XMDC | Control Box / Panel | Electronics | controller_brand, machine_class | controller_brand | — (migrates live spare XSPC) |
+| ▲ XMDH | Touch Screen / HMI | Electronics | size, brand | size, brand | — |
+| ▲ XMDN | Needle Positioner / Sensor | Electronics | type | type | clutch/servo retrofit |
+
+> **Spare Parts & Accessories** are not machine Product Types — they are catalogued in `device-dictionary-master.md` (devices) and the parts registry, with fitment in `compatibility-rulebook.md`. *(CL-0012: Motors/Drives/Electronics promoted out to category K · XMD; pure consumable spares + attachments/folders stay here.)*
