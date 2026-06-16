@@ -43,3 +43,32 @@ export const CATEGORY_BY_KEY: Record<string, IconCategory> =
 /** Map a category KEY → its short asset-code segment (e.g. navigation → NAV). */
 export const CATEGORY_CODE_BY_KEY: Record<string, string> =
   Object.fromEntries(GENERAL_ICON_CATEGORIES.map((c) => [c.key, c.code]));
+
+export type FetchedIconCategory = { key: string; label: string; code: string; custom?: boolean };
+
+/**
+ * Fetch the live category list (built-in defaults + this tenant's custom
+ * categories) from the API. Falls back to the built-in defaults on error so
+ * the UI never breaks. Client-side only.
+ */
+export async function fetchIconCategories(): Promise<FetchedIconCategory[]> {
+  try {
+    const res = await fetch("/api/visual-library/categories", { credentials: "include", cache: "no-store" });
+    if (!res.ok) throw new Error(String(res.status));
+    const j = (await res.json()) as { categories?: FetchedIconCategory[] };
+    return j.categories?.length ? j.categories : GENERAL_ICON_CATEGORIES.map((c) => ({ key: c.key, label: c.label, code: c.code }));
+  } catch {
+    return GENERAL_ICON_CATEGORIES.map((c) => ({ key: c.key, label: c.label, code: c.code }));
+  }
+}
+
+/** POST a new custom category. Returns the created category or throws. */
+export async function createIconCategory(label: string, code?: string): Promise<FetchedIconCategory> {
+  const res = await fetch("/api/visual-library/categories", {
+    method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ label, code }),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((j as { error?: string }).error ?? "Failed to add category");
+  return (j as { category: FetchedIconCategory }).category;
+}

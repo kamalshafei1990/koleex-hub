@@ -14,7 +14,7 @@ import { useSearchParams } from "next/navigation";
 import type { VisualAsset, DisplayState } from "@/lib/visual-library/types";
 import { displayState } from "@/lib/visual-library/types";
 import { ASSET_TYPES } from "@/lib/visual-library/types";
-import { GENERAL_ICON_CATEGORIES } from "@/lib/visual-library/taxonomy";
+import { GENERAL_ICON_CATEGORIES, fetchIconCategories, createIconCategory, type FetchedIconCategory } from "@/lib/visual-library/taxonomy";
 import VisualAssetCard, { STATE_PILL } from "@/components/database/VisualAssetCard";
 import VisualAssetDetailDrawer from "@/components/database/VisualAssetDetailDrawer";
 import VisualLibraryUploadModal from "@/components/database/VisualLibraryUploadModal";
@@ -50,6 +50,27 @@ export default function VisualLibraryBrowser() {
   const [showUpload, setShowUpload] = useState(false);
   const [showBulkCol, setShowBulkCol] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [categories, setCategories] = useState<FetchedIconCategory[]>(
+    GENERAL_ICON_CATEGORIES.map((c) => ({ key: c.key, label: c.label, code: c.code })),
+  );
+  const [addingCat, setAddingCat] = useState(false);
+  const [newCat, setNewCat] = useState("");
+  const [catBusy, setCatBusy] = useState(false);
+
+  useEffect(() => { fetchIconCategories().then(setCategories).catch(() => {}); }, []);
+
+  const addCategory = async () => {
+    const label = newCat.trim();
+    if (!label) return;
+    setCatBusy(true);
+    try {
+      await createIconCategory(label);
+      setCategories(await fetchIconCategories());
+      setNewCat(""); setAddingCat(false);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to add category");
+    } finally { setCatBusy(false); }
+  };
 
   const reqRef = useRef(0);
   const load = useCallback(async () => {
@@ -151,9 +172,26 @@ export default function VisualLibraryBrowser() {
       <aside className="hidden w-52 shrink-0 lg:block">
         <div className="sticky top-2 space-y-0.5">
           <SidebarItem label="All categories" count={all.length} active={category === ""} onClick={() => setCategory("")} />
-          {GENERAL_ICON_CATEGORIES.map((c) => (
+          {categories.map((c) => (
             <SidebarItem key={c.key} label={c.label} count={categoryCounts[c.key] ?? 0} active={category === c.key} onClick={() => setCategory(c.key)} />
           ))}
+          {addingCat ? (
+            <div className="flex items-center gap-1.5 px-1 pt-1.5">
+              <input autoFocus value={newCat} onChange={(e) => setNewCat(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") addCategory(); if (e.key === "Escape") { setAddingCat(false); setNewCat(""); } }}
+                placeholder="Category name…"
+                className="min-w-0 flex-1 rounded-md border border-[var(--border-focus)] bg-[var(--bg-card)] px-2 py-1 text-[12px] text-[var(--text-primary)] outline-none" />
+              <button type="button" disabled={catBusy || !newCat.trim()} onClick={addCategory}
+                className="shrink-0 rounded-md bg-[var(--bg-inverted)] px-2 py-1 text-[11px] font-semibold text-[var(--text-inverted)] disabled:opacity-50">
+                {catBusy ? "…" : "Add"}
+              </button>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setAddingCat(true)}
+              className="mt-1 flex w-full items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-medium text-[var(--text-dim)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]">
+              <PlusIcon size={12} /> Add category
+            </button>
+          )}
         </div>
       </aside>
 
@@ -187,7 +225,7 @@ export default function VisualLibraryBrowser() {
         <div className="flex flex-wrap items-center gap-2">
           <select className={`${SELECT} lg:hidden`} value={category} onChange={(e) => setCategory(e.target.value)}>
             <option value="">All categories</option>
-            {GENERAL_ICON_CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+            {categories.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
           </select>
           <select className={SELECT} value={state} onChange={(e) => setState(e.target.value)}>
             <option value="">All states</option>
