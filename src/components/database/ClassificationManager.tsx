@@ -3,12 +3,17 @@
 /* ---------------------------------------------------------------------------
    ClassificationManager — KOLEEX product classification, in the SAME layout as
    the Visual Library: a left sidebar (Divisions) + a toolbar + a grid of icon
-   cards. You drill Division → Category → Subcategory → Type via the breadcrumb;
-   each level renders as Library-style cards.
+   cards. Drill Division → Category → Subcategory → Kind via the breadcrumb.
 
-   Icons: every card has an empty white icon tile. Click it to assign an icon
-   from the Visual Library (where "Icons" live) — left empty until you do.
-   Create · rename · delete · reorder · search at every level. KOLEEX dark.
+   SOURCE OF TRUTH = the real product taxonomy (divisions / categories /
+   subcategories via /api/taxonomy/*, the SAME tables the Add-Product Classify
+   form uses) + machine kinds from the code catalog. Editing here syncs with
+   the Product Data app. Icons are stored in the classification-icon HUB
+   (/api/classification-icons) keyed by (level, slug), so an icon set here
+   shows up in the Classify form and anywhere else that reads the hub.
+
+   Kinds are listed read-only from the catalog (you can set their icon, but
+   creating/renaming kinds stays in the product schema engine).
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -21,133 +26,171 @@ import ArrowUpIcon from "@/components/icons/ui/ArrowUpIcon";
 import ArrowDownIcon from "@/components/icons/ui/ArrowDownIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
+import { getKindsForSubcategory } from "@/lib/machine-kinds";
+import {
+  fetchDivisions, fetchCategories, fetchSubcategories, fetchClassificationIcons,
+  createDivision, updateDivision, deleteDivision,
+  createCategory, updateCategory, deleteCategory,
+  createSubcategory, updateSubcategory, deleteSubcategory,
+} from "@/lib/products-admin";
+import type { DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase";
 
-interface Item {
-  id: string; name: string; slug: string; icon_url: string | null; sort_order: number;
-  category_count?: number; subcategory_count?: number; type_count?: number;
-}
+interface Item { id: string; name: string; slug: string; order: number }
 interface VlIcon { id: string; title: string; visual_asset_code: string; public_url: string | null }
 
 type LevelKey = "divisions" | "categories" | "subcategories" | "types";
 const CHILD_OF: Record<Exclude<LevelKey, "types">, LevelKey> = {
   divisions: "categories", categories: "subcategories", subcategories: "types",
 };
-const PARENT_PARAM: Record<Exclude<LevelKey, "divisions">, string> = {
-  categories: "division_id", subcategories: "category_id", types: "subcategory_id",
+const SINGULAR: Record<LevelKey, string> = { divisions: "division", categories: "category", subcategories: "subcategory", types: "kind" };
+/* This screen's level keys → classification-icon HUB levels ("types" → "kind"). */
+const HUB_LEVEL: Record<LevelKey, "division" | "category" | "subcategory" | "kind"> = {
+  divisions: "division", categories: "category", subcategories: "subcategory", types: "kind",
 };
-const CREATE_PARENT = PARENT_PARAM;
-const SINGULAR: Record<LevelKey, string> = { divisions: "division", categories: "category", subcategories: "subcategory", types: "type" };
-/* Maps this screen's level keys to the classification-icon HUB levels
-   (note: "types" → "kind"). Used to write /api/classification-icons so an
-   icon set here flows into the Add-Product Classify form by (level, slug). */
-const HUB_LEVEL: Record<LevelKey, string> = { divisions: "division", categories: "category", subcategories: "subcategory", types: "kind" };
-const childCount = (it: Item, level: LevelKey) =>
-  level === "divisions" ? it.category_count : level === "categories" ? it.subcategory_count : level === "subcategories" ? it.type_count : undefined;
+
+const slugify = (s: string) =>
+  s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 
 export default function ClassificationManager() {
-  // drill trail below the root; empty = showing divisions
-  const [trail, setTrail] = useState<{ level: LevelKey; id: string; name: string }[]>([]);
-  const [divisions, setDivisions] = useState<Item[]>([]);
-  const [divLoading, setDivLoading] = useState(true);
+  // drill trail below the root; empty = showing divisions. Each entry carries
+  // the slug so the kinds level (keyed by subcategory slug) can resolve.
+  const [trail, setTrail] = useState<{ level: LevelKey; id: string; name: string; slug: string }[]>([]);
 
-  // active division (sidebar selection) = first trail entry
-  const activeDivId = trail[0]?.id ?? null;
+  // Full real taxonomy (loaded once, refreshed on write) + the icon hub map.
+  const [divisions, setDivisions] = useState<DivisionRow[]>([]);
+  const [categories, setCategories] = useState<CategoryRow[]>([]);
+  const [subcategories, setSubcategories] = useState<SubcategoryRow[]>([]);
+  const [hubIcons, setHubIcons] = useState<Record<string, Record<string, string>>>({});
+  const [loading, setLoading] = useState(true);
 
-  // current grid level + parent
-  const level: LevelKey = trail.length === 0 ? "divisions"
-    : trail.length === 1 ? "categories"
-    : trail.length === 2 ? "subcategories" : "types";
-  const parentId = trail.length === 0 ? "ROOT" : trail[trail.length - 1].id;
-
-  const [items, setItems] = useState<Item[]>([]);
-  const [loading, setLoading] = useState(false);
   const [q, setQ] = useState("");
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
-  const [picker, setPicker] = useState<{ base: string; id: string; level: LevelKey; slug: string } | null>(null);
+  const [picker, setPicker] = useState<{ id: string; level: LevelKey; slug: string } | null>(null);
 
-  const gridBase = `/api/visual-registry/${level}`;
-  const divBase = "/api/visual-registry/divisions";
+  const activeDivId = trail[0]?.id ?? null;
+  const level: LevelKey = trail.length === 0 ? "divisions"
+    : trail.length === 1 ? "categories"
+    : trail.length === 2 ? "subcategories" : "types";
 
-  const loadDivisions = useCallback(async () => {
-    setDivLoading(true);
-    try {
-      const j = await fetch(divBase, { credentials: "include", cache: "no-store" }).then((r) => r.ok ? r.json() : { divisions: [] });
-      setDivisions((j.divisions ?? []) as Item[]);
-    } finally { setDivLoading(false); }
-  }, []);
-  useEffect(() => { loadDivisions(); }, [loadDivisions]);
-
-  const loadItems = useCallback(async () => {
+  const refresh = useCallback(async () => {
     setLoading(true);
-    setQ("");
     try {
-      if (level === "divisions") { setItems(divisions); setLoading(false); return; }
-      const param = PARENT_PARAM[level as Exclude<LevelKey, "divisions">];
-      const j = await fetch(`${gridBase}?${param}=${parentId}`, { credentials: "include", cache: "no-store" }).then((r) => r.ok ? r.json() : { [level]: [] });
-      setItems((j[level] ?? []) as Item[]);
+      const [d, c, s, icons] = await Promise.all([
+        fetchDivisions(), fetchCategories(), fetchSubcategories(), fetchClassificationIcons(),
+      ]);
+      setDivisions(d); setCategories(c); setSubcategories(s); setHubIcons(icons);
     } finally { setLoading(false); }
-  }, [gridBase, level, parentId, divisions]);
-  useEffect(() => { loadItems(); }, [loadItems]);
+  }, []);
+  useEffect(() => { refresh(); }, [refresh]);
 
-  const refresh = () => { loadDivisions(); loadItems(); };
+  const ord = (n: number | null | undefined) => (typeof n === "number" ? n : 0);
+
+  /* Items at the current level, derived from the real taxonomy (+ code kinds). */
+  const items: Item[] = useMemo(() => {
+    if (level === "divisions") {
+      return [...divisions].sort((a, b) => ord(a.order) - ord(b.order))
+        .map((d) => ({ id: d.id, name: d.name, slug: d.slug, order: ord(d.order) }));
+    }
+    if (level === "categories") {
+      return categories.filter((c) => c.division_id === trail[0]?.id)
+        .sort((a, b) => ord(a.order) - ord(b.order))
+        .map((c) => ({ id: c.id, name: c.name, slug: c.slug, order: ord(c.order) }));
+    }
+    if (level === "subcategories") {
+      return subcategories.filter((s) => s.category_id === trail[1]?.id)
+        .sort((a, b) => ord(a.order) - ord(b.order))
+        .map((s) => ({ id: s.id, name: s.name, slug: s.slug, order: ord(s.order) }));
+    }
+    // kinds — read-only from the catalog, keyed by the parent subcategory slug
+    const subSlug = trail[2]?.slug;
+    if (!subSlug) return [];
+    return getKindsForSubcategory(subSlug)
+      .filter((k) => k.subcategory === subSlug)
+      .map((k) => ({ id: k.slug, name: k.name, slug: k.slug, order: 0 }));
+  }, [level, divisions, categories, subcategories, trail]);
+
+  const childCount = (it: Item): number | undefined => {
+    if (level === "divisions") return categories.filter((c) => c.division_id === it.id).length;
+    if (level === "categories") return subcategories.filter((s) => s.category_id === it.id).length;
+    if (level === "subcategories") return getKindsForSubcategory(it.slug).filter((k) => k.subcategory === it.slug).length;
+    return undefined; // kinds are terminal
+  };
+
+  const iconFor = (it: Item): string | undefined => hubIcons[HUB_LEVEL[level]]?.[it.slug];
+  const isTypes = level === "types";
 
   const create = async () => {
-    const name = newName.trim(); if (!name) return;
+    const name = newName.trim();
+    if (!name || isTypes) { setAdding(false); setNewName(""); return; }
     setBusyId("new");
-    const body: Record<string, unknown> = { name };
-    if (level !== "divisions") body[CREATE_PARENT[level as Exclude<LevelKey, "divisions">]] = parentId;
-    await fetch(gridBase, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    setBusyId(null); setNewName(""); setAdding(false); refresh();
+    const slug = slugify(name);
+    let res: unknown = null;
+    try {
+      if (level === "divisions") {
+        res = await createDivision({ name, slug, order: Math.max(0, ...divisions.map((d) => ord(d.order))) + 1 });
+      } else if (level === "categories") {
+        const sibs = categories.filter((c) => c.division_id === trail[0].id);
+        res = await createCategory({ name, slug, division_id: trail[0].id, order: Math.max(0, ...sibs.map((c) => ord(c.order))) + 1 });
+      } else if (level === "subcategories") {
+        const sibs = subcategories.filter((s) => s.category_id === trail[1].id);
+        res = await createSubcategory({ name, slug, category_id: trail[1].id, order: Math.max(0, ...sibs.map((s) => ord(s.order))) + 1 });
+      }
+    } catch { /* surfaced below */ }
+    setBusyId(null); setNewName(""); setAdding(false);
+    if (!res) alert("Couldn't create — the name/slug may already exist.");
+    refresh();
   };
+
   const rename = async (id: string) => {
-    const name = editName.trim(); if (!name) { setEditId(null); return; }
+    const name = editName.trim();
+    if (!name || isTypes) { setEditId(null); return; }
     setBusyId(id);
-    await fetch(`${gridBase}/${id}`, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+    if (level === "divisions") await updateDivision(id, { name });
+    else if (level === "categories") await updateCategory(id, { name });
+    else if (level === "subcategories") await updateSubcategory(id, { name });
     setBusyId(null); setEditId(null); refresh();
   };
+
   const remove = async (id: string) => {
-    if (!confirm("Delete this item? (it will be archived)")) return;
+    if (isTypes) return;
+    if (!confirm("Remove this from the product taxonomy? Products that use it may be affected.")) return;
     setBusyId(id);
-    await fetch(`${gridBase}/${id}`, { method: "DELETE", credentials: "include" });
+    let ok = true;
+    if (level === "divisions") ok = await deleteDivision(id);
+    else if (level === "categories") ok = await deleteCategory(id);
+    else if (level === "subcategories") ok = await deleteSubcategory(id);
     setBusyId(null);
+    if (!ok) { alert("Couldn't delete — it may still be in use by products."); refresh(); return; }
     if (trail.some((t) => t.id === id)) setTrail((prev) => prev.slice(0, prev.findIndex((t) => t.id === id)));
     refresh();
   };
-  const move = async (id: string, dir: -1 | 1, list: Item[]) => {
-    const idx = list.findIndex((x) => x.id === id);
+
+  const move = async (it: Item, dir: -1 | 1, list: Item[]) => {
+    if (isTypes) return;
+    const idx = list.findIndex((x) => x.id === it.id);
     const swap = idx + dir;
     if (idx < 0 || swap < 0 || swap >= list.length) return;
     const a = list[idx], b = list[swap];
-    setBusyId(id);
-    await Promise.all([
-      fetch(`${gridBase}/${a.id}`, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sort_order: b.sort_order }) }),
-      fetch(`${gridBase}/${b.id}`, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sort_order: a.sort_order }) }),
-    ]);
+    const upd = level === "divisions" ? updateDivision : level === "categories" ? updateCategory : updateSubcategory;
+    setBusyId(it.id);
+    await Promise.all([upd(a.id, { order: b.order }), upd(b.id, { order: a.order })]);
     setBusyId(null); refresh();
   };
+
   const assignIcon = async (icon: VlIcon | null) => {
     if (!picker) return;
-    const { base, id, level: pLevel, slug } = picker;
+    const { id, level: pLevel, slug } = picker;
     setBusyId(id);
     try {
-      // 1) Visual Library row keeps the icon so THIS card shows it.
-      const r1 = await fetch(`${base}/${id}`, {
-        method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ icon_asset_id: icon?.id ?? null, icon_url: icon?.public_url ?? null }),
-      });
-      // 2) HUB write (classification_icons) keyed by (level, slug) — this is
-      //    what the Add-Product Classify form + the rest of the system read.
-      const r2 = await fetch("/api/classification-icons", {
+      const r = await fetch("/api/classification-icons", {
         method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ level: HUB_LEVEL[pLevel], slug, icon_asset_id: icon?.id ?? null, icon_url: icon?.public_url ?? null }),
       });
-      if (!r1.ok || !r2.ok) {
-        alert("Couldn't save the icon. Please try again.");
-      }
+      if (!r.ok) alert("Couldn't save the icon. Please try again.");
     } catch {
       alert("Couldn't save the icon — network error. Please try again.");
     } finally {
@@ -156,9 +199,9 @@ export default function ClassificationManager() {
   };
 
   const drill = (it: Item) => {
-    if (level === "types") return; // terminal
+    if (level === "types") return;
     const childLevel = CHILD_OF[level as Exclude<LevelKey, "types">];
-    setTrail((prev) => [...prev, { level: childLevel, id: it.id, name: it.name }]);
+    setTrail((prev) => [...prev, { level: childLevel, id: it.id, name: it.name, slug: it.slug }]);
   };
   const goTo = (depth: number) => setTrail((prev) => prev.slice(0, depth));
 
@@ -177,13 +220,13 @@ export default function ClassificationManager() {
             <button type="button" onClick={() => { setTrail([]); setAdding(true); }} title="New division"
               className="flex h-6 w-6 items-center justify-center rounded-md text-[var(--text-dim)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"><PlusIcon size={12} /></button>
           </div>
-          {divLoading ? <div className="flex justify-center py-6 text-[var(--text-dim)]"><SpinnerIcon size={14} className="animate-spin" /></div>
-            : divisions.map((d) => (
-              <button key={d.id} type="button" onClick={() => setTrail([{ level: "categories", id: d.id, name: d.name }])}
+          {loading && divisions.length === 0 ? <div className="flex justify-center py-6 text-[var(--text-dim)]"><SpinnerIcon size={14} className="animate-spin" /></div>
+            : [...divisions].sort((a, b) => ord(a.order) - ord(b.order)).map((d) => (
+              <button key={d.id} type="button" onClick={() => setTrail([{ level: "categories", id: d.id, name: d.name, slug: d.slug }])}
                 className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-1.5 text-[12.5px] transition-colors ${
                   activeDivId === d.id ? "bg-[var(--bg-surface)] font-semibold text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"}`}>
                 <span className="truncate">{d.name}</span>
-                <span className="shrink-0 text-[10.5px] tabular-nums text-[var(--text-dim)]">{d.category_count ?? 0}</span>
+                <span className="shrink-0 text-[10.5px] tabular-nums text-[var(--text-dim)]">{categories.filter((c) => c.division_id === d.id).length}</span>
               </button>
             ))}
         </div>
@@ -205,16 +248,22 @@ export default function ClassificationManager() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="flex flex-1 items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 py-2.5 focus-within:border-[var(--border-focus)]">
             <SearchIcon size={14} className="shrink-0 text-[var(--text-dim)]" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${level}…`}
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${level === "types" ? "kinds" : level}…`}
               className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--text-dim)]" />
           </div>
-          <button type="button" onClick={() => setAdding((v) => !v)}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3.5 py-2 text-[12.5px] font-semibold text-[var(--text-inverted)] hover:opacity-90">
-            <PlusIcon size={14} /> New {SINGULAR[level]}
-          </button>
+          {!isTypes && (
+            <button type="button" onClick={() => setAdding((v) => !v)}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3.5 py-2 text-[12.5px] font-semibold text-[var(--text-inverted)] hover:opacity-90">
+              <PlusIcon size={14} /> New {SINGULAR[level]}
+            </button>
+          )}
         </div>
 
-        {adding && (
+        {isTypes && (
+          <p className="text-[11.5px] text-[var(--text-dim)]">Kinds come from the product schema engine — set their icon here; add/rename kinds in the schema.</p>
+        )}
+
+        {adding && !isTypes && (
           <div className="flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2">
             <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") create(); if (e.key === "Escape") { setAdding(false); setNewName(""); } }}
@@ -231,21 +280,21 @@ export default function ClassificationManager() {
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] py-16 text-center">
             <ImageRawIcon size={32} className="text-[var(--text-dim)]" />
-            <p className="mt-3 text-[13px] font-medium text-[var(--text-muted)]">{q ? "Nothing matches" : `No ${level} yet`}</p>
-            <p className="mt-1 text-[12px] text-[var(--text-dim)]">{q ? "Try another search term." : `Use “New ${SINGULAR[level]}” to add one.`}</p>
+            <p className="mt-3 text-[13px] font-medium text-[var(--text-muted)]">{q ? "Nothing matches" : isTypes ? "No kinds for this subcategory" : `No ${level} yet`}</p>
+            {!isTypes && <p className="mt-1 text-[12px] text-[var(--text-dim)]">{q ? "Try another search term." : `Use “New ${SINGULAR[level]}” to add one.`}</p>}
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
             {filtered.map((it, idx) => (
               <ClassificationCard
-                key={it.id} item={it} level={level} count={childCount(it, level)}
+                key={it.id} item={it} iconUrl={iconFor(it)} level={level} count={childCount(it)}
                 busy={busyId === it.id} editing={editId === it.id} editName={editName}
                 onEditName={setEditName} onCommitRename={() => rename(it.id)} onCancelRename={() => setEditId(null)}
-                onStartRename={() => { setEditId(it.id); setEditName(it.name); }}
-                onDelete={() => remove(it.id)}
-                onMoveUp={!q && idx > 0 ? () => move(it.id, -1, filtered) : undefined}
-                onMoveDown={!q && idx < filtered.length - 1 ? () => move(it.id, 1, filtered) : undefined}
-                onOpenIcon={() => setPicker({ base: gridBase, id: it.id, level, slug: it.slug })}
+                onStartRename={isTypes ? undefined : () => { setEditId(it.id); setEditName(it.name); }}
+                onDelete={isTypes ? undefined : () => remove(it.id)}
+                onMoveUp={!q && !isTypes && idx > 0 ? () => move(it, -1, filtered) : undefined}
+                onMoveDown={!q && !isTypes && idx < filtered.length - 1 ? () => move(it, 1, filtered) : undefined}
+                onOpenIcon={() => setPicker({ id: it.id, level, slug: it.slug })}
                 onDrill={level !== "types" ? () => drill(it) : undefined}
               />
             ))}
@@ -258,14 +307,15 @@ export default function ClassificationManager() {
   );
 }
 
-/* One Library-style card. Empty white icon tile (click → assign from Library). */
+/* One Library-style card. White icon tile (click → assign from Library). The
+   icon comes from the classification-icon HUB. */
 function ClassificationCard({
-  item, level, count, busy, editing, editName, onEditName, onCommitRename, onCancelRename,
+  item, iconUrl, level, count, busy, editing, editName, onEditName, onCommitRename, onCancelRename,
   onStartRename, onDelete, onMoveUp, onMoveDown, onOpenIcon, onDrill,
 }: {
-  item: Item; level: LevelKey; count?: number; busy: boolean; editing: boolean; editName: string;
+  item: Item; iconUrl?: string; level: LevelKey; count?: number; busy: boolean; editing: boolean; editName: string;
   onEditName: (v: string) => void; onCommitRename: () => void; onCancelRename: () => void;
-  onStartRename: () => void; onDelete: () => void; onMoveUp?: () => void; onMoveDown?: () => void;
+  onStartRename?: () => void; onDelete?: () => void; onMoveUp?: () => void; onMoveDown?: () => void;
   onOpenIcon: () => void; onDrill?: () => void;
 }) {
   return (
@@ -274,16 +324,16 @@ function ClassificationCard({
       <div className="absolute right-1.5 top-1.5 z-10 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
         {onMoveUp && <CardBtn title="Move up" onClick={onMoveUp}><ArrowUpIcon size={11} /></CardBtn>}
         {onMoveDown && <CardBtn title="Move down" onClick={onMoveDown}><ArrowDownIcon size={11} /></CardBtn>}
-        <CardBtn title="Rename" onClick={onStartRename}><PencilIcon size={11} /></CardBtn>
-        <CardBtn title="Delete" tone="rose" onClick={onDelete}><TrashIcon size={11} /></CardBtn>
+        {onStartRename && <CardBtn title="Rename" onClick={onStartRename}><PencilIcon size={11} /></CardBtn>}
+        {onDelete && <CardBtn title="Delete" tone="rose" onClick={onDelete}><TrashIcon size={11} /></CardBtn>}
       </div>
 
       {/* icon tile — empty by default; click to assign a Visual Library icon */}
-      <button type="button" onClick={onOpenIcon} title={item.icon_url ? "Change icon" : "Add icon from Visual Library"}
+      <button type="button" onClick={onOpenIcon} title={iconUrl ? "Change icon" : "Add icon from Visual Library"}
         className="flex aspect-square w-full items-center justify-center bg-white p-3 text-neutral-900">
-        {busy ? <SpinnerIcon size={18} className="animate-spin text-neutral-400" /> : item.icon_url ? (
+        {busy ? <SpinnerIcon size={18} className="animate-spin text-neutral-400" /> : iconUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={item.icon_url} alt={item.name} className="h-full w-full object-contain" loading="lazy" />
+          <img src={iconUrl} alt={item.name} className="h-full w-full object-contain" loading="lazy" />
         ) : (
           <span className="flex flex-col items-center gap-1 text-neutral-300">
             <ImageRawIcon size={20} />
