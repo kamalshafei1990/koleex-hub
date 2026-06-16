@@ -27,6 +27,7 @@ import ArrowDownIcon from "@/components/icons/ui/ArrowDownIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import { getKindsForSubcategory } from "@/lib/machine-kinds";
+import { getDivisionIcon } from "@/components/icons/divisions";
 import {
   fetchDivisions, fetchCategories, fetchSubcategories, fetchClassificationIcons,
   createDivision, updateDivision, deleteDivision,
@@ -122,6 +123,23 @@ export default function ClassificationManager() {
 
   const iconFor = (it: Item): string | undefined => hubIcons[HUB_LEVEL[level]]?.[it.slug];
   const isTypes = level === "types";
+
+  /* Built-in code-icon fallback (shown when the hub has no override), so the
+     card never reads "No icon" for a classification that already ships an
+     icon in the product UI: divisions → custom division SVG; kinds → the
+     machine-kind schematic. Categories/subcategories ship their icon via
+     Storage, which is mirrored into the hub, so they need no code fallback. */
+  const fallbackFor = (it: Item): React.ReactNode => {
+    if (level === "divisions") {
+      const Div = getDivisionIcon(it.slug);
+      return Div ? <Div className="h-full w-full" /> : null;
+    }
+    if (level === "types") {
+      const Kind = getKindsForSubcategory(trail[2]?.slug ?? "").find((k) => k.slug === it.slug)?.icon;
+      return Kind ? <Kind className="h-full w-full" /> : null;
+    }
+    return null;
+  };
 
   const create = async () => {
     const name = newName.trim();
@@ -287,7 +305,7 @@ export default function ClassificationManager() {
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
             {filtered.map((it, idx) => (
               <ClassificationCard
-                key={it.id} item={it} iconUrl={iconFor(it)} level={level} count={childCount(it)}
+                key={it.id} item={it} iconUrl={iconFor(it)} fallback={fallbackFor(it)} level={level} count={childCount(it)}
                 busy={busyId === it.id} editing={editId === it.id} editName={editName}
                 onEditName={setEditName} onCommitRename={() => rename(it.id)} onCancelRename={() => setEditId(null)}
                 onStartRename={isTypes ? undefined : () => { setEditId(it.id); setEditName(it.name); }}
@@ -310,10 +328,10 @@ export default function ClassificationManager() {
 /* One Library-style card. White icon tile (click → assign from Library). The
    icon comes from the classification-icon HUB. */
 function ClassificationCard({
-  item, iconUrl, level, count, busy, editing, editName, onEditName, onCommitRename, onCancelRename,
+  item, iconUrl, fallback, level, count, busy, editing, editName, onEditName, onCommitRename, onCancelRename,
   onStartRename, onDelete, onMoveUp, onMoveDown, onOpenIcon, onDrill,
 }: {
-  item: Item; iconUrl?: string; level: LevelKey; count?: number; busy: boolean; editing: boolean; editName: string;
+  item: Item; iconUrl?: string; fallback?: React.ReactNode; level: LevelKey; count?: number; busy: boolean; editing: boolean; editName: string;
   onEditName: (v: string) => void; onCommitRename: () => void; onCancelRename: () => void;
   onStartRename?: () => void; onDelete?: () => void; onMoveUp?: () => void; onMoveDown?: () => void;
   onOpenIcon: () => void; onDrill?: () => void;
@@ -332,8 +350,11 @@ function ClassificationCard({
       <button type="button" onClick={onOpenIcon} title={iconUrl ? "Change icon" : "Add icon from Visual Library"}
         className="flex aspect-square w-full items-center justify-center bg-white p-3 text-neutral-900">
         {busy ? <SpinnerIcon size={18} className="animate-spin text-neutral-400" /> : iconUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={iconUrl} alt={item.name} className="h-full w-full object-contain" loading="lazy" />
+          // Render the override via a CSS mask so single-tone SVGs (incl.
+          // white-stroked ones) stay visible on the white tile, in theme color.
+          <MonoImg src={iconUrl} className="h-full w-full" />
+        ) : fallback ? (
+          <span className="flex h-full w-full items-center justify-center [&_svg]:h-full [&_svg]:w-full">{fallback}</span>
         ) : (
           <span className="flex flex-col items-center gap-1 text-neutral-300">
             <ImageRawIcon size={20} />
@@ -364,6 +385,27 @@ function ClassificationCard({
         </button>
       )}
     </div>
+  );
+}
+
+/* Renders an SVG URL as a single-tone (currentColor) mask so it is always
+   visible on the white icon tile, regardless of the source SVG's own color. */
+function MonoImg({ src, className }: { src: string; className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={`inline-block bg-current ${className ?? ""}`}
+      style={{
+        WebkitMaskImage: `url("${src}")`,
+        maskImage: `url("${src}")`,
+        WebkitMaskRepeat: "no-repeat",
+        maskRepeat: "no-repeat",
+        WebkitMaskPosition: "center",
+        maskPosition: "center",
+        WebkitMaskSize: "contain",
+        maskSize: "contain",
+      }}
+    />
   );
 }
 
