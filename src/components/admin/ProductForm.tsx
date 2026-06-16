@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import WizardKnowledgePanel, { type WizardKnowledge } from "@/components/admin/WizardKnowledgePanel";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { humanizeError } from "@/lib/ui/humanize-error";
@@ -462,6 +462,12 @@ interface Props {
 
 export default function ProductForm({ productId }: Props) {
   const router = useRouter();
+  const pathname = usePathname();
+  /* The wizard is mounted under BOTH /products and /product-data. Keep
+     back / cancel / post-save inside whichever app the operator is
+     actually in — mirrors ProductList's baseRoute logic so the
+     list → form → back loop never jumps apps. */
+  const baseRoute = (pathname || "").startsWith("/product-data") ? "/product-data" : "/products";
   const { t } = useTranslation(PRODUCTS_UI_I18N);
   const isEdit = !!productId;
 
@@ -676,11 +682,10 @@ export default function ProductForm({ productId }: Props) {
       );
       if (!ok) return;
     }
-    /* Both /products and /product-data routes exist; the wizard is
-       most often reached from /products in the current setup, so
-       send the admin back there. They can switch routes via the
-       sidebar if needed. */
-    router.push("/products");
+    /* Return to the list of whichever app we're in (/product-data or
+       /products) so Back / Cancel never bounces the operator into the
+       other app. */
+    router.push(baseRoute);
   };
 
   /* ── Main image ref for hero ── */
@@ -1635,7 +1640,7 @@ export default function ProductForm({ productId }: Props) {
         try { window.localStorage.removeItem(draftKey); } catch { /* noop */ }
       }
       if (!isEdit) {
-        setTimeout(() => router.push(`/products/${pid}/edit`), 800);
+        setTimeout(() => router.push(`${baseRoute}/${pid}/edit`), 800);
       }
     } catch (err) {
       /* Humanize save failures — operators must never see raw Postgres /
@@ -1706,7 +1711,7 @@ export default function ProductForm({ productId }: Props) {
             <button
               type="button"
               onClick={handleCancel}
-              className="hidden sm:inline-flex h-9 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all cursor-pointer"
+              className="hidden sm:inline-flex items-center justify-center h-9 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all cursor-pointer"
             >
               {t("action.cancel", "Cancel")}
             </button>
