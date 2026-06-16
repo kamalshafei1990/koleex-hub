@@ -28,7 +28,7 @@ import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import { getKindsForSubcategory } from "@/lib/machine-kinds";
 import { getDivisionIcon } from "@/components/icons/divisions";
-import { GENERAL_ICON_CATEGORIES } from "@/lib/visual-library/taxonomy";
+import { GENERAL_ICON_CATEGORIES, fetchIconCategories, type FetchedIconCategory } from "@/lib/visual-library/taxonomy";
 import {
   fetchDivisions, fetchCategories, fetchSubcategories, fetchClassificationIcons,
   createDivision, updateDivision, deleteDivision,
@@ -429,6 +429,7 @@ type PickerCollection = { id: string; name: string; asset_count?: number };
 function IconPicker({ onClose, onPick }: { onClose: () => void; onPick: (icon: VlIcon | null) => void }) {
   const [q, setQ] = useState("");
   const [cols, setCols] = useState<PickerCollection[]>([]);
+  const [cats, setCats] = useState<FetchedIconCategory[]>(GENERAL_ICON_CATEGORIES.map((c) => ({ key: c.key, label: c.label, code: c.code })));
   const [activeCol, setActiveCol] = useState<string | null>(null); // null = All icons (collection axis)
   const [activeCat, setActiveCat] = useState<string>("");          // "" = All categories
   const [items, setItems] = useState<VlIcon[]>([]);
@@ -444,6 +445,7 @@ function IconPicker({ onClose, onPick }: { onClose: () => void; onPick: (icon: V
       .then((r) => (r.ok ? r.json() : { collections: [] }))
       .then((j) => setCols((j.collections ?? []).filter((c: PickerCollection) => (c.asset_count ?? 0) > 0)))
       .catch(() => {});
+    fetchIconCategories().then(setCats).catch(() => {});
   }, []);
 
   // Fetch one page from either the whole library (with optional search) or a
@@ -498,7 +500,7 @@ function IconPicker({ onClose, onPick }: { onClose: () => void; onPick: (icon: V
           <select value={activeCat} onChange={(e) => { setActiveCat(e.target.value); if (e.target.value) setActiveCol(null); }}
             className="shrink-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-2 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]">
             <option value="">All categories</option>
-            {GENERAL_ICON_CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+            {cats.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
           </select>
         </div>
 

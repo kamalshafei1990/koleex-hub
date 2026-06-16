@@ -9,10 +9,10 @@
      icon can be uploaded into the record later.
    --------------------------------------------------------------------------- */
 
-import { useMemo, useState, type ChangeEvent, type DragEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type DragEvent } from "react";
 import { uploadToStorage } from "@/lib/storage-client";
 import { ASSET_TYPES } from "@/lib/visual-library/types";
-import { GENERAL_ICON_CATEGORIES, CATEGORY_BY_KEY } from "@/lib/visual-library/taxonomy";
+import { GENERAL_ICON_CATEGORIES, CATEGORY_BY_KEY, fetchIconCategories, type FetchedIconCategory } from "@/lib/visual-library/taxonomy";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import UploadIcon from "@/components/icons/ui/UploadIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -39,6 +39,10 @@ export default function VisualLibraryUploadModal({ onClose, onUploaded }: { onCl
   const [error, setError] = useState<string | null>(null);
 
   const subcats = useMemo(() => CATEGORY_BY_KEY[category]?.subcategories ?? [], [category]);
+  const [categories, setCategories] = useState<FetchedIconCategory[]>(
+    GENERAL_ICON_CATEGORIES.map((c) => ({ key: c.key, label: c.label, code: c.code })),
+  );
+  useEffect(() => { fetchIconCategories().then(setCategories).catch(() => {}); }, []);
 
   const takeFile = (f: File | null) => {
     setFile(f);
@@ -127,7 +131,7 @@ export default function VisualLibraryUploadModal({ onClose, onUploaded }: { onCl
             </div>
             <div><span className={LABEL}>Category</span>
               <select className={INPUT} value={category} onChange={(e) => { setCategory(e.target.value); setSubcategory(""); }}>
-                {GENERAL_ICON_CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+                {categories.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
               </select>
             </div>
           </div>
