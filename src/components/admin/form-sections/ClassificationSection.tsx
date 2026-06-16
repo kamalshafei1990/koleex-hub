@@ -237,7 +237,7 @@ export default function ClassificationSection({
                  the hub's main division at a glance. Other tiles keep
                  the neutral surface treatment. */
               const tileCls = isFlagship
-                ? "group relative flex flex-col items-center justify-center gap-3 aspect-square p-4 rounded-xl border border-[var(--text-primary)]/30 bg-[var(--text-primary)]/[0.04] hover:border-[var(--text-primary)]/60 hover:bg-[var(--text-primary)]/[0.08] transition-all text-center"
+                ? "group relative flex flex-col items-center justify-center gap-3 aspect-square p-4 rounded-xl border border-[var(--text-primary)]/40 bg-[var(--text-primary)]/[0.06] ring-1 ring-[var(--text-primary)]/10 shadow-lg hover:border-[var(--text-primary)]/70 hover:bg-[var(--text-primary)]/[0.10] hover:-translate-y-0.5 transition-all text-center"
                 : "group flex flex-col items-center justify-center gap-3 aspect-square p-4 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--border-focus)]/50 hover:bg-[var(--bg-surface-subtle)]/50 transition-all text-center";
               return (
                 <button
@@ -246,7 +246,7 @@ export default function ClassificationSection({
                   className={tileCls}
                 >
                   {isFlagship && (
-                    <span className="absolute top-2 right-2 text-[9px] font-bold uppercase tracking-wider text-[var(--text-primary)]/70">
+                    <span className="absolute top-2 right-2 inline-flex items-center h-4 px-1.5 rounded-full bg-[var(--text-primary)] text-[var(--text-inverted)] text-[8px] font-bold uppercase tracking-wider">
                       Flagship
                     </span>
                   )}
