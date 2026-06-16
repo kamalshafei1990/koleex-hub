@@ -28,6 +28,7 @@ import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
+import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
 import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
 import StarIcon from "@/components/icons/ui/StarIcon";
 import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
@@ -82,6 +83,7 @@ import CreateSubcategoryModal from "./form-sections/CreateSubcategoryModal";
 import CreateSupplierModal from "./form-sections/CreateSupplierModal";
 import CreateBrandModal from "./form-sections/CreateBrandModal";
 import DescriptionSection from "./form-sections/DescriptionSection";
+import KnowledgeSection from "./form-sections/KnowledgeSection";
 import SpecsSection from "./form-sections/SpecsSection";
 import ConfigSection from "./form-sections/ConfigSection";
 import TechnicalSection from "./form-sections/TechnicalSection";
@@ -197,6 +199,7 @@ function getSteps(isSewing: boolean): WizardStep[] {
     { id: "classify", label: "Classification", shortLabel: "Classify", icon: <FolderTreeIcon className="h-4 w-4" /> },
     { id: "identity", label: "Hero & Identity", shortLabel: "Hero", icon: <SparklesIcon className="h-4 w-4" /> },
     { id: "description", label: "Description", shortLabel: "Description", icon: <DocumentIcon className="h-4 w-4" /> },
+    { id: "knowledge", label: "Product Knowledge", shortLabel: "Knowledge", icon: <BookOpenIcon className="h-4 w-4" /> },
     { id: "specs", label: "Specifications", shortLabel: "Specs", icon: <Settings2Icon className="h-4 w-4" /> },
     { id: "commercial", label: "Models & Variants", shortLabel: "Models", icon: <BoxesIcon className="h-4 w-4" /> },
     { id: "media", label: "Media & Files", shortLabel: "Media", icon: <ImageRawIcon className="h-4 w-4" /> },
@@ -2458,6 +2461,29 @@ export default function ProductForm({ productId }: Props) {
                 ambiguity. The SpecsSection component still exists in
                 form-sections/ for any future use; it's just not wired
                 into the wizard. */}
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+           STEP: PRODUCT KNOWLEDGE
+           Authors products.schema_knowledge — the layer that powers the
+           customer-page knowledge sections, quotes, brochures and the AI
+           assistant. Until now these blocks could only be set via API/SQL;
+           this is the in-form editor for all 14 knowledge types.
+           ═══════════════════════════════════════════════════════════ */}
+        {(onePage || steps[currentStep]?.id === "knowledge") && (
+          <div id="sec-knowledge" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+            <Section
+              id="knowledge"
+              icon={<BookOpenIcon className="h-4 w-4" />}
+              title={t("knowledge.title", "Product Knowledge")}
+              badge={t("knowledge.badge", "Customer page · Quote · AI")}
+            >
+              <KnowledgeSection
+                blocks={(product.schema_knowledge as ProductKnowledgeBlock[]) || []}
+                onChange={(blocks) => updateProduct_({ schema_knowledge: blocks })}
+              />
+            </Section>
           </div>
         )}
 
