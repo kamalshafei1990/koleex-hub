@@ -42,6 +42,8 @@ New facets are added **here only** (governance). Categories *reference* facets; 
 | platen_shape | single_select | — | Flat · Cap · Mug · Plate · Sleeve |
 | actuation | single_select | — | Manual · Pneumatic · Hydraulic · Automatic |
 | stations | number | — | 1 … n |
+| press_format | single_select | — | Flat · Swing-away · Draw · Rotary/Calender *(CL-0012: heat-press variants = press_format × actuation × stations as ATTRIBUTES of one Heat-Press type — NOT separate subcategories)* |
+| seam_seal_process | single_select | — | Hot-Air Tape · Hot-Cold Bonding · Ultrasonic *(CL-0012: XFSS Seam-Sealing/Bonding)* |
 | steam_source | single_select | — | All-steam · Electric-steam · Gravity · Self-contained · Boiler-fed |
 | boiler_capacity | measurement | L | numeric |
 | tensioning_method | single_select | — | Steam-Air · Hot-Air · Mechanical Clamp |
