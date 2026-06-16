@@ -599,9 +599,36 @@ export default function ProductForm({ productId }: Props) {
       const raw = window.localStorage.getItem(draftKey);
       if (!raw) return;
       const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed.savedAt === "number") {
-        setDraftMeta({ savedAt: parsed.savedAt });
+      if (!parsed || typeof parsed.savedAt !== "number") return;
+
+      /* Only surface the Restore banner for a draft worth recovering: it
+         must be recent (≤ 24h) AND actually contain entered data. Stale or
+         essentially-empty drafts (the form can auto-save a blank snapshot the
+         moment it goes dirty) are cleared silently so the banner never cries
+         wolf — that false-alarm noise was the whole complaint. */
+      const STALE_MS = 24 * 60 * 60 * 1000;
+      const tooOld = Date.now() - parsed.savedAt > STALE_MS;
+      const p = (parsed.product ?? {}) as Record<string, unknown>;
+      const draftModels = Array.isArray(parsed.models) ? parsed.models : [];
+      const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+      const hasContent =
+        str(p.product_name) !== "" ||
+        str(p.division_slug) !== "" ||
+        str(p.category_slug) !== "" ||
+        str(p.subcategory_slug) !== "" ||
+        str(p.description) !== "" ||
+        draftModels.some(
+          (m: Record<string, unknown>) =>
+            str(m?.model_name) !== "" ||
+            str(m?.primary_model) !== "" ||
+            str(m?.reference_model) !== "",
+        );
+
+      if (tooOld || !hasContent) {
+        try { window.localStorage.removeItem(draftKey); } catch { /* noop */ }
+        return;
       }
+      setDraftMeta({ savedAt: parsed.savedAt });
     } catch {
       /* corrupt draft — ignore it rather than block the form */
     }
