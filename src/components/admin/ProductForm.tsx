@@ -1119,21 +1119,17 @@ export default function ProductForm({ productId }: Props) {
         : "bg-[var(--bg-surface)] text-[var(--text-primary)] border border-[var(--border-subtle)] hover:bg-[var(--bg-surface-subtle)]";
 
   /* ── Classification-gated lock ──
-     For sewing products, classification now includes the machine
-     kind (the 4th tier inside Classify). For everything else it's
-     still Division → Category → Subcategory. The kind slug rides
+     Classification is complete at Division → Category → Subcategory.
+     The machine kind (4th tier inside Classify) is OPTIONAL — it
+     refines the spec template when chosen, but the operator can skip
+     it, so it does NOT gate the rest of the form. The kind slug rides
      inside sewingSpecs.common_specs.machine_kind; template_slug is
      kept as a back-compat fallback for products saved before the
      kind selector shipped. */
-  const machineKindChosen =
-    !!(sewingSpecs.common_specs as { machine_kind?: string })?.machine_kind ||
-    !!sewingSpecs.template_slug;
-
   const classificationComplete =
     !!product.division_slug &&
     !!product.category_slug &&
-    !!product.subcategory_slug &&
-    (!isSewing || machineKindChosen);
+    !!product.subcategory_slug;
 
   const lockedSteps = useMemo(() => {
     const set = new Set<number>();
@@ -1251,7 +1247,6 @@ export default function ProductForm({ productId }: Props) {
     if (!product.division_slug) add("classify", t("field.division", "Division"));
     if (!product.category_slug) add("classify", t("field.category", "Category"));
     if (!product.subcategory_slug) add("classify", t("field.subcategory", "Subcategory"));
-    if (isSewing && !machineKindChosen) add("classify", t("field.machineKind", "Machine kind"));
     if (!(primaryModel?.primary_model || "").trim()) add("commercial", t("field.primaryModel", "Primary model"));
     return byStep;
   }, [
@@ -1259,8 +1254,6 @@ export default function ProductForm({ productId }: Props) {
     product.division_slug,
     product.category_slug,
     product.subcategory_slug,
-    isSewing,
-    machineKindChosen,
     primaryModel?.primary_model,
     t,
   ]);
@@ -2942,9 +2935,8 @@ export default function ProductForm({ productId }: Props) {
           if (!product.division_slug) missing.push({ label: t("field.division", "Division"), step: "classify" });
           if (!product.category_slug) missing.push({ label: t("field.category", "Category"), step: "classify" });
           if (!product.subcategory_slug) missing.push({ label: t("field.subcategory", "Subcategory"), step: "classify" });
-          if (isSewing && !kindSlug && !sewingSpecs.template_slug) {
-            missing.push({ label: t("field.machineKind", "Machine Kind"), step: "classify" });
-          }
+          /* Machine Kind is OPTIONAL — refines the spec template when
+             chosen, but never blocks save. Intentionally not flagged. */
           if (isSewing) {
             const cs = sewingSpecs.common_specs as Record<string, unknown>;
             if (!cs.max_sewing_speed) missing.push({ label: "Max Sewing Speed", step: "specs" });
@@ -3002,7 +2994,6 @@ export default function ProductForm({ productId }: Props) {
             product.division_slug,
             product.category_slug,
             product.subcategory_slug,
-            isSewing ? (kindSlug || sewingSpecs.template_slug) : "ok",
             product.brand,
             product.excerpt,
             product.highlights && product.highlights.length > 0 ? "ok" : "",
@@ -3016,7 +3007,7 @@ export default function ProductForm({ productId }: Props) {
                 ]
               : []),
           ].filter(Boolean).length;
-          const essentialTotal = isSewing ? 13 : 10;
+          const essentialTotal = isSewing ? 12 : 9;
           const completionPct = Math.round((essentialFilled / essentialTotal) * 100);
 
           /* ── Product Schema Engine — readiness + preview inputs ──
