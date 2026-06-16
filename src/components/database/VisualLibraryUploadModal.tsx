@@ -27,7 +27,7 @@ function normalizeSvg(raw: string): string {
 const INPUT = "w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
 const LABEL = "block text-[11px] font-semibold uppercase tracking-wide text-[var(--text-dim)] mb-1";
 
-export default function VisualLibraryUploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded: () => void }) {
+export default function VisualLibraryUploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded: (assetId?: string) => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
   const [title, setTitle] = useState("");
@@ -83,11 +83,11 @@ export default function VisualLibraryUploadModal({ onClose, onUploaded }: { onCl
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      const j = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
         setError((j as { error?: string }).error ?? "Save failed"); setBusy(false); return;
       }
-      onUploaded();
+      onUploaded((j as { id?: string }).id ?? undefined);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed"); setBusy(false);
     }

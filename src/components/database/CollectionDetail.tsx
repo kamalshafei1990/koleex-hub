@@ -13,6 +13,7 @@ import {
 } from "@/lib/visual-library/types";
 import VisualAssetDetailDrawer from "@/components/database/VisualAssetDetailDrawer";
 import CollectionModal from "@/components/database/CollectionModal";
+import VisualLibraryUploadModal from "@/components/database/VisualLibraryUploadModal";
 import UsageGovernance from "@/components/database/UsageGovernance";
 import { COLLECTION_STYLES } from "@/lib/visual-library/types";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -226,6 +227,7 @@ function AddAssets({ cid, existing, onAdded }: { cid: string; existing: Set<stri
   const [results, setResults] = useState<VisualAsset[]>([]);
   const [searching, setSearching] = useState(false);
   const [adding, setAdding] = useState<string | null>(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
   const deb = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -249,13 +251,31 @@ function AddAssets({ cid, existing, onAdded }: { cid: string; existing: Set<stri
     setAdding(null); setResults((r) => r.filter((x) => x.id !== id)); onAdded();
   };
 
+  // Add a freshly-uploaded asset straight into this collection.
+  const addUploaded = async (id?: string) => {
+    setUploadOpen(false);
+    if (id) {
+      await fetch(`/api/visual-library/collections/${cid}/assets`, {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ asset_id: id }),
+      });
+    }
+    onAdded();
+  };
+
   return (
     <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-2.5">
-      <div className="flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 focus-within:border-[var(--border-focus)]">
-        <PlusIcon size={13} className="shrink-0 text-[var(--text-dim)]" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search the library to add assets…" className="min-w-0 flex-1 bg-transparent text-[12.5px] outline-none placeholder:text-[var(--text-dim)]" />
-        {searching && <SpinnerIcon size={13} className="animate-spin text-[var(--text-dim)]" />}
+      <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 focus-within:border-[var(--border-focus)]">
+          <PlusIcon size={13} className="shrink-0 text-[var(--text-dim)]" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search the library to add assets…" className="min-w-0 flex-1 bg-transparent text-[12.5px] outline-none placeholder:text-[var(--text-dim)]" />
+          {searching && <SpinnerIcon size={13} className="animate-spin text-[var(--text-dim)]" />}
+        </div>
+        <button type="button" onClick={() => setUploadOpen(true)}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-3 py-2 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90">
+          <PlusIcon size={12} /> Upload
+        </button>
       </div>
+      {uploadOpen && <VisualLibraryUploadModal onClose={() => setUploadOpen(false)} onUploaded={addUploaded} />}
       {results.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {results.map((a) => (
