@@ -28,6 +28,7 @@ import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import { getKindsForSubcategory } from "@/lib/machine-kinds";
 import { getDivisionIcon } from "@/components/icons/divisions";
+import { GENERAL_ICON_CATEGORIES } from "@/lib/visual-library/taxonomy";
 import {
   fetchDivisions, fetchCategories, fetchSubcategories, fetchClassificationIcons,
   createDivision, updateDivision, deleteDivision,
@@ -428,7 +429,8 @@ type PickerCollection = { id: string; name: string; asset_count?: number };
 function IconPicker({ onClose, onPick }: { onClose: () => void; onPick: (icon: VlIcon | null) => void }) {
   const [q, setQ] = useState("");
   const [cols, setCols] = useState<PickerCollection[]>([]);
-  const [activeCol, setActiveCol] = useState<string | null>(null); // null = All icons
+  const [activeCol, setActiveCol] = useState<string | null>(null); // null = All icons (collection axis)
+  const [activeCat, setActiveCat] = useState<string>("");          // "" = All categories
   const [items, setItems] = useState<VlIcon[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -446,10 +448,10 @@ function IconPicker({ onClose, onPick }: { onClose: () => void; onPick: (icon: V
 
   // Fetch one page from either the whole library (with optional search) or a
   // single collection's members. Returns the icon assets + the server total.
-  const fetchPage = useCallback(async (pg: number, term: string, col: string | null) => {
+  const fetchPage = useCallback(async (pg: number, term: string, col: string | null, cat: string) => {
     const url = col
       ? `/api/visual-library/collections/${col}/assets?page=${pg}&pageSize=${PAGE}`
-      : `/api/visual-library?asset_type=icon&sort=usage&pageSize=${PAGE}&page=${pg}${term.trim().length >= 2 ? `&q=${encodeURIComponent(term.trim())}` : ""}`;
+      : `/api/visual-library?asset_type=icon&sort=usage&pageSize=${PAGE}&page=${pg}${term.trim().length >= 2 ? `&q=${encodeURIComponent(term.trim())}` : ""}${cat ? `&category=${encodeURIComponent(cat)}` : ""}`;
     const r = await fetch(url, { credentials: "include", cache: "no-store" });
     const j = r.ok ? await r.json() : {};
     const assets: VlIcon[] = col
@@ -458,21 +460,21 @@ function IconPicker({ onClose, onPick }: { onClose: () => void; onPick: (icon: V
     return { assets, total: (j.total as number) ?? assets.length };
   }, []);
 
-  // Reset + load page 1 whenever the search term or the active collection changes.
+  // Reset + load page 1 whenever the search term, category, or collection changes.
   useEffect(() => {
     let alive = true; setLoading(true); setPage(1);
     const t = setTimeout(async () => {
-      const { assets, total: tot } = await fetchPage(1, q, activeCol);
+      const { assets, total: tot } = await fetchPage(1, q, activeCol, activeCat);
       if (!alive) return;
       setItems(assets); setTotal(tot); setLoading(false);
     }, q ? 250 : 0);
     return () => { alive = false; clearTimeout(t); };
-  }, [q, activeCol, fetchPage]);
+  }, [q, activeCol, activeCat, fetchPage]);
 
   const loadMore = async () => {
     if (more || loading || items.length >= total) return;
     const next = page + 1; setMore(true);
-    const { assets } = await fetchPage(next, q, activeCol);
+    const { assets } = await fetchPage(next, q, activeCol, activeCat);
     setItems((prev) => [...prev, ...assets]); setPage(next); setMore(false);
   };
 
@@ -488,17 +490,25 @@ function IconPicker({ onClose, onPick }: { onClose: () => void; onPick: (icon: V
           <span className="text-[12px] font-semibold text-[var(--text-primary)]">Choose an icon from the Visual Library</span>
           <button type="button" onClick={onClose} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]"><CrossIcon size={14} /></button>
         </div>
-        {/* Typing searches across ALL icons (clears any active collection). */}
-        <input autoFocus value={q} onChange={(e) => { setQ(e.target.value); if (e.target.value) setActiveCol(null); }} placeholder="Search Visual Library icons…"
-          className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-2 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] placeholder:text-[var(--text-dim)]" />
+        {/* Search + category. Typing searches across icons (clears any active
+            collection); the category dropdown narrows by icon category. */}
+        <div className="flex gap-1.5">
+          <input autoFocus value={q} onChange={(e) => { setQ(e.target.value); if (e.target.value) setActiveCol(null); }} placeholder="Search Visual Library icons…"
+            className="min-w-0 flex-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-2 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] placeholder:text-[var(--text-dim)]" />
+          <select value={activeCat} onChange={(e) => { setActiveCat(e.target.value); if (e.target.value) setActiveCol(null); }}
+            className="shrink-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-2 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]">
+            <option value="">All categories</option>
+            {GENERAL_ICON_CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+          </select>
+        </div>
 
         {/* Collection filter row */}
         {cols.length > 0 && (
           <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
-            <PickerChip active={activeCol === null && !q} label="All icons" onClick={() => { setQ(""); setActiveCol(null); }} />
+            <PickerChip active={activeCol === null && !q && !activeCat} label="All icons" onClick={() => { setQ(""); setActiveCat(""); setActiveCol(null); }} />
             {cols.map((c) => (
               <PickerChip key={c.id} active={activeCol === c.id} label={c.name} count={c.asset_count}
-                onClick={() => { setQ(""); setActiveCol(c.id); }} />
+                onClick={() => { setQ(""); setActiveCat(""); setActiveCol(c.id); }} />
             ))}
           </div>
         )}
