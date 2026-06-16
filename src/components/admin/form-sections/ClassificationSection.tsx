@@ -229,8 +229,8 @@ export default function ClassificationSection({
                  the hub's main division at a glance. Other tiles keep
                  the neutral surface treatment. */
               const tileCls = isFlagship
-                ? "group relative flex flex-col items-center justify-center gap-3 px-4 py-5 rounded-xl border border-[var(--text-primary)]/30 bg-[var(--text-primary)]/[0.04] hover:border-[var(--text-primary)]/60 hover:bg-[var(--text-primary)]/[0.08] transition-all text-center"
-                : "group flex flex-col items-center justify-center gap-3 px-4 py-5 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--border-focus)]/50 hover:bg-[var(--bg-surface-subtle)]/50 transition-all text-center";
+                ? "group relative flex flex-col items-center justify-center gap-3 aspect-square p-4 rounded-xl border border-[var(--text-primary)]/30 bg-[var(--text-primary)]/[0.04] hover:border-[var(--text-primary)]/60 hover:bg-[var(--text-primary)]/[0.08] transition-all text-center"
+                : "group flex flex-col items-center justify-center gap-3 aspect-square p-4 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--border-focus)]/50 hover:bg-[var(--bg-surface-subtle)]/50 transition-all text-center";
               return (
                 <button
                   key={div.id}
@@ -267,7 +267,7 @@ export default function ClassificationSection({
             {onClickCreateDivision && (
               <button
                 onClick={onClickCreateDivision}
-                className="flex flex-col items-center justify-center gap-3 px-4 py-5 rounded-xl border border-dashed border-[var(--border-subtle)] text-[var(--text-ghost)] hover:text-[var(--text-dim)] hover:border-[var(--border-focus)]/40 transition-all"
+                className="flex flex-col items-center justify-center gap-3 aspect-square p-4 rounded-xl border border-dashed border-[var(--border-subtle)] text-[var(--text-ghost)] hover:text-[var(--text-dim)] hover:border-[var(--border-focus)]/40 transition-all"
               >
                 <PlusIcon className="h-8 w-8" />
                 <span className="text-[11px] font-medium">New Division</span>
@@ -299,7 +299,7 @@ export default function ClassificationSection({
                   <button
                     key={cat.id}
                     onClick={() => onChange({ category_slug: cat.slug, subcategory_slug: "" })}
-                    className="group flex flex-col items-center justify-center gap-3 px-4 py-5 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--border-focus)]/50 hover:bg-[var(--bg-surface-subtle)]/50 transition-all text-center"
+                    className="group flex flex-col items-center justify-center gap-3 aspect-square p-4 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--border-focus)]/50 hover:bg-[var(--bg-surface-subtle)]/50 transition-all text-center"
                   >
                     {logo ? (
                       <Image src={logo} alt={cat.name} width={48} height={48} className="h-12 w-12 object-contain" unoptimized />
@@ -313,7 +313,7 @@ export default function ClassificationSection({
               {onClickCreateCategory && (
                 <button
                   onClick={onClickCreateCategory}
-                  className="flex flex-col items-center justify-center gap-3 px-4 py-5 rounded-xl border border-dashed border-[var(--border-subtle)] text-[var(--text-ghost)] hover:text-[var(--text-dim)] hover:border-[var(--border-focus)]/40 transition-all"
+                  className="flex flex-col items-center justify-center gap-3 aspect-square p-4 rounded-xl border border-dashed border-[var(--border-subtle)] text-[var(--text-ghost)] hover:text-[var(--text-dim)] hover:border-[var(--border-focus)]/40 transition-all"
                 >
                   <PlusIcon className="h-8 w-8" />
                   <span className="text-[11px] font-medium">New Category</span>
@@ -367,7 +367,7 @@ export default function ClassificationSection({
                         });
                       }
                     }}
-                    className="group flex flex-col items-center justify-center gap-3 px-4 py-5 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--border-focus)]/50 hover:bg-[var(--bg-surface-subtle)]/50 transition-all text-center"
+                    className="group flex flex-col items-center justify-center gap-3 aspect-square p-4 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--border-focus)]/50 hover:bg-[var(--bg-surface-subtle)]/50 transition-all text-center"
                   >
                     {logo ? (
                       <Image src={logo} alt={sub.name} width={48} height={48} className="h-12 w-12 object-contain" unoptimized />
@@ -381,7 +381,7 @@ export default function ClassificationSection({
               {onClickCreateSubcategory && (
                 <button
                   onClick={onClickCreateSubcategory}
-                  className="flex flex-col items-center justify-center gap-3 px-4 py-5 rounded-xl border border-dashed border-[var(--border-subtle)] text-[var(--text-ghost)] hover:text-[var(--text-dim)] hover:border-[var(--border-focus)]/40 transition-all"
+                  className="flex flex-col items-center justify-center gap-3 aspect-square p-4 rounded-xl border border-dashed border-[var(--border-subtle)] text-[var(--text-ghost)] hover:text-[var(--text-dim)] hover:border-[var(--border-focus)]/40 transition-all"
                 >
                   <PlusIcon className="h-8 w-8" />
                   <span className="text-[11px] font-medium">New Subcategory</span>
@@ -426,7 +426,7 @@ export default function ClassificationSection({
                   key={k.slug}
                   type="button"
                   onClick={() => onMachineKindChange?.(k)}
-                  className="group flex flex-col items-center gap-2 p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 hover:border-[var(--border-focus)]/60 hover:bg-[var(--bg-surface-subtle)]/80 hover:-translate-y-0.5 transition-all text-center"
+                  className="group flex flex-col items-center justify-center gap-2 aspect-square p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 hover:border-[var(--border-focus)]/60 hover:bg-[var(--bg-surface-subtle)]/80 hover:-translate-y-0.5 transition-all text-center"
                 >
                   <Icon
                     size={28}
