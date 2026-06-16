@@ -53,3 +53,6 @@ next-env.d.ts
 /catalog Photos/
 /Koleex Catalog 2025.pdf
 /Omar Machines Photos/
+
+# Vendored UI/UX Pro Max skill source (installed into ~/.claude/skills; not app code)
+ui-ux-pro-max-skill-main/
