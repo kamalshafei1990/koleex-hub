@@ -488,11 +488,6 @@ export default function ProductForm({ productId }: Props) {
   const [product, setProduct] = useState<ProductFormState>({ ...EMPTY_PRODUCT });
   const [models, setModels] = useState<ModelFormState[]>([]);
   const [media, setMedia] = useState<MediaFormState[]>([]);
-  /* Quick Add — new products open on a compact essentials-only screen
-     (classify · name · KOLEEX code · price · main photo) so creating a
-     product is fast; the full 9-tab editor opens right after to enrich.
-     Edit always uses the full form. Toggle off to reveal the full form. */
-  const [quickMode, setQuickMode] = useState(!productId);
   const [translations, setTranslations] = useState<TranslationFormState[]>([]);
   const [prices, setPrices] = useState<MarketPriceFormState[]>([]);
   const [related, setRelated] = useState<RelatedProductFormState[]>([]);
@@ -1620,9 +1615,7 @@ export default function ProductForm({ productId }: Props) {
         try { window.localStorage.removeItem(draftKey); } catch { /* noop */ }
       }
       if (!isEdit) {
-        /* After a create (incl. Quick Add) land in the full rich editor for
-           this product so the operator can enrich the remaining details. */
-        setTimeout(() => router.push(`/product-data/${pid}/edit`), 800);
+        setTimeout(() => router.push(`/products/${pid}/edit`), 800);
       }
     } catch (err) {
       /* Humanize save failures — operators must never see raw Postgres /
@@ -1647,115 +1640,6 @@ export default function ProductForm({ productId }: Props) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
         <SpinnerIcon className="h-6 w-6 text-[var(--text-dim)] animate-spin" />
-      </div>
-    );
-  }
-
-  /* ═══════════════════════════════════════════════════════════════════
-     QUICK ADD — compact create screen for NEW products. Just the essentials
-     (classify · name · supplier model → auto KOLEEX code · price · main photo),
-     then "Create product" runs the same save and lands in the full editor to
-     enrich everything else. Reuses all existing state, the auto-code effect,
-     uniqueness guard, and save() — no duplicated logic.
-     ═══════════════════════════════════════════════════════════════════ */
-  if (quickMode && !productId) {
-    const code = (primaryModel?.primary_model || "").trim();
-    const classified = !!product.division_slug && !!product.category_slug && !!product.subcategory_slug;
-    const canCreate = product.product_name.trim() !== "" && classified && code !== "";
-    return (
-      <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-        <div className="mx-auto w-full max-w-3xl px-4 sm:px-6 py-6 md:py-8 space-y-6">
-          {/* header */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="text-2xl font-bold text-[var(--text-primary)] leading-tight">{t("quick.title", "Add a product")}</h1>
-              <p className="text-[12px] text-[var(--text-ghost)] mt-1">{t("quick.subtitle", "Capture the essentials now — you'll enrich the full details right after.")}</p>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button type="button" onClick={() => router.push("/products")} className="h-9 px-3.5 rounded-lg border border-[var(--border-subtle)] text-[13px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
-                {t("action.cancel", "Cancel")}
-              </button>
-              <button type="button" disabled={!canCreate || saving} onClick={save} className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold disabled:opacity-40 transition-opacity">
-                {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <DiskIcon className="h-4 w-4" />}
-                {saving ? t("quick.creating", "Creating…") : t("quick.create", "Create product")}
-              </button>
-            </div>
-          </div>
-
-          {error && (
-            <div className="rounded-lg border border-[var(--state-error,#ff3333)]/30 bg-[var(--state-error,#ff3333)]/10 px-4 py-2.5 text-[12px] text-[var(--state-error,#ff3333)]">{error}</div>
-          )}
-          {success && (
-            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-2.5 text-[12px] text-[var(--text-primary)]">{success}</div>
-          )}
-
-          {/* 1 · Classification */}
-          <Section id="quick-classify" icon={<FolderTreeIcon className="h-4 w-4" />} title={t("quick.step1", "1 · Classify")} badge={t("classify.badge", "Division · Category · Subcategory")}>
-            <ClassificationSection
-              data={product}
-              onChange={updateProduct_}
-              divisions={divisions}
-              categories={categories}
-              subcategories={subcategories}
-              divisionLogos={divisionLogos}
-              categoryLogos={categoryLogos}
-              subcategoryLogos={subcategoryLogos}
-              onClickCreateDivision={() => setQuickMode(false)}
-              onClickCreateCategory={() => setQuickMode(false)}
-              onClickCreateSubcategory={() => setQuickMode(false)}
-            />
-          </Section>
-
-          {/* 2 · Essentials — appears once classified */}
-          {classified && (
-            <Section id="quick-essentials" icon={<SparklesIcon className="h-4 w-4" />} title={t("quick.step2", "2 · Essentials")} badge={t("quick.essentialsBadge", "Name · Code · Price")}>
-              <div className="space-y-4">
-                <div>
-                  <label className={lbl}>{t("field.productName", "Product Name")} *</label>
-                  <input value={product.product_name} onChange={(e) => updateProduct_({ product_name: e.target.value })} placeholder={t("quick.namePlaceholder", "e.g. Single Needle Lockstitch DDL-900")} className={inp} />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className={lbl}>{t("quick.supplierModel", "Supplier / Reference Model")}</label>
-                    <input value={primaryModel?.reference_model || ""} onChange={(e) => updatePrimaryModel({ reference_model: e.target.value })} placeholder="e.g. DDL-900" className={inp} />
-                    <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("quick.codeAuto", "The KOLEEX code is generated from this + the subcategory.")}</p>
-                  </div>
-                  <div>
-                    <label className={lbl}>{t("quick.koleexCode", "KOLEEX Code")} *</label>
-                    <input value={primaryModel?.primary_model || ""} onChange={(e) => updatePrimaryModel({ primary_model: e.target.value, coding_status: "edited" })} placeholder={resolvedPrefix ? `${resolvedPrefix}-…` : "—"} className={inp + " font-mono"} />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className={lbl}>{t("quick.cost", "Cost Price (CNY)")}</label>
-                    <input type="number" value={primaryModel?.cost_price || ""} onChange={(e) => updatePrimaryModel({ cost_price: e.target.value })} placeholder="e.g. 1600" className={inp} />
-                  </div>
-                  <div>
-                    <label className={lbl}>{t("quick.global", "Global Selling Price (USD)")}</label>
-                    <input type="number" value={primaryModel?.global_price || ""} onChange={(e) => updatePrimaryModel({ global_price: e.target.value })} placeholder="e.g. 320" className={inp} />
-                  </div>
-                </div>
-              </div>
-            </Section>
-          )}
-
-          {/* 3 · Main photo — optional, collapsed */}
-          {classified && (
-            <Section id="quick-photo" icon={<ImageRawIcon className="h-4 w-4" />} title={t("quick.step3", "3 · Main photo")} badge={t("quick.optional", "Optional")} defaultOpen={false}>
-              <MediaSection media={media} onChange={setMedia} excludeTypes={["gallery", "packing_photo", "label", "manual", "ar_3d", "video"]} />
-            </Section>
-          )}
-
-          {/* footer */}
-          <div className="flex items-center justify-between gap-3 pt-1">
-            <button type="button" onClick={() => setQuickMode(false)} className="text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)] underline-offset-2 hover:underline transition-colors">
-              {t("quick.fullForm", "Need every field now? Open the full form")}
-            </button>
-            <button type="button" disabled={!canCreate || saving} onClick={save} className="inline-flex items-center gap-1.5 h-10 px-5 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold disabled:opacity-40 transition-opacity">
-              {saving ? t("quick.creating", "Creating…") : t("quick.create", "Create product")}
-            </button>
-          </div>
-        </div>
       </div>
     );
   }
