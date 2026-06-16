@@ -219,7 +219,7 @@ export default function ClassificationSection({
       {step === 0 && (
         <div>
           <p className="text-[12px] font-medium text-[var(--text-subtle)] mb-3">Select Division</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-3">
             {orderedDivisions.map((div) => {
               const DivIcon = getDivisionIcon(div.slug);
               const logo = divisionLogos?.[div.slug];
@@ -292,7 +292,7 @@ export default function ClassificationSection({
           {filteredCats.length === 0 && !onClickCreateCategory ? (
             <p className="text-[12px] text-[var(--text-ghost)] italic py-6 text-center">No categories in this division</p>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-3">
               {filteredCats.map((cat) => {
                 const logo = categoryLogos?.[cat.slug];
                 return (
@@ -339,7 +339,7 @@ export default function ClassificationSection({
           {filteredSubs.length === 0 && !onClickCreateSubcategory ? (
             <p className="text-[12px] text-[var(--text-ghost)] italic py-6 text-center">No subcategories in this category</p>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-3">
               {filteredSubs.map((sub) => {
                 const logo = subcategoryLogos?.[sub.slug];
                 return (
@@ -418,7 +418,7 @@ export default function ClassificationSection({
             </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-3">
             {availableKinds.map((k) => {
               const Icon = k.icon;
               return (
