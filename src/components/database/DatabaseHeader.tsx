@@ -16,7 +16,7 @@
    without flattening the hierarchy the user wants.
    --------------------------------------------------------------------------- */
 
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
@@ -35,14 +35,16 @@ const VL_PREFIXES = [
   "/database/product-specs",
 ];
 
-const VL_SUBTABS: Array<{ key: string; label: string; icon: RrIconName; i18nKey: string }> = [
-  { key: "/database/visual-library",  label: "General Icons", icon: "palette",          i18nKey: "db.nav.generalIcons" },
-  { key: "/database/brands",          label: "Brands",        icon: "award",            i18nKey: "db.nav.brands" },
-  { key: "/database/collections",     label: "Collections",   icon: "books",            i18nKey: "db.nav.collections" },
-  { key: "/database/visual-registry", label: "Classification", icon: "box-circle-check", i18nKey: "db.nav.registry" },
-  { key: "/database/product-specs",   label: "Specs & Attributes", icon: "tools",       i18nKey: "db.nav.specsAttributes" },
-  { key: "/database/components",      label: "UI Components", icon: "box-open",         i18nKey: "db.nav.components" },
-  { key: "/database/review",          label: "Review Board",  icon: "badge-check",      i18nKey: "db.nav.reviewBoard" },
+// Two intents, in order: browse-by-type first, then the define/govern tools.
+// A divider is drawn where the group changes.
+const VL_SUBTABS: Array<{ key: string; label: string; icon: RrIconName; i18nKey: string; group: "browse" | "manage" }> = [
+  { key: "/database/visual-library",  label: "General Icons", icon: "palette",          i18nKey: "db.nav.generalIcons",  group: "browse" },
+  { key: "/database/brands",          label: "Brands",        icon: "award",            i18nKey: "db.nav.brands",        group: "browse" },
+  { key: "/database/collections",     label: "Collections",   icon: "books",            i18nKey: "db.nav.collections",   group: "browse" },
+  { key: "/database/components",      label: "UI Components", icon: "box-open",         i18nKey: "db.nav.components",     group: "browse" },
+  { key: "/database/visual-registry", label: "Classification", icon: "box-circle-check", i18nKey: "db.nav.registry",      group: "manage" },
+  { key: "/database/product-specs",   label: "Specs & Attributes", icon: "tools",       i18nKey: "db.nav.specsAttributes", group: "manage" },
+  { key: "/database/review",          label: "Review Board",  icon: "badge-check",      i18nKey: "db.nav.reviewBoard",   group: "manage" },
 ];
 
 const T: Translations = {
@@ -114,26 +116,29 @@ export default function DatabaseHeader({
       {showTabs && inVL && (
         <nav
           aria-label="Visual Library sections"
-          className="-mt-1 flex items-center gap-1 overflow-x-auto rounded-[14px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="-mt-0.5 flex items-center gap-0.5 overflow-x-auto border-b border-[var(--border-subtle)] px-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
-          {VL_SUBTABS.map((s) => {
+          {VL_SUBTABS.map((s, i) => {
             const activeSub = isOn(pathname, s.key);
+            const groupBreak = i > 0 && VL_SUBTABS[i - 1].group !== s.group;
             return (
-              <Link
-                key={s.key}
-                href={s.key}
-                aria-current={activeSub ? "page" : undefined}
-                className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-[10px] px-3.5 py-2 text-[12.5px] transition-colors ${
-                  activeSub
-                    ? "bg-[var(--bg-inverted)] font-semibold text-[var(--text-inverted)] shadow-sm"
-                    : "font-medium text-[var(--text-muted)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
-                }`}
-              >
-                <span aria-hidden className={activeSub ? "opacity-90" : "opacity-70"}>
-                  <RrIcon name={s.icon} size={14} />
-                </span>
-                {(() => { const tr = t(s.i18nKey); return tr === s.i18nKey ? s.label : tr; })()}
-              </Link>
+              <Fragment key={s.key}>
+                {groupBreak && <span aria-hidden className="mx-1.5 h-4 w-px shrink-0 self-center bg-[var(--border-subtle)]" />}
+                <Link
+                  href={s.key}
+                  aria-current={activeSub ? "page" : undefined}
+                  className={`relative inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-2.5 text-[12.5px] transition-colors after:absolute after:inset-x-3 after:-bottom-px after:h-0.5 after:rounded-full ${
+                    activeSub
+                      ? "font-semibold text-[var(--text-primary)] after:bg-[var(--bg-inverted)]"
+                      : "font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] after:bg-transparent"
+                  }`}
+                >
+                  <span aria-hidden className={activeSub ? "opacity-90" : "opacity-60"}>
+                    <RrIcon name={s.icon} size={14} />
+                  </span>
+                  {(() => { const tr = t(s.i18nKey); return tr === s.i18nKey ? s.label : tr; })()}
+                </Link>
+              </Fragment>
             );
           })}
         </nav>
