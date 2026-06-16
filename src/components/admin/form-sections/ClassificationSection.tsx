@@ -237,7 +237,7 @@ export default function ClassificationSection({
                  the hub's main division at a glance. Other tiles keep
                  the neutral surface treatment. */
               const tileCls = isFlagship
-                ? "group relative flex flex-col items-center justify-center gap-3 aspect-square p-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] shadow-xl hover:opacity-90 hover:-translate-y-0.5 transition-all text-center"
+                ? "group relative flex flex-col items-center justify-center gap-3 col-span-2 row-span-2 aspect-square p-5 rounded-xl border border-[var(--text-primary)]/30 bg-[var(--text-primary)]/[0.05] shadow-lg hover:border-[var(--text-primary)]/50 hover:bg-[var(--text-primary)]/[0.08] transition-all text-center"
                 : "group flex flex-col items-center justify-center gap-3 aspect-square p-4 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--border-focus)]/50 hover:bg-[var(--bg-surface-subtle)]/50 transition-all text-center";
               return (
                 <button
@@ -246,15 +246,15 @@ export default function ClassificationSection({
                   className={tileCls}
                 >
                   {isFlagship && (
-                    <span className="absolute top-2 right-2 inline-flex items-center h-4 px-1.5 rounded-full bg-[var(--text-inverted)] text-[var(--bg-inverted)] text-[8px] font-bold uppercase tracking-wider">
+                    <span className="absolute top-2.5 right-2.5 inline-flex items-center h-5 px-2 rounded-full bg-[var(--text-primary)] text-[var(--text-inverted)] text-[9px] font-bold uppercase tracking-wider">
                       Flagship
                     </span>
                   )}
                   {DivIcon ? (
-                    <DivIcon className={`h-10 w-10 transition-colors ${
+                    <DivIcon className={`transition-colors ${
                       isFlagship
-                        ? "text-[var(--text-inverted)]"
-                        : "text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]"
+                        ? "h-16 w-16 text-[var(--text-primary)]"
+                        : "h-10 w-10 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]"
                     }`} />
                   ) : logo ? (
                     <Image src={logo} alt={div.name} width={48} height={48} className="h-12 w-12 object-contain" unoptimized />
@@ -262,12 +262,12 @@ export default function ClassificationSection({
                     <LayersIcon className="h-10 w-10 text-[var(--text-ghost)]" />
                   )}
                   <div>
-                    <span className={`text-[12px] leading-tight block ${
+                    <span className={`leading-tight block ${
                       isFlagship
-                        ? "font-semibold text-[var(--text-inverted)]"
-                        : "font-medium text-[var(--text-primary)]"
+                        ? "text-[15px] font-semibold text-[var(--text-primary)]"
+                        : "text-[12px] font-medium text-[var(--text-primary)]"
                     }`}>{div.name}</span>
-                    {div.tagline && <span className={`text-[10px] leading-tight line-clamp-1 mt-0.5 block ${isFlagship ? "text-[var(--text-inverted)]/60" : "text-[var(--text-ghost)]"}`}>{div.tagline}</span>}
+                    {div.tagline && <span className="text-[10px] text-[var(--text-ghost)] leading-tight line-clamp-1 mt-0.5 block">{div.tagline}</span>}
                   </div>
                 </button>
               );
