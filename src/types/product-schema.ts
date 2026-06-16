@@ -180,6 +180,9 @@ export type ProductKnowledgeBlockType =
   | 'comparison_notes'
   | 'recommended_use_cases'
   | 'limitations'
+  | 'warnings'
+  | 'troubleshooting'
+  | 'ai_summary'
   | 'package_contents'
   | 'warranty_notes';
 

@@ -797,6 +797,21 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         );
       })() : null}
 
+      {/* ═══ 10b. WARNINGS & SAFETY (knowledge) ═══ */}
+      {firstKb("warnings") ? (
+        <section className="space-y-4">
+          <SectionHead eyebrow={t("preview.eyebrowSafety", "Before you run it")} title={t("preview.warnings", "Warnings & Safety")} />
+          <ul className="space-y-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-5">
+            {asKnowledgeList(firstKb("warnings")!.content).map((item, i) => (
+              <li key={i} className="flex items-start gap-2.5 text-sm text-[var(--text-primary)]">
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--text-primary)]" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       {/* ═══ 11. WHAT'S INCLUDED / WARRANTY (knowledge) ═══ */}
       {(firstKb("package_contents") || firstKb("warranty_notes")) ? (
         <section className="grid grid-cols-1 md:grid-cols-2 gap-6">

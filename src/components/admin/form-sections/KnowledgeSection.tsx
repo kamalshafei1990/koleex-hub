@@ -58,10 +58,13 @@ const TYPE_META: Record<ProductKnowledgeBlockType, TypeMeta> = {
   operation_notes: { shape: "list", group: "Technical", hint: "How to run it well — one per line." },
   maintenance_notes: { shape: "list", group: "Technical", hint: "Upkeep & service notes — one per line." },
   comparison_notes: { shape: "list", group: "Technical", hint: "How it compares (internal / quote) — one per line." },
-  limitations: { shape: "list", group: "Technical", hint: "Constraints & warnings (internal) — one per line." },
+  limitations: { shape: "list", group: "Technical", hint: "Constraints & limitations (internal) — one per line." },
+  warnings: { shape: "list", group: "Technical", hint: "Safety warnings & cautions (public) — one per line." },
   package_contents: { shape: "list", group: "Commercial & Support", hint: "What's in the box — one per line." },
   warranty_notes: { shape: "text", group: "Commercial & Support", hint: "Warranty coverage & terms." },
   buyer_questions: { shape: "qa", group: "AI & Buyers", hint: "FAQ — question / answer pairs the AI assistant can quote." },
+  troubleshooting: { shape: "list", group: "AI & Buyers", hint: "Common problems and fixes — one per line." },
+  ai_summary: { shape: "text", group: "AI & Buyers", hint: "A concise AI-facing summary of the product." },
 };
 
 const ALL_TYPES = Object.keys(TYPE_META) as ProductKnowledgeBlockType[];

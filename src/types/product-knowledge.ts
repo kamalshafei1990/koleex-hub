@@ -97,6 +97,9 @@ export const DEFAULT_KNOWLEDGE_VISIBILITY: Record<
   maintenance_notes: { ...PRESET_OPERATIONAL },
   buyer_questions: { ...PRESET_AI_HEAVY },
   limitations: { ...PRESET_INTERNAL_AI },
+  warnings: { ...PRESET_PUBLIC },
+  troubleshooting: { ...PRESET_AI_HEAVY },
+  ai_summary: { ...PRESET_AI_HEAVY },
 };
 
 /* Per-block aiWeight — drives readiness scoring + AI prompt prioritization.
@@ -116,6 +119,9 @@ export const DEFAULT_KNOWLEDGE_AI_WEIGHT: Record<ProductKnowledgeBlockType, numb
   maintenance_notes: 0.6,
   buyer_questions: 1.0,
   limitations: 0.5,
+  warnings: 0.7,
+  troubleshooting: 0.7,
+  ai_summary: 1.0,
 };
 
 /* Default human-readable title per block type. Factories use these when
@@ -135,6 +141,9 @@ export const DEFAULT_KNOWLEDGE_TITLE: Record<ProductKnowledgeBlockType, string> 
   maintenance_notes: "Maintenance Notes",
   buyer_questions: "Buyer Questions",
   limitations: "Limitations",
+  warnings: "Warnings & Safety",
+  troubleshooting: "Troubleshooting",
+  ai_summary: "AI Summary",
 };
 
 /* -------------------------------------------------------------------------- */
