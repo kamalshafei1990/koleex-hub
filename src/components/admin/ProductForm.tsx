@@ -2704,6 +2704,18 @@ export default function ProductForm({ productId }: Props) {
                 </div>
               </div>
             </Section>
+
+            <Section id="search-social" icon={<EyeIcon className="h-4 w-4" />} title={t("review.searchSocialSection", "Search & Social")} badge={t("review.searchSocialBadge", "SEO preview")} defaultOpen>
+              <SearchSocialSection
+                productName={product.product_name}
+                brand={product.brand}
+                slug={product.slug}
+                excerpt={product.excerpt}
+                primaryImageUrl={media.find((m) => m.type === "main_image")?.url}
+                categoryName={categoryName}
+                onExcerptChange={(v) => updateProduct_({ excerpt: v })}
+              />
+            </Section>
           </div>
         )}
 
@@ -2826,6 +2838,10 @@ export default function ProductForm({ productId }: Props) {
                 blocks={(product.schema_knowledge as ProductKnowledgeBlock[]) || []}
                 onChange={(blocks) => updateProduct_({ schema_knowledge: blocks })}
               />
+            </Section>
+
+            <Section id="related" icon={<Link2Icon className="h-4 w-4" />} title={t("review.relatedSection", "Related Products")} badge={t("knowledge.relatedBadge", "Accessories · Spares · Compatible")} defaultOpen>
+              <RelatedProductsSection related={related} onChange={setRelated} currentProductId={productId} />
             </Section>
           </div>
         )}
@@ -3776,21 +3792,10 @@ export default function ProductForm({ productId }: Props) {
                 <TranslationsSection translations={translations} onChange={setTranslations} />
               </Section>
 
-              <Section id="related" icon={<Link2Icon className="h-4 w-4" />} title={t("review.relatedSection", "Related Products")} defaultOpen={false}>
-                <RelatedProductsSection related={related} onChange={setRelated} currentProductId={productId} />
-              </Section>
-
-              <Section id="search-social" icon={<EyeIcon className="h-4 w-4" />} title={t("review.searchSocialSection", "Search & Social")} badge={t("review.searchSocialBadge", "SEO preview")} defaultOpen={false}>
-                <SearchSocialSection
-                  productName={product.product_name}
-                  brand={product.brand}
-                  slug={product.slug}
-                  excerpt={product.excerpt}
-                  primaryImageUrl={media.find((m) => m.type === "main_image")?.url}
-                  categoryName={categoryName}
-                  onExcerptChange={(v) => updateProduct_({ excerpt: v })}
-                />
-              </Section>
+              {/* Related Products → moved to the Knowledge & Relationships tab.
+                 Search & Social (SEO) → moved to the Identity tab (next to the
+                 slug + short description that feed it). Both open by default so
+                 they're discovered during normal data entry, not buried here. */}
 
               {/* ── Publish action card ──
                     Bigger, clearer, premium. Status meaning + the
