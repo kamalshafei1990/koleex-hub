@@ -95,102 +95,123 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
             const logo = logoOf(l.supplier_id);
             return (
               <div key={l._tempId} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-4 space-y-3">
-                {/* Header: read-only supplier identity (from Suppliers app) + actions */}
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center overflow-hidden shrink-0">
-                      {logo ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={logo} alt="" className="h-full w-full object-contain p-0.5" />
-                      ) : (
-                        <FactoryIcon className="h-4 w-4 text-[var(--text-ghost)]" />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{nameOf(l.supplier_id)}</div>
-                      <div className="text-[10px] text-[var(--text-ghost)]">Managed in the Suppliers app</div>
-                    </div>
+                {/* ── HERO — product-led: photo · name · model · cost price.
+                       Supplier identity is secondary context below. ── */}
+                <div className="flex items-start gap-4">
+                  {/* Product photo */}
+                  <div className="relative h-24 w-24 shrink-0 rounded-xl bg-[var(--bg-surface)] border border-dashed border-[var(--border-subtle)] overflow-hidden flex items-center justify-center">
+                    {l.supplier_product_photo ? (
+                      <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={l.supplier_product_photo} alt="" className="h-full w-full object-cover" />
+                        <button type="button" onClick={() => update(l._tempId, { supplier_product_photo: "" })} aria-label="Remove photo"
+                          className="absolute top-0.5 right-0.5 h-5 w-5 flex items-center justify-center rounded-md bg-black/60 text-white hover:bg-black/80">
+                          <CrossIcon className="h-3 w-3" />
+                        </button>
+                      </>
+                    ) : (
+                      <label className="cursor-pointer flex flex-col items-center gap-1 text-[var(--text-ghost)] hover:text-[var(--text-muted)] transition-colors">
+                        {uploadingId === l._tempId ? (
+                          <span className="text-[9px]">Uploading…</span>
+                        ) : (
+                          <>
+                            <UploadIcon className="h-5 w-5" />
+                            <span className="text-[9px]">Photo</span>
+                          </>
+                        )}
+                        <input type="file" accept="image/*" className="hidden" disabled={uploadingId === l._tempId}
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setUploadingId(l._tempId);
+                            const res = await uploadProductFile(file);
+                            setUploadingId(null);
+                            if (res) update(l._tempId, { supplier_product_photo: res.url });
+                          }} />
+                      </label>
+                    )}
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setPrimary(l._tempId)}
-                      aria-pressed={l.is_primary}
-                      title={l.is_primary ? "Primary supplier" : "Make primary"}
-                      className={`h-7 px-2.5 rounded-lg border text-[11px] font-medium flex items-center gap-1.5 transition-colors ${
-                        l.is_primary
-                          ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
-                          : "bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border-subtle)] hover:text-[var(--text-primary)]"
-                      }`}
-                    >
-                      <StarIcon className="h-3 w-3" /> {l.is_primary ? "Primary" : "Make primary"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => remove(l._tempId)}
-                      aria-label="Remove supplier link"
-                      className="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-[var(--state-error,#FF3333)] border border-[var(--border-subtle)] hover:border-[var(--state-error,#FF3333)]/40 transition-colors"
-                    >
-                      <TrashIcon className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
 
-                {/* Product as supplied — photo + supplier's own product name */}
-                <div className="flex items-start gap-3">
-                  <div className="shrink-0">
-                    <label className={lbl}>Product photo</label>
-                    <div className="relative h-20 w-20 rounded-lg bg-[var(--bg-surface)] border border-dashed border-[var(--border-subtle)] overflow-hidden flex items-center justify-center">
-                      {l.supplier_product_photo ? (
-                        <>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={l.supplier_product_photo} alt="" className="h-full w-full object-cover" />
-                          <button type="button" onClick={() => update(l._tempId, { supplier_product_photo: "" })} aria-label="Remove photo"
-                            className="absolute top-0.5 right-0.5 h-5 w-5 flex items-center justify-center rounded-md bg-black/60 text-white hover:bg-black/80">
-                            <CrossIcon className="h-3 w-3" />
-                          </button>
-                        </>
-                      ) : (
-                        <label className="cursor-pointer flex flex-col items-center gap-1 text-[var(--text-ghost)] hover:text-[var(--text-muted)] transition-colors">
-                          {uploadingId === l._tempId ? (
-                            <span className="text-[9px]">Uploading…</span>
-                          ) : (
-                            <>
-                              <UploadIcon className="h-4 w-4" />
-                              <span className="text-[9px]">Upload</span>
-                            </>
-                          )}
-                          <input type="file" accept="image/*" className="hidden" disabled={uploadingId === l._tempId}
-                            onChange={async (e) => {
-                              const file = e.target.files?.[0];
-                              if (!file) return;
-                              setUploadingId(l._tempId);
-                              const res = await uploadProductFile(file);
-                              setUploadingId(null);
-                              if (res) update(l._tempId, { supplier_product_photo: res.url });
-                            }} />
-                        </label>
-                      )}
-                    </div>
-                  </div>
+                  {/* Product identity: name (title) · model · cost price */}
                   <div className="flex-1 min-w-0">
-                    <label className={lbl}>Supplier&apos;s product name</label>
-                    <input className={inp} value={l.supplier_product_name} placeholder="What the supplier calls this product"
-                      onChange={(e) => update(l._tempId, { supplier_product_name: e.target.value })} />
-                    <label className={`${lbl} mt-2`}>Supply type</label>
-                    <select className={inp} value={l.supply_type} onChange={(e) => update(l._tempId, { supply_type: e.target.value })}>
-                      <option value="">—</option>
-                      {SUPPLY_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
+                    <div className="flex items-start justify-between gap-3">
+                      <input
+                        value={l.supplier_product_name}
+                        placeholder="Product name"
+                        onChange={(e) => update(l._tempId, { supplier_product_name: e.target.value })}
+                        className="flex-1 min-w-0 bg-transparent border-0 border-b border-transparent hover:border-[var(--border-subtle)] focus:border-[var(--border-focus)] outline-none text-[16px] font-semibold text-[var(--text-primary)] placeholder:text-[var(--text-dim)] pb-0.5"
+                      />
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setPrimary(l._tempId)}
+                          aria-pressed={l.is_primary}
+                          title={l.is_primary ? "Primary supplier" : "Make primary"}
+                          className={`h-7 px-2.5 rounded-lg border text-[11px] font-medium flex items-center gap-1.5 transition-colors ${
+                            l.is_primary
+                              ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
+                              : "bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border-subtle)] hover:text-[var(--text-primary)]"
+                          }`}
+                        >
+                          <StarIcon className="h-3 w-3" /> {l.is_primary ? "Primary" : "Make primary"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => remove(l._tempId)}
+                          aria-label="Remove supplier link"
+                          className="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-[var(--state-error,#FF3333)] border border-[var(--border-subtle)] hover:border-[var(--state-error,#FF3333)]/40 transition-colors"
+                        >
+                          <TrashIcon className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-2.5">
+                      <div>
+                        <label className={lbl}>Model</label>
+                        <input className={inp} value={l.supplier_product_code} placeholder="e.g. JK-58420"
+                          onChange={(e) => update(l._tempId, { supplier_product_code: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className={lbl}>Cost price</label>
+                        <div className="flex gap-1.5">
+                          <input className={`${inp} flex-1 min-w-0`} value={l.unit_cost_cny} inputMode="decimal" placeholder="e.g. 1850"
+                            onChange={(e) => update(l._tempId, { unit_cost_cny: e.target.value.replace(/[^0-9.]/g, "") })} />
+                          <select
+                            className="h-9 w-[84px] shrink-0 px-2 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
+                            value={l.currency} onChange={(e) => update(l._tempId, { currency: e.target.value })}>
+                            <option value="CNY">CNY</option>
+                            <option value="USD">USD</option>
+                            <option value="EUR">EUR</option>
+                            <option value="AED">AED</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Supplier context (secondary) */}
+                    <div className="flex items-center gap-2 mt-3 pt-2.5 border-t border-[var(--border-subtle)] min-w-0">
+                      <div className="h-5 w-5 rounded bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center overflow-hidden shrink-0">
+                        {logo ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={logo} alt="" className="h-full w-full object-contain p-0.5" />
+                        ) : (
+                          <FactoryIcon className="h-3 w-3 text-[var(--text-ghost)]" />
+                        )}
+                      </div>
+                      <span className="text-[11px] text-[var(--text-ghost)] truncate">From {nameOf(l.supplier_id)} · managed in the Suppliers app</span>
+                    </div>
                   </div>
                 </div>
 
                 {/* Per-product link fields */}
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   <div>
-                    <label className={lbl}>Supplier product / model code</label>
-                    <input className={inp} value={l.supplier_product_code} placeholder="e.g. JK-58420"
-                      onChange={(e) => update(l._tempId, { supplier_product_code: e.target.value })} />
+                    <label className={lbl}>Supply type</label>
+                    <select className={inp} value={l.supply_type} onChange={(e) => update(l._tempId, { supply_type: e.target.value })}>
+                      <option value="">—</option>
+                      {SUPPLY_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
                   </div>
                   <div>
                     <label className={lbl}>MOQ</label>
@@ -201,20 +222,6 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                     <label className={lbl}>Lead time (days)</label>
                     <input className={inp} value={l.lead_time_days} inputMode="numeric" placeholder="e.g. 30"
                       onChange={(e) => update(l._tempId, { lead_time_days: e.target.value.replace(/[^0-9]/g, "") })} />
-                  </div>
-                  <div>
-                    <label className={lbl}>Cost price</label>
-                    <input className={inp} value={l.unit_cost_cny} inputMode="decimal" placeholder="e.g. 1850"
-                      onChange={(e) => update(l._tempId, { unit_cost_cny: e.target.value.replace(/[^0-9.]/g, "") })} />
-                  </div>
-                  <div>
-                    <label className={lbl}>Currency</label>
-                    <select className={inp} value={l.currency} onChange={(e) => update(l._tempId, { currency: e.target.value })}>
-                      <option value="CNY">CNY</option>
-                      <option value="USD">USD</option>
-                      <option value="EUR">EUR</option>
-                      <option value="AED">AED</option>
-                    </select>
                   </div>
                   <div>
                     <label className={lbl}>Payment terms</label>
