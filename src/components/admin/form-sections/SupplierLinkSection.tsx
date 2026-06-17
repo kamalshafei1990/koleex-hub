@@ -22,6 +22,8 @@ import UploadIcon from "@/components/icons/ui/UploadIcon";
 import PictureIcon from "@/components/icons/ui/PictureIcon";
 import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
 import LayoutListIcon from "@/components/icons/ui/LayoutListIcon";
+import InfoIcon from "@/components/icons/ui/InfoIcon";
+import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
 import { uploadProductFile } from "@/lib/products-admin";
 import type { ProductSupplierFormState } from "@/types/product-form";
 
@@ -59,6 +61,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
   const [pickerOpen, setPickerOpen] = useState(false);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [uploadingQuoteId, setUploadingQuoteId] = useState<string | null>(null);
+  const [infoId, setInfoId] = useState<string | null>(null);   // supplier whose info popup is open
 
   const linkedIds = new Set(links.map((l) => l.supplier_id));
   const available = suppliers.filter((s) => !linkedIds.has(s.id));
@@ -128,7 +131,12 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
               <div key={l._tempId} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-4 space-y-3">
                 {/* ── Supplier identity — clear header (logo + name) + actions ── */}
                 <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => setInfoId(l.supplier_id)}
+                    title="View supplier details"
+                    className="group flex items-center gap-3 min-w-0 text-left rounded-lg -m-1 p-1 hover:bg-[var(--bg-inverted)]/[0.04] transition-colors"
+                  >
                     <div className="h-11 w-11 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center overflow-hidden shrink-0">
                       {logo ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -138,13 +146,16 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                       )}
                     </div>
                     <div className="min-w-0">
-                      <div className="text-[15px] font-semibold text-[var(--text-primary)] truncate">{nameOf(l.supplier_id)}</div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[15px] font-semibold text-[var(--text-primary)] truncate">{nameOf(l.supplier_id)}</span>
+                        <InfoIcon className="h-3.5 w-3.5 text-[var(--text-ghost)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                      </div>
                       {nameCnOf(l.supplier_id) && (
                         <div className="text-[12px] text-[var(--text-muted)] truncate">{nameCnOf(l.supplier_id)}</div>
                       )}
-                      <div className="text-[10px] text-[var(--text-ghost)]">Supplier · managed in the Suppliers app</div>
+                      <div className="text-[10px] text-[var(--text-ghost)]">Supplier · tap for details · managed in the Suppliers app</div>
                     </div>
-                  </div>
+                  </button>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
@@ -430,6 +441,81 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
           onClose={() => setPickerOpen(false)}
         />
       )}
+
+      {infoId && supOf(infoId) && (
+        <SupplierInfoModal supplier={supOf(infoId)!} onClose={() => setInfoId(null)} />
+      )}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+   SupplierInfoModal — quick-look popup of the supplier's key facts. All data
+   is sourced from the Suppliers app (read-only here); a link opens the full
+   profile in a new tab.
+   --------------------------------------------------------------------------- */
+function SupplierInfoModal({ supplier, onClose }: { supplier: SupplierOption; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const facts: { label: string; value: string | null | undefined }[] = [
+    { label: "Supply type", value: supplier.supply_type },
+    { label: "MOQ", value: supplier.moq },
+    { label: "Lead time", value: supplier.lead_time },
+    { label: "Payment terms", value: supplier.payment_terms },
+    { label: "Currency", value: supplier.currency },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative w-full max-w-md rounded-2xl bg-[var(--bg-base)] border border-[var(--border-subtle)] shadow-xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3 p-4 border-b border-[var(--border-subtle)]">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-14 w-14 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center overflow-hidden shrink-0">
+              {supplier.logo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={supplier.logo} alt="" className="h-full w-full object-contain p-1" />
+              ) : (
+                <FactoryIcon className="h-6 w-6 text-[var(--text-ghost)]" />
+              )}
+            </div>
+            <div className="min-w-0">
+              <div className="text-[16px] font-semibold text-[var(--text-primary)] leading-tight">{supplier.name}</div>
+              {supplier.name_cn && <div className="text-[13px] text-[var(--text-muted)] truncate">{supplier.name_cn}</div>}
+              <div className="text-[10px] text-[var(--text-ghost)] mt-0.5">Managed in the Suppliers app</div>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close"
+            className="shrink-0 h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-inverted)]/[0.05]">
+            <CrossIcon className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Key facts */}
+        <div className="p-4">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+            {facts.map((f) => (
+              <div key={f.label}>
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-ghost)]">{f.label}</div>
+                <div className="text-[13px] text-[var(--text-primary)] truncate">{f.value || "—"}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Footer — open full profile */}
+        <div className="flex items-center justify-end gap-2 p-3 border-t border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
+          <a href={`/suppliers/${supplier.id}`} target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-medium hover:opacity-90 transition-opacity">
+            <ExternalLinkIcon className="h-3.5 w-3.5" /> Open full profile
+          </a>
+        </div>
+      </div>
     </div>
   );
 }
