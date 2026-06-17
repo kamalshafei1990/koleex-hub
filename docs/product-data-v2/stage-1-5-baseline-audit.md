@@ -233,6 +233,22 @@ Captured via Supabase MCP (read-only) as a reference point for the **data-popula
 
 > These are **not** acceptance targets for the schema dump (which must contain 0 data rows). They document the production data reality so the CL-0012 classification/coding additions can be planned against the true taxonomy size when V2 unfreezes. **Blocker reminder:** completing the schema dump (Steps 1–4) requires the Supabase CLI link + DB password — an **owner-only manual step** (credentials must not be entered by the assistant). Until that runs and validates, Stage 2 / PD-V2 stays BLOCKED and the CL-0012 prefixes stay documented-but-unfrozen.
 
+### Step 5c — Read-only re-validation (2026-06-17, via Supabase MCP — no credentials needed)
+Live production introspection (`information_schema` / `pg_catalog`) against the §Step-5 targets:
+
+| Object | Target | Live (2026-06-17) | |
+|---|---|---|---|
+| functions (6 app schemas) | 83 | **83** | ✅ |
+| triggers | 115 | **115** | ✅ |
+| RLS policies | 250 | **250** | ✅ |
+| enums | 14 | **14** | ✅ |
+| app schemas (public + 5 custom) | 6 | **6** | ✅ |
+| tables total / public | 310 / 274 | **312 / 276** | ✅ **+2 expected** |
+
+> The **+2 tables** are this session's additive migrations — `classification_icons` (icon hub) and `visual_icon_categories` (custom icon categories). All other objects match exactly ⇒ production schema is intact and on-target. New acceptance baseline going forward: **312 tables / 276 public**.
+>
+> **What still requires the owner:** the *executable* schema-dump file (Steps 1–4) needs the Supabase CLI/`pg_dump` with the **prod DB password** — that credentialed command cannot be run by the assistant (passwords are never handled here), and hand-reconstructing 312 tables / 83 functions / 250 policies via catalog introspection would be a fragile substitute for `pg_dump`. So the dump stays an owner action; everything that can be validated read-only is ✅ above.
+
 ### Step 6 — Adopt (after validation passes)
 Squash (recommended): make the completed baseline the single foundation migration and `supabase migration repair` the remote history so future branches replay only the baseline. Then Stage 5+ can be branch-tested faithfully.
 
