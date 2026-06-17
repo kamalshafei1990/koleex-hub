@@ -322,15 +322,20 @@ export async function deleteMarketPrice(id: string): Promise<boolean> {
 }
 
 // ── Related Products → /api/products/[id]/related ──
-export async function fetchRelatedProducts(productId: string): Promise<(RelatedProductRow & { product_name?: string })[]> {
+export async function fetchRelatedProducts(productId: string): Promise<(RelatedProductRow & { product_name?: string; relation_type?: string })[]> {
   if (!productId) return [];
-  const json = await jget<{ related?: (RelatedProductRow & { product_name?: string })[] }>(
+  const json = await jget<{ related?: (RelatedProductRow & { product_name?: string; relation_type?: string })[] }>(
     `/api/products/${encodeURIComponent(productId)}/related`, {},
   );
   return json.related ?? [];
 }
-export async function setRelatedProducts(productId: string, relatedIds: string[]): Promise<boolean> {
-  const { ok } = await jsend(`/api/products/${encodeURIComponent(productId)}/related`, "PUT", { relatedIds });
+/* Phase 6 — typed relations. Each entry carries related_id + relation_type;
+   the route falls back to 'related' for legacy callers. */
+export async function setRelatedProducts(
+  productId: string,
+  relations: { related_id: string; relation_type: string }[],
+): Promise<boolean> {
+  const { ok } = await jsend(`/api/products/${encodeURIComponent(productId)}/related`, "PUT", { relations });
   return ok;
 }
 
