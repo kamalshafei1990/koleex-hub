@@ -25,10 +25,14 @@ import LayoutListIcon from "@/components/icons/ui/LayoutListIcon";
 import { uploadProductFile } from "@/lib/products-admin";
 import type { ProductSupplierFormState } from "@/types/product-form";
 
-const SUPPLY_TYPES = ["OEM", "ODM", "Own brand"];
 const INCOTERMS = ["EXW", "FOB", "CIF", "CFR", "DDP", "DAP"];
 
-interface SupplierOption { id: string; name: string; name_cn?: string | null; logo: string | null }
+interface SupplierOption {
+  id: string; name: string; name_cn?: string | null; logo: string | null;
+  /* Supplier-level defaults — source of truth for shared fields. */
+  supply_type?: string | null; payment_terms?: string | null;
+  currency?: string | null; moq?: string | null; lead_time?: string | null;
+}
 
 interface Props {
   links: ProductSupplierFormState[];
@@ -46,9 +50,10 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
 
   const linkedIds = new Set(links.map((l) => l.supplier_id));
   const available = suppliers.filter((s) => !linkedIds.has(s.id));
-  const nameOf = (id: string) => suppliers.find((s) => s.id === id)?.name || "(unknown supplier)";
-  const nameCnOf = (id: string) => suppliers.find((s) => s.id === id)?.name_cn || null;
-  const logoOf = (id: string) => suppliers.find((s) => s.id === id)?.logo || null;
+  const supOf = (id: string) => suppliers.find((s) => s.id === id);
+  const nameOf = (id: string) => supOf(id)?.name || "(unknown supplier)";
+  const nameCnOf = (id: string) => supOf(id)?.name_cn || null;
+  const logoOf = (id: string) => supOf(id)?.logo || null;
 
   const add = (supplierId: string) => {
     if (!supplierId || linkedIds.has(supplierId)) return;
@@ -178,43 +183,44 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                       <div className="flex gap-1.5">
                         <input className={`${inp} flex-1 min-w-0`} value={l.unit_cost_cny} inputMode="decimal" placeholder="e.g. 1850"
                           onChange={(e) => update(l._tempId, { unit_cost_cny: e.target.value.replace(/[^0-9.]/g, "") })} />
-                        <select
-                          className="h-9 w-[84px] shrink-0 px-2 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
-                          value={l.currency} onChange={(e) => update(l._tempId, { currency: e.target.value })}>
-                          <option value="CNY">CNY</option>
-                          <option value="USD">USD</option>
-                          <option value="EUR">EUR</option>
-                          <option value="AED">AED</option>
-                        </select>
+                        <div className="h-9 w-[84px] shrink-0 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] flex items-center justify-center" title="Currency comes from the supplier (Suppliers app)">
+                          {supOf(l.supplier_id)?.currency || "—"}
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Per-product link fields */}
+                {/* From the supplier (Suppliers app) — source of truth, read-only here */}
+                {(() => {
+                  const sup = supOf(l.supplier_id);
+                  const facts: { label: string; value: string | null | undefined }[] = [
+                    { label: "Supply type", value: sup?.supply_type },
+                    { label: "MOQ", value: sup?.moq },
+                    { label: "Lead time", value: sup?.lead_time },
+                    { label: "Payment terms", value: sup?.payment_terms },
+                    { label: "Currency", value: sup?.currency },
+                  ];
+                  return (
+                    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-ghost)]">From the supplier</span>
+                        <span className="text-[10px] text-[var(--text-ghost)]">edit in the Suppliers app</span>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2">
+                        {facts.map((f) => (
+                          <div key={f.label}>
+                            <div className="text-[10px] uppercase tracking-wide text-[var(--text-ghost)]">{f.label}</div>
+                            <div className="text-[12px] text-[var(--text-primary)] truncate">{f.value || "—"}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Per-product link fields (product-specific — not on the supplier record) */}
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  <div>
-                    <label className={lbl}>Supply type</label>
-                    <select className={inp} value={l.supply_type} onChange={(e) => update(l._tempId, { supply_type: e.target.value })}>
-                      <option value="">—</option>
-                      {SUPPLY_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className={lbl}>MOQ</label>
-                    <input className={inp} value={l.moq} inputMode="numeric" placeholder="e.g. 10"
-                      onChange={(e) => update(l._tempId, { moq: e.target.value.replace(/[^0-9]/g, "") })} />
-                  </div>
-                  <div>
-                    <label className={lbl}>Lead time (days)</label>
-                    <input className={inp} value={l.lead_time_days} inputMode="numeric" placeholder="e.g. 30"
-                      onChange={(e) => update(l._tempId, { lead_time_days: e.target.value.replace(/[^0-9]/g, "") })} />
-                  </div>
-                  <div>
-                    <label className={lbl}>Payment terms</label>
-                    <input className={inp} value={l.payment_terms} placeholder="e.g. 30% TT, 70% on shipment"
-                      onChange={(e) => update(l._tempId, { payment_terms: e.target.value })} />
-                  </div>
                   <div>
                     <label className={lbl}>Incoterms</label>
                     <select className={inp} value={l.incoterms} onChange={(e) => update(l._tempId, { incoterms: e.target.value })}>

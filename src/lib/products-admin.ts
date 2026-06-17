@@ -444,10 +444,14 @@ export async function fetchProductMainImages(): Promise<Record<string, string>> 
 }
 
 // ── Supplier names + logos (already API-backed) ──
-export async function fetchSupplierNames(): Promise<{ id: string; name: string; name_cn?: string | null; logo: string | null }[]> {
-  const json = await jget<{ suppliers?: { id: string; name: string; name_cn?: string | null; logo: string | null }[] }>(
-    "/api/suppliers", {},
-  );
+export interface SupplierLite {
+  id: string; name: string; name_cn?: string | null; logo: string | null;
+  /* Supplier-level defaults (source of truth for shared fields). */
+  supply_type?: string | null; payment_terms?: string | null;
+  currency?: string | null; moq?: string | null; lead_time?: string | null;
+}
+export async function fetchSupplierNames(): Promise<SupplierLite[]> {
+  const json = await jget<{ suppliers?: SupplierLite[] }>("/api/suppliers", {});
   return json.suppliers ?? [];
 }
 

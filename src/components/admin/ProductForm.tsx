@@ -492,7 +492,7 @@ export default function ProductForm({ productId }: Props) {
   const [divisions, setDivisions] = useState<DivisionRow[]>([]);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [subcategories, setSubcategories] = useState<SubcategoryRow[]>([]);
-  const [suppliers, setSuppliers] = useState<{ id: string; name: string; name_cn?: string | null; logo: string | null }[]>([]);
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string; name_cn?: string | null; logo: string | null; supply_type?: string | null; payment_terms?: string | null; currency?: string | null; moq?: string | null; lead_time?: string | null }[]>([]);
   const [brands, setBrands] = useState<string[]>([]);
   const [brandLogos, setBrandLogos] = useState<Record<string, string>>({});
   const [divisionLogos, setDivisionLogos] = useState<Record<string, string>>({});
@@ -1753,15 +1753,20 @@ export default function ProductForm({ productId }: Props) {
 
       /* Supplier LINKS — per-product facts only; supplier master stays in
          the Suppliers app. Replace-the-set on save. */
-      await saveProductSuppliers(pid, productSuppliers.map(s => ({
+      await saveProductSuppliers(pid, productSuppliers.map(s => {
+        /* Fields shared with the supplier record are owned by the Suppliers
+           app (source of truth) — don't persist per-product copies. Currency
+           is inherited from the supplier so the cost price keeps a unit. */
+        const sup = suppliers.find(x => x.id === s.supplier_id);
+        return ({
         supplier_id: s.supplier_id,
         is_primary: s.is_primary,
         supplier_product_code: s.supplier_product_code || null,
-        moq: s.moq === "" ? null : Number(s.moq),
-        lead_time_days: s.lead_time_days === "" ? null : Number(s.lead_time_days),
+        moq: null,
+        lead_time_days: null,
         unit_cost_cny: s.unit_cost_cny === "" ? null : Number(s.unit_cost_cny),
-        currency: s.currency || null,
-        payment_terms: s.payment_terms || null,
+        currency: sup?.currency || null,
+        payment_terms: null,
         notes: s.notes || null,
         supplier_product_name: s.supplier_product_name || null,
         supplier_product_photo: s.supplier_product_photo || null,
@@ -1770,7 +1775,8 @@ export default function ProductForm({ productId }: Props) {
         sample_cost: s.sample_cost === "" ? null : Number(s.sample_cost),
         incoterms: s.incoterms || null,
         supplier_warranty_months: s.supplier_warranty_months === "" ? null : Number(s.supplier_warranty_months),
-      })));
+        });
+      }));
 
       /* Phase 4 — certifications + documents (replace-the-set). */
       await saveProductCertifications(pid, certifications.map(c => ({

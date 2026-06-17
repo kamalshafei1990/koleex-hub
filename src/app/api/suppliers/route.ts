@@ -35,6 +35,13 @@ interface ContactSupplierRow {
   display_name: string | null;
   photo_url: string | null;
   logo_url: string | null;
+  /* Supplier-level defaults — the source of truth for any field shared
+     with the product↔supplier link (shown read-only in Product Data). */
+  supplier_type: string | null;
+  payment_terms: string | null;
+  currency: string | null;
+  moq: string | null;
+  lead_time: string | null;
 }
 
 export async function GET() {
@@ -53,7 +60,7 @@ export async function GET() {
 
   const { data, error } = await supabaseServer
     .from("contacts")
-    .select("id, company_name_en, company_name_cn, display_name, photo_url, logo_url")
+    .select("id, company_name_en, company_name_cn, display_name, photo_url, logo_url, supplier_type, payment_terms, currency, moq, lead_time")
     .eq("contact_type", "supplier")
     .eq("tenant_id", auth.tenant_id)
     .order("company_name_en", { ascending: true });
@@ -73,6 +80,12 @@ export async function GET() {
       id: r.id,
       name: (r.company_name_en || r.display_name || "").trim(),
       name_cn: (r.company_name_cn || "").trim() || null,
+      /* Supplier-level defaults (source of truth for shared fields). */
+      supply_type: r.supplier_type || null,
+      payment_terms: r.payment_terms || null,
+      currency: r.currency || null,
+      moq: r.moq || null,
+      lead_time: r.lead_time || null,
       /* Supplier (company) logos live in logo_url for ~all rows; only a couple
          use photo_url. Prefer photo_url, fall back to logo_url — matching the
          supplier directory avatar logic — so the picker shows real logos. */
