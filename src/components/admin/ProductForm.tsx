@@ -284,10 +284,11 @@ function getSteps(isSewing: boolean): WizardStep[] {
     { id: "identity", label: "Hero & Identity", shortLabel: "Identity", icon: <SparklesIcon className="h-4 w-4" /> },
     { id: "description", label: "Description", shortLabel: "Description", icon: <DocumentIcon className="h-4 w-4" /> },
     { id: "specs", label: "Specifications", shortLabel: "Specs", icon: <Settings2Icon className="h-4 w-4" /> },
-    { id: "commercial", label: "Models & Variants", shortLabel: "Commercial", icon: <BoxesIcon className="h-4 w-4" /> },
-    { id: "logistics", label: "Logistics", shortLabel: "Logistics", icon: <GlobeIcon className="h-4 w-4" /> },
-    { id: "media", label: "Media & Files", shortLabel: "Media", icon: <ImageRawIcon className="h-4 w-4" /> },
-    { id: "knowledge", label: "Product Knowledge", shortLabel: "Knowledge", icon: <BookOpenIcon className="h-4 w-4" /> },
+    { id: "commercial", label: "Models & Pricing", shortLabel: "Models", icon: <BoxesIcon className="h-4 w-4" /> },
+    { id: "logistics", label: "Logistics & Packaging", shortLabel: "Logistics", icon: <GlobeIcon className="h-4 w-4" /> },
+    { id: "compliance", label: "Compliance & Warranty", shortLabel: "Compliance", icon: <ShieldCheckIcon className="h-4 w-4" /> },
+    { id: "media", label: "Media & Documents", shortLabel: "Media", icon: <ImageRawIcon className="h-4 w-4" /> },
+    { id: "knowledge", label: "Knowledge & Relationships", shortLabel: "Knowledge", icon: <BookOpenIcon className="h-4 w-4" /> },
     { id: "finalize", label: "Review & Publish", shortLabel: "Review", icon: <CheckIcon className="h-4 w-4" /> },
   ];
   void ZapIcon; // retained import; the standalone Technical tab merged into Specs
@@ -2317,20 +2318,9 @@ export default function ProductForm({ productId }: Props) {
                         className={inp}
                       />
                     </div>
-                    {/* Country of Origin moved to the dedicated Logistics tab —
-                        it's customs/shipping data, not hero identity. */}
-                    <div>
-                      <label className={lbl}>
-                        <span className="inline-flex items-center gap-1.5"><ShieldCheckIcon className="h-3 w-3" /> {t("hero.warranty", "Warranty")}</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={product.warranty}
-                        onChange={(e) => updateProduct_({ warranty: e.target.value })}
-                        placeholder={t("hero.warrantyPlaceholder", "e.g. 2 years parts & labour")}
-                        className={inp}
-                      />
-                    </div>
+                    {/* Country of Origin moved to the Logistics tab; Warranty
+                        moved to the dedicated Compliance & Warranty tab — both
+                        are post-identity data, not hero identity. */}
                   </div>
                 </div>
               </div>
@@ -2912,9 +2902,64 @@ export default function ProductForm({ productId }: Props) {
           </div>
         )}
 
+        {/* ═══════════════════════════════════════════════════════════
+           STEP: COMPLIANCE & WARRANTY — universal compliance + warranty.
+           Detailed certificate records (issuer, number, expiry, file) and
+           after-sales fields (spare parts, service life, maintenance) land
+           here in a later phase; CE/RoHS + warranty are surfaced now.
+           ═══════════════════════════════════════════════════════════ */}
+        {(onePage || steps[currentStep]?.id === "compliance") && (
+          <div id="sec-compliance" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+            <Section id="compliance-certs" icon={<ShieldCheckIcon className="h-4 w-4" />} title={t("compliance.title", "Compliance")} badge={t("compliance.badge", "Certifications")}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {([
+                  { key: "ce_certified" as const, label: t("compliance.ce", "CE Certified"), help: t("compliance.ceHelp", "Required for sale in the European Economic Area.") },
+                  { key: "rohs_compliant" as const, label: t("compliance.rohs", "RoHS Compliant"), help: t("compliance.rohsHelp", "EU restriction on hazardous substances in electronics.") },
+                ]).map((c) => {
+                  const on = !!product[c.key];
+                  return (
+                    <button
+                      key={c.key}
+                      type="button"
+                      onClick={() => updateProduct_({ [c.key]: !on })}
+                      aria-pressed={on}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3 text-left hover:border-[var(--border-focus)] transition-colors"
+                    >
+                      <span className="min-w-0">
+                        <span className="block text-[13px] font-medium text-[var(--text-primary)]">{c.label}</span>
+                        <span className="block text-[10px] text-[var(--text-ghost)] mt-0.5 leading-relaxed">{c.help}</span>
+                      </span>
+                      <span className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${on ? "bg-[var(--bg-inverted)]" : "bg-[var(--bg-surface-active)]"}`}>
+                        <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-[var(--bg-card)] transition-all ${on ? "left-[18px]" : "left-0.5"}`} />
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-[var(--text-ghost)] mt-3 leading-relaxed">{t("compliance.future", "Detailed certificate records — issuer, certificate number, expiry date and uploaded files — are coming to this tab.")}</p>
+            </Section>
+
+            <Section id="compliance-warranty" icon={<ShieldCheckIcon className="h-4 w-4" />} title={t("compliance.warrantyTitle", "Warranty & After-Sales")} badge={t("compliance.warrantyBadge", "Service")}>
+              <div>
+                <label className={lbl}>
+                  <span className="inline-flex items-center gap-1.5"><ShieldCheckIcon className="h-3 w-3" /> {t("hero.warranty", "Warranty")}</span>
+                </label>
+                <input
+                  type="text"
+                  value={product.warranty}
+                  onChange={(e) => updateProduct_({ warranty: e.target.value })}
+                  placeholder={t("hero.warrantyPlaceholder", "e.g. 2 years parts & labour")}
+                  className={inp}
+                />
+                <p className="text-[10px] text-[var(--text-ghost)] mt-1 leading-relaxed">{t("compliance.warrantyHint", "Spare-parts availability, service life and maintenance interval are coming to this tab.")}</p>
+              </div>
+            </Section>
+          </div>
+        )}
+
         {(onePage || steps[currentStep]?.id === "media") && (
           <div id="sec-media" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
-            <Section id="media" icon={<ImageRawIcon className="h-4 w-4" />} title={t("media.filesTitle", "Media & Files")}>
+            <Section id="media" icon={<ImageRawIcon className="h-4 w-4" />} title={t("media.filesTitle", "Media & Documents")}>
               <MediaSection
                 media={media.filter(m => m.type !== "main_image")}
                 excludeTypes={["main_image"]}
@@ -3408,7 +3453,7 @@ export default function ProductForm({ productId }: Props) {
                 <SummaryItem label={t("review.tagline", "Tagline")} value={primaryModel?.tagline || "—"} dim={!primaryModel?.tagline} onClick={() => jumpTo("commercial")} />
                 <SummaryItem label={t("review.costCny", "Cost (CNY)")} value={costDisplay} dim={costDisplay === "—"} onClick={() => jumpTo("commercial")} />
                 <SummaryItem label={t("review.sellingUsd", "Selling price (USD)")} value={priceDisplay} dim={priceDisplay === "—"} onClick={() => jumpTo("commercial")} />
-                <SummaryItem label={t("review.warranty", "Warranty")} value={product.warranty || "—"} dim={!product.warranty} onClick={() => jumpTo("identity")} />
+                <SummaryItem label={t("review.warranty", "Warranty")} value={product.warranty || "—"} dim={!product.warranty} onClick={() => jumpTo("compliance")} />
                 <SummaryItem label={t("review.madeIn", "Made in")} value={originName || "—"} dim={!originName} onClick={() => jumpTo("identity")} />
                 <SummaryItem label={t("review.variants", "Variants")} value={t("review.variantsCount", "{n} variants").replace("{n}", String(models.length))} onClick={() => jumpTo("commercial")} />
               </ReviewGroup>

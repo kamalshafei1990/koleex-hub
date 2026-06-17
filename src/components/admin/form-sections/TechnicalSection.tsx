@@ -18,7 +18,6 @@ import ScaleIcon from "@/components/icons/ui/ScaleIcon";
 import DropletsIcon from "@/components/icons/ui/DropletsIcon";
 import BadgeCheckIcon from "@/components/icons/ui/BadgeCheckIcon";
 import SparklesIcon from "@/components/icons/ui/SparklesIcon";
-import AwardIcon from "@/components/icons/ui/AwardIcon";
 import type { ProductFormState } from "@/types/product-form";
 
 interface PlugTypeOption {
@@ -567,7 +566,9 @@ export default function TechnicalSection({ data, onChange, suggestions, hiddenFi
   const elecVisible = ["voltage", "frequency_hz", "motor_power_w", "power_consumption_w", "phase", "plug_types", "pneumatic_supply"].some((k) => !hidden(k));
   const physVisible = ["machine_dimensions", "machine_weight_kg"].some((k) => !hidden(k));
   const compTopVisible = ["hs_code", "ip_rating", "operating_temp"].some((k) => !hidden(k));
-  const compTogglesVisible = ["ce_certified", "rohs_compliant", "oil_mist_filter"].some((k) => !hidden(k));
+  /* CE/RoHS moved to the dedicated Compliance & Warranty tab; only the
+     oil-mist-filter toggle remains in the technical block. */
+  const compTogglesVisible = ["oil_mist_filter"].some((k) => !hidden(k));
   const compVisible = compTopVisible || compTogglesVisible || !hidden("colors");
 
   // Per-card accents — only the digit inside the numbered badge and
@@ -799,24 +800,8 @@ export default function TechnicalSection({ data, onChange, suggestions, hiddenFi
 
         {compTogglesVisible && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-[var(--border-subtle)]/40">
-          {!hidden("ce_certified") && (
-          <ToggleRow
-            label="CE Certified"
-            icon={<BadgeCheckIcon className="h-3.5 w-3.5" />}
-            helpText="Required for sale in the European Economic Area."
-            value={data.ce_certified}
-            onChange={(v) => onChange({ ce_certified: v })}
-          />
-          )}
-          {!hidden("rohs_compliant") && (
-          <ToggleRow
-            label="RoHS Compliant"
-            icon={<AwardIcon className="h-3.5 w-3.5" />}
-            helpText="EU restriction on hazardous substances in electronics."
-            value={data.rohs_compliant}
-            onChange={(v) => onChange({ rohs_compliant: v })}
-          />
-          )}
+          {/* CE Certified + RoHS Compliant now live on the Compliance &
+              Warranty tab (ProductForm) to keep all compliance in one place. */}
           {/* Oil-mist filter — for cleanroom and light-fabric
               production. Independent of drive type so a non-air-
               purify head can still optionally have an after-market
