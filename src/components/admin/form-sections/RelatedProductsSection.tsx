@@ -52,7 +52,7 @@ export default function RelatedProductsSection({ related, onChange, currentProdu
           className="w-full h-10 pl-10 pr-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
         />
         {results.length > 0 && (
-          <div className="absolute z-20 top-full mt-1 w-full bg-[#1a1a1a] border border-[var(--border-subtle)] rounded-lg shadow-xl max-h-48 overflow-y-auto">
+          <div className="absolute z-20 top-full mt-1 w-full bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-lg shadow-xl max-h-48 overflow-y-auto">
             {results.map(r => (
               <button
                 key={r.id}

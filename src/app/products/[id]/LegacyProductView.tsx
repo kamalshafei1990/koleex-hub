@@ -134,7 +134,7 @@ function FrequencyDotsPublic({ tier }: { tier?: "essential" | "recommended" | "a
         <span
           key={i}
           className={`block h-[5px] w-[5px] rounded-full ${
-            i < filled ? "bg-[#FFB000] dark:bg-amber-400" : "bg-[#FFB000]/25 dark:bg-amber-400/20"
+            i < filled ? "bg-[var(--text-muted)]" : "bg-[var(--text-muted)]/25"
           }`}
         />
       ))}
@@ -387,17 +387,17 @@ function Section({
         {(eyebrow || title || subtitle) && (
           <div className={`mb-12 md:mb-16 ${headerAlign}`}>
             {eyebrow && (
-              <p className="text-[15px] md:text-[17px] font-normal text-[#6E6E73] dark:text-white/60 mb-3 tracking-[-0.005em]">
+              <p className="text-[15px] md:text-[17px] font-normal text-[var(--text-secondary)] mb-3 tracking-[-0.005em]">
                 {eyebrow}
               </p>
             )}
             {title && (
-              <h2 className="text-[32px] md:text-[48px] lg:text-[56px] font-semibold tracking-[-0.015em] text-[#1D1D1F] dark:text-white leading-[1.08]">
+              <h2 className="text-[32px] md:text-[48px] lg:text-[56px] font-semibold tracking-[-0.015em] text-[var(--text-primary)] leading-[1.08]">
                 {title}
               </h2>
             )}
             {subtitle && (
-              <p className="mt-5 text-[17px] md:text-[19px] text-[#6E6E73] dark:text-white/60 leading-[1.5] max-w-[680px] mx-auto font-normal">
+              <p className="mt-5 text-[17px] md:text-[19px] text-[var(--text-secondary)] leading-[1.5] max-w-[680px] mx-auto font-normal">
                 {subtitle}
               </p>
             )}
@@ -1015,9 +1015,9 @@ export default function LegacyProductView() {
   /* ── Loading / not found ── */
   if (loading) {
     return (
-      <div className="min-h-[80vh] flex items-center justify-center bg-white dark:bg-[#0A0A0A]">
-        <div className="flex items-center gap-3 text-[#6E6E73] dark:text-white/40 text-[13px]">
-          <div className="h-4 w-4 rounded-full border-2 border-[#D2D2D7] dark:border-white/20 border-t-[#06C] dark:border-t-[#2997FF] animate-spin" />
+      <div className="min-h-[80vh] flex items-center justify-center bg-[var(--bg-card)]">
+        <div className="flex items-center gap-3 text-[var(--text-secondary)] text-[13px]">
+          <div className="h-4 w-4 rounded-full border-2 border-[var(--border-subtle)] border-t-[var(--accent)] animate-spin" />
           Loading product…
         </div>
       </div>
@@ -1026,17 +1026,17 @@ export default function LegacyProductView() {
 
   if (notFound || !product) {
     return (
-      <div className="min-h-[80vh] flex flex-col items-center justify-center gap-4 px-6 text-center bg-white dark:bg-[#0A0A0A]">
-        <div className="h-16 w-16 rounded-2xl bg-[#F5F5F7] dark:bg-white/[0.04] flex items-center justify-center">
-          <ImageRawIcon className="h-7 w-7 text-[#86868B] dark:text-white/30" />
+      <div className="min-h-[80vh] flex flex-col items-center justify-center gap-4 px-6 text-center bg-[var(--bg-card)]">
+        <div className="h-16 w-16 rounded-2xl bg-[var(--bg-secondary)] flex items-center justify-center">
+          <ImageRawIcon className="h-7 w-7 text-[var(--text-muted)]" />
         </div>
-        <h1 className="text-[22px] font-semibold text-[#1D1D1F] dark:text-white">Product not found</h1>
-        <p className="text-[14px] text-[#6E6E73] dark:text-white/60">
-          We could not find a product matching <span className="font-mono text-[#1D1D1F] dark:text-white">{handle}</span>.
+        <h1 className="text-[22px] font-semibold text-[var(--text-primary)]">Product not found</h1>
+        <p className="text-[14px] text-[var(--text-secondary)]">
+          We could not find a product matching <span className="font-mono text-[var(--text-primary)]">{handle}</span>.
         </p>
         <Link
           href={backHref}
-          className="inline-flex items-center gap-2 h-[38px] px-[18px] rounded-full bg-[#06C] text-white text-[14px] font-normal hover:bg-[#0077ED] dark:bg-[#2997FF] dark:hover:bg-[#47A9FF] transition"
+          className="inline-flex items-center gap-2 h-[38px] px-[18px] rounded-full bg-[var(--accent)] text-white text-[14px] font-normal hover:bg-[var(--accent-hover)] transition"
         >
           <ArrowLeftIcon className="h-4 w-4" /> Back to products
         </Link>
@@ -1085,7 +1085,7 @@ export default function LegacyProductView() {
   /* ════════════════════════════════════════════ */
   return (
     <div
-      className="min-h-screen bg-white text-[#1D1D1F] dark:bg-[#0A0A0A] dark:text-white antialiased pb-24 md:pb-0"
+      className="min-h-screen bg-[var(--bg-card)] text-[var(--text-primary)] antialiased pb-24 md:pb-0"
       style={{
         fontFamily:
           '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif',
@@ -1258,10 +1258,10 @@ export default function LegacyProductView() {
             : "-translate-y-full opacity-0 pointer-events-none"
         }`}
       >
-        <div className="bg-white/85 dark:bg-[#0A0A0A]/85 backdrop-blur-xl border-b border-[#D2D2D7]/60 dark:border-white/[0.08]">
+        <div className="bg-[var(--bg-card)]/85 backdrop-blur-xl border-b border-[var(--border-subtle)]">
           <div className="max-w-[1200px] mx-auto px-4 md:px-6 lg:px-10 h-12 md:h-14 flex items-center gap-3">
             {/* Product name — truncated to keep the bar a single line. */}
-            <span className="text-[14px] md:text-[15px] font-semibold tracking-[-0.01em] text-[#1D1D1F] dark:text-white truncate max-w-[200px] md:max-w-[320px]">
+            <span className="text-[14px] md:text-[15px] font-semibold tracking-[-0.01em] text-[var(--text-primary)] truncate max-w-[200px] md:max-w-[320px]">
               {product.product_name}
             </span>
             {/* Anchor links — desktop only. Reflects the actual
@@ -1269,18 +1269,18 @@ export default function LegacyProductView() {
                 #models / #specs). Each link only renders if its
                 target section will actually be shown — no dead
                 links if the underlying data is missing. */}
-            <nav className="hidden md:flex items-center gap-5 ml-2 mr-auto text-[13px] text-[#1D1D1F]/80 dark:text-white/70">
+            <nav className="hidden md:flex items-center gap-5 ml-2 mr-auto text-[13px] text-[var(--text-secondary)]">
               {(product.description || product.excerpt) && (
-                <a href="#overview" className="hover:text-[#1D1D1F] dark:hover:text-white transition-colors">Overview</a>
+                <a href="#overview" className="hover:text-[var(--text-primary)] transition-colors">Overview</a>
               )}
               {(product.highlights && product.highlights.length > 0 && (galleryImages.length > 1 || mainImage)) && (
-                <a href="#features" className="hover:text-[#1D1D1F] dark:hover:text-white transition-colors">Features</a>
+                <a href="#features" className="hover:text-[var(--text-primary)] transition-colors">Features</a>
               )}
               {models.length > 1 && (
-                <a href="#models" className="hover:text-[#1D1D1F] dark:hover:text-white transition-colors">Models</a>
+                <a href="#models" className="hover:text-[var(--text-primary)] transition-colors">Models</a>
               )}
               {specTabs.length > 0 && (
-                <a href="#specs" className="hover:text-[#1D1D1F] dark:hover:text-white transition-colors">Specs</a>
+                <a href="#specs" className="hover:text-[var(--text-primary)] transition-colors">Specs</a>
               )}
             </nav>
             {/* Spacer for mobile when nav is hidden — pushes CTA right. */}
@@ -1290,7 +1290,7 @@ export default function LegacyProductView() {
                 the page's main action. */}
             <Link
               href={`/landed-cost/new?productId=${product.id}`}
-              className="inline-flex items-center h-8 md:h-9 px-3 md:px-4 rounded-full bg-[#06C] dark:bg-[#2997FF] text-white text-[12px] md:text-[13px] font-medium hover:bg-[#0077ED] dark:hover:bg-[#47A9FF] transition-colors shrink-0"
+              className="inline-flex items-center h-8 md:h-9 px-3 md:px-4 rounded-full bg-[var(--accent)] text-white text-[12px] md:text-[13px] font-medium hover:bg-[var(--accent-hover)] transition-colors shrink-0"
             >
               Estimate
             </Link>
@@ -1312,21 +1312,21 @@ export default function LegacyProductView() {
           stickyNavVisible ? "translate-y-0" : "translate-y-full"
         }`}
       >
-        <div className="bg-white/95 dark:bg-[#0A0A0A]/95 backdrop-blur-xl border-t border-[#D2D2D7]/60 dark:border-white/[0.08] px-4 pt-3 pb-[max(env(safe-area-inset-bottom),0.75rem)]">
+        <div className="bg-[var(--bg-card)]/95 backdrop-blur-xl border-t border-[var(--border-subtle)] px-4 pt-3 pb-[max(env(safe-area-inset-bottom),0.75rem)]">
           {/* Two-button cluster: primary fills, secondary fixed-width
               square so the row reads as one tight cell. */}
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
-              className="flex-1 h-11 rounded-full bg-[#06C] dark:bg-[#2997FF] text-white text-[14px] font-medium hover:bg-[#0077ED] dark:hover:bg-[#47A9FF] transition-colors"
+              className="flex-1 h-11 rounded-full bg-[var(--accent)] text-white text-[14px] font-medium hover:bg-[var(--accent-hover)] transition-colors"
             >
               Request Quote
             </button>
             <Link
               href={`/landed-cost/new?productId=${product.id}`}
               aria-label="Estimate total cost"
-              className="inline-flex items-center justify-center h-11 w-11 rounded-full border border-[#1D1D1F]/15 dark:border-white/15 text-[#1D1D1F] dark:text-white hover:bg-[#1D1D1F]/[0.04] dark:hover:bg-white/[0.04] transition-colors"
+              className="inline-flex items-center justify-center h-11 w-11 rounded-full border border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
             >
               <GaugeIcon className="h-5 w-5" />
             </Link>
@@ -1351,7 +1351,7 @@ export default function LegacyProductView() {
             · Container max-w-[1200px] mx-auto px-6 lg:px-8
             · Body container max-w-[680px]
             · Card radius rounded-3xl
-            · Surfaces alternate white ↔ #F5F5F7
+            · Surfaces alternate bg-card ↔ bg-secondary
           Typography:
             · Eyebrow:  12 px, semibold, uppercase, 0.1em tracking
             · H1:       56 / 72 / 88 px, semibold, -0.02em tracking
@@ -1368,7 +1368,7 @@ export default function LegacyProductView() {
             frame, no border, no surface. The product becomes the
             visual focal point of the section.
           ──────────────────────────────────────────────────────── */}
-      <section className="bg-white dark:bg-[#0A0A0A]">
+      <section className="bg-[var(--bg-card)]">
         <div className="max-w-[1440px] mx-auto px-6 lg:px-8 py-32 md:py-32">
           {/* Hero grid — 8/4 (~67 / 33).
               Image is now the unambiguous anchor: section widened
@@ -1396,7 +1396,7 @@ export default function LegacyProductView() {
                     fetchPriority="high"
                   />
                 ) : (
-                  <ImageRawIcon className="h-20 w-20 text-[#86868B] dark:text-white/30" />
+                  <ImageRawIcon className="h-20 w-20 text-[var(--text-muted)]" />
                 )}
               </div>
 
@@ -1425,15 +1425,15 @@ export default function LegacyProductView() {
                         aria-pressed={active}
                         className={`group relative shrink-0 h-16 w-16 md:h-20 md:w-20 rounded-xl overflow-hidden transition-all ${
                           active
-                            ? "ring-2 ring-[#06C] dark:ring-[#2997FF] scale-[1.04]"
-                            : "ring-1 ring-[#D2D2D7]/70 dark:ring-white/[0.08] hover:ring-[#1D1D1F]/30 dark:hover:ring-white/30 opacity-75 hover:opacity-100"
+                            ? "ring-2 ring-[var(--accent)] scale-[1.04]"
+                            : "ring-1 ring-[var(--border-subtle)] hover:ring-[var(--text-primary)]/30 opacity-75 hover:opacity-100"
                         }`}
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={IMG.thumb(img.url)}
                           alt=""
-                          className="absolute inset-0 w-full h-full object-contain p-1.5 bg-white dark:bg-white/[0.04]"
+                          className="absolute inset-0 w-full h-full object-contain p-1.5 bg-[var(--bg-card)]"
                           loading="lazy"
                           decoding="async"
                         />
@@ -1441,7 +1441,7 @@ export default function LegacyProductView() {
                     );
                   })}
                   {galleryImages.length > 6 && (
-                    <span className="shrink-0 text-[12px] text-[#86868B] dark:text-white/45 ml-1">
+                    <span className="shrink-0 text-[12px] text-[var(--text-muted)] ml-1">
                       +{galleryImages.length - 6}
                     </span>
                   )}
@@ -1479,12 +1479,12 @@ export default function LegacyProductView() {
                 if (isKoleex) {
                   return (
                     <KoleexLogo
-                      className="h-4 md:h-5 w-auto text-[#1D1D1F] dark:text-white"
+                      className="h-4 md:h-5 w-auto text-[var(--text-primary)]"
                     />
                   );
                 }
                 return (
-                  <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
                     {brand}
                   </p>
                 );
@@ -1494,16 +1494,16 @@ export default function LegacyProductView() {
                   identity instead of a heavy headline. The image
                   already anchors the eye; the H1 just labels the
                   product. */}
-              <h1 className="mt-8 text-[40px] md:text-[52px] lg:text-[60px] font-medium tracking-[-0.025em] leading-[1] text-[#1D1D1F] dark:text-white">
+              <h1 className="mt-8 text-[40px] md:text-[52px] lg:text-[60px] font-medium tracking-[-0.025em] leading-[1] text-[var(--text-primary)]">
                 {primaryModel?.model_name || product.product_name}
               </h1>
               {primaryModel?.model_name && product.product_name && primaryModel.model_name !== product.product_name && (
-                <p className="mt-6 text-[15px] md:text-[16px] font-normal tracking-[-0.005em] leading-[1.5] text-[#6E6E73] dark:text-white/55">
+                <p className="mt-6 text-[15px] md:text-[16px] font-normal tracking-[-0.005em] leading-[1.5] text-[var(--text-secondary)]">
                   {product.product_name}
                 </p>
               )}
               {(primaryModel?.tagline || product.excerpt) && (
-                <p className="mt-6 text-[14px] md:text-[15px] leading-[1.6] text-[#6E6E73] dark:text-white/55">
+                <p className="mt-6 text-[14px] md:text-[15px] leading-[1.6] text-[var(--text-secondary)]">
                   {primaryModel?.tagline || product.excerpt}
                 </p>
               )}
@@ -1516,18 +1516,18 @@ export default function LegacyProductView() {
                   Sits between the description and the buttons so it
                   reads as a hand-off from "what is this" to "how do
                   I act". */}
-              <div className="mt-6 inline-flex items-baseline gap-2 rounded-full bg-[#F5F5F7] dark:bg-white/[0.05] px-3.5 py-1.5">
+              <div className="mt-6 inline-flex items-baseline gap-2 rounded-full bg-[var(--bg-secondary)] px-3.5 py-1.5">
                 {priceFrom ? (
                   <>
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
                       From
                     </span>
-                    <span className="text-[15px] font-semibold tracking-[-0.01em] text-[#1D1D1F] dark:text-white">
+                    <span className="text-[15px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
                       ${new Intl.NumberFormat("en-US").format(priceFrom)}
                     </span>
                   </>
                 ) : (
-                  <span className="text-[12px] font-medium tracking-[-0.005em] text-[#6E6E73] dark:text-white/55">
+                  <span className="text-[12px] font-medium tracking-[-0.005em] text-[var(--text-secondary)]">
                     Quote on request
                   </span>
                 )}
@@ -1568,7 +1568,7 @@ export default function LegacyProductView() {
                 {/* Layer 1 — PRIMARY (own row, w-full) */}
                 <Link
                   href={`/landed-cost/new?productId=${product.id}`}
-                  className="flex items-center justify-center w-full h-10 px-8 rounded-full bg-[#06C] dark:bg-[#2997FF] text-white text-[14px] font-medium hover:bg-[#0077ED] dark:hover:bg-[#47A9FF] transition-colors"
+                  className="flex items-center justify-center w-full h-10 px-8 rounded-full bg-[var(--accent)] text-white text-[14px] font-medium hover:bg-[var(--accent-hover)] transition-colors"
                 >
                   Estimate Total Cost
                 </Link>
@@ -1578,7 +1578,7 @@ export default function LegacyProductView() {
                   <button
                     type="button"
                     onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
-                    className="flex items-center justify-center w-full h-10 px-8 rounded-full border border-[#1D1D1F]/15 dark:border-white/15 bg-transparent text-[#1D1D1F] dark:text-white text-[14px] font-medium hover:border-[#1D1D1F]/40 dark:hover:border-white/35 hover:bg-[#1D1D1F]/[0.03] dark:hover:bg-white/[0.04] transition-colors"
+                    className="flex items-center justify-center w-full h-10 px-8 rounded-full border border-[var(--border-subtle)] bg-transparent text-[var(--text-primary)] text-[14px] font-medium hover:border-[var(--text-primary)]/40 hover:bg-[var(--bg-surface)] transition-colors"
                   >
                     Request Quotation
                   </button>
@@ -1587,8 +1587,8 @@ export default function LegacyProductView() {
                     onClick={toggleCompare}
                     className={`flex items-center justify-center w-full h-10 px-8 rounded-full border text-[14px] font-medium transition-colors ${
                       inCompare
-                        ? "border-[#06C] dark:border-[#2997FF] bg-[#06C]/[0.06] dark:bg-[#2997FF]/[0.12] text-[#06C] dark:text-[#2997FF]"
-                        : "border-[#1D1D1F]/15 dark:border-white/15 bg-transparent text-[#1D1D1F] dark:text-white hover:border-[#1D1D1F]/40 dark:hover:border-white/35 hover:bg-[#1D1D1F]/[0.03] dark:hover:bg-white/[0.04]"
+                        ? "border-[var(--accent)] bg-[var(--accent)]/[0.06] text-[var(--accent)]"
+                        : "border-[var(--border-subtle)] bg-transparent text-[var(--text-primary)] hover:border-[var(--text-primary)]/40 hover:bg-[var(--bg-surface)]"
                     }`}
                   >
                     {inCompare ? "Added to Compare" : "Compare"}
@@ -1600,7 +1600,7 @@ export default function LegacyProductView() {
                 <div className="mt-10">
                   <Link
                     href="/contacts"
-                    className="inline-flex items-center gap-2 text-[14px] text-[#6E6E73] dark:text-white/55 hover:text-[#1D1D1F] dark:hover:text-white transition-colors"
+                    className="inline-flex items-center gap-2 text-[14px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
                   >
                     Contact Sales <AngleRightIcon className="h-5 w-5 mt-0.5" />
                   </Link>
@@ -1614,28 +1614,28 @@ export default function LegacyProductView() {
                   the underlying data exists — no empty cells, no
                   fake claims. Max 4 items so the row never wraps. */}
               {(product.ce_certified || product.rohs_compliant || product.warranty || product.country_of_origin) && (
-                <ul className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3 text-[12px] text-[#6E6E73] dark:text-white/55">
+                <ul className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3 text-[12px] text-[var(--text-secondary)]">
                   {product.ce_certified && (
                     <li className="inline-flex items-center gap-1.5">
-                      <BadgeCheckIcon className="h-3.5 w-3.5 text-[#0F8A6E] dark:text-[#5DD0B4]" />
+                      <BadgeCheckIcon className="h-3.5 w-3.5 text-[#00CC66]" />
                       CE certified
                     </li>
                   )}
                   {product.rohs_compliant && (
                     <li className="inline-flex items-center gap-1.5">
-                      <ShieldCheckIcon className="h-3.5 w-3.5 text-[#0F8A6E] dark:text-[#5DD0B4]" />
+                      <ShieldCheckIcon className="h-3.5 w-3.5 text-[#00CC66]" />
                       RoHS
                     </li>
                   )}
                   {product.warranty && (
                     <li className="inline-flex items-center gap-1.5">
-                      <AwardIcon className="h-3.5 w-3.5 text-[#06C] dark:text-[#2997FF]" />
+                      <AwardIcon className="h-3.5 w-3.5 text-[var(--accent)]" />
                       {product.warranty} warranty
                     </li>
                   )}
                   {product.country_of_origin && (
                     <li className="inline-flex items-center gap-1.5">
-                      <GlobeIcon className="h-3.5 w-3.5 text-[#86868B] dark:text-white/45" />
+                      <GlobeIcon className="h-3.5 w-3.5 text-[var(--text-muted)]" />
                       Made in {product.country_of_origin}
                     </li>
                   )}
@@ -1653,32 +1653,32 @@ export default function LegacyProductView() {
           means baselines align even when label or value text
           wraps. Same chip, same icon, same alignment everywhere. */}
       {headlineStats.length >= 3 && (
-        <section className="bg-[#F5F5F7] dark:bg-white/[0.02]">
+        <section className="bg-[var(--bg-secondary)]">
           <div className="max-w-[1200px] mx-auto px-6 lg:px-8 py-32 md:py-32">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {headlineStats.map((s, i) => (
                 <div
                   key={i}
-                  className="h-full p-8 rounded-3xl bg-white dark:bg-white/[0.04] dark:border dark:border-white/[0.06] flex flex-col"
+                  className="h-full p-8 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-subtle)] flex flex-col"
                 >
-                  <span className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-[#F5F5F7] dark:bg-white/[0.06] text-[#06C] dark:text-[#2997FF] shrink-0">
+                  <span className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-[var(--bg-surface)] text-[var(--accent)] shrink-0">
                     {s.icon}
                   </span>
                   {/* Label area — fixed minimum height so the value
                       block below baseline-aligns across all 4 cards
                       even when one label wraps to two lines. */}
-                  <p className="mt-8 min-h-[36px] text-[12px] font-semibold uppercase tracking-[0.08em] leading-[1.5] text-[#86868B] dark:text-white/45">
+                  <p className="mt-8 min-h-[36px] text-[12px] font-semibold uppercase tracking-[0.08em] leading-[1.5] text-[var(--text-muted)]">
                     {s.label}
                   </p>
                   {/* mt-auto pushes the value to the bottom of the
                       card so all 4 numbers sit on the same horizontal
                       line regardless of label length. */}
                   <div className="mt-auto flex items-baseline gap-2 flex-wrap">
-                    <span className="text-[32px] md:text-[40px] lg:text-[44px] font-semibold tracking-[-0.02em] leading-none text-[#1D1D1F] dark:text-white">
+                    <span className="text-[32px] md:text-[40px] lg:text-[44px] font-semibold tracking-[-0.02em] leading-none text-[var(--text-primary)]">
                       {s.value}
                     </span>
                     {s.unit && (
-                      <span className="text-[14px] md:text-[15px] text-[#86868B] dark:text-white/55">
+                      <span className="text-[14px] md:text-[15px] text-[var(--text-muted)]">
                         {s.unit}
                       </span>
                     )}
@@ -1692,22 +1692,22 @@ export default function LegacyProductView() {
 
       {/* SECTION 3 — OVERVIEW (clean prose, max-width readable) ───── */}
       {(product.description || product.excerpt) && (
-        <section id="overview" className="bg-white dark:bg-[#0A0A0A]">
+        <section id="overview" className="bg-[var(--bg-card)]">
           <div className="max-w-[680px] mx-auto px-6 py-32 md:py-32">
-            <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
               Overview
             </p>
-            <h2 className="mt-4 text-[32px] md:text-[40px] lg:text-[48px] font-semibold tracking-[-0.018em] leading-[1.1] text-[#1D1D1F] dark:text-white">
+            <h2 className="mt-4 text-[32px] md:text-[40px] lg:text-[48px] font-semibold tracking-[-0.018em] leading-[1.1] text-[var(--text-primary)]">
               The machine, in detail.
             </h2>
             {product.excerpt && (
-              <p className="mt-8 text-[18px] md:text-[20px] leading-[1.6] text-[#1D1D1F] dark:text-white/85">
+              <p className="mt-8 text-[18px] md:text-[20px] leading-[1.6] text-[var(--text-primary)]">
                 {product.excerpt}
               </p>
             )}
             {product.description && (
               <div
-                className="mt-8 text-[16px] leading-[1.7] text-[#6E6E73] dark:text-white/65 [&>p]:mb-4 [&>p:last-child]:mb-0 [&>ul]:list-disc [&>ul]:pl-5 [&>ul]:mb-4 [&>ol]:list-decimal [&>ol]:pl-5 [&>ol]:mb-4"
+                className="mt-8 text-[16px] leading-[1.7] text-[var(--text-secondary)] [&>p]:mb-4 [&>p:last-child]:mb-0 [&>ul]:list-disc [&>ul]:pl-5 [&>ul]:mb-4 [&>ol]:list-decimal [&>ol]:pl-5 [&>ol]:mb-4"
                 dangerouslySetInnerHTML={{ __html: product.description }}
               />
             )}
@@ -1717,24 +1717,24 @@ export default function LegacyProductView() {
 
       {/* SECTION 4 — FEATURES (visual rhythm: text LEFT, image RIGHT) */}
       {(galleryImages.length > 1 || mainImage) && product.highlights && product.highlights.length > 0 && (
-        <section id="features" className="bg-[#F5F5F7] dark:bg-white/[0.015]">
+        <section id="features" className="bg-[var(--bg-secondary)]">
           <div className="max-w-[1200px] mx-auto px-6 lg:px-8 py-32 md:py-32">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-center">
               {/* LEFT — text */}
               <div className="lg:col-span-5 order-2 lg:order-1">
-                <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
+                <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
                   Engineered for the line
                 </p>
-                <h2 className="mt-4 text-[32px] md:text-[40px] lg:text-[48px] font-semibold tracking-[-0.018em] leading-[1.1] text-[#1D1D1F] dark:text-white">
+                <h2 className="mt-4 text-[32px] md:text-[40px] lg:text-[48px] font-semibold tracking-[-0.018em] leading-[1.1] text-[var(--text-primary)]">
                   Built for daily volume.
                 </h2>
                 <ul className="mt-8 space-y-4">
                   {product.highlights.slice(0, 5).map((h, i) => (
                     <li
                       key={i}
-                      className="flex items-start gap-4 text-[16px] md:text-[17px] text-[#1D1D1F] dark:text-white/85 leading-[1.55]"
+                      className="flex items-start gap-4 text-[16px] md:text-[17px] text-[var(--text-primary)] leading-[1.55]"
                     >
-                      <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-[#1D1D1F] dark:bg-white text-white dark:text-[#1D1D1F] shrink-0 mt-0.5">
+                      <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] shrink-0 mt-0.5">
                         <CheckIcon className="h-5 w-5" />
                       </span>
                       {h}
@@ -1744,7 +1744,7 @@ export default function LegacyProductView() {
               </div>
               {/* RIGHT — image */}
               <div className="lg:col-span-7 order-1 lg:order-2">
-                <div className="relative w-full aspect-[5/4] rounded-3xl overflow-hidden bg-white dark:bg-white/[0.025] dark:border dark:border-white/[0.06]">
+                <div className="relative w-full aspect-[5/4] rounded-3xl overflow-hidden bg-[var(--bg-card)] border border-[var(--border-subtle)]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={IMG.gallery(galleryImages[1]?.url || mainImage || "")}
@@ -1769,15 +1769,15 @@ export default function LegacyProductView() {
           this block to pick the variant they actually want before
           they fire the quote. */}
       {models.filter((m) => m.visible).length > 1 && (
-        <section id="models" className="bg-white dark:bg-[#0A0A0A]">
+        <section id="models" className="bg-[var(--bg-card)]">
           <div className="max-w-[1200px] mx-auto px-6 lg:px-8 py-32 md:py-32">
-            <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
               Models
             </p>
-            <h2 className="mt-4 text-[32px] md:text-[40px] lg:text-[48px] font-semibold tracking-[-0.018em] leading-[1.1] text-[#1D1D1F] dark:text-white">
+            <h2 className="mt-4 text-[32px] md:text-[40px] lg:text-[48px] font-semibold tracking-[-0.018em] leading-[1.1] text-[var(--text-primary)]">
               Pick your variant.
             </h2>
-            <p className="mt-4 max-w-[640px] text-[15px] md:text-[16px] leading-[1.6] text-[#6E6E73] dark:text-white/60">
+            <p className="mt-4 max-w-[640px] text-[15px] md:text-[16px] leading-[1.6] text-[var(--text-secondary)]">
               Available configurations of this model. Pricing, packing, and lead times vary by variant.
             </p>
 
@@ -1794,12 +1794,12 @@ export default function LegacyProductView() {
                 return (
                   <article
                     key={m.id}
-                    className="group rounded-3xl bg-[#F5F5F7] dark:bg-white/[0.04] dark:border dark:border-white/[0.06] overflow-hidden flex flex-col transition-all duration-300 hover:bg-white dark:hover:bg-white/[0.06] hover:shadow-[0_6px_24px_rgba(0,0,0,0.06)] dark:hover:shadow-none hover:-translate-y-0.5"
+                    className="group rounded-3xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] overflow-hidden flex flex-col transition-all duration-300 hover:bg-[var(--bg-card)] hover:shadow-[0_6px_24px_rgba(0,0,0,0.06)] hover:-translate-y-0.5"
                   >
                     {/* Image header — same aspect across all cards
                         so the row aligns visually. White inner so
                         the photo never inherits the gray surface. */}
-                    <div className="relative w-full aspect-[4/3] bg-white dark:bg-white/[0.03]">
+                    <div className="relative w-full aspect-[4/3] bg-[var(--bg-card)]">
                       {modelImage ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img
@@ -1811,14 +1811,14 @@ export default function LegacyProductView() {
                         />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <ImageRawIcon className="h-10 w-10 text-[#86868B] dark:text-white/30" />
+                          <ImageRawIcon className="h-10 w-10 text-[var(--text-muted)]" />
                         </div>
                       )}
                       {/* Stock-status pill — only renders when the
                           model carries a status flag. */}
                       {m.stock_status && (
-                        <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-white/90 dark:bg-[#0A0A0A]/85 backdrop-blur-sm text-[10.5px] font-medium uppercase tracking-[0.06em] text-[#1D1D1F] dark:text-white">
-                          <span className={`h-1.5 w-1.5 rounded-full ${m.stock_status.toLowerCase().includes("stock") || m.stock_status.toLowerCase() === "available" ? "bg-[#0F8A6E]" : "bg-[#A05A00]"}`} />
+                        <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-[var(--bg-card)]/90 backdrop-blur-sm text-[10.5px] font-medium uppercase tracking-[0.06em] text-[var(--text-primary)]">
+                          <span className={`h-1.5 w-1.5 rounded-full ${m.stock_status.toLowerCase().includes("stock") || m.stock_status.toLowerCase() === "available" ? "bg-[#00CC66]" : "bg-[#FFCC00]"}`} />
                           {m.stock_status}
                         </span>
                       )}
@@ -1826,11 +1826,11 @@ export default function LegacyProductView() {
 
                     {/* Card body */}
                     <div className="p-6 flex flex-col flex-1">
-                      <h3 className="text-[18px] md:text-[20px] font-semibold tracking-[-0.01em] text-[#1D1D1F] dark:text-white leading-[1.2]">
+                      <h3 className="text-[18px] md:text-[20px] font-semibold tracking-[-0.01em] text-[var(--text-primary)] leading-[1.2]">
                         {m.model_name}
                       </h3>
                       {m.tagline && (
-                        <p className="mt-2 text-[13px] md:text-[14px] leading-[1.5] text-[#6E6E73] dark:text-white/55 line-clamp-2">
+                        <p className="mt-2 text-[13px] md:text-[14px] leading-[1.5] text-[var(--text-secondary)] line-clamp-2">
                           {m.tagline}
                         </p>
                       )}
@@ -1842,10 +1842,10 @@ export default function LegacyProductView() {
                         <dl className="mt-5 space-y-1.5">
                           {priceOptions.map((p) => (
                             <div key={p.label} className="flex items-baseline justify-between gap-3">
-                              <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#86868B] dark:text-white/45">
+                              <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
                                 {p.label}
                               </dt>
-                              <dd className="text-[15px] font-semibold tracking-[-0.005em] text-[#1D1D1F] dark:text-white tabular-nums">
+                              <dd className="text-[15px] font-semibold tracking-[-0.005em] text-[var(--text-primary)] tabular-nums">
                                 ${fmt.format(p.value)}
                               </dd>
                             </div>
@@ -1855,7 +1855,7 @@ export default function LegacyProductView() {
 
                       {/* Meta row — MOQ / lead time, only when set. */}
                       {(m.moq || m.lead_time) && (
-                        <ul className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11.5px] text-[#6E6E73] dark:text-white/55">
+                        <ul className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11.5px] text-[var(--text-secondary)]">
                           {m.moq != null && (
                             <li className="inline-flex items-center gap-1.5">
                               <BoxesIcon className="h-3.5 w-3.5" />
@@ -1878,7 +1878,7 @@ export default function LegacyProductView() {
                         <button
                           type="button"
                           onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
-                          className="inline-flex items-center justify-center gap-1.5 h-9 px-5 rounded-full bg-[#1D1D1F] dark:bg-white text-white dark:text-[#1D1D1F] text-[13px] font-medium hover:opacity-90 transition-opacity"
+                          className="inline-flex items-center justify-center gap-1.5 h-9 px-5 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-medium hover:opacity-90 transition-opacity"
                         >
                           Request Quote
                           <AngleRightIcon className="h-4 w-4" />
@@ -1899,12 +1899,12 @@ export default function LegacyProductView() {
           from H2 above (32-48) and hero subtitle (18-20). More
           space between groups (space-y-16) for breathing room. */}
       {specTabs.length > 0 && (
-        <section id="specs" className="bg-white dark:bg-[#0A0A0A]">
+        <section id="specs" className="bg-[var(--bg-card)]">
           <div className="max-w-[1080px] mx-auto px-6 lg:px-8 py-32 md:py-32">
-            <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
               Specifications
             </p>
-            <h2 className="mt-4 text-[32px] md:text-[40px] lg:text-[48px] font-semibold tracking-[-0.018em] leading-[1.1] text-[#1D1D1F] dark:text-white">
+            <h2 className="mt-4 text-[32px] md:text-[40px] lg:text-[48px] font-semibold tracking-[-0.018em] leading-[1.1] text-[var(--text-primary)]">
               All the details.
             </h2>
 
@@ -1929,38 +1929,44 @@ export default function LegacyProductView() {
                   accentText: string;
                   cardRing: string;
                 };
+                /* Brand = monochrome-first with a single functional
+                   accent. The previous per-chapter palette (blue /
+                   amber / purple / green) violated that, so all four
+                   buckets now share one neutral chip surface + the
+                   brand accent for their counter/bar. The icon alone
+                   differentiates the chapters. */
                 const palette: Record<string, GroupStyle> = {
                   performance: {
                     Icon: GaugeIcon,
-                    chipBg: "bg-[#E6F0FF] dark:bg-[#0B2A55]/60",
-                    chipText: "text-[#06C] dark:text-[#7CB8FF]",
-                    accentBar: "bg-[#06C] dark:bg-[#2997FF]",
-                    accentText: "text-[#06C] dark:text-[#7CB8FF]",
-                    cardRing: "ring-1 ring-[#06C]/[0.06] dark:ring-[#2997FF]/10",
+                    chipBg: "bg-[var(--bg-surface)]",
+                    chipText: "text-[var(--accent)]",
+                    accentBar: "bg-[var(--accent)]",
+                    accentText: "text-[var(--accent)]",
+                    cardRing: "ring-1 ring-[var(--border-subtle)]",
                   },
                   mechanical: {
                     Icon: CogIcon,
-                    chipBg: "bg-[#FFF1DC] dark:bg-[#3A2A0A]/60",
-                    chipText: "text-[#A05A00] dark:text-[#FFB870]",
-                    accentBar: "bg-[#A05A00] dark:bg-[#FFB870]",
-                    accentText: "text-[#A05A00] dark:text-[#FFB870]",
-                    cardRing: "ring-1 ring-[#A05A00]/[0.06] dark:ring-[#FFB870]/10",
+                    chipBg: "bg-[var(--bg-surface)]",
+                    chipText: "text-[var(--accent)]",
+                    accentBar: "bg-[var(--accent)]",
+                    accentText: "text-[var(--accent)]",
+                    cardRing: "ring-1 ring-[var(--border-subtle)]",
                   },
                   electrical: {
                     Icon: ZapIcon,
-                    chipBg: "bg-[#F0E8FF] dark:bg-[#251747]/60",
-                    chipText: "text-[#7A33C9] dark:text-[#C7A6FF]",
-                    accentBar: "bg-[#7A33C9] dark:bg-[#C7A6FF]",
-                    accentText: "text-[#7A33C9] dark:text-[#C7A6FF]",
-                    cardRing: "ring-1 ring-[#7A33C9]/[0.06] dark:ring-[#C7A6FF]/10",
+                    chipBg: "bg-[var(--bg-surface)]",
+                    chipText: "text-[var(--accent)]",
+                    accentBar: "bg-[var(--accent)]",
+                    accentText: "text-[var(--accent)]",
+                    cardRing: "ring-1 ring-[var(--border-subtle)]",
                   },
                   dimensions: {
                     Icon: RulerIcon,
-                    chipBg: "bg-[#E0F5EE] dark:bg-[#0F3A30]/60",
-                    chipText: "text-[#0F8A6E] dark:text-[#5DD0B4]",
-                    accentBar: "bg-[#0F8A6E] dark:bg-[#5DD0B4]",
-                    accentText: "text-[#0F8A6E] dark:text-[#5DD0B4]",
-                    cardRing: "ring-1 ring-[#0F8A6E]/[0.06] dark:ring-[#5DD0B4]/10",
+                    chipBg: "bg-[var(--bg-surface)]",
+                    chipText: "text-[var(--accent)]",
+                    accentBar: "bg-[var(--accent)]",
+                    accentText: "text-[var(--accent)]",
+                    cardRing: "ring-1 ring-[var(--border-subtle)]",
                   },
                 };
                 const s = palette[t.id] ?? palette.performance;
@@ -1980,9 +1986,9 @@ export default function LegacyProductView() {
                       </span>
                       <div className="flex-shrink-0">
                         <p className={`text-[10px] font-semibold uppercase tracking-[0.14em] leading-none ${s.accentText}`}>
-                          {idx}<span className="text-[#86868B] dark:text-white/40 font-medium">  /  {totalStr}</span>
+                          {idx}<span className="text-[var(--text-muted)] font-medium">  /  {totalStr}</span>
                         </p>
-                        <h3 className="mt-2 text-[22px] md:text-[26px] font-semibold tracking-[-0.01em] leading-[1.1] text-[#1D1D1F] dark:text-white">
+                        <h3 className="mt-2 text-[22px] md:text-[26px] font-semibold tracking-[-0.01em] leading-[1.1] text-[var(--text-primary)]">
                           {t.label}
                         </h3>
                       </div>
@@ -1991,9 +1997,9 @@ export default function LegacyProductView() {
                           on small screens to keep things compact. */}
                       <span
                         aria-hidden
-                        className="hidden md:block flex-1 h-px ml-3 bg-[#D2D2D7]/60 dark:bg-white/[0.06]"
+                        className="hidden md:block flex-1 h-px ml-3 bg-[var(--border-subtle)]"
                       />
-                      <span className="hidden md:inline-flex items-baseline text-[11px] font-medium text-[#86868B] dark:text-white/45 tabular-nums">
+                      <span className="hidden md:inline-flex items-baseline text-[11px] font-medium text-[var(--text-muted)] tabular-nums">
                         <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${s.accentBar}`} aria-hidden />
                         {t.rows.length} specs
                       </span>
@@ -2043,7 +2049,7 @@ export default function LegacyProductView() {
                         return (
                           <div
                             key={`${t.id}-${r.label}-${i}`}
-                            className={`group relative overflow-hidden rounded-2xl bg-[#F5F5F7] dark:bg-white/[0.035] ${s.cardRing} dark:border dark:border-white/[0.05] p-5 min-h-[124px] flex flex-col transition-all duration-300 hover:bg-white dark:hover:bg-white/[0.06] hover:shadow-[0_4px_18px_rgba(0,0,0,0.06)] dark:hover:shadow-none hover:-translate-y-0.5`}
+                            className={`group relative overflow-hidden rounded-2xl bg-[var(--bg-secondary)] ${s.cardRing} p-5 min-h-[124px] flex flex-col transition-all duration-300 hover:bg-[var(--bg-card)] hover:shadow-[0_4px_18px_rgba(0,0,0,0.06)] hover:-translate-y-0.5`}
                           >
                             {/* Per-spec icon chip in the group's hue. */}
                             <span className={`inline-flex items-center justify-center h-7 w-7 rounded-lg ${s.chipBg} ${s.chipText}`}>
@@ -2056,11 +2062,11 @@ export default function LegacyProductView() {
                               )}
                             </span>
                             {/* Value — refined display size. */}
-                            <dd className="mt-auto pt-4 text-[20px] md:text-[22px] lg:text-[24px] font-semibold tracking-[-0.018em] text-[#1D1D1F] dark:text-white leading-[1.15]">
+                            <dd className="mt-auto pt-4 text-[20px] md:text-[22px] lg:text-[24px] font-semibold tracking-[-0.018em] text-[var(--text-primary)] leading-[1.15]">
                               {r.value}
                             </dd>
                             {/* Caption label. */}
-                            <dt className="mt-1.5 text-[11.5px] font-semibold uppercase tracking-[0.08em] text-[#86868B] dark:text-white/45 leading-[1.3]">
+                            <dt className="mt-1.5 text-[11.5px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)] leading-[1.3]">
                               {r.label}
                             </dt>
                           </div>
@@ -2076,16 +2082,16 @@ export default function LegacyProductView() {
       )}
 
       {/* SECTION 6 — CLEAN END (single closing band, no clutter) ──── */}
-      <section className="bg-[#F5F5F7] dark:bg-white/[0.02]">
+      <section className="bg-[var(--bg-secondary)]">
         <div className="max-w-[680px] mx-auto px-6 py-32 md:py-32 text-center">
-          <h2 className="text-[28px] md:text-[36px] lg:text-[44px] font-semibold tracking-[-0.018em] leading-[1.15] text-[#1D1D1F] dark:text-white">
+          <h2 className="text-[28px] md:text-[36px] lg:text-[44px] font-semibold tracking-[-0.018em] leading-[1.15] text-[var(--text-primary)]">
             Ready to put it on the line?
           </h2>
           <div className="mt-8">
             <button
               type="button"
               onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
-              className="inline-flex items-center h-12 px-8 rounded-full bg-[#1D1D1F] dark:bg-white text-white dark:text-[#1D1D1F] text-[15px] font-medium hover:opacity-90 transition-opacity"
+              className="inline-flex items-center h-12 px-8 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[15px] font-medium hover:opacity-90 transition-opacity"
             >
               Request Quote
             </button>
@@ -2109,7 +2115,7 @@ export default function LegacyProductView() {
           onClick={() => { if (!rqBusy) setRqOpen(false); }}
         >
           <div
-            className="w-full max-w-md bg-white dark:bg-[#1C1C1E] rounded-2xl border border-[#D2D2D7] dark:border-white/[0.08] p-5 md:p-6"
+            className="w-full max-w-md bg-[var(--bg-card)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6"
             onClick={(e) => e.stopPropagation()}
           >
             {rqResult && rqResult.ok ? (
@@ -2117,12 +2123,12 @@ export default function LegacyProductView() {
                 <div className="h-12 w-12 rounded-full bg-emerald-500/15 text-emerald-500 flex items-center justify-center mx-auto mb-3">
                   <CheckIcon className="h-6 w-6" />
                 </div>
-                <h2 className="text-[16px] font-semibold text-[#1D1D1F] dark:text-white mb-1">
+                <h2 className="text-[16px] font-semibold text-[var(--text-primary)] mb-1">
                   Request sent
                 </h2>
-                <p className="text-[13px] text-[#86868B] dark:text-white/60 mb-4">
-                  Your quote request for <span className="font-medium text-[#1D1D1F] dark:text-white">{product.product_name}</span> has been received.
-                  Reference <span className="font-mono text-[#1D1D1F] dark:text-white">{rqResult.quote_no}</span>. Our sales team will follow up.
+                <p className="text-[13px] text-[var(--text-muted)] mb-4">
+                  Your quote request for <span className="font-medium text-[var(--text-primary)]">{product.product_name}</span> has been received.
+                  Reference <span className="font-mono text-[var(--text-primary)]">{rqResult.quote_no}</span>. Our sales team will follow up.
                 </p>
                 {/* Deep-link straight to the quotation detail page.
                     Only admins with Quotations module access land on
@@ -2132,14 +2138,14 @@ export default function LegacyProductView() {
                 <div className="flex gap-2 justify-center">
                   <Link
                     href={`/quotations/${rqResult.quote_id}`}
-                    className="inline-flex items-center h-9 px-4 rounded-full bg-[#06C] text-white text-[13px] font-medium hover:bg-[#0077ED] dark:bg-[#2997FF] dark:hover:bg-[#47A9FF] transition-colors"
+                    className="inline-flex items-center h-9 px-4 rounded-full bg-[var(--accent)] text-white text-[13px] font-medium hover:bg-[var(--accent-hover)] transition-colors"
                   >
                     View quotation
                   </Link>
                   <button
                     type="button"
                     onClick={() => { setRqOpen(false); setRqResult(null); }}
-                    className="inline-flex items-center h-9 px-4 rounded-full border border-[#D2D2D7] dark:border-white/15 text-[13px] text-[#1D1D1F] dark:text-white hover:bg-[#F5F5F7] dark:hover:bg-white/[0.04] transition-colors"
+                    className="inline-flex items-center h-9 px-4 rounded-full border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
                   >
                     Close
                   </button>
@@ -2148,19 +2154,19 @@ export default function LegacyProductView() {
             ) : (
               <>
                 <div className="flex items-start justify-between mb-1">
-                  <h2 id="rq-title" className="text-[16px] font-semibold text-[#1D1D1F] dark:text-white">
+                  <h2 id="rq-title" className="text-[16px] font-semibold text-[var(--text-primary)]">
                     Request a quote
                   </h2>
                 </div>
-                <p className="text-[12px] text-[#86868B] dark:text-white/50 mb-4">
+                <p className="text-[12px] text-[var(--text-muted)] mb-4">
                   Tell us how many units you&apos;re interested in. Our team will
                   send you a quotation with pricing, lead time, and shipping terms.
                 </p>
-                <div className="mb-3 px-3 py-2.5 rounded-lg bg-[#F5F5F7] dark:bg-white/[0.04] text-[13px]">
-                  <span className="text-[#86868B] dark:text-white/50">Product · </span>
-                  <span className="text-[#1D1D1F] dark:text-white font-medium">{product.product_name}</span>
+                <div className="mb-3 px-3 py-2.5 rounded-lg bg-[var(--bg-secondary)] text-[13px]">
+                  <span className="text-[var(--text-muted)]">Product · </span>
+                  <span className="text-[var(--text-primary)] font-medium">{product.product_name}</span>
                 </div>
-                <label className="block text-[11px] font-medium uppercase tracking-wider text-[#86868B] dark:text-white/50 mb-1">
+                <label className="block text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)] mb-1">
                   Quantity
                 </label>
                 <input
@@ -2169,9 +2175,9 @@ export default function LegacyProductView() {
                   max={9999}
                   value={rqQty}
                   onChange={(e) => setRqQty(Math.max(1, Math.min(9999, Number(e.target.value) || 1)))}
-                  className="w-full h-10 px-3 rounded-lg bg-white dark:bg-[#2C2C2E] border border-[#D2D2D7] dark:border-white/[0.08] text-[14px] text-[#1D1D1F] dark:text-white focus:outline-none focus:border-[#06C] dark:focus:border-[#2997FF] mb-3"
+                  className="w-full h-10 px-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] mb-3"
                 />
-                <label className="block text-[11px] font-medium uppercase tracking-wider text-[#86868B] dark:text-white/50 mb-1">
+                <label className="block text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)] mb-1">
                   Message <span className="normal-case font-normal">(optional)</span>
                 </label>
                 <textarea
@@ -2179,7 +2185,7 @@ export default function LegacyProductView() {
                   value={rqNotes}
                   onChange={(e) => setRqNotes(e.target.value)}
                   placeholder="Specific requirements, delivery location, timeline…"
-                  className="w-full px-3 py-2 rounded-lg bg-white dark:bg-[#2C2C2E] border border-[#D2D2D7] dark:border-white/[0.08] text-[13px] text-[#1D1D1F] dark:text-white placeholder:text-[#86868B] dark:placeholder:text-white/30 focus:outline-none focus:border-[#06C] dark:focus:border-[#2997FF] resize-none mb-4"
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)] resize-none mb-4"
                 />
                 {rqResult && !rqResult.ok && (
                   <p className="text-[12px] text-red-500 mb-3">{rqResult.error}</p>
@@ -2189,7 +2195,7 @@ export default function LegacyProductView() {
                     type="button"
                     onClick={() => setRqOpen(false)}
                     disabled={rqBusy}
-                    className="inline-flex items-center h-9 px-4 rounded-full border border-[#D2D2D7] dark:border-white/15 text-[13px] text-[#1D1D1F] dark:text-white hover:bg-[#F5F5F7] dark:hover:bg-white/[0.04] transition-colors disabled:opacity-50"
+                    className="inline-flex items-center h-9 px-4 rounded-full border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors disabled:opacity-50"
                   >
                     Cancel
                   </button>
@@ -2229,7 +2235,7 @@ export default function LegacyProductView() {
                         setRqBusy(false);
                       }
                     }}
-                    className="inline-flex items-center gap-2 h-9 px-5 rounded-full bg-[#06C] text-white text-[13px] font-medium hover:bg-[#0077ED] dark:bg-[#2997FF] dark:hover:bg-[#47A9FF] transition-colors disabled:opacity-60"
+                    className="inline-flex items-center gap-2 h-9 px-5 rounded-full bg-[var(--accent)] text-white text-[13px] font-medium hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-60"
                   >
                     {rqBusy ? "Sending…" : "Send request"}
                   </button>
