@@ -12,6 +12,7 @@
    --------------------------------------------------------------------------- */
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import { useRouter } from "next/navigation";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import FactoryIcon from "@/components/icons/ui/FactoryIcon";
@@ -68,6 +69,7 @@ const inp =
   "w-full h-9 px-3 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]";
 
 export default function SupplierLinkSection({ links, suppliers, onChange }: Props) {
+  const router = useRouter();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [uploadingQuoteId, setUploadingQuoteId] = useState<string | null>(null);
@@ -453,7 +455,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
       )}
 
       {infoId && supOf(infoId) && (
-        <SupplierInfoModal supplier={supOf(infoId)!} onClose={() => setInfoId(null)} />
+        <SupplierInfoModal supplier={supOf(infoId)!} router={router} onClose={() => setInfoId(null)} />
       )}
     </div>
   );
@@ -464,7 +466,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
    is sourced from the Suppliers app (read-only here); a link opens the full
    profile in a new tab.
    --------------------------------------------------------------------------- */
-function SupplierInfoModal({ supplier, onClose }: { supplier: SupplierOption; onClose: () => void }) {
+function SupplierInfoModal({ supplier, router, onClose }: { supplier: SupplierOption; router: ReturnType<typeof useRouter>; onClose: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
@@ -604,11 +606,7 @@ function SupplierInfoModal({ supplier, onClose }: { supplier: SupplierOption; on
         {/* Footer — open full profile */}
         <div className="flex items-center justify-end gap-2 p-3 border-t border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
           <button type="button"
-            onClick={() => {
-              const url = `/suppliers/${supplier.id}`;
-              const w = window.open(url, "_blank", "noopener,noreferrer");
-              if (!w) window.location.href = url; // popup blocked → same tab
-            }}
+            onClick={() => { onClose(); router.push(`/suppliers/${supplier.id}`); }}
             className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-medium hover:opacity-90 transition-opacity">
             <ExternalLinkIcon className="h-3.5 w-3.5" /> Open full profile
           </button>
