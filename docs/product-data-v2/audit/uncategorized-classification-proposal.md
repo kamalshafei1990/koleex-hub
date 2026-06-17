@@ -33,7 +33,14 @@ Every machine's **model code prefix** is the KOLEEX category signal:
 
 ---
 
-## A. High-confidence (52) — recommend apply
+> **STATUS (2026-06-17): Section A APPLIED to prod.** The 52 reclassifications
+> below were written. `uncategorized` is now down to the 6 in Section B, which
+> remain pending — they either have no existing subcategory (would need a new
+> slug = governance sign-off) or are unidentifiable. Do NOT invent subcategory
+> slugs for them without ratifying the change through
+> `coding-change-governance.md` first.
+
+## A. High-confidence (52) — APPLIED ✅
 
 All target `division_slug = 'garment-machinery'`.
 
