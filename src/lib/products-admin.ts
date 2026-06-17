@@ -444,8 +444,8 @@ export async function fetchProductMainImages(): Promise<Record<string, string>> 
 }
 
 // ── Supplier names + logos (already API-backed) ──
-export async function fetchSupplierNames(): Promise<{ id: string; name: string; logo: string | null }[]> {
-  const json = await jget<{ suppliers?: { id: string; name: string; logo: string | null }[] }>(
+export async function fetchSupplierNames(): Promise<{ id: string; name: string; name_cn?: string | null; logo: string | null }[]> {
+  const json = await jget<{ suppliers?: { id: string; name: string; name_cn?: string | null; logo: string | null }[] }>(
     "/api/suppliers", {},
   );
   return json.suppliers ?? [];

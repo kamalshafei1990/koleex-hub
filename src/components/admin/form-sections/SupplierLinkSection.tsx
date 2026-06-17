@@ -26,7 +26,7 @@ import type { ProductSupplierFormState } from "@/types/product-form";
 const SUPPLY_TYPES = ["OEM", "ODM", "Own brand"];
 const INCOTERMS = ["EXW", "FOB", "CIF", "CFR", "DDP", "DAP"];
 
-interface SupplierOption { id: string; name: string; logo: string | null }
+interface SupplierOption { id: string; name: string; name_cn?: string | null; logo: string | null }
 
 interface Props {
   links: ProductSupplierFormState[];
@@ -45,6 +45,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
   const linkedIds = new Set(links.map((l) => l.supplier_id));
   const available = suppliers.filter((s) => !linkedIds.has(s.id));
   const nameOf = (id: string) => suppliers.find((s) => s.id === id)?.name || "(unknown supplier)";
+  const nameCnOf = (id: string) => suppliers.find((s) => s.id === id)?.name_cn || null;
   const logoOf = (id: string) => suppliers.find((s) => s.id === id)?.logo || null;
 
   const add = (supplierId: string) => {
@@ -109,6 +110,9 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                     </div>
                     <div className="min-w-0">
                       <div className="text-[15px] font-semibold text-[var(--text-primary)] truncate">{nameOf(l.supplier_id)}</div>
+                      {nameCnOf(l.supplier_id) && (
+                        <div className="text-[12px] text-[var(--text-muted)] truncate">{nameCnOf(l.supplier_id)}</div>
+                      )}
                       <div className="text-[10px] text-[var(--text-ghost)]">Supplier · managed in the Suppliers app</div>
                     </div>
                   </div>
@@ -137,12 +141,12 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                   </div>
                 </div>
 
-                {/* ── HERO — very big product photo beside name · model · cost ── */}
-                <div className="flex flex-col sm:flex-row items-start gap-4 rounded-xl bg-[var(--bg-surface)]/40 border border-[var(--border-subtle)] p-3">
+                {/* ── HERO — big centered product photo, then name · model · cost ── */}
+                <div className="rounded-xl bg-[var(--bg-surface)]/40 border border-[var(--border-subtle)] p-4 space-y-4">
                   <SupplierPhoto
                     url={l.supplier_product_photo}
                     uploading={uploadingId === l._tempId}
-                    sizeClass="h-32 w-32 sm:h-44 sm:w-44"
+                    sizeClass="h-44 w-44 sm:h-52 sm:w-52 mx-auto"
                     onPick={async (file) => {
                       setUploadingId(l._tempId);
                       const res = await uploadProductFile(file);
@@ -152,7 +156,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                     onClear={() => update(l._tempId, { supplier_product_photo: "" })}
                   />
 
-                  <div className="flex-1 min-w-0 w-full space-y-3 self-stretch">
+                  <div className="space-y-3">
                     <div>
                       <label className={lbl}>Product name</label>
                       <input
