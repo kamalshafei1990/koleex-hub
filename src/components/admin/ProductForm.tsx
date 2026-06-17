@@ -774,6 +774,14 @@ export default function ProductForm({ productId }: Props) {
           brand: p.brand || "",
           level: p.level || "",
           family: p.family || "",
+          mpn: p.mpn || "",
+          gtin: p.gtin || "",
+          manufacturer: p.manufacturer || "",
+          generation: p.generation || "",
+          internal_sku: p.internal_sku || "",
+          launch_date: p.launch_date || "",
+          eol_date: p.eol_date || "",
+          alternate_names: p.alternate_names || [],
           tags: p.tags || [],
           excerpt: p.excerpt || "",
           highlights: p.highlights || [],
@@ -1517,6 +1525,14 @@ export default function ProductForm({ productId }: Props) {
         highlights: product.highlights,
         level: product.level || null,
         family: product.family || null,
+        mpn: product.mpn || null,
+        gtin: product.gtin || null,
+        manufacturer: product.manufacturer || null,
+        generation: product.generation || null,
+        internal_sku: product.internal_sku || null,
+        launch_date: product.launch_date || null,
+        eol_date: product.eol_date || null,
+        alternate_names: (() => { const a = product.alternate_names.map((s) => s.trim()).filter(Boolean); return a.length ? a : null; })(),
         description: product.description || null,
         specs: product.specs,
         hs_code: product.hs_code || null,
@@ -2636,6 +2652,56 @@ export default function ProductForm({ productId }: Props) {
                 </span>
               )}
             </div>
+
+            {/* Phase 5 — Identity identifiers + lifecycle. The KOLEEX
+                primary model + per-model barcode/SKU live elsewhere; these
+                are the manufacturer's identifiers + market lifecycle. */}
+            <Section id="identifiers" icon={<PackageIcon className="h-4 w-4" />} title={t("identity.identifiers", "Identifiers & Lifecycle")} badge={t("identity.identifiersBadge", "MPN · GTIN · Lifecycle")} defaultOpen={false}>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className={lbl}>Manufacturer (OEM)</label>
+                  <input className={inp} value={product.manufacturer} placeholder="Actual maker, if rebranded"
+                    onChange={(e) => updateProduct_({ manufacturer: e.target.value })} />
+                </div>
+                <div>
+                  <label className={lbl}>MPN (manufacturer part no.)</label>
+                  <input className={inp} value={product.mpn} placeholder="e.g. JK-9500"
+                    onChange={(e) => updateProduct_({ mpn: e.target.value })} />
+                </div>
+                <div>
+                  <label className={lbl}>GTIN / EAN / UPC</label>
+                  <input className={inp} value={product.gtin} placeholder="e.g. 6970000000001"
+                    onChange={(e) => updateProduct_({ gtin: e.target.value })} />
+                </div>
+                <div>
+                  <label className={lbl}>Internal SKU</label>
+                  <input className={inp} value={product.internal_sku} placeholder="KOLEEX internal stock code"
+                    onChange={(e) => updateProduct_({ internal_sku: e.target.value })} />
+                </div>
+                <div>
+                  <label className={lbl}>Generation / version</label>
+                  <input className={inp} value={product.generation} placeholder="e.g. Gen 2 / v3"
+                    onChange={(e) => updateProduct_({ generation: e.target.value })} />
+                </div>
+                <div />
+                <div>
+                  <label className={lbl}>Launch date</label>
+                  <input type="date" className={inp} value={product.launch_date}
+                    onChange={(e) => updateProduct_({ launch_date: e.target.value })} />
+                </div>
+                <div>
+                  <label className={lbl}>End-of-life date</label>
+                  <input type="date" className={inp} value={product.eol_date}
+                    onChange={(e) => updateProduct_({ eol_date: e.target.value })} />
+                </div>
+                <div className="md:col-span-3">
+                  <label className={lbl}>Alternate names / aliases</label>
+                  <input className={inp} value={product.alternate_names.join(", ")} placeholder="Comma-separated other names / model codes"
+                    onChange={(e) => updateProduct_({ alternate_names: e.target.value.split(",").map((s) => s.trim()) })} />
+                  <p className="text-[10px] text-[var(--text-ghost)] mt-1">Helps search + matching. Separate with commas.</p>
+                </div>
+              </div>
+            </Section>
           </div>
         )}
 
