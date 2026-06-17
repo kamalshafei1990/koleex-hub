@@ -361,6 +361,12 @@ export interface ProductSupplierLinkRow {
   sample_cost?: number | null;
   incoterms?: string | null;
   supplier_warranty_months?: number | null;
+  /* Tier 1 sourcing intelligence (pd_supplier_quote_tiers) */
+  price_tiers?: { min_qty: number | null; price: number | null }[] | null;
+  price_quoted_on?: string | null;
+  price_valid_until?: string | null;
+  quotation_file_url?: string | null;
+  quotation_file_name?: string | null;
 }
 export async function fetchProductSuppliers(productId: string): Promise<ProductSupplierLinkRow[]> {
   if (!productId) return [];

@@ -47,6 +47,7 @@ const inp =
 export default function SupplierLinkSection({ links, suppliers, onChange }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [uploadingQuoteId, setUploadingQuoteId] = useState<string | null>(null);
 
   const linkedIds = new Set(links.map((l) => l.supplier_id));
   const available = suppliers.filter((s) => !linkedIds.has(s.id));
@@ -78,6 +79,11 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
         sample_cost: "",
         incoterms: "",
         supplier_warranty_months: "",
+        price_tiers: [],
+        price_quoted_on: "",
+        price_valid_until: "",
+        quotation_file_url: "",
+        quotation_file_name: "",
       },
     ]);
     setPickerOpen(false);
@@ -218,6 +224,91 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                     </div>
                   );
                 })()}
+
+                {/* Quotation & volume pricing — per product, from this supplier */}
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-ghost)]">Quotation &amp; volume pricing</span>
+                    {l.price_valid_until && (() => {
+                      const expired = new Date(l.price_valid_until) < new Date(new Date().toDateString());
+                      return (
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md border border-[var(--border-subtle)]"
+                          style={{ color: expired ? "var(--state-error,#FF3333)" : "var(--state-success,#00CC66)" }}>
+                          {expired ? "Quote expired" : "Quote valid"}
+                        </span>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Quote dates */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={lbl}>Quoted on</label>
+                      <input type="date" className={inp} value={l.price_quoted_on}
+                        onChange={(e) => update(l._tempId, { price_quoted_on: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className={lbl}>Valid until</label>
+                      <input type="date" className={inp} value={l.price_valid_until}
+                        onChange={(e) => update(l._tempId, { price_valid_until: e.target.value })} />
+                    </div>
+                  </div>
+
+                  {/* Volume price tiers */}
+                  <div>
+                    <label className={lbl}>Volume pricing (qty → unit price)</label>
+                    <div className="space-y-1.5">
+                      {l.price_tiers.map((tier, ti) => (
+                        <div key={ti} className="flex items-center gap-1.5">
+                          <input className={`${inp} flex-1`} inputMode="numeric" placeholder="Min qty (e.g. 10)" value={tier.min_qty}
+                            onChange={(e) => update(l._tempId, { price_tiers: l.price_tiers.map((t, i) => i === ti ? { ...t, min_qty: e.target.value.replace(/[^0-9]/g, "") } : t) })} />
+                          <span className="text-[var(--text-ghost)] text-[12px]">→</span>
+                          <input className={`${inp} flex-1`} inputMode="decimal" placeholder="Unit price" value={tier.price}
+                            onChange={(e) => update(l._tempId, { price_tiers: l.price_tiers.map((t, i) => i === ti ? { ...t, price: e.target.value.replace(/[^0-9.]/g, "") } : t) })} />
+                          <button type="button" aria-label="Remove tier"
+                            onClick={() => update(l._tempId, { price_tiers: l.price_tiers.filter((_, i) => i !== ti) })}
+                            className="h-9 w-8 shrink-0 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-[var(--state-error,#FF3333)]">
+                            <CrossIcon className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                      <button type="button"
+                        onClick={() => update(l._tempId, { price_tiers: [...l.price_tiers, { min_qty: "", price: "" }] })}
+                        className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-dashed border-[var(--border-subtle)] text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--text-ghost)] transition-colors">
+                        <PlusIcon className="h-3 w-3" /> Add price tier
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Supplier quotation file */}
+                  <div>
+                    <label className={lbl}>Supplier quotation / spec file</label>
+                    {l.quotation_file_url ? (
+                      <div className="flex items-center justify-between gap-2 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+                        <a href={l.quotation_file_url} target="_blank" rel="noopener noreferrer" className="text-[12px] text-[var(--accent,#0066FF)] truncate hover:underline">
+                          {l.quotation_file_name || "View quotation"}
+                        </a>
+                        <button type="button" aria-label="Remove file" onClick={() => update(l._tempId, { quotation_file_url: "", quotation_file_name: "" })}
+                          className="shrink-0 text-[var(--text-ghost)] hover:text-[var(--state-error,#FF3333)]">
+                          <CrossIcon className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex items-center justify-center gap-2 h-9 px-3 rounded-lg border border-dashed border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] cursor-pointer hover:text-[var(--text-primary)] hover:border-[var(--text-ghost)] transition-colors">
+                        {uploadingQuoteId === l._tempId ? "Uploading…" : (<><UploadIcon className="h-3.5 w-3.5" /> Upload quotation (PDF/image)</>)}
+                        <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,image/*" className="hidden" disabled={uploadingQuoteId === l._tempId}
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setUploadingQuoteId(l._tempId);
+                            const res = await uploadProductFile(file);
+                            setUploadingQuoteId(null);
+                            if (res) update(l._tempId, { quotation_file_url: res.url, quotation_file_name: file.name });
+                          }} />
+                      </label>
+                    )}
+                  </div>
+                </div>
 
                 {/* Per-product link fields (product-specific — not on the supplier record) */}
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">

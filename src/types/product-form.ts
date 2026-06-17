@@ -230,6 +230,12 @@ export interface ProductSupplierFormState {
   sample_cost: string;
   incoterms: string;                // EXW / FOB / CIF / DDP
   supplier_warranty_months: string;
+  /* Tier 1 sourcing intelligence (migration pd_supplier_quote_tiers). */
+  price_tiers: { min_qty: string; price: string }[];   // volume pricing
+  price_quoted_on: string;          // date the cost was quoted
+  price_valid_until: string;        // quote expiry
+  quotation_file_url: string;       // supplier's quotation/spec PDF
+  quotation_file_name: string;
 }
 
 /* Phase 4 — one row per real certificate (product_certifications). */

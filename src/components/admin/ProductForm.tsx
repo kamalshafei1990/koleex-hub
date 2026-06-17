@@ -943,6 +943,11 @@ export default function ProductForm({ productId }: Props) {
           sample_cost: str(s.sample_cost),
           incoterms: s.incoterms || "",
           supplier_warranty_months: str(s.supplier_warranty_months),
+          price_tiers: (s.price_tiers ?? []).map(t => ({ min_qty: str(t.min_qty), price: str(t.price) })),
+          price_quoted_on: s.price_quoted_on || "",
+          price_valid_until: s.price_valid_until || "",
+          quotation_file_url: s.quotation_file_url || "",
+          quotation_file_name: s.quotation_file_name || "",
         })));
 
         setCertifications(dbCerts.map(c => ({
@@ -1775,6 +1780,16 @@ export default function ProductForm({ productId }: Props) {
         sample_cost: s.sample_cost === "" ? null : Number(s.sample_cost),
         incoterms: s.incoterms || null,
         supplier_warranty_months: s.supplier_warranty_months === "" ? null : Number(s.supplier_warranty_months),
+        price_tiers: (() => {
+          const rows = (s.price_tiers || [])
+            .map(t => ({ min_qty: t.min_qty === "" ? null : Number(t.min_qty), price: t.price === "" ? null : Number(t.price) }))
+            .filter(t => t.min_qty !== null || t.price !== null);
+          return rows.length ? rows : null;
+        })(),
+        price_quoted_on: s.price_quoted_on || null,
+        price_valid_until: s.price_valid_until || null,
+        quotation_file_url: s.quotation_file_url || null,
+        quotation_file_name: s.quotation_file_name || null,
         });
       }));
 
