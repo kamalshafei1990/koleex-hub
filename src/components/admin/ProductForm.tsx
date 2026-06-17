@@ -492,7 +492,7 @@ export default function ProductForm({ productId }: Props) {
   const [divisions, setDivisions] = useState<DivisionRow[]>([]);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [subcategories, setSubcategories] = useState<SubcategoryRow[]>([]);
-  const [suppliers, setSuppliers] = useState<{ id: string; name: string; logo: string | null }[]>([]);
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string; name_cn?: string | null; logo: string | null }[]>([]);
   const [brands, setBrands] = useState<string[]>([]);
   const [brandLogos, setBrandLogos] = useState<Record<string, string>>({});
   const [divisionLogos, setDivisionLogos] = useState<Record<string, string>>({});

@@ -31,6 +31,7 @@ import { hasProductDataAccess } from "@/lib/server/product-access";
 interface ContactSupplierRow {
   id: string;
   company_name_en: string | null;
+  company_name_cn: string | null;
   display_name: string | null;
   photo_url: string | null;
   logo_url: string | null;
@@ -52,7 +53,7 @@ export async function GET() {
 
   const { data, error } = await supabaseServer
     .from("contacts")
-    .select("id, company_name_en, display_name, photo_url, logo_url")
+    .select("id, company_name_en, company_name_cn, display_name, photo_url, logo_url")
     .eq("contact_type", "supplier")
     .eq("tenant_id", auth.tenant_id)
     .order("company_name_en", { ascending: true });
@@ -71,6 +72,7 @@ export async function GET() {
     .map((r) => ({
       id: r.id,
       name: (r.company_name_en || r.display_name || "").trim(),
+      name_cn: (r.company_name_cn || "").trim() || null,
       /* Supplier (company) logos live in logo_url for ~all rows; only a couple
          use photo_url. Prefer photo_url, fall back to logo_url — matching the
          supplier directory avatar logic — so the picker shows real logos. */
