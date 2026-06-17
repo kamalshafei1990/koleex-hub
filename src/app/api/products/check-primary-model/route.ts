@@ -81,14 +81,22 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: true, available: true });
   }
 
-  /* Found a collision — fetch the owning product's display name + slug
-     so the UI can render a one-click link to the conflicting product. */
+  /* Found a model-level collision — fetch the owning product's display
+     name + slug so the UI can render a one-click link. We also scope the
+     lookup to the caller's tenant: product_models has no tenant_id, so a
+     code that collides only with another tenant's product must read as
+     available here (cross-tenant codes never conflict). */
   const hit = models[0];
   const { data: product } = await supabaseServer
     .from("products")
     .select("product_name, slug")
+    .eq("tenant_id", auth.tenant_id)
     .eq("id", hit.product_id)
     .maybeSingle();
+
+  if (!product) {
+    return NextResponse.json({ ok: true, available: true });
+  }
 
   return NextResponse.json({
     ok: true,

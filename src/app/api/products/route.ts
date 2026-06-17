@@ -36,6 +36,7 @@ export async function GET() {
   const { data, error } = await supabaseServer
     .from("products")
     .select(cols)
+    .eq("tenant_id", auth.tenant_id)
     .order("created_at", { ascending: false });
 
   if (error) {
