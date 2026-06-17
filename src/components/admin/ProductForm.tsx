@@ -492,7 +492,7 @@ export default function ProductForm({ productId }: Props) {
   const [divisions, setDivisions] = useState<DivisionRow[]>([]);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [subcategories, setSubcategories] = useState<SubcategoryRow[]>([]);
-  const [suppliers, setSuppliers] = useState<{ id: string; name: string; name_cn?: string | null; logo: string | null; supply_type?: string | null; payment_terms?: string | null; currency?: string | null; moq?: string | null; lead_time?: string | null }[]>([]);
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string; name_cn?: string | null; logo: string | null; supply_type?: string | null; payment_terms?: string | null; currency?: string | null; moq?: string | null; lead_time?: string | null; email?: string | null; phone?: string | null; website?: string | null; wechat?: string | null; location?: string | null; primary_contact?: { name: string | null; role: string | null; email: string | null; mobile: string | null } | null }[]>([]);
   const [brands, setBrands] = useState<string[]>([]);
   const [brandLogos, setBrandLogos] = useState<Record<string, string>>({});
   const [divisionLogos, setDivisionLogos] = useState<Record<string, string>>({});

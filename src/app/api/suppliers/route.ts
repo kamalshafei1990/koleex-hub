@@ -42,6 +42,18 @@ interface ContactSupplierRow {
   currency: string | null;
   moq: string | null;
   lead_time: string | null;
+  /* Contact info (read-only quick-look; full record in the Suppliers app). */
+  supplier_email: string | null;
+  email: string | null;
+  phone: string | null;
+  supplier_website: string | null;
+  website: string | null;
+  wechat_id: string | null;
+  city: string | null;
+  province: string | null;
+  country: string | null;
+  supplier_address: string | null;
+  contact_persons: Array<{ full_name?: string; name_cn?: string; role?: string; email?: string; mobile?: string; is_primary?: boolean }> | null;
 }
 
 export async function GET() {
@@ -60,7 +72,7 @@ export async function GET() {
 
   const { data, error } = await supabaseServer
     .from("contacts")
-    .select("id, company_name_en, company_name_cn, display_name, photo_url, logo_url, supplier_type, payment_terms, currency, moq, lead_time")
+    .select("id, company_name_en, company_name_cn, display_name, photo_url, logo_url, supplier_type, payment_terms, currency, moq, lead_time, supplier_email, email, phone, supplier_website, website, wechat_id, city, province, country, supplier_address, contact_persons")
     .eq("contact_type", "supplier")
     .eq("tenant_id", auth.tenant_id)
     .order("company_name_en", { ascending: true });
@@ -76,21 +88,44 @@ export async function GET() {
      name. Rows with no usable name are filtered out so the
      dropdown doesn't show blank entries. */
   const suppliers = ((data ?? []) as ContactSupplierRow[])
-    .map((r) => ({
-      id: r.id,
-      name: (r.company_name_en || r.display_name || "").trim(),
-      name_cn: (r.company_name_cn || "").trim() || null,
-      /* Supplier-level defaults (source of truth for shared fields). */
-      supply_type: r.supplier_type || null,
-      payment_terms: r.payment_terms || null,
-      currency: r.currency || null,
-      moq: r.moq || null,
-      lead_time: r.lead_time || null,
-      /* Supplier (company) logos live in logo_url for ~all rows; only a couple
-         use photo_url. Prefer photo_url, fall back to logo_url — matching the
-         supplier directory avatar logic — so the picker shows real logos. */
-      logo: r.photo_url || r.logo_url || null,
-    }))
+    .map((r) => {
+      /* Pick the primary contact person (or the first listed) for the
+         quick-look popup; the full list stays in the Suppliers app. */
+      const persons = Array.isArray(r.contact_persons) ? r.contact_persons : [];
+      const cp = persons.find((p) => p?.is_primary) || persons[0] || null;
+      const primary_contact = cp
+        ? {
+            name: (cp.full_name || cp.name_cn || "").trim() || null,
+            role: (cp.role || "").trim() || null,
+            email: (cp.email || "").trim() || null,
+            mobile: (cp.mobile || "").trim() || null,
+          }
+        : null;
+      const location = [r.city, r.province, r.country].map((s) => (s || "").trim()).filter(Boolean).join(", ")
+        || (r.supplier_address || "").trim() || null;
+      return {
+        id: r.id,
+        name: (r.company_name_en || r.display_name || "").trim(),
+        name_cn: (r.company_name_cn || "").trim() || null,
+        /* Supplier-level defaults (source of truth for shared fields). */
+        supply_type: r.supplier_type || null,
+        payment_terms: r.payment_terms || null,
+        currency: r.currency || null,
+        moq: r.moq || null,
+        lead_time: r.lead_time || null,
+        /* Contact info (read-only quick-look). */
+        email: (r.supplier_email || r.email || "").trim() || null,
+        phone: (r.phone || "").trim() || null,
+        website: (r.supplier_website || r.website || "").trim() || null,
+        wechat: (r.wechat_id || "").trim() || null,
+        location,
+        primary_contact,
+        /* Supplier (company) logos live in logo_url for ~all rows; only a couple
+           use photo_url. Prefer photo_url, fall back to logo_url — matching the
+           supplier directory avatar logic — so the picker shows real logos. */
+        logo: r.photo_url || r.logo_url || null,
+      };
+    })
     .filter((r) => r.name);
 
   return NextResponse.json(

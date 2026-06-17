@@ -456,11 +456,18 @@ export async function fetchProductMainImages(): Promise<Record<string, string>> 
 }
 
 // ── Supplier names + logos (already API-backed) ──
+export interface SupplierContactLite {
+  name: string | null; role: string | null; email: string | null; mobile: string | null;
+}
 export interface SupplierLite {
   id: string; name: string; name_cn?: string | null; logo: string | null;
   /* Supplier-level defaults (source of truth for shared fields). */
   supply_type?: string | null; payment_terms?: string | null;
   currency?: string | null; moq?: string | null; lead_time?: string | null;
+  /* Contact info (read-only quick-look). */
+  email?: string | null; phone?: string | null; website?: string | null;
+  wechat?: string | null; location?: string | null;
+  primary_contact?: SupplierContactLite | null;
 }
 export async function fetchSupplierNames(): Promise<SupplierLite[]> {
   const json = await jget<{ suppliers?: SupplierLite[] }>("/api/suppliers", {});
