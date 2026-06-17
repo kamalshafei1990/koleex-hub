@@ -948,6 +948,11 @@ export default function ProductForm({ productId }: Props) {
           price_valid_until: s.price_valid_until || "",
           quotation_file_url: s.quotation_file_url || "",
           quotation_file_name: s.quotation_file_name || "",
+          sourcing_status: s.sourcing_status || "",
+          preferred_reason: str(s.preferred_reason),
+          min_order_value: str(s.min_order_value),
+          tooling_owner: s.tooling_owner || "",
+          tooling_cost: str(s.tooling_cost),
         })));
 
         setCertifications(dbCerts.map(c => ({
@@ -1790,6 +1795,11 @@ export default function ProductForm({ productId }: Props) {
         price_valid_until: s.price_valid_until || null,
         quotation_file_url: s.quotation_file_url || null,
         quotation_file_name: s.quotation_file_name || null,
+        sourcing_status: s.sourcing_status || null,
+        preferred_reason: s.preferred_reason || null,
+        min_order_value: s.min_order_value === "" ? null : Number(s.min_order_value),
+        tooling_owner: s.tooling_owner || null,
+        tooling_cost: s.tooling_cost === "" ? null : Number(s.tooling_cost),
         });
       }));
 

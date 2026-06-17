@@ -27,7 +27,7 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const LINK_COLS =
-  "id, product_id, supplier_id, is_primary, show_in_catalog, supplier_product_code, moq, lead_time_days, unit_cost_cny, currency, payment_terms, notes, supplier_product_name, supplier_product_photo, supply_type, sample_available, sample_cost, incoterms, supplier_warranty_months, price_tiers, price_quoted_on, price_valid_until, quotation_file_url, quotation_file_name";
+  "id, product_id, supplier_id, is_primary, show_in_catalog, supplier_product_code, moq, lead_time_days, unit_cost_cny, currency, payment_terms, notes, supplier_product_name, supplier_product_photo, supply_type, sample_available, sample_cost, incoterms, supplier_warranty_months, price_tiers, price_quoted_on, price_valid_until, quotation_file_url, quotation_file_name, sourcing_status, preferred_reason, min_order_value, tooling_owner, tooling_cost";
 
 /* Confirm the product exists AND belongs to the caller's tenant before
    reading/writing its supplier links. Returns the product id or null. */
@@ -132,6 +132,12 @@ export async function PUT(req: Request) {
       price_valid_until: (r.price_valid_until as string) || null,
       quotation_file_url: (r.quotation_file_url as string) || null,
       quotation_file_name: (r.quotation_file_name as string) || null,
+      /* Tier 2 sourcing intelligence (pd_supplier_sourcing_tier2) */
+      sourcing_status: (r.sourcing_status as string) || null,
+      preferred_reason: (r.preferred_reason as string) || null,
+      min_order_value: num(r.min_order_value),
+      tooling_owner: (r.tooling_owner as string) || null,
+      tooling_cost: num(r.tooling_cost),
     }));
 
   /* At most one primary. If callers mark several, keep the first. */

@@ -26,6 +26,17 @@ import { uploadProductFile } from "@/lib/products-admin";
 import type { ProductSupplierFormState } from "@/types/product-form";
 
 const INCOTERMS = ["EXW", "FOB", "CIF", "CFR", "DDP", "DAP"];
+const SOURCING_STATUS: { value: string; label: string }[] = [
+  { value: "preferred", label: "Preferred" },
+  { value: "backup", label: "Backup" },
+  { value: "trial", label: "Trial" },
+  { value: "phasing_out", label: "Phasing out" },
+];
+const TOOLING_OWNERS: { value: string; label: string }[] = [
+  { value: "koleex", label: "KOLEEX-owned" },
+  { value: "supplier", label: "Supplier-owned" },
+  { value: "shared", label: "Shared" },
+];
 
 interface SupplierOption {
   id: string; name: string; name_cn?: string | null; logo: string | null;
@@ -84,6 +95,11 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
         price_valid_until: "",
         quotation_file_url: "",
         quotation_file_name: "",
+        sourcing_status: "",
+        preferred_reason: "",
+        min_order_value: "",
+        tooling_owner: "",
+        tooling_cost: "",
       },
     ]);
     setPickerOpen(false);
@@ -342,6 +358,47 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                     </button>
                   </div>
                 </div>
+                {/* Sourcing strategy — how this supplier is positioned for THIS product */}
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3 space-y-3">
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-ghost)]">Sourcing strategy</span>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <div>
+                      <label className={lbl}>Sourcing status</label>
+                      <select className={inp} value={l.sourcing_status} onChange={(e) => update(l._tempId, { sourcing_status: e.target.value })}>
+                        <option value="">—</option>
+                        {SOURCING_STATUS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                      </select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className={lbl}>Why this supplier</label>
+                      <input className={inp} value={l.preferred_reason} placeholder="e.g. best price / quality / fastest lead time"
+                        onChange={(e) => update(l._tempId, { preferred_reason: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className={lbl}>Min order value</label>
+                      <div className="flex gap-1.5">
+                        <input className={`${inp} flex-1 min-w-0`} value={l.min_order_value} inputMode="decimal" placeholder="e.g. 5000"
+                          onChange={(e) => update(l._tempId, { min_order_value: e.target.value.replace(/[^0-9.]/g, "") })} />
+                        <div className="h-9 w-[84px] shrink-0 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] flex items-center justify-center" title="Currency comes from the supplier (Suppliers app)">
+                          {supOf(l.supplier_id)?.currency || "—"}
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <label className={lbl}>Tooling / mold owner</label>
+                      <select className={inp} value={l.tooling_owner} onChange={(e) => update(l._tempId, { tooling_owner: e.target.value })}>
+                        <option value="">—</option>
+                        {TOOLING_OWNERS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={lbl}>Tooling / mold cost</label>
+                      <input className={inp} value={l.tooling_cost} inputMode="decimal" placeholder="e.g. 12000"
+                        onChange={(e) => update(l._tempId, { tooling_cost: e.target.value.replace(/[^0-9.]/g, "") })} />
+                    </div>
+                  </div>
+                </div>
+
                 <div>
                   <label className={lbl}>Notes</label>
                   <input className={inp} value={l.notes} placeholder="Sourcing notes specific to this product…"
