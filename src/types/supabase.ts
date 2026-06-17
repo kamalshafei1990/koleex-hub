@@ -320,6 +320,15 @@ export interface ProductRow {
   training_available: boolean | null;
   installation_service: boolean | null;
   returns_policy: string | null;
+  /* Phase 5 — Identity identifiers + lifecycle (additive, all nullable). */
+  mpn: string | null;
+  gtin: string | null;
+  manufacturer: string | null;
+  generation: string | null;
+  internal_sku: string | null;
+  launch_date: string | null;
+  eol_date: string | null;
+  alternate_names: string[] | null;
   visible: boolean;
   featured: boolean;
   status: string | null;

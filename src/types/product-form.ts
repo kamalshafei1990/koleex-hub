@@ -17,6 +17,15 @@ export interface ProductFormState {
   brand: string;
   level: string;
   family: string;
+  /* Phase 5 — Identity identifiers + lifecycle (all optional). */
+  mpn: string;
+  gtin: string;
+  manufacturer: string;
+  generation: string;
+  internal_sku: string;
+  launch_date: string;
+  eol_date: string;
+  alternate_names: string[];
   tags: string[];
   /* Short 1-2 sentence description. Shown on product cards, SEO
      meta descriptions, and quote emails. Separate from the long
@@ -261,6 +270,14 @@ export const EMPTY_PRODUCT: ProductFormState = {
   brand: "Koleex",
   level: "",
   family: "",
+  mpn: "",
+  gtin: "",
+  manufacturer: "",
+  generation: "",
+  internal_sku: "",
+  launch_date: "",
+  eol_date: "",
+  alternate_names: [],
   tags: [],
   excerpt: "",
   highlights: [],
