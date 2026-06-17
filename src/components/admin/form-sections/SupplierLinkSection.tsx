@@ -19,6 +19,7 @@ import StarIcon from "@/components/icons/ui/StarIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import UploadIcon from "@/components/icons/ui/UploadIcon";
+import PictureIcon from "@/components/icons/ui/PictureIcon";
 import { uploadProductFile } from "@/lib/products-admin";
 import type { ProductSupplierFormState } from "@/types/product-form";
 
@@ -98,39 +99,18 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                 {/* ── HERO — product-led: photo · name · model · cost price.
                        Supplier identity is secondary context below. ── */}
                 <div className="flex items-start gap-4">
-                  {/* Product photo */}
-                  <div className="relative h-24 w-24 shrink-0 rounded-xl bg-[var(--bg-surface)] border border-dashed border-[var(--border-subtle)] overflow-hidden flex items-center justify-center">
-                    {l.supplier_product_photo ? (
-                      <>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={l.supplier_product_photo} alt="" className="h-full w-full object-cover" />
-                        <button type="button" onClick={() => update(l._tempId, { supplier_product_photo: "" })} aria-label="Remove photo"
-                          className="absolute top-0.5 right-0.5 h-5 w-5 flex items-center justify-center rounded-md bg-black/60 text-white hover:bg-black/80">
-                          <CrossIcon className="h-3 w-3" />
-                        </button>
-                      </>
-                    ) : (
-                      <label className="cursor-pointer flex flex-col items-center gap-1 text-[var(--text-ghost)] hover:text-[var(--text-muted)] transition-colors">
-                        {uploadingId === l._tempId ? (
-                          <span className="text-[9px]">Uploading…</span>
-                        ) : (
-                          <>
-                            <UploadIcon className="h-5 w-5" />
-                            <span className="text-[9px]">Photo</span>
-                          </>
-                        )}
-                        <input type="file" accept="image/*" className="hidden" disabled={uploadingId === l._tempId}
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (!file) return;
-                            setUploadingId(l._tempId);
-                            const res = await uploadProductFile(file);
-                            setUploadingId(null);
-                            if (res) update(l._tempId, { supplier_product_photo: res.url });
-                          }} />
-                      </label>
-                    )}
-                  </div>
+                  {/* Product photo — the visual anchor of the card */}
+                  <SupplierPhoto
+                    url={l.supplier_product_photo}
+                    uploading={uploadingId === l._tempId}
+                    onPick={async (file) => {
+                      setUploadingId(l._tempId);
+                      const res = await uploadProductFile(file);
+                      setUploadingId(null);
+                      if (res) update(l._tempId, { supplier_product_photo: res.url });
+                    }}
+                    onClear={() => update(l._tempId, { supplier_product_photo: "" })}
+                  />
 
                   {/* Product identity: name (title) · model · cost price */}
                   <div className="flex-1 min-w-0">
@@ -288,6 +268,76 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
           onPick={add}
           onClose={() => setPickerOpen(false)}
         />
+      )}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+   SupplierPhoto — the product photo for a supplier link. Click or drag-drop
+   to upload; object-contain so the whole product shows (no crop); hover to
+   change; small remove control. Uploads to storage via the parent's onPick.
+   --------------------------------------------------------------------------- */
+function SupplierPhoto({
+  url, uploading, onPick, onClear,
+}: {
+  url: string;
+  uploading: boolean;
+  onPick: (file: File) => void;
+  onClear: () => void;
+}) {
+  const [drag, setDrag] = useState(false);
+  const take = (files: FileList | null) => {
+    const f = files?.[0];
+    if (f && f.type.startsWith("image/")) onPick(f);
+  };
+  return (
+    <div className="relative h-28 w-28 shrink-0">
+      <label
+        onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+        onDragLeave={() => setDrag(false)}
+        onDrop={(e) => { e.preventDefault(); setDrag(false); take(e.dataTransfer.files); }}
+        className={`group relative block h-full w-full rounded-xl overflow-hidden cursor-pointer transition-colors ${
+          url
+            ? "border border-[var(--border-subtle)] bg-[var(--bg-surface)]"
+            : drag
+              ? "border-2 border-dashed border-[var(--border-focus)] bg-[var(--accent,#0066FF)]/[0.06]"
+              : "border-2 border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:border-[var(--text-ghost)]"
+        }`}
+      >
+        {url ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={url} alt="" className="h-full w-full object-contain p-1.5" />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity">
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-white">
+                <UploadIcon className="h-3.5 w-3.5" /> Change
+              </span>
+            </div>
+          </>
+        ) : (
+          <div className="h-full w-full flex flex-col items-center justify-center gap-1 text-[var(--text-ghost)] group-hover:text-[var(--text-muted)] transition-colors">
+            <PictureIcon className="h-7 w-7" />
+            <span className="text-[10px] font-medium">Add photo</span>
+            <span className="text-[9px] text-[var(--text-faint)]">drop or click</span>
+          </div>
+        )}
+        {uploading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[var(--bg-surface)]/85 text-[10px] font-medium text-[var(--text-muted)]">
+            Uploading…
+          </div>
+        )}
+        <input type="file" accept="image/*" className="hidden" disabled={uploading} onChange={(e) => take(e.target.files)} />
+      </label>
+      {url && !uploading && (
+        <button
+          type="button"
+          onClick={onClear}
+          aria-label="Remove photo"
+          className="absolute -top-1.5 -right-1.5 h-5 w-5 flex items-center justify-center rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-2 border-[var(--bg-card)] hover:opacity-90 transition-opacity"
+        >
+          <CrossIcon className="h-2.5 w-2.5" />
+        </button>
       )}
     </div>
   );
