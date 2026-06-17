@@ -63,6 +63,10 @@ import {
   fetchMediaByProductId,
   fetchSewingSpecsByProductId,
   fetchRelatedProducts,
+  fetchProductCertifications,
+  fetchProductDocuments,
+  type ProductCertificationRow,
+  type ProductDocumentRow,
   fetchDivisions,
   fetchCategories,
   fetchSubcategories,
@@ -378,6 +382,22 @@ const REL_LABELS: Record<string, string> = {
   bundle: "Bundle",
 };
 
+/* Phase 4 document-type → human label (read-only detail view). */
+const DOC_LABELS: Record<string, string> = {
+  user_manual: "User manual",
+  spare_parts_list: "Spare parts list",
+  exploded_view: "Exploded view",
+  wiring_diagram: "Wiring diagram",
+  installation_guide: "Installation guide",
+  brochure: "Brochure",
+  catalog: "Catalog",
+  certificate: "Certificate",
+  test_report: "Test report",
+  packing_list: "Packing list",
+  dimension_drawing: "Dimension drawing",
+  cad_3d: "3D / CAD",
+};
+
 function Section({
   id, eyebrow, title, subtitle, children, className = "", align = "center",
 }: {
@@ -449,6 +469,8 @@ export default function LegacyProductView() {
   const [related, setRelated] = useState<({ related_id: string; product_name?: string; relation_type?: string })[]>([]);
   const [relatedDetails, setRelatedDetails] = useState<Record<string, ProductRow>>({});
   const [relatedImages, setRelatedImages] = useState<Record<string, string>>({});
+  const [certifications, setCertifications] = useState<ProductCertificationRow[]>([]);
+  const [documents, setDocuments] = useState<ProductDocumentRow[]>([]);
 
   const [divisions, setDivisions] = useState<DivisionRow[]>([]);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
@@ -557,11 +579,13 @@ export default function LegacyProductView() {
       if (!p) { setNotFound(true); setLoading(false); return; }
 
       setProduct(p);
-      const [mdls, mds, specs, rel] = await Promise.all([
+      const [mdls, mds, specs, rel, certs, docs] = await Promise.all([
         fetchModelsByProductId(p.id),
         fetchMediaByProductId(p.id),
         fetchSewingSpecsByProductId(p.id),
         fetchRelatedProducts(p.id),
+        fetchProductCertifications(p.id).catch(() => []),
+        fetchProductDocuments(p.id).catch(() => []),
       ]);
       if (cancelled) return;
 
@@ -569,6 +593,8 @@ export default function LegacyProductView() {
       setMedia(mds);
       setSewingSpecs(specs);
       setRelated(rel);
+      setCertifications(certs);
+      setDocuments(docs);
 
       /* PERF: related products used to fan out two sequential
               Promise.alls (details, then media). Now a single
@@ -1176,6 +1202,110 @@ export default function LegacyProductView() {
         internal={isInternal}
         editHref={`/product-data/${product.id}/edit`}
       />
+
+      {/* ── Certifications (Phase 4) — buyer-relevant, shown when present. */}
+      {certifications.length > 0 && (
+        <section className="mx-auto w-full max-w-[1200px] px-4 md:px-6 lg:px-10 xl:px-16 pt-4">
+          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <LayersIcon className="h-4 w-4 text-[var(--text-muted)]" />
+              <h2 className="text-[14px] font-bold tracking-tight text-[var(--text-primary)]">Certifications</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {certifications.map((c, i) => {
+                const expired = c.expiry_date ? new Date(c.expiry_date) < new Date() : false;
+                return (
+                  <div key={c.id || i} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[13px] font-semibold text-[var(--text-primary)]">{c.cert_type}{c.certified_standard ? ` · ${c.certified_standard}` : ""}</span>
+                      {c.expiry_date && (
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md border border-[var(--border-subtle)]" style={{ color: expired ? "var(--state-error,#FF3333)" : "var(--text-muted)" }}>
+                          {expired ? "Expired" : "Valid"} · {c.expiry_date}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[var(--text-muted)]">
+                      {c.cert_number && <span>No. {c.cert_number}</span>}
+                      {c.issuer && <span>Issuer: {c.issuer}</span>}
+                      {c.country_scope && <span>Scope: {c.country_scope}</span>}
+                    </div>
+                    {(c.file_url || c.verification_url) && (
+                      <div className="mt-2 flex flex-wrap gap-3 text-[11px]">
+                        {c.file_url && <a href={c.file_url} target="_blank" rel="noopener noreferrer" className="text-[var(--accent,#0066FF)] hover:underline">Certificate file</a>}
+                        {c.verification_url && <a href={c.verification_url} target="_blank" rel="noopener noreferrer" className="text-[var(--accent,#0066FF)] hover:underline">Verify online</a>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── Documents (Phase 4) — downloadable manuals / datasheets / drawings. */}
+      {documents.length > 0 && (
+        <section className="mx-auto w-full max-w-[1200px] px-4 md:px-6 lg:px-10 xl:px-16 pt-4">
+          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <LayersIcon className="h-4 w-4 text-[var(--text-muted)]" />
+              <h2 className="text-[14px] font-bold tracking-tight text-[var(--text-primary)]">Documents</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {documents.map((d, i) => (
+                <a
+                  key={d.id || i}
+                  href={d.file_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3 hover:border-[var(--border-focus)] transition-colors"
+                >
+                  <div className="min-w-0">
+                    <p className="text-[12px] font-semibold text-[var(--text-primary)] truncate group-hover:text-[var(--text-highlight)]">{d.title || DOC_LABELS[d.doc_type] || d.file_name || "Document"}</p>
+                    <p className="text-[10px] text-[var(--text-dim)] mt-0.5">{DOC_LABELS[d.doc_type] || d.doc_type}{d.language ? ` · ${d.language.toUpperCase()}` : ""}{d.version ? ` · v${d.version}` : ""}</p>
+                  </div>
+                  <span className="text-[11px] text-[var(--accent,#0066FF)] shrink-0">Open ↗</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── Warranty & after-sales (Phase 4 structured fields) — shown when set. */}
+      {isInternal && (() => {
+        const w: { label: string; value: string }[] = [];
+        if (product.warranty_months != null) w.push({ label: "Warranty", value: `${product.warranty_months} months${product.warranty_type ? ` · ${product.warranty_type}` : ""}` });
+        if (product.warranty_coverage) w.push({ label: "Coverage", value: product.warranty_coverage });
+        if (product.warranty_exclusions) w.push({ label: "Exclusions", value: product.warranty_exclusions });
+        if (product.spare_parts_availability) w.push({ label: "Spare parts", value: product.spare_parts_availability });
+        if (product.service_life) w.push({ label: "Service life", value: product.service_life });
+        if (product.maintenance_interval) w.push({ label: "Maintenance interval", value: product.maintenance_interval });
+        if (product.technical_support) w.push({ label: "Technical support", value: product.technical_support });
+        if (product.support_channels && product.support_channels.length > 0) w.push({ label: "Support channels", value: product.support_channels.filter(Boolean).join(", ") });
+        if (product.returns_policy) w.push({ label: "Returns policy", value: product.returns_policy });
+        if (product.installation_service) w.push({ label: "Installation", value: "Available" });
+        if (product.training_available) w.push({ label: "Training", value: "Available" });
+        if (w.length === 0) return null;
+        return (
+          <section className="mx-auto w-full max-w-[1200px] px-4 md:px-6 lg:px-10 xl:px-16 pt-4">
+            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <LayersIcon className="h-4 w-4 text-[var(--text-muted)]" />
+                <h2 className="text-[14px] font-bold tracking-tight text-[var(--text-primary)]">Warranty &amp; after-sales</h2>
+              </div>
+              <dl className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3">
+                {w.map((row) => (
+                  <div key={row.label}>
+                    <dt className="text-[10px] uppercase tracking-wide text-[var(--text-ghost)]">{row.label}</dt>
+                    <dd className="text-[13px] text-[var(--text-primary)] mt-0.5 break-words">{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          </section>
+        );
+      })()}
 
       {/* ── Identifiers & lifecycle (Phase 5) — internal staff only. Renders
               only when at least one identifier is set, so it stays invisible
