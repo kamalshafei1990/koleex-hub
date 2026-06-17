@@ -289,6 +289,7 @@ function getSteps(isSewing: boolean): WizardStep[] {
        (it enriches an already-described product); Logistics is its own step so
        customs/shipping data stops scattering across Specs + Models. */
     { id: "classify", label: "Classification", shortLabel: "Classify", icon: <FolderTreeIcon className="h-4 w-4" /> },
+    { id: "supplier", label: "Supplier & Sourcing", shortLabel: "Supplier", icon: <FactoryIcon className="h-4 w-4" /> },
     { id: "identity", label: "Hero & Identity", shortLabel: "Identity", icon: <SparklesIcon className="h-4 w-4" /> },
     { id: "description", label: "Description", shortLabel: "Description", icon: <DocumentIcon className="h-4 w-4" /> },
     { id: "specs", label: "Specifications", shortLabel: "Specs", icon: <Settings2Icon className="h-4 w-4" /> },
@@ -2782,6 +2783,20 @@ export default function ProductForm({ productId }: Props) {
         )}
 
         {/* ═══════════════════════════════════════════════════════════
+           STEP: SUPPLIER & SOURCING (dedicated tab, after Classify)
+           All supplier data lives here. Supplier MASTER (name, logo,
+           contacts, ratings) stays in the Suppliers app — this links to
+           an existing supplier and edits only the per-product facts.
+           ═══════════════════════════════════════════════════════════ */}
+        {(onePage || steps[currentStep]?.id === "supplier") && (
+          <div id="sec-supplier" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+            <Section id="suppliers" icon={<FactoryIcon className="h-4 w-4" />} title={t("models.suppliers", "Supplier & Sourcing")} badge={t("models.suppliersBadge", "From Suppliers app")} defaultOpen>
+              <SupplierLinkSection links={productSuppliers} suppliers={suppliers} onChange={setProductSuppliers} />
+            </Section>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
            STEP 3 (maybe): DESCRIPTION (rich text)
            ═══════════════════════════════════════════════════════════ */}
         {(onePage || steps[currentStep]?.id === "description") && (
@@ -3046,12 +3061,8 @@ export default function ProductForm({ productId }: Props) {
             <Section id="prices" icon={<DollarSignIcon className="h-4 w-4" />} title={t("models.marketPrices", "Market Prices")} badge={t("models.perCountry", "Per country")} defaultOpen={false}>
               <MarketPricesSection prices={prices} models={models} onChange={setPrices} />
             </Section>
-
-            {/* Supplier links — pulled from the Suppliers app; only the
-                per-product facts are edited here (Phase 3). */}
-            <Section id="suppliers" icon={<FactoryIcon className="h-4 w-4" />} title={t("models.suppliers", "Supplier & Sourcing")} badge={t("models.suppliersBadge", "From Suppliers app")} defaultOpen={false}>
-              <SupplierLinkSection links={productSuppliers} suppliers={suppliers} onChange={setProductSuppliers} />
-            </Section>
+            {/* Supplier & Sourcing moved to its own dedicated Supplier tab
+                (after Classify) so all supplier data lives in one place. */}
           </div>
         )}
 
