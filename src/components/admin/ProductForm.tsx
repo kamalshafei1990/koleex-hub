@@ -78,6 +78,7 @@ import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
 import ClassificationSection from "./form-sections/ClassificationSection";
 import SelectWithCreate from "./form-sections/SelectWithCreate";
 import CreateDivisionModal from "./form-sections/CreateDivisionModal";
+import ConfirmDialog from "./form-sections/ConfirmDialog";
 import CreateCategoryModal from "./form-sections/CreateCategoryModal";
 import CreateSubcategoryModal from "./form-sections/CreateSubcategoryModal";
 import CreateSupplierModal from "./form-sections/CreateSupplierModal";
@@ -679,17 +680,21 @@ export default function ProductForm({ productId }: Props) {
   /* Smart cancel — confirms with the user when there are unsaved
      edits, otherwise just routes back to the list. */
   const handleCancel = () => {
+    /* When there are unsaved edits, open a themed ConfirmDialog instead
+       of the native window.confirm (which Safari renders with a system
+       dialog that clashes with the hub's dark theme). The actual leave
+       happens in leaveNow() once the user confirms. */
     if (dirty) {
-      const ok = window.confirm(
-        t("wizard.confirmDiscard", "Discard your changes and leave this page? Anything you've edited that hasn't been saved will be lost.")
-      );
-      if (!ok) return;
+      setDiscardOpen(true);
+      return;
     }
-    /* Return to the list of whichever app we're in (/product-data or
-       /products) so Back / Cancel never bounces the operator into the
-       other app. */
-    router.push(baseRoute);
+    leaveNow();
   };
+
+  /* Return to the list of whichever app we're in (/product-data or
+     /products) so Back / Cancel never bounces the operator into the
+     other app. */
+  const leaveNow = () => router.push(baseRoute);
 
   /* ── Main image ref for hero ── */
   const mainImageRef = useRef<HTMLInputElement>(null);
@@ -900,6 +905,7 @@ export default function ProductForm({ productId }: Props) {
   const [showSubcategoryModal, setShowSubcategoryModal] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [showBrandModal, setShowBrandModal] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
   const [supplierTarget, setSupplierTarget] = useState<"hero" | string>("hero");
 
   /* ── Hero: main image helpers ── */
@@ -3578,6 +3584,17 @@ export default function ProductForm({ productId }: Props) {
           updateProduct_({ brand: brandName });
         }}
         existingBrands={brands}
+      />
+
+      <ConfirmDialog
+        open={discardOpen}
+        onClose={() => setDiscardOpen(false)}
+        onConfirm={() => { setDiscardOpen(false); leaveNow(); }}
+        title={t("wizard.confirmDiscardTitle", "Discard unsaved changes?")}
+        message={t("wizard.confirmDiscard", "Discard your changes and leave this page? Anything you've edited that hasn't been saved will be lost.")}
+        confirmLabel={t("wizard.discardConfirm", "Discard & leave")}
+        cancelLabel={t("wizard.discardCancel", "Keep editing")}
+        destructive
       />
     </div>
   );
