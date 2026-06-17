@@ -216,7 +216,14 @@ export type ProductMediaType =
   | "logo_detail"
   | "manual"
   | "ar_3d"
-  | "video";
+  | "video"
+  /* Document types (Phase 2 — Media & Documents). product_media.type is
+     free text in the DB, so these need no migration; they widen the
+     hand-maintained union the form + renderers switch on. */
+  | "datasheet"
+  | "brochure"
+  | "certificate"
+  | "parts_list";
 
 export interface DivisionRow {
   id: string;

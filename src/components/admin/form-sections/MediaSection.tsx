@@ -103,8 +103,8 @@ const MEDIA_TYPES: MediaTypeDef[] = [
   },
   {
     type: "manual",
-    label: "Manual / Datasheet",
-    description: "PDF manuals, datasheets, spec sheets",
+    label: "User Manual",
+    description: "PDF user manuals / operation guides",
     icon: <DocumentIcon className="h-4 w-4" />,
     accentColor: "from-[var(--bg-surface)] to-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-muted)]",
     multiple: true,
@@ -112,6 +112,54 @@ const MEDIA_TYPES: MediaTypeDef[] = [
     maxSizeMB: 25,
     mimeCheck: /^(application\/pdf|application\/msword|application\/vnd\.openxmlformats-officedocument)/,
     suggestedCount: 1,
+  },
+  {
+    type: "datasheet",
+    label: "Datasheet",
+    description: "Technical datasheet / spec sheet (PDF)",
+    icon: <DocumentIcon className="h-4 w-4" />,
+    accentColor: "from-[var(--bg-surface)] to-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-muted)]",
+    multiple: true,
+    accept: ".pdf,.doc,.docx",
+    maxSizeMB: 25,
+    mimeCheck: /^(application\/pdf|application\/msword|application\/vnd\.openxmlformats-officedocument)/,
+    suggestedCount: 0,
+  },
+  {
+    type: "brochure",
+    label: "Brochure / Catalog",
+    description: "Marketing brochure or catalog page (PDF)",
+    icon: <DocumentIcon className="h-4 w-4" />,
+    accentColor: "from-[var(--bg-surface)] to-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-muted)]",
+    multiple: true,
+    accept: ".pdf,.doc,.docx",
+    maxSizeMB: 25,
+    mimeCheck: /^(application\/pdf|application\/msword|application\/vnd\.openxmlformats-officedocument)/,
+    suggestedCount: 0,
+  },
+  {
+    type: "certificate",
+    label: "Certificates",
+    description: "CE / RoHS / ISO and other compliance certificates",
+    icon: <DocumentIcon className="h-4 w-4" />,
+    accentColor: "from-[var(--bg-surface)] to-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-muted)]",
+    multiple: true,
+    accept: ".pdf,.jpg,.jpeg,.png",
+    maxSizeMB: 15,
+    mimeCheck: /^(application\/pdf|image\/)/,
+    suggestedCount: 0,
+  },
+  {
+    type: "parts_list",
+    label: "Parts List",
+    description: "Spare-parts list / exploded view (PDF)",
+    icon: <DocumentIcon className="h-4 w-4" />,
+    accentColor: "from-[var(--bg-surface)] to-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-muted)]",
+    multiple: true,
+    accept: ".pdf,.doc,.docx,.xls,.xlsx",
+    maxSizeMB: 25,
+    mimeCheck: /^(application\/pdf|application\/msword|application\/vnd\.openxmlformats-officedocument|application\/vnd\.ms-excel)/,
+    suggestedCount: 0,
   },
   {
     type: "ar_3d",
@@ -145,6 +193,11 @@ const MEDIA_TYPES: MediaTypeDef[] = [
    send a useful MIME for .glb / .gltf / .usdz files. */
 const AR_EXT = /\.(glb|gltf|usdz)$/i;
 
+/* Document-style media types render a document icon (no image thumb). */
+const DOC_TYPES = new Set<ProductMediaType>([
+  "manual", "datasheet", "brochure", "certificate", "parts_list",
+]);
+
 /* Formats a file size in MB with one decimal. */
 function fmtMB(bytes: number): string {
   return (bytes / MB).toFixed(1);
@@ -161,6 +214,10 @@ const SLOT_LABEL_KEY: Partial<Record<ProductMediaType, string>> = {
   packing_photo: "media.slot.packing_photo.label",
   label: "media.slot.label.label",
   manual: "media.slot.manual.label",
+  datasheet: "media.slot.datasheet.label",
+  brochure: "media.slot.brochure.label",
+  certificate: "media.slot.certificate.label",
+  parts_list: "media.slot.parts_list.label",
   ar_3d: "media.slot.ar_3d.label",
   video: "media.slot.video.label",
 };
@@ -170,6 +227,10 @@ const SLOT_DESC_KEY: Partial<Record<ProductMediaType, string>> = {
   packing_photo: "media.slot.packing_photo.desc",
   label: "media.slot.label.desc",
   manual: "media.slot.manual.desc",
+  datasheet: "media.slot.datasheet.desc",
+  brochure: "media.slot.brochure.desc",
+  certificate: "media.slot.certificate.desc",
+  parts_list: "media.slot.parts_list.desc",
   ar_3d: "media.slot.ar_3d.desc",
   video: "media.slot.video.desc",
 };
@@ -379,7 +440,7 @@ function MediaSlot({
                     <div className="w-full h-full flex flex-col items-center justify-center text-[var(--text-ghost)] p-2">
                       {item.type === "video" ? (
                         <FilmIcon className="h-8 w-8 mb-1" />
-                      ) : item.type === "manual" ? (
+                      ) : DOC_TYPES.has(item.type) ? (
                         <DocumentIcon className="h-8 w-8 mb-1" />
                       ) : (
                         <BoxIcon className="h-8 w-8 mb-1" />
