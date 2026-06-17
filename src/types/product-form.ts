@@ -236,6 +236,12 @@ export interface ProductSupplierFormState {
   price_valid_until: string;        // quote expiry
   quotation_file_url: string;       // supplier's quotation/spec PDF
   quotation_file_name: string;
+  /* Tier 2 sourcing intelligence (migration pd_supplier_sourcing_tier2). */
+  sourcing_status: string;          // preferred / backup / trial / phasing_out
+  preferred_reason: string;         // why this supplier (price / quality / lead time…)
+  min_order_value: string;          // minimum order VALUE (in supplier currency)
+  tooling_owner: string;            // koleex / supplier / shared
+  tooling_cost: string;             // mold / tooling cost
 }
 
 /* Phase 4 — one row per real certificate (product_certifications). */

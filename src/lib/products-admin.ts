@@ -367,6 +367,12 @@ export interface ProductSupplierLinkRow {
   price_valid_until?: string | null;
   quotation_file_url?: string | null;
   quotation_file_name?: string | null;
+  /* Tier 2 sourcing intelligence (pd_supplier_sourcing_tier2) */
+  sourcing_status?: string | null;
+  preferred_reason?: string | null;
+  min_order_value?: number | null;
+  tooling_owner?: string | null;
+  tooling_cost?: number | null;
 }
 export async function fetchProductSuppliers(productId: string): Promise<ProductSupplierLinkRow[]> {
   if (!productId) return [];
