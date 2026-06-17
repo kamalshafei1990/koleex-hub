@@ -40,11 +40,18 @@ const TOOLING_OWNERS: { value: string; label: string }[] = [
   { value: "shared", label: "Shared" },
 ];
 
+interface SupplierContact {
+  name: string | null; role: string | null; email: string | null; mobile: string | null;
+}
 interface SupplierOption {
   id: string; name: string; name_cn?: string | null; logo: string | null;
   /* Supplier-level defaults — source of truth for shared fields. */
   supply_type?: string | null; payment_terms?: string | null;
   currency?: string | null; moq?: string | null; lead_time?: string | null;
+  /* Contact info (read-only quick-look). */
+  email?: string | null; phone?: string | null; website?: string | null;
+  wechat?: string | null; location?: string | null;
+  primary_contact?: SupplierContact | null;
 }
 
 interface Props {
@@ -471,8 +478,8 @@ function SupplierInfoModal({ supplier, onClose }: { supplier: SupplierOption; on
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-full max-w-md rounded-2xl bg-[var(--bg-base)] border border-[var(--border-subtle)] shadow-xl overflow-hidden">
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="relative w-full max-w-md rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden max-h-[85vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 p-4 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-3 min-w-0">
@@ -507,6 +514,56 @@ function SupplierInfoModal({ supplier, onClose }: { supplier: SupplierOption; on
             ))}
           </div>
         </div>
+
+        {/* Contact */}
+        {(supplier.email || supplier.phone || supplier.website || supplier.wechat || supplier.location || supplier.primary_contact) && (
+          <div className="px-4 pb-4">
+            <div className="text-[10px] uppercase tracking-wide text-[var(--text-ghost)] mb-2">Contact</div>
+            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] divide-y divide-[var(--border-subtle)]">
+              {supplier.primary_contact?.name && (
+                <div className="flex items-center justify-between gap-3 px-3 py-2">
+                  <div className="min-w-0">
+                    <div className="text-[13px] text-[var(--text-primary)] truncate">{supplier.primary_contact.name}</div>
+                    {supplier.primary_contact.role && <div className="text-[11px] text-[var(--text-ghost)] truncate">{supplier.primary_contact.role}</div>}
+                  </div>
+                  {supplier.primary_contact.mobile && (
+                    <a href={`tel:${supplier.primary_contact.mobile}`} className="text-[12px] text-[var(--accent,#0066FF)] shrink-0 hover:underline">{supplier.primary_contact.mobile}</a>
+                  )}
+                </div>
+              )}
+              {supplier.email && (
+                <div className="flex items-center justify-between gap-3 px-3 py-2">
+                  <span className="text-[11px] text-[var(--text-ghost)]">Email</span>
+                  <a href={`mailto:${supplier.email}`} className="text-[12px] text-[var(--accent,#0066FF)] truncate hover:underline">{supplier.email}</a>
+                </div>
+              )}
+              {supplier.phone && (
+                <div className="flex items-center justify-between gap-3 px-3 py-2">
+                  <span className="text-[11px] text-[var(--text-ghost)]">Phone</span>
+                  <a href={`tel:${supplier.phone}`} className="text-[12px] text-[var(--text-primary)] truncate hover:underline">{supplier.phone}</a>
+                </div>
+              )}
+              {supplier.wechat && (
+                <div className="flex items-center justify-between gap-3 px-3 py-2">
+                  <span className="text-[11px] text-[var(--text-ghost)]">WeChat</span>
+                  <span className="text-[12px] text-[var(--text-primary)] truncate">{supplier.wechat}</span>
+                </div>
+              )}
+              {supplier.website && (
+                <div className="flex items-center justify-between gap-3 px-3 py-2">
+                  <span className="text-[11px] text-[var(--text-ghost)]">Website</span>
+                  <a href={supplier.website} target="_blank" rel="noopener noreferrer" className="text-[12px] text-[var(--accent,#0066FF)] truncate hover:underline">{supplier.website.replace(/^https?:\/\//, "")}</a>
+                </div>
+              )}
+              {supplier.location && (
+                <div className="flex items-center justify-between gap-3 px-3 py-2">
+                  <span className="text-[11px] text-[var(--text-ghost)]">Location</span>
+                  <span className="text-[12px] text-[var(--text-primary)] truncate text-right">{supplier.location}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Footer — open full profile */}
         <div className="flex items-center justify-end gap-2 p-3 border-t border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
