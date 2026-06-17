@@ -54,6 +54,13 @@ interface ContactSupplierRow {
   country: string | null;
   supplier_address: string | null;
   contact_persons: Array<{ full_name?: string; name_cn?: string; role?: string; email?: string; mobile?: string; is_primary?: boolean }> | null;
+  /* Supplier profile (read-only quick-look). */
+  rating: number | null;
+  sample_status: string | null;
+  employee_count_range: string | null;
+  year_established: number | string | null;
+  product_categories: string[] | null;
+  certifications: string[] | null;
 }
 
 export async function GET() {
@@ -72,7 +79,7 @@ export async function GET() {
 
   const { data, error } = await supabaseServer
     .from("contacts")
-    .select("id, company_name_en, company_name_cn, display_name, photo_url, logo_url, supplier_type, payment_terms, currency, moq, lead_time, supplier_email, email, phone, supplier_website, website, wechat_id, city, province, country, supplier_address, contact_persons")
+    .select("id, company_name_en, company_name_cn, display_name, photo_url, logo_url, supplier_type, payment_terms, currency, moq, lead_time, supplier_email, email, phone, supplier_website, website, wechat_id, city, province, country, supplier_address, contact_persons, rating, sample_status, employee_count_range, year_established, product_categories, certifications")
     .eq("contact_type", "supplier")
     .eq("tenant_id", auth.tenant_id)
     .order("company_name_en", { ascending: true });
@@ -103,6 +110,11 @@ export async function GET() {
         : null;
       const location = [r.city, r.province, r.country].map((s) => (s || "").trim()).filter(Boolean).join(", ")
         || (r.supplier_address || "").trim() || null;
+      const strList = (v: unknown): string[] | null => {
+        if (!Array.isArray(v)) return null;
+        const out = v.map((x) => (typeof x === "string" ? x.trim() : "")).filter(Boolean);
+        return out.length ? out : null;
+      };
       return {
         id: r.id,
         name: (r.company_name_en || r.display_name || "").trim(),
@@ -120,6 +132,13 @@ export async function GET() {
         wechat: (r.wechat_id || "").trim() || null,
         location,
         primary_contact,
+        /* Supplier profile (read-only quick-look). */
+        rating: typeof r.rating === "number" && r.rating > 0 ? r.rating : null,
+        sample_status: (r.sample_status || "").trim() || null,
+        employees: (r.employee_count_range || "").trim() || null,
+        year_established: r.year_established ? String(r.year_established).trim() : null,
+        categories: strList(r.product_categories),
+        certifications: strList(r.certifications),
         /* Supplier (company) logos live in logo_url for ~all rows; only a couple
            use photo_url. Prefer photo_url, fall back to logo_url — matching the
            supplier directory avatar logic — so the picker shows real logos. */
