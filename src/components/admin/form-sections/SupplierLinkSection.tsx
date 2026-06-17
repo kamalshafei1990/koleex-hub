@@ -20,6 +20,8 @@ import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import UploadIcon from "@/components/icons/ui/UploadIcon";
 import PictureIcon from "@/components/icons/ui/PictureIcon";
+import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
+import LayoutListIcon from "@/components/icons/ui/LayoutListIcon";
 import { uploadProductFile } from "@/lib/products-admin";
 import type { ProductSupplierFormState } from "@/types/product-form";
 
@@ -364,13 +366,16 @@ function SupplierPickerModal({
 }) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
+  const [view, setView] = useState<"list" | "grid">("list");
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return suppliers;
-    return suppliers.filter((s) => s.name.toLowerCase().includes(q));
+    return suppliers.filter(
+      (s) => s.name.toLowerCase().includes(q) || (s.name_cn || "").toLowerCase().includes(q),
+    );
   }, [query, suppliers]);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
@@ -401,14 +406,27 @@ function SupplierPickerModal({
       aria-modal="true"
       aria-label="Link a supplier"
     >
-      <div className="w-full max-w-lg rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+      <div className="w-full max-w-2xl rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
         {/* Header + search */}
         <div className="p-3 border-b border-[var(--border-subtle)]">
           <div className="flex items-center justify-between mb-2.5 px-1">
             <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">Link a supplier</h3>
-            <button type="button" onClick={onClose} aria-label="Close" className="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">
-              <CrossIcon className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              {/* List / grid view toggle */}
+              <div className="flex items-center rounded-lg border border-[var(--border-subtle)] overflow-hidden">
+                <button type="button" onClick={() => setView("list")} aria-pressed={view === "list"} aria-label="List view"
+                  className={`h-7 w-7 flex items-center justify-center transition-colors ${view === "list" ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}>
+                  <LayoutListIcon className="h-3.5 w-3.5" />
+                </button>
+                <button type="button" onClick={() => setView("grid")} aria-pressed={view === "grid"} aria-label="Grid view"
+                  className={`h-7 w-7 flex items-center justify-center transition-colors ${view === "grid" ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}>
+                  <LayoutGridIcon className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <button type="button" onClick={onClose} aria-label="Close" className="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">
+                <CrossIcon className="h-4 w-4" />
+              </button>
+            </div>
           </div>
           <div className="relative">
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-dim)]" />
@@ -423,9 +441,37 @@ function SupplierPickerModal({
         </div>
 
         {/* Results */}
-        <div ref={listRef} className="max-h-[44vh] overflow-y-auto p-1.5">
+        <div ref={listRef} className="max-h-[52vh] overflow-y-auto p-1.5">
           {filtered.length === 0 ? (
             <p className="text-[12px] text-[var(--text-ghost)] text-center py-8">No suppliers match “{query}”.</p>
+          ) : view === "grid" ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-0.5">
+              {filtered.map((s, i) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  data-idx={i}
+                  onMouseEnter={() => setActive(i)}
+                  onClick={() => onPick(s.id)}
+                  className={`flex flex-col items-center text-center gap-2 p-3 rounded-xl border transition-colors ${
+                    i === active ? "border-[var(--border-focus)] bg-[var(--bg-surface)]" : "border-[var(--border-subtle)] hover:bg-[var(--bg-surface)]"
+                  }`}
+                >
+                  <div className="h-14 w-14 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center overflow-hidden shrink-0">
+                    {s.logo ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={s.logo} alt="" className="h-full w-full object-contain p-1" />
+                    ) : (
+                      <FactoryIcon className="h-6 w-6 text-[var(--text-ghost)]" />
+                    )}
+                  </div>
+                  <div className="min-w-0 w-full">
+                    <p className="text-[12px] font-medium text-[var(--text-primary)] leading-snug line-clamp-2">{s.name}</p>
+                    {s.name_cn && <p className="text-[10px] text-[var(--text-ghost)] truncate mt-0.5">{s.name_cn}</p>}
+                  </div>
+                </button>
+              ))}
+            </div>
           ) : (
             filtered.map((s, i) => (
               <button
@@ -446,7 +492,10 @@ function SupplierPickerModal({
                     <FactoryIcon className="h-4 w-4 text-[var(--text-ghost)]" />
                   )}
                 </div>
-                <span className="text-[13px] text-[var(--text-primary)] truncate">{s.name}</span>
+                <div className="min-w-0">
+                  <span className="block text-[13px] text-[var(--text-primary)] truncate">{s.name}</span>
+                  {s.name_cn && <span className="block text-[11px] text-[var(--text-ghost)] truncate">{s.name_cn}</span>}
+                </div>
               </button>
             ))
           )}
