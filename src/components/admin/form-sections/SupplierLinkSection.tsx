@@ -11,11 +11,13 @@
    duplicated or editable here.
    --------------------------------------------------------------------------- */
 
-import { useState } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import FactoryIcon from "@/components/icons/ui/FactoryIcon";
 import StarIcon from "@/components/icons/ui/StarIcon";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
 import type { ProductSupplierFormState } from "@/types/product-form";
 
 interface SupplierOption { id: string; name: string; logo: string | null }
@@ -31,7 +33,7 @@ const inp =
   "w-full h-9 px-3 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]";
 
 export default function SupplierLinkSection({ links, suppliers, onChange }: Props) {
-  const [adding, setAdding] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const linkedIds = new Set(links.map((l) => l.supplier_id));
   const available = suppliers.filter((s) => !linkedIds.has(s.id));
@@ -56,7 +58,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
         notes: "",
       },
     ]);
-    setAdding("");
+    setPickerOpen(false);
   };
 
   const update = (tempId: string, patch: Partial<ProductSupplierFormState>) =>
@@ -169,22 +171,138 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
         </div>
       )}
 
-      {/* Add a supplier — picks from existing suppliers (Suppliers app). */}
+      {/* Add a supplier — opens a searchable picker (89+ suppliers). */}
       <div className="flex items-center gap-2">
-        <select
-          value={adding}
-          onChange={(e) => add(e.target.value)}
+        <button
+          type="button"
+          onClick={() => setPickerOpen(true)}
           disabled={available.length === 0}
-          className={`${inp} max-w-xs disabled:opacity-40`}
+          className="h-9 px-3.5 inline-flex items-center gap-2 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          <option value="">{available.length ? "Link a supplier…" : "All suppliers already linked"}</option>
-          {available.map((s) => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
-        </select>
-        <span className="inline-flex items-center gap-1 text-[10px] text-[var(--text-ghost)]">
-          <PlusIcon className="h-3 w-3" /> from the Suppliers app
-        </span>
+          <PlusIcon className="h-3.5 w-3.5" /> {available.length ? "Link a supplier" : "All suppliers linked"}
+        </button>
+        <span className="text-[10px] text-[var(--text-ghost)]">from the Suppliers app</span>
+      </div>
+
+      {pickerOpen && (
+        <SupplierPickerModal
+          suppliers={available}
+          onPick={add}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+   Searchable supplier picker — modal with live filter + keyboard control.
+   Esc closes, ↑/↓ move, Enter selects. Brand: monochrome + single blue accent.
+   --------------------------------------------------------------------------- */
+function SupplierPickerModal({
+  suppliers,
+  onPick,
+  onClose,
+}: {
+  suppliers: SupplierOption[];
+  onPick: (id: string) => void;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [active, setActive] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return suppliers;
+    return suppliers.filter((s) => s.name.toLowerCase().includes(q));
+  }, [query, suppliers]);
+
+  useEffect(() => { inputRef.current?.focus(); }, []);
+  useEffect(() => { setActive(0); }, [query]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { e.preventDefault(); onClose(); }
+      else if (e.key === "ArrowDown") { e.preventDefault(); setActive((a) => Math.min(a + 1, filtered.length - 1)); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)); }
+      else if (e.key === "Enter") { e.preventDefault(); const s = filtered[active]; if (s) onPick(s.id); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [filtered, active, onClose, onPick]);
+
+  /* Keep the highlighted row in view as you arrow through. */
+  useEffect(() => {
+    const el = listRef.current?.querySelector<HTMLElement>(`[data-idx="${active}"]`);
+    el?.scrollIntoView({ block: "nearest" });
+  }, [active]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[120] flex items-start justify-center p-4 pt-[12vh] bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Link a supplier"
+    >
+      <div className="w-full max-w-lg rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+        {/* Header + search */}
+        <div className="p-3 border-b border-[var(--border-subtle)]">
+          <div className="flex items-center justify-between mb-2.5 px-1">
+            <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">Link a supplier</h3>
+            <button type="button" onClick={onClose} aria-label="Close" className="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">
+              <CrossIcon className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="relative">
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-dim)]" />
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search suppliers by name…"
+              className="w-full h-10 pl-9 pr-3 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
+            />
+          </div>
+        </div>
+
+        {/* Results */}
+        <div ref={listRef} className="max-h-[44vh] overflow-y-auto p-1.5">
+          {filtered.length === 0 ? (
+            <p className="text-[12px] text-[var(--text-ghost)] text-center py-8">No suppliers match “{query}”.</p>
+          ) : (
+            filtered.map((s, i) => (
+              <button
+                key={s.id}
+                type="button"
+                data-idx={i}
+                onMouseEnter={() => setActive(i)}
+                onClick={() => onPick(s.id)}
+                className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-colors ${
+                  i === active ? "bg-[var(--bg-surface)]" : "hover:bg-[var(--bg-surface)]"
+                }`}
+              >
+                <div className="h-8 w-8 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center overflow-hidden shrink-0">
+                  {s.logo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={s.logo} alt="" className="h-full w-full object-contain p-0.5" />
+                  ) : (
+                    <FactoryIcon className="h-4 w-4 text-[var(--text-ghost)]" />
+                  )}
+                </div>
+                <span className="text-[13px] text-[var(--text-primary)] truncate">{s.name}</span>
+              </button>
+            ))
+          )}
+        </div>
+
+        {/* Footer hint */}
+        <div className="px-3.5 py-2 border-t border-[var(--border-subtle)] flex items-center justify-between text-[10px] text-[var(--text-ghost)]">
+          <span>{filtered.length} of {suppliers.length} suppliers</span>
+          <span>↑↓ to navigate · ↵ to link · esc to close</span>
+        </div>
       </div>
     </div>
   );
