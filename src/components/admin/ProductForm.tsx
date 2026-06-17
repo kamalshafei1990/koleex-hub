@@ -918,6 +918,7 @@ export default function ProductForm({ productId }: Props) {
           related_id: r.related_id,
           related_name: r.product_name || r.related_id,
           order: r.order,
+          relation_type: r.relation_type || "related",
         }));
         setRelated(mappedRelated);
 
@@ -1739,7 +1740,7 @@ export default function ProductForm({ productId }: Props) {
         });
       }
 
-      await setRelatedProducts(pid, related.map(r => r.related_id));
+      await setRelatedProducts(pid, related.map(r => ({ related_id: r.related_id, relation_type: r.relation_type || "related" })));
 
       /* Supplier LINKS — per-product facts only; supplier master stays in
          the Suppliers app. Replace-the-set on save. */

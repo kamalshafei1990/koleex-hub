@@ -39,6 +39,7 @@ export async function GET(
     product_id: r.product_id as string,
     related_id: r.related_id as string,
     order: r.order as number,
+    relation_type: (r.relation_type as string) || "related",
     product_name: (r.products as Record<string, unknown> | null)?.product_name as
       | string
       | undefined,
@@ -62,10 +63,32 @@ export async function PUT(
   if (!UUID_RE.test(id)) {
     return NextResponse.json({ error: "Invalid product id" }, { status: 400 });
   }
-  const body = (await req.json().catch(() => ({}))) as { relatedIds?: unknown };
-  const relatedIds = Array.isArray(body.relatedIds)
-    ? (body.relatedIds as string[]).filter((r) => UUID_RE.test(r))
-    : [];
+  const REL_TYPES = new Set([
+    "related", "accessory", "spare_part", "compatible_with", "replaces",
+    "replaced_by", "bundle", "consumable", "required_addon", "upgrade", "optional_attachment",
+  ]);
+  const body = (await req.json().catch(() => ({}))) as {
+    relatedIds?: unknown;
+    relations?: Array<{ related_id?: unknown; relation_type?: unknown }>;
+  };
+
+  /* Phase 6 — prefer the typed `relations` payload; fall back to the legacy
+     `relatedIds: string[]` (everything → 'related') for back-compat. */
+  let rows: { product_id: string; related_id: string; relation_type: string; order: number }[] = [];
+  if (Array.isArray(body.relations)) {
+    rows = body.relations
+      .filter((r) => typeof r.related_id === "string" && UUID_RE.test(r.related_id as string))
+      .map((r, i) => ({
+        product_id: id,
+        related_id: r.related_id as string,
+        relation_type: REL_TYPES.has(r.relation_type as string) ? (r.relation_type as string) : "related",
+        order: i,
+      }));
+  } else if (Array.isArray(body.relatedIds)) {
+    rows = (body.relatedIds as string[])
+      .filter((r) => UUID_RE.test(r))
+      .map((rid, i) => ({ product_id: id, related_id: rid, relation_type: "related", order: i }));
+  }
 
   // Replace-set semantics, matching the legacy lib behaviour.
   const del = await supabaseServer.from("related_products").delete().eq("product_id", id);
@@ -73,8 +96,7 @@ export async function PUT(
     console.error("[api/products related PUT del]", del.error.message);
     return NextResponse.json({ error: del.error.message }, { status: 500 });
   }
-  if (relatedIds.length) {
-    const rows = relatedIds.map((rid, i) => ({ product_id: id, related_id: rid, order: i }));
+  if (rows.length) {
     const ins = await supabaseServer.from("related_products").insert(rows);
     if (ins.error) {
       console.error("[api/products related PUT ins]", ins.error.message);

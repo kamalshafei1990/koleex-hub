@@ -7,6 +7,21 @@ import LinkIcon from "@/components/icons/ui/LinkIcon";
 import { searchProducts } from "@/lib/products-admin";
 import type { RelatedProductFormState } from "@/types/product-form";
 
+/* Phase 6 — relationship vocabulary [value, label]. */
+const REL_TYPES: [string, string][] = [
+  ["related", "Related"],
+  ["accessory", "Accessory"],
+  ["spare_part", "Spare part"],
+  ["consumable", "Consumable"],
+  ["compatible_with", "Compatible with"],
+  ["required_addon", "Required add-on"],
+  ["optional_attachment", "Optional attachment"],
+  ["upgrade", "Upgrade"],
+  ["replaces", "Replaces"],
+  ["replaced_by", "Replaced by"],
+  ["bundle", "Bundle"],
+];
+
 interface Props {
   related: RelatedProductFormState[];
   onChange: (r: RelatedProductFormState[]) => void;
@@ -28,13 +43,17 @@ export default function RelatedProductsSection({ related, onChange, currentProdu
   };
 
   const add = (product: { id: string; product_name: string }) => {
-    onChange([...related, { related_id: product.id, related_name: product.product_name, order: related.length }]);
+    onChange([...related, { related_id: product.id, related_name: product.product_name, order: related.length, relation_type: "related" }]);
     setQuery("");
     setResults([]);
   };
 
   const remove = (relatedId: string) => {
     onChange(related.filter(r => r.related_id !== relatedId));
+  };
+
+  const setType = (relatedId: string, relation_type: string) => {
+    onChange(related.map(r => (r.related_id === relatedId ? { ...r, relation_type } : r)));
   };
 
   return (
@@ -73,14 +92,23 @@ export default function RelatedProductsSection({ related, onChange, currentProdu
       ) : (
         <div className="space-y-1.5">
           {related.map(r => (
-            <div key={r.related_id} className="flex items-center justify-between h-10 px-4 rounded-lg bg-[var(--bg-surface-subtle)] border border-white/[0.06]">
-              <div className="flex items-center gap-2 text-[13px] text-[var(--text-muted)]">
-                <LinkIcon className="h-3.5 w-3.5 text-[var(--text-ghost)]" />
-                {r.related_name}
+            <div key={r.related_id} className="flex items-center justify-between gap-3 h-10 px-4 rounded-lg bg-[var(--bg-surface-subtle)] border border-white/[0.06]">
+              <div className="flex items-center gap-2 text-[13px] text-[var(--text-muted)] min-w-0">
+                <LinkIcon className="h-3.5 w-3.5 text-[var(--text-ghost)] shrink-0" />
+                <span className="truncate">{r.related_name}</span>
               </div>
-              <button onClick={() => remove(r.related_id)} className="text-[var(--text-ghost)] hover:text-red-400/70 transition-colors">
-                <CrossIcon className="h-3.5 w-3.5" />
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <select
+                  value={r.relation_type || "related"}
+                  onChange={(e) => setType(r.related_id, e.target.value)}
+                  className="h-7 px-2 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-secondary)] outline-none focus:border-[var(--border-focus)]"
+                >
+                  {REL_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+                <button onClick={() => remove(r.related_id)} aria-label="Remove related product" className="text-[var(--text-ghost)] hover:text-[var(--state-error,#FF3333)] transition-colors">
+                  <CrossIcon className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
           ))}
         </div>

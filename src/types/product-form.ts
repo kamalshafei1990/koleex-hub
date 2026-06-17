@@ -201,6 +201,10 @@ export interface RelatedProductFormState {
   related_id: string;
   related_name: string;
   order: number;
+  /* Phase 6 — relationship type (accessory / spare_part / compatible_with /
+     replaces / replaced_by / bundle / consumable / required_addon / upgrade /
+     optional_attachment / related). */
+  relation_type: string;
 }
 
 /* Per-product LINK to a supplier from the Suppliers app. Supplier master
