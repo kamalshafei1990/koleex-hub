@@ -353,6 +353,14 @@ export interface ProductSupplierLinkRow {
   currency?: string | null;
   payment_terms?: string | null;
   notes?: string | null;
+  /* product-as-supplied facts (pd_supplier_product_facts) */
+  supplier_product_name?: string | null;
+  supplier_product_photo?: string | null;
+  supply_type?: string | null;
+  sample_available?: boolean | null;
+  sample_cost?: number | null;
+  incoterms?: string | null;
+  supplier_warranty_months?: number | null;
 }
 export async function fetchProductSuppliers(productId: string): Promise<ProductSupplierLinkRow[]> {
   if (!productId) return [];
