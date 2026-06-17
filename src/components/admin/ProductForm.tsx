@@ -47,6 +47,7 @@ import {
   upsertTranslation, deleteTranslation,
   upsertMarketPrice, deleteMarketPrice,
   setRelatedProducts,
+  fetchProductSuppliers, saveProductSuppliers,
   fetchSupplierNames, fetchUniqueBrands,
   fetchBrandLogos, uploadBrandLogo,
   fetchDivisionLogos, fetchCategoryLogos, fetchSubcategoryLogos, fetchClassificationIcons,
@@ -56,7 +57,7 @@ import { fetchAttributeConfig } from "@/lib/product-attributes";
 import type { DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase";
 import type {
   ProductFormState, ModelFormState, MediaFormState,
-  TranslationFormState, MarketPriceFormState, RelatedProductFormState,
+  TranslationFormState, MarketPriceFormState, RelatedProductFormState, ProductSupplierFormState,
 } from "@/types/product-form";
 import { EMPTY_PRODUCT, createEmptyModel, COUNTRIES } from "@/types/product-form";
 import {
@@ -79,6 +80,7 @@ import ClassificationSection from "./form-sections/ClassificationSection";
 import SelectWithCreate from "./form-sections/SelectWithCreate";
 import CreateDivisionModal from "./form-sections/CreateDivisionModal";
 import ConfirmDialog from "./form-sections/ConfirmDialog";
+import SupplierLinkSection from "./form-sections/SupplierLinkSection";
 import CreateCategoryModal from "./form-sections/CreateCategoryModal";
 import CreateSubcategoryModal from "./form-sections/CreateSubcategoryModal";
 import CreateSupplierModal from "./form-sections/CreateSupplierModal";
@@ -502,6 +504,7 @@ export default function ProductForm({ productId }: Props) {
   const [translations, setTranslations] = useState<TranslationFormState[]>([]);
   const [prices, setPrices] = useState<MarketPriceFormState[]>([]);
   const [related, setRelated] = useState<RelatedProductFormState[]>([]);
+  const [productSuppliers, setProductSuppliers] = useState<ProductSupplierFormState[]>([]);
 
   /* ── Sewing machine specs ── */
   const [sewingSpecs, setSewingSpecs] = useState<SewingSpecsFormState>({
@@ -552,7 +555,7 @@ export default function ProductForm({ productId }: Props) {
       return;                   // first run AFTER hydration — baseline
     }
     setDirty(true);
-  }, [loading, product, models, media, translations, prices, related, sewingSpecs]);
+  }, [loading, product, models, media, translations, prices, related, productSuppliers, sewingSpecs]);
 
   /* Browser beforeunload warning — fires the native "Leave site?"
      dialog when the user tries to close/refresh/navigate away with
@@ -588,6 +591,7 @@ export default function ProductForm({ productId }: Props) {
           translations,
           prices,
           related,
+          productSuppliers,
           sewingSpecs,
         };
         window.localStorage.setItem(draftKey, JSON.stringify(snapshot));
@@ -596,7 +600,7 @@ export default function ProductForm({ productId }: Props) {
       }
     }, 800);
     return () => window.clearTimeout(id);
-  }, [loading, dirty, product, models, media, translations, prices, related, sewingSpecs, draftKey]);
+  }, [loading, dirty, product, models, media, translations, prices, related, productSuppliers, sewingSpecs, draftKey]);
 
   /* ── P0 #3 · Draft recovery detection ──
      After the server load settles, look for a saved draft for this
@@ -736,13 +740,14 @@ export default function ProductForm({ productId }: Props) {
       });
 
       if (isEdit && productId) {
-        const [p, dbModels, dbMedia, dbTranslations, dbRelated, dbSewingSpecs] = await Promise.all([
+        const [p, dbModels, dbMedia, dbTranslations, dbRelated, dbSewingSpecs, dbSuppliers] = await Promise.all([
           fetchProductById(productId),
           fetchModelsByProductId(productId),
           fetchMediaByProductId(productId),
           fetchTranslationsByProductId(productId),
           fetchRelatedProducts(productId),
           fetchSewingSpecsByProductId(productId),
+          fetchProductSuppliers(productId),
         ]);
         if (!p) { setError("Product not found"); setLoading(false); return; }
 
@@ -882,6 +887,20 @@ export default function ProductForm({ productId }: Props) {
           order: r.order,
         }));
         setRelated(mappedRelated);
+
+        const str = (v: unknown): string => (v === null || v === undefined ? "" : String(v));
+        setProductSuppliers(dbSuppliers.map(s => ({
+          _tempId: crypto.randomUUID(),
+          supplier_id: s.supplier_id,
+          is_primary: !!s.is_primary,
+          supplier_product_code: str(s.supplier_product_code),
+          moq: str(s.moq),
+          lead_time_days: str(s.lead_time_days),
+          unit_cost_cny: str(s.unit_cost_cny),
+          currency: s.currency || "CNY",
+          payment_terms: str(s.payment_terms),
+          notes: str(s.notes),
+        })));
 
         if (dbSewingSpecs) {
           setSewingSpecs({
@@ -1638,6 +1657,20 @@ export default function ProductForm({ productId }: Props) {
       }
 
       await setRelatedProducts(pid, related.map(r => r.related_id));
+
+      /* Supplier LINKS — per-product facts only; supplier master stays in
+         the Suppliers app. Replace-the-set on save. */
+      await saveProductSuppliers(pid, productSuppliers.map(s => ({
+        supplier_id: s.supplier_id,
+        is_primary: s.is_primary,
+        supplier_product_code: s.supplier_product_code || null,
+        moq: s.moq === "" ? null : Number(s.moq),
+        lead_time_days: s.lead_time_days === "" ? null : Number(s.lead_time_days),
+        unit_cost_cny: s.unit_cost_cny === "" ? null : Number(s.unit_cost_cny),
+        currency: s.currency || null,
+        payment_terms: s.payment_terms || null,
+        notes: s.notes || null,
+      })));
 
       if (sewingSpecs.template_slug) {
         await upsertSewingSpecs({
@@ -2833,6 +2866,12 @@ export default function ProductForm({ productId }: Props) {
             {/* Market Prices */}
             <Section id="prices" icon={<DollarSignIcon className="h-4 w-4" />} title={t("models.marketPrices", "Market Prices")} badge={t("models.perCountry", "Per country")} defaultOpen={false}>
               <MarketPricesSection prices={prices} models={models} onChange={setPrices} />
+            </Section>
+
+            {/* Supplier links — pulled from the Suppliers app; only the
+                per-product facts are edited here (Phase 3). */}
+            <Section id="suppliers" icon={<FactoryIcon className="h-4 w-4" />} title={t("models.suppliers", "Supplier & Sourcing")} badge={t("models.suppliersBadge", "From Suppliers app")} defaultOpen={false}>
+              <SupplierLinkSection links={productSuppliers} suppliers={suppliers} onChange={setProductSuppliers} />
             </Section>
           </div>
         )}
