@@ -468,6 +468,9 @@ export interface SupplierLite {
   email?: string | null; phone?: string | null; website?: string | null;
   wechat?: string | null; location?: string | null;
   primary_contact?: SupplierContactLite | null;
+  /* Supplier profile (read-only quick-look). */
+  rating?: number | null; sample_status?: string | null; employees?: string | null;
+  year_established?: string | null; categories?: string[] | null; certifications?: string[] | null;
 }
 export async function fetchSupplierNames(): Promise<SupplierLite[]> {
   const json = await jget<{ suppliers?: SupplierLite[] }>("/api/suppliers", {});

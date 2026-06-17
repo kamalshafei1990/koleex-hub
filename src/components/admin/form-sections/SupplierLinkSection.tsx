@@ -52,6 +52,9 @@ interface SupplierOption {
   email?: string | null; phone?: string | null; website?: string | null;
   wechat?: string | null; location?: string | null;
   primary_contact?: SupplierContact | null;
+  /* Supplier profile (read-only quick-look). */
+  rating?: number | null; sample_status?: string | null; employees?: string | null;
+  year_established?: string | null; categories?: string[] | null; certifications?: string[] | null;
 }
 
 interface Props {
@@ -475,6 +478,13 @@ function SupplierInfoModal({ supplier, onClose }: { supplier: SupplierOption; on
     { label: "Payment terms", value: supplier.payment_terms },
     { label: "Currency", value: supplier.currency },
   ];
+  /* Profile facts only show when populated (most suppliers leave them blank). */
+  if (supplier.rating) facts.push({ label: "Rating", value: `★ ${supplier.rating}/5` });
+  if (supplier.sample_status) facts.push({ label: "Samples", value: supplier.sample_status });
+  if (supplier.employees) facts.push({ label: "Employees", value: supplier.employees });
+  if (supplier.year_established) facts.push({ label: "Established", value: supplier.year_established });
+  const cats = supplier.categories || [];
+  const certs = supplier.certifications || [];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
@@ -513,6 +523,32 @@ function SupplierInfoModal({ supplier, onClose }: { supplier: SupplierOption; on
               </div>
             ))}
           </div>
+
+          {/* Product categories + certifications (chips, only when present) */}
+          {(cats.length > 0 || certs.length > 0) && (
+            <div className="mt-3 space-y-2">
+              {cats.length > 0 && (
+                <div>
+                  <div className="text-[10px] uppercase tracking-wide text-[var(--text-ghost)] mb-1">Product categories</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {cats.map((c) => (
+                      <span key={c} className="text-[11px] px-2 py-0.5 rounded-md bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)]">{c}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {certs.length > 0 && (
+                <div>
+                  <div className="text-[10px] uppercase tracking-wide text-[var(--text-ghost)] mb-1">Certifications</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {certs.map((c) => (
+                      <span key={c} className="text-[11px] px-2 py-0.5 rounded-md bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)]">{c}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Contact */}
