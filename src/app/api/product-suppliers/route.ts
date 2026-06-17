@@ -27,7 +27,7 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const LINK_COLS =
-  "id, product_id, supplier_id, is_primary, show_in_catalog, supplier_product_code, moq, lead_time_days, unit_cost_cny, currency, payment_terms, notes, supplier_product_name, supplier_product_photo, supply_type, sample_available, sample_cost, incoterms, supplier_warranty_months";
+  "id, product_id, supplier_id, is_primary, show_in_catalog, supplier_product_code, moq, lead_time_days, unit_cost_cny, currency, payment_terms, notes, supplier_product_name, supplier_product_photo, supply_type, sample_available, sample_cost, incoterms, supplier_warranty_months, price_tiers, price_quoted_on, price_valid_until, quotation_file_url, quotation_file_name";
 
 /* Confirm the product exists AND belongs to the caller's tenant before
    reading/writing its supplier links. Returns the product id or null. */
@@ -122,6 +122,16 @@ export async function PUT(req: Request) {
       sample_cost: num(r.sample_cost),
       incoterms: (r.incoterms as string) || null,
       supplier_warranty_months: num(r.supplier_warranty_months),
+      /* Tier 1 sourcing intelligence (pd_supplier_quote_tiers) */
+      price_tiers: Array.isArray(r.price_tiers)
+        ? (r.price_tiers as Array<{ min_qty?: unknown; price?: unknown }>)
+            .map((t) => ({ min_qty: num(t.min_qty), price: num(t.price) }))
+            .filter((t) => t.min_qty !== null || t.price !== null)
+        : null,
+      price_quoted_on: (r.price_quoted_on as string) || null,
+      price_valid_until: (r.price_valid_until as string) || null,
+      quotation_file_url: (r.quotation_file_url as string) || null,
+      quotation_file_name: (r.quotation_file_name as string) || null,
     }));
 
   /* At most one primary. If callers mark several, keep the first. */
