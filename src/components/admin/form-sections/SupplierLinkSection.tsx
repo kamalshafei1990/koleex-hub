@@ -488,7 +488,7 @@ function SupplierInfoModal({ supplier, onClose }: { supplier: SupplierOption; on
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose} />
       <div className="relative w-full max-w-md rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden max-h-[85vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 p-4 border-b border-[var(--border-subtle)]">
