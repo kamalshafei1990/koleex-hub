@@ -363,6 +363,21 @@ function describeApplication(tag: string): AppInfo {
   return { kind: "Application", icon: LayersIcon, description: "Optimised for industrial garment production." };
 }
 
+/* Phase 6 relationship-type → human label (read-only detail view). */
+const REL_LABELS: Record<string, string> = {
+  related: "Related product",
+  accessory: "Accessory",
+  spare_part: "Spare part",
+  consumable: "Consumable",
+  compatible_with: "Compatible with",
+  required_addon: "Required add-on",
+  optional_attachment: "Optional attachment",
+  upgrade: "Upgrade",
+  replaces: "Replaces",
+  replaced_by: "Replaced by",
+  bundle: "Bundle",
+};
+
 function Section({
   id, eyebrow, title, subtitle, children, className = "", align = "center",
 }: {
@@ -431,7 +446,7 @@ export default function LegacyProductView() {
   const [models, setModels] = useState<ProductModelRow[]>([]);
   const [media, setMedia] = useState<ProductMediaRow[]>([]);
   const [sewingSpecs, setSewingSpecs] = useState<SewingMachineSpecsRow | null>(null);
-  const [related, setRelated] = useState<({ related_id: string; product_name?: string })[]>([]);
+  const [related, setRelated] = useState<({ related_id: string; product_name?: string; relation_type?: string })[]>([]);
   const [relatedDetails, setRelatedDetails] = useState<Record<string, ProductRow>>({});
   const [relatedImages, setRelatedImages] = useState<Record<string, string>>({});
 
@@ -1162,6 +1177,40 @@ export default function LegacyProductView() {
         editHref={`/product-data/${product.id}/edit`}
       />
 
+      {/* ── Identifiers & lifecycle (Phase 5) — internal staff only. Renders
+              only when at least one identifier is set, so it stays invisible
+              for sparse records. */}
+      {isInternal && (() => {
+        const idRows: { label: string; value: string }[] = [];
+        if (product.manufacturer) idRows.push({ label: "Manufacturer / OEM", value: product.manufacturer });
+        if (product.mpn) idRows.push({ label: "MPN", value: product.mpn });
+        if (product.gtin) idRows.push({ label: "GTIN / EAN / UPC", value: product.gtin });
+        if (product.internal_sku) idRows.push({ label: "Internal SKU", value: product.internal_sku });
+        if (product.generation) idRows.push({ label: "Generation", value: product.generation });
+        if (product.launch_date) idRows.push({ label: "Launch date", value: product.launch_date });
+        if (product.eol_date) idRows.push({ label: "End-of-life", value: product.eol_date });
+        if (product.alternate_names && product.alternate_names.length > 0) idRows.push({ label: "Also known as", value: product.alternate_names.filter(Boolean).join(", ") });
+        if (idRows.length === 0) return null;
+        return (
+          <section className="mx-auto w-full max-w-[1200px] px-4 md:px-6 lg:px-10 xl:px-16 pt-4">
+            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <LayersIcon className="h-4 w-4 text-[var(--text-muted)]" />
+                <h2 className="text-[14px] font-bold tracking-tight text-[var(--text-primary)]">Identifiers</h2>
+              </div>
+              <dl className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3">
+                {idRows.map((row) => (
+                  <div key={row.label}>
+                    <dt className="text-[10px] uppercase tracking-wide text-[var(--text-ghost)]">{row.label}</dt>
+                    <dd className="text-[13px] text-[var(--text-primary)] mt-0.5 break-words">{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          </section>
+        );
+      })()}
+
       {/* ── Relationships ("Connect") — turns the catalog from islands into
               a graph. Renders the existing related_products links as cards;
               an empty state becomes a task that explains how connecting
@@ -1216,7 +1265,7 @@ export default function LegacyProductView() {
                       </div>
                       <div className="p-2.5">
                         <p className="text-[12px] font-semibold text-[var(--text-primary)] truncate group-hover:text-[var(--text-highlight)]">{label}</p>
-                        <p className="text-[10px] text-[var(--text-dim)] mt-0.5">Related product</p>
+                        <p className="text-[10px] text-[var(--text-dim)] mt-0.5">{REL_LABELS[r.relation_type || "related"] || "Related product"}</p>
                       </div>
                     </Link>
                   );
