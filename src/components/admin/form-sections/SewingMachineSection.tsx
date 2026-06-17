@@ -58,7 +58,7 @@ const GROUP_META: Record<string, { icon: React.ReactNode; color: string }> = {
 };
 
 function getGroupMeta(name: string) {
-  return GROUP_META[name] || { icon: <LayersIcon className="h-3.5 w-3.5" />, color: "from-slate-500/20 to-slate-600/10 border-slate-500/30 text-slate-300" };
+  return GROUP_META[name] || { icon: <LayersIcon className="h-3.5 w-3.5" />, color: "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-muted)]" };
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -385,13 +385,13 @@ function MachineKindPicker({
               className={`group relative flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all cursor-pointer text-left
                 ${
                   isSelected
-                    ? "border-blue-500 bg-gradient-to-br from-blue-500/15 to-blue-600/5 shadow-[0_4px_16px_rgba(59,130,246,0.2)]"
+                    ? "border-[var(--border-focus)] bg-[var(--bg-surface)]"
                     : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 hover:border-[var(--border-focus)]/60 hover:bg-[var(--bg-surface-subtle)]/80 hover:-translate-y-0.5"
                 }`}
             >
               {isSelected && (
-                <div className="absolute top-2 right-2 h-5 w-5 rounded-full bg-blue-500 flex items-center justify-center shadow-lg">
-                  <CheckIcon className="h-3 w-3 text-white" />
+                <div className="absolute top-2 right-2 h-5 w-5 rounded-full bg-[var(--bg-inverted)] flex items-center justify-center">
+                  <CheckIcon className="h-3 w-3 text-[var(--text-inverted)]" />
                 </div>
               )}
               <Icon

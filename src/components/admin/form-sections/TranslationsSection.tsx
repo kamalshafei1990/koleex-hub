@@ -55,7 +55,11 @@ export default function TranslationsSection({ translations, onChange }: Props) {
                 <div className="flex items-center justify-between">
                   <select
                     value={t.locale}
-                    onChange={(e) => update(t._tempId, { locale: e.target.value })}
+                    /* Changing the locale of a saved row clears its id → the save
+                       diff deletes the old-locale row and inserts the new one,
+                       instead of orphaning a stale duplicate (upsert key is
+                       product_id+locale). */
+                    onChange={(e) => update(t._tempId, { locale: e.target.value, id: undefined })}
                     className="h-8 px-2 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[12px] text-[var(--text-secondary)] outline-none"
                   >
                     <option value={t.locale}>{localeName}</option>

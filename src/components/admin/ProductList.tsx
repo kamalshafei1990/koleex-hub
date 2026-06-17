@@ -51,16 +51,17 @@ const FLAGSHIP_DIVISION_SLUG = "garment-machinery";
    product card on every render (stColors, previously rebuilt inside
    each card's IIFE in both the grid and list views). With 600+ cards
    mounted at once that was hundreds of throwaway objects per render. */
+/* Level is a tier label, NOT a functional status → neutral chips per the
+   brand rule (monochrome-first; color reserved for true status). */
+const LEVEL_CHIP = "text-[var(--text-muted)] bg-[var(--bg-surface)] border-[var(--border-subtle)]";
 const levelColors: Record<string, string> = {
-  entry: "text-blue-400 bg-blue-400/10 border-blue-400/20",
-  mid: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
-  premium: "text-amber-400 bg-amber-400/10 border-amber-400/20",
-  enterprise: "text-purple-400 bg-purple-400/10 border-purple-400/20",
+  entry: LEVEL_CHIP, mid: LEVEL_CHIP, premium: LEVEL_CHIP, enterprise: LEVEL_CHIP,
 };
+/* Status IS functional → keep semantic status colors (success/warning/error). */
 const stColors: Record<string, string> = {
-  draft: "text-amber-400 bg-amber-400/10 border-amber-400/20",
-  active: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
-  archived: "text-red-400 bg-red-400/10 border-red-400/20",
+  draft: "text-[var(--state-warning,#FFCC00)] bg-[var(--state-warning,#FFCC00)]/10 border-[var(--state-warning,#FFCC00)]/20",
+  active: "text-[var(--state-success,#00CC66)] bg-[var(--state-success,#00CC66)]/10 border-[var(--state-success,#00CC66)]/20",
+  archived: "text-[var(--state-error,#FF3333)] bg-[var(--state-error,#FF3333)]/10 border-[var(--state-error,#FF3333)]/20",
 };
 
 /* Renders a classification-hub icon (a flat Visual-Library SVG) in the current
@@ -1204,7 +1205,7 @@ export default function ProductList() {
                     {/* Badges overlay */}
                     <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5">
                       {p.featured && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/90 text-white text-[10px] font-bold uppercase tracking-wider backdrop-blur-sm">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10px] font-bold uppercase tracking-wider backdrop-blur-sm">
                           <StarIcon className="h-2.5 w-2.5" /> Featured
                         </span>
                       )}
@@ -1220,8 +1221,8 @@ export default function ProductList() {
                     <div className="absolute top-2.5 right-2.5 z-[1] flex items-center gap-1.5">
                       <KnowledgeRing pct={signal.pct} tone={signal.tone} />
                       {p.visible ? (
-                        <span className="h-6 w-6 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center backdrop-blur-sm">
-                          <EyeIcon className="h-3 w-3 text-emerald-400" />
+                        <span className="h-6 w-6 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center backdrop-blur-sm">
+                          <EyeIcon className="h-3 w-3 text-[var(--text-secondary)]" />
                         </span>
                       ) : (
                         <span className="h-6 w-6 rounded-full bg-[var(--bg-overlay)] border border-[var(--border-subtle)] flex items-center justify-center backdrop-blur-sm">

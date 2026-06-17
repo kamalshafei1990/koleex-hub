@@ -904,9 +904,15 @@ export default function ProductForm({ productId }: Props) {
 
   /* ── Hero: main image helpers ── */
   const mainImage = media.find(m => m.type === "main_image");
-  const mainImageSrc = mainImage?._file
-    ? URL.createObjectURL(mainImage._file)
-    : mainImage?.url || null;
+  const mainImageFile = mainImage?._file ?? null;
+  const mainImageUrl = mainImage?.url || null;
+  // Memoize the object URL so it isn't re-created on every render, and revoke
+  // the previous one on change/unmount (was leaking a blob per render).
+  const mainImageSrc = useMemo(
+    () => (mainImageFile ? URL.createObjectURL(mainImageFile) : mainImageUrl),
+    [mainImageFile, mainImageUrl],
+  );
+  useEffect(() => () => { if (mainImageFile && mainImageSrc) URL.revokeObjectURL(mainImageSrc); }, [mainImageFile, mainImageSrc]);
 
   const handleMainImage = (files: FileList | null) => {
     if (!files?.length) return;
@@ -1611,12 +1617,14 @@ export default function ProductForm({ productId }: Props) {
       for (const p of prices) {
         const realModelId = p.model_id || tempIdToRealId[p._modelTempId];
         if (!realModelId) continue;
-        const num = (v: string) => v ? parseFloat(v) : null;
+        // Finite-safe: empty OR unparseable ("abc", "12kg") → null (skip),
+        // never silently coerced to 0 (was a "free product" risk on the catalog).
+        const num = (v: string) => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
         await upsertMarketPrice({
           model_id: realModelId,
           country_code: p.country_code,
           currency: p.currency,
-          market_price: num(p.market_price) || 0,
+          market_price: num(p.market_price),
           head_only_price: num(p.head_only_price),
           complete_set_price: num(p.complete_set_price),
         });
