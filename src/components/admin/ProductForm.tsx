@@ -100,6 +100,7 @@ import MediaSection from "./form-sections/MediaSection";
 import TranslationsSection from "./form-sections/TranslationsSection";
 import MarketPricesSection from "./form-sections/MarketPricesSection";
 import RelatedProductsSection from "./form-sections/RelatedProductsSection";
+import SearchSocialSection from "./form-sections/SearchSocialSection";
 import SewingMachineSection from "./form-sections/SewingMachineSection";
 import type { SewingSpecsFormState } from "./form-sections/SewingMachineSection";
 import BarcodeQRDisplay from "./form-sections/BarcodeQRDisplay";
@@ -3777,6 +3778,18 @@ export default function ProductForm({ productId }: Props) {
 
               <Section id="related" icon={<Link2Icon className="h-4 w-4" />} title={t("review.relatedSection", "Related Products")} defaultOpen={false}>
                 <RelatedProductsSection related={related} onChange={setRelated} currentProductId={productId} />
+              </Section>
+
+              <Section id="search-social" icon={<EyeIcon className="h-4 w-4" />} title={t("review.searchSocialSection", "Search & Social")} badge={t("review.searchSocialBadge", "SEO preview")} defaultOpen={false}>
+                <SearchSocialSection
+                  productName={product.product_name}
+                  brand={product.brand}
+                  slug={product.slug}
+                  excerpt={product.excerpt}
+                  primaryImageUrl={media.find((m) => m.type === "main_image")?.url}
+                  categoryName={categoryName}
+                  onExcerptChange={(v) => updateProduct_({ excerpt: v })}
+                />
               </Section>
 
               {/* ── Publish action card ──
