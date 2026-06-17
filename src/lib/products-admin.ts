@@ -334,6 +334,33 @@ export async function setRelatedProducts(productId: string, relatedIds: string[]
   return ok;
 }
 
+// ── Product↔Supplier links → /api/product-suppliers ──
+export interface ProductSupplierLinkRow {
+  id?: string;
+  product_id?: string;
+  supplier_id: string;
+  is_primary?: boolean;
+  show_in_catalog?: boolean;
+  supplier_product_code?: string | null;
+  moq?: number | null;
+  lead_time_days?: number | null;
+  unit_cost_cny?: number | null;
+  currency?: string | null;
+  payment_terms?: string | null;
+  notes?: string | null;
+}
+export async function fetchProductSuppliers(productId: string): Promise<ProductSupplierLinkRow[]> {
+  if (!productId) return [];
+  const json = await jget<{ suppliers?: ProductSupplierLinkRow[] }>(
+    `/api/product-suppliers?product_id=${encodeURIComponent(productId)}`, {},
+  );
+  return json.suppliers ?? [];
+}
+export async function saveProductSuppliers(productId: string, suppliers: ProductSupplierLinkRow[]): Promise<boolean> {
+  const { ok } = await jsend(`/api/product-suppliers`, "PUT", { product_id: productId, suppliers });
+  return ok;
+}
+
 // ── Search → /api/products/search ──
 export async function searchProducts(query: string, excludeId?: string): Promise<Pick<ProductRow, "id" | "product_name" | "slug">[]> {
   const params = new URLSearchParams({ q: query });

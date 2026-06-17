@@ -177,6 +177,23 @@ export interface RelatedProductFormState {
   order: number;
 }
 
+/* Per-product LINK to a supplier from the Suppliers app. Supplier master
+   data (name, logo, country, contacts…) is NOT duplicated here — only the
+   facts specific to this product↔supplier relationship. Mirrors the
+   product_suppliers table. */
+export interface ProductSupplierFormState {
+  _tempId: string;
+  supplier_id: string;
+  is_primary: boolean;
+  supplier_product_code: string;
+  moq: string;            // kept as string for the input; coerced on save
+  lead_time_days: string;
+  unit_cost_cny: string;
+  currency: string;
+  payment_terms: string;
+  notes: string;
+}
+
 /* Koleex defaults for a brand-new product.
    · brand              → "Koleex" — own-brand is the common case,
                           rebranding happens after.
