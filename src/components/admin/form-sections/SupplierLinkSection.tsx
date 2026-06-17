@@ -603,10 +603,15 @@ function SupplierInfoModal({ supplier, onClose }: { supplier: SupplierOption; on
 
         {/* Footer — open full profile */}
         <div className="flex items-center justify-end gap-2 p-3 border-t border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
-          <a href={`/suppliers/${supplier.id}`} target="_blank" rel="noopener noreferrer"
+          <button type="button"
+            onClick={() => {
+              const url = `/suppliers/${supplier.id}`;
+              const w = window.open(url, "_blank", "noopener,noreferrer");
+              if (!w) window.location.href = url; // popup blocked → same tab
+            }}
             className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-medium hover:opacity-90 transition-opacity">
             <ExternalLinkIcon className="h-3.5 w-3.5" /> Open full profile
-          </a>
+          </button>
         </div>
       </div>
     </div>
