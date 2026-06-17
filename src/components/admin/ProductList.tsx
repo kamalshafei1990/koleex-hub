@@ -32,6 +32,7 @@ import ProductDataIcon from "@/components/icons/ProductDataIcon";
 import {
   fetchProducts, fetchDivisions, fetchCategories, fetchSubcategories,
   fetchModelSummaries, fetchProductMainImages, deleteProduct,
+  fetchClassificationIcons,
 } from "@/lib/products-admin";
 import type { ProductRow, DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase";
 import ConfirmDialog from "./form-sections/ConfirmDialog";
@@ -62,6 +63,25 @@ const stColors: Record<string, string> = {
   archived: "text-red-400 bg-red-400/10 border-red-400/20",
 };
 
+/* Renders a classification-hub icon (a flat Visual-Library SVG) in the current
+   theme colour via a CSS mask, so it reads correctly on dark/light. Returns
+   null when there's no icon for that slug. */
+function ClassMonoIcon({ src, className }: { src?: string; className?: string }) {
+  if (!src) return null;
+  return (
+    <span
+      aria-hidden
+      className={`inline-block shrink-0 bg-current ${className ?? "h-5 w-5"}`}
+      style={{
+        WebkitMaskImage: `url("${src}")`, maskImage: `url("${src}")`,
+        WebkitMaskRepeat: "no-repeat", maskRepeat: "no-repeat",
+        WebkitMaskPosition: "center", maskPosition: "center",
+        WebkitMaskSize: "contain", maskSize: "contain",
+      }}
+    />
+  );
+}
+
 export default function ProductList() {
   const router = useRouter();
   const pathname = usePathname();
@@ -76,6 +96,10 @@ export default function ProductList() {
   const [divisions, setDivisions] = useState<DivisionRow[]>([]);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [subcategories, setSubcategories] = useState<SubcategoryRow[]>([]);
+  // Classification-icon hub overrides (level → slug → url). Lets the icons set
+  // in the Database app surface as section markers in the catalogue.
+  const [classIcons, setClassIcons] = useState<Record<string, Record<string, string>>>({});
+  useEffect(() => { fetchClassificationIcons().then(setClassIcons).catch(() => {}); }, []);
   const [modelCounts, setModelCounts] = useState<Record<string, number>>({});
   const [productSuppliers, setProductSuppliers] = useState<Record<string, string[]>>({});
   const [allSuppliers, setAllSuppliers] = useState<string[]>([]);
@@ -1094,13 +1118,16 @@ export default function ProductList() {
                   background; the title sits big with the count
                   rendered as a small uppercase caption above. */}
               <div className="mb-7 flex items-end justify-between gap-3 pl-4 border-l-[3px] border-[var(--border-focus)]">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-ghost)] mb-1">
-                    Category
-                  </p>
-                  <h2 className="text-[20px] md:text-[26px] font-bold tracking-tight text-[var(--text-primary)] truncate leading-tight">
-                    {cat.name}
-                  </h2>
+                <div className="flex min-w-0 items-center gap-3">
+                  <ClassMonoIcon src={classIcons.category?.[cat.slug]} className="h-7 w-7 text-[var(--text-secondary)]" />
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-ghost)] mb-1">
+                      Category
+                    </p>
+                    <h2 className="text-[20px] md:text-[26px] font-bold tracking-tight text-[var(--text-primary)] truncate leading-tight">
+                      {cat.name}
+                    </h2>
+                  </div>
                 </div>
                 <span className="shrink-0 text-[12px] font-semibold text-[var(--text-muted)] tabular-nums whitespace-nowrap">
                   {cat.total} {cat.total === 1 ? "product" : "products"}
@@ -1111,7 +1138,8 @@ export default function ProductList() {
               <div className="space-y-10">
               {cat.subSections.map((section) => (
                 <div key={section.slug}>
-                  <header className="flex items-baseline gap-2.5 mb-4">
+                  <header className="flex items-center gap-2.5 mb-4">
+                    <ClassMonoIcon src={classIcons.subcategory?.[section.slug]} className="h-[18px] w-[18px] text-[var(--text-muted)]" />
                     <h3 className="text-[15px] md:text-[16px] font-semibold tracking-tight text-[var(--text-primary)]">
                       {section.name}
                     </h3>
