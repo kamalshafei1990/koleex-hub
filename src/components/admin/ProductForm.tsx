@@ -936,6 +936,13 @@ export default function ProductForm({ productId }: Props) {
           currency: s.currency || "CNY",
           payment_terms: str(s.payment_terms),
           notes: str(s.notes),
+          supplier_product_name: str(s.supplier_product_name),
+          supplier_product_photo: str(s.supplier_product_photo),
+          supply_type: s.supply_type || "",
+          sample_available: !!s.sample_available,
+          sample_cost: str(s.sample_cost),
+          incoterms: s.incoterms || "",
+          supplier_warranty_months: str(s.supplier_warranty_months),
         })));
 
         setCertifications(dbCerts.map(c => ({
@@ -1756,6 +1763,13 @@ export default function ProductForm({ productId }: Props) {
         currency: s.currency || null,
         payment_terms: s.payment_terms || null,
         notes: s.notes || null,
+        supplier_product_name: s.supplier_product_name || null,
+        supplier_product_photo: s.supplier_product_photo || null,
+        supply_type: s.supply_type || null,
+        sample_available: s.sample_available,
+        sample_cost: s.sample_cost === "" ? null : Number(s.sample_cost),
+        incoterms: s.incoterms || null,
+        supplier_warranty_months: s.supplier_warranty_months === "" ? null : Number(s.supplier_warranty_months),
       })));
 
       /* Phase 4 — certifications + documents (replace-the-set). */

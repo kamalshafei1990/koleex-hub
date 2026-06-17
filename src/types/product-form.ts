@@ -222,6 +222,14 @@ export interface ProductSupplierFormState {
   currency: string;
   payment_terms: string;
   notes: string;
+  /* product-as-supplied facts (migration pd_supplier_product_facts). */
+  supplier_product_name: string;
+  supplier_product_photo: string;   // image URL (uploaded to storage)
+  supply_type: string;              // OEM / ODM / Own brand
+  sample_available: boolean;
+  sample_cost: string;
+  incoterms: string;                // EXW / FOB / CIF / DDP
+  supplier_warranty_months: string;
 }
 
 /* Phase 4 — one row per real certificate (product_certifications). */

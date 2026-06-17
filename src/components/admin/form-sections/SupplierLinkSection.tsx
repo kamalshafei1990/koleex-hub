@@ -18,7 +18,12 @@ import FactoryIcon from "@/components/icons/ui/FactoryIcon";
 import StarIcon from "@/components/icons/ui/StarIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
+import UploadIcon from "@/components/icons/ui/UploadIcon";
+import { uploadProductFile } from "@/lib/products-admin";
 import type { ProductSupplierFormState } from "@/types/product-form";
+
+const SUPPLY_TYPES = ["OEM", "ODM", "Own brand"];
+const INCOTERMS = ["EXW", "FOB", "CIF", "CFR", "DDP", "DAP"];
 
 interface SupplierOption { id: string; name: string; logo: string | null }
 
@@ -34,6 +39,7 @@ const inp =
 
 export default function SupplierLinkSection({ links, suppliers, onChange }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
 
   const linkedIds = new Set(links.map((l) => l.supplier_id));
   const available = suppliers.filter((s) => !linkedIds.has(s.id));
@@ -56,6 +62,13 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
         currency: "CNY",
         payment_terms: "",
         notes: "",
+        supplier_product_name: "",
+        supplier_product_photo: "",
+        supply_type: "",
+        sample_available: false,
+        sample_cost: "",
+        incoterms: "",
+        supplier_warranty_months: "",
       },
     ]);
     setPickerOpen(false);
@@ -123,10 +136,59 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                   </div>
                 </div>
 
+                {/* Product as supplied — photo + supplier's own product name */}
+                <div className="flex items-start gap-3">
+                  <div className="shrink-0">
+                    <label className={lbl}>Product photo</label>
+                    <div className="relative h-20 w-20 rounded-lg bg-[var(--bg-surface)] border border-dashed border-[var(--border-subtle)] overflow-hidden flex items-center justify-center">
+                      {l.supplier_product_photo ? (
+                        <>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={l.supplier_product_photo} alt="" className="h-full w-full object-cover" />
+                          <button type="button" onClick={() => update(l._tempId, { supplier_product_photo: "" })} aria-label="Remove photo"
+                            className="absolute top-0.5 right-0.5 h-5 w-5 flex items-center justify-center rounded-md bg-black/60 text-white hover:bg-black/80">
+                            <CrossIcon className="h-3 w-3" />
+                          </button>
+                        </>
+                      ) : (
+                        <label className="cursor-pointer flex flex-col items-center gap-1 text-[var(--text-ghost)] hover:text-[var(--text-muted)] transition-colors">
+                          {uploadingId === l._tempId ? (
+                            <span className="text-[9px]">Uploading…</span>
+                          ) : (
+                            <>
+                              <UploadIcon className="h-4 w-4" />
+                              <span className="text-[9px]">Upload</span>
+                            </>
+                          )}
+                          <input type="file" accept="image/*" className="hidden" disabled={uploadingId === l._tempId}
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              setUploadingId(l._tempId);
+                              const res = await uploadProductFile(file);
+                              setUploadingId(null);
+                              if (res) update(l._tempId, { supplier_product_photo: res.url });
+                            }} />
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <label className={lbl}>Supplier&apos;s product name</label>
+                    <input className={inp} value={l.supplier_product_name} placeholder="What the supplier calls this product"
+                      onChange={(e) => update(l._tempId, { supplier_product_name: e.target.value })} />
+                    <label className={`${lbl} mt-2`}>Supply type</label>
+                    <select className={inp} value={l.supply_type} onChange={(e) => update(l._tempId, { supply_type: e.target.value })}>
+                      <option value="">—</option>
+                      {SUPPLY_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                </div>
+
                 {/* Per-product link fields */}
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   <div>
-                    <label className={lbl}>Supplier code</label>
+                    <label className={lbl}>Supplier product / model code</label>
                     <input className={inp} value={l.supplier_product_code} placeholder="e.g. JK-58420"
                       onChange={(e) => update(l._tempId, { supplier_product_code: e.target.value })} />
                   </div>
@@ -141,7 +203,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                       onChange={(e) => update(l._tempId, { lead_time_days: e.target.value.replace(/[^0-9]/g, "") })} />
                   </div>
                   <div>
-                    <label className={lbl}>Unit cost</label>
+                    <label className={lbl}>Cost price</label>
                     <input className={inp} value={l.unit_cost_cny} inputMode="decimal" placeholder="e.g. 1850"
                       onChange={(e) => update(l._tempId, { unit_cost_cny: e.target.value.replace(/[^0-9.]/g, "") })} />
                   </div>
@@ -158,6 +220,35 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                     <label className={lbl}>Payment terms</label>
                     <input className={inp} value={l.payment_terms} placeholder="e.g. 30% TT, 70% on shipment"
                       onChange={(e) => update(l._tempId, { payment_terms: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className={lbl}>Incoterms</label>
+                    <select className={inp} value={l.incoterms} onChange={(e) => update(l._tempId, { incoterms: e.target.value })}>
+                      <option value="">—</option>
+                      {INCOTERMS.map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={lbl}>Sample cost</label>
+                    <input className={inp} value={l.sample_cost} inputMode="decimal" placeholder="e.g. 200"
+                      onChange={(e) => update(l._tempId, { sample_cost: e.target.value.replace(/[^0-9.]/g, "") })} />
+                  </div>
+                  <div>
+                    <label className={lbl}>Supplier warranty (months)</label>
+                    <input className={inp} value={l.supplier_warranty_months} inputMode="numeric" placeholder="e.g. 12"
+                      onChange={(e) => update(l._tempId, { supplier_warranty_months: e.target.value.replace(/[^0-9]/g, "") })} />
+                  </div>
+                  <div className="flex items-end pb-0.5">
+                    <button type="button" onClick={() => update(l._tempId, { sample_available: !l.sample_available })}
+                      aria-pressed={l.sample_available}
+                      className={`h-9 px-3 w-full rounded-lg border text-[12px] font-medium flex items-center justify-center gap-2 transition-colors ${
+                        l.sample_available
+                          ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
+                          : "bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border-subtle)] hover:text-[var(--text-primary)]"
+                      }`}>
+                      <span className={`h-2 w-2 rounded-full ${l.sample_available ? "bg-[var(--state-success,#00CC66)]" : "bg-[var(--text-ghost)]"}`} />
+                      Sample {l.sample_available ? "available" : "not available"}
+                    </button>
                   </div>
                 </div>
                 <div>
