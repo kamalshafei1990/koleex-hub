@@ -30,6 +30,23 @@ export interface ProductFormState {
   supports_head_only: boolean;
   supports_complete_set: boolean;
   warranty: string;
+  /* Phase 4 — structured warranty / after-sales. Complement the legacy
+     free-text `warranty` above; all optional. Numbers kept as strings
+     for empty-field support; coerced on save. */
+  warranty_months: string;
+  warranty_type: string;
+  warranty_start_from: string;
+  warranty_coverage: string;
+  warranty_exclusions: string;
+  spare_parts_availability: string;
+  spare_parts_stock: string;
+  service_life: string;
+  maintenance_interval: string;
+  technical_support: string;
+  support_channels: string[];
+  training_available: boolean;
+  installation_service: boolean;
+  returns_policy: string;
   hs_code: string;
   voltage: string[];
   plug_types: string[];
@@ -194,6 +211,36 @@ export interface ProductSupplierFormState {
   notes: string;
 }
 
+/* Phase 4 — one row per real certificate (product_certifications). */
+export interface ProductCertificationFormState {
+  _tempId: string;
+  cert_type: string;
+  certified_standard: string;
+  cert_number: string;
+  issuer: string;
+  issued_date: string;
+  expiry_date: string;
+  reminder_days: string;
+  country_scope: string;
+  model_ids: string[];
+  file_url: string;
+  verification_url: string;
+  status: string;
+  notes: string;
+}
+
+/* Phase 4 — structured industrial document (product_documents). */
+export interface ProductDocumentFormState {
+  _tempId: string;
+  doc_type: string;
+  title: string;
+  file_url: string;
+  file_name: string;
+  language: string;
+  version: string;
+  model_ids: string[];
+}
+
 /* Koleex defaults for a brand-new product.
    · brand              → "Koleex" — own-brand is the common case,
                           rebranding happens after.
@@ -222,6 +269,20 @@ export const EMPTY_PRODUCT: ProductFormState = {
   supports_head_only: false,
   supports_complete_set: true,
   warranty: "3 years",
+  warranty_months: "",
+  warranty_type: "",
+  warranty_start_from: "",
+  warranty_coverage: "",
+  warranty_exclusions: "",
+  spare_parts_availability: "",
+  spare_parts_stock: "",
+  service_life: "",
+  maintenance_interval: "",
+  technical_support: "",
+  support_channels: [],
+  training_available: false,
+  installation_service: false,
+  returns_policy: "",
   hs_code: "",
   voltage: [],
   plug_types: [],

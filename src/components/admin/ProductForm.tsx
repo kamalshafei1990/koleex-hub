@@ -48,6 +48,8 @@ import {
   upsertMarketPrice, deleteMarketPrice,
   setRelatedProducts,
   fetchProductSuppliers, saveProductSuppliers,
+  fetchProductCertifications, saveProductCertifications,
+  fetchProductDocuments, saveProductDocuments,
   fetchSupplierNames, fetchUniqueBrands,
   fetchBrandLogos, uploadBrandLogo,
   fetchDivisionLogos, fetchCategoryLogos, fetchSubcategoryLogos, fetchClassificationIcons,
@@ -58,6 +60,7 @@ import type { DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase"
 import type {
   ProductFormState, ModelFormState, MediaFormState,
   TranslationFormState, MarketPriceFormState, RelatedProductFormState, ProductSupplierFormState,
+  ProductCertificationFormState, ProductDocumentFormState,
 } from "@/types/product-form";
 import { EMPTY_PRODUCT, createEmptyModel, COUNTRIES } from "@/types/product-form";
 import {
@@ -81,6 +84,8 @@ import SelectWithCreate from "./form-sections/SelectWithCreate";
 import CreateDivisionModal from "./form-sections/CreateDivisionModal";
 import ConfirmDialog from "./form-sections/ConfirmDialog";
 import SupplierLinkSection from "./form-sections/SupplierLinkSection";
+import CertificationsSection from "./form-sections/CertificationsSection";
+import ProductDocumentsSection from "./form-sections/ProductDocumentsSection";
 import CreateCategoryModal from "./form-sections/CreateCategoryModal";
 import CreateSubcategoryModal from "./form-sections/CreateSubcategoryModal";
 import CreateSupplierModal from "./form-sections/CreateSupplierModal";
@@ -505,6 +510,8 @@ export default function ProductForm({ productId }: Props) {
   const [prices, setPrices] = useState<MarketPriceFormState[]>([]);
   const [related, setRelated] = useState<RelatedProductFormState[]>([]);
   const [productSuppliers, setProductSuppliers] = useState<ProductSupplierFormState[]>([]);
+  const [certifications, setCertifications] = useState<ProductCertificationFormState[]>([]);
+  const [productDocuments, setProductDocuments] = useState<ProductDocumentFormState[]>([]);
 
   /* ── Sewing machine specs ── */
   const [sewingSpecs, setSewingSpecs] = useState<SewingSpecsFormState>({
@@ -555,7 +562,7 @@ export default function ProductForm({ productId }: Props) {
       return;                   // first run AFTER hydration — baseline
     }
     setDirty(true);
-  }, [loading, product, models, media, translations, prices, related, productSuppliers, sewingSpecs]);
+  }, [loading, product, models, media, translations, prices, related, productSuppliers, certifications, productDocuments, sewingSpecs]);
 
   /* Browser beforeunload warning — fires the native "Leave site?"
      dialog when the user tries to close/refresh/navigate away with
@@ -592,6 +599,8 @@ export default function ProductForm({ productId }: Props) {
           prices,
           related,
           productSuppliers,
+          certifications,
+          productDocuments,
           sewingSpecs,
         };
         window.localStorage.setItem(draftKey, JSON.stringify(snapshot));
@@ -600,7 +609,7 @@ export default function ProductForm({ productId }: Props) {
       }
     }, 800);
     return () => window.clearTimeout(id);
-  }, [loading, dirty, product, models, media, translations, prices, related, productSuppliers, sewingSpecs, draftKey]);
+  }, [loading, dirty, product, models, media, translations, prices, related, productSuppliers, certifications, productDocuments, sewingSpecs, draftKey]);
 
   /* ── P0 #3 · Draft recovery detection ──
      After the server load settles, look for a saved draft for this
@@ -740,7 +749,7 @@ export default function ProductForm({ productId }: Props) {
       });
 
       if (isEdit && productId) {
-        const [p, dbModels, dbMedia, dbTranslations, dbRelated, dbSewingSpecs, dbSuppliers] = await Promise.all([
+        const [p, dbModels, dbMedia, dbTranslations, dbRelated, dbSewingSpecs, dbSuppliers, dbCerts, dbDocs] = await Promise.all([
           fetchProductById(productId),
           fetchModelsByProductId(productId),
           fetchMediaByProductId(productId),
@@ -748,6 +757,8 @@ export default function ProductForm({ productId }: Props) {
           fetchRelatedProducts(productId),
           fetchSewingSpecsByProductId(productId),
           fetchProductSuppliers(productId),
+          fetchProductCertifications(productId),
+          fetchProductDocuments(productId),
         ]);
         if (!p) { setError("Product not found"); setLoading(false); return; }
 
@@ -771,6 +782,20 @@ export default function ProductForm({ productId }: Props) {
           supports_head_only: p.supports_head_only,
           supports_complete_set: p.supports_complete_set,
           warranty: p.warranty || "",
+          warranty_months: p.warranty_months?.toString() || "",
+          warranty_type: p.warranty_type || "",
+          warranty_start_from: p.warranty_start_from || "",
+          warranty_coverage: p.warranty_coverage || "",
+          warranty_exclusions: p.warranty_exclusions || "",
+          spare_parts_availability: p.spare_parts_availability || "",
+          spare_parts_stock: p.spare_parts_stock || "",
+          service_life: p.service_life || "",
+          maintenance_interval: p.maintenance_interval || "",
+          technical_support: p.technical_support || "",
+          support_channels: p.support_channels || [],
+          training_available: !!p.training_available,
+          installation_service: !!p.installation_service,
+          returns_policy: p.returns_policy || "",
           hs_code: p.hs_code || "",
           voltage: p.voltage || [],
           plug_types: p.plug_types || [],
@@ -900,6 +925,34 @@ export default function ProductForm({ productId }: Props) {
           currency: s.currency || "CNY",
           payment_terms: str(s.payment_terms),
           notes: str(s.notes),
+        })));
+
+        setCertifications(dbCerts.map(c => ({
+          _tempId: crypto.randomUUID(),
+          cert_type: c.cert_type || "CE",
+          certified_standard: str(c.certified_standard),
+          cert_number: str(c.cert_number),
+          issuer: str(c.issuer),
+          issued_date: str(c.issued_date),
+          expiry_date: str(c.expiry_date),
+          reminder_days: str(c.reminder_days),
+          country_scope: str(c.country_scope),
+          model_ids: c.model_ids || [],
+          file_url: str(c.file_url),
+          verification_url: str(c.verification_url),
+          status: c.status || "active",
+          notes: str(c.notes),
+        })));
+
+        setProductDocuments(dbDocs.map(d => ({
+          _tempId: crypto.randomUUID(),
+          doc_type: d.doc_type,
+          title: str(d.title),
+          file_url: str(d.file_url),
+          file_name: str(d.file_name),
+          language: str(d.language),
+          version: str(d.version),
+          model_ids: d.model_ids || [],
         })));
 
         if (dbSewingSpecs) {
@@ -1489,6 +1542,20 @@ export default function ProductForm({ productId }: Props) {
         supports_head_only: product.supports_head_only,
         supports_complete_set: product.supports_complete_set,
         warranty: product.warranty || null,
+        warranty_months: product.warranty_months === "" ? null : Number(product.warranty_months),
+        warranty_type: product.warranty_type || null,
+        warranty_start_from: product.warranty_start_from || null,
+        warranty_coverage: product.warranty_coverage || null,
+        warranty_exclusions: product.warranty_exclusions || null,
+        spare_parts_availability: product.spare_parts_availability || null,
+        spare_parts_stock: product.spare_parts_stock || null,
+        service_life: product.service_life || null,
+        maintenance_interval: product.maintenance_interval || null,
+        technical_support: product.technical_support || null,
+        support_channels: product.support_channels.length ? product.support_channels : null,
+        training_available: product.training_available,
+        installation_service: product.installation_service,
+        returns_policy: product.returns_policy || null,
         visible: product.visible,
         featured: product.featured,
         status: product.status,
@@ -1671,6 +1738,34 @@ export default function ProductForm({ productId }: Props) {
         payment_terms: s.payment_terms || null,
         notes: s.notes || null,
       })));
+
+      /* Phase 4 — certifications + documents (replace-the-set). */
+      await saveProductCertifications(pid, certifications.map(c => ({
+        cert_type: c.cert_type,
+        certified_standard: c.certified_standard || null,
+        cert_number: c.cert_number || null,
+        issuer: c.issuer || null,
+        issued_date: c.issued_date || null,
+        expiry_date: c.expiry_date || null,
+        reminder_days: c.reminder_days === "" ? null : Number(c.reminder_days),
+        country_scope: c.country_scope || null,
+        model_ids: c.model_ids,
+        file_url: c.file_url || null,
+        verification_url: c.verification_url || null,
+        status: c.status || "active",
+        notes: c.notes || null,
+      })));
+      await saveProductDocuments(pid, productDocuments
+        .filter(d => d.file_url)
+        .map(d => ({
+          doc_type: d.doc_type,
+          title: d.title || null,
+          file_url: d.file_url,
+          file_name: d.file_name || null,
+          language: d.language || null,
+          version: d.version || null,
+          model_ids: d.model_ids,
+        })));
 
       if (sewingSpecs.template_slug) {
         await upsertSewingSpecs({
@@ -2975,22 +3070,112 @@ export default function ProductForm({ productId }: Props) {
                   );
                 })}
               </div>
-              <p className="text-[10px] text-[var(--text-ghost)] mt-3 leading-relaxed">{t("compliance.future", "Detailed certificate records — issuer, certificate number, expiry date and uploaded files — are coming to this tab.")}</p>
+              <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]">
+                <p className="text-[11px] font-medium text-[var(--text-faint)] mb-2">{t("compliance.recordsTitle", "Certificate records")}</p>
+                <CertificationsSection certifications={certifications} onChange={setCertifications} />
+              </div>
             </Section>
 
             <Section id="compliance-warranty" icon={<ShieldCheckIcon className="h-4 w-4" />} title={t("compliance.warrantyTitle", "Warranty & After-Sales")} badge={t("compliance.warrantyBadge", "Service")}>
-              <div>
-                <label className={lbl}>
-                  <span className="inline-flex items-center gap-1.5"><ShieldCheckIcon className="h-3 w-3" /> {t("hero.warranty", "Warranty")}</span>
-                </label>
-                <input
-                  type="text"
-                  value={product.warranty}
-                  onChange={(e) => updateProduct_({ warranty: e.target.value })}
-                  placeholder={t("hero.warrantyPlaceholder", "e.g. 2 years parts & labour")}
-                  className={inp}
-                />
-                <p className="text-[10px] text-[var(--text-ghost)] mt-1 leading-relaxed">{t("compliance.warrantyHint", "Spare-parts availability, service life and maintenance interval are coming to this tab.")}</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="md:col-span-3">
+                  <label className={lbl}><span className="inline-flex items-center gap-1.5"><ShieldCheckIcon className="h-3 w-3" /> {t("hero.warranty", "Warranty")}</span></label>
+                  <input type="text" value={product.warranty} placeholder={t("hero.warrantyPlaceholder", "e.g. 2 years parts & labour")} className={inp}
+                    onChange={(e) => updateProduct_({ warranty: e.target.value })} />
+                </div>
+                <div>
+                  <label className={lbl}>Warranty (months)</label>
+                  <input className={inp} inputMode="numeric" value={product.warranty_months} placeholder="e.g. 36"
+                    onChange={(e) => updateProduct_({ warranty_months: e.target.value.replace(/[^0-9]/g, "") })} />
+                </div>
+                <div>
+                  <label className={lbl}>Warranty type</label>
+                  <select className={inp} value={product.warranty_type} onChange={(e) => updateProduct_({ warranty_type: e.target.value })}>
+                    <option value="">—</option>
+                    <option value="parts-only">Parts only</option>
+                    <option value="parts-and-labour">Parts & labour</option>
+                    <option value="on-site">On-site</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={lbl}>Starts from</label>
+                  <select className={inp} value={product.warranty_start_from} onChange={(e) => updateProduct_({ warranty_start_from: e.target.value })}>
+                    <option value="">—</option>
+                    <option value="shipment">Shipment</option>
+                    <option value="installation">Installation</option>
+                    <option value="invoice">Invoice date</option>
+                  </select>
+                </div>
+                <div className="md:col-span-3">
+                  <label className={lbl}>Coverage</label>
+                  <input className={inp} value={product.warranty_coverage} placeholder="What the warranty covers…"
+                    onChange={(e) => updateProduct_({ warranty_coverage: e.target.value })} />
+                </div>
+                <div className="md:col-span-3">
+                  <label className={lbl}>Exclusions</label>
+                  <input className={inp} value={product.warranty_exclusions} placeholder="What is not covered (wear parts, misuse…)"
+                    onChange={(e) => updateProduct_({ warranty_exclusions: e.target.value })} />
+                </div>
+                <div>
+                  <label className={lbl}>Spare-parts availability</label>
+                  <input className={inp} value={product.spare_parts_availability} placeholder="e.g. 10 years"
+                    onChange={(e) => updateProduct_({ spare_parts_availability: e.target.value })} />
+                </div>
+                <div>
+                  <label className={lbl}>Spare-parts stock</label>
+                  <input className={inp} value={product.spare_parts_stock} placeholder="e.g. In stock — Shenzhen DC"
+                    onChange={(e) => updateProduct_({ spare_parts_stock: e.target.value })} />
+                </div>
+                <div>
+                  <label className={lbl}>Service life</label>
+                  <input className={inp} value={product.service_life} placeholder="e.g. 8–10 years"
+                    onChange={(e) => updateProduct_({ service_life: e.target.value })} />
+                </div>
+                <div>
+                  <label className={lbl}>Maintenance interval</label>
+                  <input className={inp} value={product.maintenance_interval} placeholder="e.g. every 6 months"
+                    onChange={(e) => updateProduct_({ maintenance_interval: e.target.value })} />
+                </div>
+                <div>
+                  <label className={lbl}>Technical support</label>
+                  <input className={inp} value={product.technical_support} placeholder="e.g. 24/7 remote + on-site"
+                    onChange={(e) => updateProduct_({ technical_support: e.target.value })} />
+                </div>
+                <div>
+                  <label className={lbl}>Returns policy</label>
+                  <input className={inp} value={product.returns_policy} placeholder="e.g. 14-day DOA replacement"
+                    onChange={(e) => updateProduct_({ returns_policy: e.target.value })} />
+                </div>
+                <div className="md:col-span-3">
+                  <label className={lbl}>Support channels</label>
+                  <div className="flex flex-wrap gap-2">
+                    {["Phone", "Email", "WeChat", "WhatsApp", "On-site", "Remote"].map((ch) => {
+                      const on = product.support_channels.includes(ch);
+                      return (
+                        <button key={ch} type="button" aria-pressed={on}
+                          onClick={() => updateProduct_({ support_channels: on ? product.support_channels.filter((x) => x !== ch) : [...product.support_channels, ch] })}
+                          className={`h-8 px-3 rounded-lg border text-[12px] transition-colors ${on ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent" : "bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border-subtle)] hover:text-[var(--text-primary)]"}`}>
+                          {ch}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="md:col-span-3 flex flex-wrap gap-2">
+                  {([
+                    { key: "training_available" as const, label: "Training available" },
+                    { key: "installation_service" as const, label: "Installation service" },
+                  ]).map((f) => {
+                    const on = !!product[f.key];
+                    return (
+                      <button key={f.key} type="button" aria-pressed={on}
+                        onClick={() => updateProduct_({ [f.key]: !on })}
+                        className={`h-9 px-3 rounded-lg border text-[12px] font-medium inline-flex items-center gap-2 transition-colors ${on ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent" : "bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border-subtle)] hover:text-[var(--text-primary)]"}`}>
+                        <span className={`h-3.5 w-3.5 rounded-[4px] border ${on ? "bg-[var(--text-inverted)] border-transparent" : "border-[var(--border-subtle)]"}`} /> {f.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </Section>
           </div>
@@ -3007,6 +3192,11 @@ export default function ProductForm({ productId }: Props) {
                   setMedia([...mainImages, ...filtered]);
                 }}
               />
+            </Section>
+
+            {/* Phase 4 — structured industrial documents (separate from visuals). */}
+            <Section id="documents" icon={<DocumentIcon className="h-4 w-4" />} title={t("documents.title", "Product Documents")} badge={t("documents.badge", "Manuals · Drawings · Certs")} defaultOpen={false}>
+              <ProductDocumentsSection documents={productDocuments} onChange={setProductDocuments} />
             </Section>
           </div>
         )}

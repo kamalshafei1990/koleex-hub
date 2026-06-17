@@ -305,6 +305,21 @@ export interface ProductRow {
   supports_head_only: boolean;
   supports_complete_set: boolean;
   warranty: string | null;
+  /* Phase 4 — structured warranty / after-sales (additive, all nullable). */
+  warranty_months: number | null;
+  warranty_type: string | null;
+  warranty_start_from: string | null;
+  warranty_coverage: string | null;
+  warranty_exclusions: string | null;
+  spare_parts_availability: string | null;
+  spare_parts_stock: string | null;
+  service_life: string | null;
+  maintenance_interval: string | null;
+  technical_support: string | null;
+  support_channels: string[] | null;
+  training_available: boolean | null;
+  installation_service: boolean | null;
+  returns_policy: string | null;
   visible: boolean;
   featured: boolean;
   status: string | null;
