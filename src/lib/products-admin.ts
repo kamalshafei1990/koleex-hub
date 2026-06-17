@@ -361,6 +361,45 @@ export async function saveProductSuppliers(productId: string, suppliers: Product
   return ok;
 }
 
+// ── Product certifications → /api/product-certifications (Phase 4) ──
+export interface ProductCertificationRow {
+  id?: string; product_id?: string;
+  cert_type: string; certified_standard?: string | null; cert_number?: string | null;
+  issuer?: string | null; issued_date?: string | null; expiry_date?: string | null;
+  reminder_days?: number | null; country_scope?: string | null; model_ids?: string[];
+  file_url?: string | null; verification_url?: string | null; status?: string | null; notes?: string | null;
+}
+export async function fetchProductCertifications(productId: string): Promise<ProductCertificationRow[]> {
+  if (!productId) return [];
+  const json = await jget<{ certifications?: ProductCertificationRow[] }>(
+    `/api/product-certifications?product_id=${encodeURIComponent(productId)}`, {},
+  );
+  return json.certifications ?? [];
+}
+export async function saveProductCertifications(productId: string, certifications: ProductCertificationRow[]): Promise<boolean> {
+  const { ok } = await jsend(`/api/product-certifications`, "PUT", { product_id: productId, certifications });
+  return ok;
+}
+
+// ── Product documents → /api/product-documents (Phase 4) ──
+export interface ProductDocumentRow {
+  id?: string; product_id?: string;
+  doc_type: string; title?: string | null; file_url: string; file_name?: string | null;
+  file_size_kb?: number | null; language?: string | null; version?: string | null;
+  model_ids?: string[]; sort_order?: number;
+}
+export async function fetchProductDocuments(productId: string): Promise<ProductDocumentRow[]> {
+  if (!productId) return [];
+  const json = await jget<{ documents?: ProductDocumentRow[] }>(
+    `/api/product-documents?product_id=${encodeURIComponent(productId)}`, {},
+  );
+  return json.documents ?? [];
+}
+export async function saveProductDocuments(productId: string, documents: ProductDocumentRow[]): Promise<boolean> {
+  const { ok } = await jsend(`/api/product-documents`, "PUT", { product_id: productId, documents });
+  return ok;
+}
+
 // ── Search → /api/products/search ──
 export async function searchProducts(query: string, excludeId?: string): Promise<Pick<ProductRow, "id" | "product_name" | "slug">[]> {
   const params = new URLSearchParams({ q: query });
