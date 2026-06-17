@@ -37,6 +37,7 @@ export async function GET(
   const { data: bySlug } = await supabaseServer
     .from("products")
     .select(cols)
+    .eq("tenant_id", auth.tenant_id)
     .eq("slug", handle)
     .maybeSingle();
   row = (bySlug as Record<string, unknown> | null) ?? null;
@@ -45,6 +46,7 @@ export async function GET(
     const { data: byId } = await supabaseServer
       .from("products")
       .select(cols)
+      .eq("tenant_id", auth.tenant_id)
       .eq("id", handle)
       .maybeSingle();
     row = (byId as Record<string, unknown> | null) ?? null;
@@ -83,6 +85,7 @@ export async function PATCH(
     const { data: row } = await supabaseServer
       .from("products")
       .select("id")
+      .eq("tenant_id", auth.tenant_id)
       .eq("slug", id)
       .maybeSingle();
     if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -92,6 +95,7 @@ export async function PATCH(
   const { error } = await supabaseServer
     .from("products")
     .update(body)
+    .eq("tenant_id", auth.tenant_id)
     .eq("id", targetId);
   if (error) {
     console.error("[api/products/[id] PATCH]", error.message);
@@ -117,6 +121,7 @@ export async function DELETE(
   const { error } = await supabaseServer
     .from("products")
     .delete()
+    .eq("tenant_id", auth.tenant_id)
     .eq("id", id);
   if (error) {
     console.error("[api/products/[id] DELETE]", error.message);
