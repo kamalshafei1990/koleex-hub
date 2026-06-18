@@ -483,7 +483,7 @@ function ModelCard({
               weight that live on the Technical step. Net + Gross weight
               both render here so admins can fill the standard
               NW / GW pair shown on every commercial invoice. */}
-          <Panel icon={<PackageIcon className="h-3.5 w-3.5" />} title="Packaging & Logistics">
+          <Panel icon={<PackageIcon className="h-3.5 w-3.5" />} title="Shipping & Packing (this variant)">
             {inheritingLogistics ? (
               <div className="rounded-lg border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 p-3">
                 <div className="flex items-center justify-between gap-2 mb-1">
