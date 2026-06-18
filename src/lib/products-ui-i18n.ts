@@ -308,6 +308,7 @@ export const PRODUCTS_UI_I18N: Translations = {
   "hero.productNamePlaceholder": { en: "e.g. KX Lockstitch Industrial 9500", zh: "例如 KX Lockstitch Industrial 9500", ar: "مثال: KX Lockstitch Industrial 9500" },
   "hero.nameOtherLang": { en: "Other language", zh: "其他语言", ar: "لغة أخرى" },
   "hero.addLanguage": { en: "Add another language", zh: "添加其他语言", ar: "إضافة لغة أخرى" },
+  "hero.marketTier": { en: "Market tier", zh: "市场层级", ar: "فئة السوق" },
   "hero.nameInLangPlaceholder": { en: "Product name in {lang}", zh: "{lang} 的产品名称", ar: "اسم المنتج بـ {lang}" },
   "hero.autoTranslate": { en: "Auto-translate", zh: "自动翻译", ar: "ترجمة تلقائية" },
   "hero.translating": { en: "Translating…", zh: "翻译中…", ar: "جارٍ الترجمة…" },
