@@ -26,6 +26,17 @@ export interface ProductFormState {
   launch_date: string;
   eol_date: string;
   alternate_names: string[];
+  /* Identity tab expansion (all optional). */
+  legacy_code: string;
+  brand_mark_url: string;
+  status_reason: string;
+  model_year: string;
+  available_from: string;
+  last_order_date: string;
+  meta_title: string;
+  meta_description: string;
+  og_image_url: string;
+  revision_history: { version: string; date: string; note: string }[];
   tags: string[];
   /* Short 1-2 sentence description. Shown on product cards, SEO
      meta descriptions, and quote emails. Separate from the long
@@ -304,6 +315,16 @@ export const EMPTY_PRODUCT: ProductFormState = {
   launch_date: "",
   eol_date: "",
   alternate_names: [],
+  legacy_code: "",
+  brand_mark_url: "",
+  status_reason: "",
+  model_year: "",
+  available_from: "",
+  last_order_date: "",
+  meta_title: "",
+  meta_description: "",
+  og_image_url: "",
+  revision_history: [],
   tags: [],
   excerpt: "",
   highlights: [],

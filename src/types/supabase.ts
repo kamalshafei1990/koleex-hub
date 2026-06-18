@@ -329,6 +329,17 @@ export interface ProductRow {
   launch_date: string | null;
   eol_date: string | null;
   alternate_names: string[] | null;
+  /* Identity tab expansion (additive, all nullable). */
+  legacy_code: string | null;
+  brand_mark_url: string | null;
+  status_reason: string | null;
+  model_year: string | null;
+  available_from: string | null;
+  last_order_date: string | null;
+  meta_title: string | null;
+  meta_description: string | null;
+  og_image_url: string | null;
+  revision_history: { version: string; date: string; note: string }[] | null;
   visible: boolean;
   featured: boolean;
   status: string | null;

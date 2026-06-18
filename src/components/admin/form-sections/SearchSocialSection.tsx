@@ -25,6 +25,14 @@ interface Props {
   primaryImageUrl?: string;
   categoryName?: string;
   onExcerptChange: (v: string) => void;
+  /* Stored SEO overrides — blank falls back to the derived
+     title / excerpt / main image. */
+  metaTitle?: string;
+  metaDescription?: string;
+  ogImageUrl?: string;
+  onMetaTitleChange?: (v: string) => void;
+  onMetaDescriptionChange?: (v: string) => void;
+  onOgImageUrlChange?: (v: string) => void;
 }
 
 /** Trim to a soft limit, appending an ellipsis only when it actually cuts. */
@@ -41,12 +49,21 @@ export default function SearchSocialSection({
   primaryImageUrl,
   categoryName,
   onExcerptChange,
+  metaTitle: metaTitleOverride,
+  metaDescription: metaDescriptionOverride,
+  ogImageUrl: ogImageOverride,
+  onMetaTitleChange,
+  onMetaDescriptionChange,
+  onOgImageUrlChange,
 }: Props) {
   const name = productName.trim() || "Product name";
-  const metaTitle = `${name}${brand ? ` | ${brand}` : ""}`;
-  const desc = excerpt.trim();
+  const derivedTitle = `${name}${brand ? ` | ${brand}` : ""}`;
+  const metaTitle = (metaTitleOverride || "").trim() || derivedTitle;
+  const desc = ((metaDescriptionOverride || "").trim() || excerpt.trim());
+  const previewImage = (ogImageOverride || "").trim() || primaryImageUrl;
   const previewDesc = desc || "Add a short description to control how this product reads in search results and shared links.";
   const path = slug ? `products › ${slug}` : "products › product-slug";
+  const editable = !!(onMetaTitleChange || onMetaDescriptionChange || onOgImageUrlChange);
 
   const titleOver = metaTitle.length > TITLE_MAX;
   const descLen = desc.length;
@@ -80,9 +97,9 @@ export default function SearchSocialSection({
           </div>
           <div className="rounded-lg overflow-hidden border border-[var(--border-subtle)]">
             <div className="aspect-[1.91/1] bg-[var(--bg-surface)] flex items-center justify-center overflow-hidden">
-              {primaryImageUrl ? (
+              {previewImage ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={primaryImageUrl} alt="" className="w-full h-full object-cover" />
+                <img src={previewImage} alt="" className="w-full h-full object-cover" />
               ) : (
                 <div className="flex flex-col items-center gap-1.5 text-[var(--text-ghost)]">
                   <PictureIcon className="h-6 w-6" />
@@ -129,6 +146,45 @@ export default function SearchSocialSection({
         />
         <p className="text-[10px] text-[var(--text-ghost)] mt-1">{categoryName ? `Category: ${categoryName}. ` : ""}Synced with the Short description on the Identity tab.</p>
       </div>
+
+      {/* ── SEO overrides (optional, stored) ──
+          Blank fields fall back to the derived title / excerpt / main image
+          shown in the previews above. */}
+      {editable && (
+        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 p-4 space-y-3">
+          <p className="text-[11px] font-semibold text-[var(--text-muted)]">SEO overrides <span className="font-normal text-[var(--text-ghost)]">· leave blank to use the auto-derived values above</span></p>
+          <div>
+            <label className="block text-[11px] font-medium text-[var(--text-faint)] mb-1">Meta title</label>
+            <input
+              type="text"
+              value={metaTitleOverride || ""}
+              onChange={(e) => onMetaTitleChange?.(e.target.value)}
+              placeholder={derivedTitle}
+              className="w-full h-10 px-3 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-medium text-[var(--text-faint)] mb-1">Meta description</label>
+            <textarea
+              value={metaDescriptionOverride || ""}
+              onChange={(e) => onMetaDescriptionChange?.(e.target.value)}
+              rows={2}
+              placeholder={excerpt.trim() || "Falls back to the short description"}
+              className="w-full px-3 py-2 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] resize-y"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-medium text-[var(--text-faint)] mb-1">Social / OG image URL</label>
+            <input
+              type="text"
+              value={ogImageOverride || ""}
+              onChange={(e) => onOgImageUrlChange?.(e.target.value)}
+              placeholder="Falls back to the main product image"
+              className="w-full h-10 px-3 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
