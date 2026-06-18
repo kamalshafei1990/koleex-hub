@@ -172,6 +172,8 @@ export interface TranslationFormState {
   id?: string;
   locale: string;
   product_name: string;
+  tagline: string;
+  excerpt: string;
   description: string;
 }
 

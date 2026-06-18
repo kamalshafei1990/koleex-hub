@@ -412,6 +412,8 @@ export interface ProductTranslationRow {
   product_id: string;
   locale: string;
   product_name: string;
+  tagline: string | null;
+  excerpt: string | null;
   description: string | null;
   created_at: string;
 }
