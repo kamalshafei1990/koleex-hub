@@ -44,6 +44,8 @@ interface ProductPreviewProps {
   productName: string;
   primaryModel?: string | null;
   tagline?: string | null;
+  /** Optional designed poster/banner shown full-bleed as the page header. */
+  posterUrl?: string | null;
   /** Localized overlays keyed by locale; English props stay the base. */
   translations?: ProductLocaleText[];
   brand?: string | null;
@@ -187,6 +189,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
     productName,
     primaryModel,
     tagline,
+    posterUrl,
     translations,
     brand,
     schema,
@@ -390,11 +393,45 @@ export const ProductPreview = (props: ProductPreviewProps) => {
 
   return (
     <div className="space-y-20 md:space-y-28 pb-28">
-      {/* ═══ 1. CINEMATIC HERO ═══
+      {/* ═══ 0. POSTER HEADER (optional) ═══
+          When an admin uploads a designed poster/banner, it leads the page
+          full-bleed with an overlaid identity block + CTA — the "shop window".
+          A subtle bottom scrim keeps the text legible over any image. When no
+          poster is set, the auto-composed cinematic hero below takes over. */}
+      {posterUrl ? (
+        <section className="relative w-full overflow-hidden rounded-3xl border border-[var(--border-subtle)] aspect-[16/10] sm:aspect-[2/1] lg:aspect-[21/9]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={posterUrl} alt={displayName} className="absolute inset-0 h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 p-6 md:p-10 lg:p-14 space-y-3 md:space-y-4 max-w-3xl">
+            {(brand || machineKindLabel) ? (
+              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/70">
+                {brand ? <span>{brand}</span> : null}
+                {brand && machineKindLabel ? <span className="text-white/40">/</span> : null}
+                {machineKindLabel ? <span>{machineKindLabel}</span> : null}
+              </div>
+            ) : null}
+            <h1 className="text-3xl md:text-5xl lg:text-6xl font-semibold tracking-[-0.02em] text-white leading-[1.02]">
+              {displayName || t("preview.untitledProduct", "Untitled product")}
+            </h1>
+            {displayTagline ? (
+              <p className="text-base md:text-xl font-light text-white/85 leading-snug max-w-xl">{displayTagline}</p>
+            ) : null}
+            <div className="pt-1">
+              <a href="#overview" className="inline-flex items-center gap-2 h-11 px-6 rounded-xl bg-white text-black text-sm font-semibold hover:opacity-90 transition-opacity">
+                {t("preview.learnMore", "Learn more")}
+              </a>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {/* ═══ 1. CINEMATIC HERO (auto-composed; hidden when a custom poster is set) ═══
           The machine is the protagonist. Generous negative space, a large
           unframed render, and a calm identity column. No floating cards —
           the headline stats live in the dedicated band below so nothing
           duplicates or collides. */}
+      {!posterUrl ? (
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center pt-2 md:pt-6">
         {/* LEFT — identity */}
         <div className="order-2 lg:order-1 lg:col-span-5 space-y-7">
@@ -460,6 +497,10 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           </div>
         </div>
       </section>
+      ) : null}
+
+      {/* Anchor target for the poster "Learn more" CTA. */}
+      <div id="overview" className="scroll-mt-24" />
 
       {/* ═══ 2. AT A GLANCE — airy, glyph-forward stat band (no table lines) ═══ */}
       {coreAnchors.length > 0 ? (

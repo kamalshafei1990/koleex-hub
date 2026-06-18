@@ -31,7 +31,7 @@ import type {
 const PRODUCT_PUBLIC_COLUMNS =
   "id, product_name, slug, brand, division_slug, category_slug, subcategory_slug, " +
   "schema_id, schema_version, schema_specs, schema_knowledge, schema_visibility, " +
-  "warranty, country_of_origin, status, visible, featured";
+  "warranty, country_of_origin, status, visible, featured, hero_poster_url";
 
 interface PublicProductRow {
   id: string;
@@ -48,6 +48,7 @@ interface PublicProductRow {
   country_of_origin: string | null;
   status: string | null;
   visible: boolean | null;
+  hero_poster_url: string | null;
 }
 
 interface MediaRow {
@@ -77,6 +78,7 @@ export interface SchemaProductPreviewProps {
   productName: string;
   primaryModel: string | null;
   tagline: string | null;
+  posterUrl: string | null;
   translations: ProductLocaleText[];
   brand: string | null;
   schema: ProductSchemaDefinition | null;
@@ -200,6 +202,7 @@ export async function loadPublicSchemaProduct(
       productName: product.product_name,
       primaryModel: model?.primary_model ?? null,
       tagline: model?.tagline ?? null,
+      posterUrl: product.hero_poster_url ?? null,
       translations: (translationData as ProductLocaleText[] | null) ?? [],
       brand: product.brand,
       schema: publicSchema,

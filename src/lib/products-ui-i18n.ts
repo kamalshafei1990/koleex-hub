@@ -671,6 +671,7 @@ export const PRODUCTS_UI_I18N: Translations = {
   "preview.warranty": { en: "Warranty", zh: "保修", ar: "الضمان" },
   "preview.origin": { en: "Origin", zh: "原产地", ar: "المنشأ" },
   "preview.noMainImage": { en: "No main image", zh: "暂无主图", ar: "لا توجد صورة رئيسية" },
+  "preview.learnMore": { en: "Learn more", zh: "了解更多", ar: "اعرف المزيد" },
   "preview.yes": { en: "Yes", zh: "是", ar: "نعم" },
   "preview.no": { en: "No", zh: "否", ar: "لا" },
   "preview.eyebrowCapability": { en: "Capability", zh: "能力", ar: "القدرات" },
