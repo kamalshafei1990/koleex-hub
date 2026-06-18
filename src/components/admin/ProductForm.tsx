@@ -61,7 +61,7 @@ import type {
   TranslationFormState, MarketPriceFormState, RelatedProductFormState, ProductSupplierFormState,
   ProductCertificationFormState, ProductDocumentFormState,
 } from "@/types/product-form";
-import { EMPTY_PRODUCT, createEmptyModel, COUNTRIES } from "@/types/product-form";
+import { EMPTY_PRODUCT, createEmptyModel, COUNTRIES, LOCALES } from "@/types/product-form";
 import {
   resolveSchema,
   computeReadiness,
@@ -530,6 +530,16 @@ export default function ProductForm({ productId }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  /* ── Hero Product-Name language control ──
+     English is the base (product.product_name). This lets the operator
+     pick another language and write that locale's product name inline —
+     manually, or auto-filled from English via /api/ai/translate (which
+     only supports zh + ar; other locales are manual-only). Writes into
+     the same `translations` state as the Languages & Markets section
+     (product_translations.product_name), so there's one source of truth. */
+  const [heroNameLocale, setHeroNameLocale] = useState<string>("zh");
+  const [translatingHeroName, setTranslatingHeroName] = useState(false);
 
   /* P0 #3 · recovered-draft banner. Holds the timestamp of an
      autosaved draft found on mount so we can offer Restore / Discard.
@@ -1145,6 +1155,59 @@ export default function ProductForm({ productId }: Props) {
       return next;
     });
   }, []);
+
+  /* ── Hero localized-name helpers ──
+     Read/write a single locale's product_name inside the shared
+     `translations` array. A row is created lazily the first time a
+     locale gets a value (other fields stay empty until the operator
+     fills them in Languages & Markets). */
+  const heroLocaleName = (locale: string): string =>
+    translations.find((tr) => tr.locale === locale)?.product_name ?? "";
+
+  const setHeroLocaleName = useCallback((locale: string, value: string) => {
+    setTranslations((prev) => {
+      const i = prev.findIndex((tr) => tr.locale === locale);
+      if (i >= 0) {
+        const next = [...prev];
+        next[i] = { ...next[i], product_name: value };
+        return next;
+      }
+      return [
+        ...prev,
+        {
+          _tempId: `tr_${locale}_${prev.length}`,
+          locale,
+          product_name: value,
+          tagline: "",
+          excerpt: "",
+          description: "",
+        },
+      ];
+    });
+  }, []);
+
+  /* Auto-translate the English product name into the selected locale.
+     The /api/ai/translate service only supports zh + ar; for any other
+     locale the button is hidden and the operator types manually. */
+  const autoTranslateHeroName = useCallback(async () => {
+    const source = product.product_name.trim();
+    if (!source || (heroNameLocale !== "zh" && heroNameLocale !== "ar")) return;
+    setTranslatingHeroName(true);
+    try {
+      const res = await fetch("/api/ai/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ text: source, target_lang: heroNameLocale, source_lang: "en" }),
+      });
+      const data = (await res.json()) as { translated?: string };
+      if (data?.translated) setHeroLocaleName(heroNameLocale, data.translated);
+    } catch {
+      /* network/translation failure → leave the field for manual entry */
+    } finally {
+      setTranslatingHeroName(false);
+    }
+  }, [product.product_name, heroNameLocale, setHeroLocaleName]);
 
   /* Live auto-suggest: whenever the prefix or supplier-model changes,
      recompute the suggestion. Only push it into `primary_model` when
@@ -2384,6 +2447,57 @@ export default function ProductForm({ productId }: Props) {
                       placeholder={t("hero.productNamePlaceholder", "e.g. KX Lockstitch Industrial 9500")}
                       className="w-full h-14 px-5 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-xl md:text-2xl font-bold text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all"
                     />
+
+                    {/* ── Localized product name ──
+                        English (above) is the base. Pick a language and write
+                        that locale's name — manually, or auto-fill from English
+                        (auto-translate covers 中文 + العربية; type the rest).
+                        Writes into the shared `translations` state so it also
+                        appears in Languages & Markets and on the public page. */}
+                    {(() => {
+                      const isRtl = heroNameLocale === "ar" || heroNameLocale === "ur";
+                      const canAuto = heroNameLocale === "zh" || heroNameLocale === "ar";
+                      const localeName =
+                        LOCALES.find((l) => l.code === heroNameLocale)?.name ?? heroNameLocale;
+                      return (
+                        <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)] shrink-0">
+                            {t("hero.nameOtherLang", "Other language")}
+                          </span>
+                          <select
+                            value={heroNameLocale}
+                            onChange={(e) => setHeroNameLocale(e.target.value)}
+                            className="h-9 px-2.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-all shrink-0"
+                          >
+                            {LOCALES.map((l) => (
+                              <option key={l.code} value={l.code}>
+                                {l.name}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="text"
+                            dir={isRtl ? "rtl" : "ltr"}
+                            value={heroLocaleName(heroNameLocale)}
+                            onChange={(e) => setHeroLocaleName(heroNameLocale, e.target.value)}
+                            placeholder={t("hero.nameInLangPlaceholder", "Product name in {lang}").replace("{lang}", localeName)}
+                            className={`flex-1 min-w-[160px] h-9 px-3 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all ${isRtl ? "text-right" : ""}`}
+                          />
+                          {canAuto && (
+                            <button
+                              type="button"
+                              onClick={autoTranslateHeroName}
+                              disabled={!product.product_name.trim() || translatingHeroName}
+                              className="h-9 px-3 rounded-lg text-[11px] font-bold whitespace-nowrap text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
+                            >
+                              {translatingHeroName
+                                ? t("hero.translating", "Translating…")
+                                : t("hero.autoTranslate", "Auto-translate")}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Tagline — the one-liner shown directly under the
