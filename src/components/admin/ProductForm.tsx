@@ -174,6 +174,7 @@ const STEP_LABEL_KEY: Record<string, string> = {
   description: "step.description",
   "sewing-specs": "step.machineSpecs",
   commercial: "step.modelsVariants",
+  logistics: "step.logisticsCustoms",
   technical: "step.technical",
   media: "step.media",
   finalize: "step.reviewPublish",
@@ -290,7 +291,7 @@ function getSteps(isSewing: boolean): WizardStep[] {
     { id: "identity", label: "Hero & Identity", shortLabel: "Identity", icon: <SparklesIcon className="h-4 w-4" /> },
     { id: "specs", label: "Specifications", shortLabel: "Specs", icon: <Settings2Icon className="h-4 w-4" /> },
     { id: "commercial", label: "Variants & Pricing", shortLabel: "Variants", icon: <BoxesIcon className="h-4 w-4" /> },
-    { id: "logistics", label: "Logistics & Packaging", shortLabel: "Logistics", icon: <GlobeIcon className="h-4 w-4" /> },
+    { id: "logistics", label: "Logistics & Customs", shortLabel: "Logistics", icon: <GlobeIcon className="h-4 w-4" /> },
     { id: "compliance", label: "Compliance & Warranty", shortLabel: "Compliance", icon: <ShieldCheckIcon className="h-4 w-4" /> },
     { id: "media", label: "Media & Documents", shortLabel: "Media", icon: <ImageRawIcon className="h-4 w-4" /> },
     { id: "knowledge", label: "Knowledge & Relationships", shortLabel: "Knowledge", icon: <BookOpenIcon className="h-4 w-4" /> },
@@ -3161,14 +3162,14 @@ export default function ProductForm({ productId }: Props) {
             <div className="flex items-start gap-3 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
               <BoxIcon className="mt-0.5 h-4 w-4 shrink-0 text-[var(--text-ghost)]" />
               <div className="flex-1 min-w-0">
-                <p className="text-[12px] font-medium text-[var(--text-primary)]">{t("logistics.packingTitle", "Packing & shipment are per-model")}</p>
-                <p className="text-[10px] text-[var(--text-ghost)] mt-0.5 leading-relaxed">{t("logistics.packingBody", "Packing type, carton dimensions, CBM, net/gross weight and 20ft/40ft container quantities are entered per variant on the Commercial tab.")}</p>
+                <p className="text-[12px] font-medium text-[var(--text-primary)]">{t("logistics.packingTitle", "Packing & shipment are per-variant")}</p>
+                <p className="text-[10px] text-[var(--text-ghost)] mt-0.5 leading-relaxed">{t("logistics.packingBody", "Packing type, carton dimensions, CBM, net/gross weight and 20ft/40ft container quantities are entered per variant on the Variants tab.")}</p>
                 <button
                   type="button"
                   onClick={() => { const i = steps.findIndex((s) => s.id === "commercial"); if (i >= 0) goToStep(i); }}
                   className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-semibold text-[var(--text-primary)] bg-[var(--bg-base)] hover:bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] transition-colors mt-2"
                 >
-                  <ArrowUpRightIcon className="h-3 w-3" /> {t("logistics.jumpCommercial", "Open Commercial")}
+                  <ArrowUpRightIcon className="h-3 w-3" /> {t("logistics.jumpCommercial", "Open Variants")}
                 </button>
               </div>
             </div>
