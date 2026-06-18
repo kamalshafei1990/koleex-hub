@@ -2256,10 +2256,10 @@ export default function ProductForm({ productId }: Props) {
                           ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
                           : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)] border-[var(--border-subtle)] hover:text-[var(--text-muted)]"
                       }`}
-                      title={product.featured ? t("hero.featuredOnHome", "Featured on homepage") : t("hero.clickToFeature", "Click to feature on homepage")}
+                      title={product.featured ? t("hero.featuredOnHome", "Flagship product — shown on the homepage") : t("hero.clickToFeature", "Mark as a flagship product (shown on the homepage)")}
                     >
                       <StarIcon className="h-3 w-3" />
-                      {product.featured ? t("hero.featured", "Featured") : t("hero.feature", "Feature")}
+                      {product.featured ? t("hero.featured", "Flagship") : t("hero.feature", "Flagship")}
                     </button>
 
                     {/* Visibility toggle — gatekeeper for whether this
@@ -4100,7 +4100,7 @@ export default function ProductForm({ productId }: Props) {
                   <SummaryItem label={t("review.machineKind", "Machine Kind")} value={templateName || "—"} dim={!templateName} onClick={() => jumpTo("classify")} />
                 )}
                 <SummaryItem label={t("review.level", "Level")} value={product.level ? product.level.charAt(0).toUpperCase() + product.level.slice(1) : "—"} dim={!product.level} onClick={() => jumpTo("identity")} />
-                <SummaryItem label={t("review.featured", "Featured")} value={product.featured ? t("review.yes", "Yes") : t("review.no", "No")} dim={!product.featured} onClick={() => jumpTo("identity")} />
+                <SummaryItem label={t("review.featured", "Flagship")} value={product.featured ? t("review.yes", "Yes") : t("review.no", "No")} dim={!product.featured} onClick={() => jumpTo("identity")} />
                 <SummaryItem label={t("review.visible", "Visible")} value={product.visible ? t("review.public", "Public") : t("review.hidden", "Hidden")} dim={!product.visible} onClick={() => jumpTo("identity")} />
               </ReviewGroup>
 
