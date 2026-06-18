@@ -29,6 +29,7 @@ export interface ProductFormState {
   /* Identity tab expansion (all optional). */
   legacy_code: string;
   brand_mark_url: string;
+  hero_poster_url: string;
   status_reason: string;
   model_year: string;
   available_from: string;
@@ -317,6 +318,7 @@ export const EMPTY_PRODUCT: ProductFormState = {
   alternate_names: [],
   legacy_code: "",
   brand_mark_url: "",
+  hero_poster_url: "",
   status_reason: "",
   model_year: "",
   available_from: "",

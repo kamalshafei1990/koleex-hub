@@ -332,6 +332,7 @@ export interface ProductRow {
   /* Identity tab expansion (additive, all nullable). */
   legacy_code: string | null;
   brand_mark_url: string | null;
+  hero_poster_url: string | null;
   status_reason: string | null;
   model_year: string | null;
   available_from: string | null;
