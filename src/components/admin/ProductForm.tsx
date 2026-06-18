@@ -2243,9 +2243,10 @@ export default function ProductForm({ productId }: Props) {
                         <div className="h-20 w-20 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center shadow-lg">
                           <ImageRawIcon className="h-9 w-9 text-[var(--text-ghost)]" />
                         </div>
-                        <div className="text-center">
+                        <div className="text-center px-4">
                           <p className="text-[14px] font-semibold text-[var(--text-dim)]">{t("hero.uploadPhoto", "Upload Product Photo")}</p>
                           <p className="text-[11px] text-[var(--text-ghost)] mt-1">{t("hero.dropHint", "Click to browse or drag & drop")}</p>
+                          <p className="text-[10.5px] text-[var(--text-faint)] mt-2">{t("hero.mainPhotoSize", "Recommended: 2000 × 2000 px · square · transparent PNG (or white) · under 8 MB")}</p>
                         </div>
                       </div>
                     )}
