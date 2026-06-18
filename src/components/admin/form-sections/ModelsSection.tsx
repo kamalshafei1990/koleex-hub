@@ -82,9 +82,12 @@ function ReadOnlyField({
 function ModelCard({
   model, idx, total, onUpdate, onRemove, onDuplicate, onMoveUp, onMoveDown,
   suppliers, onClickCreateSupplier, defaultOpen = true, isPrimary = false, solo = false,
-  onEditInHero,
+  onEditInHero, primaryModel,
 }: {
   model: ModelFormState; idx: number; total: number;
+  /* The product's primary variant (models[0]). Non-primary variants
+     inherit packing & logistics from it unless they override. */
+  primaryModel?: ModelFormState;
   onUpdate: (u: Partial<ModelFormState>) => void;
   onRemove: () => void;
   onDuplicate: () => void;
@@ -114,6 +117,51 @@ function ModelCard({
     ref: model.reference_model || null,
   });
 
+  /* ── Packing & logistics inheritance ──
+     Variants of the same machine almost always ship in the same box.
+     Non-primary variants inherit packing/logistics from the primary
+     variant unless they explicitly override. "All these fields empty"
+     = inheriting; the operator only fills them for the rare variant
+     that's a genuinely different size. */
+  const LOGI_KEYS = [
+    "net_weight", "weight", "cbm", "carton_dimensions", "packing_type",
+    "box_include", "extra_accessories", "container_20ft_qty", "container_40ft_qty",
+  ] as const;
+  const canInherit = !isPrimary && !solo && !!primaryModel;
+  /* Override is explicit state (not just "has values") so Customize works
+     even when the primary variant has no packing entered yet. Defaults ON
+     for variants that already carry their own logistics. */
+  const [customizing, setCustomizing] = useState<boolean>(
+    () => LOGI_KEYS.some((k) => String((model[k] ?? "") as string).trim() !== ""),
+  );
+  const inheritingLogistics = canInherit && !customizing;
+  const customizeLogistics = () => {
+    if (primaryModel) {
+      const u: Partial<ModelFormState> = {};
+      LOGI_KEYS.forEach((k) => { (u as Record<string, unknown>)[k] = primaryModel[k] ?? ""; });
+      onUpdate(u);
+    }
+    setCustomizing(true);
+  };
+  const revertLogistics = () => {
+    const u: Partial<ModelFormState> = {};
+    LOGI_KEYS.forEach((k) => { (u as Record<string, unknown>)[k] = ""; });
+    onUpdate(u);
+    setCustomizing(false);
+  };
+  const pmLogiSummary = (() => {
+    const pm = primaryModel;
+    if (!pm) return "";
+    const parts: string[] = [];
+    if (pm.net_weight) parts.push(`NW ${pm.net_weight}kg`);
+    if (pm.weight) parts.push(`GW ${pm.weight}kg`);
+    if (pm.cbm) parts.push(`${pm.cbm} m³`);
+    if (pm.carton_dimensions) parts.push(pm.carton_dimensions);
+    if (pm.packing_type) parts.push(pm.packing_type);
+    if (pm.container_20ft_qty || pm.container_40ft_qty) parts.push(`${pm.container_20ft_qty || "–"}/${pm.container_40ft_qty || "–"} per 20'/40'`);
+    return parts.join(" · ");
+  })();
+
   return (
     <div className="relative bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.1)]">
       {/* Header — neutral chrome, single tier dot for the Primary
@@ -135,7 +183,7 @@ function ModelCard({
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[14px] font-semibold text-[var(--text-primary)] truncate">
-                {model.model_name || "Untitled Model"}
+                {model.model_name || "Untitled Variant"}
               </span>
               {isPrimary && !solo && (
                 <span className="inline-flex items-center gap-1 h-5 px-2 rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
@@ -215,7 +263,7 @@ function ModelCard({
                 title="Hero Basics (read-only · edit in Hero step)"
               >
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-3 mb-3">
-                  <ReadOnlyField label="Model Name" value={model.model_name} />
+                  <ReadOnlyField label="Variant Name" value={model.model_name} />
                   <ReadOnlyField label="Slug / SKU" value={model.slug} mono />
                   <ReadOnlyField label="Supplier" value={model.supplier} />
                   <ReadOnlyField label="Supplier Reference Model" value={model.reference_model} />
@@ -310,7 +358,7 @@ function ModelCard({
               {/* Identity row — fully editable on secondary variants */}
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div className="md:col-span-2">
-                  <label className={lbl}>Model Name *</label>
+                  <label className={lbl}>Variant Name *</label>
                   <input
                     type="text"
                     value={model.model_name}
@@ -436,9 +484,32 @@ function ModelCard({
               both render here so admins can fill the standard
               NW / GW pair shown on every commercial invoice. */}
           <Panel icon={<PackageIcon className="h-3.5 w-3.5" />} title="Packaging & Logistics">
-            <p className="text-[10px] text-[var(--text-ghost)] mb-3 italic">
-              Packed crate dimensions and shipment data. The bare-machine weight + footprint live on the Technical step.
-            </p>
+            {inheritingLogistics ? (
+              <div className="rounded-lg border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 p-3">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <span className="text-[11px] font-medium text-[var(--text-muted)] inline-flex items-center gap-1.5">
+                    <PackageIcon className="h-3.5 w-3.5 text-[var(--text-ghost)]" /> Same packing &amp; logistics as the primary variant
+                  </span>
+                  <button type="button" onClick={customizeLogistics} className="text-[11px] font-semibold text-[var(--accent,#0066FF)] hover:underline shrink-0">
+                    Customize for this variant
+                  </button>
+                </div>
+                <p className="text-[11px] text-[var(--text-ghost)] leading-relaxed">
+                  {pmLogiSummary || "Primary variant has no packing data yet — fill it on the primary variant card."}
+                </p>
+              </div>
+            ) : (
+            <>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[10px] text-[var(--text-ghost)] italic">
+                Packed crate dimensions and shipment data. The bare-machine weight + footprint live on the Technical step.
+              </p>
+              {canInherit && (
+                <button type="button" onClick={revertLogistics} className="text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] shrink-0 ml-2">
+                  Use primary variant&apos;s packing
+                </button>
+              )}
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className={lbl}>Net Weight (kg)</label>
@@ -475,6 +546,8 @@ function ModelCard({
                 <input type="text" value={model.extra_accessories} onChange={(e) => onUpdate({ extra_accessories: e.target.value })} placeholder="e.g. Spare parts kit" className={inp} />
               </div>
             </div>
+            </>
+            )}
           </Panel>
 
           {/* Advanced (MOQ / Lead Time / Container loading / Barcode) */}
@@ -501,7 +574,11 @@ function ModelCard({
               </div>
               {/* Container loading — units that fit in standard
                   20'/40' ocean containers. Used by the logistics
-                  team to quote FCL pricing. */}
+                  team to quote FCL pricing. Inherited from the primary
+                  variant when packing is inherited. */}
+              {inheritingLogistics ? (
+                <p className="text-[11px] text-[var(--text-ghost)] italic">Container loading inherited from the primary variant.</p>
+              ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className={lbl}>Container 20&apos; (units)</label>
@@ -512,6 +589,7 @@ function ModelCard({
                   <input type="number" value={model.container_40ft_qty} onChange={(e) => onUpdate({ container_40ft_qty: e.target.value })} placeholder="e.g. 280" className={inp} />
                 </div>
               </div>
+              )}
             </div>
           </details>
 
@@ -587,7 +665,7 @@ export default function ModelsSection({ models, onChange, suppliers, onClickCrea
           <div className="flex items-center gap-2">
             <TagsIcon className="h-4 w-4 text-[var(--text-muted)]" />
             <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">
-              {hidePrimary ? "Additional Model Variants" : "Product Models / Variants"}
+              {hidePrimary ? "Additional Variants" : "Product Variants"}
             </h3>
           </div>
           <p className="text-[11px] text-[var(--text-ghost)] mt-0.5">
@@ -600,7 +678,7 @@ export default function ModelsSection({ models, onChange, suppliers, onClickCrea
           onClick={addModel}
           className="h-9 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-sm"
         >
-          <PlusIcon className="h-3.5 w-3.5" /> Add Model
+          <PlusIcon className="h-3.5 w-3.5" /> Add Variant
         </button>
       </div>
 
@@ -608,10 +686,10 @@ export default function ModelsSection({ models, onChange, suppliers, onClickCrea
         <div className="py-12 text-center border border-dashed border-[var(--border-subtle)] rounded-2xl bg-[var(--bg-surface-subtle)]/30">
           <ScaleIcon className="h-8 w-8 text-[var(--text-ghost)] mx-auto mb-2" />
           <p className="text-[13px] text-[var(--text-dim)] font-medium">
-            {hidePrimary ? "No additional variants" : "No models yet"}
+            {hidePrimary ? "No additional variants" : "No variants yet"}
           </p>
           <p className="text-[11px] text-[var(--text-ghost)] mt-1">
-            {hidePrimary ? "Add a variant when this product has multiple versions" : "Add your first model variant"}
+            {hidePrimary ? "Add a variant when this product has multiple versions" : "Add your first variant"}
           </p>
         </div>
       ) : (
@@ -635,6 +713,7 @@ export default function ModelsSection({ models, onChange, suppliers, onClickCrea
                 onClickCreateSupplier={onClickCreateSupplier ? () => onClickCreateSupplier(m._tempId) : undefined}
                 defaultOpen={i === 0}
                 onEditInHero={onEditInHero}
+                primaryModel={models[0]}
               />
             );
           })}
@@ -646,8 +725,8 @@ export default function ModelsSection({ models, onChange, suppliers, onClickCrea
         open={removeTempId !== null}
         onClose={() => setRemoveTempId(null)}
         onConfirm={confirmRemove}
-        title="Remove this model?"
-        message="The model and its saved prices are removed from this draft. Nothing is deleted from the database until you save the product."
+        title="Remove this variant?"
+        message="The variant and its saved prices are removed from this draft. Nothing is deleted from the database until you save the product."
         confirmLabel="Remove"
         destructive
       />

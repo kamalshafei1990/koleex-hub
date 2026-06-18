@@ -27,7 +27,7 @@ export const PRODUCTS_UI_I18N: Translations = {
   "step.description": { en: "Description", zh: "描述", ar: "الوصف" },
   "step.specs": { en: "Specs", zh: "规格", ar: "المواصفات" },
   "step.machineSpecs": { en: "Machine Specs", zh: "机器规格", ar: "مواصفات الماكينة" },
-  "step.models": { en: "Models", zh: "型号", ar: "الموديلات" },
+  "step.models": { en: "Variants", zh: "变体", ar: "المتغيرات" },
   "step.modelsVariants": { en: "Models & Variants", zh: "型号与变体", ar: "الموديلات والمتغيرات" },
   "step.technical": { en: "Technical", zh: "技术参数", ar: "التفاصيل التقنية" },
   "step.media": { en: "Media & Files", zh: "媒体与文件", ar: "الوسائط والملفات" },
@@ -432,8 +432,8 @@ export const PRODUCTS_UI_I18N: Translations = {
   "technical.stockBadge": { en: "Inventory", zh: "库存", ar: "المخزون" },
 
   /* ── Models step (P0 #5b) ── */
-  "models.title": { en: "Models & Variants", zh: "型号与变体", ar: "الموديلات والمتغيرات" },
-  "models.countBadge": { en: "{n} model(s)", zh: "{n} 个型号", ar: "{n} موديل" },
+  "models.title": { en: "Variants", zh: "变体", ar: "المتغيرات" },
+  "models.countBadge": { en: "{n} variant(s)", zh: "{n} 个变体", ar: "{n} متغير" },
   "models.marketPrices": { en: "Market Prices", zh: "市场价格", ar: "أسعار السوق" },
   "models.perCountry": { en: "Per country", zh: "按国家／地区", ar: "حسب الدولة" },
 

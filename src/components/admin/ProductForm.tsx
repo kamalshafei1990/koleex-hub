@@ -289,7 +289,7 @@ function getSteps(isSewing: boolean): WizardStep[] {
     { id: "supplier", label: "Supplier & Sourcing", shortLabel: "Supplier", icon: <FactoryIcon className="h-4 w-4" /> },
     { id: "identity", label: "Hero & Identity", shortLabel: "Identity", icon: <SparklesIcon className="h-4 w-4" /> },
     { id: "specs", label: "Specifications", shortLabel: "Specs", icon: <Settings2Icon className="h-4 w-4" /> },
-    { id: "commercial", label: "Models & Pricing", shortLabel: "Models", icon: <BoxesIcon className="h-4 w-4" /> },
+    { id: "commercial", label: "Variants & Pricing", shortLabel: "Variants", icon: <BoxesIcon className="h-4 w-4" /> },
     { id: "logistics", label: "Logistics & Packaging", shortLabel: "Logistics", icon: <GlobeIcon className="h-4 w-4" /> },
     { id: "compliance", label: "Compliance & Warranty", shortLabel: "Compliance", icon: <ShieldCheckIcon className="h-4 w-4" /> },
     { id: "media", label: "Media & Documents", shortLabel: "Media", icon: <ImageRawIcon className="h-4 w-4" /> },
