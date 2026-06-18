@@ -288,7 +288,6 @@ function getSteps(isSewing: boolean): WizardStep[] {
     { id: "classify", label: "Classification", shortLabel: "Classify", icon: <FolderTreeIcon className="h-4 w-4" /> },
     { id: "supplier", label: "Supplier & Sourcing", shortLabel: "Supplier", icon: <FactoryIcon className="h-4 w-4" /> },
     { id: "identity", label: "Hero & Identity", shortLabel: "Identity", icon: <SparklesIcon className="h-4 w-4" /> },
-    { id: "description", label: "Description", shortLabel: "Description", icon: <DocumentIcon className="h-4 w-4" /> },
     { id: "specs", label: "Specifications", shortLabel: "Specs", icon: <Settings2Icon className="h-4 w-4" /> },
     { id: "commercial", label: "Models & Pricing", shortLabel: "Models", icon: <BoxesIcon className="h-4 w-4" /> },
     { id: "logistics", label: "Logistics & Packaging", shortLabel: "Logistics", icon: <GlobeIcon className="h-4 w-4" /> },
@@ -2605,6 +2604,20 @@ export default function ProductForm({ productId }: Props) {
               </div>
             </Section>
 
+            {/* ── Full description (long, rich text) ──
+                  Merged in from the old Description tab. Lives right
+                  after the Short description so short + long copy are
+                  authored together. Collapsed by default to keep the
+                  Identity tab manageable. */}
+            <Section id="description" icon={<DocumentIcon className="h-4 w-4" />} title={t("description.title", "Product Description")} badge={t("description.badgeRichText", "Rich text")} defaultOpen={false}>
+              <DescriptionSection
+                data={product}
+                onChange={updateProduct_}
+                subcategorySlug={product.subcategory_slug}
+                machineKindSlug={(sewingSpecs.common_specs as { machine_kind?: string })?.machine_kind || ""}
+              />
+            </Section>
+
             {/* ── Key highlights ──
                   3-5 short bullet strings displayed on the public
                   product hero ("Max 5000 SPM", "Auto trimmer",
@@ -2823,43 +2836,9 @@ export default function ProductForm({ productId }: Props) {
           </div>
         )}
 
-        {/* ═══════════════════════════════════════════════════════════
-           STEP 3 (maybe): DESCRIPTION (rich text)
-           ═══════════════════════════════════════════════════════════ */}
-        {(onePage || steps[currentStep]?.id === "description") && (
-          <div id="sec-description" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
-            {/* Classification breadcrumb used to repeat here, but the
-                same chips already appear in the Classify step and at
-                the top of the wizard. Showing them a third time was
-                noise — the StepNav's "Classify ✓" badge already
-                signals the admin they're past classification. */}
-
-            <Section id="description" icon={<DocumentIcon className="h-4 w-4" />} title={t("description.title", "Product Description")} badge={t("description.badgeRichText", "Rich text")}>
-              {/* Pass the classification down so Quick Start Blocks
-                  return lockstitch / overlock / automatic copy
-                  tailored to the admin's choice. The machine-kind
-                  slug lives on sewingSpecs.common_specs.machine_kind
-                  (see the Classify step's wiring). */}
-              <DescriptionSection
-                data={product}
-                onChange={updateProduct_}
-                subcategorySlug={product.subcategory_slug}
-                machineKindSlug={
-                  (sewingSpecs.common_specs as { machine_kind?: string })?.machine_kind || ""
-                }
-              />
-            </Section>
-
-            {/* The legacy "Additional Specifications" key/value table
-                has been removed from the wizard. Now that the three-tier
-                structured Specs step (Common + Family + Kind) covers the
-                full sewing-machine spec universe, the inline freeform
-                table was a third place where data could land — pure
-                ambiguity. The SpecsSection component still exists in
-                form-sections/ for any future use; it's just not wired
-                into the wizard. */}
-          </div>
-        )}
+        {/* Description merged into the Identity (Hero & Identity) tab —
+           the full rich-text description now lives there, right under the
+           short description. */}
 
         {/* ═══════════════════════════════════════════════════════════
            STEP: PRODUCT KNOWLEDGE
@@ -3817,7 +3796,7 @@ export default function ProductForm({ productId }: Props) {
               >
                 <SummaryItem label={t("review.excerpt", "Excerpt")} value={product.excerpt ? t("review.filled", "Filled") : "—"} dim={!product.excerpt} onClick={() => jumpTo("identity")} />
                 <SummaryItem label={t("review.highlights", "Highlights")} value={product.highlights && product.highlights.length > 0 ? t("review.highlightsCount", "{n} items").replace("{n}", String(product.highlights.length)) : "—"} dim={!product.highlights || product.highlights.length === 0} onClick={() => jumpTo("identity")} />
-                <SummaryItem label={t("review.description", "Description")} value={product.description ? t("review.filled", "Filled") : "—"} dim={!product.description} onClick={() => jumpTo("description")} />
+                <SummaryItem label={t("review.description", "Description")} value={product.description ? t("review.filled", "Filled") : "—"} dim={!product.description} onClick={() => jumpTo("identity")} />
                 <SummaryItem label={t("review.mediaLabel", "Media")} value={t("review.mediaCount", "{n} files").replace("{n}", String(media.length))} dim={media.length === 0} onClick={() => jumpTo("media")} />
                 <SummaryItem label={t("review.translations", "Translations")} value={t("review.translationsCount", "{n} locales").replace("{n}", String(translations.length))} dim={translations.length === 0} />
                 <SummaryItem label={t("review.related", "Related")} value={t("review.relatedCount", "{n} links").replace("{n}", String(related.length))} dim={related.length === 0} />
