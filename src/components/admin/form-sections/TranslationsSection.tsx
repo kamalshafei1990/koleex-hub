@@ -20,6 +20,8 @@ export default function TranslationsSection({ translations, onChange }: Props) {
       _tempId: crypto.randomUUID(),
       locale: availableLocales[0].code,
       product_name: "",
+      tagline: "",
+      excerpt: "",
       description: "",
     }]);
   };
@@ -77,6 +79,28 @@ export default function TranslationsSection({ translations, onChange }: Props) {
                     onChange={(e) => update(t._tempId, { product_name: e.target.value })}
                     placeholder={`Product name in ${localeName}`}
                     className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
+                    dir={t.locale === "ar" || t.locale === "ur" ? "rtl" : "ltr"}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-[var(--text-faint)] mb-1">Tagline ({localeName})</label>
+                  <input
+                    type="text"
+                    value={t.tagline}
+                    onChange={(e) => update(t._tempId, { tagline: e.target.value })}
+                    placeholder={`Tagline in ${localeName}`}
+                    className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
+                    dir={t.locale === "ar" || t.locale === "ur" ? "rtl" : "ltr"}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-[var(--text-faint)] mb-1">Short Description ({localeName})</label>
+                  <textarea
+                    value={t.excerpt}
+                    onChange={(e) => update(t._tempId, { excerpt: e.target.value })}
+                    placeholder={`Short description in ${localeName}`}
+                    rows={2}
+                    className="w-full px-4 py-2.5 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] resize-y"
                     dir={t.locale === "ar" || t.locale === "ur" ? "rtl" : "ltr"}
                   />
                 </div>

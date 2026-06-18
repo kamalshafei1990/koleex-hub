@@ -892,6 +892,8 @@ export default function ProductForm({ productId }: Props) {
           id: t.id,
           locale: t.locale,
           product_name: t.product_name,
+          tagline: t.tagline || "",
+          excerpt: t.excerpt || "",
           description: t.description || "",
         }));
         setTranslations(mappedTranslations);
@@ -1462,8 +1464,13 @@ export default function ProductForm({ productId }: Props) {
     const gaps = [...missingRequiredLabels];
     if (!media.some((m) => m.type === "main_image")) gaps.push(t("publish.gapImage", "Main photo"));
     if (!(primaryModel?.global_price || "").toString().trim()) gaps.push(t("publish.gapPrice", "Selling price"));
+    /* Export-market readiness: Chinese is the priority second locale — flag
+       a missing zh product name so a product doesn't go live English-only. */
+    if (!translations.some((tr) => tr.locale === "zh" && (tr.product_name || "").trim())) {
+      gaps.push(t("publish.gapChineseName", "Chinese name"));
+    }
     return gaps;
-  }, [missingRequiredLabels, media, primaryModel?.global_price, t]);
+  }, [missingRequiredLabels, media, primaryModel?.global_price, translations, t]);
 
   /* ── Validation per step ──
      Generalised over the required-set above: leaving a step is
@@ -1799,6 +1806,8 @@ export default function ProductForm({ productId }: Props) {
           product_id: pid,
           locale: t.locale,
           product_name: t.product_name,
+          tagline: t.tagline || null,
+          excerpt: t.excerpt || null,
           description: t.description || null,
         });
       }
@@ -2885,6 +2894,14 @@ export default function ProductForm({ productId }: Props) {
               </div>
             </Section>
 
+            {/* Languages — author the localized name / tagline / short
+                description / description next to the English originals,
+                not buried on the Review tab. Shared state with the form,
+                so the Review summary count stays in sync. */}
+            <Section id="translations" icon={<LanguagesIcon className="h-4 w-4" />} title={t("identity.languages", "Languages & Markets")} badge={t("identity.languagesBadge", "中文 · العربية · +")} defaultOpen={false}>
+              <TranslationsSection translations={translations} onChange={setTranslations} />
+            </Section>
+
             <Section id="search-social" icon={<EyeIcon className="h-4 w-4" />} title={t("review.searchSocialSection", "Search & Social")} badge={t("review.searchSocialBadge", "SEO preview")} defaultOpen>
               <SearchSocialSection
                 productName={product.product_name}
@@ -3944,9 +3961,9 @@ export default function ProductForm({ productId }: Props) {
               {/* Translations + Related editors stay collapsed below
                   so the review remains scannable, but power-users can
                   still adjust them inline. */}
-              <Section id="translations" icon={<LanguagesIcon className="h-4 w-4" />} title={t("review.translationsSection", "Translations")} defaultOpen={false}>
-                <TranslationsSection translations={translations} onChange={setTranslations} />
-              </Section>
+              {/* Translations are now authored on the Identity tab (Languages
+                  & Markets), next to the English originals. The summary count
+                  above links there. */}
 
               {/* Related Products → moved to the Knowledge & Relationships tab.
                  Search & Social (SEO) → moved to the Identity tab (next to the
