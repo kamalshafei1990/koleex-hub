@@ -11,7 +11,7 @@
    duplicated or editable here.
    --------------------------------------------------------------------------- */
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
@@ -25,7 +25,7 @@ import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
 import LayoutListIcon from "@/components/icons/ui/LayoutListIcon";
 import InfoIcon from "@/components/icons/ui/InfoIcon";
 import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
-import { uploadProductFile } from "@/lib/products-admin";
+import { uploadProductFile, fetchSupplierNames } from "@/lib/products-admin";
 import type { ProductSupplierFormState } from "@/types/product-form";
 
 const INCOTERMS = ["EXW", "FOB", "CIF", "CFR", "DDP", "DAP"];
@@ -75,9 +75,42 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
   const [uploadingQuoteId, setUploadingQuoteId] = useState<string | null>(null);
   const [infoId, setInfoId] = useState<string | null>(null);   // supplier whose info popup is open
 
+  /* Self-healing supplier list. The form loads suppliers at mount in a big
+     parallel batch with a timeout; /api/suppliers occasionally spikes to
+     several seconds, so that batch sometimes hands us an empty list and the
+     picker had nothing to offer (the button then wrongly said "All suppliers
+     linked"). We keep a local copy synced from the prop, and if it ever
+     arrives empty we fetch the directory ourselves (warm ≈ 40ms) — plus a
+     manual Retry — so linking a supplier never gets stuck. */
+  const [supList, setSupList] = useState<SupplierOption[]>(suppliers);
+  const [loadingSuppliers, setLoadingSuppliers] = useState(false);
+  const [supLoadFailed, setSupLoadFailed] = useState(false);
+
+  useEffect(() => { if (suppliers.length) setSupList(suppliers); }, [suppliers]);
+
+  const loadSuppliers = useCallback(async () => {
+    setLoadingSuppliers(true);
+    setSupLoadFailed(false);
+    try {
+      const list = (await fetchSupplierNames()) as unknown as SupplierOption[];
+      if (list.length) setSupList(list);
+      else setSupLoadFailed(true);
+    } catch {
+      setSupLoadFailed(true);
+    } finally {
+      setLoadingSuppliers(false);
+    }
+  }, []);
+
+  /* If the parent handed us nothing, recover on our own. */
+  useEffect(() => {
+    if (suppliers.length === 0 && supList.length === 0) loadSuppliers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const linkedIds = new Set(links.map((l) => l.supplier_id));
-  const available = suppliers.filter((s) => !linkedIds.has(s.id));
-  const supOf = (id: string) => suppliers.find((s) => s.id === id);
+  const available = supList.filter((s) => !linkedIds.has(s.id));
+  const supOf = (id: string) => supList.find((s) => s.id === id);
   const nameOf = (id: string) => supOf(id)?.name || "(unknown supplier)";
   const nameCnOf = (id: string) => supOf(id)?.name_cn || null;
   const logoOf = (id: string) => supOf(id)?.logo || null;
@@ -433,18 +466,38 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
         </div>
       )}
 
-      {/* Add a supplier — opens a searchable picker (89+ suppliers). */}
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setPickerOpen(true)}
-          disabled={available.length === 0}
-          className="h-9 px-3.5 inline-flex items-center gap-2 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <PlusIcon className="h-3.5 w-3.5" /> {available.length ? "Link a supplier" : "All suppliers linked"}
-        </button>
-        <span className="text-[10px] text-[var(--text-ghost)]">from the Suppliers app</span>
-      </div>
+      {/* Add a supplier — opens a searchable picker (89+ suppliers).
+          The empty supplier list is treated honestly: "loading", "couldn't
+          load → Retry", or genuinely "all linked" — never a misleading
+          disabled button when the directory simply hasn't arrived. */}
+      {supList.length === 0 ? (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={loadSuppliers}
+            disabled={loadingSuppliers}
+            className="h-9 px-3.5 inline-flex items-center gap-2 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <PlusIcon className="h-3.5 w-3.5" />
+            {loadingSuppliers ? "Loading suppliers…" : supLoadFailed ? "Retry loading suppliers" : "Load suppliers"}
+          </button>
+          <span className="text-[10px] text-[var(--text-ghost)]">
+            {supLoadFailed ? "couldn't reach the Suppliers app — try again" : "from the Suppliers app"}
+          </span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            disabled={available.length === 0}
+            className="h-9 px-3.5 inline-flex items-center gap-2 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <PlusIcon className="h-3.5 w-3.5" /> {available.length ? "Link a supplier" : "All suppliers linked"}
+          </button>
+          <span className="text-[10px] text-[var(--text-ghost)]">from the Suppliers app</span>
+        </div>
+      )}
 
       {pickerOpen && (
         <SupplierPickerModal
