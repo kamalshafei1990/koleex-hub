@@ -550,6 +550,11 @@ export default function ProductForm({ productId }: Props) {
   const [heroExcerptLocale, setHeroExcerptLocale] = useState<string>("zh");
   const [translatingHeroExcerpt, setTranslatingHeroExcerpt] = useState(false);
   const [heroExcerptMsg, setHeroExcerptMsg] = useState<{ kind: "error" | "ok"; text: string } | null>(null);
+  /* Translation rows are collapsed by default to keep the hero clean — the
+     operator opts in per field with a small link (and they auto-open when a
+     translation already exists, e.g. when editing). */
+  const [showNameTr, setShowNameTr] = useState(false);
+  const [showExcerptTr, setShowExcerptTr] = useState(false);
 
   /* P0 #3 · recovered-draft banner. Holds the timestamp of an
      autosaved draft found on mount so we can offer Restore / Discard.
@@ -2586,6 +2591,19 @@ export default function ProductForm({ productId }: Props) {
                       const canAuto = true; // every offered locale is a translatable target
                       const localeName =
                         LOCALES.find((l) => l.code === heroNameLocale)?.name ?? heroNameLocale;
+                      const hasNameTr = translations.some((tr) => (tr.product_name || "").trim().length > 0);
+                      /* Collapsed by default — keep the hero clean. */
+                      if (!showNameTr && !hasNameTr) {
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => setShowNameTr(true)}
+                            className="mt-2 text-[11px] font-medium text-[var(--accent,#0066FF)] hover:underline inline-flex items-center gap-1"
+                          >
+                            + {t("hero.addLanguage", "Add another language")}
+                          </button>
+                        );
+                      }
                       return (
                         <div className="mt-2.5 flex flex-wrap items-center gap-2">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)] shrink-0">
@@ -2928,6 +2946,19 @@ export default function ProductForm({ productId }: Props) {
                     {(() => {
                       const isRtl = heroExcerptLocale === "ar" || heroExcerptLocale === "ur";
                       const localeName = LOCALES.find((l) => l.code === heroExcerptLocale)?.name ?? heroExcerptLocale;
+                      const hasExcerptTr = translations.some((tr) => (tr.excerpt || "").trim().length > 0);
+                      /* Collapsed by default — keep the hero clean. */
+                      if (!showExcerptTr && !hasExcerptTr) {
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => setShowExcerptTr(true)}
+                            className="mt-2 text-[11px] font-medium text-[var(--accent,#0066FF)] hover:underline inline-flex items-center gap-1"
+                          >
+                            + {t("hero.addLanguage", "Add another language")}
+                          </button>
+                        );
+                      }
                       return (
                         <div className="mt-2.5 flex flex-wrap items-start gap-2">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)] shrink-0 mt-2.5">
