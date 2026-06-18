@@ -281,9 +281,9 @@ export const PRODUCTS_UI_I18N: Translations = {
   "model.pickDifferentNumber": { en: "Pick a different number after the prefix.", zh: "请在前缀后选择不同的编号。", ar: "اختر رقمًا مختلفًا بعد البادئة." },
   "model.availableInline": { en: "Available — no other product uses this code.", zh: "可用 — 没有其他产品使用该编码。", ar: "متاح — لا يوجد منتج آخر يستخدم هذا الرمز." },
   "model.helperText": {
-    en: "KOLEEX commercial code — auto-suggested from the classification prefix + supplier model below, freely editable. Codes are unique across the catalog. Supplier model stays untouched as the factory reference.",
-    zh: "KOLEEX 商业编码 — 根据下方的分类前缀 + 供应商型号自动建议，可自由编辑。编码在整个目录中唯一。供应商型号保持不变，作为工厂参考。",
-    ar: "رمز كوليكس التجاري — يُقترح تلقائيًا من بادئة التصنيف + موديل المورّد أدناه، وقابل للتعديل بحرية. الرموز فريدة عبر الكتالوج. يبقى موديل المورّد دون تغيير كمرجع للمصنع.",
+    en: "KOLEEX commercial code — auto-suggested from the classification prefix + the primary supplier's model (set in the Supplier tab), freely editable. Codes are unique across the catalog. The supplier model stays untouched as the factory reference.",
+    zh: "KOLEEX 商业编码 — 根据分类前缀 + 主要供应商型号（在“供应商”标签中设置）自动建议，可自由编辑。编码在整个目录中唯一。供应商型号保持不变，作为工厂参考。",
+    ar: "رمز كوليكس التجاري — يُقترح تلقائيًا من بادئة التصنيف + موديل المورّد الأساسي (يُحدَّد في تبويب المورّد)، وقابل للتعديل بحرية. الرموز فريدة عبر الكتالوج. يبقى موديل المورّد دون تغيير كمرجع للمصنع.",
   },
 
   /* ── Hero step: pills, toggles, labels (P0 #5b) ── */

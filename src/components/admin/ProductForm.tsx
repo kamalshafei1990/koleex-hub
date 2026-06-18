@@ -1119,13 +1119,21 @@ export default function ProductForm({ productId }: Props) {
      the field has never been hand-edited (coding_status != "edited" /
      "locked"). The "Reset to auto" button below clears the flag so a
      user can reclaim the suggestion explicitly. */
+  /* The supplier's own model code now lives on the primary supplier LINK
+     (Supplier tab → "Model number" = supplier_product_code). Fall back to
+     the legacy product_models.reference_model for products created before
+     sourcing moved to the Supplier tab. This is what seeds the KOLEEX
+     code suggestion (prefix + supplier model). */
+  const primarySupplierModel =
+    (productSuppliers.find((s) => s.is_primary) || productSuppliers[0])?.supplier_product_code ||
+    primaryModel?.reference_model || "";
   const suggestedPrimaryModel = suggestPrimaryModel(
     resolvedPrefix,
-    primaryModel?.reference_model || "",
+    primarySupplierModel,
   );
   useEffect(() => {
     if (!primaryModel) return;
-    if (!resolvedPrefix || !primaryModel.reference_model) return;
+    if (!resolvedPrefix || !primarySupplierModel) return;
     const status = primaryModel.coding_status;
     if (status === "edited" || status === "locked") return;
     if (primaryModel.primary_model === suggestedPrimaryModel) return;
