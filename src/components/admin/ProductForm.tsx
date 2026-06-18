@@ -2605,41 +2605,46 @@ export default function ProductForm({ productId }: Props) {
                         );
                       }
                       return (
-                        <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)] shrink-0">
-                            {t("hero.nameOtherLang", "Other language")}
-                          </span>
-                          <select
-                            value={heroNameLocale}
-                            onChange={(e) => { setHeroNameLocale(e.target.value); setHeroNameMsg(null); }}
-                            className="h-9 px-2.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-all shrink-0"
-                          >
-                            {LOCALES.map((l) => (
-                              <option key={l.code} value={l.code}>
-                                {l.name}
-                              </option>
-                            ))}
-                          </select>
+                        /* Stacked: a slim controls row (language + auto-translate)
+                           above a full-width localized field that matches the
+                           English name's size — so the translation isn't cramped. */
+                        <div className="mt-3 space-y-2">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">
+                                {t("hero.nameOtherLang", "Other language")}
+                              </span>
+                              <select
+                                value={heroNameLocale}
+                                onChange={(e) => { setHeroNameLocale(e.target.value); setHeroNameMsg(null); }}
+                                className="h-8 px-2.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-all"
+                              >
+                                {LOCALES.map((l) => (
+                                  <option key={l.code} value={l.code}>{l.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                            {canAuto && (
+                              <button
+                                type="button"
+                                onClick={autoTranslateHeroName}
+                                disabled={!product.product_name.trim() || translatingHeroName}
+                                className="h-8 px-3 rounded-lg text-[11px] font-bold whitespace-nowrap text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
+                              >
+                                {translatingHeroName
+                                  ? t("hero.translating", "Translating…")
+                                  : t("hero.autoTranslate", "Auto-translate")}
+                              </button>
+                            )}
+                          </div>
                           <input
                             type="text"
                             dir={isRtl ? "rtl" : "ltr"}
                             value={heroLocaleName(heroNameLocale)}
                             onChange={(e) => setHeroLocaleName(heroNameLocale, e.target.value)}
                             placeholder={t("hero.nameInLangPlaceholder", "Product name in {lang}").replace("{lang}", localeName)}
-                            className={`flex-1 min-w-[160px] h-9 px-3 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all ${isRtl ? "text-right" : ""}`}
+                            className={`w-full h-14 px-5 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-xl md:text-2xl font-bold text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all ${isRtl ? "text-right" : ""}`}
                           />
-                          {canAuto && (
-                            <button
-                              type="button"
-                              onClick={autoTranslateHeroName}
-                              disabled={!product.product_name.trim() || translatingHeroName}
-                              className="h-9 px-3 rounded-lg text-[11px] font-bold whitespace-nowrap text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
-                            >
-                              {translatingHeroName
-                                ? t("hero.translating", "Translating…")
-                                : t("hero.autoTranslate", "Auto-translate")}
-                            </button>
-                          )}
                         </div>
                       );
                     })()}
@@ -2960,37 +2965,43 @@ export default function ProductForm({ productId }: Props) {
                         );
                       }
                       return (
-                        <div className="mt-2.5 flex flex-wrap items-start gap-2">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)] shrink-0 mt-2.5">
-                            {t("hero.nameOtherLang", "Other language")}
-                          </span>
-                          <select
-                            value={heroExcerptLocale}
-                            onChange={(e) => { setHeroExcerptLocale(e.target.value); setHeroExcerptMsg(null); }}
-                            className="h-9 px-2.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-all shrink-0"
-                          >
-                            {LOCALES.map((l) => (
-                              <option key={l.code} value={l.code}>{l.name}</option>
-                            ))}
-                          </select>
+                        /* Stacked: controls row + full-width localized textarea
+                           matching the English short description. */
+                        <div className="mt-3 space-y-2">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">
+                                {t("hero.nameOtherLang", "Other language")}
+                              </span>
+                              <select
+                                value={heroExcerptLocale}
+                                onChange={(e) => { setHeroExcerptLocale(e.target.value); setHeroExcerptMsg(null); }}
+                                className="h-8 px-2.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-all"
+                              >
+                                {LOCALES.map((l) => (
+                                  <option key={l.code} value={l.code}>{l.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={autoTranslateHeroExcerpt}
+                              disabled={!product.excerpt.trim() || translatingHeroExcerpt}
+                              className="h-8 px-3 rounded-lg text-[11px] font-bold whitespace-nowrap text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
+                            >
+                              {translatingHeroExcerpt
+                                ? t("hero.translating", "Translating…")
+                                : t("hero.autoTranslate", "Auto-translate")}
+                            </button>
+                          </div>
                           <textarea
                             dir={isRtl ? "rtl" : "ltr"}
                             value={heroLocaleExcerpt(heroExcerptLocale)}
                             onChange={(e) => setHeroLocaleExcerpt(heroExcerptLocale, e.target.value)}
                             placeholder={t("hero.shortDescInLangPlaceholder", "Short description in {lang}").replace("{lang}", localeName)}
                             rows={2}
-                            className={`flex-1 min-w-[180px] px-3 py-2 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[13px] leading-relaxed text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all resize-y ${isRtl ? "text-right" : ""}`}
+                            className={`w-full px-5 py-3 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[14px] leading-relaxed text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all resize-y ${isRtl ? "text-right" : ""}`}
                           />
-                          <button
-                            type="button"
-                            onClick={autoTranslateHeroExcerpt}
-                            disabled={!product.excerpt.trim() || translatingHeroExcerpt}
-                            className="h-9 px-3 rounded-lg text-[11px] font-bold whitespace-nowrap text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0 mt-0"
-                          >
-                            {translatingHeroExcerpt
-                              ? t("hero.translating", "Translating…")
-                              : t("hero.autoTranslate", "Auto-translate")}
-                          </button>
                         </div>
                       );
                     })()}
