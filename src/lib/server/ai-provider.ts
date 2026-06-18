@@ -49,7 +49,12 @@ export function getLastAiError(): string | null {
    2. Gemini (kept so we can switch back if billing gets enabled)
    3. Claude / OpenAI (reserved slots for later)
    Callers don't know or care which one is behind aiChat() / aiTranslate(). */
-function pickProvider(): "groq" | "gemini" | "claude" | "openai" | null {
+function pickProvider(): "deepseek" | "groq" | "gemini" | "claude" | "openai" | null {
+  // DeepSeek first: it's the key Koleex actually has provisioned. Activated
+  // on DEEPSEEK_API_KEY presence alone — the USE_DEEPSEEK kill-switch only
+  // gates the strict-fallback business-chat router, not this shared
+  // translate/chat abstraction.
+  if (process.env.DEEPSEEK_API_KEY) return "deepseek";
   if (process.env.GROQ_API_KEY) return "groq";
   if (process.env.GEMINI_API_KEY) return "gemini";
   if (process.env.ANTHROPIC_API_KEY) return "claude";
@@ -62,6 +67,12 @@ function pickProvider(): "groq" | "gemini" | "claude" | "openai" | null {
 const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 const GROQ_CHAT_MODEL =
   process.env.GROQ_CHAT_MODEL || "llama-3.1-8b-instant";
+
+/* DeepSeek — OpenAI-compatible Chat Completions API. deepseek-chat is the
+   production V3 model (not the reasoner). Same request/response shape as
+   Groq/OpenAI, so the adapters below mirror groqTranslate/groqChat. */
+const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || "deepseek-chat";
+const DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions";
 
 /* ── Gemini Flash (free tier) ────────────────────────────── */
 
@@ -263,6 +274,78 @@ async function groqTranslate(input: TranslateInput): Promise<TranslateResult | n
   return { translated, provider: `groq:${GROQ_MODEL}` };
 }
 
+/* ── DeepSeek (OpenAI-compatible) ── */
+
+async function deepseekTranslate(input: TranslateInput): Promise<TranslateResult | null> {
+  const key = process.env.DEEPSEEK_API_KEY;
+  if (!key) return null;
+
+  const langNames: Record<string, string> = { en: "English", zh: "Chinese (Simplified)", ar: "Arabic" };
+  const targetName = langNames[input.targetLang] ?? input.targetLang;
+
+  const messages: ChatMessage[] = [
+    {
+      role: "system",
+      content:
+        `You are a professional translator for a business ERP system. Translate the user message to ${targetName}. Return ONLY the translated text — no explanations, no quotes, no commentary. Preserve product codes, numbers, proper nouns, and punctuation exactly.`,
+    },
+    { role: "user", content: input.text },
+  ];
+
+  const res = await fetch(DEEPSEEK_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`,
+    },
+    body: JSON.stringify({ model: DEEPSEEK_MODEL, messages, temperature: 0, max_tokens: 1024 }),
+  });
+
+  if (!res.ok) {
+    const bodyText = await res.text().catch(() => "");
+    console.error("[ai.deepseek.translate]", res.status, bodyText);
+    lastProviderError = `DeepSeek ${res.status}: ${extractErrorMessage(bodyText)}`;
+    return null;
+  }
+
+  const json = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const translated = stripThinking(json.choices?.[0]?.message?.content ?? "");
+  if (!translated) return null;
+  lastProviderError = null;
+  return { translated, provider: `deepseek:${DEEPSEEK_MODEL}` };
+}
+
+async function deepseekChat(messages: ChatMessage[]): Promise<ChatResult | null> {
+  const key = process.env.DEEPSEEK_API_KEY;
+  if (!key) return null;
+
+  const res = await fetch(DEEPSEEK_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`,
+    },
+    body: JSON.stringify({ model: DEEPSEEK_MODEL, messages, temperature: 0.3, max_tokens: 600 }),
+  });
+
+  if (!res.ok) {
+    const bodyText = await res.text().catch(() => "");
+    console.error("[ai.deepseek.chat]", res.status, bodyText);
+    lastProviderError = `DeepSeek ${res.status}: ${extractErrorMessage(bodyText)}`;
+    return null;
+  }
+
+  const json = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const reply = stripThinking(json.choices?.[0]?.message?.content ?? "");
+  if (!reply) return null;
+  lastProviderError = null;
+  return { reply, provider: `deepseek:${DEEPSEEK_MODEL}` };
+}
+
 /**
  * Translate a string to the target language. Returns null if no AI
  * provider is configured OR the call failed — callers should treat
@@ -272,6 +355,7 @@ export async function aiTranslate(input: TranslateInput): Promise<TranslateResul
   const provider = pickProvider();
   if (!provider) return null;
   try {
+    if (provider === "deepseek") return await deepseekTranslate(input);
     if (provider === "groq") return await groqTranslate(input);
     if (provider === "gemini") return await geminiTranslate(input);
     // Room for Claude / OpenAI to be added later without touching callers.
@@ -290,6 +374,7 @@ export async function aiChat(messages: ChatMessage[]): Promise<ChatResult | null
   const provider = pickProvider();
   if (!provider) return null;
   try {
+    if (provider === "deepseek") return await deepseekChat(messages);
     if (provider === "groq") return await groqChat(messages);
     if (provider === "gemini") return await geminiChat(messages);
     return null;
