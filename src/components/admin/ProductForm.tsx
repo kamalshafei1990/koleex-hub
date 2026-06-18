@@ -2159,6 +2159,39 @@ export default function ProductForm({ productId }: Props) {
         <div className={onePage ? "space-y-10" : ""}>
         {(onePage || steps[currentStep]?.id === "identity") && (
           <div id="sec-identity" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+            {/* ═══ PRODUCT POSTER / HERO BANNER (first field) ═══
+                Optional designed banner shown full-bleed at the top of the
+                public product page. Blank = the page auto-builds its hero from
+                the product photo + name + tagline. Placed first so it reads as
+                the product's headline visual. */}
+            <Section id="poster" icon={<ImageRawIcon className="h-4 w-4" />} title={t("identity.posterTitle", "Product poster / hero banner")} badge={t("identity.posterBadge", "Optional · public page header")} defaultOpen>
+              <div>
+                <div className="w-full aspect-[21/9] rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] overflow-hidden flex items-center justify-center mb-3">
+                  {product.hero_poster_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={product.hero_poster_url} alt="Product poster" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex flex-col items-center gap-1.5 text-[var(--text-ghost)]">
+                      <ImageRawIcon className="h-8 w-8" />
+                      <span className="text-[11px]">No custom poster — the public page builds one automatically</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <input type="text" className={`${inp} flex-1`} value={product.hero_poster_url} placeholder="Paste poster image URL, or upload →"
+                    onChange={(e) => updateProduct_({ hero_poster_url: e.target.value })} />
+                  <label className="h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] inline-flex items-center gap-1.5 cursor-pointer transition-colors shrink-0">
+                    <CameraIcon className="h-3.5 w-3.5" /> Upload
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => uploadIdentityImage(e.target.files, "hero_poster_url")} />
+                  </label>
+                  {product.hero_poster_url && (
+                    <button type="button" onClick={() => updateProduct_({ hero_poster_url: "" })} className="text-[11px] text-[var(--text-ghost)] hover:text-[var(--state-error,#FF3333)] shrink-0">Clear</button>
+                  )}
+                </div>
+                <p className="text-[10px] text-[var(--text-ghost)] mt-1.5">Wide banner (≈21:9). Leave empty to auto-generate the hero from the product photo, name &amp; tagline.</p>
+              </div>
+            </Section>
+
             {/* ═══ HERO CARD ═══
                     overflow-visible (not hidden) so the SelectWithCreate
                     dropdowns inside the Primary Commercial strip —
@@ -3017,38 +3050,6 @@ export default function ProductForm({ productId }: Props) {
                     {product.brand_mark_url && (
                       <button type="button" onClick={() => updateProduct_({ brand_mark_url: "" })} className="text-[11px] text-[var(--text-ghost)] hover:text-[var(--state-error,#FF3333)] shrink-0">Clear</button>
                     )}
-                  </div>
-                </div>
-
-                {/* Product poster / hero banner — optional designed banner shown
-                    full-bleed at the top of the public product page. Blank = the
-                    page auto-builds its hero from the product photo + name + tagline. */}
-                <div className="md:col-span-3">
-                  <label className={lbl}>Product poster / hero banner <span className="text-[var(--text-faint)] font-normal normal-case">· optional, shown on the public page</span></label>
-                  <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 p-3">
-                    <div className="w-full aspect-[21/9] rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] overflow-hidden flex items-center justify-center mb-2.5">
-                      {product.hero_poster_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={product.hero_poster_url} alt="Product poster" className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="flex flex-col items-center gap-1.5 text-[var(--text-ghost)]">
-                          <ImageRawIcon className="h-7 w-7" />
-                          <span className="text-[10px]">No custom poster — the page builds one automatically</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input type="text" className={`${inp} flex-1`} value={product.hero_poster_url} placeholder="Paste poster image URL, or upload →"
-                        onChange={(e) => updateProduct_({ hero_poster_url: e.target.value })} />
-                      <label className="h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] inline-flex items-center gap-1.5 cursor-pointer transition-colors shrink-0">
-                        <CameraIcon className="h-3.5 w-3.5" /> Upload
-                        <input type="file" accept="image/*" className="hidden" onChange={(e) => uploadIdentityImage(e.target.files, "hero_poster_url")} />
-                      </label>
-                      {product.hero_poster_url && (
-                        <button type="button" onClick={() => updateProduct_({ hero_poster_url: "" })} className="text-[11px] text-[var(--text-ghost)] hover:text-[var(--state-error,#FF3333)] shrink-0">Clear</button>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-[var(--text-ghost)] mt-1.5">Wide banner (≈21:9). Leave empty to auto-generate the hero from the product photo, name &amp; tagline.</p>
                   </div>
                 </div>
 
