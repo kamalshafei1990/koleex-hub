@@ -73,6 +73,7 @@ import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
 import EyeIcon from "@/components/icons/ui/EyeIcon";
 import EyeOffIcon from "@/components/icons/ui/EyeOffIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import GlobeIcon from "@/components/icons/ui/GlobeIcon";
@@ -781,6 +782,16 @@ export default function ProductForm({ productId }: Props) {
           launch_date: p.launch_date || "",
           eol_date: p.eol_date || "",
           alternate_names: p.alternate_names || [],
+          legacy_code: p.legacy_code || "",
+          brand_mark_url: p.brand_mark_url || "",
+          status_reason: p.status_reason || "",
+          model_year: p.model_year || "",
+          available_from: p.available_from || "",
+          last_order_date: p.last_order_date || "",
+          meta_title: p.meta_title || "",
+          meta_description: p.meta_description || "",
+          og_image_url: p.og_image_url || "",
+          revision_history: Array.isArray(p.revision_history) ? p.revision_history : [],
           tags: p.tags || [],
           excerpt: p.excerpt || "",
           highlights: p.highlights || [],
@@ -1057,6 +1068,23 @@ export default function ProductForm({ productId }: Props) {
       _file: file,
     };
     setMedia([...filtered, newItem]);
+  };
+
+  /* Generic image uploader for the small Identity image fields (brand
+     mark, OG image). Uploads immediately via uploadProductFile and writes
+     the resulting URL straight onto the product — unlike the main image
+     which is deferred to save. Image-only, 4 MB cap. */
+  const uploadIdentityImage = async (
+    files: FileList | null,
+    key: "brand_mark_url" | "og_image_url",
+  ) => {
+    const file = files?.[0];
+    if (!file) return;
+    if (!/^image\//.test(file.type)) { setError(t("media.mainNotImage", "{name} is not an image.").replace("{name}", file.name)); return; }
+    if (file.size > 4 * 1024 * 1024) { setError("Image must be under 4 MB."); return; }
+    setError("");
+    const res = await uploadProductFile(file);
+    if (res?.url) updateProduct_({ [key]: res.url } as Partial<ProductFormState>);
   };
 
   /* ── Auto-create first model ── */
@@ -1627,6 +1655,16 @@ export default function ProductForm({ productId }: Props) {
         launch_date: product.launch_date || null,
         eol_date: product.eol_date || null,
         alternate_names: (() => { const a = product.alternate_names.map((s) => s.trim()).filter(Boolean); return a.length ? a : null; })(),
+        legacy_code: product.legacy_code || null,
+        brand_mark_url: product.brand_mark_url || null,
+        status_reason: product.status_reason || null,
+        model_year: product.model_year || null,
+        available_from: product.available_from || null,
+        last_order_date: product.last_order_date || null,
+        meta_title: product.meta_title || null,
+        meta_description: product.meta_description || null,
+        og_image_url: product.og_image_url || null,
+        revision_history: (product.revision_history || []).filter((r) => (r.version || r.date || r.note)),
         description: product.description || null,
         specs: product.specs,
         hs_code: product.hs_code || null,
@@ -2724,6 +2762,53 @@ export default function ProductForm({ productId }: Props) {
               </div>
             </div>
 
+            {/* ── Pricing summary (READ-ONLY) ──
+                  Mirrors the numbers owned by the Variants & Supplier tabs
+                  so Identity shows pricing at a glance without becoming a
+                  second place to edit them. Single source of truth stays in
+                  those tabs; click through to edit. */}
+            <Section id="pricing-summary" icon={<DollarSignIcon className="h-4 w-4" />} title={t("identity.pricingSummary", "Pricing summary")} badge={t("identity.pricingSummaryBadge", "Read-only · from Variants & Supplier")} defaultOpen={false}>
+              {(() => {
+                const pm = primaryModel;
+                const link = productSuppliers.find((s) => s.is_primary) || productSuppliers[0] || null;
+                const sup = link ? suppliers.find((x) => x.id === link.supplier_id) : null;
+                const cur = link?.currency || sup?.currency || "";
+                const nums = models.map((m) => parseFloat(String(m.global_price || ""))).filter((n) => !Number.isNaN(n) && n > 0);
+                const range = nums.length
+                  ? (Math.min(...nums) === Math.max(...nums) ? `$${Math.min(...nums)}` : `$${Math.min(...nums)} – $${Math.max(...nums)}`)
+                  : "—";
+                const cell = (label: string, value: string) => (
+                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/50 px-3 py-2">
+                    <div className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">{label}</div>
+                    <div className="text-[13px] font-medium text-[var(--text-primary)] truncate mt-0.5">{value}</div>
+                  </div>
+                );
+                const money = (v: string | undefined, prefix = "$") => (v && String(v).trim() ? `${prefix}${v}` : "—");
+                return (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
+                      {cell(t("identity.psGlobal", "Global price"), money(pm?.global_price))}
+                      {cell(t("identity.psHeadOnly", "Head-only"), money(pm?.head_only_price))}
+                      {cell(t("identity.psCompleteSet", "Complete set"), money(pm?.complete_set_price))}
+                      {cell(t("identity.psVariantRange", "Variant range"), range)}
+                      {cell(t("identity.psMoq", "MOQ"), pm?.moq ? String(pm.moq) : (product.moq ? String(product.moq) : "—"))}
+                      {cell(t("identity.psSupplierCost", "Supplier cost"), link?.unit_cost_cny ? `${cur ? cur + " " : ""}${link.unit_cost_cny}` : "—")}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => goToStep(steps.findIndex((s) => s.id === "commercial"))}
+                        className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-semibold text-[var(--text-primary)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-focus)] transition-colors">
+                        <ArrowUpRightIcon className="h-3 w-3" /> {t("identity.psEditVariants", "Edit in Variants")}
+                      </button>
+                      <button type="button" onClick={() => goToStep(steps.findIndex((s) => s.id === "supplier"))}
+                        className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-semibold text-[var(--text-muted)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors">
+                        <FactoryIcon className="h-3 w-3" /> {t("identity.psEditSupplier", "Edit in Supplier")}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+            </Section>
+
             {/* ── Short description (excerpt) ──
                   One or two sentences used on product cards in the
                   catalog, SEO meta descriptions, and quote emails.
@@ -2867,7 +2952,16 @@ export default function ProductForm({ productId }: Props) {
                   <input className={inp} value={product.generation} placeholder="e.g. Gen 2 / v3"
                     onChange={(e) => updateProduct_({ generation: e.target.value })} />
                 </div>
-                <div />
+                <div>
+                  <label className={lbl}>Old model no. / legacy code</label>
+                  <input className={`${inp} font-mono`} value={product.legacy_code} placeholder="Pre-KOLEEX code (cross-reference)"
+                    onChange={(e) => updateProduct_({ legacy_code: e.target.value })} />
+                </div>
+                <div>
+                  <label className={lbl}>Model year</label>
+                  <input className={inp} value={product.model_year} placeholder="e.g. 2025"
+                    onChange={(e) => updateProduct_({ model_year: e.target.value })} />
+                </div>
                 <div>
                   <label className={lbl}>Launch date</label>
                   <input type="date" className={inp} value={product.launch_date}
@@ -2881,6 +2975,81 @@ export default function ProductForm({ productId }: Props) {
                     <p className="text-[10px] text-[var(--state-warning,#FFCC00)] mt-1">End-of-life is on or before the launch date.</p>
                   )}
                 </div>
+                <div>
+                  <label className={lbl}>Available from</label>
+                  <input type="date" className={inp} value={product.available_from}
+                    onChange={(e) => updateProduct_({ available_from: e.target.value })} />
+                  <p className="text-[10px] text-[var(--text-ghost)] mt-1">Order window opens.</p>
+                </div>
+                <div>
+                  <label className={lbl}>Last-order date</label>
+                  <input type="date" className={inp} value={product.last_order_date}
+                    onChange={(e) => updateProduct_({ last_order_date: e.target.value })} />
+                  <p className="text-[10px] text-[var(--text-ghost)] mt-1">Order cut-off (before EOL).</p>
+                </div>
+                <div>
+                  <label className={lbl}>Status reason</label>
+                  <input className={inp} value={product.status_reason} placeholder="e.g. Replaced by XSL-9100"
+                    onChange={(e) => updateProduct_({ status_reason: e.target.value })} />
+                </div>
+
+                {/* Brand mark / logo override — falls back to the brand's logo
+                    on the public page when left empty. */}
+                <div className="md:col-span-3">
+                  <label className={lbl}>Brand mark / logo override</label>
+                  <div className="flex items-center gap-3">
+                    <div className="h-12 w-12 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] flex items-center justify-center overflow-hidden shrink-0">
+                      {product.brand_mark_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={product.brand_mark_url} alt="Brand mark" className="h-full w-full object-contain p-1" />
+                      ) : (
+                        <ImageRawIcon className="h-5 w-5 text-[var(--text-ghost)]" />
+                      )}
+                    </div>
+                    <input type="text" className={`${inp} flex-1`} value={product.brand_mark_url} placeholder="Paste image URL, or upload →"
+                      onChange={(e) => updateProduct_({ brand_mark_url: e.target.value })} />
+                    <label className="h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] inline-flex items-center gap-1.5 cursor-pointer transition-colors shrink-0">
+                      <CameraIcon className="h-3.5 w-3.5" /> Upload
+                      <input type="file" accept="image/*" className="hidden" onChange={(e) => uploadIdentityImage(e.target.files, "brand_mark_url")} />
+                    </label>
+                    {product.brand_mark_url && (
+                      <button type="button" onClick={() => updateProduct_({ brand_mark_url: "" })} className="text-[11px] text-[var(--text-ghost)] hover:text-[var(--state-error,#FF3333)] shrink-0">Clear</button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Revision / version history — small inline log. */}
+                <div className="md:col-span-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className={lbl}>Revision history</label>
+                    <button type="button"
+                      onClick={() => updateProduct_({ revision_history: [...product.revision_history, { version: "", date: "", note: "" }] })}
+                      className="text-[11px] font-semibold text-[var(--accent,#0066FF)] hover:underline inline-flex items-center gap-1">
+                      <PlusIcon className="h-3 w-3" /> Add revision
+                    </button>
+                  </div>
+                  {product.revision_history.length === 0 ? (
+                    <p className="text-[10px] text-[var(--text-ghost)]">No revisions logged.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {product.revision_history.map((r, i) => (
+                        <div key={i} className="grid grid-cols-1 md:grid-cols-[120px_140px_1fr_auto] gap-2 items-center">
+                          <input className={inp} value={r.version} placeholder="v / rev"
+                            onChange={(e) => { const next = [...product.revision_history]; next[i] = { ...next[i], version: e.target.value }; updateProduct_({ revision_history: next }); }} />
+                          <input type="date" className={inp} value={r.date}
+                            onChange={(e) => { const next = [...product.revision_history]; next[i] = { ...next[i], date: e.target.value }; updateProduct_({ revision_history: next }); }} />
+                          <input className={inp} value={r.note} placeholder="What changed"
+                            onChange={(e) => { const next = [...product.revision_history]; next[i] = { ...next[i], note: e.target.value }; updateProduct_({ revision_history: next }); }} />
+                          <button type="button" onClick={() => updateProduct_({ revision_history: product.revision_history.filter((_, j) => j !== i) })}
+                            className="h-9 w-9 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-[var(--state-error,#FF3333)] transition-colors">
+                            <TrashIcon className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <div className="md:col-span-3">
                   <label className={lbl}>Alternate names / aliases</label>
                   <TagsInput
@@ -2911,6 +3080,12 @@ export default function ProductForm({ productId }: Props) {
                 primaryImageUrl={media.find((m) => m.type === "main_image")?.url}
                 categoryName={categoryName}
                 onExcerptChange={(v) => updateProduct_({ excerpt: v })}
+                metaTitle={product.meta_title}
+                metaDescription={product.meta_description}
+                ogImageUrl={product.og_image_url}
+                onMetaTitleChange={(v) => updateProduct_({ meta_title: v })}
+                onMetaDescriptionChange={(v) => updateProduct_({ meta_description: v })}
+                onOgImageUrlChange={(v) => updateProduct_({ og_image_url: v })}
               />
             </Section>
           </div>
