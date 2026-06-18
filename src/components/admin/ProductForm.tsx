@@ -544,6 +544,13 @@ export default function ProductForm({ productId }: Props) {
      provider is surfaced honestly instead of silently copying the English. */
   const [heroNameMsg, setHeroNameMsg] = useState<{ kind: "error" | "ok"; text: string } | null>(null);
 
+  /* ── Hero Short-Description language control — same pattern as the
+     product name, but writes per-locale into product_translations.excerpt
+     (English base = product.excerpt). */
+  const [heroExcerptLocale, setHeroExcerptLocale] = useState<string>("zh");
+  const [translatingHeroExcerpt, setTranslatingHeroExcerpt] = useState(false);
+  const [heroExcerptMsg, setHeroExcerptMsg] = useState<{ kind: "error" | "ok"; text: string } | null>(null);
+
   /* P0 #3 · recovered-draft banner. Holds the timestamp of an
      autosaved draft found on mount so we can offer Restore / Discard.
      We NEVER auto-apply it — the saved product is left untouched until
@@ -1263,6 +1270,71 @@ export default function ProductForm({ productId }: Props) {
       setTranslatingHeroName(false);
     }
   }, [product.product_name, heroNameLocale, setHeroLocaleName, t]);
+
+  /* ── Hero localized short-description helpers ── (mirror of the name
+     helpers, writing product_translations.excerpt). */
+  const heroLocaleExcerpt = (locale: string): string =>
+    translations.find((tr) => tr.locale === locale)?.excerpt ?? "";
+
+  const setHeroLocaleExcerpt = useCallback((locale: string, value: string) => {
+    setTranslations((prev) => {
+      const i = prev.findIndex((tr) => tr.locale === locale);
+      if (i >= 0) {
+        const next = [...prev];
+        next[i] = { ...next[i], excerpt: value };
+        return next;
+      }
+      return [
+        ...prev,
+        {
+          _tempId: `tr_${locale}_${prev.length}`,
+          locale,
+          product_name: "",
+          tagline: "",
+          excerpt: value,
+          description: "",
+        },
+      ];
+    });
+  }, []);
+
+  const autoTranslateHeroExcerpt = useCallback(async () => {
+    const source = product.excerpt.trim();
+    if (!source) return;
+    setTranslatingHeroExcerpt(true);
+    setHeroExcerptMsg(null);
+    try {
+      const res = await fetch("/api/ai/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ text: source, target_lang: heroExcerptLocale, source_lang: "en" }),
+      });
+      const data = (await res.json()) as {
+        translated?: string;
+        fallback?: boolean;
+        reason?: string;
+        error?: string;
+      };
+      if (!res.ok || data?.fallback || !data?.translated) {
+        const why =
+          data?.reason === "no_provider"
+            ? t("hero.translateNoProvider", "Auto-translate is off — no translation service is configured. Type the name manually for now.")
+            : t("hero.translateFailed", "Couldn't translate right now. Try again, or type the name manually.");
+        setHeroExcerptMsg({ kind: "error", text: why });
+        return;
+      }
+      setHeroLocaleExcerpt(heroExcerptLocale, data.translated);
+      setHeroExcerptMsg({ kind: "ok", text: t("hero.translateDone", "Translated — review before saving.") });
+    } catch {
+      setHeroExcerptMsg({
+        kind: "error",
+        text: t("hero.translateFailed", "Couldn't translate right now. Try again, or type the name manually."),
+      });
+    } finally {
+      setTranslatingHeroExcerpt(false);
+    }
+  }, [product.excerpt, heroExcerptLocale, setHeroLocaleExcerpt, t]);
 
   /* Live auto-suggest: whenever the prefix or supplier-model changes,
      recompute the suggestion. Only push it into `primary_model` when
@@ -2831,6 +2903,77 @@ export default function ProductForm({ productId }: Props) {
                           : t("hero.supplierModelSetInTab", "Set in the Supplier tab →")}
                       </button>
                     </div>
+                  </div>
+
+                  {/* Short Description — the product excerpt (English base =
+                      product.excerpt) with the same language picker + Auto-
+                      translate control as the product name, writing per-locale
+                      into product_translations.excerpt. Sits after the model
+                      codes, before the tagline. */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-[var(--text-ghost)] uppercase tracking-wider mb-2">
+                      <span className="inline-flex items-center gap-1.5"><SparklesIcon className="h-3 w-3" /> {t("hero.shortDesc", "Short Description")}</span>
+                    </label>
+                    <textarea
+                      value={product.excerpt}
+                      onChange={(e) => updateProduct_({ excerpt: e.target.value })}
+                      placeholder={t("hero.shortDescPlaceholder", "One or two lines summarizing the product.")}
+                      rows={2}
+                      className="w-full px-5 py-3 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[14px] leading-relaxed text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all resize-y"
+                    />
+
+                    {/* Localized short description — pick a language, write it
+                        manually or auto-translate from English. Writes into the
+                        shared `translations` state (product_translations.excerpt). */}
+                    {(() => {
+                      const isRtl = heroExcerptLocale === "ar" || heroExcerptLocale === "ur";
+                      const localeName = LOCALES.find((l) => l.code === heroExcerptLocale)?.name ?? heroExcerptLocale;
+                      return (
+                        <div className="mt-2.5 flex flex-wrap items-start gap-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)] shrink-0 mt-2.5">
+                            {t("hero.nameOtherLang", "Other language")}
+                          </span>
+                          <select
+                            value={heroExcerptLocale}
+                            onChange={(e) => { setHeroExcerptLocale(e.target.value); setHeroExcerptMsg(null); }}
+                            className="h-9 px-2.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-all shrink-0"
+                          >
+                            {LOCALES.map((l) => (
+                              <option key={l.code} value={l.code}>{l.name}</option>
+                            ))}
+                          </select>
+                          <textarea
+                            dir={isRtl ? "rtl" : "ltr"}
+                            value={heroLocaleExcerpt(heroExcerptLocale)}
+                            onChange={(e) => setHeroLocaleExcerpt(heroExcerptLocale, e.target.value)}
+                            placeholder={t("hero.shortDescInLangPlaceholder", "Short description in {lang}").replace("{lang}", localeName)}
+                            rows={2}
+                            className={`flex-1 min-w-[180px] px-3 py-2 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[13px] leading-relaxed text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all resize-y ${isRtl ? "text-right" : ""}`}
+                          />
+                          <button
+                            type="button"
+                            onClick={autoTranslateHeroExcerpt}
+                            disabled={!product.excerpt.trim() || translatingHeroExcerpt}
+                            className="h-9 px-3 rounded-lg text-[11px] font-bold whitespace-nowrap text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0 mt-0"
+                          >
+                            {translatingHeroExcerpt
+                              ? t("hero.translating", "Translating…")
+                              : t("hero.autoTranslate", "Auto-translate")}
+                          </button>
+                        </div>
+                      );
+                    })()}
+                    {heroExcerptMsg && (
+                      <p
+                        className={`mt-1.5 text-[11px] leading-relaxed ${
+                          heroExcerptMsg.kind === "error"
+                            ? "text-[var(--state-warning,#FFCC00)]"
+                            : "text-[var(--text-muted)]"
+                        }`}
+                      >
+                        {heroExcerptMsg.text}
+                      </p>
+                    )}
                   </div>
 
                   {/* Tagline — the one-liner shown directly under the
