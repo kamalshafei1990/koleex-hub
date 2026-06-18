@@ -32,10 +32,20 @@ import VisualGlyph from "./VisualGlyph";
 import { useTranslation } from "@/lib/i18n";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 
+interface ProductLocaleText {
+  locale: string;
+  product_name?: string | null;
+  tagline?: string | null;
+  excerpt?: string | null;
+  description?: string | null;
+}
+
 interface ProductPreviewProps {
   productName: string;
   primaryModel?: string | null;
   tagline?: string | null;
+  /** Localized overlays keyed by locale; English props stay the base. */
+  translations?: ProductLocaleText[];
   brand?: string | null;
   schema: ProductSchemaDefinition | null;
   values: Record<string, unknown>;
@@ -172,11 +182,12 @@ const Disclosure = ({
 };
 
 export const ProductPreview = (props: ProductPreviewProps) => {
-  const { t } = useTranslation(PRODUCTS_UI_I18N);
+  const { t, lang } = useTranslation(PRODUCTS_UI_I18N);
   const {
     productName,
     primaryModel,
     tagline,
+    translations,
     brand,
     schema,
     values,
@@ -191,6 +202,13 @@ export const ProductPreview = (props: ProductPreviewProps) => {
     countryOfOrigin,
     warranty,
   } = props;
+
+  /* Localized overlay: when the active language has a filled-in
+     translation, show it; otherwise fall back to the English base.
+     English (lang === "en") always uses the base props. */
+  const localized = (translations ?? []).find((tr) => tr.locale === lang) ?? null;
+  const displayName = (localized?.product_name || "").trim() || productName;
+  const displayTagline = (localized?.tagline || "").trim() || tagline;
 
   const effectiveSurface: ProductSchemaSurface = surface ?? "website";
 
@@ -389,11 +407,11 @@ export const ProductPreview = (props: ProductPreviewProps) => {
               </div>
             ) : null}
             <h1 className="text-[2.75rem] leading-[1.02] md:text-6xl md:leading-[0.98] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
-              {productName || t("preview.untitledProduct", "Untitled product")}
+              {displayName || t("preview.untitledProduct", "Untitled product")}
             </h1>
-            {tagline ? (
+            {displayTagline ? (
               <p className="text-xl md:text-2xl font-light text-[var(--text-secondary)] leading-snug max-w-xl">
-                {tagline}
+                {displayTagline}
               </p>
             ) : null}
             {primaryModel ? (
@@ -435,7 +453,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           <div className="relative w-full aspect-[4/3] md:aspect-[5/4] flex items-center justify-center">
             {mainImageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={mainImageUrl} alt={productName} className="h-full w-full object-contain drop-shadow-[0_30px_60px_rgba(0,0,0,0.25)]" />
+              <img src={mainImageUrl} alt={displayName} className="h-full w-full object-contain drop-shadow-[0_30px_60px_rgba(0,0,0,0.25)]" />
             ) : (
               <span className="text-sm text-[var(--text-faint)]">{t("preview.noMainImage", "No main image")}</span>
             )}
