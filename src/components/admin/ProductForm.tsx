@@ -1230,6 +1230,52 @@ export default function ProductForm({ productId }: Props) {
     };
   }, [primaryModel?.primary_model, productId, resolvedPrefix]);
 
+  /* ── Slug uniqueness check ──────────────────────────────────────
+     The public URL is /products/<slug>; two products sharing a slug
+     means only one resolves and the other silently 404s. Mirror the
+     Primary-Model check: debounced ping to /api/products/check-slug,
+     tenant-scoped, edit-aware. Surfaced as a friendly warning (not a
+     hard save-block) because slug isn't guaranteed unique on legacy
+     rows — we don't want to trap re-saves of old products. */
+  type SlugCheck =
+    | { status: "idle" }
+    | { status: "checking" }
+    | { status: "available" }
+    | { status: "error" }
+    | { status: "taken"; conflict: { product_id: string; product_name: string; slug: string } };
+  const [slugCheck, setSlugCheck] = useState<SlugCheck>({ status: "idle" });
+
+  useEffect(() => {
+    const slug = (product.slug || "").trim().toLowerCase();
+    if (!slug) {
+      setSlugCheck({ status: "idle" });
+      return;
+    }
+    let cancelled = false;
+    setSlugCheck({ status: "checking" });
+    const timer = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ slug });
+        if (productId) params.set("excludeProductId", productId);
+        const res = await fetch(`/api/products/check-slug?${params.toString()}`, { credentials: "include" });
+        if (cancelled) return;
+        if (!res.ok) { setSlugCheck({ status: "error" }); return; }
+        const payload = await res.json();
+        if (cancelled) return;
+        if (payload?.available === false && payload?.conflict) {
+          setSlugCheck({ status: "taken", conflict: payload.conflict });
+        } else {
+          setSlugCheck({ status: "available" });
+        }
+      } catch (err) {
+        if (cancelled) return;
+        console.warn("[slug uniqueness] check failed", err);
+        setSlugCheck({ status: "error" });
+      }
+    }, 350);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [product.slug, productId]);
+
   /* Smart save-button label + styling based on the chosen status.
      Shared between the Review step's preview card and the bottom
      nav's primary action so both stay in sync. Draft = grey
@@ -1402,6 +1448,22 @@ export default function ProductForm({ productId }: Props) {
     () => Object.values(requiredIssues).flat(),
     [requiredIssues],
   );
+
+  /* ── Publish-readiness gaps (advisory) ──
+     Surfaced inline next to the hero Status / Visible toggles so the
+     operator sees what's still missing AT THE MOMENT they flip a
+     product live — not only when they hit Save or reach the Review
+     tab. Combines the identity-critical required set with two soft
+     commercial checks (a main photo + a headline price) that the
+     catalog really wants before a product faces customers. Advisory
+     only: it never blocks: the authoritative publish gate still lives
+     in save(). */
+  const publishGaps = useMemo(() => {
+    const gaps = [...missingRequiredLabels];
+    if (!media.some((m) => m.type === "main_image")) gaps.push(t("publish.gapImage", "Main photo"));
+    if (!(primaryModel?.global_price || "").toString().trim()) gaps.push(t("publish.gapPrice", "Selling price"));
+    return gaps;
+  }, [missingRequiredLabels, media, primaryModel?.global_price, t]);
 
   /* ── Validation per step ──
      Generalised over the required-set above: leaving a step is
@@ -2030,7 +2092,15 @@ export default function ProductForm({ productId }: Props) {
             <span className="font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("wizard.classificationLabel", "Classification:")}</span>
             <span>{divisionName}</span>
             {categoryName && <><AngleRightIcon className="h-3 w-3" /><span>{categoryName}</span></>}
-            {subcategoryName && <><AngleRightIcon className="h-3 w-3" /><span className="text-emerald-400 font-medium">{subcategoryName}</span></>}
+            {subcategoryName && <><AngleRightIcon className="h-3 w-3" /><span className="text-[var(--text-primary)] font-medium">{subcategoryName}</span></>}
+            {resolvedPrefix && (
+              <span
+                className="ml-1 font-mono font-bold text-[10px] tracking-[0.06em] text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-md px-1.5 py-0.5"
+                title={t("wizard.prefixChipTitle", "KOLEEX classification prefix — inherited from this subcategory.")}
+              >
+                {resolvedPrefix}
+              </span>
+            )}
           </div>
         )}
 
@@ -2191,6 +2261,23 @@ export default function ProductForm({ productId }: Props) {
                       })}
                     </div>
                   </div>
+
+                  {/* Publish-readiness hint — only when the product is set
+                      to go live (Active or Visible) AND something the catalog
+                      wants is still missing. Advisory, never blocks. */}
+                  {(product.status === "active" || product.visible) && publishGaps.length > 0 && (
+                    <div className="flex items-start gap-2 rounded-xl border border-[var(--state-warning,#FFCC00)]/40 bg-[var(--state-warning,#FFCC00)]/10 px-3.5 py-2.5">
+                      <TriangleWarningIcon className="h-4 w-4 shrink-0 mt-0.5 text-[var(--state-warning,#FFCC00)]" />
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-semibold text-[var(--text-primary)]">
+                          {t("publish.notReadyTitle", "Not ready to go live yet")}
+                        </p>
+                        <p className="text-[11px] text-[var(--text-muted)] leading-relaxed mt-0.5">
+                          {t("publish.notReadyBody", "Still missing:")} {publishGaps.join(" · ")}
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Product Name — XL prominent */}
                   <div>
@@ -2480,6 +2567,19 @@ export default function ProductForm({ productId }: Props) {
                     }}
                     t={t}
                   />
+                  {/* Live slug-uniqueness feedback — a duplicate slug means
+                      one of the two products won't resolve at /products/<slug>. */}
+                  {slugCheck.status === "taken" ? (
+                    <p className="text-[11px] text-[var(--state-error,#FF3333)] mt-1.5 leading-relaxed">
+                      <span className="font-semibold">{t("hero.slugInUse", "This URL is already used by")}</span>{" "}
+                      <span className="font-semibold">{slugCheck.conflict.product_name}</span>.{" "}
+                      {t("hero.slugPickDifferent", "Edit it so each product has its own public URL.")}
+                    </p>
+                  ) : slugCheck.status === "checking" ? (
+                    <p className="text-[11px] text-[var(--text-ghost)] mt-1.5">{t("hero.slugChecking", "Checking if this URL is available…")}</p>
+                  ) : slugCheck.status === "available" ? (
+                    <p className="text-[11px] text-[var(--state-success,#00CC66)] mt-1.5">✓ {t("hero.slugAvailable", "URL is available.")}</p>
+                  ) : null}
 
                   {/* Brand · Family · Origin · Warranty
                       lg:grid-cols-4 (not xl:) — every laptop 1024px+
