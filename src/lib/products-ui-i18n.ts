@@ -367,6 +367,8 @@ export const PRODUCTS_UI_I18N: Translations = {
   "publish.gapChineseName": { en: "Chinese name", zh: "中文名称", ar: "الاسم الصيني" },
   "identity.languages": { en: "Languages & Markets", zh: "语言与市场", ar: "اللغات والأسواق" },
   "identity.languagesBadge": { en: "中文 · العربية · +", zh: "中文 · العربية · +", ar: "中文 · العربية · +" },
+  "identity.posterTitle": { en: "Product poster / hero banner", zh: "产品海报 / 主横幅", ar: "بوستر المنتج / لافتة الواجهة" },
+  "identity.posterBadge": { en: "Optional · public page header", zh: "可选 · 公开页头图", ar: "اختياري · ترويسة الصفحة العامة" },
   "identity.pricingSummary": { en: "Pricing summary", zh: "价格摘要", ar: "ملخص التسعير" },
   "identity.pricingSummaryBadge": { en: "Read-only · from Variants & Supplier", zh: "只读 · 来自变体与供应商", ar: "للقراءة فقط · من المتغيرات والمورد" },
   "identity.psGlobal": { en: "Global price", zh: "全球价格", ar: "السعر العالمي" },
