@@ -175,6 +175,7 @@ const STEP_LABEL_KEY: Record<string, string> = {
   description: "step.description",
   "sewing-specs": "step.machineSpecs",
   commercial: "step.modelsVariants",
+  pricing: "step.costPrice",
   logistics: "step.logisticsCustoms",
   technical: "step.technical",
   media: "step.media",
@@ -291,7 +292,8 @@ function getSteps(isSewing: boolean): WizardStep[] {
     { id: "supplier", label: "Supplier & Sourcing", shortLabel: "Supplier", icon: <FactoryIcon className="h-4 w-4" /> },
     { id: "identity", label: "Hero & Identity", shortLabel: "Identity", icon: <SparklesIcon className="h-4 w-4" /> },
     { id: "specs", label: "Specifications", shortLabel: "Specs", icon: <Settings2Icon className="h-4 w-4" /> },
-    { id: "commercial", label: "Variants & Pricing", shortLabel: "Variants", icon: <BoxesIcon className="h-4 w-4" /> },
+    { id: "commercial", label: "Variants", shortLabel: "Variants", icon: <BoxesIcon className="h-4 w-4" /> },
+    { id: "pricing", label: "Cost & Price", shortLabel: "Price", icon: <DollarSignIcon className="h-4 w-4" /> },
     { id: "logistics", label: "Logistics & Customs", shortLabel: "Logistics", icon: <GlobeIcon className="h-4 w-4" /> },
     { id: "compliance", label: "Compliance & Warranty", shortLabel: "Compliance", icon: <ShieldCheckIcon className="h-4 w-4" /> },
     { id: "media", label: "Media & Documents", shortLabel: "Media", icon: <ImageRawIcon className="h-4 w-4" /> },
@@ -3124,31 +3126,16 @@ export default function ProductForm({ productId }: Props) {
               <div className="border-t border-[var(--border-subtle)] bg-[var(--bg-primary)]/30 px-6 md:px-8 py-6">
                 <div className="flex items-center gap-2 mb-4">
                   <div className="h-6 w-6 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
-                    <DollarSignIcon className="h-3 w-3 text-[var(--text-ghost)]" />
+                    <FactoryIcon className="h-3 w-3 text-[var(--text-ghost)]" />
                   </div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">{t("hero.pricingStrip", "Primary Pricing")}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">{t("hero.sourcingStrip", "Primary supplier")}</span>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Pricing moved to the Cost & Price tab. This strip now only
+                    MIRRORS the primary supplier read-only — name · model ·
+                    cost — so the hero shows sourcing at a glance. Click to
+                    jump to the Supplier tab to edit. */}
+                <div className="grid grid-cols-1 gap-4">
                   <div>
-                    <label className={lbl}>{t("hero.globalPrice", "Global Selling Price (USD)")}</label>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[12px] font-semibold text-[var(--text-ghost)]">$</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={primaryModel?.global_price || ""}
-                        onChange={(e) => updatePrimaryModel({ global_price: e.target.value })}
-                        placeholder="0.00"
-                        className={`${inp} pl-8`}
-                      />
-                    </div>
-                  </div>
-                  {/* Sourcing is OWNED by the Supplier tab (single source of
-                      truth). Here we only MIRROR the primary supplier
-                      read-only — name · model · cost — so the hero shows
-                      sourcing at a glance. Click to jump to the Supplier tab
-                      to edit. */}
-                  <div className="flex items-end">
                     {(() => {
                       const link = productSuppliers.find((s) => s.is_primary) || productSuppliers[0] || null;
                       if (!link) {
@@ -3213,52 +3200,7 @@ export default function ProductForm({ productId }: Props) {
               </div>
             </div>
 
-            {/* ── Pricing summary (READ-ONLY) ──
-                  Mirrors the numbers owned by the Variants & Supplier tabs
-                  so Identity shows pricing at a glance without becoming a
-                  second place to edit them. Single source of truth stays in
-                  those tabs; click through to edit. */}
-            <Section id="pricing-summary" icon={<DollarSignIcon className="h-4 w-4" />} title={t("identity.pricingSummary", "Pricing summary")} badge={t("identity.pricingSummaryBadge", "Read-only · from Variants & Supplier")} defaultOpen={false}>
-              {(() => {
-                const pm = primaryModel;
-                const link = productSuppliers.find((s) => s.is_primary) || productSuppliers[0] || null;
-                const sup = link ? suppliers.find((x) => x.id === link.supplier_id) : null;
-                const cur = link?.currency || sup?.currency || "";
-                const nums = models.map((m) => parseFloat(String(m.global_price || ""))).filter((n) => !Number.isNaN(n) && n > 0);
-                const range = nums.length
-                  ? (Math.min(...nums) === Math.max(...nums) ? `$${Math.min(...nums)}` : `$${Math.min(...nums)} – $${Math.max(...nums)}`)
-                  : "—";
-                const cell = (label: string, value: string) => (
-                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/50 px-3 py-2">
-                    <div className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">{label}</div>
-                    <div className="text-[13px] font-medium text-[var(--text-primary)] truncate mt-0.5">{value}</div>
-                  </div>
-                );
-                const money = (v: string | undefined, prefix = "$") => (v && String(v).trim() ? `${prefix}${v}` : "—");
-                return (
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
-                      {cell(t("identity.psGlobal", "Global price"), money(pm?.global_price))}
-                      {cell(t("identity.psHeadOnly", "Head-only"), money(pm?.head_only_price))}
-                      {cell(t("identity.psCompleteSet", "Complete set"), money(pm?.complete_set_price))}
-                      {cell(t("identity.psVariantRange", "Variant range"), range)}
-                      {cell(t("identity.psMoq", "MOQ"), pm?.moq ? String(pm.moq) : (product.moq ? String(product.moq) : "—"))}
-                      {cell(t("identity.psSupplierCost", "Supplier cost"), link?.unit_cost_cny ? `${cur ? cur + " " : ""}${link.unit_cost_cny}` : "—")}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={() => goToStep(steps.findIndex((s) => s.id === "commercial"))}
-                        className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-semibold text-[var(--text-primary)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-focus)] transition-colors">
-                        <ArrowUpRightIcon className="h-3 w-3" /> {t("identity.psEditVariants", "Edit in Variants")}
-                      </button>
-                      <button type="button" onClick={() => goToStep(steps.findIndex((s) => s.id === "supplier"))}
-                        className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-semibold text-[var(--text-muted)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors">
-                        <FactoryIcon className="h-3 w-3" /> {t("identity.psEditSupplier", "Edit in Supplier")}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })()}
-            </Section>
+            {/* Pricing summary moved to the dedicated Cost & Price tab. */}
 
             {/* ── Short description (excerpt) ──
                   One or two sentences used on product cards in the
@@ -3845,12 +3787,83 @@ export default function ProductForm({ productId }: Props) {
               />
             </Section>
 
-            {/* Market Prices */}
+            {/* Market Prices + the rest of pricing moved to the dedicated
+                Cost & Price tab. Supplier & Sourcing lives in the Supplier
+                tab. This step now owns only the variant definitions. */}
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+           STEP: COST & PRICE — everything price-related in one place.
+           Supplier cost stays owned by the Supplier tab and is shown
+           here READ-ONLY.
+           ═══════════════════════════════════════════════════════════ */}
+        {(onePage || steps[currentStep]?.id === "pricing") && (
+          <div id="sec-pricing" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+            {/* Selling price (editable) */}
+            <Section id="selling-price" icon={<DollarSignIcon className="h-4 w-4" />} title={t("pricing.sellingTitle", "Selling Price")} badge={t("pricing.sellingBadge", "Public · USD")} defaultOpen>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className={lbl}>{t("hero.globalPrice", "Global Selling Price (USD)")}</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[12px] font-semibold text-[var(--text-ghost)]">$</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={primaryModel?.global_price || ""}
+                      onChange={(e) => updatePrimaryModel({ global_price: e.target.value })}
+                      placeholder="0.00"
+                      className={`${inp} pl-8`}
+                    />
+                  </div>
+                  <p className="text-[10px] text-[var(--text-ghost)] mt-1.5">{t("pricing.sellingHint", "The list price shown on the public product page. Per-variant prices are set on the Variants tab.")}</p>
+                </div>
+              </div>
+            </Section>
+
+            {/* Market Prices (per country) */}
             <Section id="prices" icon={<DollarSignIcon className="h-4 w-4" />} title={t("models.marketPrices", "Market Prices")} badge={t("models.perCountry", "Per country")} defaultOpen={false}>
               <MarketPricesSection prices={prices} models={models} onChange={setPrices} />
             </Section>
-            {/* Supplier & Sourcing moved to its own dedicated Supplier tab
-                (after Classify) so all supplier data lives in one place. */}
+
+            {/* Cost & margin (READ-ONLY) — supplier cost is owned by the
+                Supplier tab; mirrored here so price decisions sit next to
+                the landed cost without becoming a second edit surface. */}
+            <Section id="cost-summary" icon={<DollarSignIcon className="h-4 w-4" />} title={t("pricing.costTitle", "Cost & margin")} badge={t("pricing.costBadge", "Read-only · supplier cost from Supplier tab")} defaultOpen>
+              {(() => {
+                const pm = primaryModel;
+                const link = productSuppliers.find((s) => s.is_primary) || productSuppliers[0] || null;
+                const sup = link ? suppliers.find((x) => x.id === link.supplier_id) : null;
+                const cur = link?.currency || sup?.currency || "";
+                const nums = models.map((m) => parseFloat(String(m.global_price || ""))).filter((n) => !Number.isNaN(n) && n > 0);
+                const range = nums.length
+                  ? (Math.min(...nums) === Math.max(...nums) ? `$${Math.min(...nums)}` : `$${Math.min(...nums)} – $${Math.max(...nums)}`)
+                  : "—";
+                const cell = (label: string, value: string) => (
+                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/50 px-3 py-2">
+                    <div className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">{label}</div>
+                    <div className="text-[13px] font-medium text-[var(--text-primary)] truncate mt-0.5">{value}</div>
+                  </div>
+                );
+                const money = (v: string | undefined, prefix = "$") => (v && String(v).trim() ? `${prefix}${v}` : "—");
+                return (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
+                      {cell(t("identity.psGlobal", "Global price"), money(pm?.global_price))}
+                      {cell(t("identity.psHeadOnly", "Head-only"), money(pm?.head_only_price))}
+                      {cell(t("identity.psCompleteSet", "Complete set"), money(pm?.complete_set_price))}
+                      {cell(t("identity.psVariantRange", "Variant range"), range)}
+                      {cell(t("identity.psMoq", "MOQ"), pm?.moq ? String(pm.moq) : (product.moq ? String(product.moq) : "—"))}
+                      {cell(t("identity.psSupplierCost", "Supplier cost"), link?.unit_cost_cny ? `${cur ? cur + " " : ""}${link.unit_cost_cny}` : "—")}
+                    </div>
+                    <button type="button" onClick={() => goToStep(steps.findIndex((s) => s.id === "supplier"))}
+                      className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-semibold text-[var(--text-muted)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors">
+                      <FactoryIcon className="h-3 w-3" /> {t("pricing.editSupplierCost", "Edit supplier cost in the Supplier tab")}
+                    </button>
+                  </div>
+                );
+              })()}
+            </Section>
           </div>
         )}
 
