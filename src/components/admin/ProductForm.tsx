@@ -2318,7 +2318,7 @@ export default function ProductForm({ productId }: Props) {
                     instead of being clipped behind it. Nothing inside
                     the card actually overflows visually, so there's no
                     cost to turning clipping off here. */}
-            <div className="bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-surface-subtle)]/40 rounded-3xl border border-[var(--border-subtle)] overflow-visible shadow-[0_4px_24px_rgba(0,0,0,0.2)]">
+            <div className="bg-[var(--bg-secondary)] rounded-3xl border border-[var(--border-subtle)] overflow-visible shadow-[0_4px_24px_rgba(0,0,0,0.2)]">
               <div className="grid grid-cols-1 lg:grid-cols-5 gap-0">
                 {/* Left: Main Product Image (2/5 width) */}
                 <div className="lg:col-span-2 p-6 md:p-8 lg:border-r lg:border-[var(--border-subtle)] flex flex-col">
