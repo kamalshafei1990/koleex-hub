@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useDeferredValue } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
@@ -145,6 +145,12 @@ export default function ProductList() {
   const [filterFeatured, setFilterFeatured] = useState(initialFilters.featured ?? "");
   const [filterStatus, setFilterStatus] = useState(initialFilters.status ?? "");
   const [search, setSearch] = useState(initialFilters.search ?? "");
+  /* The search box stays instant, but filtering 700+ products and
+     re-rendering every card on each keystroke is what made the page
+     lag. useDeferredValue lets React keep the input responsive and
+     render the (expensive) filtered grid at a lower priority — it can
+     even interrupt a stale filter pass when the next keystroke lands. */
+  const deferredSearch = useDeferredValue(search);
   const [showFilters, setShowFilters] = useState(initialFilters.showFilters ?? false);
   const [viewMode, setViewMode] = useState<"grid" | "list">(initialFilters.viewMode ?? "grid");
 
@@ -463,7 +469,7 @@ export default function ProductList() {
   };
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = deferredSearch.trim().toLowerCase();
     const tokens = q ? q.split(/\s+/).filter(Boolean) : [];
     return products.filter(p => {
       if (filterDiv && p.division_slug !== filterDiv) return false;
@@ -483,7 +489,7 @@ export default function ProductList() {
       }
       return true;
     });
-  }, [products, filterDiv, filterCat, filterSub, filterBrand, filterLevel, filterSupplier, filterVisible, filterFeatured, filterStatus, search, productSuppliers, searchHaystack]);
+  }, [products, filterDiv, filterCat, filterSub, filterBrand, filterLevel, filterSupplier, filterVisible, filterFeatured, filterStatus, deferredSearch, productSuppliers, searchHaystack]);
 
   /* Build sub-category and category name lookup tables once so
      section headers + the search index resolve in O(1). */
