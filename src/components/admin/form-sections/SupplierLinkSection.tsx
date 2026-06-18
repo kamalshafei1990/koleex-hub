@@ -715,7 +715,6 @@ function SupplierPickerModal({
   }, [query, suppliers]);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
-  useEffect(() => { setActive(0); }, [query]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -769,7 +768,7 @@ function SupplierPickerModal({
             <input
               ref={inputRef}
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => { setQuery(e.target.value); setActive(0); }}
               placeholder="Search suppliers by name…"
               className="w-full h-10 pl-9 pr-3 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
             />
