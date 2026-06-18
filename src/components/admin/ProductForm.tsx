@@ -2809,14 +2809,27 @@ export default function ProductForm({ productId }: Props) {
                       <label className="block text-[10px] font-bold text-[var(--text-ghost)] uppercase tracking-wider mb-2">
                         <span className="inline-flex items-center gap-1.5"><FactoryIcon className="h-3 w-3" /> {t("hero.supplierModel", "Supplier Model")}</span>
                       </label>
+                      {/* Read-only — the supplier's model number is owned by the
+                          Supplier tab (primary supplier link → Model number). We
+                          mirror it here so the operator sees it next to the codes,
+                          with a shortcut to edit it where it actually lives. */}
                       <input
                         type="text"
-                        value={primaryModel?.reference_model || ""}
-                        onChange={(e) => updatePrimaryModel({ reference_model: e.target.value })}
-                        placeholder={t("hero.supplierModelPlaceholder", "Factory model no.")}
-                        title={t("hero.supplierModelHint", "The factory's own model number — seeds the KOLEEX code suggestion.")}
-                        className="w-full h-12 px-5 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[15px] font-mono tracking-[0.03em] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all"
+                        value={primarySupplierModel}
+                        readOnly
+                        placeholder={t("hero.supplierModelPlaceholder", "e.g. JUKI DDL-8700H")}
+                        title={t("hero.supplierModelReadonly", "Read from the primary supplier in the Supplier tab.")}
+                        className="w-full h-12 px-5 rounded-xl bg-[var(--bg-surface-subtle)]/40 border border-[var(--border-subtle)] text-[15px] font-mono tracking-[0.03em] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none cursor-default"
                       />
+                      <button
+                        type="button"
+                        onClick={() => goToStep(steps.findIndex((s) => s.id === "supplier"))}
+                        className="mt-1.5 text-[10px] font-medium text-[var(--accent,#0066FF)] hover:underline inline-flex items-center gap-1"
+                      >
+                        {primarySupplierModel
+                          ? t("hero.supplierModelEditInTab", "Edit in the Supplier tab")
+                          : t("hero.supplierModelSetInTab", "Set in the Supplier tab →")}
+                      </button>
                     </div>
                   </div>
 
