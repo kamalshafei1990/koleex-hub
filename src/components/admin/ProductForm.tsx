@@ -1222,7 +1222,7 @@ export default function ProductForm({ productId }: Props) {
      locale the button is hidden and the operator types manually. */
   const autoTranslateHeroName = useCallback(async () => {
     const source = product.product_name.trim();
-    if (!source || (heroNameLocale !== "zh" && heroNameLocale !== "ar")) return;
+    if (!source) return;
     setTranslatingHeroName(true);
     setHeroNameMsg(null);
     try {
@@ -2511,7 +2511,7 @@ export default function ProductForm({ productId }: Props) {
                         appears in Languages & Markets and on the public page. */}
                     {(() => {
                       const isRtl = heroNameLocale === "ar" || heroNameLocale === "ur";
-                      const canAuto = heroNameLocale === "zh" || heroNameLocale === "ar";
+                      const canAuto = true; // every offered locale is a translatable target
                       const localeName =
                         LOCALES.find((l) => l.code === heroNameLocale)?.name ?? heroNameLocale;
                       return (

@@ -4,10 +4,10 @@ import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { aiTranslate, aiProviderConfigured } from "@/lib/server/ai-provider";
+import { aiTranslate, aiProviderConfigured, isTranslatableLang } from "@/lib/server/ai-provider";
 
 /* POST /api/ai/translate
-     body: { text: string, target_lang: 'en' | 'zh' | 'ar', source_lang?: string }
+     body: { text: string, target_lang: <locale code>, source_lang?: string }
    response: { translated: string, cached: boolean } | { error: string, fallback: string }
 
    Tenant-scoped cache: the same text asked twice across the team is
@@ -21,15 +21,15 @@ export async function POST(req: Request) {
 
   const body = (await req.json()) as {
     text?: string;
-    target_lang?: "en" | "zh" | "ar";
+    target_lang?: string;
     source_lang?: string;
   };
 
   const text = (body.text ?? "").trim();
   const target = body.target_lang;
   if (!text) return NextResponse.json({ translated: "", cached: false });
-  if (!target || !["en", "zh", "ar"].includes(target)) {
-    return NextResponse.json({ error: "target_lang must be en/zh/ar" }, { status: 400 });
+  if (!target || !isTranslatableLang(target)) {
+    return NextResponse.json({ error: "unsupported target_lang" }, { status: 400 });
   }
   if (text.length > MAX_LEN) {
     return NextResponse.json(
