@@ -2536,14 +2536,44 @@ export default function ProductForm({ productId }: Props) {
                       />
                     </div>
                   </div>
-                  {/* Sourcing (supplier · supplier model · cost) is owned by the
-                      Supplier tab now — single source of truth. Point there
-                      instead of duplicating the fields in the hero. */}
+                  {/* Sourcing is OWNED by the Supplier tab (single source of
+                      truth). Here we only MIRROR the primary supplier
+                      read-only — name · model · cost — so the hero shows
+                      sourcing at a glance. Click to jump to the Supplier tab
+                      to edit. */}
                   <div className="flex items-end">
-                    <div className="w-full rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/50 px-3.5 h-[42px] flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
-                      <FactoryIcon className="h-3.5 w-3.5 text-[var(--text-ghost)] shrink-0" />
-                      <span>{t("hero.sourcingMovedHint", "Supplier, cost & sourcing → manage in the Supplier tab")}</span>
-                    </div>
+                    {(() => {
+                      const link = productSuppliers.find((s) => s.is_primary) || productSuppliers[0] || null;
+                      if (!link) {
+                        return (
+                          <button type="button" onClick={() => goToStep(steps.findIndex((s) => s.id === "supplier"))}
+                            className="w-full rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/50 px-3.5 h-[42px] flex items-center gap-2 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors">
+                            <FactoryIcon className="h-3.5 w-3.5 text-[var(--text-ghost)] shrink-0" />
+                            <span>{t("hero.noSupplierLinked", "No supplier linked — add one in the Supplier tab")}</span>
+                          </button>
+                        );
+                      }
+                      const sup = suppliers.find((x) => x.id === link.supplier_id);
+                      const name = sup?.name || t("hero.unknownSupplier", "(supplier)");
+                      const cur = link.currency || sup?.currency || "";
+                      return (
+                        <button type="button" onClick={() => goToStep(steps.findIndex((s) => s.id === "supplier"))}
+                          title={t("hero.manageInSupplierTab", "Manage in the Supplier tab")}
+                          className="w-full text-left rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/50 px-3.5 py-2 hover:border-[var(--border-focus)] transition-colors">
+                          <div className="flex items-center justify-between mb-0.5">
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-ghost)] inline-flex items-center gap-1">
+                              <FactoryIcon className="h-3 w-3" /> {t("hero.primarySupplier", "Primary supplier")}
+                            </span>
+                            <span className="text-[9px] text-[var(--text-ghost)]">{t("hero.fromSupplierTab", "from Supplier tab ›")}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[12px] text-[var(--text-primary)] truncate">
+                            <span className="font-semibold truncate">{name}</span>
+                            {link.supplier_product_code && (<><span className="text-[var(--text-ghost)]">·</span><span className="font-mono text-[11px] truncate">{link.supplier_product_code}</span></>)}
+                            {link.unit_cost_cny && (<><span className="text-[var(--text-ghost)]">·</span><span className="whitespace-nowrap">{cur ? `${cur} ` : ""}{link.unit_cost_cny}</span></>)}
+                          </div>
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
 
