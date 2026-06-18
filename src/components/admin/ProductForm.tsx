@@ -1074,7 +1074,7 @@ export default function ProductForm({ productId }: Props) {
   /* Generic image uploader for the small Identity image fields (brand
      mark, OG image). Uploads immediately via uploadProductFile and writes
      the resulting URL straight onto the product — unlike the main image
-     which is deferred to save. Image-only, 4 MB cap. */
+     which is deferred to save. Image-only, 8 MB cap. */
   const uploadIdentityImage = async (
     files: FileList | null,
     key: "brand_mark_url" | "og_image_url" | "hero_poster_url",
@@ -1082,7 +1082,7 @@ export default function ProductForm({ productId }: Props) {
     const file = files?.[0];
     if (!file) return;
     if (!/^image\//.test(file.type)) { setError(t("media.mainNotImage", "{name} is not an image.").replace("{name}", file.name)); return; }
-    if (file.size > 4 * 1024 * 1024) { setError("Image must be under 4 MB."); return; }
+    if (file.size > 8 * 1024 * 1024) { setError("Image must be under 8 MB."); return; }
     setError("");
     const res = await uploadProductFile(file);
     if (res?.url) updateProduct_({ [key]: res.url } as Partial<ProductFormState>);
@@ -2173,7 +2173,7 @@ export default function ProductForm({ productId }: Props) {
                   ) : (
                     <div className="flex flex-col items-center gap-1.5 text-[var(--text-ghost)] text-center px-4">
                       <ImageRawIcon className="h-8 w-8" />
-                      <span className="text-[12px] font-medium text-[var(--text-muted)]">Recommended: 2520 × 1080 px · 21:9 · under 4 MB</span>
+                      <span className="text-[12px] font-medium text-[var(--text-muted)]">Recommended: 2520 × 1080 px · 21:9 · under 8 MB</span>
                       <span className="text-[10px]">No custom poster — the public page builds one automatically</span>
                     </div>
                   )}
@@ -2189,7 +2189,7 @@ export default function ProductForm({ productId }: Props) {
                     <button type="button" onClick={() => updateProduct_({ hero_poster_url: "" })} className="text-[11px] text-[var(--text-ghost)] hover:text-[var(--state-error,#FF3333)] shrink-0">Clear</button>
                   )}
                 </div>
-                <p className="text-[10px] text-[var(--text-ghost)] mt-1.5"><strong className="text-[var(--text-muted)] font-semibold">Size: 2520 × 1080 px (21:9), under 4 MB.</strong> Keep the product centered/right — the bottom-left is overlaid with the name, tagline &amp; button. Leave empty to auto-build the hero from the product photo, name &amp; tagline.</p>
+                <p className="text-[10px] text-[var(--text-ghost)] mt-1.5"><strong className="text-[var(--text-muted)] font-semibold">Size: 2520 × 1080 px (21:9), under 8 MB.</strong> Keep the product centered/right — the bottom-left is overlaid with the name, tagline &amp; button. Leave empty to auto-build the hero from the product photo, name &amp; tagline.</p>
               </div>
             </Section>
 
