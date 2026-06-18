@@ -540,6 +540,9 @@ export default function ProductForm({ productId }: Props) {
      (product_translations.product_name), so there's one source of truth. */
   const [heroNameLocale, setHeroNameLocale] = useState<string>("zh");
   const [translatingHeroName, setTranslatingHeroName] = useState(false);
+  /* Inline status for the auto-translate action so a failure / unconfigured
+     provider is surfaced honestly instead of silently copying the English. */
+  const [heroNameMsg, setHeroNameMsg] = useState<{ kind: "error" | "ok"; text: string } | null>(null);
 
   /* P0 #3 · recovered-draft banner. Holds the timestamp of an
      autosaved draft found on mount so we can offer Restore / Discard.
@@ -1193,6 +1196,7 @@ export default function ProductForm({ productId }: Props) {
     const source = product.product_name.trim();
     if (!source || (heroNameLocale !== "zh" && heroNameLocale !== "ar")) return;
     setTranslatingHeroName(true);
+    setHeroNameMsg(null);
     try {
       const res = await fetch("/api/ai/translate", {
         method: "POST",
@@ -1200,14 +1204,37 @@ export default function ProductForm({ productId }: Props) {
         credentials: "include",
         body: JSON.stringify({ text: source, target_lang: heroNameLocale, source_lang: "en" }),
       });
-      const data = (await res.json()) as { translated?: string };
-      if (data?.translated) setHeroLocaleName(heroNameLocale, data.translated);
+      const data = (await res.json()) as {
+        translated?: string;
+        fallback?: boolean;
+        reason?: string;
+        error?: string;
+      };
+
+      // The endpoint returns 200 with `fallback:true` when no AI provider is
+      // configured (reason:"no_provider") or the provider call failed
+      // (reason:"provider_error") — in both cases `translated` is just the
+      // original English echoed back. Surface that instead of pretending.
+      if (!res.ok || data?.fallback || !data?.translated) {
+        const why =
+          data?.reason === "no_provider"
+            ? t("hero.translateNoProvider", "Auto-translate is off — no translation service is configured. Type the name manually for now.")
+            : t("hero.translateFailed", "Couldn't translate right now. Try again, or type the name manually.");
+        setHeroNameMsg({ kind: "error", text: why });
+        return;
+      }
+
+      setHeroLocaleName(heroNameLocale, data.translated);
+      setHeroNameMsg({ kind: "ok", text: t("hero.translateDone", "Translated — review before saving.") });
     } catch {
-      /* network/translation failure → leave the field for manual entry */
+      setHeroNameMsg({
+        kind: "error",
+        text: t("hero.translateFailed", "Couldn't translate right now. Try again, or type the name manually."),
+      });
     } finally {
       setTranslatingHeroName(false);
     }
-  }, [product.product_name, heroNameLocale, setHeroLocaleName]);
+  }, [product.product_name, heroNameLocale, setHeroLocaleName, t]);
 
   /* Live auto-suggest: whenever the prefix or supplier-model changes,
      recompute the suggestion. Only push it into `primary_model` when
@@ -2466,7 +2493,7 @@ export default function ProductForm({ productId }: Props) {
                           </span>
                           <select
                             value={heroNameLocale}
-                            onChange={(e) => setHeroNameLocale(e.target.value)}
+                            onChange={(e) => { setHeroNameLocale(e.target.value); setHeroNameMsg(null); }}
                             className="h-9 px-2.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-all shrink-0"
                           >
                             {LOCALES.map((l) => (
@@ -2498,6 +2525,17 @@ export default function ProductForm({ productId }: Props) {
                         </div>
                       );
                     })()}
+                    {heroNameMsg && (
+                      <p
+                        className={`mt-1.5 text-[11px] leading-relaxed ${
+                          heroNameMsg.kind === "error"
+                            ? "text-[var(--state-warning,#FFCC00)]"
+                            : "text-[var(--text-muted)]"
+                        }`}
+                      >
+                        {heroNameMsg.text}
+                      </p>
+                    )}
                   </div>
 
                   {/* Tagline — the one-liner shown directly under the
