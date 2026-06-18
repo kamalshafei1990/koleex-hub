@@ -2171,9 +2171,10 @@ export default function ProductForm({ productId }: Props) {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={product.hero_poster_url} alt="Product poster" className="h-full w-full object-cover" />
                   ) : (
-                    <div className="flex flex-col items-center gap-1.5 text-[var(--text-ghost)]">
+                    <div className="flex flex-col items-center gap-1.5 text-[var(--text-ghost)] text-center px-4">
                       <ImageRawIcon className="h-8 w-8" />
-                      <span className="text-[11px]">No custom poster — the public page builds one automatically</span>
+                      <span className="text-[12px] font-medium text-[var(--text-muted)]">Recommended: 2520 × 1080 px · 21:9 · under 4 MB</span>
+                      <span className="text-[10px]">No custom poster — the public page builds one automatically</span>
                     </div>
                   )}
                 </div>
@@ -2188,7 +2189,7 @@ export default function ProductForm({ productId }: Props) {
                     <button type="button" onClick={() => updateProduct_({ hero_poster_url: "" })} className="text-[11px] text-[var(--text-ghost)] hover:text-[var(--state-error,#FF3333)] shrink-0">Clear</button>
                   )}
                 </div>
-                <p className="text-[10px] text-[var(--text-ghost)] mt-1.5">Wide banner (≈21:9). Leave empty to auto-generate the hero from the product photo, name &amp; tagline.</p>
+                <p className="text-[10px] text-[var(--text-ghost)] mt-1.5"><strong className="text-[var(--text-muted)] font-semibold">Size: 2520 × 1080 px (21:9), under 4 MB.</strong> Keep the product centered/right — the bottom-left is overlaid with the name, tagline &amp; button. Leave empty to auto-build the hero from the product photo, name &amp; tagline.</p>
               </div>
             </Section>
 

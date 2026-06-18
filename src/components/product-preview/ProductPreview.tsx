@@ -399,7 +399,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           A subtle bottom scrim keeps the text legible over any image. When no
           poster is set, the auto-composed cinematic hero below takes over. */}
       {posterUrl ? (
-        <section className="relative w-full overflow-hidden rounded-3xl border border-[var(--border-subtle)] aspect-[16/10] sm:aspect-[2/1] lg:aspect-[21/9]">
+        <section className="relative w-full overflow-hidden rounded-3xl border border-[var(--border-subtle)] aspect-[21/9]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={posterUrl} alt={displayName} className="absolute inset-0 h-full w-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
