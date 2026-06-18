@@ -326,6 +326,8 @@ export const PRODUCTS_UI_I18N: Translations = {
   "hero.pickSubcategory": { en: "PICK SUBCATEGORY", zh: "选择子类别", ar: "اختر الفئة الفرعية" },
   "hero.pickSubcategoryTitle": { en: "Pick a subcategory to inherit a classification prefix.", zh: "选择一个子类别以继承分类前缀。", ar: "اختر فئة فرعية لوراثة بادئة التصنيف." },
   "hero.codePlaceholder": { en: "e.g. XCS-7800", zh: "例如 XCS-7800", ar: "مثال: XCS-7800" },
+  "hero.oldModel": { en: "Old Model", zh: "旧型号", ar: "الموديل القديم" },
+  "hero.oldModelPlaceholder": { en: "Previous / superseded code", zh: "旧的 / 被取代的编号", ar: "الرمز السابق / المُستبدَل" },
   "hero.reset": { en: "Reset", zh: "重置", ar: "إعادة تعيين" },
   "hero.resetToAuto": { en: "Reset to the auto-suggested code", zh: "重置为自动建议的编码", ar: "إعادة التعيين إلى الرمز المقترح تلقائيًا" },
   "hero.approve": { en: "Approve", zh: "批准", ar: "اعتماد" },

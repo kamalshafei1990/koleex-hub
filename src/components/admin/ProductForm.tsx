@@ -2566,37 +2566,6 @@ export default function ProductForm({ productId }: Props) {
                     )}
                   </div>
 
-                  {/* Tagline — the one-liner shown directly under the
-                      product name on the public hero. Biggest single
-                      piece of marketing copy on the whole product
-                      page. Lives on the primary model (each model can
-                      have its own tagline) but surfaced here so the
-                      admin isn't hunting for it in Models. */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="block text-[10px] font-bold text-[var(--text-ghost)] uppercase tracking-wider">
-                        <span className="inline-flex items-center gap-1.5"><SparklesIcon className="h-3 w-3" /> {t("hero.tagline", "Tagline")}</span>
-                      </label>
-                      <span className="text-[10px] text-[var(--text-ghost)]">
-                        {t("hero.taglineMeta").replace("{n}", String((primaryModel?.tagline || "").length))}
-                      </span>
-                    </div>
-                    {/* Tagline is rendered at 32px on the public hero and
-                        was designed to fit comfortably in one line at
-                        ≤ 80 characters. The old maxLength=140 let admins
-                        type past that and contradicted the "char / 80"
-                        counter. Hard cap at 80 so WYSIWYG matches the
-                        rendered page. */}
-                    <input
-                      type="text"
-                      value={primaryModel?.tagline || ""}
-                      onChange={(e) => updatePrimaryModel({ tagline: e.target.value })}
-                      placeholder={t("hero.taglinePlaceholder", "e.g. Precision jetted pockets at 3-second cycle.")}
-                      maxLength={80}
-                      className="w-full h-12 px-5 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[15px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all"
-                    />
-                  </div>
-
                   {/* Primary Model — the canonical KOLEEX commercial code.
                       Single source of truth for the 3-layer identity:
                       classification prefix (left chip) + editable code
@@ -2815,6 +2784,64 @@ export default function ProductForm({ productId }: Props) {
                       </div>
                     );
                   })()}
+
+                  {/* Old Model + Supplier Model — the two reference codes that
+                      sit under the KOLEEX primary code. Old Model = the
+                      previous / superseded code this product replaces
+                      (product.legacy_code). Supplier Model = the factory's own
+                      model number (product_models.reference_model), which also
+                      seeds the KOLEEX code suggestion. Two-up on wider screens,
+                      stacked on mobile. */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-[var(--text-ghost)] uppercase tracking-wider mb-2">
+                        <span className="inline-flex items-center gap-1.5"><TagsIcon className="h-3 w-3" /> {t("hero.oldModel", "Old Model")}</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={product.legacy_code}
+                        onChange={(e) => updateProduct_({ legacy_code: e.target.value })}
+                        placeholder={t("hero.oldModelPlaceholder", "Previous / superseded code")}
+                        className="w-full h-12 px-5 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[15px] font-mono tracking-[0.03em] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-[var(--text-ghost)] uppercase tracking-wider mb-2">
+                        <span className="inline-flex items-center gap-1.5"><FactoryIcon className="h-3 w-3" /> {t("hero.supplierModel", "Supplier Model")}</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={primaryModel?.reference_model || ""}
+                        onChange={(e) => updatePrimaryModel({ reference_model: e.target.value })}
+                        placeholder={t("hero.supplierModelPlaceholder", "Factory model no.")}
+                        title={t("hero.supplierModelHint", "The factory's own model number — seeds the KOLEEX code suggestion.")}
+                        className="w-full h-12 px-5 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[15px] font-mono tracking-[0.03em] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Tagline — the one-liner shown directly under the
+                      product name on the public hero. Lives on the primary
+                      model but surfaced here so the admin isn't hunting for
+                      it in Models. Sits below the identity codes now. */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-[10px] font-bold text-[var(--text-ghost)] uppercase tracking-wider">
+                        <span className="inline-flex items-center gap-1.5"><SparklesIcon className="h-3 w-3" /> {t("hero.tagline", "Tagline")}</span>
+                      </label>
+                      <span className="text-[10px] text-[var(--text-ghost)]">
+                        {t("hero.taglineMeta").replace("{n}", String((primaryModel?.tagline || "").length))}
+                      </span>
+                    </div>
+                    <input
+                      type="text"
+                      value={primaryModel?.tagline || ""}
+                      onChange={(e) => updatePrimaryModel({ tagline: e.target.value })}
+                      placeholder={t("hero.taglinePlaceholder", "e.g. Precision jetted pockets at 3-second cycle.")}
+                      maxLength={80}
+                      className="w-full h-12 px-5 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[15px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all"
+                    />
+                  </div>
 
                   {/* Slug / URL preview — SEO-friendly URL that can be
                       edited. Auto-syncs from product name until the
