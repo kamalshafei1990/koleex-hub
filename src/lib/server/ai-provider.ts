@@ -16,13 +16,49 @@ import "server-only";
 export interface TranslateInput {
   text: string;
   sourceLang?: string;     // omit to let the model auto-detect
-  targetLang: "en" | "zh" | "ar";
+  /* Any locale code in TRANSLATE_LANG_NAMES. The model translates to any
+     language given its name, so this is not limited to en/zh/ar. */
+  targetLang: string;
 }
 
 export interface TranslateResult {
   translated: string;
   provider: string;
   detectedSource?: string;
+}
+
+/* Supported translation targets → the language name handed to the model.
+   Mirrors the LOCALES list the product form offers. Add a row here to
+   enable a new language end-to-end. */
+export const TRANSLATE_LANG_NAMES: Record<string, string> = {
+  en: "English",
+  zh: "Chinese (Simplified)",
+  ar: "Arabic",
+  de: "German",
+  fr: "French",
+  es: "Spanish",
+  tr: "Turkish",
+  ru: "Russian",
+  pt: "Portuguese",
+  hi: "Hindi",
+  ur: "Urdu",
+  id: "Indonesian",
+  vi: "Vietnamese",
+  th: "Thai",
+  ja: "Japanese",
+  ko: "Korean",
+  pl: "Polish",
+  nl: "Dutch",
+};
+
+/** Whether a locale code is a translatable target. */
+export function isTranslatableLang(code: string): boolean {
+  return Object.prototype.hasOwnProperty.call(TRANSLATE_LANG_NAMES, code);
+}
+
+/** The model-facing language name for a code (falls back to the code). */
+function translateLangName(code: string): string {
+  return TRANSLATE_LANG_NAMES[code] ?? code;
 }
 
 export interface ChatMessage {
@@ -80,8 +116,7 @@ async function geminiTranslate(input: TranslateInput): Promise<TranslateResult |
   const key = process.env.GEMINI_API_KEY;
   if (!key) return null;
 
-  const langNames: Record<string, string> = { en: "English", zh: "Chinese (Simplified)", ar: "Arabic" };
-  const targetName = langNames[input.targetLang] ?? input.targetLang;
+  const targetName = translateLangName(input.targetLang);
 
   const prompt = `You are a professional translator for a business ERP system. Translate the following text to ${targetName}. Return ONLY the translated text, no explanations, no quotes, no commentary. Preserve product codes, numbers, proper nouns, and punctuation exactly.
 
@@ -232,8 +267,7 @@ async function groqTranslate(input: TranslateInput): Promise<TranslateResult | n
   const key = process.env.GROQ_API_KEY;
   if (!key) return null;
 
-  const langNames: Record<string, string> = { en: "English", zh: "Chinese (Simplified)", ar: "Arabic" };
-  const targetName = langNames[input.targetLang] ?? input.targetLang;
+  const targetName = translateLangName(input.targetLang);
 
   const messages: ChatMessage[] = [
     {
@@ -280,8 +314,7 @@ async function deepseekTranslate(input: TranslateInput): Promise<TranslateResult
   const key = process.env.DEEPSEEK_API_KEY;
   if (!key) return null;
 
-  const langNames: Record<string, string> = { en: "English", zh: "Chinese (Simplified)", ar: "Arabic" };
-  const targetName = langNames[input.targetLang] ?? input.targetLang;
+  const targetName = translateLangName(input.targetLang);
 
   const messages: ChatMessage[] = [
     {
