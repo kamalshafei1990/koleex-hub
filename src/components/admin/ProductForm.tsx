@@ -734,14 +734,34 @@ export default function ProductForm({ productId }: Props) {
 
   /* ── Load data ── */
   useEffect(() => {
-    (async () => {
-      const [divs, cats, subs, supplierList, brandList, logoMap, attrCfg, divLogos, catLogos, subLogos, classIconMap] = await Promise.all([
-        fetchDivisions(), fetchCategories(), fetchSubcategories(),
-        fetchSupplierNames(), fetchUniqueBrands(), fetchBrandLogos(),
-        fetchAttributeConfig(),
-        fetchDivisionLogos(), fetchCategoryLogos(), fetchSubcategoryLogos(),
-        fetchClassificationIcons(),
+    let cancelled = false;
+    /* Resolve to a fallback if a reference fetch rejects OR stalls. A single
+       slow/failed lookup (a storage logo list, the attribute config, etc.)
+       must never trap the "Add product" form on an infinite spinner — that
+       was the bug: the load had no try/finally and no timeout, so one hung
+       request kept setLoading(false) from ever running. */
+    const REF_TIMEOUT = 12_000;
+    const guard = <T,>(p: Promise<T>, fallback: T): Promise<T> =>
+      Promise.race([
+        Promise.resolve(p).catch(() => fallback),
+        new Promise<T>((res) => setTimeout(() => res(fallback), REF_TIMEOUT)),
       ]);
+    (async () => {
+     try {
+      const [divs, cats, subs, supplierList, brandList, logoMap, attrCfg, divLogos, catLogos, subLogos, classIconMap] = await Promise.all([
+        guard(fetchDivisions(), [] as Awaited<ReturnType<typeof fetchDivisions>>),
+        guard(fetchCategories(), [] as Awaited<ReturnType<typeof fetchCategories>>),
+        guard(fetchSubcategories(), [] as Awaited<ReturnType<typeof fetchSubcategories>>),
+        guard(fetchSupplierNames(), [] as Awaited<ReturnType<typeof fetchSupplierNames>>),
+        guard(fetchUniqueBrands(), [] as Awaited<ReturnType<typeof fetchUniqueBrands>>),
+        guard(fetchBrandLogos(), {} as Awaited<ReturnType<typeof fetchBrandLogos>>),
+        guard(fetchAttributeConfig(), { voltage: [], plug_types: [], colors: [], watt: [], levels: [], tags: [], tag_colors: {} } as Awaited<ReturnType<typeof fetchAttributeConfig>>),
+        guard(fetchDivisionLogos(), {} as Awaited<ReturnType<typeof fetchDivisionLogos>>),
+        guard(fetchCategoryLogos(), {} as Awaited<ReturnType<typeof fetchCategoryLogos>>),
+        guard(fetchSubcategoryLogos(), {} as Awaited<ReturnType<typeof fetchSubcategoryLogos>>),
+        guard(fetchClassificationIcons(), {} as Awaited<ReturnType<typeof fetchClassificationIcons>>),
+      ]);
+      if (cancelled) return;
       setDivisions(divs);
       setCategories(cats);
       setSubcategories(subs);
@@ -763,17 +783,18 @@ export default function ProductForm({ productId }: Props) {
 
       if (isEdit && productId) {
         const [p, dbModels, dbMedia, dbTranslations, dbRelated, dbSewingSpecs, dbSuppliers, dbCerts, dbDocs] = await Promise.all([
-          fetchProductById(productId),
-          fetchModelsByProductId(productId),
-          fetchMediaByProductId(productId),
-          fetchTranslationsByProductId(productId),
-          fetchRelatedProducts(productId),
-          fetchSewingSpecsByProductId(productId),
-          fetchProductSuppliers(productId),
-          fetchProductCertifications(productId),
-          fetchProductDocuments(productId),
+          guard(fetchProductById(productId), null as Awaited<ReturnType<typeof fetchProductById>>),
+          guard(fetchModelsByProductId(productId), [] as Awaited<ReturnType<typeof fetchModelsByProductId>>),
+          guard(fetchMediaByProductId(productId), [] as Awaited<ReturnType<typeof fetchMediaByProductId>>),
+          guard(fetchTranslationsByProductId(productId), [] as Awaited<ReturnType<typeof fetchTranslationsByProductId>>),
+          guard(fetchRelatedProducts(productId), [] as Awaited<ReturnType<typeof fetchRelatedProducts>>),
+          guard(fetchSewingSpecsByProductId(productId), null as Awaited<ReturnType<typeof fetchSewingSpecsByProductId>>),
+          guard(fetchProductSuppliers(productId), [] as Awaited<ReturnType<typeof fetchProductSuppliers>>),
+          guard(fetchProductCertifications(productId), [] as Awaited<ReturnType<typeof fetchProductCertifications>>),
+          guard(fetchProductDocuments(productId), [] as Awaited<ReturnType<typeof fetchProductDocuments>>),
         ]);
-        if (!p) { setError("Product not found"); setLoading(false); return; }
+        if (cancelled) return;
+        if (!p) { setError("Product not found"); return; }
 
         const modelIds = dbModels.map(m => m.id);
         const dbPrices = await fetchMarketPricesByModelIds(modelIds);
@@ -1016,8 +1037,15 @@ export default function ProductForm({ productId }: Props) {
         }
       }
 
-      setLoading(false);
+     } catch (e) {
+       // Last-resort guard: even an unexpected throw must not leave the
+       // form stuck on the loading spinner.
+       console.error("[ProductForm] load failed", e);
+     } finally {
+       if (!cancelled) setLoading(false);
+     }
     })();
+    return () => { cancelled = true; };
   }, [isEdit, productId]);
 
   const updateProduct_ = useCallback((updates: Partial<ProductFormState>) => {
