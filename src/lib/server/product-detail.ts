@@ -63,10 +63,21 @@ interface ModelRow {
   order: number | null;
 }
 
+/** Localized overlay for the public hero — English stays the base; a row
+ *  exists only for locales an admin has filled in. */
+export interface ProductLocaleText {
+  locale: string;
+  product_name: string | null;
+  tagline: string | null;
+  excerpt: string | null;
+  description: string | null;
+}
+
 export interface SchemaProductPreviewProps {
   productName: string;
   primaryModel: string | null;
   tagline: string | null;
+  translations: ProductLocaleText[];
   brand: string | null;
   schema: ProductSchemaDefinition | null;
   values: Record<string, unknown>;
@@ -124,7 +135,7 @@ export async function loadPublicSchemaProduct(
 
   const supabase = getSupabaseServer();
 
-  const [{ data: subcat }, { data: mediaData }, { data: modelData }] =
+  const [{ data: subcat }, { data: mediaData }, { data: modelData }, { data: translationData }] =
     await Promise.all([
       supabase.from("subcategories").select("code").eq("slug", product.subcategory_slug ?? "").maybeSingle(),
       supabase
@@ -137,6 +148,10 @@ export async function loadPublicSchemaProduct(
         .select('primary_model, tagline, "order"')
         .eq("product_id", product.id)
         .order("order", { ascending: true }),
+      supabase
+        .from("product_translations")
+        .select("locale, product_name, tagline, excerpt, description")
+        .eq("product_id", product.id),
     ]);
 
   const subcategoryCode = (subcat?.code as string | null) ?? "";
@@ -185,6 +200,7 @@ export async function loadPublicSchemaProduct(
       productName: product.product_name,
       primaryModel: model?.primary_model ?? null,
       tagline: model?.tagline ?? null,
+      translations: (translationData as ProductLocaleText[] | null) ?? [],
       brand: product.brand,
       schema: publicSchema,
       values: publicSpecs,
