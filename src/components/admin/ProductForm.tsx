@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import WizardKnowledgePanel, { type WizardKnowledge } from "@/components/admin/WizardKnowledgePanel";
-import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
@@ -45,13 +44,13 @@ import {
   createModel, updateModel, deleteModel,
   uploadProductFile, createProductMedia, deleteProductMedia,
   upsertTranslation, deleteTranslation,
-  upsertMarketPrice, deleteMarketPrice,
+  upsertMarketPrice,
   setRelatedProducts,
   fetchProductSuppliers, saveProductSuppliers,
   fetchProductCertifications, saveProductCertifications,
   fetchProductDocuments, saveProductDocuments,
   fetchSupplierNames, fetchUniqueBrands,
-  fetchBrandLogos, uploadBrandLogo,
+  fetchBrandLogos,
   fetchDivisionLogos, fetchCategoryLogos, fetchSubcategoryLogos, fetchClassificationIcons,
   fetchSewingSpecsByProductId, upsertSewingSpecs,
 } from "@/lib/products-admin";
@@ -92,8 +91,6 @@ import CreateSupplierModal from "./form-sections/CreateSupplierModal";
 import CreateBrandModal from "./form-sections/CreateBrandModal";
 import DescriptionSection from "./form-sections/DescriptionSection";
 import KnowledgeSection from "./form-sections/KnowledgeSection";
-import SpecsSection from "./form-sections/SpecsSection";
-import ConfigSection from "./form-sections/ConfigSection";
 import TechnicalSection from "./form-sections/TechnicalSection";
 import ModelsSection from "./form-sections/ModelsSection";
 import MediaSection from "./form-sections/MediaSection";
@@ -2105,9 +2102,9 @@ export default function ProductForm({ productId }: Props) {
                     {/* Status pills — 3-way toggle (Draft / Active / Archived) */}
                     <div className="flex gap-1 p-0.5 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)]">
                       {([
-                        { v: "draft", label: t("status.draft", "Draft"), cls: "text-amber-400 bg-amber-400/15" },
-                        { v: "active", label: t("status.active", "Active"), cls: "text-emerald-400 bg-emerald-400/15" },
-                        { v: "archived", label: t("status.archived", "Archived"), cls: "text-red-400 bg-red-400/15" },
+                        { v: "draft", label: t("status.draft", "Draft"), cls: "text-[var(--state-warning,#FFCC00)] bg-[var(--state-warning,#FFCC00)]/15" },
+                        { v: "active", label: t("status.active", "Active"), cls: "text-[var(--state-success,#00CC66)] bg-[var(--state-success,#00CC66)]/15" },
+                        { v: "archived", label: t("status.archived", "Archived"), cls: "text-[var(--state-error,#FF3333)] bg-[var(--state-error,#FF3333)]/15" },
                       ] as const).map(s => {
                         const active = product.status === s.v;
                         return (
@@ -2131,7 +2128,7 @@ export default function ProductForm({ productId }: Props) {
                       onClick={() => updateProduct_({ featured: !product.featured })}
                       className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[11px] font-semibold border transition-all ${
                         product.featured
-                          ? "bg-amber-500/15 text-amber-400 border-amber-500/40"
+                          ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
                           : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)] border-[var(--border-subtle)] hover:text-[var(--text-muted)]"
                       }`}
                       title={product.featured ? t("hero.featuredOnHome", "Featured on homepage") : t("hero.clickToFeature", "Click to feature on homepage")}
@@ -2148,7 +2145,7 @@ export default function ProductForm({ productId }: Props) {
                       onClick={() => updateProduct_({ visible: !product.visible })}
                       className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[11px] font-semibold border transition-all ${
                         product.visible
-                          ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/40"
+                          ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
                           : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)] border-[var(--border-subtle)] hover:text-[var(--text-muted)]"
                       }`}
                       title={product.visible ? t("hero.visibleOnCatalog", "Visible on public catalog") : t("hero.hiddenFromCatalog", "Hidden from public catalog")}
@@ -2276,7 +2273,7 @@ export default function ProductForm({ productId }: Props) {
                       null;
                     const statusCls =
                       status === "approved" || status === "locked"
-                        ? "border-emerald-500/50 text-emerald-600 dark:text-emerald-300"
+                        ? "border-[var(--state-success,#00CC66)]/50 text-[var(--state-success,#00CC66)]"
                         : status === "edited"
                           ? "border-[var(--text-primary)] text-[var(--text-primary)]"
                           : "border-[var(--border-subtle)] text-[var(--text-ghost)]";
@@ -2358,7 +2355,7 @@ export default function ProductForm({ productId }: Props) {
                             }
                             className={`flex-1 min-w-[180px] h-12 px-5 rounded-xl bg-[var(--bg-surface-subtle)]/70 border ${
                               isTaken
-                                ? "border-red-500/70 focus:border-red-500"
+                                ? "border-[var(--state-error,#FF3333)]/70 focus:border-[var(--state-error,#FF3333)]"
                                 : "border-[var(--border-subtle)] focus:border-[var(--border-focus)]"
                             } text-[15px] font-bold font-mono tracking-[0.04em] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none transition-all disabled:opacity-60 disabled:cursor-not-allowed`}
                           />
@@ -2412,16 +2409,16 @@ export default function ProductForm({ productId }: Props) {
                               5. Prefix-mismatch warning
                               6. Default helper text. */}
                         {validationError ? (
-                          <p className="text-[11px] text-red-500 mt-2">{validationError}</p>
+                          <p className="text-[11px] text-[var(--state-error,#FF3333)] mt-2">{validationError}</p>
                         ) : isTaken && codeCheck.status === "taken" ? (
-                          <p className="text-[11px] text-red-500 mt-2 leading-relaxed">
+                          <p className="text-[11px] text-[var(--state-error,#FF3333)] mt-2 leading-relaxed">
                             <span className="font-semibold">{t("model.codeInUseInline", "Code already in use.")}</span>{" "}
                             <span className="font-mono font-bold">{codeCheck.conflict.primary_model}</span>{" "}
                             {t("model.codeBelongsTo", "belongs to")}{" "}
                             {codeCheck.conflict.product_slug ? (
                               <a
                                 href={`/admin/products/${codeCheck.conflict.product_id}`}
-                                className="font-semibold underline underline-offset-2 hover:text-red-400"
+                                className="font-semibold underline underline-offset-2 hover:opacity-80"
                                 target="_blank"
                                 rel="noopener noreferrer"
                               >
@@ -2439,18 +2436,18 @@ export default function ProductForm({ productId }: Props) {
                             {t("model.checking", "Checking if this code is available…")}
                           </p>
                         ) : codeCheck.status === "available" && code && code !== suggestedPrimaryModel ? (
-                          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-2">
+                          <p className="text-[11px] text-[var(--state-success,#00CC66)] mt-2">
                             ✓ {t("model.availableInline", "Available — no other product uses this code.")}
                           </p>
                         ) : codeCheck.status === "error" && code ? (
                           /* P0 #4 · the live check couldn't reach the server.
                              Be honest, and reassure that Save still verifies
                              (the save-time re-check + DB unique index). */
-                          <p className="text-[11px] text-amber-500 mt-2">
+                          <p className="text-[11px] text-[var(--state-warning,#FFCC00)] mt-2">
                             {t("model.unableToVerify", "Couldn't verify this code right now — we'll re-check it when you save.")}
                           </p>
                         ) : validationWarning ? (
-                          <p className="text-[11px] text-amber-500 mt-2">{validationWarning}</p>
+                          <p className="text-[11px] text-[var(--state-warning,#FFCC00)] mt-2">{validationWarning}</p>
                         ) : (
                           <p className="text-[10px] text-[var(--text-ghost)] mt-2 leading-relaxed">
                             {t("model.helperText", "KOLEEX commercial code — auto-suggested from the classification prefix + supplier model below, freely editable. Codes are unique across the catalog. Supplier model stays untouched as the factory reference.")}
@@ -2523,52 +2520,9 @@ export default function ProductForm({ productId }: Props) {
                   <div className="h-6 w-6 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
                     <DollarSignIcon className="h-3 w-3 text-[var(--text-ghost)]" />
                   </div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">{t("hero.commercialStrip", "Primary Commercial · Supplier & Pricing")}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">{t("hero.pricingStrip", "Primary Pricing")}</span>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div>
-                    <label className={lbl}>
-                      <span className="inline-flex items-center gap-1.5"><FactoryIcon className="h-3 w-3" /> {t("hero.supplier", "Supplier")}</span>
-                    </label>
-                    <SelectWithCreate
-                      value={primaryModel?.supplier || ""}
-                      options={suppliers.map(s => ({ value: s.name, label: s.name, icon: s.logo }))}
-                      onChange={(val) => updatePrimaryModel({ supplier: val })}
-                      onClickCreate={() => { setSupplierTarget("hero"); setShowSupplierModal(true); }}
-                      placeholder={t("hero.selectSupplier", "Select supplier...")}
-                      createLabel={t("hero.createSupplier", "Create Supplier")}
-                    />
-                  </div>
-                  <div>
-                    <label className={lbl}>{t("hero.supplierModel", "Supplier Model")}</label>
-                    <input
-                      type="text"
-                      value={primaryModel?.reference_model || ""}
-                      onChange={(e) => updatePrimaryModel({ reference_model: e.target.value })}
-                      placeholder={t("hero.supplierModelPlaceholder", "e.g. JUKI DDL-8700H")}
-                      className={inp}
-                    />
-                    <p className="text-[10px] text-[var(--text-ghost)] mt-1">
-                      {t("hero.supplierModelHint", "The factory's own model code. Helps operations match invoices + spare parts.")}
-                    </p>
-                  </div>
-                  <div>
-                    {/* Cost is what Koleex pays the Chinese factory —
-                        stored + entered in CNY (¥). The selling price
-                        below stays in USD since we sell globally. */}
-                    <label className={lbl}>{t("hero.costPrice", "Cost Price (CNY)")}</label>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[12px] font-semibold text-[var(--text-ghost)]">¥</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={primaryModel?.cost_price || ""}
-                        onChange={(e) => updatePrimaryModel({ cost_price: e.target.value })}
-                        placeholder="0.00"
-                        className={`${inp} pl-8`}
-                      />
-                    </div>
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className={lbl}>{t("hero.globalPrice", "Global Selling Price (USD)")}</label>
                     <div className="relative">
@@ -2581,6 +2535,15 @@ export default function ProductForm({ productId }: Props) {
                         placeholder="0.00"
                         className={`${inp} pl-8`}
                       />
+                    </div>
+                  </div>
+                  {/* Sourcing (supplier · supplier model · cost) is owned by the
+                      Supplier tab now — single source of truth. Point there
+                      instead of duplicating the fields in the hero. */}
+                  <div className="flex items-end">
+                    <div className="w-full rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/50 px-3.5 h-[42px] flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
+                      <FactoryIcon className="h-3.5 w-3.5 text-[var(--text-ghost)] shrink-0" />
+                      <span>{t("hero.sourcingMovedHint", "Supplier, cost & sourcing → manage in the Supplier tab")}</span>
                     </div>
                   </div>
                 </div>
@@ -2635,7 +2598,7 @@ export default function ProductForm({ productId }: Props) {
                 />
                 <p className="text-[10px] mt-1.5 flex items-center justify-between text-[var(--text-ghost)]">
                   <span>{t("hero.excerptSeoHint", "Aim for under 160 characters for best SEO display.")}</span>
-                  <span className={product.excerpt.length > 160 ? "text-amber-400 font-semibold" : ""}>
+                  <span className={product.excerpt.length > 160 ? "text-[var(--state-warning,#FFCC00)] font-semibold" : ""}>
                     {product.excerpt.length} / 320{product.excerpt.length > 160 ? ` · ${t("hero.excerptOverSeo", "over SEO limit")}` : ""}
                   </span>
                 </p>
@@ -2720,6 +2683,18 @@ export default function ProductForm({ productId }: Props) {
                   <label className={lbl}>GTIN / EAN / UPC</label>
                   <input className={inp} value={product.gtin} placeholder="e.g. 6970000000001"
                     onChange={(e) => updateProduct_({ gtin: e.target.value })} />
+                  {(() => {
+                    const g = product.gtin.replace(/\s/g, "");
+                    if (!g) return null;
+                    const ok = /^(\d{8}|\d{12}|\d{13}|\d{14})$/.test(g) && (() => {
+                      const d = g.split("").map(Number); const cd = d.pop()!;
+                      const sum = d.reverse().reduce((a, n, i) => a + n * (i % 2 === 0 ? 3 : 1), 0);
+                      return (10 - (sum % 10)) % 10 === cd;
+                    })();
+                    return ok ? null : (
+                      <p className="text-[10px] text-[var(--state-warning,#FFCC00)] mt-1">Check the GTIN — not a valid 8/12/13/14-digit barcode.</p>
+                    );
+                  })()}
                 </div>
                 <div>
                   <label className={lbl}>Internal SKU</label>
@@ -2741,12 +2716,19 @@ export default function ProductForm({ productId }: Props) {
                   <label className={lbl}>End-of-life date</label>
                   <input type="date" className={inp} value={product.eol_date}
                     onChange={(e) => updateProduct_({ eol_date: e.target.value })} />
+                  {product.launch_date && product.eol_date && product.eol_date <= product.launch_date && (
+                    <p className="text-[10px] text-[var(--state-warning,#FFCC00)] mt-1">End-of-life is on or before the launch date.</p>
+                  )}
                 </div>
                 <div className="md:col-span-3">
                   <label className={lbl}>Alternate names / aliases</label>
-                  <input className={inp} value={product.alternate_names.join(", ")} placeholder="Comma-separated other names / model codes"
-                    onChange={(e) => updateProduct_({ alternate_names: e.target.value.split(",").map((s) => s.trim()) })} />
-                  <p className="text-[10px] text-[var(--text-ghost)] mt-1">Helps search + matching. Separate with commas.</p>
+                  <TagsInput
+                    tags={product.alternate_names}
+                    onChange={(alternate_names) => updateProduct_({ alternate_names })}
+                    suggestions={[]}
+                    t={t}
+                  />
+                  <p className="text-[10px] text-[var(--text-ghost)] mt-1">Helps search + matching. Press Enter or comma to add each alias.</p>
                 </div>
               </div>
             </Section>
