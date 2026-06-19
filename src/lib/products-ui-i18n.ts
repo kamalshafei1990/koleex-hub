@@ -444,6 +444,7 @@ export const PRODUCTS_UI_I18N: Translations = {
   /* ── Description step (P0 #5b) ── */
   "description.title": { en: "Product Description", zh: "产品描述", ar: "وصف المنتج" },
   "description.badgeRichText": { en: "Rich text", zh: "富文本", ar: "نص منسّق" },
+  "description.inLangPlaceholder": { en: "Full description in {lang}", zh: "{lang}的完整描述", ar: "الوصف الكامل بـ{lang}" },
 
   /* ── Specs step (P0 #5b) ── */
   "specs.productSpecs": { en: "Product Specs", zh: "产品规格", ar: "مواصفات المنتج" },
