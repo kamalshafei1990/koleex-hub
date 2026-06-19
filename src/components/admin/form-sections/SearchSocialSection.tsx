@@ -106,22 +106,25 @@ export default function SearchSocialSection({
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img src={customOg} alt="" className="w-full h-full object-contain bg-[var(--bg-surface)]" />
               ) : (
-                /* Branded KOLEEX share card — black, real logo, the product
-                   photo, then name + model. Matches the generated og:image. */
-                <div className="w-full h-full bg-black flex flex-col items-center justify-between text-center px-6 py-4">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/koleex-hub-logo.svg" alt="KOLEEX" className="h-3 w-auto opacity-90 shrink-0" />
-                  {primaryImageUrl ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img src={primaryImageUrl} alt="" className="flex-1 min-h-0 w-auto max-w-[68%] object-contain my-2" />
-                  ) : (
-                    <div className="flex-1" />
-                  )}
-                  <div className="shrink-0">
-                    <div className="text-[14px] font-bold leading-tight text-white line-clamp-1">{name}</div>
-                    {modelCode && (
-                      <div className="text-[11px] font-mono tracking-wide text-white/55 mt-0.5">{modelCode}</div>
-                    )}
+                /* Simple product poster — the photo is the hero, with a clean
+                   caption bar (name + model on the left, KOLEEX logo on the
+                   right). Matches the generated og:image. */
+                <div className="w-full h-full bg-black flex flex-col px-6 pt-5 pb-4">
+                  <div className="flex-1 min-h-0 flex items-center justify-center">
+                    {primaryImageUrl ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={primaryImageUrl} alt="" className="max-h-full max-w-[82%] object-contain" />
+                    ) : null}
+                  </div>
+                  <div className="shrink-0 mt-3 pt-3 border-t border-white/10 flex items-end justify-between gap-3">
+                    <div className="min-w-0 text-left">
+                      <div className="text-[14px] font-bold leading-tight text-white truncate">{name}</div>
+                      {modelCode && (
+                        <div className="text-[11px] font-mono tracking-wide text-white/50 mt-0.5 truncate">{modelCode}</div>
+                      )}
+                    </div>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/koleex-hub-logo.svg" alt="KOLEEX" className="h-2.5 w-auto opacity-75 shrink-0" />
                   </div>
                 </div>
               )}
