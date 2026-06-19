@@ -67,17 +67,7 @@ export default async function OgImage({
           padding: "64px 72px 56px",
         }}
       >
-        {/* KOLEEX wordmark — canonical brand logo, inlined for Satori */}
-        <svg width={360} height={54} viewBox="0 0 719.83 107.57" fill="#FFFFFF" xmlns="http://www.w3.org/2000/svg">
-          <path d="M116.59,96.3v11.05h-10.6L14.66,62.47v44.88H0V1.58h14.66v43.53L105.99,1.58h10.6v11.05L28.42,53.9l88.18,42.4Z" />
-          <path d="M242.65,71.04c0,20.07-14.21,36.54-34.28,36.54h-50.74c-20.52,0-35.18-16.01-35.18-36.54v-35.18C122.45,15.11,136.88.45,157.63.45h49.84c20.52,0,35.18,14.88,35.18,35.41v35.18ZM227.77,38.11c0-12.4-8.34-23.23-20.3-23.23h-49.84c-11.95,0-20.3,10.83-20.3,23.23v31.8c0,11.95,8.34,23,20.3,23h49.84c11.95,0,20.3-11.05,20.3-23v-31.8Z" />
-          <path d="M363.07,107.57h-68.56c-20.52,0-35.18-16.01-35.18-36.54l.23-71.04h14.66v69.91c0,11.95,8.34,23,20.3,23h68.56v14.66h-.01Z" />
-          <path d="M473.8,107.57h-68.56c-20.52,0-35.18-16.01-35.18-36.54v-34.51c0-20.52,14.66-34.96,35.18-34.96h68.56v14.88h-68.56c-11.73,0-20.3,9.7-20.3,21.2v10.6l88.18.23v14.66l-88.18-.23v6.99c0,11.95,8.57,23,20.3,23h68.56v14.68Z" />
-          <path d="M585.42,107.57h-68.56c-20.52,0-35.18-16.01-35.18-36.54v-34.51c0-20.52,14.66-34.96,35.18-34.96h68.56v14.88h-68.56c-11.73,0-20.3,9.7-20.3,21.2v10.6l88.18.23v14.66l-88.18-.23v6.99c0,11.95,8.57,23,20.3,23h68.56v14.68Z" />
-          <path d="M719.83,96.3v11.05h-10.6l-48.04-42.62-48.04,42.62h-10.37v-11.05l46.91-41.72-46.91-41.95V1.58h10.37l48.04,42.62L709.23,1.58h10.6v11.05l-47.13,41.95,47.13,41.72ZM661.19,71.04l40.59,36.31h-81.19l40.59-36.31h0Z" />
-        </svg>
-
-        {/* Product photo — the poster hero */}
+        {/* Product photo — the dominant hero */}
         <div
           style={{
             flex: 1,
@@ -85,30 +75,43 @@ export default async function OgImage({
             alignItems: "center",
             justifyContent: "center",
             width: "100%",
-            padding: "24px 0",
           }}
         >
           {photo ? (
             /* eslint-disable-next-line @next/next/no-img-element */
-            <img src={photo} alt="" style={{ maxWidth: 900, maxHeight: 340, objectFit: "contain" }} width={900} height={340} />
+            <img src={photo} alt="" style={{ maxWidth: 1000, maxHeight: 430, objectFit: "contain" }} width={1000} height={430} />
           ) : null}
         </div>
 
-        {/* Caption — product name + model */}
+        {/* Footer — name + model on the left, small KOLEEX mark on the right */}
         <div
           style={{
             display: "flex",
-            flexDirection: "column",
+            alignItems: "flex-end",
+            justifyContent: "space-between",
+            gap: 32,
+            marginTop: 36,
             paddingTop: 28,
             borderTop: "1px solid rgba(255,255,255,0.16)",
           }}
         >
-          <div style={{ display: "flex", fontSize: name.length > 40 ? 40 : 52, fontWeight: 800, lineHeight: 1.1, maxWidth: 1040 }}>
-            {name}
+          <div style={{ display: "flex", flexDirection: "column", maxWidth: 880 }}>
+            <div style={{ display: "flex", fontSize: name.length > 40 ? 40 : 50, fontWeight: 800, lineHeight: 1.1 }}>
+              {name}
+            </div>
+            {model ? (
+              <div style={{ fontSize: 28, letterSpacing: 2, color: "rgba(255,255,255,0.55)", marginTop: 14 }}>Model: {model}</div>
+            ) : null}
           </div>
-          {model ? (
-            <div style={{ fontSize: 30, letterSpacing: 2, color: "rgba(255,255,255,0.6)", marginTop: 14 }}>Model: {model}</div>
-          ) : null}
+          {/* Small KOLEEX wordmark */}
+          <svg width={150} height={22} viewBox="0 0 719.83 107.57" fill="rgba(255,255,255,0.75)" xmlns="http://www.w3.org/2000/svg">
+            <path d="M116.59,96.3v11.05h-10.6L14.66,62.47v44.88H0V1.58h14.66v43.53L105.99,1.58h10.6v11.05L28.42,53.9l88.18,42.4Z" />
+            <path d="M242.65,71.04c0,20.07-14.21,36.54-34.28,36.54h-50.74c-20.52,0-35.18-16.01-35.18-36.54v-35.18C122.45,15.11,136.88.45,157.63.45h49.84c20.52,0,35.18,14.88,35.18,35.41v35.18ZM227.77,38.11c0-12.4-8.34-23.23-20.3-23.23h-49.84c-11.95,0-20.3,10.83-20.3,23.23v31.8c0,11.95,8.34,23,20.3,23h49.84c11.95,0,20.3-11.05,20.3-23v-31.8Z" />
+            <path d="M363.07,107.57h-68.56c-20.52,0-35.18-16.01-35.18-36.54l.23-71.04h14.66v69.91c0,11.95,8.34,23,20.3,23h68.56v14.66h-.01Z" />
+            <path d="M473.8,107.57h-68.56c-20.52,0-35.18-16.01-35.18-36.54v-34.51c0-20.52,14.66-34.96,35.18-34.96h68.56v14.88h-68.56c-11.73,0-20.3,9.7-20.3,21.2v10.6l88.18.23v14.66l-88.18-.23v6.99c0,11.95,8.57,23,20.3,23h68.56v14.68Z" />
+            <path d="M585.42,107.57h-68.56c-20.52,0-35.18-16.01-35.18-36.54v-34.51c0-20.52,14.66-34.96,35.18-34.96h68.56v14.88h-68.56c-11.73,0-20.3,9.7-20.3,21.2v10.6l88.18.23v14.66l-88.18-.23v6.99c0,11.95,8.57,23,20.3,23h68.56v14.68Z" />
+            <path d="M719.83,96.3v11.05h-10.6l-48.04-42.62-48.04,42.62h-10.37v-11.05l46.91-41.72-46.91-41.95V1.58h10.37l48.04,42.62L709.23,1.58h10.6v11.05l-47.13,41.95,47.13,41.72ZM661.19,71.04l40.59,36.31h-81.19l40.59-36.31h0Z" />
+          </svg>
         </div>
       </div>
     ),
