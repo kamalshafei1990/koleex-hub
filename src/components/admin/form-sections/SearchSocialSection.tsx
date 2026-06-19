@@ -114,19 +114,26 @@ export default function SearchSocialSection({
                   <div className="w-[42%] shrink-0 flex flex-col items-start pl-6 pr-3 py-4">
                     {/* logo near the top, small — nudged down a touch */}
                     <KoleexLogo className="h-2 w-auto text-white/90 shrink-0 block mt-1.5" />
-                    {/* name + model centred in the remaining space */}
+                    {/* name + model centred in the remaining space; name font
+                        shrinks for longer names so it never crowds */}
                     <div className="flex-1 min-h-0 min-w-0 flex flex-col justify-center">
-                      <div className="text-[16px] font-bold leading-snug text-white line-clamp-3">{name}</div>
+                      <div className={`${name.length > 42 ? "text-[13px]" : name.length > 24 ? "text-[15px]" : "text-[17px]"} font-bold leading-snug text-white line-clamp-4`}>{name}</div>
                       {modelCode && (
                         <div className="text-[12px] font-mono tracking-wide text-white/55 mt-2 truncate">{modelCode}</div>
                       )}
                     </div>
+                    {/* official footer */}
+                    <div className="text-[9px] uppercase tracking-[0.2em] text-white/30 shrink-0">koleexgroup.com</div>
                   </div>
                   <div className="flex-1 min-w-0 flex items-center justify-center p-3">
                     {primaryImageUrl ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img src={primaryImageUrl} alt="" className="max-h-full max-w-full object-contain" />
-                    ) : null}
+                    ) : (
+                      /* empty-photo fallback — a faint KOLEEX watermark so the
+                         photo side never reads as a broken black void */
+                      <KoleexLogo className="h-8 w-auto text-white/[0.08]" />
+                    )}
                   </div>
                 </div>
               )}
