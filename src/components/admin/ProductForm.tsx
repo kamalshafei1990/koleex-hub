@@ -90,6 +90,7 @@ import CreateSubcategoryModal from "./form-sections/CreateSubcategoryModal";
 import CreateSupplierModal from "./form-sections/CreateSupplierModal";
 import CreateBrandModal from "./form-sections/CreateBrandModal";
 import DescriptionSection from "./form-sections/DescriptionSection";
+import RichTextEditor from "./form-sections/RichTextEditor";
 import KnowledgeSection from "./form-sections/KnowledgeSection";
 import TechnicalSection from "./form-sections/TechnicalSection";
 import ModelsSection from "./form-sections/ModelsSection";
@@ -3339,14 +3340,19 @@ export default function ProductForm({ productId }: Props) {
                           : t("hero.autoTranslate", "Auto-translate")}
                       </button>
                     </div>
-                    <textarea
-                      dir={isRtl ? "rtl" : "ltr"}
-                      value={localeDescription(descLocale)}
-                      onChange={(e) => setLocaleDescription(descLocale, e.target.value)}
-                      placeholder={t("description.inLangPlaceholder", "Full description in {lang}").replace("{lang}", localeName)}
-                      rows={6}
-                      className={`w-full px-4 py-3 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[14px] leading-relaxed text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all resize-y ${isRtl ? "text-right" : ""}`}
-                    />
+                    {/* Same rich-text editor as the English description, so
+                        the localized copy keeps headings, bullet lists, tables,
+                        links + images. key={descLocale} remounts on language
+                        switch; the dir wrapper makes RTL locales read right. */}
+                    <div dir={isRtl ? "rtl" : "ltr"}>
+                      <RichTextEditor
+                        key={descLocale}
+                        value={localeDescription(descLocale)}
+                        onChange={(html) => setLocaleDescription(descLocale, html)}
+                        placeholder={t("description.inLangPlaceholder", "Full description in {lang}").replace("{lang}", localeName)}
+                        minHeight={240}
+                      />
+                    </div>
                     {descMsg && (
                       <p className={`text-[11px] leading-relaxed ${descMsg.kind === "error" ? "text-[var(--state-warning,#FFCC00)]" : "text-[var(--text-muted)]"}`}>
                         {descMsg.text}
