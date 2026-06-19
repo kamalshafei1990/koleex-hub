@@ -19,7 +19,6 @@ import BoxesIcon from "@/components/icons/ui/BoxesIcon";
 import BoxIcon from "@/components/icons/ui/BoxIcon";
 import ProductStockProfile from "@/components/admin/ProductStockProfile";
 import DollarSignIcon from "@/components/icons/ui/DollarSignIcon";
-import LanguagesIcon from "@/components/icons/ui/LanguagesIcon";
 import Link2Icon from "@/components/icons/ui/Link2Icon";
 import ZapIcon from "@/components/icons/ui/ZapIcon";
 import Settings2Icon from "@/components/icons/ui/Settings2Icon";
@@ -95,7 +94,6 @@ import KnowledgeSection from "./form-sections/KnowledgeSection";
 import TechnicalSection from "./form-sections/TechnicalSection";
 import ModelsSection from "./form-sections/ModelsSection";
 import MediaSection from "./form-sections/MediaSection";
-import TranslationsSection from "./form-sections/TranslationsSection";
 import MarketPricesSection from "./form-sections/MarketPricesSection";
 import RelatedProductsSection from "./form-sections/RelatedProductsSection";
 import SearchSocialSection from "./form-sections/SearchSocialSection";
@@ -3440,13 +3438,11 @@ export default function ProductForm({ productId }: Props) {
               </div>
             </Section>
 
-            {/* Languages — author the localized name / tagline / short
-                description / description next to the English originals,
-                not buried on the Review tab. Shared state with the form,
-                so the Review summary count stays in sync. */}
-            <Section id="translations" icon={<LanguagesIcon className="h-4 w-4" />} title={t("identity.languages", "Languages & Markets")} badge={t("identity.languagesBadge", "中文 · العربية · +")} defaultOpen={false}>
-              <TranslationsSection translations={translations} onChange={setTranslations} />
-            </Section>
+            {/* Languages & Markets section removed — per-language name +
+                short description are now authored inline in the hero
+                (the "+ Add another language" controls). The translations
+                state + save path stay intact, so existing translations
+                persist and the hero controls still read/write them. */}
 
             <Section id="search-social" icon={<EyeIcon className="h-4 w-4" />} title={t("review.searchSocialSection", "Search & Social")} badge={t("review.searchSocialBadge", "SEO preview")} defaultOpen>
               <SearchSocialSection
