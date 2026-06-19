@@ -3162,10 +3162,10 @@ export default function ProductForm({ productId }: Props) {
                           <div className="flex items-center gap-2 text-[12px] text-[var(--text-primary)] truncate">
                             {sup?.logo ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img src={sup.logo} alt="" className="h-5 w-5 rounded-md object-cover border border-[var(--border-subtle)] shrink-0" />
+                              <img src={sup.logo} alt="" className="h-10 w-10 rounded-lg object-contain bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-0.5 shrink-0" />
                             ) : (
-                              <span className="h-5 w-5 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0">
-                                <FactoryIcon className="h-3 w-3 text-[var(--text-ghost)]" />
+                              <span className="h-10 w-10 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0">
+                                <FactoryIcon className="h-5 w-5 text-[var(--text-ghost)]" />
                               </span>
                             )}
                             <span className="font-semibold truncate">{name}</span>
