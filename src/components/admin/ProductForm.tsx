@@ -1434,7 +1434,9 @@ export default function ProductForm({ productId }: Props) {
     if (!primaryModel) return;
     if (!resolvedPrefix || !primarySupplierModel) return;
     const status = primaryModel.coding_status;
-    if (status === "edited" || status === "locked") return;
+    /* Never overwrite a code the operator has taken ownership of —
+       hand-edited, approved, or locked. Only auto/blank codes re-derive. */
+    if (status === "edited" || status === "approved" || status === "locked") return;
     if (primaryModel.primary_model === suggestedPrimaryModel) return;
     /* Mirror the suggestion into model_name + slug too so the hero
        "Primary Model" input — bound to primary_model with a model_name
@@ -2981,7 +2983,7 @@ export default function ProductForm({ productId }: Props) {
                             {t("model.codeBelongsTo", "belongs to")}{" "}
                             {codeCheck.conflict.product_slug ? (
                               <a
-                                href={`/admin/products/${codeCheck.conflict.product_id}`}
+                                href={`${baseRoute}/${codeCheck.conflict.product_id}/edit`}
                                 className="font-semibold underline underline-offset-2 hover:opacity-80"
                                 target="_blank"
                                 rel="noopener noreferrer"
