@@ -3201,33 +3201,10 @@ export default function ProductForm({ productId }: Props) {
 
             {/* Pricing summary moved to the dedicated Cost & Price tab. */}
 
-            {/* ── Short description (excerpt) ──
-                  One or two sentences used on product cards in the
-                  catalog, SEO meta descriptions, and quote emails.
-                  Separate from the long rich-text Description step. */}
-            <Section
-              id="excerpt"
-              icon={<DocumentIcon className="h-4 w-4" />}
-              title={t("hero.shortDescription", "Short Description")}
-              badge={t("hero.shortDescBadge", "Cards · SEO · Quotes")}
-            >
-              <div>
-                <textarea
-                  value={product.excerpt}
-                  onChange={(e) => updateProduct_({ excerpt: e.target.value })}
-                  placeholder={t("hero.excerptPlaceholder", "One or two sentences that summarise this product — shown on product cards and used as the SEO meta description.")}
-                  rows={3}
-                  maxLength={320}
-                  className="w-full px-4 py-3 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all resize-none"
-                />
-                <p className="text-[10px] mt-1.5 flex items-center justify-between text-[var(--text-ghost)]">
-                  <span>{t("hero.excerptSeoHint", "Aim for under 160 characters for best SEO display.")}</span>
-                  <span className={product.excerpt.length > 160 ? "text-[var(--state-warning,#FFCC00)] font-semibold" : ""}>
-                    {product.excerpt.length} / 320{product.excerpt.length > 160 ? ` · ${t("hero.excerptOverSeo", "over SEO limit")}` : ""}
-                  </span>
-                </p>
-              </div>
-            </Section>
+            {/* Short Description now lives in the hero (under the model
+                codes, with the language picker + Auto-translate) — the old
+                standalone excerpt section here was a duplicate of the same
+                product.excerpt field and has been removed. */}
 
             {/* ── Full description (long, rich text) ──
                   Merged in from the old Description tab. Lives right
