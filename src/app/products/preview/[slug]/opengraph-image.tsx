@@ -78,6 +78,12 @@ export default async function OgImage({
           padding: "64px 72px 56px",
         }}
       >
+        {/* KOLEEX logo header — clearly visible */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {logo ? <img src={logo} alt="KOLEEX" width={300} height={54} style={{ opacity: 0.95 }} /> : (
+          <div style={{ fontSize: 34, fontWeight: 700, letterSpacing: 18 }}>KOLEEX</div>
+        )}
+
         {/* Product photo — the poster hero */}
         <div
           style={{
@@ -86,37 +92,30 @@ export default async function OgImage({
             alignItems: "center",
             justifyContent: "center",
             width: "100%",
+            padding: "24px 0",
           }}
         >
           {photo ? (
             /* eslint-disable-next-line @next/next/no-img-element */
-            <img src={photo} alt="" style={{ maxWidth: 920, maxHeight: 380, objectFit: "contain" }} width={920} height={380} />
+            <img src={photo} alt="" style={{ maxWidth: 900, maxHeight: 340, objectFit: "contain" }} width={900} height={340} />
           ) : null}
         </div>
 
-        {/* Caption bar — name + model on the left, KOLEEX logo on the right */}
+        {/* Caption — product name + model */}
         <div
           style={{
             display: "flex",
-            alignItems: "flex-end",
-            justifyContent: "space-between",
-            marginTop: 32,
+            flexDirection: "column",
             paddingTop: 28,
-            borderTop: "1px solid rgba(255,255,255,0.14)",
+            borderTop: "1px solid rgba(255,255,255,0.16)",
           }}
         >
-          <div style={{ display: "flex", flexDirection: "column", maxWidth: 880 }}>
-            <div style={{ display: "flex", fontSize: name.length > 40 ? 38 : 48, fontWeight: 800, lineHeight: 1.1 }}>
-              {name}
-            </div>
-            {model ? (
-              <div style={{ fontSize: 24, letterSpacing: 2, color: "rgba(255,255,255,0.5)", marginTop: 12 }}>{model}</div>
-            ) : null}
+          <div style={{ display: "flex", fontSize: name.length > 40 ? 40 : 52, fontWeight: 800, lineHeight: 1.1, maxWidth: 1040 }}>
+            {name}
           </div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          {logo ? <img src={logo} alt="KOLEEX" width={200} height={36} style={{ opacity: 0.8 }} /> : (
-            <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: 14, opacity: 0.8 }}>KOLEEX</div>
-          )}
+          {model ? (
+            <div style={{ fontSize: 30, letterSpacing: 2, color: "rgba(255,255,255,0.6)", marginTop: 14 }}>Model: {model}</div>
+          ) : null}
         </div>
       </div>
     ),
