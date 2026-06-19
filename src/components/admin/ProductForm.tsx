@@ -2424,10 +2424,10 @@ export default function ProductForm({ productId }: Props) {
                       <button type="button" onClick={() => goToStep(steps.findIndex((s) => s.id === "supplier"))}
                         title={t("hero.manageInSupplierTab", "Manage in the Supplier tab")}
                         className="w-full text-left rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/50 px-3.5 py-2 hover:border-[var(--border-focus)] transition-colors">
-                        <div className="flex items-center justify-between mb-0.5">
-                          <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-ghost)] inline-flex items-center gap-1">
-                            <FactoryIcon className="h-3 w-3" /> {t("hero.primarySupplier", "Primary supplier")}
-                          </span>
+                        <div className="flex items-center justify-end mb-0.5">
+                          {/* Label removed — the band header above already
+                              reads "PRIMARY SUPPLIER"; only the source hint
+                              stays here. */}
                           <span className="text-[9px] text-[var(--text-ghost)]">{t("hero.fromSupplierTab", "from Supplier tab ›")}</span>
                         </div>
                         <div className="flex items-center gap-2 text-[12px] text-[var(--text-primary)] truncate">
