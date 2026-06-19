@@ -2583,7 +2583,7 @@ export default function ProductForm({ productId }: Props) {
                   {(() => {
                     const groupLabel = "block text-[9px] font-bold uppercase tracking-[0.15em] text-[var(--text-ghost)] mb-1.5";
                     return (
-                  <div className="space-y-4">
+                  <div className="space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 p-4 md:p-5">
                     {/* Row 1 — Status + Visibility, each as a labelled group. */}
                     <div className="flex items-end justify-between gap-x-6 gap-y-4 flex-wrap">
                       {/* Status group */}
@@ -2679,9 +2679,8 @@ export default function ProductForm({ productId }: Props) {
                     );
                   })()}
 
-                  {/* Hairline separating the publish controls from the
-                      identity fields — light structure, no heavy boxes. */}
-                  <div className="border-t border-[var(--border-subtle)]/60" />
+                  {/* The publish-controls shell above now provides the
+                      separation, so no extra hairline is needed here. */}
 
                   {/* Publish-readiness hint — only when the product is set
                       to go live (Active or Visible) AND something the catalog
