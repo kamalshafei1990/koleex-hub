@@ -550,6 +550,13 @@ export default function ProductForm({ productId }: Props) {
   const [heroExcerptLocale, setHeroExcerptLocale] = useState<string>("zh");
   const [translatingHeroExcerpt, setTranslatingHeroExcerpt] = useState(false);
   const [heroExcerptMsg, setHeroExcerptMsg] = useState<{ kind: "error" | "ok"; text: string } | null>(null);
+  /* Full product description — same per-locale Auto-translate flow as the
+     short description, writing into product_translations.description
+     (English base = product.description). */
+  const [descLocale, setDescLocale] = useState<string>("zh");
+  const [translatingDesc, setTranslatingDesc] = useState(false);
+  const [descMsg, setDescMsg] = useState<{ kind: "error" | "ok"; text: string } | null>(null);
+  const [showDescTr, setShowDescTr] = useState(false);
   /* Translation rows are collapsed by default to keep the hero clean — the
      operator opts in per field with a small link (and they auto-open when a
      translation already exists, e.g. when editing). */
@@ -1340,6 +1347,70 @@ export default function ProductForm({ productId }: Props) {
       setTranslatingHeroExcerpt(false);
     }
   }, [product.excerpt, heroExcerptLocale, setHeroLocaleExcerpt, t]);
+
+  /* ── Full product description, per-locale ── */
+  const localeDescription = (locale: string): string =>
+    translations.find((tr) => tr.locale === locale)?.description ?? "";
+
+  const setLocaleDescription = useCallback((locale: string, value: string) => {
+    setTranslations((prev) => {
+      const i = prev.findIndex((tr) => tr.locale === locale);
+      if (i >= 0) {
+        const next = [...prev];
+        next[i] = { ...next[i], description: value };
+        return next;
+      }
+      return [
+        ...prev,
+        {
+          _tempId: `tr_${locale}_${prev.length}`,
+          locale,
+          product_name: "",
+          tagline: "",
+          excerpt: "",
+          description: value,
+        },
+      ];
+    });
+  }, []);
+
+  const autoTranslateDescription = useCallback(async () => {
+    const source = (product.description || "").trim();
+    if (!source) return;
+    setTranslatingDesc(true);
+    setDescMsg(null);
+    try {
+      const res = await fetch("/api/ai/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ text: source, target_lang: descLocale, source_lang: "en" }),
+      });
+      const data = (await res.json()) as {
+        translated?: string;
+        fallback?: boolean;
+        reason?: string;
+        error?: string;
+      };
+      if (!res.ok || data?.fallback || !data?.translated) {
+        const why =
+          data?.reason === "no_provider"
+            ? t("hero.translateNoProvider", "Auto-translate is off — no translation service is configured. Type the name manually for now.")
+            : t("hero.translateFailed", "Couldn't translate right now. Try again, or type the name manually.");
+        setDescMsg({ kind: "error", text: why });
+        return;
+      }
+      setLocaleDescription(descLocale, data.translated);
+      setDescMsg({ kind: "ok", text: t("hero.translateDone", "Translated — review before saving.") });
+    } catch {
+      setDescMsg({
+        kind: "error",
+        text: t("hero.translateFailed", "Couldn't translate right now. Try again, or type the name manually."),
+      });
+    } finally {
+      setTranslatingDesc(false);
+    }
+  }, [product.description, descLocale, setLocaleDescription, t]);
 
   /* Live auto-suggest: whenever the prefix or supplier-model changes,
      recompute the suggestion. Only push it into `primary_model` when
@@ -3220,6 +3291,70 @@ export default function ProductForm({ productId }: Props) {
                 subcategorySlug={product.subcategory_slug}
                 machineKindSlug={(sewingSpecs.common_specs as { machine_kind?: string })?.machine_kind || ""}
               />
+
+              {/* Localized full description — pick a language, write it
+                  manually or auto-translate from the English description.
+                  Writes into the shared `translations` state
+                  (product_translations.description). */}
+              {(() => {
+                const isRtl = descLocale === "ar" || descLocale === "ur";
+                const localeName = LOCALES.find((l) => l.code === descLocale)?.name ?? descLocale;
+                const hasDescTr = translations.some((tr) => (tr.description || "").trim().length > 0);
+                if (!showDescTr && !hasDescTr) {
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => setShowDescTr(true)}
+                      className="mt-3 text-[11px] font-medium text-[var(--accent,#0066FF)] hover:underline inline-flex items-center gap-1"
+                    >
+                      + {t("hero.addLanguage", "Add another language")}
+                    </button>
+                  );
+                }
+                return (
+                  <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] space-y-2">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">
+                          {t("hero.nameOtherLang", "Other language")}
+                        </span>
+                        <select
+                          value={descLocale}
+                          onChange={(e) => { setDescLocale(e.target.value); setDescMsg(null); }}
+                          className="h-8 px-2.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-all"
+                        >
+                          {LOCALES.map((l) => (
+                            <option key={l.code} value={l.code}>{l.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={autoTranslateDescription}
+                        disabled={!(product.description || "").trim() || translatingDesc}
+                        className="h-8 px-3 rounded-lg text-[11px] font-bold whitespace-nowrap text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
+                      >
+                        {translatingDesc
+                          ? t("hero.translating", "Translating…")
+                          : t("hero.autoTranslate", "Auto-translate")}
+                      </button>
+                    </div>
+                    <textarea
+                      dir={isRtl ? "rtl" : "ltr"}
+                      value={localeDescription(descLocale)}
+                      onChange={(e) => setLocaleDescription(descLocale, e.target.value)}
+                      placeholder={t("description.inLangPlaceholder", "Full description in {lang}").replace("{lang}", localeName)}
+                      rows={6}
+                      className={`w-full px-4 py-3 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[14px] leading-relaxed text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all resize-y ${isRtl ? "text-right" : ""}`}
+                    />
+                    {descMsg && (
+                      <p className={`text-[11px] leading-relaxed ${descMsg.kind === "error" ? "text-[var(--state-warning,#FFCC00)]" : "text-[var(--text-muted)]"}`}>
+                        {descMsg.text}
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
             </Section>
 
             {/* ── Key highlights ──
