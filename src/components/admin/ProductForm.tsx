@@ -2580,96 +2580,104 @@ export default function ProductForm({ productId }: Props) {
                         being buried in the Technical step. Admins can
                         see at a glance whether the product will show
                         up on the site and where it ranks. */}
-                  <div className="space-y-3">
-                    {/* Row 1 — "is it live?" : status on the left, the two
-                        publish toggles grouped on the right. */}
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      {/* Status pills — 3-way toggle (Draft / Active / Archived) */}
-                      <div className="flex gap-1 p-0.5 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)]">
+                  {(() => {
+                    const groupLabel = "block text-[9px] font-bold uppercase tracking-[0.15em] text-[var(--text-ghost)] mb-1.5";
+                    return (
+                  <div className="space-y-4">
+                    {/* Row 1 — Status + Visibility, each as a labelled group. */}
+                    <div className="flex items-end justify-between gap-x-6 gap-y-4 flex-wrap">
+                      {/* Status group */}
+                      <div>
+                        <span className={groupLabel}>{t("hero.statusLabel", "Status")}</span>
+                        <div className="inline-flex gap-1 p-0.5 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)]">
+                          {([
+                            { v: "draft", label: t("status.draft", "Draft"), cls: "text-[var(--state-warning,#FFCC00)] bg-[var(--state-warning,#FFCC00)]/15" },
+                            { v: "active", label: t("status.active", "Active"), cls: "text-[var(--state-success,#00CC66)] bg-[var(--state-success,#00CC66)]/15" },
+                            { v: "archived", label: t("status.archived", "Archived"), cls: "text-[var(--state-error,#FF3333)] bg-[var(--state-error,#FF3333)]/15" },
+                          ] as const).map(s => {
+                            const active = product.status === s.v;
+                            return (
+                              <button
+                                key={s.v}
+                                type="button"
+                                onClick={() => updateProduct_({ status: s.v as ProductFormState["status"] })}
+                                className={`h-7 px-3 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
+                                  active ? s.cls : "text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+                                }`}
+                              >
+                                {s.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Visibility group — public-catalog gatekeeper + flagship */}
+                      <div>
+                        <span className={groupLabel}>{t("hero.visibilityLabel", "Visibility")}</span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => updateProduct_({ visible: !product.visible })}
+                            className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[11px] font-semibold border transition-all ${
+                              product.visible
+                                ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
+                                : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)] border-[var(--border-subtle)] hover:text-[var(--text-muted)]"
+                            }`}
+                            title={product.visible ? t("hero.visibleOnCatalog", "Visible on public catalog") : t("hero.hiddenFromCatalog", "Hidden from public catalog")}
+                          >
+                            {product.visible ? <EyeIcon className="h-3 w-3" /> : <EyeOffIcon className="h-3 w-3" />}
+                            {product.visible ? t("hero.visible", "Visible") : t("hero.hidden", "Hidden")}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => updateProduct_({ featured: !product.featured })}
+                            className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[11px] font-semibold border transition-all ${
+                              product.featured
+                                ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
+                                : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)] border-[var(--border-subtle)] hover:text-[var(--text-muted)]"
+                            }`}
+                            title={product.featured ? t("hero.featuredOnHome", "Flagship product — shown on the homepage") : t("hero.clickToFeature", "Mark as a flagship product (shown on the homepage)")}
+                          >
+                            <StarIcon className="h-3 w-3" />
+                            {product.featured ? t("hero.featured", "Flagship") : t("hero.feature", "Flagship")}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Row 2 — market tier, same labelled-group treatment. */}
+                    <div>
+                      <span className={groupLabel}>{t("hero.marketTier", "Market tier")}</span>
+                      <div className="flex items-center gap-2 flex-wrap">
                         {([
-                          { v: "draft", label: t("status.draft", "Draft"), cls: "text-[var(--state-warning,#FFCC00)] bg-[var(--state-warning,#FFCC00)]/15" },
-                          { v: "active", label: t("status.active", "Active"), cls: "text-[var(--state-success,#00CC66)] bg-[var(--state-success,#00CC66)]/15" },
-                          { v: "archived", label: t("status.archived", "Archived"), cls: "text-[var(--state-error,#FF3333)] bg-[var(--state-error,#FF3333)]/15" },
-                        ] as const).map(s => {
-                          const active = product.status === s.v;
+                          { v: "entry", label: t("hero.levelEntry", "Entry") },
+                          { v: "mid", label: t("hero.levelMid", "Mid") },
+                          { v: "premium", label: t("hero.levelPremium", "Premium") },
+                          { v: "enterprise", label: t("hero.levelEnterprise", "Enterprise") },
+                        ] as const).map(l => {
+                          const active = product.level === l.v;
                           return (
                             <button
-                              key={s.v}
+                              key={l.v}
                               type="button"
-                              onClick={() => updateProduct_({ status: s.v as ProductFormState["status"] })}
-                              className={`h-7 px-3 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
-                                active ? s.cls : "text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+                              onClick={() => updateProduct_({ level: active ? "" : l.v })}
+                              className={`h-7 px-2.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border transition-all ${
+                                active
+                                  ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-[var(--bg-inverted)]"
+                                  : "border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)] hover:border-[var(--border-focus)]"
                               }`}
                             >
-                              {s.label}
+                              {l.label}
                             </button>
                           );
                         })}
                       </div>
-
-                      <div className="flex items-center gap-2">
-                        {/* Visibility toggle — gatekeeper for whether this
-                            appears on the public catalog at all. */}
-                        <button
-                          type="button"
-                          onClick={() => updateProduct_({ visible: !product.visible })}
-                          className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[11px] font-semibold border transition-all ${
-                            product.visible
-                              ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
-                              : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)] border-[var(--border-subtle)] hover:text-[var(--text-muted)]"
-                          }`}
-                          title={product.visible ? t("hero.visibleOnCatalog", "Visible on public catalog") : t("hero.hiddenFromCatalog", "Hidden from public catalog")}
-                        >
-                          {product.visible ? <EyeIcon className="h-3 w-3" /> : <EyeOffIcon className="h-3 w-3" />}
-                          {product.visible ? t("hero.visible", "Visible") : t("hero.hidden", "Hidden")}
-                        </button>
-
-                        {/* Flagship toggle — hero decision, not buried in Technical */}
-                        <button
-                          type="button"
-                          onClick={() => updateProduct_({ featured: !product.featured })}
-                          className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[11px] font-semibold border transition-all ${
-                            product.featured
-                              ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
-                              : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)] border-[var(--border-subtle)] hover:text-[var(--text-muted)]"
-                          }`}
-                          title={product.featured ? t("hero.featuredOnHome", "Flagship product — shown on the homepage") : t("hero.clickToFeature", "Mark as a flagship product (shown on the homepage)")}
-                        >
-                          <StarIcon className="h-3 w-3" />
-                          {product.featured ? t("hero.featured", "Flagship") : t("hero.feature", "Flagship")}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Row 2 — market tier, clearly labelled (not floating). */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)] mr-1">
-                        {t("hero.marketTier", "Market tier")}
-                      </span>
-                      {([
-                        { v: "entry", label: t("hero.levelEntry", "Entry") },
-                        { v: "mid", label: t("hero.levelMid", "Mid") },
-                        { v: "premium", label: t("hero.levelPremium", "Premium") },
-                        { v: "enterprise", label: t("hero.levelEnterprise", "Enterprise") },
-                      ] as const).map(l => {
-                        const active = product.level === l.v;
-                        return (
-                          <button
-                            key={l.v}
-                            type="button"
-                            onClick={() => updateProduct_({ level: active ? "" : l.v })}
-                            className={`h-7 px-2.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border transition-all ${
-                              active
-                                ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-[var(--bg-inverted)]"
-                                : "border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)] hover:border-[var(--border-focus)]"
-                            }`}
-                          >
-                            {l.label}
-                          </button>
-                        );
-                      })}
                     </div>
                   </div>
+                    );
+                  })()}
 
                   {/* Hairline separating the publish controls from the
                       identity fields — light structure, no heavy boxes. */}
