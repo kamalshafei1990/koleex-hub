@@ -61,11 +61,9 @@ export default function SearchSocialSection({
   const derivedTitle = `${name}${brand ? ` | ${brand}` : ""}`;
   const metaTitle = (metaTitleOverride || "").trim() || derivedTitle;
   const desc = ((metaDescriptionOverride || "").trim() || excerpt.trim());
-  /* Always-branded share image (KOLEEX wordmark + name + model on black),
-     matching the generated og:image. A custom Social/OG image URL still
-     wins when the operator explicitly sets one. primaryImageUrl is no
-     longer used for the share image by design (always branded). */
-  void primaryImageUrl;
+  /* Branded share card (matches the generated og:image): black background,
+     real KOLEEX logo, the product photo, and the name + model. A custom
+     Social/OG image URL still wins when the operator explicitly sets one. */
   const customOg = (ogImageOverride || "").trim();
   const modelCode = (primaryModel || "").trim();
   const previewDesc = desc || "Add a short description to control how this product reads in search results and shared links.";
@@ -108,14 +106,23 @@ export default function SearchSocialSection({
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img src={customOg} alt="" className="w-full h-full object-contain bg-[var(--bg-surface)]" />
               ) : (
-                /* Branded KOLEEX share card — black, monochrome, matches the
-                   generated og:image for the public page. */
-                <div className="w-full h-full bg-black flex flex-col items-center justify-center text-center px-6 gap-2">
-                  <div className="text-[11px] font-bold uppercase tracking-[0.35em] text-white/90">KOLEEX</div>
-                  <div className="text-[18px] font-bold leading-tight text-white line-clamp-2">{name}</div>
-                  {modelCode && (
-                    <div className="text-[12px] font-mono tracking-wide text-white/55">{modelCode}</div>
+                /* Branded KOLEEX share card — black, real logo, the product
+                   photo, then name + model. Matches the generated og:image. */
+                <div className="w-full h-full bg-black flex flex-col items-center justify-between text-center px-6 py-4">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/koleex-hub-logo.svg" alt="KOLEEX" className="h-3 w-auto opacity-90 shrink-0" />
+                  {primaryImageUrl ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={primaryImageUrl} alt="" className="flex-1 min-h-0 w-auto max-w-[68%] object-contain my-2" />
+                  ) : (
+                    <div className="flex-1" />
                   )}
+                  <div className="shrink-0">
+                    <div className="text-[14px] font-bold leading-tight text-white line-clamp-1">{name}</div>
+                    {modelCode && (
+                      <div className="text-[11px] font-mono tracking-wide text-white/55 mt-0.5">{modelCode}</div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
