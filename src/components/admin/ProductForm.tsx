@@ -3081,12 +3081,11 @@ export default function ProductForm({ productId }: Props) {
                     <p className="text-[11px] text-[var(--state-success,#00CC66)] mt-1.5">✓ {t("hero.slugAvailable", "URL is available.")}</p>
                   ) : null}
 
-                  {/* Brand · Family · Origin · Warranty
-                      lg:grid-cols-4 (not xl:) — every laptop 1024px+
-                      fits all four cells on one row. The old
-                      xl:grid-cols-4 meant 1024–1280px screens wrapped
-                      Origin + Warranty onto a second row awkwardly. */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {/* Brand · Family — Origin + Warranty moved to their own
+                      tabs, so only these two remain. Two columns (not four)
+                      so each field gets the full half-width instead of being
+                      squeezed into a quarter. */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                       <label className={lbl}>
                         <span className="inline-flex items-center gap-1.5"><StarIcon className="h-3 w-3" /> {t("hero.brand", "Brand")}</span>
