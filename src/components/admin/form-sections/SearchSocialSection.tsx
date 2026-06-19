@@ -111,8 +111,8 @@ export default function SearchSocialSection({
                    product name + model number. Right: the product photo.
                    Matches the generated og:image. */
                 <div className="w-full h-full bg-black flex items-stretch">
-                  <div className="flex-1 min-w-0 flex flex-col justify-center gap-3 pl-6 pr-4 py-5">
-                    <KoleexLogo className="h-5 w-auto text-white shrink-0" />
+                  <div className="flex-1 min-w-0 flex flex-col items-start justify-center gap-3 pl-6 pr-4 py-5">
+                    <KoleexLogo className="h-4 w-auto text-white shrink-0 block" />
                     <div className="min-w-0">
                       <div className="text-[16px] font-bold leading-snug text-white line-clamp-3">{name}</div>
                       {modelCode && (
