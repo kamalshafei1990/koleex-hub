@@ -111,16 +111,18 @@ export default function SearchSocialSection({
                    product name + model number. Right: the product photo.
                    Matches the generated og:image. */
                 <div className="w-full h-full bg-black flex items-stretch">
-                  <div className="flex-1 min-w-0 flex flex-col items-start justify-center gap-3 pl-6 pr-4 py-5">
-                    <KoleexLogo className="h-4 w-auto text-white shrink-0 block" />
-                    <div className="min-w-0">
+                  <div className="w-[42%] shrink-0 flex flex-col items-start pl-6 pr-3 py-4">
+                    {/* logo pinned to the top, smaller */}
+                    <KoleexLogo className="h-3 w-auto text-white/90 shrink-0 block" />
+                    {/* name + model centred in the remaining space */}
+                    <div className="flex-1 min-h-0 min-w-0 flex flex-col justify-center">
                       <div className="text-[16px] font-bold leading-snug text-white line-clamp-3">{name}</div>
                       {modelCode && (
                         <div className="text-[12px] font-mono tracking-wide text-white/55 mt-2 truncate">{modelCode}</div>
                       )}
                     </div>
                   </div>
-                  <div className="w-1/2 shrink-0 flex items-center justify-center p-4">
+                  <div className="flex-1 min-w-0 flex items-center justify-center p-3">
                     {primaryImageUrl ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img src={primaryImageUrl} alt="" className="max-h-full max-w-full object-contain" />
