@@ -66,14 +66,16 @@ export default async function OgImage({
           fontFamily: "sans-serif",
         }}
       >
-        {/* Left column — KOLEEX logo (top), then product name + model number */}
+        {/* Left column — KOLEEX logo, then product name + model number,
+            grouped and vertically centred so spacing stays even */}
         <div
           style={{
             flex: 1,
             display: "flex",
             flexDirection: "column",
-            justifyContent: "space-between",
-            padding: "72px 60px",
+            justifyContent: "center",
+            gap: 28,
+            padding: "64px 56px",
           }}
         >
           <svg width={230} height={34} viewBox="0 0 719.83 107.57" fill="#FFFFFF" xmlns="http://www.w3.org/2000/svg">
@@ -97,12 +99,11 @@ export default async function OgImage({
         {/* Right column — product photo */}
         <div
           style={{
-            width: "52%",
+            width: "50%",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             padding: "56px",
-            borderLeft: "1px solid rgba(255,255,255,0.12)",
           }}
         >
           {photo ? (
