@@ -3160,6 +3160,14 @@ export default function ProductForm({ productId }: Props) {
                             <span className="text-[9px] text-[var(--text-ghost)]">{t("hero.fromSupplierTab", "from Supplier tab ›")}</span>
                           </div>
                           <div className="flex items-center gap-2 text-[12px] text-[var(--text-primary)] truncate">
+                            {sup?.logo ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={sup.logo} alt="" className="h-5 w-5 rounded-md object-cover border border-[var(--border-subtle)] shrink-0" />
+                            ) : (
+                              <span className="h-5 w-5 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0">
+                                <FactoryIcon className="h-3 w-3 text-[var(--text-ghost)]" />
+                              </span>
+                            )}
                             <span className="font-semibold truncate">{name}</span>
                             {link.supplier_product_code && (<><span className="text-[var(--text-ghost)]">·</span><span className="font-mono text-[11px] truncate">{link.supplier_product_code}</span></>)}
                             {link.unit_cost_cny && (<><span className="text-[var(--text-ghost)]">·</span><span className="whitespace-nowrap">{cur ? `${cur} ` : ""}{link.unit_cost_cny}</span></>)}
