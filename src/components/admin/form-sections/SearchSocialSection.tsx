@@ -113,7 +113,7 @@ export default function SearchSocialSection({
                 <div className="w-full h-full bg-black flex items-stretch">
                   <div className="w-[42%] shrink-0 flex flex-col items-start pl-6 pr-3 py-4">
                     {/* logo near the top, small — nudged down a touch */}
-                    <KoleexLogo className="h-2.5 w-auto text-white/90 shrink-0 block mt-1.5" />
+                    <KoleexLogo className="h-2 w-auto text-white/90 shrink-0 block mt-1.5" />
                     {/* name + model centred in the remaining space */}
                     <div className="flex-1 min-h-0 min-w-0 flex flex-col justify-center">
                       <div className="text-[16px] font-bold leading-snug text-white line-clamp-3">{name}</div>
