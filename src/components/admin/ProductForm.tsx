@@ -3592,6 +3592,7 @@ export default function ProductForm({ productId }: Props) {
                    uploaded (not-yet-saved) file. Reading only .url here showed
                    "No main image yet" until the product was saved. */
                 primaryImageUrl={mainImageSrc || undefined}
+                primaryModel={primaryModel?.primary_model || primaryModel?.model_name || ""}
                 categoryName={categoryName}
                 onExcerptChange={(v) => updateProduct_({ excerpt: v })}
                 metaTitle={product.meta_title}

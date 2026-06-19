@@ -11,7 +11,6 @@
 
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import Share2Icon from "@/components/icons/ui/Share2Icon";
-import PictureIcon from "@/components/icons/ui/PictureIcon";
 
 const SITE = "koleexgroup.com";
 const TITLE_MAX = 60;
@@ -23,6 +22,7 @@ interface Props {
   slug: string;
   excerpt: string;
   primaryImageUrl?: string;
+  primaryModel?: string;
   categoryName?: string;
   onExcerptChange: (v: string) => void;
   /* Stored SEO overrides — blank falls back to the derived
@@ -47,6 +47,7 @@ export default function SearchSocialSection({
   slug,
   excerpt,
   primaryImageUrl,
+  primaryModel,
   categoryName,
   onExcerptChange,
   metaTitle: metaTitleOverride,
@@ -60,7 +61,13 @@ export default function SearchSocialSection({
   const derivedTitle = `${name}${brand ? ` | ${brand}` : ""}`;
   const metaTitle = (metaTitleOverride || "").trim() || derivedTitle;
   const desc = ((metaDescriptionOverride || "").trim() || excerpt.trim());
-  const previewImage = (ogImageOverride || "").trim() || primaryImageUrl;
+  /* Always-branded share image (KOLEEX wordmark + name + model on black),
+     matching the generated og:image. A custom Social/OG image URL still
+     wins when the operator explicitly sets one. primaryImageUrl is no
+     longer used for the share image by design (always branded). */
+  void primaryImageUrl;
+  const customOg = (ogImageOverride || "").trim();
+  const modelCode = (primaryModel || "").trim();
   const previewDesc = desc || "Add a short description to control how this product reads in search results and shared links.";
   const path = slug ? `products › ${slug}` : "products › product-slug";
   const editable = !!(onMetaTitleChange || onMetaDescriptionChange || onOgImageUrlChange);
@@ -96,14 +103,19 @@ export default function SearchSocialSection({
             <Share2Icon className="h-3 w-3" /> Social card
           </div>
           <div className="rounded-lg overflow-hidden border border-[var(--border-subtle)]">
-            <div className="aspect-[1.91/1] bg-[var(--bg-surface)] flex items-center justify-center overflow-hidden">
-              {previewImage ? (
+            <div className="aspect-[1.91/1] overflow-hidden">
+              {customOg ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={previewImage} alt="" className="w-full h-full object-contain" />
+                <img src={customOg} alt="" className="w-full h-full object-contain bg-[var(--bg-surface)]" />
               ) : (
-                <div className="flex flex-col items-center gap-1.5 text-[var(--text-ghost)]">
-                  <PictureIcon className="h-6 w-6" />
-                  <span className="text-[10px]">No main image yet</span>
+                /* Branded KOLEEX share card — black, monochrome, matches the
+                   generated og:image for the public page. */
+                <div className="w-full h-full bg-black flex flex-col items-center justify-center text-center px-6 gap-2">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.35em] text-white/90">KOLEEX</div>
+                  <div className="text-[18px] font-bold leading-tight text-white line-clamp-2">{name}</div>
+                  {modelCode && (
+                    <div className="text-[12px] font-mono tracking-wide text-white/55">{modelCode}</div>
+                  )}
                 </div>
               )}
             </div>
