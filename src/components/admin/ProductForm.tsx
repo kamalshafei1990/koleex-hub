@@ -2396,6 +2396,59 @@ export default function ProductForm({ productId }: Props) {
                     the card actually overflows visually, so there's no
                     cost to turning clipping off here. */}
             <div className="bg-[var(--bg-secondary)] rounded-3xl border border-[var(--border-subtle)] overflow-visible shadow-[0_4px_24px_rgba(0,0,0,0.2)]">
+              {/* ═══ PRIMARY SUPPLIER — top of the hero shell so sourcing
+                  reads first. Read-only mirror of the Supplier tab. ═══ */}
+              <div className="border-b border-[var(--border-subtle)] bg-[var(--bg-primary)]/30 px-6 md:px-8 py-4 rounded-t-3xl">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="h-6 w-6 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
+                    <FactoryIcon className="h-3 w-3 text-[var(--text-ghost)]" />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">{t("hero.sourcingStrip", "Primary supplier")}</span>
+                </div>
+                <div>
+                  {(() => {
+                    const link = productSuppliers.find((s) => s.is_primary) || productSuppliers[0] || null;
+                    if (!link) {
+                      return (
+                        <button type="button" onClick={() => goToStep(steps.findIndex((s) => s.id === "supplier"))}
+                          className="w-full rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/50 px-3.5 h-[42px] flex items-center gap-2 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors">
+                          <FactoryIcon className="h-3.5 w-3.5 text-[var(--text-ghost)] shrink-0" />
+                          <span>{t("hero.noSupplierLinked", "No supplier linked — add one in the Supplier tab")}</span>
+                        </button>
+                      );
+                    }
+                    const sup = suppliers.find((x) => x.id === link.supplier_id);
+                    const name = sup?.name || t("hero.unknownSupplier", "(supplier)");
+                    const cur = link.currency || sup?.currency || "";
+                    return (
+                      <button type="button" onClick={() => goToStep(steps.findIndex((s) => s.id === "supplier"))}
+                        title={t("hero.manageInSupplierTab", "Manage in the Supplier tab")}
+                        className="w-full text-left rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/50 px-3.5 py-2 hover:border-[var(--border-focus)] transition-colors">
+                        <div className="flex items-center justify-between mb-0.5">
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-ghost)] inline-flex items-center gap-1">
+                            <FactoryIcon className="h-3 w-3" /> {t("hero.primarySupplier", "Primary supplier")}
+                          </span>
+                          <span className="text-[9px] text-[var(--text-ghost)]">{t("hero.fromSupplierTab", "from Supplier tab ›")}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[12px] text-[var(--text-primary)] truncate">
+                          {sup?.logo ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={sup.logo} alt="" className="h-10 w-10 rounded-lg object-contain bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-0.5 shrink-0" />
+                          ) : (
+                            <span className="h-10 w-10 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0">
+                              <FactoryIcon className="h-5 w-5 text-[var(--text-ghost)]" />
+                            </span>
+                          )}
+                          <span className="font-semibold truncate">{name}</span>
+                          {link.supplier_product_code && (<><span className="text-[var(--text-ghost)]">·</span><span className="font-mono text-[11px] truncate">{link.supplier_product_code}</span></>)}
+                          {link.unit_cost_cny && (<><span className="text-[var(--text-ghost)]">·</span><span className="whitespace-nowrap">{cur ? `${cur} ` : ""}{link.unit_cost_cny}</span></>)}
+                        </div>
+                      </button>
+                    );
+                  })()}
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 lg:grid-cols-5 gap-0">
                 {/* Left: Main Product Image (2/5 width) */}
                 <div className="lg:col-span-2 p-6 md:p-8 lg:border-r lg:border-[var(--border-subtle)] flex flex-col">
@@ -3119,68 +3172,12 @@ export default function ProductForm({ productId }: Props) {
                 </div>
               </div>
 
-              {/* ═══ PRIMARY MODEL COMMERCIAL STRIP ═══ */}
-              <div className="border-t border-[var(--border-subtle)] bg-[var(--bg-primary)]/30 px-6 md:px-8 py-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="h-6 w-6 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
-                    <FactoryIcon className="h-3 w-3 text-[var(--text-ghost)]" />
-                  </div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">{t("hero.sourcingStrip", "Primary supplier")}</span>
-                </div>
-                {/* Pricing moved to the Cost & Price tab. This strip now only
-                    MIRRORS the primary supplier read-only — name · model ·
-                    cost — so the hero shows sourcing at a glance. Click to
-                    jump to the Supplier tab to edit. */}
-                <div className="grid grid-cols-1 gap-4">
-                  <div>
-                    {(() => {
-                      const link = productSuppliers.find((s) => s.is_primary) || productSuppliers[0] || null;
-                      if (!link) {
-                        return (
-                          <button type="button" onClick={() => goToStep(steps.findIndex((s) => s.id === "supplier"))}
-                            className="w-full rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/50 px-3.5 h-[42px] flex items-center gap-2 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors">
-                            <FactoryIcon className="h-3.5 w-3.5 text-[var(--text-ghost)] shrink-0" />
-                            <span>{t("hero.noSupplierLinked", "No supplier linked — add one in the Supplier tab")}</span>
-                          </button>
-                        );
-                      }
-                      const sup = suppliers.find((x) => x.id === link.supplier_id);
-                      const name = sup?.name || t("hero.unknownSupplier", "(supplier)");
-                      const cur = link.currency || sup?.currency || "";
-                      return (
-                        <button type="button" onClick={() => goToStep(steps.findIndex((s) => s.id === "supplier"))}
-                          title={t("hero.manageInSupplierTab", "Manage in the Supplier tab")}
-                          className="w-full text-left rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/50 px-3.5 py-2 hover:border-[var(--border-focus)] transition-colors">
-                          <div className="flex items-center justify-between mb-0.5">
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-ghost)] inline-flex items-center gap-1">
-                              <FactoryIcon className="h-3 w-3" /> {t("hero.primarySupplier", "Primary supplier")}
-                            </span>
-                            <span className="text-[9px] text-[var(--text-ghost)]">{t("hero.fromSupplierTab", "from Supplier tab ›")}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-[12px] text-[var(--text-primary)] truncate">
-                            {sup?.logo ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={sup.logo} alt="" className="h-10 w-10 rounded-lg object-contain bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-0.5 shrink-0" />
-                            ) : (
-                              <span className="h-10 w-10 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0">
-                                <FactoryIcon className="h-5 w-5 text-[var(--text-ghost)]" />
-                              </span>
-                            )}
-                            <span className="font-semibold truncate">{name}</span>
-                            {link.supplier_product_code && (<><span className="text-[var(--text-ghost)]">·</span><span className="font-mono text-[11px] truncate">{link.supplier_product_code}</span></>)}
-                            {link.unit_cost_cny && (<><span className="text-[var(--text-ghost)]">·</span><span className="whitespace-nowrap">{cur ? `${cur} ` : ""}{link.unit_cost_cny}</span></>)}
-                          </div>
-                        </button>
-                      );
-                    })()}
-                  </div>
-                </div>
-
-                {/* Auto-generated codes for the primary model — uses the
-                    KOLEEX primary_model when set so the approved code is
-                    the one that lands on the barcode + QR. */}
+              {/* ═══ AUTO-GENERATED CODES — primary model barcode + QR.
+                  (The primary-supplier mirror now lives at the top of the
+                  shell.) Uses the KOLEEX primary_model when set so the
+                  approved code is the one on the barcode + QR. ═══ */}
                 {primaryModel?.model_name && (
-                  <div className="mt-5 pt-5 border-t border-[var(--border-subtle)]">
+                  <div className="border-t border-[var(--border-subtle)] bg-[var(--bg-primary)]/30 px-6 md:px-8 py-6">
                     <div className="flex items-center gap-2 mb-3">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">{t("hero.autoCodes", "Auto-Generated Codes")}</span>
                     </div>
@@ -3202,7 +3199,6 @@ export default function ProductForm({ productId }: Props) {
                     />
                   </div>
                 )}
-              </div>
             </div>
 
             {/* Pricing summary moved to the dedicated Cost & Price tab. */}
