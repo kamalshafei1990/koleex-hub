@@ -107,26 +107,24 @@ export default function SearchSocialSection({
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img src={customOg} alt="" className="w-full h-full object-contain bg-[var(--bg-surface)]" />
               ) : (
-                /* Product poster — the photo is the dominant hero; a slim
-                   footer carries the name + model on the left and a small
-                   KOLEEX mark on the right. Matches the generated og:image. */
-                <div className="w-full h-full bg-black flex flex-col px-6 py-5">
-                  <div className="flex-1 min-h-0 flex items-center justify-center">
-                    {primaryImageUrl ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={primaryImageUrl} alt="" className="max-h-full max-w-[92%] object-contain" />
-                    ) : null}
-                  </div>
-                  <div className="shrink-0 mt-4 pt-3 border-t border-white/15 flex items-center justify-between gap-3">
-                    <div className="min-w-0 text-left">
-                      <div className="text-[15px] font-bold leading-tight text-white truncate">{name}</div>
+                /* Product poster — two columns. Left: KOLEEX logo (top) +
+                   product name + model number. Right: the product photo.
+                   Matches the generated og:image. */
+                <div className="w-full h-full bg-black flex items-stretch">
+                  <div className="flex-1 min-w-0 flex flex-col justify-between px-5 py-4">
+                    <KoleexLogo className="h-5 w-auto text-white shrink-0" />
+                    <div className="min-w-0">
+                      <div className="text-[16px] font-bold leading-tight text-white line-clamp-3">{name}</div>
                       {modelCode && (
-                        <div className="text-[11px] font-mono tracking-wide text-white/55 mt-0.5 truncate">
-                          Model: {modelCode}
-                        </div>
+                        <div className="text-[12px] font-mono tracking-wide text-white/55 mt-1.5 truncate">{modelCode}</div>
                       )}
                     </div>
-                    <KoleexLogo className="h-3.5 w-auto text-white/70 shrink-0" />
+                  </div>
+                  <div className="w-[48%] shrink-0 flex items-center justify-center p-3 border-l border-white/10">
+                    {primaryImageUrl ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={primaryImageUrl} alt="" className="max-h-full max-w-full object-contain" />
+                    ) : null}
                   </div>
                 </div>
               )}
