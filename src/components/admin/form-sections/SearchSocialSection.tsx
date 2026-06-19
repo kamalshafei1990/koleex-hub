@@ -99,7 +99,7 @@ export default function SearchSocialSection({
             <div className="aspect-[1.91/1] bg-[var(--bg-surface)] flex items-center justify-center overflow-hidden">
               {previewImage ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={previewImage} alt="" className="w-full h-full object-cover" />
+                <img src={previewImage} alt="" className="w-full h-full object-contain" />
               ) : (
                 <div className="flex flex-col items-center gap-1.5 text-[var(--text-ghost)]">
                   <PictureIcon className="h-6 w-6" />
