@@ -11,6 +11,7 @@
 
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import Share2Icon from "@/components/icons/ui/Share2Icon";
+import KoleexLogo from "@/components/layout/KoleexLogo";
 
 const SITE = "koleexgroup.com";
 const TITLE_MAX = 60;
@@ -110,9 +111,8 @@ export default function SearchSocialSection({
                    caption bar (name + model on the left, KOLEEX logo on the
                    right). Matches the generated og:image. */
                 <div className="w-full h-full bg-black flex flex-col px-6 pt-4 pb-4">
-                  {/* KOLEEX logo header — clearly visible */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/koleex-hub-logo.svg" alt="KOLEEX" className="h-5 w-auto opacity-95 shrink-0 self-start" />
+                  {/* KOLEEX wordmark (canonical brand logo) — clearly visible */}
+                  <KoleexLogo className="h-7 w-auto text-white shrink-0 self-start" />
                   <div className="flex-1 min-h-0 flex items-center justify-center my-2">
                     {primaryImageUrl ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
