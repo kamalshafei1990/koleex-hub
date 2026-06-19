@@ -105,7 +105,6 @@ export default async function OgImage({
             alignItems: "center",
             justifyContent: "center",
             padding: "40px",
-            borderLeft: "1px solid rgba(0,0,0,0.06)",
           }}
         >
           {photo ? (

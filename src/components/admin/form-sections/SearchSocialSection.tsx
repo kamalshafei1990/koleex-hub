@@ -125,7 +125,7 @@ export default function SearchSocialSection({
                     {/* official footer */}
                     <div className="text-[9px] uppercase tracking-[0.2em] text-black/40 shrink-0">koleexgroup.com</div>
                   </div>
-                  <div className="flex-1 min-w-0 flex items-center justify-center p-3 border-l border-black/[0.06]">
+                  <div className="flex-1 min-w-0 flex items-center justify-center p-3">
                     {primaryImageUrl ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img src={primaryImageUrl} alt="" className="max-h-full max-w-full object-contain" />
