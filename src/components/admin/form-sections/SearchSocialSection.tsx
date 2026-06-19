@@ -107,25 +107,26 @@ export default function SearchSocialSection({
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img src={customOg} alt="" className="w-full h-full object-contain bg-[var(--bg-surface)]" />
               ) : (
-                /* Simple product poster — the photo is the hero, with a clean
-                   caption bar (name + model on the left, KOLEEX logo on the
-                   right). Matches the generated og:image. */
-                <div className="w-full h-full bg-black flex flex-col px-6 pt-4 pb-4">
-                  {/* KOLEEX wordmark (canonical brand logo) — clearly visible */}
-                  <KoleexLogo className="h-7 w-auto text-white shrink-0 self-start" />
-                  <div className="flex-1 min-h-0 flex items-center justify-center my-2">
+                /* Product poster — the photo is the dominant hero; a slim
+                   footer carries the name + model on the left and a small
+                   KOLEEX mark on the right. Matches the generated og:image. */
+                <div className="w-full h-full bg-black flex flex-col px-6 py-5">
+                  <div className="flex-1 min-h-0 flex items-center justify-center">
                     {primaryImageUrl ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={primaryImageUrl} alt="" className="max-h-full max-w-[80%] object-contain" />
+                      <img src={primaryImageUrl} alt="" className="max-h-full max-w-[92%] object-contain" />
                     ) : null}
                   </div>
-                  <div className="shrink-0 pt-3 border-t border-white/15 text-left">
-                    <div className="text-[15px] font-bold leading-tight text-white truncate">{name}</div>
-                    {modelCode && (
-                      <div className="text-[12px] font-mono tracking-wide text-white/65 mt-1 truncate">
-                        Model: {modelCode}
-                      </div>
-                    )}
+                  <div className="shrink-0 mt-4 pt-3 border-t border-white/15 flex items-center justify-between gap-3">
+                    <div className="min-w-0 text-left">
+                      <div className="text-[15px] font-bold leading-tight text-white truncate">{name}</div>
+                      {modelCode && (
+                        <div className="text-[11px] font-mono tracking-wide text-white/55 mt-0.5 truncate">
+                          Model: {modelCode}
+                        </div>
+                      )}
+                    </div>
+                    <KoleexLogo className="h-3.5 w-auto text-white/70 shrink-0" />
                   </div>
                 </div>
               )}
