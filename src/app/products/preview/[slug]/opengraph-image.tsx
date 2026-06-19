@@ -61,8 +61,8 @@ export default async function OgImage({
           height: "100%",
           display: "flex",
           flexDirection: "row",
-          background: "#000000",
-          color: "#FFFFFF",
+          background: "#FFFFFF",
+          color: "#000000",
           fontFamily: "sans-serif",
         }}
       >
@@ -77,7 +77,7 @@ export default async function OgImage({
             padding: "48px 52px",
           }}
         >
-          <svg width={96} height={14} viewBox="0 0 719.83 107.57" fill="#FFFFFF" xmlns="http://www.w3.org/2000/svg" style={{ marginTop: 16 }}>
+          <svg width={96} height={14} viewBox="0 0 719.83 107.57" fill="#000000" xmlns="http://www.w3.org/2000/svg" style={{ marginTop: 16 }}>
             <path d="M116.59,96.3v11.05h-10.6L14.66,62.47v44.88H0V1.58h14.66v43.53L105.99,1.58h10.6v11.05L28.42,53.9l88.18,42.4Z" />
             <path d="M242.65,71.04c0,20.07-14.21,36.54-34.28,36.54h-50.74c-20.52,0-35.18-16.01-35.18-36.54v-35.18C122.45,15.11,136.88.45,157.63.45h49.84c20.52,0,35.18,14.88,35.18,35.41v35.18ZM227.77,38.11c0-12.4-8.34-23.23-20.3-23.23h-49.84c-11.95,0-20.3,10.83-20.3,23.23v31.8c0,11.95,8.34,23,20.3,23h49.84c11.95,0,20.3-11.05,20.3-23v-31.8Z" />
             <path d="M363.07,107.57h-68.56c-20.52,0-35.18-16.01-35.18-36.54l.23-71.04h14.66v69.91c0,11.95,8.34,23,20.3,23h68.56v14.66h-.01Z" />
@@ -90,11 +90,11 @@ export default async function OgImage({
               {name}
             </div>
             {model ? (
-              <div style={{ fontSize: 30, letterSpacing: 2, color: "rgba(255,255,255,0.6)", marginTop: 18 }}>{model}</div>
+              <div style={{ fontSize: 30, letterSpacing: 2, color: "rgba(0,0,0,0.6)", marginTop: 18 }}>{model}</div>
             ) : null}
           </div>
           {/* official footer */}
-          <div style={{ display: "flex", fontSize: 18, letterSpacing: 4, textTransform: "uppercase", color: "rgba(255,255,255,0.3)" }}>koleexgroup.com</div>
+          <div style={{ display: "flex", fontSize: 18, letterSpacing: 4, textTransform: "uppercase", color: "rgba(0,0,0,0.4)" }}>koleexgroup.com</div>
         </div>
 
         {/* Right column — product photo (the bigger hero) */}
@@ -105,6 +105,7 @@ export default async function OgImage({
             alignItems: "center",
             justifyContent: "center",
             padding: "40px",
+            borderLeft: "1px solid rgba(0,0,0,0.06)",
           }}
         >
           {photo ? (
@@ -112,8 +113,8 @@ export default async function OgImage({
             <img src={photo} alt="" style={{ maxWidth: "100%", maxHeight: 560, objectFit: "contain" }} width={620} height={560} />
           ) : (
             /* empty-photo fallback — faint KOLEEX watermark so the photo
-               side never reads as a broken black void */
-            <svg width={300} height={45} viewBox="0 0 719.83 107.57" fill="rgba(255,255,255,0.07)" xmlns="http://www.w3.org/2000/svg">
+               side never reads as a broken empty panel */
+            <svg width={300} height={45} viewBox="0 0 719.83 107.57" fill="rgba(0,0,0,0.06)" xmlns="http://www.w3.org/2000/svg">
               <path d="M116.59,96.3v11.05h-10.6L14.66,62.47v44.88H0V1.58h14.66v43.53L105.99,1.58h10.6v11.05L28.42,53.9l88.18,42.4Z" />
               <path d="M242.65,71.04c0,20.07-14.21,36.54-34.28,36.54h-50.74c-20.52,0-35.18-16.01-35.18-36.54v-35.18C122.45,15.11,136.88.45,157.63.45h49.84c20.52,0,35.18,14.88,35.18,35.41v35.18ZM227.77,38.11c0-12.4-8.34-23.23-20.3-23.23h-49.84c-11.95,0-20.3,10.83-20.3,23.23v31.8c0,11.95,8.34,23,20.3,23h49.84c11.95,0,20.3-11.05,20.3-23v-31.8Z" />
               <path d="M363.07,107.57h-68.56c-20.52,0-35.18-16.01-35.18-36.54l.23-71.04h14.66v69.91c0,11.95,8.34,23,20.3,23h68.56v14.66h-.01Z" />
