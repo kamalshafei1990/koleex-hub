@@ -164,20 +164,280 @@ interface BodyProps {
   onToast: (msg: string) => void;
 }
 
+/* Section anchors — id + nav label, in render order. Used by the sticky
+   nav (jump links) and as scroll targets. */
+const POLICY_SECTIONS: { id: string; label: string }[] = [
+  { id: "cp-simulator", label: "Simulator" },
+  { id: "cp-settings", label: "Settings" },
+  { id: "cp-levels", label: "Levels" },
+  { id: "cp-tiers", label: "Tiers" },
+  { id: "cp-markets", label: "Markets" },
+  { id: "cp-channels", label: "Channels" },
+  { id: "cp-volume", label: "Volume" },
+  { id: "cp-discounts", label: "Discounts" },
+  { id: "cp-commission", label: "Commission" },
+  { id: "cp-approvals", label: "Approvals" },
+];
+
+function Anchor({ id, children }: { id: string; children: React.ReactNode }) {
+  return <div id={id} className="scroll-mt-20">{children}</div>;
+}
+
 function PolicyBody({ s, onPatch, onToast }: BodyProps) {
   return (
     <>
+      <PolicyHealthStrip s={s} />
+      <PolicyNav />
       <InfoBanner />
-      <SettingsSection row={s.settings} onPatch={(r) => { onPatch("settings", r); onToast("Settings saved"); }} />
-      <ProductLevelsSection rows={s.productLevels} onPatch={(r) => { onPatch("productLevels", r); onToast("Product levels saved"); }} />
-      <CustomerTiersSection rows={s.customerTiers} onPatch={(r) => { onPatch("customerTiers", r); onToast("Customer tiers saved"); }} />
-      <MarketBandsSection bands={s.marketBands} countries={s.bandCountries} onPatch={(r) => { onPatch("marketBands", r); onToast("Market bands saved"); }} />
-      <ChannelMultipliersSection rows={s.channelMultipliers} onPatch={(r) => { onPatch("channelMultipliers", r); onToast("Channel multipliers saved"); }} />
-      <VolumeDiscountTiersSection rows={s.volumeDiscountTiers} onPatch={(r) => { onPatch("volumeDiscountTiers", r); onToast("Volume discount tiers saved"); }} />
-      <DiscountTiersSection rows={s.discountTiers} onPatch={(r) => { onPatch("discountTiers", r); onToast("Discount tiers saved"); }} />
-      <CommissionTiersSection rows={s.commissionTiers} onPatch={(r) => { onPatch("commissionTiers", r); onToast("Commission tiers saved"); }} />
-      <ApprovalAuthoritySection rows={s.approvalAuthority} onPatch={(r) => { onPatch("approvalAuthority", r); onToast("Approval authority saved"); }} />
+      <Anchor id="cp-simulator"><PricingSimulator s={s} /></Anchor>
+      <Anchor id="cp-settings"><SettingsSection row={s.settings} onPatch={(r) => { onPatch("settings", r); onToast("Settings saved"); }} /></Anchor>
+      <Anchor id="cp-levels"><ProductLevelsSection rows={s.productLevels} onPatch={(r) => { onPatch("productLevels", r); onToast("Product levels saved"); }} /></Anchor>
+      <Anchor id="cp-tiers"><CustomerTiersSection rows={s.customerTiers} onPatch={(r) => { onPatch("customerTiers", r); onToast("Customer tiers saved"); }} /></Anchor>
+      <Anchor id="cp-markets"><MarketBandsSection bands={s.marketBands} countries={s.bandCountries} onPatch={(r) => { onPatch("marketBands", r); onToast("Market bands saved"); }} /></Anchor>
+      <Anchor id="cp-channels"><ChannelMultipliersSection rows={s.channelMultipliers} onPatch={(r) => { onPatch("channelMultipliers", r); onToast("Channel multipliers saved"); }} /></Anchor>
+      <Anchor id="cp-volume"><VolumeDiscountTiersSection rows={s.volumeDiscountTiers} onPatch={(r) => { onPatch("volumeDiscountTiers", r); onToast("Volume discount tiers saved"); }} /></Anchor>
+      <Anchor id="cp-discounts"><DiscountTiersSection rows={s.discountTiers} onPatch={(r) => { onPatch("discountTiers", r); onToast("Discount tiers saved"); }} /></Anchor>
+      <Anchor id="cp-commission"><CommissionTiersSection rows={s.commissionTiers} onPatch={(r) => { onPatch("commissionTiers", r); onToast("Commission tiers saved"); }} /></Anchor>
+      <Anchor id="cp-approvals"><ApprovalAuthoritySection rows={s.approvalAuthority} onPatch={(r) => { onPatch("approvalAuthority", r); onToast("Approval authority saved"); }} /></Anchor>
     </>
+  );
+}
+
+/* ─── Sticky section nav (jump links) ───────────────────────── */
+function PolicyNav() {
+  const jump = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  return (
+    <div className="sticky top-0 z-20 -mx-1 px-1 py-2 bg-[var(--bg-primary)]/95 backdrop-blur border-b border-[var(--border-subtle)]">
+      <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+        {POLICY_SECTIONS.map((sec) => (
+          <button
+            key={sec.id}
+            type="button"
+            onClick={() => jump(sec.id)}
+            className="shrink-0 text-[12px] font-medium px-3 py-1.5 rounded-full border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] bg-[var(--bg-secondary)] transition-colors"
+          >
+            {sec.label}
+          </button>
+        ))}
+      </nav>
+    </div>
+  );
+}
+
+/* ─── Policy health strip ───────────────────────────────────── */
+function PolicyHealthStrip({ s }: { s: CommercialPolicySnapshot }) {
+  const engineOn = !!s.settings?.use_policy_engine;
+  const updatedAt = s.settings?.updated_at ? new Date(s.settings.updated_at) : null;
+  const fxFreshLabel = (() => {
+    if (!updatedAt) return "FX: not yet updated";
+    const fx = Number(s.settings?.fx_cny_per_usd ?? 0).toFixed(4);
+    return `FX ${fx} · updated ${relativeDay(updatedAt)}`;
+  })();
+  const fxStale = (() => {
+    if (!updatedAt) return true;
+    const ageMs = nowMs() - updatedAt.getTime();
+    return ageMs > 1000 * 60 * 60 * 36; // >36h since last write
+  })();
+
+  return (
+    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3 flex flex-wrap items-center gap-x-5 gap-y-2">
+      <HealthPill
+        ok={engineOn}
+        label={engineOn ? "Pricing engine: LIVE" : "Pricing engine: OFF (legacy)"}
+        hint={engineOn ? "Lines price from the policy" : "Prices are entered manually until you turn it on in Settings"}
+      />
+      <HealthPill
+        ok={!fxStale}
+        label={fxFreshLabel}
+        hint={fxStale ? "Refresh the rate in Settings → FX" : "Auto-updates daily"}
+      />
+    </div>
+  );
+}
+
+function HealthPill({ ok, label, hint }: { ok: boolean; label: string; hint?: string }) {
+  return (
+    <div className="flex items-center gap-2 min-w-0">
+      <span className={`h-2 w-2 rounded-full shrink-0 ${ok ? "bg-emerald-400" : "bg-[var(--text-dim)]"}`} />
+      <div className="min-w-0">
+        <div className="text-[12px] font-medium text-[var(--text-secondary)] truncate">{label}</div>
+        {hint && <div className="text-[10px] text-[var(--text-dim)] truncate">{hint}</div>}
+      </div>
+    </div>
+  );
+}
+
+/* Small date helpers — kept local so they can't drift. */
+function nowMs(): number {
+  return Date.parse(new Date().toISOString());
+}
+function relativeDay(d: Date): string {
+  const days = Math.floor((nowMs() - d.getTime()) / (1000 * 60 * 60 * 24));
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  return `${days}d ago`;
+}
+
+/* ─── Pricing simulator ─────────────────────────────────────────
+   Read-only "what does this product sell for?" panel. Pure client-side
+   math from the loaded policy snapshot — type a cost + tier + market and
+   see the base → channel ladder → market band → final price + margin.
+   No API, no writes. Mirrors the documented 12-step flow. */
+function PricingSimulator({ s }: { s: CommercialPolicySnapshot }) {
+  const fx = Number(s.settings?.fx_cny_per_usd ?? 0);
+  const uplift = Number(s.settings?.cost_uplift_percent ?? 0);
+  const levels = [...(s.productLevels ?? [])].sort((a, b) => a.sort_order - b.sort_order);
+  const channels = [...(s.channelMultipliers ?? [])].sort((a, b) => a.sort_order - b.sort_order);
+  const bands = [...(s.marketBands ?? [])].sort((a, b) => a.sort_order - b.sort_order);
+
+  const [costCny, setCostCny] = useState<number>(75000);
+  const [channelCode, setChannelCode] = useState<string>(channels[channels.length - 1]?.code ?? "");
+  const [bandCode, setBandCode] = useState<string>(bands[0]?.code ?? "");
+
+  const ready = fx > 0 && levels.length > 0 && channels.length > 0;
+
+  const usd = (n: number) => `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  const cny = (n: number) => `¥${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+
+  let sim: null | {
+    levelName: string; margin: number; minMargin: number;
+    netCny: number; costUsd: number; base: number;
+    steps: { label: string; mult: number; running: number }[];
+    bandName: string; bandAdj: number; bandFlexible: boolean;
+    finalPrice: number; profit: number; marginOnPrice: number; markupOnCost: number; belowFloor: boolean;
+  } = null;
+
+  if (ready) {
+    const level = levels.find((l) => costCny >= l.min_cost_cny && (l.max_cost_cny == null || costCny <= l.max_cost_cny)) ?? null;
+    const margin = level ? Number(level.margin_percent) : 0;
+    const minMargin = level ? Number(level.min_margin_percent) : 0;
+    const netCny = costCny * (1 + uplift / 100);
+    const costUsd = netCny / fx;
+    const base = costUsd * (1 + margin / 100);
+    const idx = channels.findIndex((c) => c.code === channelCode);
+    const upto = idx >= 0 ? channels.slice(0, idx + 1) : channels;
+    const steps: { label: string; mult: number; running: number }[] = [];
+    let running = base;
+    for (const c of upto) {
+      const m = Number(c.multiplier);
+      running *= m;
+      steps.push({ label: c.name, mult: m, running });
+    }
+    const band = bands.find((b) => b.code === bandCode) ?? null;
+    const bandFlexible = !!band?.is_flexible;
+    const bandAdj = band && !bandFlexible ? Number(band.adjustment_percent) : 0;
+    const finalPrice = running * (1 + bandAdj / 100);
+    const profit = finalPrice - costUsd;
+    sim = {
+      levelName: level ? `${level.code} · ${level.name}` : "No level matches this cost",
+      margin, minMargin, netCny, costUsd, base, steps,
+      bandName: band ? (band.label || band.name) : "—",
+      bandAdj, bandFlexible,
+      finalPrice, profit,
+      marginOnPrice: finalPrice > 0 ? (profit / finalPrice) * 100 : 0,
+      markupOnCost: costUsd > 0 ? (profit / costUsd) * 100 : 0,
+      belowFloor: !!level && costUsd > 0 && (profit / costUsd) * 100 < minMargin,
+    };
+  }
+
+  const selectCls = "h-9 w-full rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-2 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
+
+  return (
+    <section className="scroll-mt-20 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
+      <div className="px-5 pt-4 pb-3 border-b border-[var(--border-subtle)]">
+        <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">Pricing simulator</h2>
+        <p className="text-[11px] text-[var(--text-dim)] mt-1">
+          Type a factory cost, channel and market — see the price this policy produces. Read-only; nothing is saved.
+        </p>
+      </div>
+      <div className="p-5 space-y-4">
+        {/* Inputs */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-1">Factory cost (CNY)</label>
+            <input type="number" min={0} step={100} value={costCny}
+              onChange={(e) => setCostCny(Number(e.target.value))} className={selectCls} />
+          </div>
+          <div>
+            <label className="block text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-1">Sells to (channel)</label>
+            <select value={channelCode} onChange={(e) => setChannelCode(e.target.value)} className={selectCls}>
+              {channels.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-1">Market band</label>
+            <select value={bandCode} onChange={(e) => setBandCode(e.target.value)} className={selectCls}>
+              {bands.map((b) => <option key={b.code} value={b.code}>{(b.label || b.name)}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {!ready && (
+          <div className="text-[12px] text-[var(--text-dim)]">Configure FX, product levels and channels first to use the simulator.</div>
+        )}
+
+        {sim && (
+          <>
+            {/* Result headline */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">Selling price</div>
+                <div className="text-[22px] font-bold tabular-nums mt-1 text-[var(--text-primary)]">{usd(sim.finalPrice)}</div>
+                <div className="text-[10px] text-[var(--text-dim)] mt-0.5">{sim.levelName}</div>
+              </div>
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">Profit / unit</div>
+                <div className="text-[22px] font-bold tabular-nums mt-1 text-[var(--text-primary)]">{usd(sim.profit)}</div>
+                <div className="text-[10px] text-[var(--text-dim)] mt-0.5">cost {usd(sim.costUsd)}</div>
+              </div>
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">Margin</div>
+                <div className={`text-[22px] font-bold tabular-nums mt-1 ${sim.belowFloor ? "text-amber-300" : "text-emerald-300"}`}>{sim.marginOnPrice.toFixed(1)}%</div>
+                <div className="text-[10px] text-[var(--text-dim)] mt-0.5">markup {sim.markupOnCost.toFixed(1)}% · floor {sim.minMargin}%</div>
+              </div>
+            </div>
+
+            {/* Breakdown */}
+            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-4 py-3 text-[12px] space-y-1.5">
+              <BreakdownRow label={`Factory cost`} value={cny(costCny)} />
+              <BreakdownRow label={`Net cost (uplift +${uplift}%)`} value={cny(sim.netCny)} muted />
+              <BreakdownRow label={`Cost in USD (÷ ${fx})`} value={usd(sim.costUsd)} />
+              <BreakdownRow label={`Base price (+${sim.margin}% margin)`} value={usd(sim.base)} />
+              {sim.steps.map((st, i) => (
+                <BreakdownRow key={i} label={`${st.label} (×${st.mult})`} value={usd(st.running)} muted />
+              ))}
+              <BreakdownRow
+                label={`Market: ${sim.bandName} ${sim.bandFlexible ? "(flexible)" : `(${sim.bandAdj >= 0 ? "+" : ""}${sim.bandAdj}%)`}`}
+                value={usd(sim.finalPrice)}
+                strong
+              />
+            </div>
+
+            {/* Warnings */}
+            {sim.belowFloor && (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/[0.08] px-3 py-2 text-[11px] text-amber-300">
+                Below the {sim.levelName.split(" · ")[0]} minimum margin ({sim.minMargin}%) — this deal would need GM/CEO approval.
+              </div>
+            )}
+            {sim.bandFlexible && (
+              <div className="text-[11px] text-[var(--text-dim)]">Flexible market band — using 0% here; set a negotiated rate per deal.</div>
+            )}
+            <p className="text-[10px] text-[var(--text-ghost)]">List price before any customer discount or sales commission. {s.settings?.use_policy_engine ? "" : "The pricing engine is OFF, so live quotes are still manual — this is a preview of what the policy would produce."}</p>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function BreakdownRow({ label, value, muted, strong }: { label: string; value: string; muted?: boolean; strong?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className={`${muted ? "text-[var(--text-dim)]" : strong ? "text-[var(--text-primary)] font-semibold" : "text-[var(--text-secondary)]"}`}>{label}</span>
+      <span className={`tabular-nums ${strong ? "text-[var(--text-primary)] font-bold" : muted ? "text-[var(--text-dim)]" : "text-[var(--text-secondary)]"}`}>{value}</span>
+    </div>
   );
 }
 
@@ -197,6 +457,7 @@ function InfoBanner() {
 /* ─── Generic editable-section scaffolding ───────────────── */
 
 function SectionShell({
+  id,
   title,
   description,
   editing,
@@ -207,6 +468,7 @@ function SectionShell({
   canSave = true,
   children,
 }: {
+  id?: string;
   title: string;
   description?: string;
   editing: boolean;
@@ -218,7 +480,7 @@ function SectionShell({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
+    <section id={id} className="scroll-mt-20 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
       <div className="px-5 pt-4 pb-3 border-b border-[var(--border-subtle)] flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0 flex-1">
           <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">{title}</h2>
