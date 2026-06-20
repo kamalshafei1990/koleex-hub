@@ -222,6 +222,15 @@ export default function PriceCalculator() {
     setExpandedItems(new Set());
   }
 
+  /* ── Back target ── reads ?from=/path so the Back button returns to
+     wherever we were opened from (e.g. Commercial Policy & Pricing),
+     defaulting to home. Validated to internal paths to avoid open-redirect. */
+  const [backHref, setBackHref] = useState("/");
+  useEffect(() => {
+    const from = new URLSearchParams(window.location.search).get("from");
+    if (from && from.startsWith("/") && !from.startsWith("//")) setBackHref(from);
+  }, []);
+
   /* ── Derived from config ── */
   const cfgCountries = pricingConfig?.countries ?? COUNTRIES;
   const cfgCategories = pricingConfig?.categories ?? CATEGORIES;
@@ -244,7 +253,7 @@ export default function PriceCalculator() {
 
         {/* ── Page Header ── */}
         <div className="flex flex-wrap items-center gap-3 mb-1">
-          <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
+          <Link href={backHref} className="h-8 w-8 flex items-center justify-center rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
             <ArrowLeftIcon className="h-4 w-4" />
           </Link>
           <div className="flex-1 flex items-center gap-2.5 min-w-0">

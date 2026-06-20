@@ -287,7 +287,7 @@ function relativeDay(d: Date): string {
 function PriceCalculatorCTA() {
   return (
     <Link
-      href="/price-calculator"
+      href="/price-calculator?from=/commercial-policy"
       className="group flex items-center gap-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-5 py-4 transition-colors hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)]"
     >
       <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)]">
