@@ -119,7 +119,7 @@ function CommercialPolicyView() {
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 space-y-6">
+        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-6 pb-28 space-y-6">
           {loading && <LoadingState />}
           {!loading && error && <ErrorState message={error} />}
           {!loading && !error && snapshot && (
@@ -1573,7 +1573,7 @@ function ResponsiveTable({
 }: { head: string[]; rows: React.ReactNode }) {
   return (
     <div className="overflow-x-auto -mx-5">
-      <table className="w-full text-[12px]">
+      <table className="w-full text-[12px] [&_tbody_tr]:transition-colors [&_tbody_tr:hover]:bg-[var(--bg-surface-subtle)]">
         <thead>
           <tr className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">
             {head.map((h, i) => {
