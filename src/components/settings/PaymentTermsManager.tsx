@@ -25,6 +25,9 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import StarIcon from "@/components/icons/ui/StarIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import PencilIcon from "@/components/icons/ui/PencilIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import { CatalogEditorModal, deleteCatalogRow, type CatalogField } from "./CatalogEditorModal";
 
 export interface PaymentTermStage {
   order: number;
@@ -112,6 +115,7 @@ export default function PaymentTermsManager({
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [activeCategoryCode, setActiveCategoryCode] = useState<string | null>(null);
+  const [editing, setEditing] = useState<PaymentTermRow | "new" | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -135,6 +139,33 @@ export default function PaymentTermsManager({
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  const handleDelete = useCallback(async (term: PaymentTermRow) => {
+    if (!confirm(`Delete "${term.label}"? It will be hidden from quotes, invoices & contracts.`)) return;
+    const err = await deleteCatalogRow("/api/payment-terms", term.id);
+    if (err) { alert(err); return; }
+    void refresh();
+  }, [refresh]);
+
+  const RISK_OPTS = [
+    { value: "low", label: "Low" }, { value: "medium", label: "Medium" }, { value: "high", label: "High" },
+  ];
+  const termFields: CatalogField[] = useMemo(() => [
+    { key: "category_id", label: "Category", type: "select", required: true,
+      options: categories.map((c) => ({ value: c.id, label: c.name })) },
+    { key: "code", label: "Code", type: "text", required: true, placeholder: "tt_30_70" },
+    { key: "label", label: "Label", type: "text", required: true, placeholder: "30% deposit, 70% against B/L" },
+    { key: "short_label", label: "Short label", type: "text", placeholder: "T/T 30/70" },
+    { key: "total_days", label: "Total days", type: "number" },
+    { key: "days_basis", label: "Days basis", type: "text", placeholder: "days_after_bl / none" },
+    { key: "exporter_risk", label: "Exporter risk", type: "select", options: RISK_OPTS },
+    { key: "buyer_risk", label: "Buyer risk", type: "select", options: RISK_OPTS },
+    { key: "suitable_for", label: "Suitable for", type: "chips", full: true, placeholder: "new_customer, trusted (comma-separated)" },
+    { key: "sort_order", label: "Sort order", type: "number" },
+    { key: "is_default", label: "Default for category", type: "toggle" },
+    { key: "is_active", label: "Active", type: "toggle" },
+    { key: "notes", label: "Notes", type: "textarea" },
+  ], [categories]);
 
   /* Filtered + searched view. We keep categories in the same order
      even when empty so chip filters stay stable. */
@@ -185,7 +216,7 @@ export default function PaymentTermsManager({
           <button
             type="button"
             className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] rounded-lg hover:opacity-90 transition"
-            onClick={() => alert("Custom-term editor coming next — for v1, contact engineering to add tenant-specific terms via SQL.")}
+            onClick={() => setEditing("new")}
           >
             <PlusIcon size={14} />
             Add Custom Term
@@ -284,12 +315,34 @@ export default function PaymentTermsManager({
               )}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
                 {cat.terms.map((term) => (
-                  <TermCard key={term.id} term={term} canEdit={isSuperAdmin} onChanged={refresh} />
+                  <TermCard
+                    key={term.id}
+                    term={term}
+                    canEdit={isSuperAdmin}
+                    onChanged={refresh}
+                    onEdit={() => setEditing(term)}
+                    onDelete={() => handleDelete(term)}
+                  />
                 ))}
               </div>
             </div>
           ))}
         </div>
+      )}
+
+      {editing && (
+        <CatalogEditorModal
+          open
+          title={editing === "new" ? "Add Payment Term" : `Edit ${editing.label}`}
+          endpoint="/api/payment-terms"
+          fields={termFields}
+          idValue={editing === "new" ? null : editing.id}
+          initial={editing === "new"
+            ? { category_id: categories[0]?.id ?? "", days_basis: "none", is_active: true, sort_order: 1000 }
+            : (editing as unknown as Record<string, unknown>)}
+          onClose={() => setEditing(null)}
+          onSaved={() => void refresh()}
+        />
       )}
     </section>
   );
@@ -299,10 +352,14 @@ function TermCard({
   term,
   canEdit,
   onChanged,
+  onEdit,
+  onDelete,
 }: {
   term: PaymentTermRow;
   canEdit: boolean;
   onChanged: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
 }) {
   const setDefault = useCallback(async () => {
     if (!canEdit || term.is_system) return;
@@ -378,15 +435,33 @@ function TermCard({
           </div>
         </div>
 
-        {canEdit && !term.is_system && (
+        {canEdit && (
           <div className="flex items-start gap-1 shrink-0">
+            {!term.is_system && !term.is_default && (
+              <button
+                type="button"
+                onClick={setDefault}
+                title="Set as the default for this category"
+                className="p-1.5 text-[var(--text-dim)] hover:text-amber-400 hover:bg-amber-500/10 rounded transition"
+              >
+                <StarIcon size={12} />
+              </button>
+            )}
             <button
               type="button"
-              onClick={setDefault}
-              title="Set as the default for this category"
-              className="p-1.5 text-[var(--text-dim)] hover:text-amber-400 hover:bg-amber-500/10 rounded transition"
+              onClick={onEdit}
+              title="Edit"
+              className="p-1.5 text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] rounded transition"
             >
-              <StarIcon size={12} />
+              <PencilIcon className="h-3 w-3" />
+            </button>
+            <button
+              type="button"
+              onClick={onDelete}
+              title="Delete"
+              className="p-1.5 text-[var(--text-dim)] hover:text-red-400 hover:bg-red-500/10 rounded transition"
+            >
+              <TrashIcon className="h-3 w-3" />
             </button>
           </div>
         )}

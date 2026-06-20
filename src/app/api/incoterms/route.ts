@@ -16,6 +16,22 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 
+/* Columns a caller may write. Everything else (id, tenant_id, is_system,
+   created_by/at) is server-controlled and never accepted from the body. */
+const EDITABLE = [
+  "code", "name", "short_name", "transport_mode",
+  "includes_export_clearance", "includes_main_carriage", "includes_insurance",
+  "includes_import_clearance", "includes_import_duty", "includes_unloading_at_dest",
+  "risk_transfer_point", "named_location_required", "named_location_label",
+  "standing", "is_obsolete", "effort_score", "notes", "sort_order",
+  "is_default", "is_active",
+] as const;
+function pick(body: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k of EDITABLE) if (k in body) out[k] = body[k];
+  return out;
+}
+
 export async function GET() {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
@@ -56,7 +72,7 @@ export async function POST(req: Request) {
   const { data, error } = await supabaseServer
     .from("incoterms")
     .insert({
-      ...body,
+      ...pick(body),
       tenant_id: auth.tenant_id,
       standing: "custom",
       is_system: false,
@@ -87,10 +103,9 @@ export async function PATCH(req: Request) {
     .eq("id", body.id)
     .single();
   if (!existing) return NextResponse.json({ error: "Not found." }, { status: 404 });
-  if (existing.is_system) {
-    return NextResponse.json({ error: "System Incoterms are read-only." }, { status: 403 });
-  }
-  if (existing.tenant_id !== auth.tenant_id) {
+  /* Super-admin may edit system seeds (tenant_id NULL) and own-tenant rows;
+     other tenants' custom rows stay protected. */
+  if (existing.tenant_id !== null && existing.tenant_id !== auth.tenant_id) {
     return NextResponse.json({ error: "Not in your tenant." }, { status: 403 });
   }
   if (body.is_default === true) {
@@ -99,13 +114,11 @@ export async function PATCH(req: Request) {
       .eq("tenant_id", auth.tenant_id)
       .neq("id", body.id);
   }
-  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  for (const k of Object.keys(body)) if (k !== "id") patch[k] = body[k];
+  const patch: Record<string, unknown> = { ...pick(body), updated_at: new Date().toISOString() };
   const { data, error } = await supabaseServer
     .from("incoterms")
     .update(patch)
     .eq("id", body.id)
-    .eq("tenant_id", auth.tenant_id)
     .select()
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -127,10 +140,7 @@ export async function DELETE(req: Request) {
     .eq("id", id)
     .single();
   if (!existing) return NextResponse.json({ error: "Not found." }, { status: 404 });
-  if (existing.is_system) {
-    return NextResponse.json({ error: "System Incoterms cannot be deleted." }, { status: 403 });
-  }
-  if (existing.tenant_id !== auth.tenant_id) {
+  if (existing.tenant_id !== null && existing.tenant_id !== auth.tenant_id) {
     return NextResponse.json({ error: "Not in your tenant." }, { status: 403 });
   }
   const { error } = await supabaseServer

@@ -16,6 +16,30 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import PencilIcon from "@/components/icons/ui/PencilIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import { CatalogEditorModal, deleteCatalogRow, type CatalogField } from "./CatalogEditorModal";
+
+const INCOTERM_FIELDS: CatalogField[] = [
+  { key: "code", label: "Code", type: "text", required: true, placeholder: "FOB" },
+  { key: "name", label: "Name", type: "text", required: true, placeholder: "Free On Board" },
+  { key: "short_name", label: "Short name", type: "text" },
+  { key: "transport_mode", label: "Transport mode", type: "select", options: [{ value: "any", label: "Any mode" }, { value: "sea", label: "Sea only" }] },
+  { key: "standing", label: "Standing", type: "select", options: [{ value: "icc_2020", label: "ICC 2020" }, { value: "icc_2010", label: "ICC 2010" }, { value: "variant", label: "Variant" }, { value: "custom", label: "Custom" }] },
+  { key: "includes_export_clearance", label: "Seller: export clearance", type: "toggle" },
+  { key: "includes_main_carriage", label: "Seller: main carriage", type: "toggle" },
+  { key: "includes_insurance", label: "Seller: insurance", type: "toggle" },
+  { key: "includes_import_clearance", label: "Seller: import clearance", type: "toggle" },
+  { key: "includes_import_duty", label: "Seller: import duty", type: "toggle" },
+  { key: "includes_unloading_at_dest", label: "Seller: unload at destination", type: "toggle" },
+  { key: "risk_transfer_point", label: "Risk transfer point", type: "text", full: true, placeholder: "On board the vessel at the named port" },
+  { key: "named_location_required", label: "Named location required", type: "toggle" },
+  { key: "is_obsolete", label: "Obsolete", type: "toggle" },
+  { key: "is_default", label: "Default", type: "toggle" },
+  { key: "is_active", label: "Active", type: "toggle" },
+  { key: "sort_order", label: "Sort order", type: "number" },
+  { key: "notes", label: "Notes", type: "textarea" },
+];
 
 interface IncotermRow {
   id: string;
@@ -67,6 +91,7 @@ export default function IncotermsManager({ isSuperAdmin }: { isSuperAdmin: boole
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [mode, setMode] = useState<"all" | "any" | "sea">("all");
+  const [editing, setEditing] = useState<IncotermRow | "new" | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -88,6 +113,13 @@ export default function IncotermsManager({ isSuperAdmin }: { isSuperAdmin: boole
   }, []);
 
   useEffect(() => { void refresh(); }, [refresh]);
+
+  const handleDelete = useCallback(async (row: IncotermRow) => {
+    if (!confirm(`Delete "${row.code} — ${row.name}"? It will be hidden from quotes.`)) return;
+    const err = await deleteCatalogRow("/api/incoterms", row.id);
+    if (err) { alert(err); return; }
+    void refresh();
+  }, [refresh]);
 
   const view = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -127,7 +159,7 @@ export default function IncotermsManager({ isSuperAdmin }: { isSuperAdmin: boole
           <button
             type="button"
             className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] rounded-lg hover:opacity-90 transition"
-            onClick={() => alert("Custom-Incoterm editor coming next. v1 ships the 11 ICC 2020 terms + DDU, C&F, CIFFO.")}
+            onClick={() => setEditing("new")}
           >
             <PlusIcon size={14} />
             Add Custom Incoterm
@@ -178,7 +210,7 @@ export default function IncotermsManager({ isSuperAdmin }: { isSuperAdmin: boole
       {!loading && !error && (
         <div className="grid grid-cols-1 gap-2">
           {view.map((row) => (
-            <IncotermCard key={row.id} row={row} />
+            <IncotermCard key={row.id} row={row} canEdit={isSuperAdmin} onEdit={() => setEditing(row)} onDelete={() => handleDelete(row)} />
           ))}
           {view.length === 0 && (
             <div className="py-12 text-center text-[var(--text-dim)] text-[13px]">
@@ -187,11 +219,26 @@ export default function IncotermsManager({ isSuperAdmin }: { isSuperAdmin: boole
           )}
         </div>
       )}
+
+      {editing && (
+        <CatalogEditorModal
+          open
+          title={editing === "new" ? "Add Incoterm" : `Edit ${editing.code}`}
+          endpoint="/api/incoterms"
+          fields={INCOTERM_FIELDS}
+          idValue={editing === "new" ? null : editing.id}
+          initial={editing === "new"
+            ? { transport_mode: "any", standing: "icc_2020", named_location_required: true, is_active: true, sort_order: 1000 }
+            : (editing as unknown as Record<string, unknown>)}
+          onClose={() => setEditing(null)}
+          onSaved={() => void refresh()}
+        />
+      )}
     </section>
   );
 }
 
-function IncotermCard({ row }: { row: IncotermRow }) {
+function IncotermCard({ row, canEdit, onEdit, onDelete }: { row: IncotermRow; canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
   return (
     <div className="bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-xl p-3 hover:border-[var(--border-strong)] transition">
       <div className="flex items-start gap-3">
@@ -266,6 +313,17 @@ function IncotermCard({ row }: { row: IncotermRow }) {
             <p className="text-[11px] text-[var(--text-dim)] italic">{row.notes}</p>
           )}
         </div>
+
+        {canEdit && (
+          <div className="flex flex-col gap-1 shrink-0">
+            <button type="button" onClick={onEdit} title="Edit" className="h-7 w-7 flex items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] transition">
+              <PencilIcon className="h-3.5 w-3.5" />
+            </button>
+            <button type="button" onClick={onDelete} title="Delete" className="h-7 w-7 flex items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-red-400 hover:border-red-500/40 transition">
+              <TrashIcon className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

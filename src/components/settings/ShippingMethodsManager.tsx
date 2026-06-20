@@ -18,6 +18,41 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import PencilIcon from "@/components/icons/ui/PencilIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import { CatalogEditorModal, deleteCatalogRow, type CatalogField } from "./CatalogEditorModal";
+
+const METHOD_FIELDS: CatalogField[] = [
+  { key: "code", label: "Code", type: "text", required: true, placeholder: "sea_fcl" },
+  { key: "name", label: "Name", type: "text", required: true, placeholder: "Sea — FCL" },
+  { key: "short_name", label: "Short name", type: "text" },
+  { key: "mode", label: "Mode", type: "select", required: true, options: [
+    { value: "sea", label: "Sea" }, { value: "air", label: "Air" }, { value: "road", label: "Road" }, { value: "rail", label: "Rail" },
+    { value: "multimodal", label: "Multimodal" }, { value: "courier", label: "Courier" }, { value: "other", label: "Other" },
+  ] },
+  { key: "sub_type", label: "Sub-type", type: "text", placeholder: "FCL / LCL / RoRo" },
+  { key: "typical_transit_days_min", label: "Transit days (min)", type: "number" },
+  { key: "typical_transit_days_max", label: "Transit days (max)", type: "number" },
+  { key: "cost_tier", label: "Cost tier", type: "select", options: [
+    { value: "low", label: "Low" }, { value: "medium", label: "Medium" }, { value: "high", label: "High" }, { value: "very_high", label: "Very high" },
+  ] },
+  { key: "speed_tier", label: "Speed tier", type: "select", options: [
+    { value: "slow", label: "Slow" }, { value: "medium", label: "Medium" }, { value: "fast", label: "Fast" }, { value: "express", label: "Express" },
+  ] },
+  { key: "has_tracking", label: "Has tracking", type: "toggle" },
+  { key: "tracking_url_template", label: "Tracking URL template", type: "text", full: true, placeholder: "https://track.example.com/{number}" },
+  { key: "supports_dangerous_goods", label: "Dangerous goods", type: "toggle" },
+  { key: "supports_refrigerated", label: "Refrigerated", type: "toggle" },
+  { key: "supports_oversized", label: "Oversized", type: "toggle" },
+  { key: "supports_hazmat", label: "Hazmat", type: "toggle" },
+  { key: "documents", label: "Documents", type: "chips", full: true, placeholder: "B/L, packing list (comma-separated)" },
+  { key: "common_carriers", label: "Common carriers", type: "chips", full: true, placeholder: "Maersk, MSC, DHL" },
+  { key: "common_lanes", label: "Common lanes", type: "chips", full: true, placeholder: "CN→EG, CN→US" },
+  { key: "is_default", label: "Default", type: "toggle" },
+  { key: "is_active", label: "Active", type: "toggle" },
+  { key: "sort_order", label: "Sort order", type: "number" },
+  { key: "notes", label: "Notes", type: "textarea" },
+];
 
 interface ShippingMethodRow {
   id: string;
@@ -76,6 +111,7 @@ export default function ShippingMethodsManager({ isSuperAdmin }: { isSuperAdmin:
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [activeMode, setActiveMode] = useState<ShippingMethodRow["mode"] | "all">("all");
+  const [editing, setEditing] = useState<ShippingMethodRow | "new" | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -96,6 +132,13 @@ export default function ShippingMethodsManager({ isSuperAdmin }: { isSuperAdmin:
     }
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
+
+  const handleDelete = useCallback(async (row: ShippingMethodRow) => {
+    if (!confirm(`Delete "${row.name}"? It will be hidden from quotes & shipments.`)) return;
+    const err = await deleteCatalogRow("/api/shipping-methods", row.id);
+    if (err) { alert(err); return; }
+    void refresh();
+  }, [refresh]);
 
   const view = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -135,7 +178,7 @@ export default function ShippingMethodsManager({ isSuperAdmin }: { isSuperAdmin:
           <button
             type="button"
             className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] rounded-lg hover:opacity-90 transition"
-            onClick={() => alert("Custom shipping method editor coming next.")}
+            onClick={() => setEditing("new")}
           >
             <PlusIcon size={14} />
             Add Custom Method
@@ -196,7 +239,7 @@ export default function ShippingMethodsManager({ isSuperAdmin }: { isSuperAdmin:
       {!loading && !error && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
           {view.map((row) => (
-            <ShippingMethodCard key={row.id} row={row} />
+            <ShippingMethodCard key={row.id} row={row} canEdit={isSuperAdmin} onEdit={() => setEditing(row)} onDelete={() => handleDelete(row)} />
           ))}
           {view.length === 0 && (
             <div className="col-span-full py-12 text-center text-[var(--text-dim)] text-[13px]">
@@ -205,11 +248,26 @@ export default function ShippingMethodsManager({ isSuperAdmin }: { isSuperAdmin:
           )}
         </div>
       )}
+
+      {editing && (
+        <CatalogEditorModal
+          open
+          title={editing === "new" ? "Add Shipping Method" : `Edit ${editing.name}`}
+          endpoint="/api/shipping-methods"
+          fields={METHOD_FIELDS}
+          idValue={editing === "new" ? null : editing.id}
+          initial={editing === "new"
+            ? { mode: "sea", has_tracking: true, is_active: true, sort_order: 1000 }
+            : (editing as unknown as Record<string, unknown>)}
+          onClose={() => setEditing(null)}
+          onSaved={() => void refresh()}
+        />
+      )}
     </section>
   );
 }
 
-function ShippingMethodCard({ row }: { row: ShippingMethodRow }) {
+function ShippingMethodCard({ row, canEdit, onEdit, onDelete }: { row: ShippingMethodRow; canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
   const transit =
     row.typical_transit_days_min != null && row.typical_transit_days_max != null
       ? row.typical_transit_days_min === row.typical_transit_days_max
@@ -326,6 +384,17 @@ function ShippingMethodCard({ row }: { row: ShippingMethodRow }) {
             <p className="text-[11px] text-[var(--text-dim)] italic mt-1">{row.notes}</p>
           )}
         </div>
+
+        {canEdit && (
+          <div className="flex flex-col gap-1 shrink-0">
+            <button type="button" onClick={onEdit} title="Edit" className="h-7 w-7 flex items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] transition">
+              <PencilIcon className="h-3.5 w-3.5" />
+            </button>
+            <button type="button" onClick={onDelete} title="Delete" className="h-7 w-7 flex items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-red-400 hover:border-red-500/40 transition">
+              <TrashIcon className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

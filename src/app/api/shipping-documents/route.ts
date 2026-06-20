@@ -12,6 +12,18 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 
+/* Writable columns — everything else is server-controlled. */
+const EDITABLE = [
+  "code", "name", "short_name", "description", "category", "applies_to_modes",
+  "issued_by", "is_mandatory_export", "is_lc_required", "is_customs_required",
+  "notes", "sort_order", "is_default", "is_active",
+] as const;
+function pick(body: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k of EDITABLE) if (k in body) out[k] = body[k];
+  return out;
+}
+
 export async function GET() {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
@@ -38,10 +50,15 @@ export async function POST(req: Request) {
   if (!body || !body.code || !body.name || !body.category) {
     return NextResponse.json({ error: "code, name and category required." }, { status: 400 });
   }
+  if (body.is_default === true) {
+    await supabaseServer.from("shipping_documents")
+      .update({ is_default: false })
+      .eq("tenant_id", auth.tenant_id);
+  }
   const { data, error } = await supabaseServer
     .from("shipping_documents")
     .insert({
-      ...body,
+      ...pick(body),
       tenant_id: auth.tenant_id,
       is_system: false,
       is_active: true,
@@ -71,19 +88,20 @@ export async function PATCH(req: Request) {
     .eq("id", body.id)
     .single();
   if (!existing) return NextResponse.json({ error: "Not found." }, { status: 404 });
-  if (existing.is_system) {
-    return NextResponse.json({ error: "System documents are read-only." }, { status: 403 });
-  }
-  if (existing.tenant_id !== auth.tenant_id) {
+  if (existing.tenant_id !== null && existing.tenant_id !== auth.tenant_id) {
     return NextResponse.json({ error: "Not in your tenant." }, { status: 403 });
   }
-  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  for (const k of Object.keys(body)) if (k !== "id") patch[k] = body[k];
+  if (body.is_default === true) {
+    await supabaseServer.from("shipping_documents")
+      .update({ is_default: false })
+      .eq("tenant_id", auth.tenant_id)
+      .neq("id", body.id);
+  }
+  const patch: Record<string, unknown> = { ...pick(body), updated_at: new Date().toISOString() };
   const { data, error } = await supabaseServer
     .from("shipping_documents")
     .update(patch)
     .eq("id", body.id)
-    .eq("tenant_id", auth.tenant_id)
     .select()
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -105,10 +123,7 @@ export async function DELETE(req: Request) {
     .eq("id", id)
     .single();
   if (!existing) return NextResponse.json({ error: "Not found." }, { status: 404 });
-  if (existing.is_system) {
-    return NextResponse.json({ error: "System documents cannot be deleted." }, { status: 403 });
-  }
-  if (existing.tenant_id !== auth.tenant_id) {
+  if (existing.tenant_id !== null && existing.tenant_id !== auth.tenant_id) {
     return NextResponse.json({ error: "Not in your tenant." }, { status: 403 });
   }
   const { error } = await supabaseServer

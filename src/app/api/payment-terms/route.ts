@@ -220,13 +220,8 @@ export async function PATCH(req: Request) {
   if (getErr || !existing) {
     return NextResponse.json({ error: "Term not found." }, { status: 404 });
   }
-  if (existing.is_system) {
-    return NextResponse.json(
-      { error: "System payment terms are read-only. Clone it to customise." },
-      { status: 403 },
-    );
-  }
-  if (existing.tenant_id !== auth.tenant_id) {
+  /* Super-admin may edit system seeds (tenant_id NULL) and own-tenant rows. */
+  if (existing.tenant_id !== null && existing.tenant_id !== auth.tenant_id) {
     return NextResponse.json({ error: "Term not in your tenant." }, { status: 403 });
   }
 
@@ -263,7 +258,6 @@ export async function PATCH(req: Request) {
     .from("payment_terms")
     .update(patch)
     .eq("id", body.id)
-    .eq("tenant_id", auth.tenant_id)
     .select()
     .single();
   if (error) {
@@ -299,13 +293,7 @@ export async function DELETE(req: Request) {
   if (getErr || !existing) {
     return NextResponse.json({ error: "Term not found." }, { status: 404 });
   }
-  if (existing.is_system) {
-    return NextResponse.json(
-      { error: "System terms cannot be deleted." },
-      { status: 403 },
-    );
-  }
-  if (existing.tenant_id !== auth.tenant_id) {
+  if (existing.tenant_id !== null && existing.tenant_id !== auth.tenant_id) {
     return NextResponse.json({ error: "Term not in your tenant." }, { status: 403 });
   }
 

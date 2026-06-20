@@ -14,6 +14,33 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import PencilIcon from "@/components/icons/ui/PencilIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import { CatalogEditorModal, deleteCatalogRow, type CatalogField } from "./CatalogEditorModal";
+
+const DOC_FIELDS: CatalogField[] = [
+  { key: "code", label: "Code", type: "text", required: true, placeholder: "bill_of_lading" },
+  { key: "name", label: "Name", type: "text", required: true, placeholder: "Bill of Lading" },
+  { key: "short_name", label: "Short code", type: "text", placeholder: "B/L" },
+  { key: "category", label: "Category", type: "select", required: true, options: [
+    { value: "transport", label: "Transport" }, { value: "commercial", label: "Commercial" },
+    { value: "customs", label: "Customs" }, { value: "quality", label: "Quality" },
+    { value: "special", label: "Special" }, { value: "financial", label: "Financial" }, { value: "other", label: "Other" },
+  ] },
+  { key: "issued_by", label: "Issued by", type: "select", options: [
+    { value: "seller", label: "Seller" }, { value: "buyer", label: "Buyer" }, { value: "third_party", label: "Third party" },
+    { value: "bank", label: "Bank" }, { value: "customs", label: "Customs" }, { value: "any", label: "Any" },
+  ] },
+  { key: "applies_to_modes", label: "Applies to modes", type: "chips", full: true, placeholder: "sea, air, road (comma-separated)" },
+  { key: "is_mandatory_export", label: "Mandatory for export", type: "toggle" },
+  { key: "is_lc_required", label: "L/C required", type: "toggle" },
+  { key: "is_customs_required", label: "Customs required", type: "toggle" },
+  { key: "is_default", label: "Default", type: "toggle" },
+  { key: "is_active", label: "Active", type: "toggle" },
+  { key: "sort_order", label: "Sort order", type: "number" },
+  { key: "description", label: "Description", type: "textarea" },
+  { key: "notes", label: "Notes", type: "textarea" },
+];
 
 interface DocRow {
   id: string;
@@ -51,6 +78,7 @@ export default function ShippingDocumentsManager({ isSuperAdmin }: { isSuperAdmi
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<DocRow["category"] | "all">("all");
+  const [editing, setEditing] = useState<DocRow | "new" | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -71,6 +99,13 @@ export default function ShippingDocumentsManager({ isSuperAdmin }: { isSuperAdmi
     }
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
+
+  const handleDelete = useCallback(async (row: DocRow) => {
+    if (!confirm(`Delete "${row.name}"? It will be hidden from quotes & invoices.`)) return;
+    const err = await deleteCatalogRow("/api/shipping-documents", row.id);
+    if (err) { alert(err); return; }
+    void refresh();
+  }, [refresh]);
 
   const view = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -108,7 +143,7 @@ export default function ShippingDocumentsManager({ isSuperAdmin }: { isSuperAdmi
           <button
             type="button"
             className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] rounded-lg hover:opacity-90 transition"
-            onClick={() => alert("Custom-document editor coming next.")}
+            onClick={() => setEditing("new")}
           >
             <PlusIcon size={14} />
             Add Custom Document
@@ -167,14 +202,29 @@ export default function ShippingDocumentsManager({ isSuperAdmin }: { isSuperAdmi
 
       {!loading && !error && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
-          {view.map((row) => <DocCard key={row.id} row={row} />)}
+          {view.map((row) => <DocCard key={row.id} row={row} canEdit={isSuperAdmin} onEdit={() => setEditing(row)} onDelete={() => handleDelete(row)} />)}
         </div>
+      )}
+
+      {editing && (
+        <CatalogEditorModal
+          open
+          title={editing === "new" ? "Add Document" : `Edit ${editing.name}`}
+          endpoint="/api/shipping-documents"
+          fields={DOC_FIELDS}
+          idValue={editing === "new" ? null : editing.id}
+          initial={editing === "new"
+            ? { category: "commercial", issued_by: "seller", is_active: true, sort_order: 1000 }
+            : (editing as unknown as Record<string, unknown>)}
+          onClose={() => setEditing(null)}
+          onSaved={() => void refresh()}
+        />
       )}
     </section>
   );
 }
 
-function DocCard({ row }: { row: DocRow }) {
+function DocCard({ row, canEdit, onEdit, onDelete }: { row: DocRow; canEdit: boolean; onEdit: () => void; onDelete: () => void }) {
   return (
     <div className="bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-xl p-3 hover:border-[var(--border-strong)] transition">
       <div className="flex items-start gap-3">
@@ -231,6 +281,17 @@ function DocCard({ row }: { row: DocRow }) {
             )}
           </div>
         </div>
+
+        {canEdit && (
+          <div className="flex flex-col gap-1 shrink-0">
+            <button type="button" onClick={onEdit} title="Edit" className="h-7 w-7 flex items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] transition">
+              <PencilIcon className="h-3.5 w-3.5" />
+            </button>
+            <button type="button" onClick={onDelete} title="Delete" className="h-7 w-7 flex items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-red-400 hover:border-red-500/40 transition">
+              <TrashIcon className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
