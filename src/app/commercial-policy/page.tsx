@@ -25,7 +25,6 @@ import PriceCalculatorIcon from "@/components/icons/PriceCalculatorIcon";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import PaymentTermsManager from "@/components/settings/PaymentTermsManager";
 import IncotermsManager from "@/components/settings/IncotermsManager";
-import PricingTiersManager from "@/components/settings/PricingTiersManager";
 import ShippingMethodsManager from "@/components/settings/ShippingMethodsManager";
 import ShippingDocumentsManager from "@/components/settings/ShippingDocumentsManager";
 import type {
@@ -188,7 +187,6 @@ const POLICY_SECTIONS: { id: string; label: string }[] = [
   { id: "cp-approvals", label: "Approvals" },
   { id: "cp-payment-terms", label: "Payment Terms" },
   { id: "cp-incoterms", label: "Incoterms" },
-  { id: "cp-pricing-tiers", label: "Pricing Tiers" },
   { id: "cp-shipping", label: "Shipping" },
   { id: "cp-documents", label: "Documents" },
 ];
@@ -221,7 +219,6 @@ function PolicyBody({ s, onPatch, onToast, isSuperAdmin }: BodyProps) {
       <GroupLabel>Trade terms &amp; logistics</GroupLabel>
       <Anchor id="cp-payment-terms"><PaymentTermsManager isSuperAdmin={isSuperAdmin} /></Anchor>
       <Anchor id="cp-incoterms"><IncotermsManager isSuperAdmin={isSuperAdmin} /></Anchor>
-      <Anchor id="cp-pricing-tiers"><PricingTiersManager isSuperAdmin={isSuperAdmin} /></Anchor>
       <Anchor id="cp-shipping"><ShippingMethodsManager isSuperAdmin={isSuperAdmin} /></Anchor>
       <Anchor id="cp-documents"><ShippingDocumentsManager isSuperAdmin={isSuperAdmin} /></Anchor>
     </>
