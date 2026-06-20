@@ -77,7 +77,7 @@ export default function PricingSettingsPage() {
         if (i !== idx) return co;
         const merged = { ...co, ...patch };
         if (patch.band) {
-          merged.adjustmentPct = c.bands[patch.band] / 100;
+          merged.adjustmentPct = (c.bands[patch.band as keyof typeof c.bands] ?? 0) / 100;
         }
         return merged;
       });
@@ -284,7 +284,7 @@ export default function PricingSettingsPage() {
                     <input type="text" value={co.code} onChange={e => updateCountry(realIdx, { code: e.target.value.toUpperCase() })} className="w-16 h-8 px-2 rounded-md bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] text-center outline-none focus:border-[var(--border-focus)]" maxLength={3} />
                     <input type="text" value={co.name} onChange={e => updateCountry(realIdx, { name: e.target.value })} className="flex-1 h-8 px-3 rounded-md bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]" />
                     <input type="text" value={co.currency} onChange={e => updateCountry(realIdx, { currency: e.target.value.toUpperCase() })} className="w-20 h-8 px-2 rounded-md bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] text-center outline-none focus:border-[var(--border-focus)]" maxLength={3} />
-                    <select value={co.band} onChange={e => updateCountry(realIdx, { band: e.target.value as "A" | "B" | "C" })} className={`w-20 h-8 px-2 rounded-md border text-[11px] font-semibold text-center outline-none cursor-pointer ${bandColors[co.band]}`}>
+                    <select value={co.band} onChange={e => updateCountry(realIdx, { band: e.target.value })} className={`w-20 h-8 px-2 rounded-md border text-[11px] font-semibold text-center outline-none cursor-pointer ${bandColors[co.band as keyof typeof bandColors] ?? ""}`}>
                       <option value="A">Band A</option>
                       <option value="B">Band B</option>
                       <option value="C">Band C</option>

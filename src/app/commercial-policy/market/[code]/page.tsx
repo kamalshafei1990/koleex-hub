@@ -288,8 +288,8 @@ function MarketProfileView() {
                     {!isSaved
                       ? "Suggested default from the country list — not saved yet. Click Edit Market and choose a band to store it."
                       : engineOn
-                        ? "Saved and applied: the pricing-policy engine uses this band for quotes in this market."
-                        : "Saved. The pricing-policy engine is currently OFF (manual pricing), so this isn't auto-applied to prices yet — turn it on in Commercial Setup → Settings. Note: the standalone Price Calculator uses its own country table and is not driven by this."}
+                        ? "Saved and live: the Price Calculator and the auto-pricing policy engine both use this band for this market."
+                        : "Saved and live in the Price Calculator for this market. (The auto-pricing policy engine for quotation lines is still OFF — turn it on in Commercial Setup → Settings to apply bands automatically on quotes too.)"}
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2">

@@ -25,7 +25,7 @@ import InfoIcon from "@/components/icons/ui/InfoIcon";
 import ActivityIcon from "@/components/icons/ui/ActivityIcon";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
 import SettingsIcon2 from "@/components/icons/ui/SettingsIcon2";
-import { fetchPricingConfig, type PricingConfig } from "@/lib/pricing-config";
+import { fetchPricingConfig, type PricingConfig, type CountryEntry } from "@/lib/pricing-config";
 import PriceCalculatorIcon from "@/components/icons/PriceCalculatorIcon";
 
 /* ═══════════════════ CONSTANTS ═══════════════════ */
@@ -139,8 +139,22 @@ export default function PriceCalculator() {
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
   const [fetchingRate, setFetchingRate] = useState(false);
   const [pricingConfig, setPricingConfig] = useState<PricingConfig | null>(null);
+  /* Live per-country adjustments from Commercial Setup (single source of
+     truth). Falls back to pricingConfig / local defaults when the tenant
+     has no bands configured or the fetch fails. */
+  const [liveCountries, setLiveCountries] = useState<CountryEntry[] | null>(null);
 
   useEffect(() => { fetchPricingConfig().then(setPricingConfig); }, []);
+  useEffect(() => {
+    let off = false;
+    fetch("/api/commercial-policy/market-adjustments", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { markets?: CountryEntry[] } | null) => {
+        if (!off && j?.markets && j.markets.length > 0) setLiveCountries(j.markets);
+      })
+      .catch(() => { /* keep fallback */ });
+    return () => { off = true; };
+  }, []);
 
   async function fetchLiveRate() {
     setFetchingRate(true);
@@ -170,7 +184,7 @@ export default function PriceCalculator() {
 
   function generate() {
     const cats = pricingConfig?.categories ?? CATEGORIES;
-    const cntrs = pricingConfig?.countries ?? COUNTRIES;
+    const cntrs = liveCountries ?? pricingConfig?.countries ?? COUNTRIES;
     const custs = pricingConfig ? pricingConfig.customers.filter(c => c.visible) : CUSTOMER_RULES;
     const taxRate = pricingConfig ? pricingConfig.defaultTaxRefund / 100 : TAX_REFUND_DEFAULT;
     const country = cntrs.find(c => c.code === countryCode) ?? cntrs[0];
@@ -232,7 +246,7 @@ export default function PriceCalculator() {
   }, []);
 
   /* ── Derived from config ── */
-  const cfgCountries = pricingConfig?.countries ?? COUNTRIES;
+  const cfgCountries = liveCountries ?? pricingConfig?.countries ?? COUNTRIES;
   const cfgCategories = pricingConfig?.categories ?? CATEGORIES;
   const cfgCustomers = pricingConfig ? pricingConfig.customers.filter(c => c.visible) : CUSTOMER_RULES;
   const cfgTaxRefund = pricingConfig ? pricingConfig.defaultTaxRefund / 100 : TAX_REFUND_DEFAULT;

@@ -24,7 +24,7 @@ export interface CountryEntry {
   name: string;
   currency: string;
   adjustmentPct: number;
-  band: "A" | "B" | "C";
+  band: string; // band code (A/B/C/D…); sourced live from Commercial Setup
 }
 
 export interface PricingCategory {
