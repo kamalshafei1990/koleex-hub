@@ -22,6 +22,12 @@ import InfoIcon from "@/components/icons/ui/InfoIcon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
 import PriceCalculatorIcon from "@/components/icons/PriceCalculatorIcon";
+import { useMeBootstrap } from "@/lib/me-bootstrap";
+import PaymentTermsManager from "@/components/settings/PaymentTermsManager";
+import IncotermsManager from "@/components/settings/IncotermsManager";
+import PricingTiersManager from "@/components/settings/PricingTiersManager";
+import ShippingMethodsManager from "@/components/settings/ShippingMethodsManager";
+import ShippingDocumentsManager from "@/components/settings/ShippingDocumentsManager";
 import type {
   CommercialPolicySnapshot,
   CommercialSettingsRow,
@@ -39,8 +45,8 @@ import type {
 export default function CommercialPolicyPage() {
   return (
     <AuthGate
-      title="Commercial Policy & Pricing"
-      subtitle="The editable source of truth for Koleex pricing and approvals"
+      title="Commercial Setup"
+      subtitle="Pricing policy, trade terms, and shipping configuration"
     >
       <CommercialPolicyView />
     </AuthGate>
@@ -54,6 +60,8 @@ function CommercialPolicyView() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
+  const { data: bootstrap } = useMeBootstrap();
+  const isSuperAdmin = bootstrap?.auth?.is_super_admin ?? false;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -108,12 +116,12 @@ function CommercialPolicyView() {
                 <CommercialPolicyIcon className="h-4 w-4" />
               </div>
               <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
-                Commercial Policy &amp; Pricing
+                Commercial Setup
               </h1>
             </div>
           </div>
           <p className="text-[12px] text-[var(--text-dim)] mb-4 ml-0 md:ml-11">
-            Editable · Changes sync to the pricing engine immediately
+            Pricing policy · trade terms · shipping &amp; documents — all commercial configuration in one place
           </p>
         </div>
       </div>
@@ -123,7 +131,7 @@ function CommercialPolicyView() {
           {loading && <LoadingState />}
           {!loading && error && <ErrorState message={error} />}
           {!loading && !error && snapshot && (
-            <PolicyBody s={snapshot} onPatch={patchSection} onToast={setToast} />
+            <PolicyBody s={snapshot} onPatch={patchSection} onToast={setToast} isSuperAdmin={isSuperAdmin} />
           )}
         </div>
       </div>
@@ -163,6 +171,7 @@ interface BodyProps {
   s: CommercialPolicySnapshot;
   onPatch: <K extends keyof CommercialPolicySnapshot>(key: K, payload: CommercialPolicySnapshot[K]) => void;
   onToast: (msg: string) => void;
+  isSuperAdmin: boolean;
 }
 
 /* Section anchors — id + nav label, in render order. Used by the sticky
@@ -177,19 +186,27 @@ const POLICY_SECTIONS: { id: string; label: string }[] = [
   { id: "cp-discounts", label: "Discounts" },
   { id: "cp-commission", label: "Commission" },
   { id: "cp-approvals", label: "Approvals" },
+  { id: "cp-payment-terms", label: "Payment Terms" },
+  { id: "cp-incoterms", label: "Incoterms" },
+  { id: "cp-pricing-tiers", label: "Pricing Tiers" },
+  { id: "cp-shipping", label: "Shipping" },
+  { id: "cp-documents", label: "Documents" },
 ];
 
 function Anchor({ id, children }: { id: string; children: React.ReactNode }) {
   return <div id={id} className="scroll-mt-20">{children}</div>;
 }
 
-function PolicyBody({ s, onPatch, onToast }: BodyProps) {
+function PolicyBody({ s, onPatch, onToast, isSuperAdmin }: BodyProps) {
   return (
     <>
       <PolicyHealthStrip s={s} />
       <PolicyNav />
       <InfoBanner />
       <PriceCalculatorCTA />
+
+      {/* ── Pricing policy ── */}
+      <GroupLabel>Pricing policy</GroupLabel>
       <Anchor id="cp-settings"><SettingsSection row={s.settings} onPatch={(r) => { onPatch("settings", r); onToast("Settings saved"); }} /></Anchor>
       <Anchor id="cp-levels"><ProductLevelsSection rows={s.productLevels} onPatch={(r) => { onPatch("productLevels", r); onToast("Product levels saved"); }} /></Anchor>
       <Anchor id="cp-tiers"><CustomerTiersSection rows={s.customerTiers} onPatch={(r) => { onPatch("customerTiers", r); onToast("Customer tiers saved"); }} /></Anchor>
@@ -199,7 +216,25 @@ function PolicyBody({ s, onPatch, onToast }: BodyProps) {
       <Anchor id="cp-discounts"><DiscountTiersSection rows={s.discountTiers} onPatch={(r) => { onPatch("discountTiers", r); onToast("Discount tiers saved"); }} /></Anchor>
       <Anchor id="cp-commission"><CommissionTiersSection rows={s.commissionTiers} onPatch={(r) => { onPatch("commissionTiers", r); onToast("Commission tiers saved"); }} /></Anchor>
       <Anchor id="cp-approvals"><ApprovalAuthoritySection rows={s.approvalAuthority} onPatch={(r) => { onPatch("approvalAuthority", r); onToast("Approval authority saved"); }} /></Anchor>
+
+      {/* ── Trade terms & logistics (master data) ── */}
+      <GroupLabel>Trade terms &amp; logistics</GroupLabel>
+      <Anchor id="cp-payment-terms"><PaymentTermsManager isSuperAdmin={isSuperAdmin} /></Anchor>
+      <Anchor id="cp-incoterms"><IncotermsManager isSuperAdmin={isSuperAdmin} /></Anchor>
+      <Anchor id="cp-pricing-tiers"><PricingTiersManager isSuperAdmin={isSuperAdmin} /></Anchor>
+      <Anchor id="cp-shipping"><ShippingMethodsManager isSuperAdmin={isSuperAdmin} /></Anchor>
+      <Anchor id="cp-documents"><ShippingDocumentsManager isSuperAdmin={isSuperAdmin} /></Anchor>
     </>
+  );
+}
+
+/* A subtle group divider between the pricing-policy sections and the
+   trade-terms/logistics master-data sections. */
+function GroupLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="pt-2 first:pt-0">
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-dim)]">{children}</h2>
+    </div>
   );
 }
 

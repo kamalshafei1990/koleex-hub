@@ -36,25 +36,13 @@ import PhoneIcon from "@/components/icons/ui/PhoneIcon";
 import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
 import Settings2Icon from "@/components/icons/ui/Settings2Icon";
 import CalendarIcon from "@/components/icons/ui/CalendarRawIcon";
-import BuildingIcon from "@/components/icons/ui/BuildingIcon";
-import CreditCardIcon from "@/components/icons/ui/CreditCardIcon";
-import GlobeIcon from "@/components/icons/ui/GlobeIcon";
-import LayersIcon from "@/components/icons/ui/LayersIcon";
-import TruckIcon from "@/components/icons/ui/TruckIcon";
-import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import { useCurrentAccount, notifyIdentityChanged } from "@/lib/identity";
-import { useMeBootstrap } from "@/lib/me-bootstrap";
 import { updateAccountAvatar } from "@/lib/accounts-admin";
 import PreferencesTab from "@/components/admin/accounts/tabs/PreferencesTab";
 import CalendarTab from "@/components/admin/accounts/tabs/CalendarTab";
-import PaymentTermsManager from "@/components/settings/PaymentTermsManager";
-import IncotermsManager from "@/components/settings/IncotermsManager";
-import PricingTiersManager from "@/components/settings/PricingTiersManager";
-import ShippingMethodsManager from "@/components/settings/ShippingMethodsManager";
-import ShippingDocumentsManager from "@/components/settings/ShippingDocumentsManager";
 import type { AccountWithLinks } from "@/types/supabase";
 
-type Tab = "profile" | "preferences" | "calendar" | "workspace";
+type Tab = "profile" | "preferences" | "calendar";
 
 export default function SettingsPage() {
   return (
@@ -69,26 +57,9 @@ export default function SettingsPage() {
 
 function SettingsContent() {
   const { account, refresh } = useCurrentAccount();
-  /* Read is_super_admin straight off the bootstrap payload — same
-     source useScopeContext reads from, but synchronous once the
-     bootstrap has resolved. Avoids the extra hop through
-     useScopeContext's internal useState which was rendering the
-     hook in null state for too long, hiding the Workspace tab. */
-  const { data: bootstrap } = useMeBootstrap();
-  const isSuperAdmin = bootstrap?.auth?.is_super_admin ?? false;
-  /* Default tab: System-Workspace for super-admins (the page is now
-     system-first), Profile for everyone else. The bootstrap may not
-     be ready on first render, so we also re-target the tab once it
-     resolves — useEffect below. */
-  const [tab, setTab] = useState<Tab>(isSuperAdmin ? "workspace" : "profile");
-  useEffect(() => {
-    if (isSuperAdmin && tab === "profile") {
-      /* Bootstrap resolved after first render — switch the default
-         to Workspace if the operator hasn't already picked a tab. */
-      setTab("workspace");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSuperAdmin]);
+  /* Settings is now purely personal — profile, preferences, calendar.
+     Company-wide configuration moved into the Commercial Setup app. */
+  const [tab, setTab] = useState<Tab>("profile");
 
   if (!account) {
     return (
@@ -118,33 +89,16 @@ function SettingsContent() {
                 <SettingsIcon className="h-4 w-4" />
               </div>
               <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
-                System Settings
+                Settings
               </h1>
             </div>
           </div>
           <p className="text-[12px] text-[var(--text-dim)] mb-4 ml-0 md:ml-11">
-            {isSuperAdmin
-              ? "Workspace-wide configuration — payment terms, master data, document defaults — plus your own profile."
-              : <>Your profile, preferences, and calendar defaults. Signed in as <span className="text-[var(--text-primary)] font-medium">@{account.username}</span>.</>}
+            Your profile, preferences, and calendar defaults. Signed in as <span className="text-[var(--text-primary)] font-medium">@{account.username}</span>.
           </p>
 
-          {/* Tabs — System group first (super-admin only), then My
-              Account group everyone sees. A small visual divider
-              between the two groups keeps the system / personal
-              boundary obvious at a glance. */}
+          {/* Personal account tabs. */}
           <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar -mx-1 px-1 pb-1">
-            {isSuperAdmin && (
-              <>
-                <span className="hidden md:inline-flex pl-1 pr-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">
-                  System
-                </span>
-                <TabButton active={tab === "workspace"} onClick={() => setTab("workspace")} icon={<BuildingIcon size={14} />} label="Workspace" />
-                <span className="mx-2 h-5 w-px bg-[var(--border-subtle)]" aria-hidden />
-                <span className="hidden md:inline-flex pl-1 pr-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">
-                  My Account
-                </span>
-              </>
-            )}
             <TabButton active={tab === "profile"} onClick={() => setTab("profile")} icon={<UserIcon size={14} />} label="Profile" />
             <TabButton active={tab === "preferences"} onClick={() => setTab("preferences")} icon={<Settings2Icon className="h-3.5 w-3.5" />} label="Preferences" />
             <TabButton active={tab === "calendar"} onClick={() => setTab("calendar")} icon={<CalendarIcon className="h-3.5 w-3.5" />} label="Calendar" />
@@ -152,11 +106,9 @@ function SettingsContent() {
         </div>
       </div>
 
-      {/* Body — wider when on a System tab (the master-data grids
-          want the room); 900px column on My-Account tabs since those
-          are form-shaped and read better at that width. */}
+      {/* Body — 900px column; account forms read best at this width. */}
       <div className="flex-1 overflow-y-auto">
-        <div className={`mx-auto px-4 md:px-6 lg:px-8 py-6 w-full space-y-4 ${tab === "workspace" ? "max-w-[1500px]" : "max-w-[900px]"}`}>
+        <div className="mx-auto px-4 md:px-6 lg:px-8 py-6 w-full space-y-4 max-w-[900px]">
           {tab === "profile" && (
             <ProfileSection
               account={account}
@@ -175,9 +127,6 @@ function SettingsContent() {
               onChanged={() => { notifyIdentityChanged(); refresh(); }}
             />
           )}
-          {tab === "workspace" && isSuperAdmin && (
-            <WorkspaceTab isSuperAdmin={isSuperAdmin} />
-          )}
         </div>
       </div>
     </div>
@@ -185,92 +134,6 @@ function SettingsContent() {
 }
 
 /* ─────────────── Tab button ─────────────── */
-
-/* ───────────────────────────────────────────────────────────────────────
-   Workspace tab — tenant-wide master data & governance.
-
-   Presented as a Database-app-style CARD GRID (one card per system)
-   rather than pill sub-tabs. A card opens its manager inline with a
-   "back to settings" control. Commercial Policy is the governed
-   source-of-truth for pricing (product levels & margins, customer
-   tiers, market bands, discount/approval matrix, commission, credit)
-   and opens its dedicated editor at /commercial-policy.
-   ─────────────────────────────────────────────────────────────────────── */
-type WorkspaceSub = "payment-terms" | "incoterms" | "pricing-tiers" | "shipping-methods" | "shipping-documents";
-
-function WorkspaceTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
-  /* null = show the card grid; a value = a system is open inline. */
-  const [sub, setSub] = useState<WorkspaceSub | null>(null);
-
-  if (sub) {
-    return (
-      <div className="space-y-4">
-        <button
-          type="button"
-          onClick={() => setSub(null)}
-          className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
-        >
-          <ArrowLeftIcon className="h-3.5 w-3.5" /> All settings
-        </button>
-        {sub === "payment-terms"      && <PaymentTermsManager     isSuperAdmin={isSuperAdmin} />}
-        {sub === "incoterms"          && <IncotermsManager        isSuperAdmin={isSuperAdmin} />}
-        {sub === "pricing-tiers"      && <PricingTiersManager     isSuperAdmin={isSuperAdmin} />}
-        {sub === "shipping-methods"   && <ShippingMethodsManager  isSuperAdmin={isSuperAdmin} />}
-        {sub === "shipping-documents" && <ShippingDocumentsManager isSuperAdmin={isSuperAdmin} />}
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Intro */}
-      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5">
-        <div className="flex items-start gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)]"><BuildingIcon size={20} /></span>
-          <div>
-            <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">Workspace configuration</h2>
-            <p className="mt-1 max-w-2xl text-[12.5px] leading-relaxed text-[var(--text-muted)]">
-              Company-wide rules and master data. Each card opens one system.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Systems grid */}
-      <div>
-        <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.12em] text-[var(--text-dim)]">Systems</h2>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <SystemCard icon={<CreditCardIcon size={20} />} title="Payment Terms" desc="International-trade payment methods catalogue (T/T, L/C, D/P …)." onClick={() => setSub("payment-terms")} />
-          <SystemCard icon={<GlobeIcon size={20} />} title="Incoterms (Price Types)" desc="ICC 2020 price-formula rules — FOB, CIF, DDP and the rest." onClick={() => setSub("incoterms")} />
-          <SystemCard icon={<LayersIcon size={20} />} title="Pricing Tiers" desc="Internal who-is-buying classification used across quoting." onClick={() => setSub("pricing-tiers")} />
-          <SystemCard icon={<TruckIcon size={20} />} title="Shipping Methods" desc="Delivery modes and carriers available on documents." onClick={() => setSub("shipping-methods")} />
-          <SystemCard icon={<DocumentIcon size={20} />} title="Documents" desc="Default trade-document set and templates." onClick={() => setSub("shipping-documents")} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* A single tenant-master-data system, styled like the Database app's
-   system cards. Opens its manager inline (sets the parent's `sub`). */
-function SystemCard({
-  icon, title, desc, onClick,
-}: {
-  icon: React.ReactNode; title: string; desc: string; onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group flex flex-col items-start text-left rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5 transition-all duration-200 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)]"
-    >
-      <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)]">{icon}</span>
-      <div className="mt-3.5 text-[15px] font-semibold text-[var(--text-primary)]">{title}</div>
-      <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--text-muted)]">{desc}</p>
-      <span className="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-[var(--text-dim)] transition-colors group-hover:text-[var(--text-primary)]">Open →</span>
-    </button>
-  );
-}
 
 function TabButton({
   active, onClick, icon, label,
