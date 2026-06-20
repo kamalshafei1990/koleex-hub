@@ -66,18 +66,24 @@ function MarketProfileView() {
   const [editingBand, setEditingBand] = useState(false);
   const [savingBand, setSavingBand] = useState(false);
   const [bandErr, setBandErr] = useState<string | null>(null);
+  const [engineOn, setEngineOn] = useState<boolean | null>(null);
 
-  /* Policy snapshot → bands + assignments. */
+  /* Policy snapshot → bands + assignments + engine status. */
   useEffect(() => {
     let off = false;
     (async () => {
       try {
         const res = await fetch("/api/commercial-policy", { credentials: "include" });
         if (!res.ok) { if (!off) setLoadErr(`Couldn't load policy (${res.status})`); return; }
-        const j = (await res.json()) as { marketBands?: MarketBandRow[]; bandCountries?: BandCountryRow[] };
+        const j = (await res.json()) as {
+          marketBands?: MarketBandRow[];
+          bandCountries?: BandCountryRow[];
+          settings?: { use_policy_engine?: boolean } | null;
+        };
         if (off) return;
         setBands(j.marketBands ?? []);
         setBandCountries(j.bandCountries ?? []);
+        setEngineOn(!!j.settings?.use_policy_engine);
       } catch (e) {
         if (!off) setLoadErr(e instanceof Error ? e.message : "Network error");
       } finally {
@@ -87,7 +93,8 @@ function MarketProfileView() {
     return () => { off = true; };
   }, []);
 
-  /* Customers in this market (matched by country name). */
+  /* Customers in this market. Country is free text on the customer record,
+     so match tolerantly on the country name OR ISO code (trimmed/cased). */
   useEffect(() => {
     if (!country) return;
     let off = false;
@@ -97,8 +104,12 @@ function MarketProfileView() {
         if (!res.ok) { if (!off) setCustomers([]); return; }
         const j = (await res.json()) as { customers?: CustomerLite[] };
         if (off) return;
-        const needle = country.name.toLowerCase();
-        setCustomers((j.customers ?? []).filter((c) => (c.country ?? "").toLowerCase().trim() === needle));
+        const name = country.name.toLowerCase();
+        const iso = country.code.toLowerCase();
+        setCustomers((j.customers ?? []).filter((c) => {
+          const v = (c.country ?? "").toLowerCase().trim();
+          return v !== "" && (v === name || v === iso);
+        }));
       } catch { if (!off) setCustomers([]); }
     })();
     return () => { off = true; };
@@ -110,6 +121,13 @@ function MarketProfileView() {
   );
   const bandById = useMemo(() => new Map(bands.map((b) => [b.id, b])), [bands]);
   const bandByCode = useMemo(() => new Map(bands.map((b) => [b.code.toUpperCase(), b])), [bands]);
+
+  /* Is this country's band actually persisted (what the engine reads), or
+     just a suggested default from the master list (not yet applied)? */
+  const isSaved = useMemo(
+    () => bandCountries.some((bc) => bc.country_code.toUpperCase() === code && bandById.has(bc.band_id)),
+    [bandCountries, code, bandById],
+  );
 
   const effectiveBandId = useMemo(() => {
     const saved = bandCountries.find((bc) => bc.country_code.toUpperCase() === code);
@@ -248,12 +266,31 @@ function MarketProfileView() {
                         {savingBand ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <CheckIcon size={14} className="text-[var(--text-dim)]" />}
                       </span>
                     ) : (
-                      <span className="text-[10px] px-2 py-1 rounded-full border border-[var(--border-subtle)] text-[var(--text-dim)] shrink-0">
-                        {band ? "Active band" : "No band"}
+                      <span className={`text-[10px] px-2 py-1 rounded-full shrink-0 ${
+                        !band
+                          ? "border border-[var(--border-subtle)] text-[var(--text-dim)]"
+                          : isSaved
+                            ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                            : "border border-amber-500/40 text-amber-400"
+                      }`}>
+                        {!band ? "No band" : isSaved ? "Saved" : "Default — not saved"}
                       </span>
                     )}
                   </div>
                   {bandErr && <p className="text-[12px] text-red-400 mb-3">{bandErr}</p>}
+
+                  {/* Honest sync status: what does this band actually drive? */}
+                  <div className={`text-[11px] mb-4 rounded-lg px-3 py-2 ${
+                    !isSaved
+                      ? "bg-amber-500/[0.08] text-amber-300/90 border border-amber-500/20"
+                      : "bg-[var(--bg-primary)] text-[var(--text-dim)] border border-[var(--border-subtle)]"
+                  }`}>
+                    {!isSaved
+                      ? "Suggested default from the country list — not saved yet. Click Edit Market and choose a band to store it."
+                      : engineOn
+                        ? "Saved and applied: the pricing-policy engine uses this band for quotes in this market."
+                        : "Saved. The pricing-policy engine is currently OFF (manual pricing), so this isn't auto-applied to prices yet — turn it on in Commercial Setup → Settings. Note: the standalone Price Calculator uses its own country table and is not driven by this."}
+                  </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                     <OverviewField label="Band" value={band ? `Band ${band.code}` : "—"} />
