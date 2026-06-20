@@ -14,12 +14,12 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useMemo, useState } from "react";
-import { COUNTRIES, type Country } from "@/lib/commercial-policy/countries";
+import { useRouter } from "next/navigation";
+import { COUNTRIES } from "@/lib/commercial-policy/countries";
 import type { MarketBandRow, BandCountryRow } from "@/lib/server/commercial-policy";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
-import MarketProfileDrawer from "./MarketProfileDrawer";
 
 const UNASSIGNED = "__none__";
 
@@ -74,7 +74,7 @@ export default function MarketSegmentation({
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [profile, setProfile] = useState<Country | null>(null);
+  const router = useRouter();
 
   const map = editing ? draft : effective;
 
@@ -214,7 +214,7 @@ export default function MarketSegmentation({
                   {list.map((c) => (
                     <div
                       key={c.code}
-                      onClick={editing ? undefined : () => setProfile(c)}
+                      onClick={editing ? undefined : () => router.push(`/commercial-policy/market/${c.code}`)}
                       title={editing ? undefined : "Open market profile"}
                       className={`flex items-center justify-between gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2.5 py-1.5 ${editing ? "" : "cursor-pointer hover:border-[var(--border-strong)] hover:bg-[var(--bg-surface)] transition-colors"}`}
                     >
@@ -258,17 +258,6 @@ export default function MarketSegmentation({
 
         {error && <p className="mt-3 text-[12px] text-red-400">{error}</p>}
       </div>
-
-      {profile && (
-        <MarketProfileDrawer
-          country={profile}
-          bands={bands}
-          currentBandId={effective.get(profile.code) ?? UNASSIGNED}
-          canEdit={canEdit}
-          onClose={() => setProfile(null)}
-          onBandSaved={onSaved}
-        />
-      )}
     </section>
   );
 }
