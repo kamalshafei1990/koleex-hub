@@ -425,24 +425,6 @@ function SettingsSection({
         if (fresh !== null) onPatch(fresh);
       }}
     >
-      <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
-        <p className="text-[11px] text-[var(--text-dim)] leading-relaxed max-w-xl">
-          FX auto-updates daily from the live market rate. Use the button to refresh on demand.
-        </p>
-        <button
-          type="button"
-          onClick={refreshFx}
-          disabled={fxRefreshing || ed.editing}
-          title={ed.editing ? "Finish editing first" : "Fetch the latest CNY/USD rate now"}
-          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[12px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] disabled:opacity-50 disabled:cursor-not-allowed transition shrink-0"
-        >
-          {fxRefreshing
-            ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
-            : <RefreshCwIcon className="h-3.5 w-3.5" />}
-          {fxRefreshing ? "Updating…" : "Update FX now"}
-        </button>
-      </div>
-      {fxMsg && <p className="text-[11px] text-[var(--text-secondary)] mb-3">{fxMsg}</p>}
       <KpiGrid>
         <KpiEditable
           label="FX · CNY per USD"
@@ -452,6 +434,25 @@ function SettingsSection({
           step="0.0001"
           onChange={(v) => ed.setDraft({ ...d, fx_cny_per_usd: Number(v) })}
           renderValue={(v) => Number(v).toFixed(4)}
+          footer={
+            <div className="space-y-1.5">
+              <button
+                type="button"
+                onClick={refreshFx}
+                disabled={fxRefreshing || ed.editing}
+                title={ed.editing ? "Finish editing first" : "Fetch the latest CNY/USD rate now"}
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[12px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                {fxRefreshing
+                  ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
+                  : <RefreshCwIcon className="h-3.5 w-3.5" />}
+                {fxRefreshing ? "Updating…" : "Update FX now"}
+              </button>
+              <p className="text-[10px] text-[var(--text-dim)] leading-relaxed">
+                {fxMsg ?? "Auto-updates daily from the live market rate."}
+              </p>
+            </div>
+          }
         />
         <KpiBool
           label="Sales sees cost"
@@ -1479,7 +1480,7 @@ function KpiReadonly({ label, value }: { label: string; value: string | number }
 }
 
 function KpiEditable({
-  label, value, editing, onChange, renderValue, type = "text", step,
+  label, value, editing, onChange, renderValue, type = "text", step, footer,
 }: {
   label: string;
   value: string | number;
@@ -1488,9 +1489,11 @@ function KpiEditable({
   renderValue?: (v: string | number) => string;
   type?: "text" | "number";
   step?: string;
+  /** Optional content rendered under the value — e.g. an action button. */
+  footer?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
+    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3 flex flex-col">
       <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{label}</div>
       {!editing ? (
         <div className="text-[18px] font-semibold tabular-nums mt-1 text-[var(--text-primary)]">
@@ -1505,6 +1508,7 @@ function KpiEditable({
           className={inputCls + " mt-1 text-[16px] h-9"}
         />
       )}
+      {footer && <div className="mt-3">{footer}</div>}
     </div>
   );
 }

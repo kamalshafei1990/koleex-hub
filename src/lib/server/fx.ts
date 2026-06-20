@@ -25,28 +25,30 @@ export interface FxResult {
 const SANE_MIN = 4;
 const SANE_MAX = 12;
 
-async function fromOpenErApi(): Promise<number | null> {
+/** Fetch with a hard timeout so a hanging provider can't stall the cron. */
+async function fetchJson(url: string): Promise<unknown | null> {
   try {
-    const res = await fetch("https://open.er-api.com/v6/latest/USD", { cache: "no-store" });
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    const res = await fetch(url, { cache: "no-store", signal: ctrl.signal });
+    clearTimeout(timer);
     if (!res.ok) return null;
-    const json = (await res.json()) as { rates?: { CNY?: number } };
-    const r = Number(json?.rates?.CNY);
-    return Number.isFinite(r) ? r : null;
+    return await res.json();
   } catch {
     return null;
   }
 }
 
+async function fromOpenErApi(): Promise<number | null> {
+  const json = (await fetchJson("https://open.er-api.com/v6/latest/USD")) as { rates?: { CNY?: number } } | null;
+  const r = Number(json?.rates?.CNY);
+  return Number.isFinite(r) ? r : null;
+}
+
 async function fromFrankfurter(): Promise<number | null> {
-  try {
-    const res = await fetch("https://api.frankfurter.app/latest?from=USD&to=CNY", { cache: "no-store" });
-    if (!res.ok) return null;
-    const json = (await res.json()) as { rates?: { CNY?: number } };
-    const r = Number(json?.rates?.CNY);
-    return Number.isFinite(r) ? r : null;
-  } catch {
-    return null;
-  }
+  const json = (await fetchJson("https://api.frankfurter.app/latest?from=USD&to=CNY")) as { rates?: { CNY?: number } } | null;
+  const r = Number(json?.rates?.CNY);
+  return Number.isFinite(r) ? r : null;
 }
 
 /** Fetch the current CNY-per-USD rate. Throws if no provider responds or
