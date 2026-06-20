@@ -83,6 +83,15 @@ export interface AppDef {
   route: string;
   /** Whether the page is built and navigable today */
   active: boolean;
+
+  /**
+   * Hide this app from the home App Launcher (favorites / recent / All-Apps
+   * grid). The route + registry entry stay intact (so RBAC, breadcrumbs and
+   * direct links keep working) — it's just not surfaced as a standalone tile.
+   * Used for apps that now live inside another app (e.g. Commercial Policy,
+   * which is reached via Settings → Workspace).
+   */
+  hideFromLauncher?: boolean;
   /**
    * Future role-based visibility.
    * undefined / empty → everyone can see.
@@ -216,7 +225,7 @@ export const APP_REGISTRY: AppDef[] = [
   /* ── System ── */
   { id: "accounts",         tKey: "app.accounts",         name: "Accounts",          icon: AccountsIcon,  route: "/accounts",         active: true  },
   { id: "roles",            tKey: "app.roles",            name: "Roles & Permissions", icon: RolesPermissionsIcon, route: "/roles",   active: true  },
-  { id: "commercial-policy", tKey: "app.commercial-policy", name: "Commercial Policy", icon: CommercialPolicyIcon, route: "/commercial-policy", active: true, newSince: "2026-04-20" },
+  { id: "commercial-policy", tKey: "app.commercial-policy", name: "Commercial Policy", icon: CommercialPolicyIcon, route: "/commercial-policy", active: true, hideFromLauncher: true },
   { id: "settings",         tKey: "app.settings",         name: "Settings",          icon: SettingsIcon,  route: "/settings",         active: true,  newSince: "2026-04-19" },
 
   /* ── Not in sidebar — accessible via All Apps or direct URL ── */
@@ -293,7 +302,11 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.system",
     label: "System",
     icon: SystemSidebarIcon,
-    appIds: ["accounts", "roles", "commercial-policy", "settings"],
+    /* Commercial Policy is no longer a top-level app tile — it now lives
+       inside Settings → Workspace (card → /commercial-policy). The route +
+       APP_REGISTRY entry stay so it remains reachable; it's just not in the
+       sidebar / All-Apps grid. */
+    appIds: ["accounts", "roles", "settings"],
   },
 ];
 
@@ -345,6 +358,7 @@ export function getAppCategory(appId: string): string {
   const extra: Record<string, string> = {
     inbox: "communication",
     "price-calculator": "commercial",
+    "commercial-policy": "system",
     dashboard: "system",
   };
   return extra[appId] || "system";

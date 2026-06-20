@@ -104,7 +104,7 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
         Knowledge
       </Link>
       <div className="px-3 pb-2">
-        <p className="text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>Commercial Policy</p>
+        <p className="text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>Commercial Policy &amp; Pricing</p>
       </div>
 
       {grouped.map((sec) => (
