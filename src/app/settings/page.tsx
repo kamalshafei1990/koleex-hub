@@ -37,7 +37,6 @@ import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
 import Settings2Icon from "@/components/icons/ui/Settings2Icon";
 import CalendarIcon from "@/components/icons/ui/CalendarRawIcon";
 import BuildingIcon from "@/components/icons/ui/BuildingIcon";
-import CommercialPolicyIcon from "@/components/icons/CommercialPolicyIcon";
 import CreditCardIcon from "@/components/icons/ui/CreditCardIcon";
 import GlobeIcon from "@/components/icons/ui/GlobeIcon";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
@@ -231,8 +230,7 @@ function WorkspaceTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
           <div>
             <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">Workspace configuration</h2>
             <p className="mt-1 max-w-2xl text-[12.5px] leading-relaxed text-[var(--text-muted)]">
-              Company-wide rules and master data. Each card opens one system — the Commercial Policy is the governed
-              source of truth that pricing across the Hub reads from.
+              Company-wide rules and master data. Each card opens one system.
             </p>
           </div>
         </div>
@@ -242,17 +240,6 @@ function WorkspaceTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
       <div>
         <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.12em] text-[var(--text-dim)]">Systems</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {/* Commercial Policy — governance source of truth (dedicated editor) */}
-          <Link
-            href="/commercial-policy"
-            className="group flex flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5 transition-all duration-200 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)]"
-          >
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)]"><CommercialPolicyIcon size={20} /></span>
-            <div className="mt-3.5 text-[15px] font-semibold text-[var(--text-primary)]">Commercial Policy &amp; Pricing</div>
-            <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--text-muted)]">Product levels &amp; margins, customer tiers, market bands, discount &amp; approval matrix, commission and credit — the single source of truth for pricing.</p>
-            <span className="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-[var(--text-dim)] transition-colors group-hover:text-[var(--text-primary)]">Open system →</span>
-          </Link>
-
           <SystemCard icon={<CreditCardIcon size={20} />} title="Payment Terms" desc="International-trade payment methods catalogue (T/T, L/C, D/P …)." onClick={() => setSub("payment-terms")} />
           <SystemCard icon={<GlobeIcon size={20} />} title="Incoterms (Price Types)" desc="ICC 2020 price-formula rules — FOB, CIF, DDP and the rest." onClick={() => setSub("incoterms")} />
           <SystemCard icon={<LayersIcon size={20} />} title="Pricing Tiers" desc="Internal who-is-buying classification used across quoting." onClick={() => setSub("pricing-tiers")} />

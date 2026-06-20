@@ -225,7 +225,7 @@ export const APP_REGISTRY: AppDef[] = [
   /* ── System ── */
   { id: "accounts",         tKey: "app.accounts",         name: "Accounts",          icon: AccountsIcon,  route: "/accounts",         active: true  },
   { id: "roles",            tKey: "app.roles",            name: "Roles & Permissions", icon: RolesPermissionsIcon, route: "/roles",   active: true  },
-  { id: "commercial-policy", tKey: "app.commercial-policy", name: "Commercial Policy", icon: CommercialPolicyIcon, route: "/commercial-policy", active: true, hideFromLauncher: true },
+  { id: "commercial-policy", tKey: "app.commercial-policy", name: "Commercial Policy", icon: CommercialPolicyIcon, route: "/commercial-policy", active: true },
   { id: "settings",         tKey: "app.settings",         name: "Settings",          icon: SettingsIcon,  route: "/settings",         active: true,  newSince: "2026-04-19" },
 
   /* ── Not in sidebar — accessible via All Apps or direct URL ── */
@@ -302,11 +302,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.system",
     label: "System",
     icon: SystemSidebarIcon,
-    /* Commercial Policy is no longer a top-level app tile — it now lives
-       inside Settings → Workspace (card → /commercial-policy). The route +
-       APP_REGISTRY entry stay so it remains reachable; it's just not in the
-       sidebar / All-Apps grid. */
-    appIds: ["accounts", "roles", "settings"],
+    appIds: ["accounts", "roles", "commercial-policy", "settings"],
   },
 ];
 
@@ -358,7 +354,6 @@ export function getAppCategory(appId: string): string {
   const extra: Record<string, string> = {
     inbox: "communication",
     "price-calculator": "commercial",
-    "commercial-policy": "system",
     dashboard: "system",
   };
   return extra[appId] || "system";
