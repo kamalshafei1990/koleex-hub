@@ -27,6 +27,7 @@ import PaymentTermsManager from "@/components/settings/PaymentTermsManager";
 import IncotermsManager from "@/components/settings/IncotermsManager";
 import ShippingMethodsManager from "@/components/settings/ShippingMethodsManager";
 import ShippingDocumentsManager from "@/components/settings/ShippingDocumentsManager";
+import MarketSegmentation from "@/components/commercial-policy/MarketSegmentation";
 import type {
   CommercialPolicySnapshot,
   CommercialSettingsRow,
@@ -208,7 +209,7 @@ function PolicyBody({ s, onPatch, onToast, isSuperAdmin }: BodyProps) {
       <Anchor id="cp-settings"><SettingsSection row={s.settings} onPatch={(r) => { onPatch("settings", r); onToast("Settings saved"); }} /></Anchor>
       <Anchor id="cp-levels"><ProductLevelsSection rows={s.productLevels} onPatch={(r) => { onPatch("productLevels", r); onToast("Product levels saved"); }} /></Anchor>
       <Anchor id="cp-tiers"><CustomerTiersSection rows={s.customerTiers} onPatch={(r) => { onPatch("customerTiers", r); onToast("Customer tiers saved"); }} /></Anchor>
-      <Anchor id="cp-markets"><MarketBandsSection bands={s.marketBands} countries={s.bandCountries} onPatch={(r) => { onPatch("marketBands", r); onToast("Market bands saved"); }} /></Anchor>
+      <Anchor id="cp-markets"><MarketBandsSection bands={s.marketBands} countries={s.bandCountries} onPatch={(r) => { onPatch("marketBands", r); onToast("Market bands saved"); }} onCountriesPatch={(c) => { onPatch("bandCountries", c); onToast("Country segmentation saved"); }} /></Anchor>
       <Anchor id="cp-channels"><ChannelMultipliersSection rows={s.channelMultipliers} onPatch={(r) => { onPatch("channelMultipliers", r); onToast("Channel multipliers saved"); }} /></Anchor>
       <Anchor id="cp-volume"><VolumeDiscountTiersSection rows={s.volumeDiscountTiers} onPatch={(r) => { onPatch("volumeDiscountTiers", r); onToast("Volume discount tiers saved"); }} /></Anchor>
       <Anchor id="cp-discounts"><DiscountTiersSection rows={s.discountTiers} onPatch={(r) => { onPatch("discountTiers", r); onToast("Discount tiers saved"); }} /></Anchor>
@@ -341,7 +342,7 @@ function InfoBanner() {
       <div className="min-w-0 text-[12px] text-[var(--text-muted)] leading-relaxed">
         Click <span className="text-[var(--text-primary)] font-semibold">Edit</span> on any
         section to change values. Saves are applied per-section and sync to the pricing engine
-        immediately. Country-to-band re-assignments and adding/removing rows arrive in the next release.
+        immediately. Assign each country to a market band in the Country Segmentation panel under Market Bands.
       </div>
     </div>
   );
@@ -846,10 +847,12 @@ function MarketBandsSection({
   bands,
   countries,
   onPatch,
+  onCountriesPatch,
 }: {
   bands: MarketBandRow[];
   countries: BandCountryRow[];
   onPatch: (r: MarketBandRow[]) => void;
+  onCountriesPatch: (c: BandCountryRow[]) => void;
 }) {
   const counts = useMemo(() => {
     const m = new Map<string, number>();
@@ -905,9 +908,10 @@ function MarketBandsSection({
   };
 
   return (
+    <div className="space-y-4">
     <SectionShell
       title="Market Bands"
-      description="Retail-price adjustment by market. Country assignments editable in the next release."
+      description="Retail-price adjustment by market. Assign countries to bands in Country Segmentation below."
       editing={ed.editing}
       saving={ed.saving}
       onEditStart={ed.begin}
@@ -935,6 +939,14 @@ function MarketBandsSection({
       {ed.editing && <AddRowButton onClick={handleAdd} label="Add band" />}
       {ed.error && <ErrorLine message={ed.error} />}
     </SectionShell>
+
+    <MarketSegmentation
+      bands={bands}
+      countries={countries}
+      canEdit
+      onSaved={onCountriesPatch}
+    />
+    </div>
   );
 }
 
