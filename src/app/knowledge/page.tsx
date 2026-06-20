@@ -11,7 +11,7 @@ import WorkflowIcon from "@/components/icons/ui/WorkflowIcon";
 const knowledgeBases = [
   {
     id: "commercial-policy",
-    title: "Commercial Policy",
+    title: "Commercial Policy & Pricing",
     description: "Complete commercial system covering pricing, margins, discounts, commissions, credit, and approval authority.",
     icon: CommercialPolicyIcon,
     href: "/knowledge/commercial-policy",

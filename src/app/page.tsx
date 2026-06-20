@@ -297,7 +297,9 @@ export default function HomePage() {
   const visibleRegistry = useMemo(() => {
     // Fail-closed: while perms load, show no apps at all.
     if (permLoading) return [];
-    return APP_REGISTRY.filter((a) => permittedModules.has(a.name));
+    return APP_REGISTRY.filter(
+      (a) => !a.hideFromLauncher && permittedModules.has(a.name),
+    );
   }, [permLoading, permittedModules]);
 
   /* ── Derived ── */

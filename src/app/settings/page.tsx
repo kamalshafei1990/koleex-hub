@@ -37,6 +37,12 @@ import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
 import Settings2Icon from "@/components/icons/ui/Settings2Icon";
 import CalendarIcon from "@/components/icons/ui/CalendarRawIcon";
 import BuildingIcon from "@/components/icons/ui/BuildingIcon";
+import CommercialPolicyIcon from "@/components/icons/CommercialPolicyIcon";
+import CreditCardIcon from "@/components/icons/ui/CreditCardIcon";
+import GlobeIcon from "@/components/icons/ui/GlobeIcon";
+import LayersIcon from "@/components/icons/ui/LayersIcon";
+import TruckIcon from "@/components/icons/ui/TruckIcon";
+import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import { useCurrentAccount, notifyIdentityChanged } from "@/lib/identity";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import { updateAccountAvatar } from "@/lib/accounts-admin";
@@ -182,68 +188,99 @@ function SettingsContent() {
 /* ─────────────── Tab button ─────────────── */
 
 /* ───────────────────────────────────────────────────────────────────────
-   Workspace tab — sub-navigation for tenant-wide master data.
+   Workspace tab — tenant-wide master data & governance.
 
-   Three sections today, each backed by its own admin manager:
-     · Payment Terms — international-trade payment-method catalogue
-     · Incoterms     — ICC 2020 price-formula rules (FOB / CIF / DDP / …)
-     · Pricing Tiers — internal who-is-buying classification
-
-   The sub-nav stays compact and Apple-pill-style so it doesn't compete
-   visually with the top-level tabs (Workspace / Profile / etc).
+   Presented as a Database-app-style CARD GRID (one card per system)
+   rather than pill sub-tabs. A card opens its manager inline with a
+   "back to settings" control. Commercial Policy is the governed
+   source-of-truth for pricing (product levels & margins, customer
+   tiers, market bands, discount/approval matrix, commission, credit)
+   and opens its dedicated editor at /commercial-policy.
    ─────────────────────────────────────────────────────────────────────── */
 type WorkspaceSub = "payment-terms" | "incoterms" | "pricing-tiers" | "shipping-methods" | "shipping-documents";
 
 function WorkspaceTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
-  const [sub, setSub] = useState<WorkspaceSub>("payment-terms");
+  /* null = show the card grid; a value = a system is open inline. */
+  const [sub, setSub] = useState<WorkspaceSub | null>(null);
+
+  if (sub) {
+    return (
+      <div className="space-y-4">
+        <button
+          type="button"
+          onClick={() => setSub(null)}
+          className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
+        >
+          <ArrowLeftIcon className="h-3.5 w-3.5" /> All settings
+        </button>
+        {sub === "payment-terms"      && <PaymentTermsManager     isSuperAdmin={isSuperAdmin} />}
+        {sub === "incoterms"          && <IncotermsManager        isSuperAdmin={isSuperAdmin} />}
+        {sub === "pricing-tiers"      && <PricingTiersManager     isSuperAdmin={isSuperAdmin} />}
+        {sub === "shipping-methods"   && <ShippingMethodsManager  isSuperAdmin={isSuperAdmin} />}
+        {sub === "shipping-documents" && <ShippingDocumentsManager isSuperAdmin={isSuperAdmin} />}
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-4">
-      <nav className="flex flex-wrap gap-1.5">
-        <SubButton active={sub === "payment-terms"}  onClick={() => setSub("payment-terms")}>
-          Payment Terms
-        </SubButton>
-        <SubButton active={sub === "incoterms"}      onClick={() => setSub("incoterms")}>
-          Incoterms (Price Types)
-        </SubButton>
-        <SubButton active={sub === "pricing-tiers"}  onClick={() => setSub("pricing-tiers")}>
-          Pricing Tiers
-        </SubButton>
-        <SubButton active={sub === "shipping-methods"} onClick={() => setSub("shipping-methods")}>
-          Shipping Methods
-        </SubButton>
-        <SubButton active={sub === "shipping-documents"} onClick={() => setSub("shipping-documents")}>
-          Documents
-        </SubButton>
-      </nav>
-      {sub === "payment-terms"      && <PaymentTermsManager     isSuperAdmin={isSuperAdmin} />}
-      {sub === "incoterms"          && <IncotermsManager        isSuperAdmin={isSuperAdmin} />}
-      {sub === "pricing-tiers"      && <PricingTiersManager     isSuperAdmin={isSuperAdmin} />}
-      {sub === "shipping-methods"   && <ShippingMethodsManager  isSuperAdmin={isSuperAdmin} />}
-      {sub === "shipping-documents" && <ShippingDocumentsManager isSuperAdmin={isSuperAdmin} />}
+    <div className="space-y-6">
+      {/* Intro */}
+      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5">
+        <div className="flex items-start gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)]"><BuildingIcon size={20} /></span>
+          <div>
+            <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">Workspace configuration</h2>
+            <p className="mt-1 max-w-2xl text-[12.5px] leading-relaxed text-[var(--text-muted)]">
+              Company-wide rules and master data. Each card opens one system — the Commercial Policy is the governed
+              source of truth that pricing across the Hub reads from.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Systems grid */}
+      <div>
+        <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.12em] text-[var(--text-dim)]">Systems</h2>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Commercial Policy — governance source of truth (dedicated editor) */}
+          <Link
+            href="/commercial-policy"
+            className="group flex flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5 transition-all duration-200 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)]"
+          >
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)]"><CommercialPolicyIcon size={20} /></span>
+            <div className="mt-3.5 text-[15px] font-semibold text-[var(--text-primary)]">Commercial Policy &amp; Pricing</div>
+            <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--text-muted)]">Product levels &amp; margins, customer tiers, market bands, discount &amp; approval matrix, commission and credit — the single source of truth for pricing.</p>
+            <span className="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-[var(--text-dim)] transition-colors group-hover:text-[var(--text-primary)]">Open system →</span>
+          </Link>
+
+          <SystemCard icon={<CreditCardIcon size={20} />} title="Payment Terms" desc="International-trade payment methods catalogue (T/T, L/C, D/P …)." onClick={() => setSub("payment-terms")} />
+          <SystemCard icon={<GlobeIcon size={20} />} title="Incoterms (Price Types)" desc="ICC 2020 price-formula rules — FOB, CIF, DDP and the rest." onClick={() => setSub("incoterms")} />
+          <SystemCard icon={<LayersIcon size={20} />} title="Pricing Tiers" desc="Internal who-is-buying classification used across quoting." onClick={() => setSub("pricing-tiers")} />
+          <SystemCard icon={<TruckIcon size={20} />} title="Shipping Methods" desc="Delivery modes and carriers available on documents." onClick={() => setSub("shipping-methods")} />
+          <SystemCard icon={<DocumentIcon size={20} />} title="Documents" desc="Default trade-document set and templates." onClick={() => setSub("shipping-documents")} />
+        </div>
+      </div>
     </div>
   );
 }
 
-function SubButton({
-  active,
-  onClick,
-  children,
+/* A single tenant-master-data system, styled like the Database app's
+   system cards. Opens its manager inline (sets the parent's `sub`). */
+function SystemCard({
+  icon, title, desc, onClick,
 }: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
+  icon: React.ReactNode; title: string; desc: string; onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`text-[12px] font-medium px-3 py-1.5 rounded-full border transition ${
-        active
-          ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-[var(--bg-inverted)]"
-          : "border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] bg-[var(--bg-secondary)]"
-      }`}
+      className="group flex flex-col items-start text-left rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5 transition-all duration-200 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)]"
     >
-      {children}
+      <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)]">{icon}</span>
+      <div className="mt-3.5 text-[15px] font-semibold text-[var(--text-primary)]">{title}</div>
+      <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--text-muted)]">{desc}</p>
+      <span className="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-[var(--text-dim)] transition-colors group-hover:text-[var(--text-primary)]">Open →</span>
     </button>
   );
 }

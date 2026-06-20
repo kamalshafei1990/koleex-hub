@@ -20,6 +20,7 @@ import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import CommercialPolicyIcon from "@/components/icons/CommercialPolicyIcon";
 import InfoIcon from "@/components/icons/ui/InfoIcon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
+import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
 import type {
   CommercialPolicySnapshot,
   CommercialSettingsRow,
@@ -37,7 +38,7 @@ import type {
 export default function CommercialPolicyPage() {
   return (
     <AuthGate
-      title="Commercial Policy"
+      title="Commercial Policy & Pricing"
       subtitle="The editable source of truth for Koleex pricing and approvals"
     >
       <CommercialPolicyView />
@@ -106,7 +107,7 @@ function CommercialPolicyView() {
                 <CommercialPolicyIcon className="h-4 w-4" />
               </div>
               <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
-                Commercial Policy
+                Commercial Policy &amp; Pricing
               </h1>
             </div>
           </div>
@@ -373,6 +374,36 @@ function SettingsSection({
   );
   // Settings has no add/delete — it's a singleton.
 
+  /* Live FX refresh — independent of edit mode. Hits the server, which
+     fetches the market rate and writes it; we then patch the snapshot so
+     the displayed value updates (the editor resyncs its draft from the
+     incoming row when not editing). */
+  const [fxRefreshing, setFxRefreshing] = useState(false);
+  const [fxMsg, setFxMsg] = useState<string | null>(null);
+  async function refreshFx() {
+    setFxRefreshing(true);
+    setFxMsg(null);
+    try {
+      const res = await fetch("/api/commercial-policy/fx/refresh", {
+        method: "POST",
+        credentials: "include",
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        ok?: boolean; rate?: number; source?: string; payload?: unknown; error?: string;
+      };
+      if (!res.ok || !body.ok) {
+        setFxMsg(body.error ?? `Update failed (${res.status})`);
+        return;
+      }
+      onPatch((body.payload as CommercialSettingsRow | null) ?? null);
+      setFxMsg(`Updated to ${Number(body.rate).toFixed(4)} · ${body.source}`);
+    } catch (e) {
+      setFxMsg(e instanceof Error ? e.message : "Network error");
+    } finally {
+      setFxRefreshing(false);
+    }
+  }
+
   const d = ed.draft;
   if (!d) {
     return (
@@ -394,6 +425,24 @@ function SettingsSection({
         if (fresh !== null) onPatch(fresh);
       }}
     >
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+        <p className="text-[11px] text-[var(--text-dim)] leading-relaxed max-w-xl">
+          FX auto-updates daily from the live market rate. Use the button to refresh on demand.
+        </p>
+        <button
+          type="button"
+          onClick={refreshFx}
+          disabled={fxRefreshing || ed.editing}
+          title={ed.editing ? "Finish editing first" : "Fetch the latest CNY/USD rate now"}
+          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[12px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] disabled:opacity-50 disabled:cursor-not-allowed transition shrink-0"
+        >
+          {fxRefreshing
+            ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
+            : <RefreshCwIcon className="h-3.5 w-3.5" />}
+          {fxRefreshing ? "Updating…" : "Update FX now"}
+        </button>
+      </div>
+      {fxMsg && <p className="text-[11px] text-[var(--text-secondary)] mb-3">{fxMsg}</p>}
       <KpiGrid>
         <KpiEditable
           label="FX · CNY per USD"
