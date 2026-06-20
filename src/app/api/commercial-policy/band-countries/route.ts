@@ -97,3 +97,55 @@ export async function PUT(req: Request) {
   const fresh = await getBandCountries(auth.tenant_id);
   return NextResponse.json({ ok: true, bandCountries: fresh });
 }
+
+/* PATCH — set (or clear) the band for a SINGLE country. Used by the market
+   profile drawer's band picker. Body: { country_code, band_id | null }.
+   band_id null/empty → the country becomes unassigned (row removed). */
+export async function PATCH(req: Request) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const allowed = await callerHasPolicyAccess(auth.role_id, auth.is_super_admin);
+  if (!allowed) {
+    return NextResponse.json({ error: "Not authorised to edit the commercial policy" }, { status: 403 });
+  }
+
+  let body: { country_code?: unknown; band_id?: unknown };
+  try {
+    body = (await req.json()) as typeof body;
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+  const cc = typeof body.country_code === "string" ? body.country_code.trim().toUpperCase() : "";
+  if (!cc || cc.length > 3) {
+    return NextResponse.json({ error: "country_code is required" }, { status: 400 });
+  }
+  const bid = typeof body.band_id === "string" && body.band_id ? body.band_id : null;
+
+  if (bid) {
+    const { data: band } = await supabaseServer
+      .from("commercial_market_bands")
+      .select("id")
+      .eq("tenant_id", auth.tenant_id)
+      .eq("id", bid)
+      .maybeSingle();
+    if (!band) return NextResponse.json({ error: "Unknown band for this tenant" }, { status: 400 });
+  }
+
+  /* Remove the country's current row, then re-insert if a band was chosen. */
+  const { error: delErr } = await supabaseServer
+    .from("commercial_band_countries")
+    .delete()
+    .eq("tenant_id", auth.tenant_id)
+    .eq("country_code", cc);
+  if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
+
+  if (bid) {
+    const { error: insErr } = await supabaseServer
+      .from("commercial_band_countries")
+      .insert({ tenant_id: auth.tenant_id, band_id: bid, country_code: cc });
+    if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
+  }
+
+  const fresh = await getBandCountries(auth.tenant_id);
+  return NextResponse.json({ ok: true, bandCountries: fresh });
+}
