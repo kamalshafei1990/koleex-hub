@@ -92,6 +92,19 @@ interface CalcResult {
   fxRisk: FxRisk; includeTaxRefund: boolean;
 }
 
+/* Live commercial-policy model (single source of truth). When present, the
+   calculator computes EXACTLY like the engine: sequential channel ladder +
+   band on the retail/end-user rung only. */
+interface PricingModelLevel { code: string; name: string; minCostCny: number; maxCostCny: number | null; marginPercent: number; minMarginPercent: number }
+interface PricingModelChannel { tier: string | null; code: string; multiplier: number; isRetail: boolean }
+interface PricingModelTier { code: string; name: string; level: number }
+interface PricingModel {
+  levels: PricingModelLevel[];
+  channels: PricingModelChannel[];
+  tiers: PricingModelTier[];
+  settings: { fxCnyPerUsd: number | null; costUpliftPercent: number };
+}
+
 /* ═══════════════════ HELPERS ═══════════════════ */
 
 function fmt(n: number, d = 2) { return n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d }); }
@@ -144,6 +157,9 @@ export default function PriceCalculator() {
      has no bands configured or the fetch fails. */
   const [liveCountries, setLiveCountries] = useState<CountryEntry[] | null>(null);
 
+  /* Live commercial-policy model — the engine source of truth. */
+  const [model, setModel] = useState<PricingModel | null>(null);
+
   useEffect(() => { fetchPricingConfig().then(setPricingConfig); }, []);
   useEffect(() => {
     let off = false;
@@ -153,8 +169,23 @@ export default function PriceCalculator() {
         if (!off && j?.markets && j.markets.length > 0) setLiveCountries(j.markets);
       })
       .catch(() => { /* keep fallback */ });
+    fetch("/api/commercial-policy/pricing-model", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: PricingModel | null) => {
+        if (off || !j) return;
+        if (j.levels?.length && j.channels?.length) {
+          setModel(j);
+          // Default FX + customer tier to the live model on first load.
+          if (j.settings.fxCnyPerUsd) setExchangeRate((cur) => (cur === 7.18 ? j.settings.fxCnyPerUsd! : cur));
+          setCustomerType((cur) => (j.tiers.some((t) => t.code === cur) ? cur : (j.tiers.find((t) => t.code === "end_user")?.code ?? j.tiers[0]?.code ?? cur)));
+        }
+      })
+      .catch(() => { /* keep fallback */ });
     return () => { off = true; };
   }, []);
+
+  /* Engine ready = tenant has levels + channels configured. */
+  const engineReady = !!(model && model.levels.length > 0 && model.channels.length > 0);
 
   async function fetchLiveRate() {
     setFetchingRate(true);
@@ -183,13 +214,61 @@ export default function PriceCalculator() {
   }
 
   function generate() {
-    const cats = pricingConfig?.categories ?? CATEGORIES;
     const cntrs = liveCountries ?? pricingConfig?.countries ?? COUNTRIES;
-    const custs = pricingConfig ? pricingConfig.customers.filter(c => c.visible) : CUSTOMER_RULES;
-    const taxRate = pricingConfig ? pricingConfig.defaultTaxRefund / 100 : TAX_REFUND_DEFAULT;
     const country = cntrs.find(c => c.code === countryCode) ?? cntrs[0];
-    const autoDetect = (cost: number) => { for (const c of cats) { if (cost >= c.min && cost < c.max) return c; } return cats[cats.length - 1]; };
+    const taxRate = pricingConfig ? pricingConfig.defaultTaxRefund / 100 : TAX_REFUND_DEFAULT;
     const discFrac = discountPct / 100;
+
+    /* ── ENGINE PATH — mirrors computePolicyPrice exactly (sequential
+       channel ladder + market band on the retail rung only). Active when
+       the tenant has commercial-policy levels + channels configured. ── */
+    if (engineReady && model) {
+      const uplift = model.settings.costUpliftPercent || 0;
+      const rows = [{ id: "base", name: "Base FOB" }, ...model.tiers.map(t => ({ id: t.code, name: t.name }))];
+      const itemResults: ItemResult[] = products.map(prod => {
+        const costUsd = prod.costCny / exchangeRate;                       // raw, for display
+        const netInternalUsd = (prod.costCny * (1 + uplift / 100)) / exchangeRate;
+        const level = categoryId === "auto"
+          ? (model.levels.find(l => prod.costCny >= l.minCostCny && (l.maxCostCny == null || prod.costCny <= l.maxCostCny)) ?? model.levels[model.levels.length - 1])
+          : (model.levels.find(l => l.code === categoryId) ?? model.levels[0]);
+        let marginPctVal: number;
+        if (overrideActive) marginPctVal = overrideMode === "amount" ? (netInternalUsd > 0 ? overrideValue / netInternalUsd : 0) : overrideValue / 100;
+        else marginPctVal = level.marginPercent / 100;
+        let marginUsd = netInternalUsd * marginPctVal;
+        if (fxRisk === "usd_down") marginUsd *= 1.05; else if (fxRisk === "usd_up") marginUsd *= 0.95;
+        marginPctVal = netInternalUsd > 0 ? marginUsd / netInternalUsd : 0;
+        const baseFob = netInternalUsd + marginUsd;                        // Global FOB (no band)
+        const baseAfterDisc = baseFob * (1 - discFrac);
+        // Sequential ladder off base; band applies to the retail rung only.
+        const channelPrices: Record<string, number> = { base: baseAfterDisc };
+        let running = baseAfterDisc;
+        let firstRung: number | null = null;
+        const byTier: Record<string, number> = {};
+        for (const c of model.channels) {
+          running = running * c.multiplier;
+          if (firstRung == null) firstRung = running;
+          const price = c.isRetail ? running * (1 + country.adjustmentPct) : running;
+          if (c.tier) byTier[c.tier] = price;
+        }
+        // Every tier gets a price; tiers without a channel rung (e.g. Diamond)
+        // take the best/first (cheapest) rung — never the retail price.
+        for (const t of model.tiers) channelPrices[t.code] = byTier[t.code] ?? firstRung ?? baseAfterDisc;
+        const taxRefundPerUnit = costUsd * taxRate;
+        const channelProfits: Record<string, number> = {};
+        const channelProfitsWithTax: Record<string, number> = {};
+        for (const r of rows) { channelProfits[r.id] = channelPrices[r.id] - netInternalUsd; channelProfitsWithTax[r.id] = channelPrices[r.id] - netInternalUsd + taxRefundPerUnit; }
+        return { name: prod.name || "Unnamed Product", qty: prod.qty, costCny: prod.costCny, costUsd, categoryName: `${level.code} – ${level.name}`, marginPct: marginPctVal, marginUsd, initialBase: baseFob, countryAdjusted: baseFob, finalBase: baseAfterDisc, taxRefundPerUnit, channelPrices, channelProfits, channelProfitsWithTax };
+      });
+      const totalCostCny = products.reduce((s, p) => s + p.costCny * p.qty, 0);
+      setResult({ items: itemResults, totalCostCny, totalCostUsd: totalCostCny / exchangeRate, exchangeRate, totalItems: products.length, totalQty: products.reduce((s, p) => s + p.qty, 0), categoryName: itemResults[0]?.categoryName ?? "", countryName: country.name, countryAdjPct: country.adjustmentPct, customerType, discountPct, overrideActive, overrideMode, overrideValue, fxRisk, includeTaxRefund });
+      setExpandedItems(new Set());
+      return;
+    }
+
+    /* ── LEGACY PATH — used only when no commercial-policy model exists. ── */
+    const cats = pricingConfig?.categories ?? CATEGORIES;
+    const custs = pricingConfig ? pricingConfig.customers.filter(c => c.visible) : CUSTOMER_RULES;
+    const autoDetect = (cost: number) => { for (const c of cats) { if (cost >= c.min && cost < c.max) return c; } return cats[cats.length - 1]; };
     const allRows = [{ id: "base", name: "Base Price" }, ...custs.map(c => ({ id: c.id, name: c.name }))];
     const itemResults: ItemResult[] = products.map(prod => {
       const costUsd = prod.costCny / exchangeRate;
@@ -205,19 +284,13 @@ export default function PriceCalculator() {
       const countryAdjusted = initialBase * (1 + country.adjustmentPct);
       const finalBase = countryAdjusted * (1 - discFrac);
       const channelPrices: Record<string, number> = { base: finalBase };
-      /* Resolve each channel by following its `rel` chain instead of relying on
-         array order. This is robust to any customer ordering, a `rel` that points
-         at a hidden/removed channel, and accidental cycles — each falls back to
-         the base price rather than producing NaN. (The default config lists OEM,
-         whose rel is "agent", BEFORE agent — the old single-pass loop produced
-         NaN for OEM and anything downstream of it.) */
       const channelById = new Map(custs.map((c) => [c.id, c]));
       const resolveChannel = (id: string, seen: Set<string> = new Set()): number => {
         if (id === "base") return finalBase;
         const cached = channelPrices[id];
         if (cached !== undefined) return cached;
         const rule = channelById.get(id);
-        if (!rule || seen.has(id)) return finalBase; // missing rel or cycle → base
+        if (!rule || seen.has(id)) return finalBase;
         seen.add(id);
         const price = resolveChannel(rule.rel, seen) * (1 + rule.markupPct);
         channelPrices[id] = price;
@@ -254,8 +327,17 @@ export default function PriceCalculator() {
   const cfgUI = pricingConfig?.ui ?? { showOverride: true, showFxRisk: true, showTaxRefund: true };
   const selectedCountry = cfgCountries.find(c => c.code === countryCode) ?? cfgCountries[0];
 
+  /* ── Engine-aware option lists (live levels/tiers when configured) ── */
+  const levelOptions = engineReady && model
+    ? model.levels.map(l => ({ id: l.code, name: `${l.code} – ${l.name}`, marginPct: l.marginPercent / 100 }))
+    : cfgCategories.map(c => ({ id: c.id, name: c.name, marginPct: c.marginPct }));
+  const customerOptions = engineReady && model
+    ? model.tiers.map(t => ({ id: t.code, name: t.name }))
+    : cfgCustomers.map(c => ({ id: c.id, name: c.name }));
+  const tierLabel = (code: string) => customerOptions.find(o => o.id === code)?.name ?? code;
+
   /* ── Row order for results table ── */
-  const rowOrder = [{ id: "base", name: "Base Price" }, ...cfgCustomers.map(c => ({ id: c.id, name: c.name }))];
+  const rowOrder = [{ id: "base", name: engineReady ? "Base FOB" : "Base Price" }, ...customerOptions];
 
   /* ── Exact ProductForm input/select/label classes ── */
   const inputCls = "w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-all";
@@ -370,7 +452,7 @@ export default function PriceCalculator() {
                   <label className={labelCls}>Product Category</label>
                   <FieldSelect value={categoryId} onChange={e => setCategoryId(e.target.value)}>
                     <option value="auto">Auto-Detect (Smart Margin)</option>
-                    {cfgCategories.map(c => <option key={c.id} value={c.id}>{c.name} ({(c.marginPct * 100).toFixed(0)}%)</option>)}
+                    {levelOptions.map(c => <option key={c.id} value={c.id}>{c.name} ({(c.marginPct * 100).toFixed(0)}%)</option>)}
                   </FieldSelect>
                 </div>
                 <div>
@@ -386,7 +468,7 @@ export default function PriceCalculator() {
                 <div>
                   <label className={labelCls}>Target Customer Type</label>
                   <FieldSelect value={customerType} onChange={e => setCustomerType(e.target.value)}>
-                    {cfgCustomers.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                    {customerOptions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                   </FieldSelect>
                 </div>
               </div>
@@ -471,7 +553,7 @@ export default function PriceCalculator() {
                         <GlobeIcon className="h-3 w-3 text-[var(--text-dim)]" /> {result.countryName}
                       </span>
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[10px] font-medium text-[var(--text-muted)]">
-                        <UsersIcon className="h-3 w-3 text-[var(--text-dim)]" /> {cfgCustomers.find(r => r.id === result.customerType)?.name}
+                        <UsersIcon className="h-3 w-3 text-[var(--text-dim)]" /> {tierLabel(result.customerType)}
                       </span>
                     </div>
                   </div>
@@ -586,7 +668,7 @@ export default function PriceCalculator() {
                 {/* Actions */}
                 <div className="flex items-center gap-2 flex-wrap">
                   {[
-                    { icon: CopyIcon, label: "Copy", fn: () => { navigator.clipboard?.writeText(`Quotation: ${result.countryName} | ${cfgCustomers.find(r => r.id === result.customerType)?.name}\nBase Price: $${fmt(result.items[0].finalBase)}\nTotal Cost: $${fmt(result.totalCostUsd)}`); } },
+                    { icon: CopyIcon, label: "Copy", fn: () => { navigator.clipboard?.writeText(`Quotation: ${result.countryName} | ${tierLabel(result.customerType)}\nBase Price: $${fmt(result.items[0].finalBase)}\nTotal Cost: $${fmt(result.totalCostUsd)}`); } },
                     { icon: DocumentIcon, label: "Export PDF", fn: () => {} },
                     { icon: PrinterIcon, label: "Print", fn: () => window.print() },
                     { icon: Share2Icon, label: "Share", fn: () => {} },

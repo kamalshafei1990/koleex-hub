@@ -100,8 +100,15 @@ export async function GET(req: Request) {
       tierName: t.name,
       channelCode: r.breakdown.channelCode,
       multiplier: r.breakdown.channelMultiplier,
-      unitPriceUsd: r.breakdown.unitPriceUsd,
-      effectiveMarginPercent: r.breakdown.effectiveMarginPercent,
+      // Channel LIST price = pre-discount (per spec: "discounts are applied
+      // after the channel price is determined"). Volume / header discounts
+      // belong to the quotation, not the catalog list — this keeps the list
+      // identical to the Price Calculator.
+      unitPriceUsd: r.breakdown.channelPriceUsd,
+      effectiveMarginPercent:
+        r.breakdown.channelPriceUsd && r.breakdown.channelPriceUsd > 0
+          ? Math.round(((r.breakdown.channelPriceUsd - r.breakdown.netInternalCostUsd) / r.breakdown.channelPriceUsd) * 1000) / 10
+          : null,
       approvalRequired: r.breakdown.approvalRequired,
     };
   });
