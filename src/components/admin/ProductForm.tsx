@@ -97,6 +97,7 @@ import ModelsSection from "./form-sections/ModelsSection";
 import MediaSection from "./form-sections/MediaSection";
 import MarketPricesSection from "./form-sections/MarketPricesSection";
 import PricingIntelligenceCard from "./form-sections/PricingIntelligenceCard";
+import BaseFobCard from "./form-sections/BaseFobCard";
 import RelatedProductsSection from "./form-sections/RelatedProductsSection";
 import SearchSocialSection from "./form-sections/SearchSocialSection";
 import SewingMachineSection from "./form-sections/SewingMachineSection";
@@ -3953,8 +3954,19 @@ export default function ProductForm({ productId }: Props) {
               </div>
             </Section>
 
+            {/* Base FOB — auto from cost via product level (Commercial Setup) */}
+            <Section id="base-fob" icon={<DollarSignIcon className="h-4 w-4" />} title={t("pricing.baseFobTitle", "Base FOB Price")} badge={t("pricing.baseFobBadge", "Auto · by product level")} defaultOpen>
+              {(() => {
+                const link = productSuppliers.find((s) => s.is_primary) || productSuppliers[0] || null;
+                const sup = link ? suppliers.find((x) => x.id === link.supplier_id) : null;
+                const cur = primaryModel?.cost_price ? "CNY" : (link?.currency || sup?.currency || "CNY");
+                const costNum = primaryModel?.cost_price ? Number(primaryModel.cost_price) : (link?.unit_cost_cny ? Number(link.unit_cost_cny) : null);
+                return <BaseFobCard costCny={Number.isFinite(costNum as number) ? (costNum as number) : null} currency={cur} />;
+              })()}
+            </Section>
+
             {/* FOB Pricing engine — live breakdown from Commercial Setup */}
-            <Section id="fob-pricing" icon={<DollarSignIcon className="h-4 w-4" />} title={t("pricing.fobTitle", "FOB Pricing")} badge={t("pricing.fobBadge", "Live · from Commercial Setup")} defaultOpen>
+            <Section id="fob-pricing" icon={<DollarSignIcon className="h-4 w-4" />} title={t("pricing.fobTitle", "Market & Customer Pricing")} badge={t("pricing.fobBadge", "Live · from Commercial Setup")} defaultOpen>
               {(() => {
                 const link = productSuppliers.find((s) => s.is_primary) || productSuppliers[0] || null;
                 const sup = link ? suppliers.find((x) => x.id === link.supplier_id) : null;

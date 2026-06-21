@@ -106,10 +106,7 @@ export default function PricingIntelligenceCard({
   const flow = useMemo(() => {
     if (!base) return [];
     return [
-      { k: "Factory cost", v: cny(base.factoryCostCny), sub: "CNY" },
-      { k: "Net internal", v: cny(base.netInternalCostCny), sub: `+${data?.costUpliftPercent ?? 0}% uplift · ${usd(base.netInternalCostUsd)}` },
-      { k: base.productLevelCode ? `Level ${base.productLevelCode}` : "Level", v: pct(base.baseMarginPercent), sub: base.productLevelName ?? "margin" },
-      { k: "Global FOB", v: usd(base.globalFobUsd), sub: "before market" },
+      { k: "Base FOB", v: usd(base.globalFobUsd), sub: `Level ${base.productLevelCode ?? "—"}` },
       { k: market?.bandCode ? `Band ${market.bandCode}` : "Market", v: pct(market?.adjustmentPercent ?? 0), sub: country },
       { k: "Regional FOB", v: usd(market?.regionalFobUsd), sub: country, strong: true },
     ];
@@ -128,14 +125,8 @@ export default function PricingIntelligenceCard({
 
   return (
     <div className="space-y-4">
-      {/* Controls — cost comes from the Cost Price field above (read-only here) */}
+      {/* Controls — cost comes from the Cost Price field above; pick the market */}
       <div className="flex flex-wrap items-end gap-3">
-        <div>
-          <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)] mb-1">Factory cost (CNY)</label>
-          <div className="h-9 px-3 inline-flex items-center rounded-lg bg-[var(--bg-surface-subtle)]/50 border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-primary)] min-w-[120px]">
-            {hasCost ? cny(Number(cost)) : <span className="text-[var(--text-ghost)] font-normal">from Cost Price ↑</span>}
-          </div>
-        </div>
         <div>
           <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)] mb-1">Market</label>
           <select
