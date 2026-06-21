@@ -20,6 +20,7 @@ import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
 import InfoIcon from "@/components/icons/ui/InfoIcon";
 import MapPinIcon from "@/components/icons/ui/MapPinIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
+import BoxIcon from "@/components/icons/ui/BoxIcon";
 
 interface Preview {
   ok?: boolean;
@@ -74,12 +75,24 @@ function fxAgeLabel(iso: string): string {
   return `${days}d ago`;
 }
 
+interface AccessoryOpt {
+  productId: string;
+  name: string;
+  role: "stand" | "table" | string;
+  costCny: number | null;
+  baseFobUsd: number | null;
+}
+
 export default function PricingIntelligenceCard({
   costCny,
   currency,
+  subcategorySlug,
+  supportsCompleteSet,
 }: {
   costCny: number | null;
   currency?: string | null;
+  subcategorySlug?: string | null;
+  supportsCompleteSet?: boolean;
 }) {
   const isCny = !currency || currency.toUpperCase() === "CNY";
   const cost = costCny && costCny > 0 ? String(costCny) : "";
@@ -89,6 +102,19 @@ export default function PricingIntelligenceCard({
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const debRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Complete-set: compatible accessories (priced) for this machine class.
+  const [accessories, setAccessories] = useState<AccessoryOpt[]>([]);
+  const [pickStand, setPickStand] = useState<string | null>(null);
+  const [pickTable, setPickTable] = useState<string | null>(null);
+  useEffect(() => {
+    if (!supportsCompleteSet || !subcategorySlug) { setAccessories([]); return; }
+    const qs = new URLSearchParams({ subcategory: subcategorySlug, country });
+    fetch(`/api/products/accessory-pricing?${qs.toString()}`, { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { accessories?: AccessoryOpt[] } | null) => setAccessories(j?.accessories ?? []))
+      .catch(() => setAccessories([]));
+  }, [supportsCompleteSet, subcategorySlug, country]);
 
   // Country options (full managed list) for the market selector.
   useEffect(() => {
@@ -293,6 +319,61 @@ export default function PricingIntelligenceCard({
               ))}
             </div>
           </div>
+
+          {/* Complete-set preview — head + chosen stand/table, each priced
+              through the engine and summed. Only for products flagged
+              supports_complete_set. */}
+          {supportsCompleteSet && (() => {
+            const headFob = data?.market?.regionalFobUsd ?? data?.base?.globalFobUsd ?? null;
+            const stands = accessories.filter((a) => a.role === "stand");
+            const tables = accessories.filter((a) => a.role === "table");
+            const stand = accessories.find((a) => a.productId === pickStand) ?? null;
+            const table = accessories.find((a) => a.productId === pickTable) ?? null;
+            const addOns = (stand?.baseFobUsd ?? 0) + (table?.baseFobUsd ?? 0);
+            const total = headFob != null ? headFob + addOns : null;
+            const Group = ({ label, items, picked, onPick }: { label: string; items: AccessoryOpt[]; picked: string | null; onPick: (id: string | null) => void }) => (
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)] mb-1.5">{label}</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {items.map((a) => (
+                    <button type="button" key={a.productId}
+                      onClick={() => onPick(picked === a.productId ? null : a.productId)}
+                      className={`text-left rounded-lg border px-2.5 py-1.5 transition-colors ${picked === a.productId ? "border-[var(--accent)] bg-[var(--accent)]/[0.08]" : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 hover:border-[var(--border-strong)]"}`}>
+                      <div className="text-[11.5px] font-medium text-[var(--text-primary)]">{a.name}</div>
+                      <div className="text-[11px] tabular-nums text-[var(--text-secondary)]">{a.baseFobUsd != null ? `+${usd(a.baseFobUsd)}` : "cost —"}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+            return (
+              <div className="rounded-xl border border-[var(--border-subtle)] p-3.5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <BoxIcon className="h-4 w-4 text-[var(--text-dim)]" />
+                  <h4 className="text-[12px] font-semibold text-[var(--text-primary)]">Complete set</h4>
+                  <span className="text-[10px] text-[var(--text-ghost)]">head + stand + table, each priced separately</span>
+                </div>
+                {accessories.length === 0 ? (
+                  <p className="text-[11px] text-[var(--text-dim)]">
+                    No compatible stand/table mapped for this class yet. Map accessory products to this subcategory to enable the set.
+                  </p>
+                ) : (
+                  <>
+                    {stands.length > 0 && <Group label="Stand" items={stands} picked={pickStand} onPick={setPickStand} />}
+                    {tables.length > 0 && <Group label="Table" items={tables} picked={pickTable} onPick={setPickTable} />}
+                    <div className="flex items-center justify-between rounded-lg bg-[var(--accent)]/[0.06] border border-[var(--accent)]/30 px-3 py-2">
+                      <div className="text-[11px] text-[var(--text-secondary)]">
+                        Complete-set Base FOB
+                        <span className="text-[var(--text-ghost)]"> · head {usd(headFob)}{stand ? ` + stand ${usd(stand.baseFobUsd)}` : ""}{table ? ` + table ${usd(table.baseFobUsd)}` : ""}</span>
+                      </div>
+                      <div className="text-[15px] font-bold tabular-nums text-[var(--accent)]">{usd(total)}</div>
+                    </div>
+                    <p className="text-[10px] text-[var(--text-ghost)]">Preview only. Each item carries its own level/margin/band; the customer-facing configurator is quote-time.</p>
+                  </>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Sync footer */}
           <div className="flex items-start gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 px-3 py-2.5 text-[11px] text-[var(--text-dim)]">

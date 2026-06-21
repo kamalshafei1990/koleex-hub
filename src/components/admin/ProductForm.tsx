@@ -4007,7 +4007,7 @@ export default function ProductForm({ productId }: Props) {
               {(() => {
                 const link = productSuppliers.find((s) => s.is_primary) || productSuppliers[0] || null;
                 const costNum = link?.unit_cost_cny ? Number(link.unit_cost_cny) : (primaryModel?.cost_price ? Number(primaryModel.cost_price) : null);
-                return <PricingIntelligenceCard costCny={Number.isFinite(costNum as number) ? (costNum as number) : null} currency="CNY" />;
+                return <PricingIntelligenceCard costCny={Number.isFinite(costNum as number) ? (costNum as number) : null} currency="CNY" subcategorySlug={product.subcategory_slug || null} supportsCompleteSet={!!product.supports_complete_set} />;
               })()}
             </Section>
 
