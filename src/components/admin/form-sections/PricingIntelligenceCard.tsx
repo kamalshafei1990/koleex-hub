@@ -59,16 +59,13 @@ export default function PricingIntelligenceCard({
   currency?: string | null;
 }) {
   const isCny = !currency || currency.toUpperCase() === "CNY";
-  const [cost, setCost] = useState<string>(costCny ? String(costCny) : "");
+  const cost = costCny && costCny > 0 ? String(costCny) : "";
   const [country, setCountry] = useState("EG");
   const [markets, setMarkets] = useState<MarketOpt[]>([]);
   const [data, setData] = useState<Preview | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const debRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Keep the preview cost in sync if the upstream supplier cost changes.
-  useEffect(() => { setCost(costCny ? String(costCny) : ""); }, [costCny]);
 
   // Country options (full managed list) for the market selector.
   useEffect(() => {
@@ -131,19 +128,12 @@ export default function PricingIntelligenceCard({
 
   return (
     <div className="space-y-4">
-      {/* Controls */}
+      {/* Controls — cost comes from the Cost Price field above (read-only here) */}
       <div className="flex flex-wrap items-end gap-3">
         <div>
           <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)] mb-1">Factory cost (CNY)</label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[12px] font-semibold text-[var(--text-ghost)]">¥</span>
-            <input
-              type="number"
-              value={cost}
-              onChange={(e) => setCost(e.target.value)}
-              placeholder="0"
-              className="w-40 h-9 pl-7 pr-3 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
-            />
+          <div className="h-9 px-3 inline-flex items-center rounded-lg bg-[var(--bg-surface-subtle)]/50 border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-primary)] min-w-[120px]">
+            {hasCost ? cny(Number(cost)) : <span className="text-[var(--text-ghost)] font-normal">from Cost Price ↑</span>}
           </div>
         </div>
         <div>
@@ -167,8 +157,8 @@ export default function PricingIntelligenceCard({
 
       {!hasCost ? (
         <Note>
-          Enter the factory cost above (or set it on the <b>Supplier</b> tab) — the system auto-detects the
-          product level, applies the margin, market band and channel ladder from <b>Commercial Setup</b>.
+          Enter the <b>Cost Price</b> above and the system auto-detects the product level, applies the margin,
+          market band and channel ladder from <b>Commercial Setup</b>.
         </Note>
       ) : err ? (
         <div className="rounded-xl border border-amber-500/25 bg-amber-500/[0.07] px-4 py-3 text-[12px] text-amber-300/90 flex items-start gap-2">
@@ -257,7 +247,7 @@ export default function PricingIntelligenceCard({
             <InfoIcon className="h-3.5 w-3.5 mt-0.5 shrink-0" />
             <span>
               Computed live from <a href="/commercial-policy" className="underline text-[var(--text-primary)]">Commercial Setup</a> — product levels, margins, market bands and channel ladder.
-              Change them there and this recalculates. Cost comes from the Supplier tab; edit the box above to preview a different cost.
+              Change them there and this recalculates. The factory cost comes from the Cost Price field above.
             </span>
           </div>
         </>

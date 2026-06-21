@@ -3932,23 +3932,23 @@ export default function ProductForm({ productId }: Props) {
            ═══════════════════════════════════════════════════════════ */}
         {(onePage || steps[currentStep]?.id === "pricing") && (
           <div id="sec-pricing" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
-            {/* Selling price (editable) */}
-            <Section id="selling-price" icon={<DollarSignIcon className="h-4 w-4" />} title={t("pricing.sellingTitle", "Selling Price")} badge={t("pricing.sellingBadge", "Public · USD")} defaultOpen>
+            {/* Cost price (editable) — drives the FOB pricing engine below */}
+            <Section id="selling-price" icon={<DollarSignIcon className="h-4 w-4" />} title={t("pricing.costPriceTitle", "Cost Price")} badge={t("pricing.costPriceBadge", "Factory · CNY")} defaultOpen>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className={lbl}>{t("hero.globalPrice", "Global Selling Price (USD)")}</label>
+                  <label className={lbl}>{t("pricing.factoryCostCny", "Factory cost (CNY)")}</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[12px] font-semibold text-[var(--text-ghost)]">$</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[12px] font-semibold text-[var(--text-ghost)]">¥</span>
                     <input
                       type="number"
                       step="0.01"
-                      value={primaryModel?.global_price || ""}
-                      onChange={(e) => updatePrimaryModel({ global_price: e.target.value })}
-                      placeholder="0.00"
+                      value={primaryModel?.cost_price || ""}
+                      onChange={(e) => updatePrimaryModel({ cost_price: e.target.value })}
+                      placeholder="0"
                       className={`${inp} pl-8`}
                     />
                   </div>
-                  <p className="text-[10px] text-[var(--text-ghost)] mt-1.5">{t("pricing.sellingHint", "The list price shown on the public product page. Per-variant prices are set on the Variants tab.")}</p>
+                  <p className="text-[10px] text-[var(--text-ghost)] mt-1.5">{t("pricing.costPriceHint", "The KOLEEX factory cost. The FOB Pricing below auto-detects the product level, margin, market band and channel prices from Commercial Setup.")}</p>
                 </div>
               </div>
             </Section>
@@ -3958,8 +3958,8 @@ export default function ProductForm({ productId }: Props) {
               {(() => {
                 const link = productSuppliers.find((s) => s.is_primary) || productSuppliers[0] || null;
                 const sup = link ? suppliers.find((x) => x.id === link.supplier_id) : null;
-                const cur = link?.currency || sup?.currency || "CNY";
-                const costNum = link?.unit_cost_cny ? Number(link.unit_cost_cny) : (primaryModel?.cost_price ? Number(primaryModel.cost_price) : null);
+                const cur = primaryModel?.cost_price ? "CNY" : (link?.currency || sup?.currency || "CNY");
+                const costNum = primaryModel?.cost_price ? Number(primaryModel.cost_price) : (link?.unit_cost_cny ? Number(link.unit_cost_cny) : null);
                 return <PricingIntelligenceCard costCny={Number.isFinite(costNum as number) ? (costNum as number) : null} currency={cur} />;
               })()}
             </Section>
