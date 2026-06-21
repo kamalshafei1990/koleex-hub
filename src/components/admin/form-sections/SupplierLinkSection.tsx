@@ -12,6 +12,7 @@
    --------------------------------------------------------------------------- */
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
@@ -789,8 +790,14 @@ function SupplierPickerModal({
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const [view, setView] = useState<"list" | "grid">("list");
+  const [mounted, setMounted] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  /* Render via a portal on <body> so the fixed overlay is sized to the
+     viewport — not clipped by a transformed ancestor (the form's animated
+     step container), which was collapsing the supplier list to ~1 row. */
+  useEffect(() => { setMounted(true); }, []);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -819,7 +826,9 @@ function SupplierPickerModal({
     el?.scrollIntoView({ block: "nearest" });
   }, [active]);
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal((
     <div
       className="fixed inset-0 z-[120] flex items-start justify-center p-4 pt-[12vh] bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
@@ -923,11 +932,11 @@ function SupplierPickerModal({
         </div>
 
         {/* Footer hint */}
-        <div className="px-3.5 py-2 border-t border-[var(--border-subtle)] flex items-center justify-between text-[10px] text-[var(--text-ghost)]">
+        <div className="shrink-0 px-3.5 py-2 border-t border-[var(--border-subtle)] flex items-center justify-between text-[10px] text-[var(--text-ghost)]">
           <span>{filtered.length} of {suppliers.length} suppliers</span>
           <span>↑↓ to navigate · ↵ to link · esc to close</span>
         </div>
       </div>
     </div>
-  );
+  ), document.body);
 }
