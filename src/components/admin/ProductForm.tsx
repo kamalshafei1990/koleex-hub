@@ -95,7 +95,6 @@ import KnowledgeSection from "./form-sections/KnowledgeSection";
 import TechnicalSection from "./form-sections/TechnicalSection";
 import ModelsSection from "./form-sections/ModelsSection";
 import MediaSection from "./form-sections/MediaSection";
-import MarketPricesSection from "./form-sections/MarketPricesSection";
 import PricingIntelligenceCard from "./form-sections/PricingIntelligenceCard";
 import BaseFobCard from "./form-sections/BaseFobCard";
 import RelatedProductsSection from "./form-sections/RelatedProductsSection";
@@ -1208,6 +1207,25 @@ export default function ProductForm({ productId }: Props) {
       return next;
     });
   }, []);
+
+  /* Factory cost is a single value shared with the Supplier tab. If a cost was
+     typed on the Price tab before any supplier existed (stored on the model),
+     move it onto the primary supplier link the moment one is added — so the two
+     never diverge. The guard (link cost empty + model cost set) self-clears, so
+     this can't loop. */
+  useEffect(() => {
+    if (!productSuppliers.length) return;
+    const cp = models[0]?.cost_price;
+    if (!cp) return;
+    const i = productSuppliers.findIndex((s) => s.is_primary);
+    const ti = i >= 0 ? i : 0;
+    const link = productSuppliers[ti];
+    if (link && (link.unit_cost_cny == null || link.unit_cost_cny === "")) {
+      setProductSuppliers((prev) => prev.map((s, idx) => (idx === ti ? { ...s, unit_cost_cny: cp } : s)));
+      updatePrimaryModel({ cost_price: "" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productSuppliers.length]);
 
   /* ── Hero localized-name helpers ──
      Read/write a single locale's product_name inside the shared
@@ -3936,21 +3954,48 @@ export default function ProductForm({ productId }: Props) {
             {/* Cost price (editable) — drives the FOB pricing engine below */}
             <Section id="selling-price" icon={<DollarSignIcon className="h-4 w-4" />} title={t("pricing.costPriceTitle", "Cost Price")} badge={t("pricing.costPriceBadge", "Factory · CNY")} defaultOpen>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className={lbl}>{t("pricing.factoryCostCny", "Factory cost (CNY)")}</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[12px] font-semibold text-[var(--text-ghost)]">¥</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={primaryModel?.cost_price || ""}
-                      onChange={(e) => updatePrimaryModel({ cost_price: e.target.value })}
-                      placeholder="0"
-                      className={`${inp} pl-8`}
-                    />
-                  </div>
-                  <p className="text-[10px] text-[var(--text-ghost)] mt-1.5">{t("pricing.costPriceHint", "The KOLEEX factory cost. The FOB Pricing below auto-detects the product level, margin, market band and channel prices from Commercial Setup.")}</p>
-                </div>
+                {(() => {
+                  // The factory cost is a SINGLE value shared with the Supplier
+                  // tab. When a supplier is linked, this reads/writes that link's
+                  // unit_cost_cny (two-way sync). With no supplier yet, it lives
+                  // on the model and is migrated onto the supplier once linked.
+                  const primaryIdx = (() => {
+                    const i = productSuppliers.findIndex((s) => s.is_primary);
+                    return i >= 0 ? i : (productSuppliers.length ? 0 : -1);
+                  })();
+                  const primaryLink = primaryIdx >= 0 ? productSuppliers[primaryIdx] : null;
+                  const sup = primaryLink ? suppliers.find((x) => x.id === primaryLink.supplier_id) : null;
+                  const costValue = primaryLink ? (primaryLink.unit_cost_cny || "") : (primaryModel?.cost_price || "");
+                  const setCost = (val: string) => {
+                    if (primaryIdx >= 0) {
+                      setProductSuppliers((prev) => prev.map((s, i) => (i === primaryIdx ? { ...s, unit_cost_cny: val } : s)));
+                      if (primaryModel?.cost_price) updatePrimaryModel({ cost_price: "" });
+                    } else {
+                      updatePrimaryModel({ cost_price: val });
+                    }
+                  };
+                  return (
+                    <div>
+                      <label className={lbl}>{t("pricing.factoryCostCny", "Factory cost (CNY)")}</label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[12px] font-semibold text-[var(--text-ghost)]">¥</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={costValue}
+                          onChange={(e) => setCost(e.target.value)}
+                          placeholder="0"
+                          className={`${inp} pl-8`}
+                        />
+                      </div>
+                      <p className="text-[10px] text-[var(--text-ghost)] mt-1.5">
+                        {primaryLink
+                          ? t("pricing.costPriceHintSynced", "Synced with the Supplier tab") + (sup?.name ? ` (${sup.name})` : "") + ". " + t("pricing.costPriceHint2", "Editing here updates the supplier cost too. The FOB Pricing below is derived from it via Commercial Setup.")
+                          : t("pricing.costPriceHintNew", "The KOLEEX factory cost. Once you link a supplier it becomes the supplier cost (Supplier tab). The FOB Pricing below auto-detects level, margin, band and channel prices from Commercial Setup.")}
+                      </p>
+                    </div>
+                  );
+                })()}
               </div>
             </Section>
 
@@ -3958,10 +4003,8 @@ export default function ProductForm({ productId }: Props) {
             <Section id="base-fob" icon={<DollarSignIcon className="h-4 w-4" />} title={t("pricing.baseFobTitle", "Base FOB Price")} badge={t("pricing.baseFobBadge", "Auto · by product level")} defaultOpen>
               {(() => {
                 const link = productSuppliers.find((s) => s.is_primary) || productSuppliers[0] || null;
-                const sup = link ? suppliers.find((x) => x.id === link.supplier_id) : null;
-                const cur = primaryModel?.cost_price ? "CNY" : (link?.currency || sup?.currency || "CNY");
-                const costNum = primaryModel?.cost_price ? Number(primaryModel.cost_price) : (link?.unit_cost_cny ? Number(link.unit_cost_cny) : null);
-                return <BaseFobCard costCny={Number.isFinite(costNum as number) ? (costNum as number) : null} currency={cur} />;
+                const costNum = link?.unit_cost_cny ? Number(link.unit_cost_cny) : (primaryModel?.cost_price ? Number(primaryModel.cost_price) : null);
+                return <BaseFobCard costCny={Number.isFinite(costNum as number) ? (costNum as number) : null} currency="CNY" />;
               })()}
             </Section>
 
@@ -3969,56 +4012,11 @@ export default function ProductForm({ productId }: Props) {
             <Section id="fob-pricing" icon={<DollarSignIcon className="h-4 w-4" />} title={t("pricing.fobTitle", "Market & Customer Pricing")} badge={t("pricing.fobBadge", "Live · from Commercial Setup")} defaultOpen>
               {(() => {
                 const link = productSuppliers.find((s) => s.is_primary) || productSuppliers[0] || null;
-                const sup = link ? suppliers.find((x) => x.id === link.supplier_id) : null;
-                const cur = primaryModel?.cost_price ? "CNY" : (link?.currency || sup?.currency || "CNY");
-                const costNum = primaryModel?.cost_price ? Number(primaryModel.cost_price) : (link?.unit_cost_cny ? Number(link.unit_cost_cny) : null);
-                return <PricingIntelligenceCard costCny={Number.isFinite(costNum as number) ? (costNum as number) : null} currency={cur} />;
+                const costNum = link?.unit_cost_cny ? Number(link.unit_cost_cny) : (primaryModel?.cost_price ? Number(primaryModel.cost_price) : null);
+                return <PricingIntelligenceCard costCny={Number.isFinite(costNum as number) ? (costNum as number) : null} currency="CNY" />;
               })()}
             </Section>
 
-            {/* Market Prices (per country) */}
-            <Section id="prices" icon={<DollarSignIcon className="h-4 w-4" />} title={t("models.marketPrices", "Market Prices")} badge={t("models.perCountry", "Per country")} defaultOpen={false}>
-              <MarketPricesSection prices={prices} models={models} onChange={setPrices} />
-            </Section>
-
-            {/* Cost & margin (READ-ONLY) — supplier cost is owned by the
-                Supplier tab; mirrored here so price decisions sit next to
-                the landed cost without becoming a second edit surface. */}
-            <Section id="cost-summary" icon={<DollarSignIcon className="h-4 w-4" />} title={t("pricing.costTitle", "Cost & margin")} badge={t("pricing.costBadge", "Read-only · supplier cost from Supplier tab")} defaultOpen>
-              {(() => {
-                const pm = primaryModel;
-                const link = productSuppliers.find((s) => s.is_primary) || productSuppliers[0] || null;
-                const sup = link ? suppliers.find((x) => x.id === link.supplier_id) : null;
-                const cur = link?.currency || sup?.currency || "";
-                const nums = models.map((m) => parseFloat(String(m.global_price || ""))).filter((n) => !Number.isNaN(n) && n > 0);
-                const range = nums.length
-                  ? (Math.min(...nums) === Math.max(...nums) ? `$${Math.min(...nums)}` : `$${Math.min(...nums)} – $${Math.max(...nums)}`)
-                  : "—";
-                const cell = (label: string, value: string) => (
-                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/50 px-3 py-2">
-                    <div className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">{label}</div>
-                    <div className="text-[13px] font-medium text-[var(--text-primary)] truncate mt-0.5">{value}</div>
-                  </div>
-                );
-                const money = (v: string | undefined, prefix = "$") => (v && String(v).trim() ? `${prefix}${v}` : "—");
-                return (
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
-                      {cell(t("identity.psGlobal", "Global price"), money(pm?.global_price))}
-                      {cell(t("identity.psHeadOnly", "Head-only"), money(pm?.head_only_price))}
-                      {cell(t("identity.psCompleteSet", "Complete set"), money(pm?.complete_set_price))}
-                      {cell(t("identity.psVariantRange", "Variant range"), range)}
-                      {cell(t("identity.psMoq", "MOQ"), pm?.moq ? String(pm.moq) : (product.moq ? String(product.moq) : "—"))}
-                      {cell(t("identity.psSupplierCost", "Supplier cost"), link?.unit_cost_cny ? `${cur ? cur + " " : ""}${link.unit_cost_cny}` : "—")}
-                    </div>
-                    <button type="button" onClick={() => goToStep(steps.findIndex((s) => s.id === "supplier"))}
-                      className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-semibold text-[var(--text-muted)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors">
-                      <FactoryIcon className="h-3 w-3" /> {t("pricing.editSupplierCost", "Edit supplier cost in the Supplier tab")}
-                    </button>
-                  </div>
-                );
-              })()}
-            </Section>
           </div>
         )}
 
