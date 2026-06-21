@@ -97,6 +97,7 @@ import ModelsSection from "./form-sections/ModelsSection";
 import MediaSection from "./form-sections/MediaSection";
 import PricingIntelligenceCard from "./form-sections/PricingIntelligenceCard";
 import BaseFobCard from "./form-sections/BaseFobCard";
+import TabStrip from "@/components/ui/TabStrip";
 import RelatedProductsSection from "./form-sections/RelatedProductsSection";
 import SearchSocialSection from "./form-sections/SearchSocialSection";
 import SewingMachineSection from "./form-sections/SewingMachineSection";
@@ -321,26 +322,15 @@ function SectionTabs({
 }) {
   return (
     <nav className="sticky top-0 z-20 mb-6 py-2 bg-[var(--bg-primary)]/90 backdrop-blur-md">
-      <div className="flex items-center gap-1 overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {items.map((it) => {
-          const on = it.index === activeIndex;
-          return (
-            <button
-              key={it.id}
-              type="button"
-              onClick={() => onSelect(it.index)}
-              aria-current={on ? "page" : undefined}
-              className={`shrink-0 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[12.5px] font-medium transition-colors ${
-                on
-                  ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
-                  : "text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
-              }`}
-            >
-              {it.label}
-            </button>
-          );
-        })}
-      </div>
+      <TabStrip
+        ariaLabel="Product sections"
+        items={items.map((it) => ({
+          key: it.id,
+          label: it.label,
+          active: it.index === activeIndex,
+          onClick: () => onSelect(it.index),
+        }))}
+      />
     </nav>
   );
 }

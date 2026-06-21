@@ -215,7 +215,6 @@ function SlidingPillNav({
   ariaLabel: string;
 }) {
   const [tabWidth, setTabWidth] = useState<number>(TAB_WIDTH_LG);
-  const [rtl, setRtl] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
   // Clickable scroll arrows (issue 4c9884b1): the tab strip scrolls on
   // touch/trackpad, but mouse users had no way to reach off-screen tabs and
@@ -245,16 +244,6 @@ function SlidingPillNav({
     el.scrollBy({ left: dir * Math.max(160, tabWidth * 2), behavior: "smooth" });
   };
 
-  /* Direction-aware: in RTL the tabs flow right-to-left, so the sliding pill
-     must be anchored to the inline-start (right edge) and translate the other
-     way — otherwise it lands on the wrong side as a detached white box. */
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    const read = () => setRtl((document.documentElement.dir || document.dir) === "rtl");
-    read();
-    window.addEventListener("langchange", read as EventListener);
-    return () => window.removeEventListener("langchange", read as EventListener);
-  }, []);
 
   /* Responsive tab width — 148px on ≥900px, 120px below. */
   useEffect(() => {
@@ -284,13 +273,15 @@ function SlidingPillNav({
   useEffect(() => {
     const track = trackRef.current;
     if (!track) return;
-    const tabLeft  = TRACK_PADDING + activeIndex * tabWidth;
-    const tabRight = tabLeft + tabWidth;
+    const el = track.querySelectorAll<HTMLElement>('[role="tab"]')[activeIndex];
+    if (!el) return;
+    const tabLeft  = el.offsetLeft;
+    const tabRight = tabLeft + el.offsetWidth;
     const viewLeft  = track.scrollLeft;
     const viewRight = viewLeft + track.clientWidth;
     const inView = tabLeft >= viewLeft && tabRight <= viewRight;
     if (inView) return;
-    const center = tabLeft - track.clientWidth / 2 + tabWidth / 2;
+    const center = tabLeft - track.clientWidth / 2 + el.offsetWidth / 2;
     const max = track.scrollWidth - track.clientWidth;
     const left = Math.max(0, Math.min(center, max));
     track.scrollTo({
@@ -298,7 +289,7 @@ function SlidingPillNav({
       behavior: firstMountRef.current ? "auto" : "smooth",
     });
     firstMountRef.current = false;
-  }, [activeIndex, tabWidth]);
+  }, [activeIndex]);
 
   /* iOS Safari fix: when the user scrolls the page vertically, iOS leaks
      a tiny amount of horizontal momentum into any sibling `overflow-x:auto`
@@ -405,36 +396,18 @@ function SlidingPillNav({
       // bar completely hid the fact that more tabs existed off-screen. A
       // thin, low-contrast scrollbar gives the cue without harming the
       // brand-minimal aesthetic.
-      className="relative inline-flex max-w-full overflow-x-auto rounded-[14px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-1.5 [scrollbar-width:thin] [scrollbar-color:var(--border-color)_transparent] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-[var(--border-color)] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
+      className="relative inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
-      {/* The sliding indicator — single absolutely-positioned element that
-          glides between active tabs via `transform: translateX(...)`.
-          It lives inside the scrolling track so it scrolls with its tab
-          (no "indicator vanishes off-screen" issue). When the active tab
-          changes, the transform animates smoothly between positions.
-          GPU-accelerated and respects prefers-reduced-motion. */}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute top-1.5 bottom-1.5 rounded-[10px] bg-[var(--bg-inverted)] shadow-sm transition-transform motion-reduce:transition-none"
-        style={{
-          width: `${tabWidth}px`,
-          insetInlineStart: 0,
-          transform: `translateX(${(rtl ? -1 : 1) * (TRACK_PADDING + activeIndex * tabWidth)}px)`,
-          transitionDuration: "350ms",
-          transitionTimingFunction: "cubic-bezier(0.22, 0.61, 0.36, 1)",
-        }}
-      />
-
       {tabs.map((tab, i) => {
         const isActive = i === activeIndex;
-        /* Tab text fades color via transition-colors; the sliding indicator
-           (above) provides the moving background. Per-tab `bg-` is removed
-           so the indicator can sit underneath without visible seams. */
+        /* Canonical TabStrip pill: auto-width, per-button filled active.
+           (Matches src/components/ui/TabStrip.tsx so every tab bar in the
+           system looks identical.) */
         const tabClass =
-          "relative z-10 inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-[10px] py-2.5 text-[13px] outline-none transition-colors duration-[250ms] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--border-focus)] " +
+          "relative z-10 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[12.5px] font-medium outline-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--border-focus)] " +
           (isActive
-            ? "font-semibold text-[var(--text-inverted)]"
-            : "font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]");
+            ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+            : "text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]");
         const inner = (
           <>
             {tab.icon && (
@@ -455,7 +428,7 @@ function SlidingPillNav({
           tabIndex: isActive ? 0 : -1,
           /* scroll-snap-align: start so each tab settles at the left edge
              of the viewport when the user finishes a swipe. */
-          style: { width: `${tabWidth}px`, scrollSnapAlign: "start" as const },
+          style: { scrollSnapAlign: "start" as const },
           className: tabClass,
         };
         if (tab.onClick) {
