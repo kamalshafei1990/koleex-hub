@@ -1,21 +1,21 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   AccessoryOptionsSection — ST-2.
+   AccessoryOptionsSection — ST-2 (controlled).
 
    Shown only for Stand / Table products (subcategory `stands` / `tables`).
    Lets the operator define the configurable option values per axis and the
-   price add-on (delta CNY) for each. The complete-set configurator later sums:
-   base cost + Σ selected deltas → engine price.
+   price add-on (delta CNY) for each. These ARE the accessory's specs &
+   variants. The complete-set configurator later sums: base cost + Σ selected
+   deltas → engine price.
 
-   Self-persisting: loads + saves via /api/products/[id]/options (needs a saved
-   product). Descriptive axes (shape/type) carry no price; priced axes show a
-   ¥ delta input.
+   CONTROLLED: the parent (ProductForm) owns the rows and persists them with
+   the rest of the product on Save — so options can be entered BEFORE the
+   product's first save (no "save first" requirement). Descriptive axes
+   (shape/type) carry no price; priced axes show a ¥ delta input.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useState } from "react";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 type Axis = { key: string; label: string; priced: boolean };
 
@@ -34,63 +34,45 @@ const STAND_AXES: Axis[] = [
   { key: "wheel_size", label: "Wheel size", priced: true },
 ];
 
-interface Row { _k: string; axis: string; value: string; price_delta_cny: number; affects_price: boolean; is_default: boolean; }
+export interface AccessoryOptionRow {
+  _k: string;
+  axis: string;
+  value: string;
+  price_delta_cny: number;
+  affects_price: boolean;
+  is_default: boolean;
+}
+
+export function axesForSubcategory(subcategorySlug?: string | null): Axis[] {
+  return subcategorySlug === "tables" ? TABLE_AXES : subcategorySlug === "stands" ? STAND_AXES : [];
+}
 
 const inp = "h-8 px-2.5 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
 
-export default function AccessoryOptionsSection({ productId, subcategorySlug }: { productId?: string | null; subcategorySlug?: string | null }) {
+export default function AccessoryOptionsSection({
+  rows,
+  onChange,
+  subcategorySlug,
+}: {
+  rows: AccessoryOptionRow[];
+  onChange: (rows: AccessoryOptionRow[]) => void;
+  subcategorySlug?: string | null;
+}) {
   const kind = subcategorySlug === "tables" ? "table" : subcategorySlug === "stands" ? "stand" : null;
-  const axes = kind === "table" ? TABLE_AXES : kind === "stand" ? STAND_AXES : [];
-
-  const [rows, setRows] = useState<Row[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [savedMsg, setSavedMsg] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    if (!productId) return;
-    setLoading(true);
-    try {
-      const r = await fetch(`/api/products/${productId}/options`, { credentials: "include" });
-      const j = (await r.json().catch(() => ({}))) as { options?: Array<Omit<Row, "_k">> };
-      setRows((j.options ?? []).map((o, i) => ({ ...o, _k: `${o.axis}-${i}-${Math.round(o.price_delta_cny)}` })));
-    } catch { /* ignore */ } finally { setLoading(false); }
-  }, [productId]);
-  useEffect(() => { load(); }, [load]);
-
+  const axes = axesForSubcategory(subcategorySlug);
   if (!kind) return null;
-
-  if (!productId) {
-    return (
-      <p className="text-[12px] text-[var(--text-dim)]">
-        Save the product first, then come back here to add its configurable options (size, quality, wheels…) and their price add-ons.
-      </p>
-    );
-  }
 
   const axisRows = (axis: string) => rows.filter((r) => r.axis === axis);
   const addValue = (a: Axis) =>
-    setRows((p) => [...p, { _k: `${a.key}-${p.length}-${Date.now() % 100000}`, axis: a.key, value: "", price_delta_cny: 0, affects_price: a.priced, is_default: !p.some((r) => r.axis === a.key) }]);
-  const patch = (k: string, p: Partial<Row>) => setRows((rs) => rs.map((r) => (r._k === k ? { ...r, ...p } : r)));
-  const remove = (k: string) => setRows((rs) => rs.filter((r) => r._k !== k));
-  const setDefault = (axis: string, k: string) => setRows((rs) => rs.map((r) => (r.axis === axis ? { ...r, is_default: r._k === k } : r)));
-
-  async function save() {
-    if (!productId) return;
-    setSaving(true); setSavedMsg(null);
-    try {
-      const payload = rows.filter((r) => r.value.trim()).map((r, i) => ({ axis: r.axis, value: r.value.trim(), price_delta_cny: r.affects_price ? r.price_delta_cny : 0, affects_price: r.affects_price, is_default: r.is_default, sort_order: i }));
-      const r = await fetch(`/api/products/${productId}/options`, { method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ options: payload }) });
-      const j = await r.json().catch(() => ({}));
-      setSavedMsg(r.ok ? `Saved ${j.count} option${j.count === 1 ? "" : "s"}` : (j.error || "Save failed"));
-      if (r.ok) await load();
-    } catch { setSavedMsg("Network error"); } finally { setSaving(false); }
-  }
+    onChange([...rows, { _k: `${a.key}-${rows.length}-${rows.reduce((n, r) => n + r.value.length, 0)}`, axis: a.key, value: "", price_delta_cny: 0, affects_price: a.priced, is_default: !rows.some((r) => r.axis === a.key) }]);
+  const patch = (k: string, p: Partial<AccessoryOptionRow>) => onChange(rows.map((r) => (r._k === k ? { ...r, ...p } : r)));
+  const remove = (k: string) => onChange(rows.filter((r) => r._k !== k));
+  const setDefault = (axis: string, k: string) => onChange(rows.map((r) => (r.axis === axis ? { ...r, is_default: r._k === k } : r)));
 
   return (
     <div className="space-y-4">
       <p className="text-[11px] text-[var(--text-dim)]">
-        These options appear in the <b>complete-set</b> configurator. Priced options add their <b>¥ delta</b> to the base cost; shape/type are descriptive (no price).
+        These options are this product&apos;s variants &amp; appear in the <b>complete-set</b> configurator. Priced options add their <b>¥ delta</b> to the base cost; shape/type are descriptive (no price). Saved together with the product.
       </p>
 
       {axes.map((a) => (
@@ -127,14 +109,6 @@ export default function AccessoryOptionsSection({ productId, subcategorySlug }: 
           )}
         </div>
       ))}
-
-      <div className="flex items-center gap-3">
-        <button type="button" onClick={save} disabled={saving || loading}
-          className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-medium disabled:opacity-50">
-          {saving ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : null} Save options
-        </button>
-        {savedMsg && <span className="text-[11px] text-[var(--text-dim)]">{savedMsg}</span>}
-      </div>
     </div>
   );
 }

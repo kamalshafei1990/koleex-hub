@@ -96,7 +96,7 @@ import TechnicalSection from "./form-sections/TechnicalSection";
 import ModelsSection from "./form-sections/ModelsSection";
 import MediaSection from "./form-sections/MediaSection";
 import PricingIntelligenceCard from "./form-sections/PricingIntelligenceCard";
-import AccessoryOptionsSection from "./form-sections/AccessoryOptionsSection";
+import AccessoryOptionsSection, { type AccessoryOptionRow, axesForSubcategory } from "./form-sections/AccessoryOptionsSection";
 import BaseFobCard from "./form-sections/BaseFobCard";
 import TabStrip from "@/components/ui/TabStrip";
 import RelatedProductsSection from "./form-sections/RelatedProductsSection";
@@ -503,6 +503,10 @@ export default function ProductForm({ productId }: Props) {
   const [prices, setPrices] = useState<MarketPriceFormState[]>([]);
   const [related, setRelated] = useState<RelatedProductFormState[]>([]);
   const [productSuppliers, setProductSuppliers] = useState<ProductSupplierFormState[]>([]);
+  /* Stand / Table configurable options (their specs & variants). Held in form
+     state so they can be entered before the product's first save, then
+     persisted alongside everything else. */
+  const [accessoryOptions, setAccessoryOptions] = useState<AccessoryOptionRow[]>([]);
   const [certifications, setCertifications] = useState<ProductCertificationFormState[]>([]);
   const [productDocuments, setProductDocuments] = useState<ProductDocumentFormState[]>([]);
 
@@ -1064,6 +1068,21 @@ export default function ProductForm({ productId }: Props) {
      } finally {
        if (!cancelled) setLoading(false);
      }
+    })();
+    return () => { cancelled = true; };
+  }, [isEdit, productId]);
+
+  /* Load Stand / Table configurable options on edit (kept separate from the
+     main bundle since it's only relevant for accessories). */
+  useEffect(() => {
+    if (!isEdit || !productId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(`/api/products/${productId}/options`, { credentials: "include" });
+        const j = (await r.json().catch(() => ({}))) as { options?: Array<Omit<AccessoryOptionRow, "_k">> };
+        if (!cancelled) setAccessoryOptions((j.options ?? []).map((o, i) => ({ ...o, _k: `${o.axis}-${i}-${Math.round(o.price_delta_cny)}` })));
+      } catch { /* ignore */ }
     })();
     return () => { cancelled = true; };
   }, [isEdit, productId]);
@@ -2208,6 +2227,19 @@ export default function ProductForm({ productId }: Props) {
         tooling_cost: s.tooling_cost === "" ? null : Number(s.tooling_cost),
         });
       }));
+
+      /* Stand / Table configurable options — replace-the-set. Only meaningful
+         for accessories; persisted here so they save with the product (no
+         "save first" step). */
+      if (product.subcategory_slug === "stands" || product.subcategory_slug === "tables") {
+        const optPayload = accessoryOptions
+          .filter((r) => r.value.trim())
+          .map((r, i) => ({ axis: r.axis, value: r.value.trim(), price_delta_cny: r.affects_price ? r.price_delta_cny : 0, affects_price: r.affects_price, is_default: r.is_default, sort_order: i }));
+        await fetch(`/api/products/${pid}/options`, {
+          method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ options: optPayload }),
+        });
+      }
 
       /* Phase 4 — certifications + documents (replace-the-set). */
       await saveProductCertifications(pid, certifications.map(c => ({
@@ -3815,7 +3847,7 @@ export default function ProductForm({ productId }: Props) {
                 badge={t("specs.accessoryBadge", "Options · price add-ons")}
                 defaultOpen
               >
-                <AccessoryOptionsSection productId={productId} subcategorySlug={product.subcategory_slug || null} />
+                <AccessoryOptionsSection rows={accessoryOptions} onChange={(r) => { setAccessoryOptions(r); setDirty(true); }} subcategorySlug={product.subcategory_slug || null} />
               </Section>
             )}
             {/* ── Hero-ownership note ──
@@ -3936,6 +3968,66 @@ export default function ProductForm({ productId }: Props) {
                 itself makes the Hero-basics-are-read-only story
                 explicit, so the banner is redundant and removed. */}
 
+            {isAccessory ? (
+              /* Stand / Table variants = the configured option axes. The full
+                 sewing Models & Variants editor (SKU / packing / per-model
+                 pricing) doesn't fit an accessory — show its variant axes here
+                 (read-only summary) with a jump to edit them on the Specs tab. */
+              <Section
+                id="accessory-variants"
+                icon={<BoxesIcon className="h-4 w-4" />}
+                title={t("models.accessoryTitle", "Variants")}
+                badge={t("models.accessoryBadge", "From options")}
+              >
+                {(() => {
+                  const axes = axesForSubcategory(product.subcategory_slug);
+                  const filled = axes.filter((a) => accessoryOptions.some((r) => r.axis === a.key && r.value.trim()));
+                  if (filled.length === 0) {
+                    return (
+                      <div className="flex items-start gap-3 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
+                        <Settings2Icon className="mt-0.5 h-4 w-4 shrink-0 text-[var(--text-ghost)]" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] leading-relaxed text-[var(--text-ghost)]">
+                            {t("models.accessoryEmpty", "This product's variants are its options (size, quality, thickness, wheels…). Add them on the Specs tab and they'll show here and feed the complete-set price.")}
+                          </p>
+                          <button type="button" onClick={() => { const i = steps.findIndex((s) => s.id === "specs"); if (i >= 0) goToStep(i); }}
+                            className="inline-flex items-center gap-1.5 h-7 px-2.5 mt-2 rounded-lg text-[11px] font-semibold text-[var(--accent)] bg-[var(--accent)]/10 hover:bg-[var(--accent)]/15 border border-[var(--accent)]/30 transition-colors">
+                            <ArrowUpRightIcon className="h-3 w-3" /> {t("models.accessoryEdit", "Define options on Specs")}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="space-y-2.5">
+                      {filled.map((a) => {
+                        const vals = accessoryOptions.filter((r) => r.axis === a.key && r.value.trim());
+                        return (
+                          <div key={a.key} className="rounded-xl border border-[var(--border-subtle)] p-3">
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <span className="text-[12px] font-semibold text-[var(--text-primary)]">{a.label}</span>
+                              {a.priced && <span className="text-[9px] uppercase tracking-wider text-[var(--accent)]">affects price</span>}
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {vals.map((r) => (
+                                <span key={r._k} className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 px-2.5 py-1 text-[11px] text-[var(--text-secondary)]">
+                                  {r.value}{a.priced && r.price_delta_cny ? <span className="text-[10px] text-[var(--text-ghost)]">+¥{r.price_delta_cny}</span> : null}
+                                  {r.is_default ? <span className="text-[9px] uppercase text-[var(--accent)]">def</span> : null}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <button type="button" onClick={() => { const i = steps.findIndex((s) => s.id === "specs"); if (i >= 0) goToStep(i); }}
+                        className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-semibold text-[var(--accent)] bg-[var(--accent)]/10 hover:bg-[var(--accent)]/15 border border-[var(--accent)]/30 transition-colors">
+                        <ArrowUpRightIcon className="h-3 w-3" /> {t("models.accessoryEdit", "Edit options on Specs")}
+                      </button>
+                    </div>
+                  );
+                })()}
+              </Section>
+            ) : (
             <Section
               id="models"
               icon={<BoxesIcon className="h-4 w-4" />}
@@ -3954,6 +4046,7 @@ export default function ProductForm({ productId }: Props) {
                 }}
               />
             </Section>
+            )}
 
             {/* Market Prices + the rest of pricing moved to the dedicated
                 Cost & Price tab. Supplier & Sourcing lives in the Supplier

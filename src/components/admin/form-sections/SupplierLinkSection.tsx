@@ -827,9 +827,9 @@ function SupplierPickerModal({
       aria-modal="true"
       aria-label="Link a supplier"
     >
-      <div className="w-full max-w-2xl rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+      <div className="w-full max-w-2xl flex flex-col max-h-[78vh] rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
         {/* Header + search */}
-        <div className="p-3 border-b border-[var(--border-subtle)]">
+        <div className="shrink-0 p-3 border-b border-[var(--border-subtle)]">
           <div className="flex items-center justify-between mb-2.5 px-1">
             <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">Link a supplier</h3>
             <div className="flex items-center gap-2">
@@ -862,7 +862,7 @@ function SupplierPickerModal({
         </div>
 
         {/* Results */}
-        <div ref={listRef} className="max-h-[52vh] overflow-y-auto p-1.5">
+        <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto p-1.5">
           {filtered.length === 0 ? (
             <p className="text-[12px] text-[var(--text-ghost)] text-center py-8">No suppliers match “{query}”.</p>
           ) : view === "grid" ? (
