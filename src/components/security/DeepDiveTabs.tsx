@@ -53,6 +53,7 @@ export default function DeepDiveTabs({ report, activeTab, onTab, onSelect }: Dee
         ))}
       </div>
 
+      <div key={activeTab} className="kx-tab-in">
       {activeTab === "identifiers" && (
         <DataTable<ReportIdentifier>
           columns={IDENT_COLS}
@@ -108,6 +109,7 @@ export default function DeepDiveTabs({ report, activeTab, onTab, onSelect }: Dee
           emptyText="No enforcement events — expected while production is observe-only."
         />
       )}
+      </div>
     </SectionCard>
   );
 }

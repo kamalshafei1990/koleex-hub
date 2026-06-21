@@ -692,7 +692,7 @@ export default function AccountDetail({ accountId }: Props) {
         </div>
 
         {/* ── Tab body ── */}
-        <div className="pb-10">
+        <div key={activeTab} className="kx-tab-in pb-10">
           {activeTab === "overview" && <OverviewTab account={data} />}
           {activeTab === "access" && (
             <AccessRightsTab

@@ -701,7 +701,7 @@ export default function ProductSettingsPage() {
         {loading ? (
           <div className="flex items-center justify-center py-20"><SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" /></div>
         ) : (
-          <div className="min-h-[500px]">
+          <div key={activeTab} className="kx-tab-in min-h-[500px]">
 
             {/* ── CLASSIFICATIONS ── */}
             {activeTab === "classifications" && (

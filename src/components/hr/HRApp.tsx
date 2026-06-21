@@ -136,7 +136,9 @@ export default function HRApp() {
             <SpinnerIcon size={24} className="animate-spin text-[var(--text-dim)]" />
           </div>
         ) : (
-          <ActiveModule employees={employees} t={t} lang={lang} setActiveTab={setActiveTab} />
+          <div key={activeTab} className="kx-tab-in">
+            <ActiveModule employees={employees} t={t} lang={lang} setActiveTab={setActiveTab} />
+          </div>
         )}
       </div>
     </div>

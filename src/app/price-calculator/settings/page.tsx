@@ -159,6 +159,7 @@ export default function PricingSettingsPage() {
           })}
         </div>
 
+        <div key={activeTab} className="kx-tab-in">
         {/* ═══════ TAB: UI Visibility ═══════ */}
         {activeTab === "ui" && (
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
@@ -345,6 +346,7 @@ export default function PricingSettingsPage() {
             </div>
           </div>
         )}
+        </div>
 
         {/* ── Bottom Save ── */}
         <div className="mt-6 flex items-center justify-end">

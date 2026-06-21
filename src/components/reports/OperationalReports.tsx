@@ -138,7 +138,7 @@ export default function OperationalReports() {
       {loading && <div className="px-1 text-sm text-gray-500">Loading…</div>}
       {error && <div className="px-1 text-sm text-rose-300">{error}</div>}
       {report && !loading && (
-        <>
+        <div key={kind} className="kx-tab-in">
           {/* Summary strip — operational intelligence before the detail
               table (per the SCOPE 3 rule: summary → insights → details). */}
           {report.rows.length > 0 && (
@@ -151,7 +151,7 @@ export default function OperationalReports() {
             footerTotals={totalsRow}
             empty="No data in this range."
           />
-        </>
+        </div>
       )}
     </ReportShell>
   );

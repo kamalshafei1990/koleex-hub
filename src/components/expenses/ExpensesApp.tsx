@@ -346,7 +346,7 @@ export default function ExpensesApp() {
               ) : undefined}
             />
           ) : (
-            <ul className="grid gap-2">
+            <ul key={tab} className="kx-tab-in grid gap-2">
               {filtered.map((e) => (
                 <ExpenseRow
                   key={e.id}
