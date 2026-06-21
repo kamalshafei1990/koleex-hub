@@ -131,7 +131,7 @@ function Section({ icon, title, children, id, defaultOpen = true, badge }: {
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <section id={id} {...kxInspectAttrs({ component: sectionComponentName(title), module: "Product Data", section: title })} className="scroll-mt-24 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,0.15)]">
+    <section id={id} {...kxInspectAttrs({ component: sectionComponentName(title), module: "Product Data", section: title })} className="kx-tab-in scroll-mt-24 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,0.15)]">
       <button
         type="button"
         onClick={() => setOpen(!open)}

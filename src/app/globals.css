@@ -556,3 +556,21 @@ input[type="number"]:not(.kx-spinner) {
   appearance: textfield;
 }
 
+/* ─────────────────────────────────────────────────────────────────
+   Tab / section entrance — a smooth fade + gentle rise when content
+   mounts (e.g. switching between the Product Data tabs). Runs once on
+   mount, so it doesn't restart on re-renders or typing. Respects the
+   user's reduced-motion preference.
+   ───────────────────────────────────────────────────────────────── */
+@keyframes kx-tab-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.kx-tab-in {
+  animation: kx-tab-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: opacity, transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .kx-tab-in { animation: none; }
+}
+
