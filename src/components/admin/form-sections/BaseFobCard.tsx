@@ -104,12 +104,14 @@ export default function BaseFobCard({
           </div>
         ))}
       </div>
-      {/* result */}
-      <div className="rounded-xl border border-[var(--border-strong)] bg-[var(--bg-inverted)]/[0.05] px-4 py-3 flex flex-col justify-center min-w-[180px]">
-        <div className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-ghost)] flex items-center gap-1.5">
+      {/* result — the hero number, accent-highlighted so it stands out */}
+      <div className="relative overflow-hidden rounded-xl border border-[var(--accent)]/40 bg-[var(--accent)]/[0.08] px-5 py-3 flex flex-col justify-center min-w-[200px] ring-1 ring-[var(--accent)]/15">
+        {/* accent edge bar */}
+        <div className="absolute inset-y-0 left-0 w-1 bg-[var(--accent)]" />
+        <div className="text-[9px] font-bold uppercase tracking-wider text-[var(--accent)] flex items-center gap-1.5">
           Base FOB (USD) {loading && <SpinnerIcon className="h-3 w-3 animate-spin" />}
         </div>
-        <div className="text-[24px] font-bold text-[var(--text-primary)] leading-tight mt-0.5">{usd(base.globalFobUsd)}</div>
+        <div className="text-[26px] font-black text-[var(--accent)] leading-tight mt-0.5 tabular-nums">{usd(base.globalFobUsd)}</div>
         <div className="text-[10px] text-[var(--text-ghost)]">Global · before market &amp; customer{fx ? ` · fx ¥${fx}/$` : ""}</div>
       </div>
     </div>
