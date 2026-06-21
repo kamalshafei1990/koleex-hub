@@ -44,14 +44,14 @@ export async function GET(req: Request) {
 
   const { data: items } = await supabaseServer
     .from("product_set_template_items")
-    .select("set_template_id, accessory_product_id, role")
+    .select("set_template_id, accessory_product_id, role, selected_options")
     .in("set_template_id", list.map((t) => (t as { id: string }).id));
 
-  const byTpl = new Map<string, { accessory_product_id: string; role: string }[]>();
+  const byTpl = new Map<string, { accessory_product_id: string; role: string; selected_options: Record<string, string> }[]>();
   for (const it of items ?? []) {
-    const r = it as { set_template_id: string; accessory_product_id: string; role: string };
+    const r = it as { set_template_id: string; accessory_product_id: string; role: string; selected_options: Record<string, string> | null };
     if (!byTpl.has(r.set_template_id)) byTpl.set(r.set_template_id, []);
-    byTpl.get(r.set_template_id)!.push({ accessory_product_id: r.accessory_product_id, role: r.role });
+    byTpl.get(r.set_template_id)!.push({ accessory_product_id: r.accessory_product_id, role: r.role, selected_options: r.selected_options ?? {} });
   }
 
   return NextResponse.json(
@@ -69,7 +69,7 @@ export async function PUT(req: Request) {
 
   const body = (await req.json().catch(() => ({}))) as {
     subcategory?: string;
-    templates?: Array<{ name?: string; tier?: string; sort_order?: number; items?: Array<{ accessory_product_id?: string; role?: string }> }>;
+    templates?: Array<{ name?: string; tier?: string; sort_order?: number; items?: Array<{ accessory_product_id?: string; role?: string; selected_options?: Record<string, string> }> }>;
   };
   const subcategory = (body.subcategory || "").trim();
   if (!subcategory) return NextResponse.json({ error: "A subcategory slug is required." }, { status: 400 });
@@ -113,7 +113,12 @@ export async function PUT(req: Request) {
     }
     const itemRows = (t.items ?? [])
       .filter((it) => validIds.has(it.accessory_product_id as string))
-      .map((it) => ({ set_template_id: (ins as { id: string }).id, accessory_product_id: it.accessory_product_id as string, role: ROLES.has(it.role as string) ? (it.role as string) : "stand" }));
+      .map((it) => ({
+        set_template_id: (ins as { id: string }).id,
+        accessory_product_id: it.accessory_product_id as string,
+        role: ROLES.has(it.role as string) ? (it.role as string) : "stand",
+        selected_options: (it as { selected_options?: Record<string, string> }).selected_options ?? {},
+      }));
     if (itemRows.length) {
       const itemIns = await supabaseServer.from("product_set_template_items").insert(itemRows);
       if (itemIns.error) {

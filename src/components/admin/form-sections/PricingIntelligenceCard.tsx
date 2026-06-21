@@ -303,7 +303,7 @@ export default function PricingIntelligenceCard({
               Stand; each is priced on its own configured cost (base + option
               deltas) through the engine and summed with the head's Base FOB. */}
           {supportsCompleteSet && (
-            <CompleteSetConfigurator country={country} headFobUsd={data?.market?.regionalFobUsd ?? data?.base?.globalFobUsd ?? null} />
+            <CompleteSetConfigurator country={country} headFobUsd={data?.market?.regionalFobUsd ?? data?.base?.globalFobUsd ?? null} machineSubcategory={subcategorySlug ?? null} />
           )}
 
           {/* Sync footer */}

@@ -1,7 +1,7 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   CompleteSetConfigurator — ST-3.
+   CompleteSetConfigurator — ST-3 + ST-4.
 
    The machine-side complete-set configurator. Pulls the Stands & Tables catalog
    (each product + base cost + configurable option values), lets the operator
@@ -9,8 +9,9 @@
    base + Σ selected option deltas → priced through the SAME engine (via
    /api/products/price-preview) → summed with the head's Base FOB.
 
-   Each component is priced on its own cost (own level/band) per the
-   sum-of-components rule. Templates (ST-4) plug in here later.
+   ST-4: named set templates (Economy / Standard / Premium) per machine
+   subcategory store the full configuration (product + its option selections)
+   and apply with one click. "Save selection as set" captures the current pick.
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -19,6 +20,10 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 interface OptionValue { axis: string; value: string; priceDelta: number; affectsPrice: boolean; isDefault: boolean; sortOrder: number; }
 interface AccessoryProduct { productId: string; name: string; baseCostCny: number | null; options: OptionValue[]; }
+interface Applied { productId: string | null; options: Record<string, string>; }
+interface SideState { productId: string | null; options: Record<string, string>; fobUsd: number | null; }
+interface TemplateItem { accessory_product_id: string; role: string; selected_options: Record<string, string>; }
+interface SetTemplate { id?: string; name: string; tier: string; items: TemplateItem[]; }
 
 const usd = (n: number | null | undefined) =>
   n == null ? "—" : `$${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -34,11 +39,10 @@ async function priceFobUsd(costCny: number, country: string | null): Promise<num
   } catch { return null; }
 }
 
-/* One side (Table or Stand): product picker + per-axis option selects.
-   Reports its configured cost (CNY) and priced FOB (USD) up to the parent. */
-function AccessorySide({ label, products, country, onChange }: {
+function AccessorySide({ label, products, country, applied, applyNonce, onChange }: {
   label: string; products: AccessoryProduct[]; country: string | null;
-  onChange: (s: { productId: string | null; costCny: number | null; fobUsd: number | null }) => void;
+  applied?: Applied | null; applyNonce: number;
+  onChange: (s: SideState) => void;
 }) {
   const [productId, setProductId] = useState<string | null>(null);
   const [sel, setSel] = useState<Record<string, string>>({});
@@ -47,7 +51,6 @@ function AccessorySide({ label, products, country, onChange }: {
 
   const product = products.find((p) => p.productId === productId) ?? null;
 
-  // Axes (ordered) for the chosen product.
   const axes = useMemo(() => {
     if (!product) return [] as { axis: string; values: OptionValue[] }[];
     const by = new Map<string, OptionValue[]>();
@@ -55,16 +58,24 @@ function AccessorySide({ label, products, country, onChange }: {
     return [...by.entries()].map(([axis, values]) => ({ axis, values }));
   }, [product]);
 
-  // Pick first product + seed defaults when the list arrives.
-  useEffect(() => {
-    if (!productId && products.length) setProductId(products[0].productId);
-  }, [products, productId]);
+  // First product default.
+  useEffect(() => { if (!productId && products.length) setProductId(products[0].productId); }, [products, productId]);
+
+  // Seed default option selections when the product changes.
   useEffect(() => {
     if (!product) { setSel({}); return; }
     const d: Record<string, string> = {};
     for (const o of product.options) { if (!(o.axis in d)) d[o.axis] = o.value; if (o.isDefault) d[o.axis] = o.value; }
     setSel(d);
   }, [product]);
+
+  // Apply a template selection (productId + options) when the nonce bumps.
+  useEffect(() => {
+    if (!applied) return;
+    setProductId(applied.productId);
+    if (applied.options && Object.keys(applied.options).length) setSel(applied.options);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applyNonce]);
 
   const costCny = useMemo(() => {
     if (!product || product.baseCostCny == null) return null;
@@ -73,14 +84,13 @@ function AccessorySide({ label, products, country, onChange }: {
     return c;
   }, [product, sel]);
 
-  // Re-price (debounced) whenever the configured cost changes.
   useEffect(() => {
-    if (costCny == null) { setFob(null); onChange({ productId, costCny: null, fobUsd: null }); return; }
+    if (costCny == null) { setFob(null); onChange({ productId, options: sel, fobUsd: null }); return; }
     setPricing(true);
     const t = setTimeout(async () => {
       const f = await priceFobUsd(costCny, country);
       setFob(f); setPricing(false);
-      onChange({ productId, costCny, fobUsd: f });
+      onChange({ productId, options: sel, fobUsd: f });
     }, 250);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -121,11 +131,21 @@ function AccessorySide({ label, products, country, onChange }: {
   );
 }
 
-export default function CompleteSetConfigurator({ country, headFobUsd }: { country: string | null; headFobUsd: number | null }) {
+export default function CompleteSetConfigurator({ country, headFobUsd, machineSubcategory }: { country: string | null; headFobUsd: number | null; machineSubcategory?: string | null }) {
   const [catalog, setCatalog] = useState<{ tables: AccessoryProduct[]; stands: AccessoryProduct[] }>({ tables: [], stands: [] });
   const [loading, setLoading] = useState(false);
-  const [tableSel, setTableSel] = useState<{ fobUsd: number | null }>({ fobUsd: null });
-  const [standSel, setStandSel] = useState<{ fobUsd: number | null }>({ fobUsd: null });
+  const [table, setTable] = useState<SideState>({ productId: null, options: {}, fobUsd: null });
+  const [stand, setStand] = useState<SideState>({ productId: null, options: {}, fobUsd: null });
+
+  // Template application — push a saved config into the two sides.
+  const [appliedTable, setAppliedTable] = useState<Applied | null>(null);
+  const [appliedStand, setAppliedStand] = useState<Applied | null>(null);
+  const [applyNonce, setApplyNonce] = useState(0);
+
+  const [templates, setTemplates] = useState<SetTemplate[]>([]);
+  const [newName, setNewName] = useState("");
+  const [newTier, setNewTier] = useState("standard");
+  const [savingTpl, setSavingTpl] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -137,7 +157,52 @@ export default function CompleteSetConfigurator({ country, headFobUsd }: { count
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  const total = headFobUsd != null ? headFobUsd + (tableSel.fobUsd ?? 0) + (standSel.fobUsd ?? 0) : null;
+  const loadTemplates = useCallback(async () => {
+    if (!machineSubcategory) { setTemplates([]); return; }
+    try {
+      const r = await fetch(`/api/product-set-templates?subcategory=${encodeURIComponent(machineSubcategory)}`, { credentials: "include" });
+      const j = (await r.json().catch(() => ({}))) as { templates?: SetTemplate[] };
+      setTemplates(j.templates ?? []);
+    } catch { setTemplates([]); }
+  }, [machineSubcategory]);
+  useEffect(() => { loadTemplates(); }, [loadTemplates]);
+
+  const applyTemplate = (tpl: SetTemplate) => {
+    const t = tpl.items.find((i) => i.role === "table");
+    const s = tpl.items.find((i) => i.role === "stand");
+    setAppliedTable({ productId: t?.accessory_product_id ?? null, options: t?.selected_options ?? {} });
+    setAppliedStand({ productId: s?.accessory_product_id ?? null, options: s?.selected_options ?? {} });
+    setApplyNonce((n) => n + 1);
+  };
+
+  const saveCurrentAsTemplate = async () => {
+    if (!machineSubcategory || !newName.trim()) return;
+    const items: TemplateItem[] = [];
+    if (table.productId) items.push({ accessory_product_id: table.productId, role: "table", selected_options: table.options });
+    if (stand.productId) items.push({ accessory_product_id: stand.productId, role: "stand", selected_options: stand.options });
+    setSavingTpl(true);
+    try {
+      const next = [...templates.map((t) => ({ name: t.name, tier: t.tier, items: t.items })), { name: newName.trim(), tier: newTier, items }];
+      await fetch("/api/product-set-templates", {
+        method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subcategory: machineSubcategory, templates: next.map((t, i) => ({ ...t, sort_order: i })) }),
+      });
+      setNewName("");
+      await loadTemplates();
+    } finally { setSavingTpl(false); }
+  };
+
+  const removeTemplate = async (idx: number) => {
+    if (!machineSubcategory) return;
+    const next = templates.filter((_, i) => i !== idx);
+    await fetch("/api/product-set-templates", {
+      method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subcategory: machineSubcategory, templates: next.map((t, i) => ({ name: t.name, tier: t.tier, items: t.items, sort_order: i })) }),
+    });
+    await loadTemplates();
+  };
+
+  const total = headFobUsd != null ? headFobUsd + (table.fobUsd ?? 0) + (stand.fobUsd ?? 0) : null;
   const empty = catalog.tables.length === 0 && catalog.stands.length === 0;
 
   return (
@@ -145,7 +210,7 @@ export default function CompleteSetConfigurator({ country, headFobUsd }: { count
       <div className="flex items-center gap-2">
         <BoxIcon className="h-4 w-4 text-[var(--text-dim)]" />
         <h4 className="text-[12px] font-semibold text-[var(--text-primary)]">Complete set</h4>
-        <span className="text-[10px] text-[var(--text-ghost)]">head + table + stand, each configured & priced separately</span>
+        <span className="text-[10px] text-[var(--text-ghost)]">head + table + stand, each configured &amp; priced separately</span>
         {loading && <SpinnerIcon className="ms-auto h-3.5 w-3.5 animate-spin text-[var(--text-dim)]" />}
       </div>
 
@@ -155,17 +220,54 @@ export default function CompleteSetConfigurator({ country, headFobUsd }: { count
         </p>
       ) : (
         <>
+          {/* One-click set templates */}
+          {templates.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">Sets</span>
+              {templates.map((tpl, ti) => (
+                <span key={tpl.id ?? ti} className="inline-flex items-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 overflow-hidden">
+                  <button type="button" onClick={() => applyTemplate(tpl)}
+                    className="px-2.5 py-1 text-[11px] font-medium hover:text-[var(--accent)]">
+                    {tpl.name} <span className="text-[9px] uppercase text-[var(--text-ghost)]">{tpl.tier}</span>
+                  </button>
+                  <button type="button" onClick={() => removeTemplate(ti)} title="Remove set"
+                    className="px-1.5 text-[var(--text-ghost)] hover:text-[var(--accent)] border-s border-[var(--border-subtle)]">×</button>
+                </span>
+              ))}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <AccessorySide label="Table" products={catalog.tables} country={country} onChange={(s) => setTableSel({ fobUsd: s.fobUsd })} />
-            <AccessorySide label="Stand" products={catalog.stands} country={country} onChange={(s) => setStandSel({ fobUsd: s.fobUsd })} />
+            <AccessorySide label="Table" products={catalog.tables} country={country} applied={appliedTable} applyNonce={applyNonce} onChange={setTable} />
+            <AccessorySide label="Stand" products={catalog.stands} country={country} applied={appliedStand} applyNonce={applyNonce} onChange={setStand} />
           </div>
+
           <div className="flex items-center justify-between rounded-lg bg-[var(--accent)]/[0.06] border border-[var(--accent)]/30 px-3 py-2">
             <div className="text-[11px] text-[var(--text-secondary)]">
               Complete-set Base FOB
-              <span className="text-[var(--text-ghost)]"> · head {usd(headFobUsd)}{tableSel.fobUsd ? ` + table ${usd(tableSel.fobUsd)}` : ""}{standSel.fobUsd ? ` + stand ${usd(standSel.fobUsd)}` : ""}</span>
+              <span className="text-[var(--text-ghost)]"> · head {usd(headFobUsd)}{table.fobUsd ? ` + table ${usd(table.fobUsd)}` : ""}{stand.fobUsd ? ` + stand ${usd(stand.fobUsd)}` : ""}</span>
             </div>
             <div className="text-[15px] font-bold tabular-nums text-[var(--accent)]">{usd(total)}</div>
           </div>
+
+          {/* Save current configuration as a named set */}
+          {machineSubcategory && (table.productId || stand.productId) && (
+            <div className="flex items-center gap-1.5">
+              <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Save this as a set (e.g. Standard)"
+                className="flex-1 h-7 px-2 rounded-md bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[11.5px] outline-none focus:border-[var(--border-focus)]" />
+              <select value={newTier} onChange={(e) => setNewTier(e.target.value)}
+                className="h-7 px-1.5 rounded-md bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[11px]">
+                <option value="economy">economy</option>
+                <option value="standard">standard</option>
+                <option value="premium">premium</option>
+              </select>
+              <button type="button" onClick={saveCurrentAsTemplate} disabled={savingTpl || !newName.trim()}
+                className="text-[10.5px] px-2 py-1 rounded border border-[var(--border-subtle)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-40">
+                Save set
+              </button>
+            </div>
+          )}
+
           <p className="text-[10px] text-[var(--text-ghost)]">Each item is priced on its own configured cost (base + options) through the engine, then summed. Preview only — the customer-facing configurator is quote-time.</p>
         </>
       )}
