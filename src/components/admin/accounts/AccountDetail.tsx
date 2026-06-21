@@ -30,6 +30,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import TabStrip from "@/components/ui/TabStrip";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import KeyIcon from "@/components/icons/ui/KeyIcon";
@@ -665,30 +666,21 @@ export default function AccountDetail({ accountId }: Props) {
         </div>
 
         {/* ── Tab navigation ── */}
-        <div className="sticky top-0 z-10 -mx-4 md:mx-0 px-4 md:px-0 bg-[var(--bg-primary)]/80 backdrop-blur mb-4">
-          <div className="flex items-center gap-1 overflow-x-auto border-b border-[var(--border-subtle)]">
-            {tabs
+        <div className="sticky top-0 z-10 -mx-4 md:mx-0 px-4 md:px-0 py-2 bg-[var(--bg-primary)]/80 backdrop-blur mb-4">
+          <TabStrip
+            items={tabs
               .filter((tab) => !tab.hidden)
               .map((tab) => {
                 const Icon = tab.icon;
-                const active = activeTab === tab.key;
-                return (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    onClick={() => setActiveTab(tab.key)}
-                    className={`shrink-0 h-11 px-4 text-[12px] font-semibold uppercase tracking-wider flex items-center gap-2 border-b-2 -mb-px transition-colors ${
-                      active
-                        ? "border-[var(--text-primary)] text-[var(--text-primary)]"
-                        : "border-transparent text-[var(--text-dim)] hover:text-[var(--text-muted)]"
-                    }`}
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                    {tab.label}
-                  </button>
-                );
+                return {
+                  key: tab.key,
+                  label: tab.label,
+                  icon: <Icon className="h-3.5 w-3.5" />,
+                  active: activeTab === tab.key,
+                  onClick: () => setActiveTab(tab.key),
+                };
               })}
-          </div>
+          />
         </div>
 
         {/* ── Tab body ── */}

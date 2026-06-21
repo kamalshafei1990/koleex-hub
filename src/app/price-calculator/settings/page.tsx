@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
+import TabStrip from "@/components/ui/TabStrip";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import SettingsIcon2 from "@/components/icons/ui/SettingsIcon2";
 import DiskIcon from "@/components/icons/ui/DiskIcon";
@@ -147,16 +148,16 @@ export default function PricingSettingsPage() {
         <p className="text-[12px] md:text-[13px] text-[var(--text-dim)] mb-6 md:mb-8 ml-11">Configure Pricing Rules, Margins & UI Visibility</p>
 
         {/* ── Tabs ── */}
-        <div className="flex items-center gap-1.5 mb-6 overflow-x-auto pb-1 scrollbar-hide">
-          {TABS.map(tab => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`shrink-0 h-9 px-4 rounded-lg text-[12px] font-medium flex items-center gap-2 transition-all ${isActive ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "bg-[var(--bg-surface)] text-[var(--text-dim)] border border-[var(--border-subtle)] hover:text-[var(--text-primary)]"}`}>
-                <tab.icon className="h-3.5 w-3.5" />
-                {tab.label}
-              </button>
-            );
-          })}
+        <div className="mb-6">
+          <TabStrip
+            items={TABS.map(tab => ({
+              key: tab.id,
+              label: tab.label,
+              icon: <tab.icon className="h-3.5 w-3.5" />,
+              active: activeTab === tab.id,
+              onClick: () => setActiveTab(tab.id),
+            }))}
+          />
         </div>
 
         <div key={activeTab} className="kx-tab-in">

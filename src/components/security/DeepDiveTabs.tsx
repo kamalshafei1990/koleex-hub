@@ -8,6 +8,7 @@
 import type {
   SecurityReport, ReportIdentifier, ReportRule, ReportFalsePositive, ReportBucket,
 } from "@/lib/security/view-model";
+import TabStrip from "@/components/ui/TabStrip";
 import SectionCard from "./SectionCard";
 import DataTable, { type Column } from "./DataTable";
 import { ruleLabel, type Entity, type TabId } from "./investigation";
@@ -37,20 +38,16 @@ export interface DeepDiveTabsProps {
 export default function DeepDiveTabs({ report, activeTab, onTab, onSelect }: DeepDiveTabsProps) {
   return (
     <SectionCard title="Investigate">
-      <div role="tablist" aria-label="Deep dive" className="mb-3 flex flex-wrap gap-1 border-b border-[var(--border)] pb-2">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            role="tab"
-            aria-selected={activeTab === t.id}
-            onClick={() => onTab(t.id)}
-            className={`rounded-md px-3 py-1.5 text-sm transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500 ${
-              activeTab === t.id ? "bg-[var(--bg-surface-hover)] text-[var(--text-primary)]" : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="mb-3">
+        <TabStrip
+          ariaLabel="Deep dive"
+          items={TABS.map((t) => ({
+            key: t.id,
+            label: t.label,
+            active: activeTab === t.id,
+            onClick: () => onTab(t.id),
+          }))}
+        />
       </div>
 
       <div key={activeTab} className="kx-tab-in">

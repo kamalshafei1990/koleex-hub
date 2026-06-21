@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import TabStrip from "@/components/ui/TabStrip";
 import {
   ReportShell, ReportFilters, ReportToolbar, ReportTable, ReportFooter,
   type ReportColumn, fmtMoney,
@@ -116,16 +117,14 @@ export default function OperationalReports() {
       filters={
         <div className="space-y-3">
           {/* Tabs */}
-          <div className="flex flex-wrap gap-1.5 rounded-xl border border-white/[0.05] bg-white/[0.012] p-1.5">
-            {TABS.map((t) => (
-              <button key={t.k} type="button" onClick={() => setKind(t.k)}
-                      className={`rounded-md px-3 py-1.5 text-[12px] transition-colors ${
-                        t.k === kind ? "bg-white/[0.10] text-white" : "text-gray-400 hover:bg-white/[0.05]"
-                      }`}>
-                {t.label}
-              </button>
-            ))}
-          </div>
+          <TabStrip
+            items={TABS.map((t) => ({
+              key: t.k,
+              label: t.label,
+              active: t.k === kind,
+              onClick: () => setKind(t.k),
+            }))}
+          />
           {filterFields.length > 0 && (
             <ReportFilters fields={filterFields} onApply={fetchReport}
                            onReset={() => { setFrom(yearStart); setTo(today); }} />

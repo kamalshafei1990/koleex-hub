@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
+import TabStrip from "@/components/ui/TabStrip";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
@@ -683,17 +684,21 @@ export default function ProductSettingsPage() {
         <p className="text-[12px] md:text-[13px] text-[var(--text-dim)] mb-6 md:mb-8 ml-11">Manage classifications, brands, attributes, and options</p>
 
         {/* Tab Bar */}
-        <div className="flex items-center flex-wrap gap-1.5 mb-6">
-          {TABS.map(tab => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-1.5 h-9 px-3 rounded-lg text-[12px] font-semibold transition-all border ${isActive ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-[var(--bg-inverted)] shadow-lg shadow-[var(--border-subtle)]" : "bg-[var(--bg-surface)] text-[var(--text-dim)] border-[var(--border-subtle)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-secondary)]"}`}>
-                <Icon className="h-3.5 w-3.5" /><span className="hidden sm:inline">{tab.label}</span>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold tabular-nums ${isActive ? "bg-[var(--bg-surface)] text-[var(--text-dim)]" : "bg-[var(--bg-surface-hover)] text-[var(--text-dim)]"}`}>{tabCounts[tab.id] || 0}</span>
-              </button>
-            );
-          })}
+        <div className="flex items-center gap-1.5 mb-6">
+          <TabStrip
+            className="flex-1 min-w-0"
+            items={TABS.map(tab => {
+              const Icon = tab.icon;
+              return {
+                key: tab.id,
+                label: <span className="hidden sm:inline">{tab.label}</span>,
+                icon: <Icon className="h-3.5 w-3.5" />,
+                active: activeTab === tab.id,
+                onClick: () => setActiveTab(tab.id),
+                badge: tabCounts[tab.id] || 0,
+              };
+            })}
+          />
           <button onClick={loadAll} disabled={loading} className="h-9 w-9 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors ml-auto"><RefreshIcon className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /></button>
         </div>
 
