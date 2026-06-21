@@ -26,6 +26,8 @@ interface Preview {
   error?: string;
   reason?: string;
   fxCnyPerUsd?: number;
+  fxEffectiveCnyPerUsd?: number;
+  fxSafetyBufferPercent?: number;
   fxUpdatedAt?: string | null;
   costUpliftPercent?: number;
   base?: {
@@ -153,21 +155,32 @@ export default function PricingIntelligenceCard({
             {markets.map((m) => <option key={m.code} value={m.code}>{m.name}</option>)}
           </select>
         </div>
-        {data?.fxCnyPerUsd && (
-          <div
-            className="ms-auto inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border border-[var(--accent)]/30 bg-[var(--accent)]/[0.07] text-[11px] font-semibold text-[var(--text-primary)]"
-            title={`Exchange rate used for the USD prices. Auto-updated daily from live FX${data.fxUpdatedAt ? ` — last updated ${new Date(data.fxUpdatedAt).toLocaleString()}` : ""}.`}
-          >
-            {loading
-              ? <SpinnerIcon className="h-3 w-3 animate-spin text-[var(--accent)]" />
-              : <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />}
-            <span className="text-[var(--accent)]">FX</span>
-            <span className="tabular-nums">¥{data.fxCnyPerUsd} / $1</span>
-            {data.fxUpdatedAt && (
-              <span className="text-[var(--text-ghost)] font-normal">· {fxAgeLabel(data.fxUpdatedAt)}</span>
-            )}
-          </div>
-        )}
+        {data?.fxCnyPerUsd && (() => {
+          const buffer = Number(data.fxSafetyBufferPercent ?? 0);
+          const pricingFx = buffer > 0 && data.fxEffectiveCnyPerUsd ? data.fxEffectiveCnyPerUsd : data.fxCnyPerUsd;
+          return (
+            <div
+              className="ms-auto inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border border-[var(--accent)]/30 bg-[var(--accent)]/[0.07] text-[11px] font-semibold text-[var(--text-primary)]"
+              title={
+                buffer > 0
+                  ? `Pricing FX ¥${pricingFx} / $1 = live ¥${data.fxCnyPerUsd} − ${buffer}% safety buffer. Live rate auto-updated daily${data.fxUpdatedAt ? ` (last ${new Date(data.fxUpdatedAt).toLocaleString()})` : ""}.`
+                  : `Exchange rate used for the USD prices. Auto-updated daily from live FX${data.fxUpdatedAt ? ` — last updated ${new Date(data.fxUpdatedAt).toLocaleString()}` : ""}.`
+              }
+            >
+              {loading
+                ? <SpinnerIcon className="h-3 w-3 animate-spin text-[var(--accent)]" />
+                : <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />}
+              <span className="text-[var(--accent)]">FX</span>
+              <span className="tabular-nums">¥{pricingFx} / $1</span>
+              {buffer > 0 && (
+                <span className="text-[var(--text-ghost)] font-normal">· −{buffer}% buffer</span>
+              )}
+              {data.fxUpdatedAt && (
+                <span className="text-[var(--text-ghost)] font-normal">· {fxAgeLabel(data.fxUpdatedAt)}</span>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {!hasCost ? (

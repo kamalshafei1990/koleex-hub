@@ -132,6 +132,8 @@ export async function GET(req: Request) {
       ok: true,
       country,
       fxCnyPerUsd: b.fxCnyPerUsd,
+      fxEffectiveCnyPerUsd: b.fxEffectiveCnyPerUsd,
+      fxSafetyBufferPercent: b.fxSafetyBufferPercent,
       fxUpdatedAt: (ctx.settings as { updated_at?: string | null }).updated_at ?? null,
       costUpliftPercent: b.costUpliftPercent,
       base: {

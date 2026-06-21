@@ -29,6 +29,10 @@ export interface CommercialSettingsRow {
    *  reserve − tax refund). Single-knob until the full breakdown is
    *  modelled. Defaults to 0 so legacy callers keep their numbers. */
   cost_uplift_percent: number;
+  /** CFO margin cushion against FX swings. Effective pricing FX =
+   *  fx_cny_per_usd × (1 − buffer/100). The live FX above is never changed;
+   *  the pricing engine prices off the effective rate. Default 0 = no change. */
+  fx_safety_buffer_percent: number;
   /** Feature flag for the policy-driven pricing engine (Phase 4).
    *  When true, the engine falls back to computing from the
    *  commercial_* tables (12-step flow) for lines without an explicit

@@ -102,7 +102,7 @@ interface PricingModel {
   levels: PricingModelLevel[];
   channels: PricingModelChannel[];
   tiers: PricingModelTier[];
-  settings: { fxCnyPerUsd: number | null; costUpliftPercent: number };
+  settings: { fxCnyPerUsd: number | null; costUpliftPercent: number; fxSafetyBufferPercent?: number };
 }
 
 /* ═══════════════════ HELPERS ═══════════════════ */
@@ -224,10 +224,14 @@ export default function PriceCalculator() {
        has commercial-policy levels + channels configured. ── */
     if (engineReady && model) {
       const uplift = model.settings.costUpliftPercent || 0;
+      // FX safety buffer — pricing uses effective FX (live × (1 − buffer%)) so
+      // the calculator matches the engine / Product Data Price tab exactly.
+      const fxBuffer = Math.max(0, Math.min(50, model.settings.fxSafetyBufferPercent || 0));
+      const effRate = exchangeRate * (1 - fxBuffer / 100);
       const rows = [{ id: "base", name: "Base FOB" }, ...model.tiers.map(t => ({ id: t.code, name: t.name }))];
       const itemResults: ItemResult[] = products.map(prod => {
-        const costUsd = prod.costCny / exchangeRate;                       // raw, for display
-        const netInternalUsd = (prod.costCny * (1 + uplift / 100)) / exchangeRate;
+        const costUsd = prod.costCny / exchangeRate;                       // raw, for display (live FX)
+        const netInternalUsd = (prod.costCny * (1 + uplift / 100)) / effRate;
         const level = categoryId === "auto"
           ? (model.levels.find(l => prod.costCny >= l.minCostCny && (l.maxCostCny == null || prod.costCny <= l.maxCostCny)) ?? model.levels[model.levels.length - 1])
           : (model.levels.find(l => l.code === categoryId) ?? model.levels[0]);

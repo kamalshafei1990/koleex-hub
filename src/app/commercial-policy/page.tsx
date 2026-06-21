@@ -522,6 +522,7 @@ function SettingsSection({
               fx_cny_per_usd: Number(draft.fx_cny_per_usd),
               sales_sees_cost: !!draft.sales_sees_cost,
               cost_uplift_percent: Number(draft.cost_uplift_percent ?? 0),
+              fx_safety_buffer_percent: Number(draft.fx_safety_buffer_percent ?? 0),
               use_policy_engine: !!draft.use_policy_engine,
               notes: draft.notes ?? null,
             },
@@ -608,6 +609,37 @@ function SettingsSection({
                 {fxMsg ?? "Auto-updates daily from the live market rate."}
               </p>
             </div>
+          }
+        />
+        <KpiEditable
+          label="FX safety buffer %"
+          value={d.fx_safety_buffer_percent ?? 0}
+          editing={ed.editing}
+          type="number"
+          step="0.5"
+          onChange={(v) => ed.setDraft({ ...d, fx_safety_buffer_percent: Number(v) })}
+          renderValue={(v) => `${Number(v).toFixed(1)}%`}
+          footer={
+            <p className="text-[10px] text-[var(--text-dim)] leading-relaxed">
+              CFO cushion against FX swings. Pricing uses{" "}
+              <span className="font-medium text-[var(--text-secondary)]">Effective FX</span> below;
+              the live rate is never changed. 0 = no change.
+            </p>
+          }
+        />
+        <KpiEditable
+          label="Effective pricing FX"
+          value={Number(d.fx_cny_per_usd) * (1 - Number(d.fx_safety_buffer_percent ?? 0) / 100)}
+          editing={false}
+          type="number"
+          onChange={() => {}}
+          renderValue={(v) => `¥${Number(v).toFixed(4)} / $1`}
+          footer={
+            <p className="text-[10px] text-[var(--text-dim)] leading-relaxed">
+              {Number(d.fx_safety_buffer_percent ?? 0) > 0
+                ? `Live ¥${Number(d.fx_cny_per_usd).toFixed(4)} − ${Number(d.fx_safety_buffer_percent).toFixed(1)}% buffer. This is the rate the engine prices with.`
+                : "No buffer set — equals the live FX rate."}
+            </p>
           }
         />
         <KpiBool

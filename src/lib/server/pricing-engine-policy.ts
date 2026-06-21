@@ -83,8 +83,11 @@ export interface PolicyEngineBreakdown {
   factoryCostCny: number;
   netInternalCostCny: number;
   costUpliftPercent: number;
-  /* FX. */
+  /* FX. fxCnyPerUsd = live rate (unchanged); fxEffectiveCnyPerUsd = rate
+     actually used for pricing after the safety buffer. */
   fxCnyPerUsd: number;
+  fxEffectiveCnyPerUsd: number;
+  fxSafetyBufferPercent: number;
   netInternalCostUsd: number;
   /* Step 3-4. */
   productLevelCode: string | null;
@@ -162,9 +165,15 @@ export function computePolicyPrice(
       `FX rate (CNY per USD) is not configured on commercial_settings.`,
     );
   }
-  const netInternalCostUsd = netInternalCostCny / fxCnyPerUsd;
+  /* FX safety buffer — a CFO cushion against currency swings. The stored
+     (live) FX is never mutated; pricing uses the effective rate
+     fx × (1 − buffer%), which makes USD cost slightly higher → protects
+     margin. Default 0 → effective == live (fully backward compatible). */
+  const fxBufferPercent = Math.max(0, Math.min(50, Number(ctx.settings.fx_safety_buffer_percent ?? 0)));
+  const fxEffectiveCnyPerUsd = fxCnyPerUsd * (1 - fxBufferPercent / 100);
+  const netInternalCostUsd = netInternalCostCny / fxEffectiveCnyPerUsd;
   notes.push(
-    `Factory ${fmt(factoryCostCny)} CNY → Net Internal ${fmt(netInternalCostCny)} CNY (uplift ${costUpliftPercent}%) → ${fmt(netInternalCostUsd, 2)} USD (fx ${fxCnyPerUsd}).`,
+    `Factory ${fmt(factoryCostCny)} CNY → Net Internal ${fmt(netInternalCostCny)} CNY (uplift ${costUpliftPercent}%) → ${fmt(netInternalCostUsd, 2)} USD (fx ${fxEffectiveCnyPerUsd}${fxBufferPercent ? ` · live ${fxCnyPerUsd} − ${fxBufferPercent}% buffer` : ""}).`,
   );
 
   /* Step 3: Product Level (detect from factory cost CNY). */
@@ -334,6 +343,8 @@ export function computePolicyPrice(
       netInternalCostCny: round2(netInternalCostCny),
       costUpliftPercent,
       fxCnyPerUsd,
+      fxEffectiveCnyPerUsd: Math.round(fxEffectiveCnyPerUsd * 1000) / 1000,
+      fxSafetyBufferPercent: fxBufferPercent,
       netInternalCostUsd: round2(netInternalCostUsd),
       productLevelCode: level.code,
       productLevelName: level.name,
@@ -391,6 +402,8 @@ function buildEmpty(
       netInternalCostCny: 0,
       costUpliftPercent: Number(ctx.settings?.cost_uplift_percent ?? 0),
       fxCnyPerUsd: Number(ctx.settings?.fx_cny_per_usd ?? 0),
+      fxEffectiveCnyPerUsd: Number(ctx.settings?.fx_cny_per_usd ?? 0) * (1 - Number(ctx.settings?.fx_safety_buffer_percent ?? 0) / 100),
+      fxSafetyBufferPercent: Number(ctx.settings?.fx_safety_buffer_percent ?? 0),
       netInternalCostUsd: 0,
       productLevelCode: null,
       productLevelName: null,
