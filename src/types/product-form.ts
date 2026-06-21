@@ -234,6 +234,9 @@ export interface ProductSupplierFormState {
   lead_time_days: string;
   unit_cost_cny: string;
   currency: string;
+  /* What unit_cost_cny already includes (display + warning only for now). */
+  cost_basis: "factory_only" | "packing" | "delivered";
+  cost_includes_tax: boolean;
   payment_terms: string;
   notes: string;
   /* product-as-supplied facts (migration pd_supplier_product_facts). */

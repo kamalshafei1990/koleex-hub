@@ -129,6 +129,8 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
         lead_time_days: "",
         unit_cost_cny: "",
         currency: "CNY",
+        cost_basis: "delivered",
+        cost_includes_tax: true,
         payment_terms: "",
         notes: "",
         supplier_product_name: "",
@@ -267,6 +269,37 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                       </div>
                     </div>
                   </div>
+
+                  {/* What the cost already includes. Display + warning only —
+                      lets the same machine quoted ex-works vs full-landed be
+                      told apart so it isn't silently mis-leveled. */}
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className={lbl}>Cost includes</label>
+                      <select className={inp} value={l.cost_basis}
+                        onChange={(e) => update(l._tempId, { cost_basis: e.target.value as ProductSupplierFormState["cost_basis"] })}>
+                        <option value="delivered">Delivered to Koleex (full landed)</option>
+                        <option value="packing">+ Packing (no delivery)</option>
+                        <option value="factory_only">Factory only (ex-works)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className={lbl}>Tax (VAT)</label>
+                      <button type="button"
+                        onClick={() => update(l._tempId, { cost_includes_tax: !l.cost_includes_tax })}
+                        className={`h-9 w-full px-3 rounded-lg border text-[12px] font-medium flex items-center justify-between transition-colors ${l.cost_includes_tax ? "border-[var(--border-subtle)] bg-[var(--bg-inverted)]/[0.05] text-[var(--text-primary)]" : "border-amber-500/40 bg-amber-500/[0.06] text-amber-400"}`}>
+                        <span>{l.cost_includes_tax ? "Tax included" : "Tax NOT included"}</span>
+                        <span className={`h-4 w-7 rounded-full relative transition-colors ${l.cost_includes_tax ? "bg-[var(--accent)]" : "bg-[var(--border-strong)]"}`}>
+                          <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${l.cost_includes_tax ? "left-3.5" : "left-0.5"}`} />
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                  {(l.cost_basis !== "delivered" || !l.cost_includes_tax) && (
+                    <p className="mt-2 text-[10.5px] leading-relaxed text-amber-400/90">
+                      ⚠ This cost is <b>not</b> full-landed/tax-in. Its margin isn&apos;t directly comparable to delivered costs — add the missing {l.cost_basis === "factory_only" ? "packing + delivery" : l.cost_basis === "packing" ? "delivery" : "components"}{!l.cost_includes_tax ? " + VAT" : ""} before relying on the auto-detected level.
+                    </p>
+                  )}
                 </div>
 
                 {/* From the supplier (Suppliers app) — source of truth, read-only here */}

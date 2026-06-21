@@ -351,6 +351,9 @@ export interface ProductSupplierLinkRow {
   lead_time_days?: number | null;
   unit_cost_cny?: number | null;
   currency?: string | null;
+  /* What unit_cost_cny already includes (display + warning, no math yet). */
+  cost_basis?: "factory_only" | "packing" | "delivered" | null;
+  cost_includes_tax?: boolean | null;
   payment_terms?: string | null;
   notes?: string | null;
   /* product-as-supplied facts (pd_supplier_product_facts) */
