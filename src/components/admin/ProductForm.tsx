@@ -738,8 +738,14 @@ export default function ProductForm({ productId }: Props) {
   /* ── Main image ref for hero ── */
   const mainImageRef = useRef<HTMLInputElement>(null);
 
+  /* ── Derived: Stand / Table accessory? Its "specs & variants" are the
+        configurable option axes (shape/size/quality · thickness/lifting/
+        wheels…), NOT machine specs. Force these out of the sewing path so the
+        Specs/Variants tabs never show motor/needle/speed fields for them. ── */
+  const isAccessory = product.subcategory_slug === "stands" || product.subcategory_slug === "tables";
+
   /* ── Derived: is this a sewing machine product? ── */
-  const isSewing = isSewingMachineSubcategory(product.subcategory_slug, product.division_slug, product.category_slug);
+  const isSewing = !isAccessory && isSewingMachineSubcategory(product.subcategory_slug, product.division_slug, product.category_slug);
 
   /* ── Wizard steps ── */
   const steps = useMemo(() => getSteps(isSewing), [isSewing]);
@@ -3796,6 +3802,22 @@ export default function ProductForm({ productId }: Props) {
            ═══════════════════════════════════════════════════════════ */}
         {steps[currentStep]?.id === "specs" && (
           <div id="sec-technical" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+            {/* Stand / Table products: their specs & variants ARE the
+                configurable option axes (shape · type · size · quality —
+                thickness · lifting · wheels · wheel size), each able to carry a
+                ¥ price add-on. Shown here so the Specs tab is meaningful for
+                accessories instead of machine electrical/physical fields. */}
+            {isAccessory && (
+              <Section
+                id="accessory-specs"
+                icon={<Settings2Icon className="h-4 w-4" />}
+                title={t("specs.accessoryTitle", "Stand / Table Specifications & Variants")}
+                badge={t("specs.accessoryBadge", "Options · price add-ons")}
+                defaultOpen
+              >
+                <AccessoryOptionsSection productId={productId} subcategorySlug={product.subcategory_slug || null} />
+              </Section>
+            )}
             {/* ── Hero-ownership note ──
                   Visibility (Visible/Featured), Marketing (Level,
                   Warranty), and URL basics (Slug, Made-in) used to
@@ -3829,7 +3851,7 @@ export default function ProductForm({ productId }: Props) {
               </div>
             </div>
 
-            {technicalHasVisibleField ? (
+            {!isAccessory && (technicalHasVisibleField ? (
               <Section id="technical" icon={<ZapIcon className="h-4 w-4" />} title={t("technical.title", "Technical Details")} badge={t("technical.badge", "Electrical · Physical")}>
                 <TechnicalSection data={product} onChange={updateProduct_} suggestions={attrSuggestions} hiddenFields={schemaCoveredCols} />
               </Section>
@@ -3840,12 +3862,12 @@ export default function ProductForm({ productId }: Props) {
                   {t("technical.coveredBySpecs", "Electrical, physical and compliance specs for this category are captured in the structured Product Specs above — entered once, no duplicate fields here.")}
                 </p>
               </div>
-            )}
+            ))}
 
             {/* Purchase Options — unique to this step (not on Hero).
                 Visibility / Featured / Warranty / Level moved up to
                 Hero when we redesigned Hero as the publishing hub. */}
-            {!purchaseCoveredBySchema && (
+            {!isAccessory && !purchaseCoveredBySchema && (
             <Section id="config" icon={<Settings2Icon className="h-4 w-4" />} title={t("technical.purchaseOptions", "Purchase Options")} badge={t("technical.purchaseBadge", "Head-only · Complete set")}>
               <div className="space-y-3">
                 <p className="text-[11px] text-[var(--text-ghost)] italic">
@@ -4012,13 +4034,17 @@ export default function ProductForm({ productId }: Props) {
               })()}
             </Section>
 
-            {/* Configurable options — only for Stand / Table products. Each
-                option value can add a ¥ delta to the base cost; the complete-set
-                configurator on machines sums these. */}
-            {(product.subcategory_slug === "stands" || product.subcategory_slug === "tables") && (
-              <Section id="accessory-options" icon={<DollarSignIcon className="h-4 w-4" />} title={t("pricing.optionsTitle", "Configurable options & price add-ons")} badge={t("pricing.optionsBadge", "Stand / Table")} defaultOpen>
-                <AccessoryOptionsSection productId={productId} subcategorySlug={product.subcategory_slug || null} />
-              </Section>
+            {/* Stand / Table configurable options now live on the Specs tab
+                (they ARE the accessory's specs & variants). A pointer keeps the
+                ¥ price-add-on context discoverable from the Variants/pricing
+                area without duplicating the editor. */}
+            {isAccessory && (
+              <div className="flex items-start gap-3 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
+                <Settings2Icon className="mt-0.5 h-4 w-4 shrink-0 text-[var(--text-ghost)]" />
+                <p className="text-[11px] leading-relaxed text-[var(--text-ghost)]">
+                  {t("pricing.optionsMovedHint", "This product's options (shape, size, quality, thickness, lifting, wheels…) and their ¥ price add-ons are configured on the Specs tab. Each option's delta feeds the complete-set price on machines.")}
+                </p>
+              </div>
             )}
 
           </div>
