@@ -96,6 +96,7 @@ import TechnicalSection from "./form-sections/TechnicalSection";
 import ModelsSection from "./form-sections/ModelsSection";
 import MediaSection from "./form-sections/MediaSection";
 import MarketPricesSection from "./form-sections/MarketPricesSection";
+import PricingIntelligenceCard from "./form-sections/PricingIntelligenceCard";
 import RelatedProductsSection from "./form-sections/RelatedProductsSection";
 import SearchSocialSection from "./form-sections/SearchSocialSection";
 import SewingMachineSection from "./form-sections/SewingMachineSection";
@@ -3950,6 +3951,17 @@ export default function ProductForm({ productId }: Props) {
                   <p className="text-[10px] text-[var(--text-ghost)] mt-1.5">{t("pricing.sellingHint", "The list price shown on the public product page. Per-variant prices are set on the Variants tab.")}</p>
                 </div>
               </div>
+            </Section>
+
+            {/* FOB Pricing engine — live breakdown from Commercial Setup */}
+            <Section id="fob-pricing" icon={<DollarSignIcon className="h-4 w-4" />} title={t("pricing.fobTitle", "FOB Pricing")} badge={t("pricing.fobBadge", "Live · from Commercial Setup")} defaultOpen>
+              {(() => {
+                const link = productSuppliers.find((s) => s.is_primary) || productSuppliers[0] || null;
+                const sup = link ? suppliers.find((x) => x.id === link.supplier_id) : null;
+                const cur = link?.currency || sup?.currency || "CNY";
+                const costNum = link?.unit_cost_cny ? Number(link.unit_cost_cny) : (primaryModel?.cost_price ? Number(primaryModel.cost_price) : null);
+                return <PricingIntelligenceCard costCny={Number.isFinite(costNum as number) ? (costNum as number) : null} currency={cur} />;
+              })()}
             </Section>
 
             {/* Market Prices (per country) */}
