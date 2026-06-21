@@ -21,6 +21,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { bustPolicySnapshot } from "@/lib/server/commercial-policy";
 
 type AuthCtx = Awaited<ReturnType<typeof requireAuth>>;
 
@@ -467,6 +468,7 @@ export async function PATCH(
   /* Return the freshly-read section so the client can patch its local
      snapshot without a second round-trip. Section shape mirrors the
      read endpoint's snapshot keys. */
+  bustPolicySnapshot(auth.tenant_id); // so the Price tab / Calculator see the edit immediately
   const fresh = await readSection(section, auth.tenant_id);
   return NextResponse.json({ ok: true, section, payload: fresh });
 }

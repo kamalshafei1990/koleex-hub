@@ -20,7 +20,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { getBandCountries } from "@/lib/server/commercial-policy";
+import { getBandCountries, bustPolicySnapshot } from "@/lib/server/commercial-policy";
 
 const POLICY_ADMIN_ROLES = new Set<string>(["super_admin", "admin", "general_manager"]);
 
@@ -94,6 +94,7 @@ export async function PUT(req: Request) {
     }
   }
 
+  bustPolicySnapshot(auth.tenant_id);
   const fresh = await getBandCountries(auth.tenant_id);
   return NextResponse.json({ ok: true, bandCountries: fresh });
 }
@@ -146,6 +147,7 @@ export async function PATCH(req: Request) {
     if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
   }
 
+  bustPolicySnapshot(auth.tenant_id);
   const fresh = await getBandCountries(auth.tenant_id);
   return NextResponse.json({ ok: true, bandCountries: fresh });
 }

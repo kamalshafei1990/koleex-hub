@@ -272,7 +272,38 @@ export async function getVolumeDiscountTiers(tenantId: string): Promise<VolumeDi
 /** Load every section in parallel. One network round-trip to Supabase
  *  (supabaseServer uses HTTP keep-alive + pools), ~9 parallel queries.
  *  Admin app uses this to render the whole policy page without a stagger. */
-export async function getPolicySnapshot(tenantId: string): Promise<CommercialPolicySnapshot> {
+/* Per-tenant cache. The snapshot is ~10 table reads against the remote DB
+   (~3s cold); the Price tab + Price Calculator call it on every cost/country
+   change. Caching collapses those into one round-trip. Every write path
+   (section PATCH / band edits / fx refresh) calls bustPolicySnapshot, so the
+   cache can be held long without going stale. */
+const SNAPSHOT_TTL_MS = 60_000;
+const snapshotCache = new Map<string, { at: number; data: CommercialPolicySnapshot }>();
+// In-flight loads, so concurrent callers (e.g. the Base FOB card and the FOB
+// card mounting together) share ONE DB round-trip instead of each firing a
+// full ~3s snapshot load.
+const inFlight = new Map<string, Promise<CommercialPolicySnapshot>>();
+
+export function bustPolicySnapshot(tenantId: string): void {
+  snapshotCache.delete(tenantId);
+  inFlight.delete(tenantId);
+}
+
+export async function getPolicySnapshot(tenantId: string, opts?: { fresh?: boolean }): Promise<CommercialPolicySnapshot> {
+  if (!opts?.fresh) {
+    const hit = snapshotCache.get(tenantId);
+    if (hit && Date.now() - hit.at < SNAPSHOT_TTL_MS) return hit.data;
+    const pending = inFlight.get(tenantId);
+    if (pending) return pending;
+  }
+  const p = loadPolicySnapshot(tenantId)
+    .then((snap) => { snapshotCache.set(tenantId, { at: Date.now(), data: snap }); return snap; })
+    .finally(() => { inFlight.delete(tenantId); });
+  inFlight.set(tenantId, p);
+  return p;
+}
+
+async function loadPolicySnapshot(tenantId: string): Promise<CommercialPolicySnapshot> {
   const [
     settings,
     productLevels,

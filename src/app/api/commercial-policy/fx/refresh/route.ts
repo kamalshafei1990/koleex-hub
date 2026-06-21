@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { fetchCnyPerUsd } from "@/lib/server/fx";
+import { bustPolicySnapshot } from "@/lib/server/commercial-policy";
 
 const POLICY_ADMIN_ROLES = new Set<string>([
   "super_admin",
@@ -67,6 +68,7 @@ export async function POST() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  bustPolicySnapshot(auth.tenant_id);
   const { data } = await supabaseServer
     .from("commercial_settings")
     .select("*")

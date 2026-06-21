@@ -91,13 +91,17 @@ export default function PricingIntelligenceCard({
       .finally(() => setLoading(false));
   }, []);
 
-  // Debounced recompute on cost / country change.
+  // Recompute on cost / country change. First compute fires immediately so the
+  // breakdown appears as fast as possible; later edits are debounced so rapid
+  // typing in the Cost Price field doesn't spam the engine.
   useEffect(() => {
     const n = Number(cost);
     if (!isCny || !Number.isFinite(n) || n <= 0) { setData(null); return; }
     if (debRef.current) clearTimeout(debRef.current);
-    debRef.current = setTimeout(() => run(n, country), 350);
+    const delay = data ? 350 : 0;
+    debRef.current = setTimeout(() => run(n, country), delay);
     return () => { if (debRef.current) clearTimeout(debRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cost, country, isCny, run]);
 
   const base = data?.base;
