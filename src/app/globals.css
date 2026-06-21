@@ -537,3 +537,22 @@ select option[selected] {
   font-weight: 500;
 }
 
+/* ─────────────────────────────────────────────────────────────────
+   Number inputs — remove the browser's native up/down spinner arrows
+   everywhere. They don't match the Koleex minimal UI and render
+   inconsistently across Safari/Chrome/Firefox. Applied globally so
+   every <input type="number"> in every app is clean. Users still type
+   or use the keyboard arrows; we just drop the ugly chrome.
+   Add the `kx-spinner` class to an input to opt BACK IN if ever needed.
+   ───────────────────────────────────────────────────────────────── */
+input[type="number"]:not(.kx-spinner)::-webkit-outer-spin-button,
+input[type="number"]:not(.kx-spinner)::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+input[type="number"]:not(.kx-spinner) {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
