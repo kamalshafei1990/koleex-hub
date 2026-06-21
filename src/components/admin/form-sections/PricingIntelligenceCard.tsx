@@ -107,8 +107,8 @@ export default function PricingIntelligenceCard({
     if (!base) return [];
     return [
       { k: "Base FOB", v: usd(base.globalFobUsd), sub: `Level ${base.productLevelCode ?? "—"}` },
-      { k: market?.bandCode ? `Band ${market.bandCode}` : "Market", v: pct(market?.adjustmentPercent ?? 0), sub: country },
-      { k: "Regional FOB", v: usd(market?.regionalFobUsd), sub: country, strong: true },
+      { k: market?.bandCode ? `Band ${market.bandCode}` : "Market", v: pct(market?.adjustmentPercent ?? 0), sub: `${country} · retail only` },
+      { k: "End-user (market)", v: usd(market?.regionalFobUsd), sub: "retail + band", strong: true },
     ];
   }, [base, market, data, country]);
 
@@ -207,8 +207,9 @@ export default function PricingIntelligenceCard({
                 </tbody>
               </table>
             </div>
+            <p className="text-[10px] text-[var(--text-ghost)] mt-1.5">Sequential channel ladder. Only <b>End User</b> varies by market — agent/distributor/dealer prices are the same worldwide (per policy).</p>
             {(data?.channels ?? []).some((c) => c.approvalRequired) && (
-              <p className="text-[10px] text-amber-400/80 mt-1.5">Amber margin = below the level&apos;s minimum-margin floor (approval needed at that price).</p>
+              <p className="text-[10px] text-amber-400/80 mt-1">Amber margin = below the level&apos;s minimum-margin floor (approval needed at that price).</p>
             )}
           </div>
 
@@ -216,7 +217,7 @@ export default function PricingIntelligenceCard({
           <div>
             <div className="flex items-center gap-2 mb-2">
               <MapPinIcon className="h-4 w-4 text-[var(--text-dim)]" />
-              <h4 className="text-[12px] font-semibold text-[var(--text-primary)]">Regional FOB across key markets</h4>
+              <h4 className="text-[12px] font-semibold text-[var(--text-primary)]">End-user price across key markets</h4>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
               {(data?.markets ?? []).map((m) => (

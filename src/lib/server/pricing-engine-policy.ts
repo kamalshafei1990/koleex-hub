@@ -190,39 +190,65 @@ export function computePolicyPrice(
   const baseMarginPercent = Number(level.margin_percent);
   const globalFobUsd = netInternalCostUsd * (1 + baseMarginPercent / 100);
 
-  /* Step 6: Regional Adjustment. */
+  /* Steps 6-7 — Channel ladder + Regional Adjustment.
+
+     Per the confirmed "Channel Pricing Structure" spec:
+       · The channel ladder is SEQUENTIAL off the Global FOB (base):
+           Platinum = Base × 0.97 → Gold = Platinum × 1.08
+           → Silver = Gold × 1.08 → Retail = Silver × 1.20
+         (each rung multiplies the rung above it, NOT the base directly).
+       · The market band adjusts ONLY the retail / end-user price —
+         channel prices (agent / distributor / dealer) are the SAME in
+         every market. */
   const band = resolveCountryBand(
     ctx.marketBands,
     ctx.bandCountries,
     input.customerCountryCode,
   );
   const bandAdjPct = band ? Number(band.adjustment_percent) : 0;
-  const regionalFobUsd = globalFobUsd * (1 + bandAdjPct / 100);
   if (!band && input.customerCountryCode) {
     notes.push(`Country ${input.customerCountryCode} not mapped; defaulting to Band B (0%).`);
   }
 
-  /* Step 7: Channel Price. */
-  const channel = ctx.channelMultipliers
+  const ladder = ctx.channelMultipliers
     .filter((c) => c.is_active)
-    .sort((a, b) => a.sort_order - b.sort_order)
-    .find((c) => c.applies_to_tier === input.customerTierCode);
+    .sort((a, b) => a.sort_order - b.sort_order);
 
-  // When no channel maps to this tier (e.g. customer is Diamond but
-  // tenant doesn't have a Diamond channel row), the retail channel
-  // is the pragmatic default. Falls further back to multiplier=1 so
-  // the number stays sensible rather than going 0.
-  const effectiveChannel =
-    channel ??
-    ctx.channelMultipliers.find((c) => c.applies_to_tier === "end_user") ??
-    null;
-  const channelMultiplier = effectiveChannel ? Number(effectiveChannel.multiplier) : 1;
-  const channelPriceUsd = regionalFobUsd * channelMultiplier;
-  if (!channel) {
+  interface Rung { tier: string | null; code: string; multiplier: number; price: number; isRetail: boolean }
+  const rungByTier = new Map<string, Rung>();
+  let firstRung: Rung | null = null;
+  let retailGlobalUsd: number | null = null;
+  let running = globalFobUsd;
+  for (const c of ladder) {
+    const m = Number(c.multiplier);
+    running = running * m; // sequential — builds on the rung above
+    const isRetail = c.applies_to_tier === "end_user" || /retail/i.test(c.code);
+    const r: Rung = { tier: c.applies_to_tier, code: c.code, multiplier: m, price: running, isRetail };
+    if (c.applies_to_tier) rungByTier.set(c.applies_to_tier, r);
+    if (!firstRung) firstRung = r;
+    if (isRetail) retailGlobalUsd = running;
+  }
+
+  // Resolve this customer's rung. An unmapped premium tier (e.g. a Sole
+  // Agent / Diamond with no own channel row) takes the BEST (first, cheapest)
+  // rung — never the retail price.
+  const tierRung: Rung | null =
+    (input.customerTierCode ? rungByTier.get(input.customerTierCode) ?? null : null) ?? firstRung;
+  const channelMultiplier = tierRung ? tierRung.multiplier : 1;
+  // Band touches the retail rung only; all other channels are market-flat.
+  const channelPriceUsd = tierRung
+    ? (tierRung.isRetail ? tierRung.price * (1 + bandAdjPct / 100) : tierRung.price)
+    : globalFobUsd;
+  const effectiveChannel = tierRung ? { code: tierRung.code } : null;
+  if (input.customerTierCode && !rungByTier.has(input.customerTierCode)) {
     notes.push(
-      `No channel row matches tier "${input.customerTierCode ?? "?"}"; used ${effectiveChannel?.code ?? "multiplier=1"} as fallback.`,
+      `No channel row for tier "${input.customerTierCode}"; used best channel ${tierRung?.code ?? "base"}.`,
     );
   }
+
+  // The market-varying number surfaced to the UI is the END-USER retail
+  // price for the country (retail global × band). Channel prices don't move.
+  const regionalFobUsd = (retailGlobalUsd ?? globalFobUsd) * (1 + bandAdjPct / 100);
 
   /* Step 8: Volume discount — use line total (unit × qty) to pick the bucket. */
   const preDiscountLineUsd = channelPriceUsd * input.qty;
