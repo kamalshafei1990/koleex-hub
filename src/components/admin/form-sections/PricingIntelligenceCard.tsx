@@ -107,14 +107,51 @@ export default function PricingIntelligenceCard({
   const [accessories, setAccessories] = useState<AccessoryOpt[]>([]);
   const [pickStand, setPickStand] = useState<string | null>(null);
   const [pickTable, setPickTable] = useState<string | null>(null);
-  useEffect(() => {
+  const [managing, setManaging] = useState(false);
+  const [searchQ, setSearchQ] = useState("");
+  const [searchRes, setSearchRes] = useState<{ id: string; product_name: string }[]>([]);
+  const [savingMap, setSavingMap] = useState(false);
+
+  const loadAccessories = useCallback(async () => {
     if (!supportsCompleteSet || !subcategorySlug) { setAccessories([]); return; }
     const qs = new URLSearchParams({ subcategory: subcategorySlug, country });
-    fetch(`/api/products/accessory-pricing?${qs.toString()}`, { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j: { accessories?: AccessoryOpt[] } | null) => setAccessories(j?.accessories ?? []))
-      .catch(() => setAccessories([]));
+    try {
+      const r = await fetch(`/api/products/accessory-pricing?${qs.toString()}`, { credentials: "include" });
+      const j = (await r.json().catch(() => ({}))) as { accessories?: AccessoryOpt[] };
+      setAccessories(j?.accessories ?? []);
+    } catch { setAccessories([]); }
   }, [supportsCompleteSet, subcategorySlug, country]);
+  useEffect(() => { loadAccessories(); }, [loadAccessories]);
+
+  // Persist the full mapping for this subcategory, then reprice.
+  const saveMapping = useCallback(async (next: { accessory_product_id: string; role: string }[]) => {
+    if (!subcategorySlug) return;
+    setSavingMap(true);
+    try {
+      await fetch("/api/product-accessory-options", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subcategory: subcategorySlug, options: next }),
+      });
+      await loadAccessories();
+    } finally { setSavingMap(false); }
+  }, [subcategorySlug, loadAccessories]);
+
+  // Debounced product search for the accessory picker.
+  useEffect(() => {
+    if (!managing) return;
+    const q = searchQ.trim();
+    if (!q) { setSearchRes([]); return; }
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/products/search?q=${encodeURIComponent(q)}`, { credentials: "include" });
+        const j = (await r.json().catch(() => ({}))) as { results?: { id: string; product_name: string }[] };
+        setSearchRes(j?.results ?? []);
+      } catch { setSearchRes([]); }
+    }, 250);
+    return () => clearTimeout(t);
+  }, [searchQ, managing]);
 
   // Country options (full managed list) for the market selector.
   useEffect(() => {
@@ -352,7 +389,66 @@ export default function PricingIntelligenceCard({
                   <BoxIcon className="h-4 w-4 text-[var(--text-dim)]" />
                   <h4 className="text-[12px] font-semibold text-[var(--text-primary)]">Complete set</h4>
                   <span className="text-[10px] text-[var(--text-ghost)]">head + stand + table, each priced separately</span>
+                  {subcategorySlug && (
+                    <button type="button" onClick={() => setManaging((v) => !v)}
+                      className="ms-auto text-[11px] font-medium text-[var(--accent)] hover:underline">
+                      {managing ? "Done" : "Manage"}
+                    </button>
+                  )}
                 </div>
+
+                {managing && (
+                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 p-3 space-y-2.5">
+                    <div className="text-[10px] text-[var(--text-dim)]">
+                      Compatible stands/tables for <b>{subcategorySlug}</b> (shared by every machine in this class).
+                    </div>
+                    {/* Current mapping with remove + role toggle */}
+                    {accessories.length > 0 && (
+                      <div className="space-y-1.5">
+                        {accessories.map((a) => (
+                          <div key={a.productId} className="flex items-center gap-2 text-[11.5px]">
+                            <span className="flex-1 truncate text-[var(--text-primary)]">{a.name}</span>
+                            <select
+                              className="h-7 px-1.5 rounded-md bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[11px]"
+                              value={a.role}
+                              onChange={(e) => {
+                                const next = accessories.map((x) => ({ accessory_product_id: x.productId, role: x.productId === a.productId ? e.target.value : x.role }));
+                                saveMapping(next);
+                              }}>
+                              <option value="stand">stand</option>
+                              <option value="table">table</option>
+                            </select>
+                            <button type="button"
+                              onClick={() => saveMapping(accessories.filter((x) => x.productId !== a.productId).map((x) => ({ accessory_product_id: x.productId, role: x.role })))}
+                              className="text-[var(--text-ghost)] hover:text-[var(--accent)] text-[14px] leading-none px-1">×</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {/* Search + add */}
+                    <input
+                      value={searchQ}
+                      onChange={(e) => setSearchQ(e.target.value)}
+                      placeholder="Search products to add as stand/table…"
+                      className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[12px] outline-none focus:border-[var(--border-focus)]"
+                    />
+                    {searchRes.filter((r) => !accessories.some((a) => a.productId === r.id)).length > 0 && (
+                      <div className="max-h-40 overflow-y-auto rounded-md border border-[var(--border-subtle)] divide-y divide-[var(--border-subtle)]/60">
+                        {searchRes.filter((r) => !accessories.some((a) => a.productId === r.id)).map((r) => (
+                          <div key={r.id} className="flex items-center gap-2 px-2 py-1.5 text-[11.5px]">
+                            <span className="flex-1 truncate">{r.product_name}</span>
+                            <button type="button" disabled={savingMap}
+                              onClick={() => { saveMapping([...accessories.map((a) => ({ accessory_product_id: a.productId, role: a.role })), { accessory_product_id: r.id, role: "stand" }]); setSearchQ(""); }}
+                              className="text-[10.5px] px-1.5 py-0.5 rounded border border-[var(--border-subtle)] hover:border-[var(--accent)] hover:text-[var(--accent)]">+ stand</button>
+                            <button type="button" disabled={savingMap}
+                              onClick={() => { saveMapping([...accessories.map((a) => ({ accessory_product_id: a.productId, role: a.role })), { accessory_product_id: r.id, role: "table" }]); setSearchQ(""); }}
+                              className="text-[10.5px] px-1.5 py-0.5 rounded border border-[var(--border-subtle)] hover:border-[var(--accent)] hover:text-[var(--accent)]">+ table</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
                 {accessories.length === 0 ? (
                   <p className="text-[11px] text-[var(--text-dim)]">
                     No compatible stand/table mapped for this class yet. Map accessory products to this subcategory to enable the set.
