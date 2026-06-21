@@ -261,8 +261,8 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                       <div className="flex gap-1.5">
                         <input className={`${inp} flex-1 min-w-0`} value={l.unit_cost_cny} inputMode="decimal" placeholder="e.g. 1850"
                           onChange={(e) => update(l._tempId, { unit_cost_cny: e.target.value.replace(/[^0-9.]/g, "") })} />
-                        <div className="h-9 w-[84px] shrink-0 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] flex items-center justify-center" title="Currency comes from the supplier (Suppliers app)">
-                          {supOf(l.supplier_id)?.currency || "—"}
+                        <div className="h-9 w-[84px] shrink-0 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] flex items-center justify-center" title="Factory cost is always entered in CNY (¥) — the pricing engine works from the CNY cost.">
+                          CNY
                         </div>
                       </div>
                     </div>
@@ -435,8 +435,8 @@ export default function SupplierLinkSection({ links, suppliers, onChange }: Prop
                       <div className="flex gap-1.5">
                         <input className={`${inp} flex-1 min-w-0`} value={l.min_order_value} inputMode="decimal" placeholder="e.g. 5000"
                           onChange={(e) => update(l._tempId, { min_order_value: e.target.value.replace(/[^0-9.]/g, "") })} />
-                        <div className="h-9 w-[84px] shrink-0 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] flex items-center justify-center" title="Currency comes from the supplier (Suppliers app)">
-                          {supOf(l.supplier_id)?.currency || "—"}
+                        <div className="h-9 w-[84px] shrink-0 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] flex items-center justify-center" title="Factory cost is always entered in CNY (¥) — the pricing engine works from the CNY cost.">
+                          CNY
                         </div>
                       </div>
                     </div>
