@@ -96,6 +96,7 @@ import TechnicalSection from "./form-sections/TechnicalSection";
 import ModelsSection from "./form-sections/ModelsSection";
 import MediaSection from "./form-sections/MediaSection";
 import PricingIntelligenceCard from "./form-sections/PricingIntelligenceCard";
+import AccessoryOptionsSection from "./form-sections/AccessoryOptionsSection";
 import BaseFobCard from "./form-sections/BaseFobCard";
 import TabStrip from "@/components/ui/TabStrip";
 import RelatedProductsSection from "./form-sections/RelatedProductsSection";
@@ -4010,6 +4011,15 @@ export default function ProductForm({ productId }: Props) {
                 return <PricingIntelligenceCard costCny={Number.isFinite(costNum as number) ? (costNum as number) : null} currency="CNY" subcategorySlug={product.subcategory_slug || null} supportsCompleteSet={!!product.supports_complete_set} />;
               })()}
             </Section>
+
+            {/* Configurable options — only for Stand / Table products. Each
+                option value can add a ¥ delta to the base cost; the complete-set
+                configurator on machines sums these. */}
+            {(product.subcategory_slug === "stands" || product.subcategory_slug === "tables") && (
+              <Section id="accessory-options" icon={<DollarSignIcon className="h-4 w-4" />} title={t("pricing.optionsTitle", "Configurable options & price add-ons")} badge={t("pricing.optionsBadge", "Stand / Table")} defaultOpen>
+                <AccessoryOptionsSection productId={productId} subcategorySlug={product.subcategory_slug || null} />
+              </Section>
+            )}
 
           </div>
         )}
