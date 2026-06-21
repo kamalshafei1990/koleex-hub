@@ -219,9 +219,9 @@ export default function PriceCalculator() {
     const taxRate = pricingConfig ? pricingConfig.defaultTaxRefund / 100 : TAX_REFUND_DEFAULT;
     const discFrac = discountPct / 100;
 
-    /* ── ENGINE PATH — mirrors computePolicyPrice exactly (sequential
-       channel ladder + market band on the retail rung only). Active when
-       the tenant has commercial-policy levels + channels configured. ── */
+    /* ── ENGINE PATH — mirrors computePolicyPrice exactly (band on the base →
+       all channels, then sequential channel ladder). Active when the tenant
+       has commercial-policy levels + channels configured. ── */
     if (engineReady && model) {
       const uplift = model.settings.costUpliftPercent || 0;
       const rows = [{ id: "base", name: "Base FOB" }, ...model.tiers.map(t => ({ id: t.code, name: t.name }))];
@@ -238,8 +238,9 @@ export default function PriceCalculator() {
         if (fxRisk === "usd_down") marginUsd *= 1.05; else if (fxRisk === "usd_up") marginUsd *= 0.95;
         marginPctVal = netInternalUsd > 0 ? marginUsd / netInternalUsd : 0;
         const baseFob = netInternalUsd + marginUsd;                        // Global FOB (no band)
-        const baseAfterDisc = baseFob * (1 - discFrac);
-        // Sequential ladder off base; band applies to the retail rung only.
+        // Band on the BASE so every channel carries it; then manual discount.
+        const baseAfterDisc = baseFob * (1 + country.adjustmentPct) * (1 - discFrac);
+        // Sequential ladder off the regional (banded) base.
         const channelPrices: Record<string, number> = { base: baseAfterDisc };
         let running = baseAfterDisc;
         let firstRung: number | null = null;
@@ -247,11 +248,10 @@ export default function PriceCalculator() {
         for (const c of model.channels) {
           running = running * c.multiplier;
           if (firstRung == null) firstRung = running;
-          const price = c.isRetail ? running * (1 + country.adjustmentPct) : running;
-          if (c.tier) byTier[c.tier] = price;
+          if (c.tier) byTier[c.tier] = running;
         }
         // Every tier gets a price; tiers without a channel rung (e.g. Diamond)
-        // take the best/first (cheapest) rung — never the retail price.
+        // take the best/first (cheapest) rung.
         for (const t of model.tiers) channelPrices[t.code] = byTier[t.code] ?? firstRung ?? baseAfterDisc;
         const taxRefundPerUnit = costUsd * taxRate;
         const channelProfits: Record<string, number> = {};

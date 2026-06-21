@@ -14,22 +14,22 @@ import PolicyPage, {
 
 const priceLadderSteps = [
   { label: "KOLEEX Cost", description: "Original product cost in CNY (direct input)" },
-  { label: "Base Price", description: "KOLEEX Cost x (1 + Product Level Margin)" },
-  { label: "Platinum Price (Agent)", description: "Base Price x 0.97 -- best channel price" },
+  { label: "Base Price (Global FOB)", description: "KOLEEX Cost x (1 + Product Level Margin)" },
+  { label: "Regional Base", description: "Base Price x (1 + Market Band) -- band is applied here, so every channel below carries it" },
+  { label: "Platinum Price (Agent)", description: "Regional Base x 0.97 -- best channel price" },
   { label: "Gold Price (Distributor)", description: "Platinum x 1.08 -- distributor channel price" },
   { label: "Silver Price (Dealer)", description: "Gold x 1.08 -- dealer channel price" },
-  { label: "Retail Global Price", description: "Silver x 1.20 -- global end user price" },
-  { label: "Retail Market Price", description: "Retail Global x Band multiplier -- market-adjusted retail" },
+  { label: "Retail Price (End User)", description: "Silver x 1.20 -- end user price" },
 ];
 
 const ladderTableRows = [
   ["1", "KOLEEX Cost", "Original product cost in CNY", "Direct input"],
-  ["2", "Base Price", "Cost + product level margin", "KOLEEX Cost x (1 + Margin)"],
-  ["3", "Platinum (Agent)", "Best channel price", "Base Price x 0.97"],
-  ["4", "Gold (Distributor)", "Distributor channel price", "Platinum x 1.08"],
-  ["5", "Silver (Dealer)", "Dealer channel price", "Gold x 1.08"],
-  ["6", "Retail Global", "Global end user price", "Silver x 1.20"],
-  ["7", "Retail Market", "Market-adjusted end user price", "Retail Global x Band multiplier"],
+  ["2", "Base Price (Global FOB)", "Cost + product level margin", "KOLEEX Cost x (1 + Margin)"],
+  ["3", "Regional Base", "Market band applied to the base", "Base Price x (1 + Band)"],
+  ["4", "Platinum (Agent)", "Best channel price", "Regional Base x 0.97"],
+  ["5", "Gold (Distributor)", "Distributor channel price", "Platinum x 1.08"],
+  ["6", "Silver (Dealer)", "Dealer channel price", "Gold x 1.08"],
+  ["7", "Retail (End User)", "End user price", "Silver x 1.20"],
 ];
 
 const tierCards = [
@@ -54,7 +54,7 @@ const tierCards = [
   {
     title: "Retail Global (End User)",
     value: "x 1.20",
-    description: "End user price. 20% markup on Silver. This is the baseline retail before market band adjustment.",
+    description: "End user price. 20% markup on Silver. Like every channel, it already includes the market band (baked into the base).",
     color: "#6B8F71",
   },
 ];
@@ -159,8 +159,8 @@ export default function ChannelStructurePage() {
             "Platinum receives the best (lowest) channel price",
             "Each subsequent tier pays progressively more",
             "Multipliers are sequential -- each builds on the tier above",
-            "Market band adjustment applies ONLY to the Retail price, not channel prices",
-            "The price ladder is the same for all markets -- only Retail Market varies by band",
+            "Market band adjustment is applied to the BASE, so it flows into every channel price",
+            "Every channel varies by market -- an Agent in the US pays more than an Agent in Egypt",
             "Discounts are applied after the channel price is determined",
           ]}
         />

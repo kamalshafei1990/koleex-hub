@@ -190,16 +190,18 @@ export function computePolicyPrice(
   const baseMarginPercent = Number(level.margin_percent);
   const globalFobUsd = netInternalCostUsd * (1 + baseMarginPercent / 100);
 
-  /* Steps 6-7 — Channel ladder + Regional Adjustment.
+  /* Steps 6-7 — Regional Adjustment + Channel ladder.
 
-     Per the confirmed "Channel Pricing Structure" spec:
-       · The channel ladder is SEQUENTIAL off the Global FOB (base):
-           Platinum = Base × 0.97 → Gold = Platinum × 1.08
+     Per the confirmed "Channel Pricing Structure" spec (band applies to ALL
+     channels — matches the Price Calculator):
+       · The regional market band adjusts the BASE (Global FOB) first:
+           Regional Base = Global FOB × (1 + band%)
+         so EVERY channel price carries the country adjustment.
+       · The channel ladder is then SEQUENTIAL off that regional base:
+           Platinum = RegionalBase × 0.97 → Gold = Platinum × 1.08
            → Silver = Gold × 1.08 → Retail = Silver × 1.20
-         (each rung multiplies the rung above it, NOT the base directly).
-       · The market band adjusts ONLY the retail / end-user price —
-         channel prices (agent / distributor / dealer) are the SAME in
-         every market. */
+         (each rung multiplies the rung above it). Channel prices DO move by
+         market — an Agent in the US pays more than an Agent in Egypt. */
   const band = resolveCountryBand(
     ctx.marketBands,
     ctx.bandCountries,
@@ -210,6 +212,9 @@ export function computePolicyPrice(
     notes.push(`Country ${input.customerCountryCode} not mapped; defaulting to Band B (0%).`);
   }
 
+  // Band on the base → flows into every channel rung.
+  const regionalBaseUsd = globalFobUsd * (1 + bandAdjPct / 100);
+
   const ladder = ctx.channelMultipliers
     .filter((c) => c.is_active)
     .sort((a, b) => a.sort_order - b.sort_order);
@@ -217,16 +222,16 @@ export function computePolicyPrice(
   interface Rung { tier: string | null; code: string; multiplier: number; price: number; isRetail: boolean }
   const rungByTier = new Map<string, Rung>();
   let firstRung: Rung | null = null;
-  let retailGlobalUsd: number | null = null;
-  let running = globalFobUsd;
+  let retailUsd: number | null = null;
+  let running = regionalBaseUsd;
   for (const c of ladder) {
     const m = Number(c.multiplier);
-    running = running * m; // sequential — builds on the rung above
+    running = running * m; // sequential — builds on the rung above (regional base)
     const isRetail = c.applies_to_tier === "end_user" || /retail/i.test(c.code);
     const r: Rung = { tier: c.applies_to_tier, code: c.code, multiplier: m, price: running, isRetail };
     if (c.applies_to_tier) rungByTier.set(c.applies_to_tier, r);
     if (!firstRung) firstRung = r;
-    if (isRetail) retailGlobalUsd = running;
+    if (isRetail) retailUsd = running;
   }
 
   // Resolve this customer's rung. An unmapped premium tier (e.g. a Sole
@@ -235,10 +240,8 @@ export function computePolicyPrice(
   const tierRung: Rung | null =
     (input.customerTierCode ? rungByTier.get(input.customerTierCode) ?? null : null) ?? firstRung;
   const channelMultiplier = tierRung ? tierRung.multiplier : 1;
-  // Band touches the retail rung only; all other channels are market-flat.
-  const channelPriceUsd = tierRung
-    ? (tierRung.isRetail ? tierRung.price * (1 + bandAdjPct / 100) : tierRung.price)
-    : globalFobUsd;
+  // All rungs already carry the band (it's baked into the regional base).
+  const channelPriceUsd = tierRung ? tierRung.price : regionalBaseUsd;
   const effectiveChannel = tierRung ? { code: tierRung.code } : null;
   if (input.customerTierCode && !rungByTier.has(input.customerTierCode)) {
     notes.push(
@@ -246,9 +249,8 @@ export function computePolicyPrice(
     );
   }
 
-  // The market-varying number surfaced to the UI is the END-USER retail
-  // price for the country (retail global × band). Channel prices don't move.
-  const regionalFobUsd = (retailGlobalUsd ?? globalFobUsd) * (1 + bandAdjPct / 100);
+  // The END-USER retail price for the country (already includes the band).
+  const regionalFobUsd = retailUsd ?? regionalBaseUsd;
 
   /* Step 8: Volume discount — use line total (unit × qty) to pick the bucket. */
   const preDiscountLineUsd = channelPriceUsd * input.qty;

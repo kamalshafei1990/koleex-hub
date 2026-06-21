@@ -111,7 +111,7 @@ export default function PricingIntelligenceCard({
     if (!base) return [];
     return [
       { k: "Base FOB", v: usd(base.globalFobUsd), sub: `Level ${base.productLevelCode ?? "—"}` },
-      { k: market?.bandCode ? `Band ${market.bandCode}` : "Market", v: pct(market?.adjustmentPercent ?? 0), sub: `${country} · retail only` },
+      { k: market?.bandCode ? `Band ${market.bandCode}` : "Market", v: pct(market?.adjustmentPercent ?? 0), sub: `${country} · all channels` },
       { k: "End-user (market)", v: usd(market?.regionalFobUsd), sub: "retail + band", strong: true },
     ];
   }, [base, market, data, country]);
@@ -211,7 +211,7 @@ export default function PricingIntelligenceCard({
                 </tbody>
               </table>
             </div>
-            <p className="text-[10px] text-[var(--text-ghost)] mt-1.5">Sequential channel ladder. Only <b>End User</b> varies by market — agent/distributor/dealer prices are the same worldwide (per policy).</p>
+            <p className="text-[10px] text-[var(--text-ghost)] mt-1.5">Sequential channel ladder. The <b>market band</b> is applied to the base, so <b>every</b> channel price varies by market (per policy).</p>
             {(data?.channels ?? []).some((c) => c.approvalRequired) && (
               <p className="text-[10px] text-amber-400/80 mt-1">Amber margin = below the level&apos;s minimum-margin floor (approval needed at that price).</p>
             )}
