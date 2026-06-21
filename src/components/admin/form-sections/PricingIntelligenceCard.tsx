@@ -55,6 +55,15 @@ const cny = (n: number | null | undefined) =>
 const pct = (n: number | null | undefined) =>
   n == null ? "—" : `${n > 0 ? "+" : ""}${Number(n).toLocaleString(undefined, { maximumFractionDigits: 1 })}%`;
 
+/* ISO-3166 alpha-2 → flag emoji (regional-indicator letters). Pure derivation,
+   no data dependency: each letter maps to its regional-indicator symbol. */
+function flagOf(code: string | null | undefined): string {
+  if (!code || code.length !== 2) return "🏳️";
+  const cc = code.toUpperCase();
+  if (!/^[A-Z]{2}$/.test(cc)) return "🏳️";
+  return String.fromCodePoint(...[...cc].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
+}
+
 /* Short "freshness" label for the FX rate: today / yesterday / N d ago. */
 function fxAgeLabel(iso: string): string {
   const t = new Date(iso).getTime();
@@ -152,8 +161,8 @@ export default function PricingIntelligenceCard({
             onChange={(e) => setCountry(e.target.value)}
             className="h-9 px-2.5 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] min-w-[160px]"
           >
-            {markets.length === 0 && <option value="EG">Egypt</option>}
-            {markets.map((m) => <option key={m.code} value={m.code}>{m.name}</option>)}
+            {markets.length === 0 && <option value="EG">🇪🇬 Egypt</option>}
+            {markets.map((m) => <option key={m.code} value={m.code}>{flagOf(m.code)} {m.name}</option>)}
           </select>
         </div>
         {data?.fxCnyPerUsd && (() => {
@@ -278,7 +287,7 @@ export default function PricingIntelligenceCard({
                   onClick={() => setCountry(m.code)}
                   className={`text-left rounded-lg border px-2.5 py-2 transition-colors ${m.code === country ? "border-[var(--border-strong)] bg-[var(--bg-inverted)]/[0.04]" : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 hover:border-[var(--border-strong)]"}`}
                 >
-                  <div className="text-[10px] font-semibold text-[var(--text-primary)]">{m.code} <span className="text-[var(--text-ghost)] font-normal">{m.bandCode ? `· ${m.bandCode}` : ""} {pct(m.adjustmentPercent)}</span></div>
+                  <div className="text-[10px] font-semibold text-[var(--text-primary)]"><span className="text-[12px]">{flagOf(m.code)}</span> {m.code} <span className="text-[var(--text-ghost)] font-normal">{m.bandCode ? `· ${m.bandCode}` : ""} {pct(m.adjustmentPercent)}</span></div>
                   <div className="text-[13px] font-bold text-[var(--text-primary)] tabular-nums mt-0.5">{usd(m.regionalFobUsd)}</div>
                 </button>
               ))}
