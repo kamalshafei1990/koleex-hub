@@ -20,7 +20,7 @@ import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
 import InfoIcon from "@/components/icons/ui/InfoIcon";
 import MapPinIcon from "@/components/icons/ui/MapPinIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
-import BoxIcon from "@/components/icons/ui/BoxIcon";
+import CompleteSetConfigurator from "./CompleteSetConfigurator";
 
 interface Preview {
   ok?: boolean;
@@ -75,21 +75,6 @@ function fxAgeLabel(iso: string): string {
   return `${days}d ago`;
 }
 
-interface AccessoryOpt {
-  productId: string;
-  name: string;
-  role: "stand" | "table" | string;
-  costCny: number | null;
-  baseFobUsd: number | null;
-}
-
-interface SetTemplate {
-  id?: string;
-  name: string;
-  tier: string;
-  items: { accessory_product_id: string; role: string }[];
-}
-
 export default function PricingIntelligenceCard({
   costCny,
   currency,
@@ -109,79 +94,6 @@ export default function PricingIntelligenceCard({
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const debRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Complete-set: compatible accessories (priced) for this machine class.
-  const [accessories, setAccessories] = useState<AccessoryOpt[]>([]);
-  const [pickStand, setPickStand] = useState<string | null>(null);
-  const [pickTable, setPickTable] = useState<string | null>(null);
-  const [managing, setManaging] = useState(false);
-  const [searchQ, setSearchQ] = useState("");
-  const [searchRes, setSearchRes] = useState<{ id: string; product_name: string }[]>([]);
-  const [savingMap, setSavingMap] = useState(false);
-
-  const loadAccessories = useCallback(async () => {
-    if (!supportsCompleteSet || !subcategorySlug) { setAccessories([]); return; }
-    const qs = new URLSearchParams({ subcategory: subcategorySlug, country });
-    try {
-      const r = await fetch(`/api/products/accessory-pricing?${qs.toString()}`, { credentials: "include" });
-      const j = (await r.json().catch(() => ({}))) as { accessories?: AccessoryOpt[] };
-      setAccessories(j?.accessories ?? []);
-    } catch { setAccessories([]); }
-  }, [supportsCompleteSet, subcategorySlug, country]);
-  useEffect(() => { loadAccessories(); }, [loadAccessories]);
-
-  // CS-3: named set templates (economy/standard/premium) for this class.
-  const [templates, setTemplates] = useState<SetTemplate[]>([]);
-  const [newTplName, setNewTplName] = useState("");
-  const [newTplTier, setNewTplTier] = useState("standard");
-  const loadTemplates = useCallback(async () => {
-    if (!supportsCompleteSet || !subcategorySlug) { setTemplates([]); return; }
-    try {
-      const r = await fetch(`/api/product-set-templates?subcategory=${encodeURIComponent(subcategorySlug)}`, { credentials: "include" });
-      const j = (await r.json().catch(() => ({}))) as { templates?: SetTemplate[] };
-      setTemplates(j?.templates ?? []);
-    } catch { setTemplates([]); }
-  }, [supportsCompleteSet, subcategorySlug]);
-  useEffect(() => { loadTemplates(); }, [loadTemplates]);
-
-  const saveTemplates = useCallback(async (next: SetTemplate[]) => {
-    if (!subcategorySlug) return;
-    await fetch("/api/product-set-templates", {
-      method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ subcategory: subcategorySlug, templates: next.map((t, i) => ({ name: t.name, tier: t.tier, sort_order: i, items: t.items })) }),
-    });
-    await loadTemplates();
-  }, [subcategorySlug, loadTemplates]);
-
-  // Persist the full mapping for this subcategory, then reprice.
-  const saveMapping = useCallback(async (next: { accessory_product_id: string; role: string }[]) => {
-    if (!subcategorySlug) return;
-    setSavingMap(true);
-    try {
-      await fetch("/api/product-accessory-options", {
-        method: "PUT",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subcategory: subcategorySlug, options: next }),
-      });
-      await loadAccessories();
-    } finally { setSavingMap(false); }
-  }, [subcategorySlug, loadAccessories]);
-
-  // Debounced product search for the accessory picker.
-  useEffect(() => {
-    if (!managing) return;
-    const q = searchQ.trim();
-    if (!q) { setSearchRes([]); return; }
-    const t = setTimeout(async () => {
-      try {
-        const r = await fetch(`/api/products/search?q=${encodeURIComponent(q)}`, { credentials: "include" });
-        const j = (await r.json().catch(() => ({}))) as { results?: { id: string; product_name: string }[] };
-        setSearchRes(j?.results ?? []);
-      } catch { setSearchRes([]); }
-    }, 250);
-    return () => clearTimeout(t);
-  }, [searchQ, managing]);
 
   // Country options (full managed list) for the market selector.
   useEffect(() => {
@@ -387,173 +299,12 @@ export default function PricingIntelligenceCard({
             </div>
           </div>
 
-          {/* Complete-set preview — head + chosen stand/table, each priced
-              through the engine and summed. Only for products flagged
-              supports_complete_set. */}
-          {supportsCompleteSet && (() => {
-            const headFob = data?.market?.regionalFobUsd ?? data?.base?.globalFobUsd ?? null;
-            const stands = accessories.filter((a) => a.role === "stand");
-            const tables = accessories.filter((a) => a.role === "table");
-            const stand = accessories.find((a) => a.productId === pickStand) ?? null;
-            const table = accessories.find((a) => a.productId === pickTable) ?? null;
-            const addOns = (stand?.baseFobUsd ?? 0) + (table?.baseFobUsd ?? 0);
-            const total = headFob != null ? headFob + addOns : null;
-            const Group = ({ label, items, picked, onPick }: { label: string; items: AccessoryOpt[]; picked: string | null; onPick: (id: string | null) => void }) => (
-              <div>
-                <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)] mb-1.5">{label}</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {items.map((a) => (
-                    <button type="button" key={a.productId}
-                      onClick={() => onPick(picked === a.productId ? null : a.productId)}
-                      className={`text-left rounded-lg border px-2.5 py-1.5 transition-colors ${picked === a.productId ? "border-[var(--accent)] bg-[var(--accent)]/[0.08]" : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 hover:border-[var(--border-strong)]"}`}>
-                      <div className="text-[11.5px] font-medium text-[var(--text-primary)]">{a.name}</div>
-                      <div className="text-[11px] tabular-nums text-[var(--text-secondary)]">{a.baseFobUsd != null ? `+${usd(a.baseFobUsd)}` : "cost —"}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            );
-            return (
-              <div className="rounded-xl border border-[var(--border-subtle)] p-3.5 space-y-3">
-                <div className="flex items-center gap-2">
-                  <BoxIcon className="h-4 w-4 text-[var(--text-dim)]" />
-                  <h4 className="text-[12px] font-semibold text-[var(--text-primary)]">Complete set</h4>
-                  <span className="text-[10px] text-[var(--text-ghost)]">head + stand + table, each priced separately</span>
-                  {subcategorySlug && (
-                    <button type="button" onClick={() => setManaging((v) => !v)}
-                      className="ms-auto text-[11px] font-medium text-[var(--accent)] hover:underline">
-                      {managing ? "Done" : "Manage"}
-                    </button>
-                  )}
-                </div>
-
-                {managing && (
-                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 p-3 space-y-2.5">
-                    <div className="text-[10px] text-[var(--text-dim)]">
-                      Compatible stands/tables for <b>{subcategorySlug}</b> (shared by every machine in this class).
-                    </div>
-                    {/* Current mapping with remove + role toggle */}
-                    {accessories.length > 0 && (
-                      <div className="space-y-1.5">
-                        {accessories.map((a) => (
-                          <div key={a.productId} className="flex items-center gap-2 text-[11.5px]">
-                            <span className="flex-1 truncate text-[var(--text-primary)]">{a.name}</span>
-                            <select
-                              className="h-7 px-1.5 rounded-md bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[11px]"
-                              value={a.role}
-                              onChange={(e) => {
-                                const next = accessories.map((x) => ({ accessory_product_id: x.productId, role: x.productId === a.productId ? e.target.value : x.role }));
-                                saveMapping(next);
-                              }}>
-                              <option value="stand">stand</option>
-                              <option value="table">table</option>
-                            </select>
-                            <button type="button"
-                              onClick={() => saveMapping(accessories.filter((x) => x.productId !== a.productId).map((x) => ({ accessory_product_id: x.productId, role: x.role })))}
-                              className="text-[var(--text-ghost)] hover:text-[var(--accent)] text-[14px] leading-none px-1">×</button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {/* Search + add */}
-                    <input
-                      value={searchQ}
-                      onChange={(e) => setSearchQ(e.target.value)}
-                      placeholder="Search products to add as stand/table…"
-                      className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[12px] outline-none focus:border-[var(--border-focus)]"
-                    />
-                    {searchRes.filter((r) => !accessories.some((a) => a.productId === r.id)).length > 0 && (
-                      <div className="max-h-40 overflow-y-auto rounded-md border border-[var(--border-subtle)] divide-y divide-[var(--border-subtle)]/60">
-                        {searchRes.filter((r) => !accessories.some((a) => a.productId === r.id)).map((r) => (
-                          <div key={r.id} className="flex items-center gap-2 px-2 py-1.5 text-[11.5px]">
-                            <span className="flex-1 truncate">{r.product_name}</span>
-                            <button type="button" disabled={savingMap}
-                              onClick={() => { saveMapping([...accessories.map((a) => ({ accessory_product_id: a.productId, role: a.role })), { accessory_product_id: r.id, role: "stand" }]); setSearchQ(""); }}
-                              className="text-[10.5px] px-1.5 py-0.5 rounded border border-[var(--border-subtle)] hover:border-[var(--accent)] hover:text-[var(--accent)]">+ stand</button>
-                            <button type="button" disabled={savingMap}
-                              onClick={() => { saveMapping([...accessories.map((a) => ({ accessory_product_id: a.productId, role: a.role })), { accessory_product_id: r.id, role: "table" }]); setSearchQ(""); }}
-                              className="text-[10.5px] px-1.5 py-0.5 rounded border border-[var(--border-subtle)] hover:border-[var(--accent)] hover:text-[var(--accent)]">+ table</button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Set templates: list + remove, and save current selection. */}
-                    <div className="pt-1 border-t border-[var(--border-subtle)]/60 space-y-1.5">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">Set templates</div>
-                      {templates.map((tpl, ti) => (
-                        <div key={tpl.id ?? ti} className="flex items-center gap-2 text-[11.5px]">
-                          <span className="flex-1 truncate">{tpl.name} <span className="text-[9px] uppercase text-[var(--text-ghost)]">{tpl.tier}</span></span>
-                          <button type="button"
-                            onClick={() => saveTemplates(templates.filter((_, i) => i !== ti))}
-                            className="text-[var(--text-ghost)] hover:text-[var(--accent)] text-[14px] leading-none px-1">×</button>
-                        </div>
-                      ))}
-                      <div className="flex items-center gap-1.5">
-                        <input value={newTplName} onChange={(e) => setNewTplName(e.target.value)} placeholder="Set name (e.g. Standard)"
-                          className="flex-1 h-7 px-2 rounded-md bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[11.5px] outline-none focus:border-[var(--border-focus)]" />
-                        <select value={newTplTier} onChange={(e) => setNewTplTier(e.target.value)}
-                          className="h-7 px-1.5 rounded-md bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[11px]">
-                          <option value="economy">economy</option>
-                          <option value="standard">standard</option>
-                          <option value="premium">premium</option>
-                        </select>
-                        <button type="button" disabled={!newTplName.trim() || (!pickStand && !pickTable)}
-                          onClick={() => {
-                            const items: { accessory_product_id: string; role: string }[] = [];
-                            if (pickStand) items.push({ accessory_product_id: pickStand, role: "stand" });
-                            if (pickTable) items.push({ accessory_product_id: pickTable, role: "table" });
-                            saveTemplates([...templates, { name: newTplName.trim(), tier: newTplTier, items }]);
-                            setNewTplName("");
-                          }}
-                          className="text-[10.5px] px-2 py-1 rounded border border-[var(--border-subtle)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-40">
-                          Save selection
-                        </button>
-                      </div>
-                      <p className="text-[10px] text-[var(--text-ghost)]">Pick a stand/table above, then save it as a named set for one-click reuse.</p>
-                    </div>
-                  </div>
-                )}
-                {accessories.length === 0 ? (
-                  <p className="text-[11px] text-[var(--text-dim)]">
-                    No compatible stand/table mapped for this class yet. Map accessory products to this subcategory to enable the set.
-                  </p>
-                ) : (
-                  <>
-                    {/* One-click set templates (Economy / Standard / Premium). */}
-                    {templates.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">Sets</span>
-                        {templates.map((tpl, ti) => (
-                          <button type="button" key={tpl.id ?? ti}
-                            onClick={() => {
-                              const s = tpl.items.find((i) => i.role === "stand");
-                              const t = tpl.items.find((i) => i.role === "table");
-                              setPickStand(s ? s.accessory_product_id : null);
-                              setPickTable(t ? t.accessory_product_id : null);
-                            }}
-                            className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 px-2.5 py-1 text-[11px] font-medium hover:border-[var(--accent)] hover:text-[var(--accent)]">
-                            {tpl.name}
-                            <span className="text-[9px] uppercase text-[var(--text-ghost)]">{tpl.tier}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {stands.length > 0 && <Group label="Stand" items={stands} picked={pickStand} onPick={setPickStand} />}
-                    {tables.length > 0 && <Group label="Table" items={tables} picked={pickTable} onPick={setPickTable} />}
-                    <div className="flex items-center justify-between rounded-lg bg-[var(--accent)]/[0.06] border border-[var(--accent)]/30 px-3 py-2">
-                      <div className="text-[11px] text-[var(--text-secondary)]">
-                        Complete-set Base FOB
-                        <span className="text-[var(--text-ghost)]"> · head {usd(headFob)}{stand ? ` + stand ${usd(stand.baseFobUsd)}` : ""}{table ? ` + table ${usd(table.baseFobUsd)}` : ""}</span>
-                      </div>
-                      <div className="text-[15px] font-bold tabular-nums text-[var(--accent)]">{usd(total)}</div>
-                    </div>
-                    <p className="text-[10px] text-[var(--text-ghost)]">Preview only. Each item carries its own level/margin/band; the customer-facing configurator is quote-time.</p>
-                  </>
-                )}
-              </div>
-            );
-          })()}
+          {/* Complete-set configurator (ST-3) — pick + configure a Table and a
+              Stand; each is priced on its own configured cost (base + option
+              deltas) through the engine and summed with the head's Base FOB. */}
+          {supportsCompleteSet && (
+            <CompleteSetConfigurator country={country} headFobUsd={data?.market?.regionalFobUsd ?? data?.base?.globalFobUsd ?? null} />
+          )}
 
           {/* Sync footer */}
           <div className="flex items-start gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 px-3 py-2.5 text-[11px] text-[var(--text-dim)]">
