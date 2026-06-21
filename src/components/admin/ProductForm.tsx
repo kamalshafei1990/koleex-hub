@@ -320,8 +320,8 @@ function SectionTabs({
   onSelect: (i: number) => void;
 }) {
   return (
-    <nav className="sticky top-0 z-20 mb-6 -mx-4 md:-mx-8 lg:-mx-12 xl:-mx-16 border-b border-[var(--border-subtle)] bg-[var(--bg-primary)]/90 backdrop-blur-md">
-      <div className="flex items-center gap-1 overflow-x-auto px-4 md:px-8 lg:px-12 xl:px-16 py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <nav className="sticky top-0 z-20 mb-6 py-2 bg-[var(--bg-primary)]/90 backdrop-blur-md">
+      <div className="flex items-center gap-1 overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map((it) => {
           const on = it.index === activeIndex;
           return (
