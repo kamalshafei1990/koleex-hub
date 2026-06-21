@@ -1,3 +1,33 @@
+# ⚠️ REVISED 2026-06-22 — read this first
+
+Kamal clarified the real model, which differs from the first build (CS-1/2/3 treated
+each accessory as a whole product). **Correct model:**
+
+- A **dedicated taxonomy category "Stands & Tables"** under Garment Machinery, with
+  two subcategories **Tables** (`tables`, code XAT) and **Stands** (`stands`, code XAS).
+  ✅ **Created** (division garment-machinery `534ff427-…`).
+- Stand/Table = a product **with configurable option axes**, each option carrying a
+  **price delta**. Configured cost = base cost + Σ selected deltas → engine price.
+  - **Table axes:** shape · type · **size 💰** · **quality 💰**
+  - **Stand axes:** type · shape · **thickness 💰** · **lifting (y/n) 💰** · **wheels (y/n) 💰** · **wheel size 💰** · **quality 💰**
+  - (💰 = affects price; shape/type = descriptive)
+- Schema `accessory_option_values (product_id, axis, value, price_delta_cny, affects_price, is_default, sort_order)`. ✅ **Created** (service-role RLS).
+- On the machine: the existing **`supports_complete_set`** flag = "needs stand & table?".
+  When on, the configurator shows → pick a Table + configure its options, pick a Stand +
+  configure its options → live summed price added to the machine (sum-of-components rule).
+- Templates Economy/Standard/Premium store a **full option set** (extend CS-3).
+
+**This is option B (configurator), self-contained to the new category — it does NOT
+touch the frozen machine knowledge model**, so the earlier freeze concern doesn't block it.
+
+**Phases:** ST-1 taxonomy + option schema ✅ · ST-2 option editor on Stand/Table product
+form · ST-3 rework complete-set configurator to consume options + deltas · ST-4 templates
+store option sets. The CS-1/2/3 "pick a whole product" picker is superseded by the
+configurator (its `product_accessory_options` mapping can still scope which stands/tables
+are offered, or default to all in the Stands & Tables subcategories).
+
+---
+
 # Configurable Sets + Per-Variant Pricing — Build Spec (DRAFT / proposal)
 
 Status: **DRAFT — awaiting Kamal's approval.** Scope = Product Data (catalog) side only.
