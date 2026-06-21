@@ -26,6 +26,7 @@ interface Preview {
   error?: string;
   reason?: string;
   fxCnyPerUsd?: number;
+  fxUpdatedAt?: string | null;
   costUpliftPercent?: number;
   base?: {
     factoryCostCny: number;
@@ -50,6 +51,16 @@ const cny = (n: number | null | undefined) =>
   n == null ? "—" : `¥${Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 const pct = (n: number | null | undefined) =>
   n == null ? "—" : `${n > 0 ? "+" : ""}${Number(n).toLocaleString(undefined, { maximumFractionDigits: 1 })}%`;
+
+/* Short "freshness" label for the FX rate: today / yesterday / N d ago. */
+function fxAgeLabel(iso: string): string {
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return "";
+  const days = Math.floor((Date.now() - t) / 86_400_000);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  return `${days}d ago`;
+}
 
 export default function PricingIntelligenceCard({
   costCny,
@@ -143,9 +154,18 @@ export default function PricingIntelligenceCard({
           </select>
         </div>
         {data?.fxCnyPerUsd && (
-          <div className="ms-auto text-[11px] text-[var(--text-dim)] flex items-center gap-1.5">
-            {loading && <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />}
-            FX ¥{data.fxCnyPerUsd}/$
+          <div
+            className="ms-auto inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border border-[var(--accent)]/30 bg-[var(--accent)]/[0.07] text-[11px] font-semibold text-[var(--text-primary)]"
+            title={`Exchange rate used for the USD prices. Auto-updated daily from live FX${data.fxUpdatedAt ? ` — last updated ${new Date(data.fxUpdatedAt).toLocaleString()}` : ""}.`}
+          >
+            {loading
+              ? <SpinnerIcon className="h-3 w-3 animate-spin text-[var(--accent)]" />
+              : <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />}
+            <span className="text-[var(--accent)]">FX</span>
+            <span className="tabular-nums">¥{data.fxCnyPerUsd} / $1</span>
+            {data.fxUpdatedAt && (
+              <span className="text-[var(--text-ghost)] font-normal">· {fxAgeLabel(data.fxUpdatedAt)}</span>
+            )}
           </div>
         )}
       </div>

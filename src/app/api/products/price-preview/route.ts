@@ -132,6 +132,7 @@ export async function GET(req: Request) {
       ok: true,
       country,
       fxCnyPerUsd: b.fxCnyPerUsd,
+      fxUpdatedAt: (ctx.settings as { updated_at?: string | null }).updated_at ?? null,
       costUpliftPercent: b.costUpliftPercent,
       base: {
         factoryCostCny: b.factoryCostCny,
