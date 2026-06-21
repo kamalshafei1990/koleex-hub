@@ -95,6 +95,14 @@ export async function GET(req: Request) {
       { factoryCostCny: costCny, qty: 1, customerCountryCode: country, customerTierCode: t.code },
       engineCtx,
     );
+    const price = r.breakdown.channelPriceUsd;
+    const cost = r.breakdown.netInternalCostUsd;
+    const refund = r.breakdown.taxRefundUsd;
+    // PURE margin = commercial margin only, never blended with the VAT refund —
+    // this is the governed number. EFFECTIVE margin adds the refund as a
+    // separate, clearly-labelled line on top.
+    const pureProfitUsd = price != null ? price - cost : null;
+    const profitWithRefundUsd = pureProfitUsd != null ? pureProfitUsd + refund : null;
     return {
       tierCode: t.code,
       tierName: t.name,
@@ -104,11 +112,20 @@ export async function GET(req: Request) {
       // after the channel price is determined"). Volume / header discounts
       // belong to the quotation, not the catalog list — this keeps the list
       // identical to the Price Calculator.
-      unitPriceUsd: r.breakdown.channelPriceUsd,
+      unitPriceUsd: price,
+      // Pure commercial margin (no tax refund) — the number the floor/approval
+      // governs against.
+      pureProfitUsd: pureProfitUsd != null ? Math.round(pureProfitUsd * 100) / 100 : null,
+      pureMarginPercent:
+        price && price > 0 ? Math.round((pureProfitUsd! / price) * 1000) / 10 : null,
+      // Tax refund as a separate line + the refund-inclusive total.
+      taxRefundUsd: Math.round(refund * 100) / 100,
+      profitWithRefundUsd: profitWithRefundUsd != null ? Math.round(profitWithRefundUsd * 100) / 100 : null,
+      marginWithRefundPercent:
+        price && price > 0 ? Math.round((profitWithRefundUsd! / price) * 1000) / 10 : null,
+      // Back-compat alias (was the pre-refund margin all along).
       effectiveMarginPercent:
-        r.breakdown.channelPriceUsd && r.breakdown.channelPriceUsd > 0
-          ? Math.round(((r.breakdown.channelPriceUsd - r.breakdown.netInternalCostUsd) / r.breakdown.channelPriceUsd) * 1000) / 10
-          : null,
+        price && price > 0 ? Math.round((pureProfitUsd! / price) * 1000) / 10 : null,
       approvalRequired: r.breakdown.approvalRequired,
     };
   });
@@ -136,6 +153,8 @@ export async function GET(req: Request) {
       fxSafetyBufferPercent: b.fxSafetyBufferPercent,
       fxUpdatedAt: (ctx.settings as { updated_at?: string | null }).updated_at ?? null,
       costUpliftPercent: b.costUpliftPercent,
+      taxRefundRatePercent: b.taxRefundRatePercent,
+      taxRefundUsd: b.taxRefundUsd,
       base: {
         factoryCostCny: b.factoryCostCny,
         netInternalCostCny: b.netInternalCostCny,

@@ -33,6 +33,12 @@ export interface CommercialSettingsRow {
    *  fx_cny_per_usd × (1 − buffer/100). The live FX above is never changed;
    *  the pricing engine prices off the effective rate. Default 0 = no change. */
   fx_safety_buffer_percent: number;
+  /** Net export VAT rebate, captured as a SEPARATE profit line — never
+   *  blended into the commercial margin. Default 10 (Kamal's net rule:
+   *  13% gross refund − 3% reserve for stray fees). Refund = landed cost
+   *  × rate. Pure margin is always computed and governed without it, so the
+   *  business can never price down to "surviving on the refund". */
+  tax_refund_rate_percent: number;
   /** Feature flag for the policy-driven pricing engine (Phase 4).
    *  When true, the engine falls back to computing from the
    *  commercial_* tables (12-step flow) for lines without an explicit

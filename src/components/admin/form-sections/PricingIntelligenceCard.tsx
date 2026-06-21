@@ -41,7 +41,8 @@ interface Preview {
     globalFobUsd: number | null;
   };
   market?: { countryCode: string | null; bandCode: string | null; adjustmentPercent: number; regionalFobUsd: number | null };
-  channels?: { tierCode: string; tierName: string; channelCode: string | null; multiplier: number; unitPriceUsd: number | null; effectiveMarginPercent: number | null; approvalRequired: boolean }[];
+  taxRefundRatePercent?: number;
+  channels?: { tierCode: string; tierName: string; channelCode: string | null; multiplier: number; unitPriceUsd: number | null; pureProfitUsd: number | null; pureMarginPercent: number | null; taxRefundUsd: number; profitWithRefundUsd: number | null; marginWithRefundPercent: number | null; effectiveMarginPercent: number | null; approvalRequired: boolean }[];
   markets?: { code: string; bandCode: string | null; adjustmentPercent: number; regionalFobUsd: number | null }[];
 }
 
@@ -220,33 +221,46 @@ export default function PricingIntelligenceCard({
               <UsersIcon className="h-4 w-4 text-[var(--text-dim)]" />
               <h4 className="text-[12px] font-semibold text-[var(--text-primary)]">Selling price by customer — {country}</h4>
             </div>
-            <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]">
-              <table className="w-full text-[12px]">
+            <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)]">
+              <table className="w-full text-[12px] min-w-[520px]">
                 <thead>
                   <tr className="bg-[var(--bg-surface-subtle)]/60 text-[9px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">
                     <th className="text-left px-3 py-2">Customer tier</th>
-                    <th className="text-left px-3 py-2">Channel</th>
                     <th className="text-right px-3 py-2">Unit price</th>
-                    <th className="text-right px-3 py-2">Margin</th>
+                    <th className="text-right px-3 py-2">Pure margin</th>
+                    <th className="text-right px-3 py-2">Tax refund</th>
+                    <th className="text-right px-3 py-2">+ Refund</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(data?.channels ?? []).map((c) => (
                     <tr key={c.tierCode} className="border-t border-[var(--border-subtle)]/60">
                       <td className="px-3 py-2 text-[var(--text-primary)]">{c.tierName}</td>
-                      <td className="px-3 py-2 text-[var(--text-dim)]">{c.channelCode ?? "—"} <span className="opacity-60">×{c.multiplier}</span></td>
                       <td className="px-3 py-2 text-right font-semibold text-[var(--text-primary)] tabular-nums">{usd(c.unitPriceUsd)}</td>
+                      {/* PURE commercial margin — the governed number. */}
                       <td className="px-3 py-2 text-right tabular-nums">
-                        <span className={c.approvalRequired ? "text-amber-400" : "text-[var(--text-dim)]"}>{pct(c.effectiveMarginPercent)}</span>
+                        <span className={`font-semibold ${c.approvalRequired ? "text-amber-400" : "text-[var(--text-primary)]"}`}>{pct(c.pureMarginPercent)}</span>
+                        <span className="block text-[10px] text-[var(--text-ghost)]">{usd(c.pureProfitUsd)}</span>
+                      </td>
+                      {/* Tax refund — a SEPARATE line, never blended in. */}
+                      <td className="px-3 py-2 text-right tabular-nums text-[var(--accent)]">
+                        +{usd(c.taxRefundUsd)}
+                      </td>
+                      {/* Margin including the refund (total picture only). */}
+                      <td className="px-3 py-2 text-right tabular-nums">
+                        <span className="text-[var(--text-secondary)]">{pct(c.marginWithRefundPercent)}</span>
+                        <span className="block text-[10px] text-[var(--text-ghost)]">{usd(c.profitWithRefundUsd)}</span>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <p className="text-[10px] text-[var(--text-ghost)] mt-1.5">Sequential channel ladder. The <b>market band</b> is applied to the base, so <b>every</b> channel price varies by market (per policy).</p>
+            <p className="text-[10px] text-[var(--text-ghost)] mt-1.5">
+              <b>Pure margin</b> is your real commercial margin — the tax refund is <b>never</b> mixed in. The <b>+ Refund</b> column adds the {pct(data?.taxRefundRatePercent ?? 0)} export VAT rebate as a separate bonus on top. Sequential channel ladder; the market band is applied to the base, so every channel varies by market.
+            </p>
             {(data?.channels ?? []).some((c) => c.approvalRequired) && (
-              <p className="text-[10px] text-amber-400/80 mt-1">Amber margin = below the level&apos;s minimum-margin floor (approval needed at that price).</p>
+              <p className="text-[10px] text-amber-400/80 mt-1">Amber <b>pure margin</b> = below the level&apos;s minimum-margin floor (approval needed) — the floor governs pure margin, so you can never price down to live on the refund.</p>
             )}
           </div>
 

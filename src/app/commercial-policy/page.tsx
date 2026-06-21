@@ -523,6 +523,7 @@ function SettingsSection({
               sales_sees_cost: !!draft.sales_sees_cost,
               cost_uplift_percent: Number(draft.cost_uplift_percent ?? 0),
               fx_safety_buffer_percent: Number(draft.fx_safety_buffer_percent ?? 0),
+              tax_refund_rate_percent: Number(draft.tax_refund_rate_percent ?? 0),
               use_policy_engine: !!draft.use_policy_engine,
               notes: draft.notes ?? null,
             },
@@ -658,6 +659,22 @@ function SettingsSection({
           step="0.1"
           onChange={(v) => ed.setDraft({ ...d, cost_uplift_percent: Number(v) })}
           renderValue={(v) => `${Number(v).toFixed(2)}%`}
+        />
+        <KpiEditable
+          label="Tax refund rate %"
+          value={d.tax_refund_rate_percent ?? 0}
+          editing={ed.editing}
+          type="number"
+          step="0.5"
+          onChange={(v) => ed.setDraft({ ...d, tax_refund_rate_percent: Number(v) })}
+          renderValue={(v) => `${Number(v).toFixed(1)}%`}
+          footer={
+            <p className="text-[10px] text-[var(--text-dim)] leading-relaxed">
+              Net export VAT rebate (e.g. 13% gross − 3% fees reserve = 10%). Shown as a
+              <span className="font-medium text-[var(--text-secondary)]"> separate</span> profit
+              line — never blended into margin. The min-margin floor governs pure margin only.
+            </p>
+          }
         />
         <KpiBool
           label="Policy engine active"

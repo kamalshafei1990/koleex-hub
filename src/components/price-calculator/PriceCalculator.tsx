@@ -102,7 +102,7 @@ interface PricingModel {
   levels: PricingModelLevel[];
   channels: PricingModelChannel[];
   tiers: PricingModelTier[];
-  settings: { fxCnyPerUsd: number | null; costUpliftPercent: number; fxSafetyBufferPercent?: number };
+  settings: { fxCnyPerUsd: number | null; costUpliftPercent: number; fxSafetyBufferPercent?: number; taxRefundRatePercent?: number };
 }
 
 /* ═══════════════════ HELPERS ═══════════════════ */
@@ -216,7 +216,12 @@ export default function PriceCalculator() {
   function generate() {
     const cntrs = liveCountries ?? pricingConfig?.countries ?? COUNTRIES;
     const country = cntrs.find(c => c.code === countryCode) ?? cntrs[0];
-    const taxRate = pricingConfig ? pricingConfig.defaultTaxRefund / 100 : TAX_REFUND_DEFAULT;
+    // Refund rate: prefer the canonical Commercial Setup value so the
+    // calculator matches the engine / Product Data Price tab; fall back to
+    // legacy pricing-config only when no policy model is loaded.
+    const taxRate = (model?.settings.taxRefundRatePercent != null)
+      ? model.settings.taxRefundRatePercent / 100
+      : (pricingConfig ? pricingConfig.defaultTaxRefund / 100 : TAX_REFUND_DEFAULT);
     const discFrac = discountPct / 100;
 
     /* ── ENGINE PATH — mirrors computePolicyPrice exactly (band on the base →

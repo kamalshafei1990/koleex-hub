@@ -32,7 +32,7 @@ export async function GET() {
       .select("code, name, level_number, is_active, sort_order")
       .eq("tenant_id", auth.tenant_id).eq("is_active", true).order("level_number", { ascending: true }),
     supabaseServer.from("commercial_settings")
-      .select("fx_cny_per_usd, cost_uplift_percent, fx_safety_buffer_percent")
+      .select("fx_cny_per_usd, cost_uplift_percent, fx_safety_buffer_percent, tax_refund_rate_percent")
       .eq("tenant_id", auth.tenant_id).maybeSingle(),
   ]);
 
@@ -57,6 +57,7 @@ export async function GET() {
         fxCnyPerUsd: settings.data ? Number(settings.data.fx_cny_per_usd) : null,
         costUpliftPercent: settings.data ? Number(settings.data.cost_uplift_percent ?? 0) : 0,
         fxSafetyBufferPercent: settings.data ? Number(settings.data.fx_safety_buffer_percent ?? 0) : 0,
+        taxRefundRatePercent: settings.data ? Number(settings.data.tax_refund_rate_percent ?? 0) : 0,
       },
     },
     { headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=600" } },

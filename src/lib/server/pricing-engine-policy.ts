@@ -89,6 +89,10 @@ export interface PolicyEngineBreakdown {
   fxEffectiveCnyPerUsd: number;
   fxSafetyBufferPercent: number;
   netInternalCostUsd: number;
+  /* Export VAT rebate — a SEPARATE profit line, never blended into margin.
+     taxRefundUsd = landed cost (USD, live FX) × rate. */
+  taxRefundRatePercent: number;
+  taxRefundUsd: number;
   /* Step 3-4. */
   productLevelCode: string | null;
   productLevelName: string | null;
@@ -175,6 +179,12 @@ export function computePolicyPrice(
   notes.push(
     `Factory ${fmt(factoryCostCny)} CNY → Net Internal ${fmt(netInternalCostCny)} CNY (uplift ${costUpliftPercent}%) → ${fmt(netInternalCostUsd, 2)} USD (fx ${fxEffectiveCnyPerUsd}${fxBufferPercent ? ` · live ${fxCnyPerUsd} − ${fxBufferPercent}% buffer` : ""}).`,
   );
+
+  /* Export VAT rebate — kept OUT of the margin. It's government cash on the
+     landed cost (which already includes the VAT), so the refund base is the
+     real purchase cost at the live FX, not the buffered/uplifted figure. */
+  const taxRefundRatePercent = Math.max(0, Math.min(30, Number(ctx.settings.tax_refund_rate_percent ?? 0)));
+  const taxRefundUsd = (factoryCostCny / fxCnyPerUsd) * (taxRefundRatePercent / 100);
 
   /* Step 3: Product Level (detect from factory cost CNY). */
   const level = ctx.productLevels
@@ -346,6 +356,8 @@ export function computePolicyPrice(
       fxEffectiveCnyPerUsd: Math.round(fxEffectiveCnyPerUsd * 1000) / 1000,
       fxSafetyBufferPercent: fxBufferPercent,
       netInternalCostUsd: round2(netInternalCostUsd),
+      taxRefundRatePercent,
+      taxRefundUsd: round2(taxRefundUsd),
       productLevelCode: level.code,
       productLevelName: level.name,
       baseMarginPercent,
@@ -405,6 +417,8 @@ function buildEmpty(
       fxEffectiveCnyPerUsd: Number(ctx.settings?.fx_cny_per_usd ?? 0) * (1 - Number(ctx.settings?.fx_safety_buffer_percent ?? 0) / 100),
       fxSafetyBufferPercent: Number(ctx.settings?.fx_safety_buffer_percent ?? 0),
       netInternalCostUsd: 0,
+      taxRefundRatePercent: Number(ctx.settings?.tax_refund_rate_percent ?? 0),
+      taxRefundUsd: 0,
       productLevelCode: null,
       productLevelName: null,
       baseMarginPercent: null,

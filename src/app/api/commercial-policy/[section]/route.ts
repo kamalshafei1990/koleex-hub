@@ -59,7 +59,7 @@ const POLICY_ADMIN_ROLES = new Set<string>([
 const SECTIONS: Record<string, SectionCfg> = {
   settings: {
     table: "commercial_settings",
-    editableFields: ["fx_cny_per_usd", "sales_sees_cost", "cost_uplift_percent", "fx_safety_buffer_percent", "use_policy_engine", "notes"],
+    editableFields: ["fx_cny_per_usd", "sales_sees_cost", "cost_uplift_percent", "fx_safety_buffer_percent", "tax_refund_rate_percent", "use_policy_engine", "notes"],
     slugColumn: null,
     slugSourceField: null,
     validate: (row) => {
@@ -77,6 +77,12 @@ const SECTIONS: Record<string, SectionCfg> = {
         const b = Number(row.fx_safety_buffer_percent);
         if (!Number.isFinite(b) || b < 0 || b > 50) {
           throw new Error("fx_safety_buffer_percent must be between 0 and 50");
+        }
+      }
+      if (row.tax_refund_rate_percent !== undefined) {
+        const tr = Number(row.tax_refund_rate_percent);
+        if (!Number.isFinite(tr) || tr < 0 || tr > 30) {
+          throw new Error("tax_refund_rate_percent must be between 0 and 30");
         }
       }
     },
