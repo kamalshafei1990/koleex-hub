@@ -110,7 +110,7 @@ export default function HRApp() {
     <div dir={lang === "ar" ? "rtl" : "ltr"} className="h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden max-w-[100vw]">
 
       {/* ═══════════ TOP BAR — Odoo-style compact header with inline menu ═══════════ */}
-      <div className="shrink-0 px-4 sm:px-5">
+      <div className="shrink-0 px-4 sm:px-5 pt-4 sm:pt-5">
         <PageHeader
           title={t("hr.title")}
           icon={<HrIcon size={16} />}
