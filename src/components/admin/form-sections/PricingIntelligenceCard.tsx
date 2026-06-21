@@ -83,6 +83,13 @@ interface AccessoryOpt {
   baseFobUsd: number | null;
 }
 
+interface SetTemplate {
+  id?: string;
+  name: string;
+  tier: string;
+  items: { accessory_product_id: string; role: string }[];
+}
+
 export default function PricingIntelligenceCard({
   costCny,
   currency,
@@ -122,6 +129,29 @@ export default function PricingIntelligenceCard({
     } catch { setAccessories([]); }
   }, [supportsCompleteSet, subcategorySlug, country]);
   useEffect(() => { loadAccessories(); }, [loadAccessories]);
+
+  // CS-3: named set templates (economy/standard/premium) for this class.
+  const [templates, setTemplates] = useState<SetTemplate[]>([]);
+  const [newTplName, setNewTplName] = useState("");
+  const [newTplTier, setNewTplTier] = useState("standard");
+  const loadTemplates = useCallback(async () => {
+    if (!supportsCompleteSet || !subcategorySlug) { setTemplates([]); return; }
+    try {
+      const r = await fetch(`/api/product-set-templates?subcategory=${encodeURIComponent(subcategorySlug)}`, { credentials: "include" });
+      const j = (await r.json().catch(() => ({}))) as { templates?: SetTemplate[] };
+      setTemplates(j?.templates ?? []);
+    } catch { setTemplates([]); }
+  }, [supportsCompleteSet, subcategorySlug]);
+  useEffect(() => { loadTemplates(); }, [loadTemplates]);
+
+  const saveTemplates = useCallback(async (next: SetTemplate[]) => {
+    if (!subcategorySlug) return;
+    await fetch("/api/product-set-templates", {
+      method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subcategory: subcategorySlug, templates: next.map((t, i) => ({ name: t.name, tier: t.tier, sort_order: i, items: t.items })) }),
+    });
+    await loadTemplates();
+  }, [subcategorySlug, loadTemplates]);
 
   // Persist the full mapping for this subcategory, then reprice.
   const saveMapping = useCallback(async (next: { accessory_product_id: string; role: string }[]) => {
@@ -447,6 +477,41 @@ export default function PricingIntelligenceCard({
                         ))}
                       </div>
                     )}
+
+                    {/* Set templates: list + remove, and save current selection. */}
+                    <div className="pt-1 border-t border-[var(--border-subtle)]/60 space-y-1.5">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">Set templates</div>
+                      {templates.map((tpl, ti) => (
+                        <div key={tpl.id ?? ti} className="flex items-center gap-2 text-[11.5px]">
+                          <span className="flex-1 truncate">{tpl.name} <span className="text-[9px] uppercase text-[var(--text-ghost)]">{tpl.tier}</span></span>
+                          <button type="button"
+                            onClick={() => saveTemplates(templates.filter((_, i) => i !== ti))}
+                            className="text-[var(--text-ghost)] hover:text-[var(--accent)] text-[14px] leading-none px-1">×</button>
+                        </div>
+                      ))}
+                      <div className="flex items-center gap-1.5">
+                        <input value={newTplName} onChange={(e) => setNewTplName(e.target.value)} placeholder="Set name (e.g. Standard)"
+                          className="flex-1 h-7 px-2 rounded-md bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[11.5px] outline-none focus:border-[var(--border-focus)]" />
+                        <select value={newTplTier} onChange={(e) => setNewTplTier(e.target.value)}
+                          className="h-7 px-1.5 rounded-md bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[11px]">
+                          <option value="economy">economy</option>
+                          <option value="standard">standard</option>
+                          <option value="premium">premium</option>
+                        </select>
+                        <button type="button" disabled={!newTplName.trim() || (!pickStand && !pickTable)}
+                          onClick={() => {
+                            const items: { accessory_product_id: string; role: string }[] = [];
+                            if (pickStand) items.push({ accessory_product_id: pickStand, role: "stand" });
+                            if (pickTable) items.push({ accessory_product_id: pickTable, role: "table" });
+                            saveTemplates([...templates, { name: newTplName.trim(), tier: newTplTier, items }]);
+                            setNewTplName("");
+                          }}
+                          className="text-[10.5px] px-2 py-1 rounded border border-[var(--border-subtle)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-40">
+                          Save selection
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-[var(--text-ghost)]">Pick a stand/table above, then save it as a named set for one-click reuse.</p>
+                    </div>
                   </div>
                 )}
                 {accessories.length === 0 ? (
@@ -455,6 +520,25 @@ export default function PricingIntelligenceCard({
                   </p>
                 ) : (
                   <>
+                    {/* One-click set templates (Economy / Standard / Premium). */}
+                    {templates.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">Sets</span>
+                        {templates.map((tpl, ti) => (
+                          <button type="button" key={tpl.id ?? ti}
+                            onClick={() => {
+                              const s = tpl.items.find((i) => i.role === "stand");
+                              const t = tpl.items.find((i) => i.role === "table");
+                              setPickStand(s ? s.accessory_product_id : null);
+                              setPickTable(t ? t.accessory_product_id : null);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 px-2.5 py-1 text-[11px] font-medium hover:border-[var(--accent)] hover:text-[var(--accent)]">
+                            {tpl.name}
+                            <span className="text-[9px] uppercase text-[var(--text-ghost)]">{tpl.tier}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     {stands.length > 0 && <Group label="Stand" items={stands} picked={pickStand} onPick={setPickStand} />}
                     {tables.length > 0 && <Group label="Table" items={tables} picked={pickTable} onPick={setPickTable} />}
                     <div className="flex items-center justify-between rounded-lg bg-[var(--accent)]/[0.06] border border-[var(--accent)]/30 px-3 py-2">
