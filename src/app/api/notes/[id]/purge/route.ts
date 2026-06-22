@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 
 /* DELETE /api/notes/[id]/purge — permanently remove the note. */
 export async function DELETE(
@@ -12,7 +12,7 @@ export async function DELETE(
   const { id } = await params;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Notes");
+  const deny = await requireModuleAction(auth, "Notes", "delete");
   if (deny) return deny;
 
   const { error } = await supabaseServer

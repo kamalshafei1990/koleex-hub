@@ -11,7 +11,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { RULE_KINDS } from "@/lib/visual-library/types";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -46,7 +46,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ cid: string }> 
 export async function POST(req: Request, ctx: { params: Promise<{ cid: string }> }) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Database");
+  const deny = await requireModuleAction(auth, "Database", "create");
   if (deny) return deny;
   const { cid } = await ctx.params;
   const colId = await resolveId(cid, auth.tenant_id);
@@ -70,7 +70,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ cid: string }>
 export async function DELETE(req: Request, ctx: { params: Promise<{ cid: string }> }) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Database");
+  const deny = await requireModuleAction(auth, "Database", "delete");
   if (deny) return deny;
   const { cid } = await ctx.params;
   const colId = await resolveId(cid, auth.tenant_id);

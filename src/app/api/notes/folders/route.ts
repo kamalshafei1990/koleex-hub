@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 
 /* GET  /api/notes/folders — list all folders owned by the caller.
    POST /api/notes/folders — create a folder.
@@ -34,7 +34,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Notes");
+  const deny = await requireModuleAction(auth, "Notes", "create");
   if (deny) return deny;
 
   const body = (await req.json()) as {

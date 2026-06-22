@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 
 /* GET    — list overrides for this account
    PUT    — upsert a single override (body: AccountPermissionOverrideInsert)
@@ -57,7 +57,7 @@ export async function PUT(
   const { id: accountId } = await params;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Accounts");
+  const deny = await requireModuleAction(auth, "Accounts", "edit");
   if (deny) return deny;
   const guard = await guardAccountInTenant(accountId, auth.tenant_id);
   if (guard) return guard;
@@ -82,7 +82,7 @@ export async function DELETE(
   const { id: accountId } = await params;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Accounts");
+  const deny = await requireModuleAction(auth, "Accounts", "delete");
   if (deny) return deny;
   const guard = await guardAccountInTenant(accountId, auth.tenant_id);
   if (guard) return guard;
@@ -108,7 +108,7 @@ export async function POST(
   const { id: accountId } = await params;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Accounts");
+  const deny = await requireModuleAction(auth, "Accounts", "create");
   if (deny) return deny;
   const guard = await guardAccountInTenant(accountId, auth.tenant_id);
   if (guard) return guard;

@@ -8,7 +8,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { pathBelongsToTenant } from "@/lib/server/storage-tenant";
 import type { AttachmentCategory, AttachmentEntityType, FinanceAttachment } from "@/lib/finance/types";
 
@@ -94,7 +94,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const att = await loadAttachment(id, auth.tenant_id);
   if (!att || att.deleted_at) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const deny = await requireModuleAccess(auth, moduleForEntity(att.entity_type));
+  const deny = await requireModuleAction(auth, moduleForEntity(att.entity_type), "edit");
   if (deny) return deny;
 
   const body = (await req.json()) as PatchBody;
@@ -163,7 +163,7 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
   if (!att) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (att.deleted_at) return NextResponse.json({ attachment: att }); // idempotent
 
-  const deny = await requireModuleAccess(auth, moduleForEntity(att.entity_type));
+  const deny = await requireModuleAction(auth, moduleForEntity(att.entity_type), "delete");
   if (deny) return deny;
 
   const { data, error } = await supabaseServer

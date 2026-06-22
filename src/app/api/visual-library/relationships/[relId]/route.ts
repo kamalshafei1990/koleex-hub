@@ -13,7 +13,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { isRelationshipType, reverseOf, coerceConfidence } from "@/lib/visual-library/relationship-fields";
 import type { RelationshipType } from "@/lib/visual-library/types";
 
@@ -27,7 +27,7 @@ async function load(relId: string, tid: string) {
 export async function PATCH(req: Request, ctx: { params: Promise<{ relId: string }> }) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Database");
+  const deny = await requireModuleAction(auth, "Database", "edit");
   if (deny) return deny;
 
   const { relId } = await ctx.params;
@@ -84,7 +84,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ relId: string
 export async function DELETE(req: Request, ctx: { params: Promise<{ relId: string }> }) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Database");
+  const deny = await requireModuleAction(auth, "Database", "delete");
   if (deny) return deny;
 
   const { relId } = await ctx.params;

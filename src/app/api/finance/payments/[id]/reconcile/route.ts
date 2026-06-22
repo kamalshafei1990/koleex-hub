@@ -35,7 +35,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import type { FinancePayment, ReconciliationStatus } from "@/lib/finance/types";
 
 type Action = "match" | "partial_match" | "mismatch" | "dispute" | "verify" | "reset";
@@ -78,7 +78,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   }
 
-  const deny = await requireModuleAccess(auth, "Finance");
+  const deny = await requireModuleAction(auth, "Finance", "edit");
   if (deny) return deny;
 
   const { data, error } = await supabaseServer.rpc("fn_payment_reconcile_transition", {

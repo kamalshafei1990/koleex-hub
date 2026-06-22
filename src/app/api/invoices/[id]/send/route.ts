@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 
 /* POST /api/invoices/:id/send — mark a draft invoice as sent and fire
    an inbox notification to the customer's account (if they have one)
@@ -13,7 +13,7 @@ type RouteCtx = { params: Promise<{ id: string }> };
 export async function POST(_req: Request, { params }: RouteCtx) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Invoices");
+  const deny = await requireModuleAction(auth, "Invoices", "edit");
   if (deny) return deny;
   const { id } = await params;
 

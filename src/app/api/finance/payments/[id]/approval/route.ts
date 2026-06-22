@@ -20,7 +20,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { isAutoApprovable } from "@/lib/finance/payment-thresholds";
 import type { ApprovalStatus, FinancePayment } from "@/lib/finance/types";
 
@@ -80,7 +80,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const payment = await loadPayment(id, auth.tenant_id);
   if (!payment) return NextResponse.json({ error: "Payment not found" }, { status: 404 });
 
-  const deny = await requireModuleAccess(auth, "Finance");
+  const deny = await requireModuleAction(auth, "Finance", "create");
   if (deny) return deny;
 
   const current = (payment.approval_status ?? "draft") as ApprovalStatus;

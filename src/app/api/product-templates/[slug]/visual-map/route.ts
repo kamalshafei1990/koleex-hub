@@ -1,7 +1,7 @@
 import "server-only";
 
 import { NextResponse, type NextRequest } from "next/server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 
 /* ---------------------------------------------------------------------------
@@ -38,7 +38,7 @@ export async function POST(
 ) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, MODULE);
+  const deny = await requireModuleAction(auth, MODULE, "create");
   if (deny) return deny;
 
   const { slug } = await ctx.params;

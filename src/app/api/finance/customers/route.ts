@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { computeCustomerTotals } from "@/lib/finance/calc";
 import { resolveBaseCurrency } from "@/lib/finance/currency";
 import type { FinanceCustomerAccount, FinanceOrder, FinancePayment } from "@/lib/finance/types";
@@ -97,7 +97,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Finance");
+  const deny = await requireModuleAction(auth, "Finance", "create");
   if (deny) return deny;
 
   const body = (await req.json()) as Partial<FinanceCustomerAccount>;

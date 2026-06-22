@@ -16,7 +16,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { buildAssetPatch, validateAssetPatch } from "@/lib/visual-library/asset-fields";
 import { logVisualAssetEvent } from "@/lib/visual-library/events";
 
@@ -49,7 +49,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Database");
+  const deny = await requireModuleAction(auth, "Database", "edit");
   if (deny) return deny;
 
   const { id } = await ctx.params;
@@ -149,7 +149,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Database");
+  const deny = await requireModuleAction(auth, "Database", "delete");
   if (deny) return deny;
 
   const { id } = await ctx.params;

@@ -7,7 +7,7 @@ import "server-only";
    ========================================================================== */
 
 import { NextResponse } from "next/server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { getItemStockSummary } from "@/lib/inventory/queries";
 import { updateInventoryItem, archiveInventoryItem } from "@/lib/inventory/items";
@@ -39,7 +39,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const { id } = await ctx.params;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, MODULE);
+  const deny = await requireModuleAction(auth, MODULE, "edit");
   if (deny) return deny;
 
   const patch = (await req.json().catch(() => null)) as Partial<InventoryItem> | null;
@@ -62,7 +62,7 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
   const { id } = await ctx.params;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, MODULE);
+  const deny = await requireModuleAction(auth, MODULE, "delete");
   if (deny) return deny;
 
   const r = await archiveInventoryItem(auth.tenant_id, id, { actor_id: auth.account_id });

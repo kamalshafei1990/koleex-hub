@@ -6,7 +6,7 @@ import "server-only";
    ========================================================================== */
 
 import { NextResponse } from "next/server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import {
   createReturn,
   listReturns,
@@ -69,7 +69,7 @@ interface CreateBody {
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, MODULE);
+  const deny = await requireModuleAction(auth, MODULE, "create");
   if (deny) return deny;
 
   const body = (await req.json().catch(() => null)) as CreateBody | null;

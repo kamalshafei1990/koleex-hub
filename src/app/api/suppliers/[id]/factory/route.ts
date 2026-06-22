@@ -10,7 +10,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { recordSectionEdits } from "@/lib/suppliers/section-audit";
 import { logSupplierEvent, actorName } from "@/lib/suppliers/timeline";
 
@@ -35,7 +35,7 @@ const FACTORY_TYPES = new Set([
 export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Suppliers");
+  const deny = await requireModuleAction(auth, "Suppliers", "edit");
   if (deny) return deny;
 
   const { id } = await ctx.params;

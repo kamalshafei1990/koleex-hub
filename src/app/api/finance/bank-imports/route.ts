@@ -17,7 +17,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { createHash } from "node:crypto";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import type { BankStatementImport, BankStatementFileType } from "@/lib/finance/types";
 
 const DUP_WINDOW_DAYS = 30;
@@ -66,7 +66,7 @@ function inferFileType(name: string, mime: string | undefined): BankStatementFil
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Finance");
+  const deny = await requireModuleAction(auth, "Finance", "create");
   if (deny) return deny;
 
   const form = await req.formData();

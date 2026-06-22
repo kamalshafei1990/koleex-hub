@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 
 /* ---------------------------------------------------------------------------
    /api/calendar/holidays  (report GEN-10)
@@ -57,7 +57,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Calendar");
+  const deny = await requireModuleAction(auth, "Calendar", "create");
   if (deny) return deny;
 
   if (!auth.is_super_admin) {

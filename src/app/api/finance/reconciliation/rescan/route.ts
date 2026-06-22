@@ -25,7 +25,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import type {
   CashMovement,
   FinancePayment,
@@ -42,7 +42,7 @@ const LOOKBACK_DAYS = 180;
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Finance");
+  const deny = await requireModuleAction(auth, "Finance", "edit");
   if (deny) return deny;
 
   const body = (await req.json().catch(() => ({}))) as Body;

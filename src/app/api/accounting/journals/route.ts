@@ -11,7 +11,7 @@ import "server-only";
    ========================================================================== */
 
 import { NextResponse } from "next/server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { resolveBaseCurrency } from "@/lib/finance/currency";
 import type { JournalEntry, JournalLine } from "@/lib/accounting/types";
@@ -62,7 +62,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Finance");
+  const deny = await requireModuleAction(auth, "Finance", "create");
   if (deny) return deny;
 
   const body = (await req.json().catch(() => null)) as ManualEntryBody | null;

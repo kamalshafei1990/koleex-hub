@@ -16,7 +16,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 
 type Level = "division" | "category" | "subcategory" | "kind";
 const LEVELS: Level[] = ["division", "category", "subcategory", "kind"];
@@ -53,7 +53,7 @@ export async function GET() {
 export async function PUT(req: Request) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Database");
+  const deny = await requireModuleAction(auth, "Database", "edit");
   if (deny) return deny;
 
   let body: { level?: string; slug?: string; icon_asset_id?: string | null; icon_url?: string | null };

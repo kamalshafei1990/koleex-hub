@@ -14,7 +14,7 @@ import "server-only";
    ========================================================================== */
 
 import { NextResponse } from "next/server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { receivePurchaseOrder } from "@/lib/purchase/receiving";
 import type { ReceiveRequest } from "@/lib/purchase/types";
 
@@ -22,7 +22,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const { id } = await ctx.params;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Purchase");
+  const deny = await requireModuleAction(auth, "Purchase", "edit");
   if (deny) return deny;
 
   const body = (await req.json().catch(() => null)) as ReceiveRequest | null;

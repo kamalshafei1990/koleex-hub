@@ -1,7 +1,7 @@
 import "server-only";
 
 import { NextResponse, type NextRequest } from "next/server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { validateValueShape } from "@/lib/product-templates/validate";
 import type { ProductTemplateField } from "@/lib/product-templates/types";
@@ -163,7 +163,7 @@ export async function POST(
      write API). */
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, MODULE);
+  const deny = await requireModuleAction(auth, MODULE, "create");
   if (deny) return deny;
 
   const { slug, productId } = await ctx.params;

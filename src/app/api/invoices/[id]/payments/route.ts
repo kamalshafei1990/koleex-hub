@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { resolveBaseCurrency } from "@/lib/finance/currency";
 
 /* GET  /api/invoices/:id/payments — list payments
@@ -31,7 +31,7 @@ export async function GET(_req: Request, { params }: RouteCtx) {
 export async function POST(req: Request, { params }: RouteCtx) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Invoices");
+  const deny = await requireModuleAction(auth, "Invoices", "create");
   if (deny) return deny;
   const { id } = await params;
 

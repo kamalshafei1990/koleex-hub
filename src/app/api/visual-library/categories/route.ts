@@ -13,7 +13,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { GENERAL_ICON_CATEGORIES } from "@/lib/visual-library/taxonomy";
 
 type Cat = { key: string; label: string; code: string; custom?: boolean };
@@ -56,7 +56,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Database");
+  const deny = await requireModuleAction(auth, "Database", "create");
   if (deny) return deny;
 
   let body: { label?: string; code?: string; description?: string };

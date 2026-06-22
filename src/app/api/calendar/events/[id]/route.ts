@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 
 /* PATCH /api/calendar/events/[id]
    Update a single event. Caller must own the calendar (account_id = me)
@@ -16,7 +16,7 @@ export async function PATCH(
   const { id } = await params;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Calendar");
+  const deny = await requireModuleAction(auth, "Calendar", "edit");
   if (deny) return deny;
 
   const existing = await loadEvent(id, auth.tenant_id);
@@ -58,7 +58,7 @@ export async function DELETE(
   const { id } = await params;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Calendar");
+  const deny = await requireModuleAction(auth, "Calendar", "delete");
   if (deny) return deny;
 
   const existing = await loadEvent(id, auth.tenant_id);

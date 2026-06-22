@@ -15,7 +15,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import type {
   AttachmentCategory,
   AttachmentEntityType,
@@ -98,7 +98,7 @@ export async function POST(req: Request) {
   }
 
   /* Module permission gate. */
-  const deny = await requireModuleAccess(auth, moduleForEntity(body.entity_type));
+  const deny = await requireModuleAction(auth, moduleForEntity(body.entity_type), "create");
   if (deny) return deny;
 
   /* ── Entity ownership check ─────────────────────────────────── */

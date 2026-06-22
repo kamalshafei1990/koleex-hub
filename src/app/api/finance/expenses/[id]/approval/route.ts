@@ -26,7 +26,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import type { ApprovalStatus, FinanceExpense } from "@/lib/finance/types";
 
 type Action =
@@ -101,7 +101,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   /* Permission: review actions require Finance module access; submit
      and reset only require the Expenses gate. */
   const moduleNeeded = actionRequiresApproverRole(body.action) ? "Finance" : "Expenses";
-  const deny = await requireModuleAccess(auth, moduleNeeded);
+  const deny = await requireModuleAction(auth, moduleNeeded, "create");
   if (deny) return deny;
 
   const current = (expense.approval_status ?? "draft") as ApprovalStatus;

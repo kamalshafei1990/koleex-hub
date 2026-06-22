@@ -10,7 +10,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { compatibilityScore, assetViolations } from "@/lib/visual-library/governance";
 import { logVisualAssetEvent } from "@/lib/visual-library/events";
 import { RULE_KINDS } from "@/lib/visual-library/types";
@@ -58,7 +58,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Database");
+  const deny = await requireModuleAction(auth, "Database", "create");
   if (deny) return deny;
   const { id } = await ctx.params;
 
@@ -82,7 +82,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Database");
+  const deny = await requireModuleAction(auth, "Database", "delete");
   if (deny) return deny;
   const { id } = await ctx.params;
   const ruleId = new URL(req.url).searchParams.get("rule_id");

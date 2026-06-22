@@ -26,7 +26,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 
 /* Map contact_type → ERP module name. Unknown / missing types fall
    back to "Customers" which is the broadest directory view. */
@@ -97,7 +97,7 @@ export async function POST(req: Request) {
   const body = (await req.json()) as Record<string, unknown>;
   const submittedType = typeof body.contact_type === "string" ? body.contact_type : null;
 
-  const deny = await requireModuleAccess(auth, moduleForType(submittedType));
+  const deny = await requireModuleAction(auth, moduleForType(submittedType), "create");
   if (deny) return deny;
 
   /* ── Canonical name derivation (data boundary) ──

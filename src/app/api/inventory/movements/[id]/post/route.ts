@@ -11,7 +11,7 @@ import "server-only";
    ========================================================================== */
 
 import { NextResponse } from "next/server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { postInventoryMovement } from "@/lib/inventory/posting";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { guardPostingApproval } from "@/lib/inventory/discipline";
@@ -22,7 +22,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
   const { id } = await ctx.params;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Inventory");
+  const deny = await requireModuleAction(auth, "Inventory", "edit");
   if (deny) return deny;
 
   /* INV-H2 — Approval gate (route layer). Loading the draft once here

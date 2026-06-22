@@ -19,7 +19,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import type { BankStatementRow } from "@/lib/finance/types";
 
 interface RowUpdate {
@@ -46,7 +46,7 @@ const ALLOWED_FIELDS: Array<keyof BankStatementRow> = [
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Finance");
+  const deny = await requireModuleAction(auth, "Finance", "edit");
   if (deny) return deny;
   const { id } = await ctx.params;
 

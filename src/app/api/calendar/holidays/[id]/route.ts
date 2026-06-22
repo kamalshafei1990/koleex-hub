@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 
 /* DELETE /api/calendar/holidays/[id] — soft-delete (is_active=false) a holiday.
    Super Admin only, tenant-scoped. (Report GEN-10) */
@@ -12,7 +12,7 @@ export async function DELETE(
 ) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Calendar");
+  const deny = await requireModuleAction(auth, "Calendar", "delete");
   if (deny) return deny;
   if (!auth.is_super_admin) {
     return NextResponse.json({ error: "Only a Super Admin can manage holidays." }, { status: 403 });

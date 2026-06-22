@@ -6,7 +6,7 @@ import "server-only";
    movements (super-admin OR can_void_movements). */
 
 import { NextResponse } from "next/server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { voidTransfer } from "@/lib/inventory/transfers";
 import { loadInventoryPermissions } from "@/lib/inventory/permissions";
 import { logInventoryAudit } from "@/lib/inventory/audit";
@@ -16,7 +16,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const { id } = await ctx.params;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Inventory");
+  const deny = await requireModuleAction(auth, "Inventory", "edit");
   if (deny) return deny;
 
   const perms = await loadInventoryPermissions(auth);

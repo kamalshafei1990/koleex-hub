@@ -10,7 +10,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 
 export async function DELETE(
   req: Request,
@@ -18,7 +18,7 @@ export async function DELETE(
 ) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Suppliers");
+  const deny = await requireModuleAction(auth, "Suppliers", "delete");
   if (deny) return deny;
 
   const { id, eventId } = await ctx.params;

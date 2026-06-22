@@ -4,7 +4,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { BOARD_TYPES } from "@/lib/visual-library/types";
 
 const BTYPES = new Set<string>(BOARD_TYPES);
@@ -32,7 +32,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Database");
+  const deny = await requireModuleAction(auth, "Database", "create");
   if (deny) return deny;
   const tid = auth.tenant_id;
 

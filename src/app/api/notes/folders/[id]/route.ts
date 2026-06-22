@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 
 /* PATCH  /api/notes/folders/[id] — rename / move / reorder
    DELETE /api/notes/folders/[id] — delete folder (notes inside get folder_id=null
@@ -25,7 +25,7 @@ export async function PATCH(
   const { id } = await params;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Notes");
+  const deny = await requireModuleAction(auth, "Notes", "edit");
   if (deny) return deny;
 
   if (!(await ownsFolder(id, auth.account_id))) {
@@ -56,7 +56,7 @@ export async function DELETE(
   const { id } = await params;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Notes");
+  const deny = await requireModuleAction(auth, "Notes", "delete");
   if (deny) return deny;
 
   if (!(await ownsFolder(id, auth.account_id))) {

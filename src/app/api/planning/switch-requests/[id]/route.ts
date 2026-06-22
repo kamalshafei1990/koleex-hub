@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 
 /* PATCH /api/planning/switch-requests/:id — approve / reject / cancel.
    body: { status: "approved" | "rejected" | "cancelled" }
@@ -14,7 +14,7 @@ type RouteCtx = { params: Promise<{ id: string }> };
 export async function PATCH(req: Request, { params }: RouteCtx) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Planning");
+  const deny = await requireModuleAction(auth, "Planning", "edit");
   if (deny) return deny;
   const { id } = await params;
 

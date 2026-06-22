@@ -11,13 +11,13 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { COVERAGE_ROLES, type CoverageRole } from "@/lib/suppliers/coverage";
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Suppliers");
+  const deny = await requireModuleAction(auth, "Suppliers", "edit");
   if (deny) return deny;
   const { id } = await ctx.params;
   const tid = auth.tenant_id;
@@ -48,7 +48,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Suppliers");
+  const deny = await requireModuleAction(auth, "Suppliers", "delete");
   if (deny) return deny;
   const { id } = await ctx.params;
   const tid = auth.tenant_id;

@@ -11,7 +11,7 @@ import "server-only";
    ========================================================================== */
 
 import { NextResponse } from "next/server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 
 const MODULE = "Inventory";
@@ -19,7 +19,7 @@ const MODULE = "Inventory";
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, MODULE);
+  const deny = await requireModuleAction(auth, MODULE, "edit");
   if (deny) return deny;
 
   const body = (await req.json().catch(() => ({}))) as { allow_create_product?: boolean };

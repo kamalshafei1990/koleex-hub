@@ -3,7 +3,7 @@ import "server-only";
 /* POST /api/inventory/returns/[id]/submit — draft → pending */
 
 import { NextResponse } from "next/server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { transitionReturn } from "@/lib/inventory/returns";
 import { humanizeError } from "@/lib/ui/humanize-error";
 
@@ -11,7 +11,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
   const { id } = await ctx.params;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Inventory");
+  const deny = await requireModuleAction(auth, "Inventory", "edit");
   if (deny) return deny;
 
   const r = await transitionReturn(auth.tenant_id, id, "pending", auth.account_id);

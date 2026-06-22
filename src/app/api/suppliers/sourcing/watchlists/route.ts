@@ -10,7 +10,7 @@ import "server-only";
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { resolveCallerTier, visibleTiers } from "@/lib/suppliers/intelligence";
 import { logSupplierEvent, actorName } from "@/lib/suppliers/timeline";
 
@@ -43,7 +43,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Suppliers");
+  const deny = await requireModuleAction(auth, "Suppliers", "create");
   if (deny) return deny;
 
   const tier = resolveCallerTier(auth);

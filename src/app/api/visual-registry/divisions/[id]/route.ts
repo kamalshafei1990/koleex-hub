@@ -3,13 +3,13 @@ import "server-only";
 /* /api/visual-registry/divisions/[id] — PATCH (edit) + DELETE (soft archive). */
 
 import { NextResponse } from "next/server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { ENTITIES, patchEntity, archiveEntity } from "@/lib/visual-library/registry-crud";
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Database");
+  const deny = await requireModuleAction(auth, "Database", "edit");
   if (deny) return deny;
   const { id } = await ctx.params;
   let body: Record<string, unknown>;
@@ -22,7 +22,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Database");
+  const deny = await requireModuleAction(auth, "Database", "delete");
   if (deny) return deny;
   const { id } = await ctx.params;
   const r = await archiveEntity(ENTITIES.divisions, auth.tenant_id, id);

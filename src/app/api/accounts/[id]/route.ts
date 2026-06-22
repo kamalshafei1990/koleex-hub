@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { derivePasswordState } from "@/lib/server/password-state";
 
 /* GET    /api/accounts/[id] — fetch single account with person, company,
@@ -131,7 +131,7 @@ export async function PATCH(
   const { id } = await params;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Accounts");
+  const deny = await requireModuleAction(auth, "Accounts", "edit");
   if (deny) return deny;
 
   if (!(await existsInTenant(id, auth.tenant_id))) {
@@ -168,7 +168,7 @@ export async function DELETE(
   const { id } = await params;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Accounts");
+  const deny = await requireModuleAction(auth, "Accounts", "delete");
   if (deny) return deny;
 
   if (!(await existsInTenant(id, auth.tenant_id))) {

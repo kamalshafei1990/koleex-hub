@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { deptsFromFields, recordSectionEdits } from "@/lib/suppliers/section-audit";
 
 /* PATCH /api/contacts/[id] — update a contact. Tenant-enforced.
@@ -62,7 +62,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const deny = await requireModuleAccess(auth, moduleForType(existing.contact_type));
+  const deny = await requireModuleAction(auth, moduleForType(existing.contact_type), "edit");
   if (deny) return deny;
 
   const patch = (await req.json()) as Record<string, unknown>;
@@ -75,7 +75,7 @@ export async function PATCH(
      the destination module. Otherwise you could launder a supplier
      into a customer entry and read the cost-linked fields. */
   if (typeof patch.contact_type === "string" && patch.contact_type !== existing.contact_type) {
-    const denyDest = await requireModuleAccess(auth, moduleForType(patch.contact_type));
+    const denyDest = await requireModuleAction(auth, moduleForType(patch.contact_type), "edit");
     if (denyDest) return denyDest;
   }
 
@@ -135,7 +135,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const deny = await requireModuleAccess(auth, moduleForType(existing.contact_type));
+  const deny = await requireModuleAction(auth, moduleForType(existing.contact_type), "delete");
   if (deny) return deny;
 
   const { error } = await supabaseServer

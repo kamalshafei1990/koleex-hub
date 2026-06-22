@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 
 /* GET  /api/planning/templates — list shift templates for this tenant
    POST /api/planning/templates — create a new template */
@@ -27,7 +27,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Planning");
+  const deny = await requireModuleAction(auth, "Planning", "create");
   if (deny) return deny;
 
   const body = (await req.json()) as {

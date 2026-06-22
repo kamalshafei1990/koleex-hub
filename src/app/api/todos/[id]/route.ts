@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 
 /* PATCH /api/todos/[id] — update fields + optionally re-sync assignees.
    DELETE /api/todos/[id] — remove the todo + assignees/notes (cascade).
@@ -50,7 +50,7 @@ export async function PATCH(
   const { id } = await params;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "To-do");
+  const deny = await requireModuleAction(auth, "To-do", "edit");
   if (deny) return deny;
 
   const existing = await loadTodo(id, auth.tenant_id);
@@ -104,7 +104,7 @@ export async function DELETE(
   const { id } = await params;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "To-do");
+  const deny = await requireModuleAction(auth, "To-do", "delete");
   if (deny) return deny;
 
   const existing = await loadTodo(id, auth.tenant_id);

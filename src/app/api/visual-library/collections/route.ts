@@ -9,7 +9,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { buildCollectionPatch, validateCollectionPatch, slugify } from "@/lib/visual-library/collection-fields";
 
 function publicUrl(bucket: string | null, path: string | null): string | null {
@@ -69,7 +69,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Database");
+  const deny = await requireModuleAction(auth, "Database", "create");
   if (deny) return deny;
 
   let body: Record<string, unknown>;

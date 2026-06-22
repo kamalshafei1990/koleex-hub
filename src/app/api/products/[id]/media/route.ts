@@ -2,7 +2,7 @@ import "server-only";
 import { humanizeError } from "@/lib/ui/humanize-error";
 
 import { NextResponse } from "next/server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 
 /* ---------------------------------------------------------------------------
@@ -103,7 +103,7 @@ export async function POST(
 ) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Product Data");
+  const deny = await requireModuleAction(auth, "Product Data", "create");
   if (deny) return deny;
 
   const { id } = await ctx.params;

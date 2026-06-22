@@ -12,7 +12,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { logSupplierEvent, actorName } from "@/lib/suppliers/timeline";
 
 const QR_CATEGORIES = new Set([
@@ -25,7 +25,7 @@ const VISIBILITY_TIERS = new Set([
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Suppliers");
+  const deny = await requireModuleAction(auth, "Suppliers", "create");
   if (deny) return deny;
 
   const { id } = await ctx.params;

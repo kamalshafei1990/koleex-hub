@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { calcInvoiceTotals, type LineInput } from "@/lib/server/invoice-totals";
 
 /* PUT /api/invoices/:id/lines — replace every line on the invoice and
@@ -14,7 +14,7 @@ type RouteCtx = { params: Promise<{ id: string }> };
 export async function PUT(req: Request, { params }: RouteCtx) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Invoices");
+  const deny = await requireModuleAction(auth, "Invoices", "edit");
   if (deny) return deny;
   const { id } = await params;
 

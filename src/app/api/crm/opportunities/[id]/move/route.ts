@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 
 /* POST /api/crm/opportunities/[id]/move
    Body: { stageId: string; isWonStage: boolean }
@@ -15,7 +15,7 @@ export async function POST(
   const { id } = await params;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "CRM");
+  const deny = await requireModuleAction(auth, "CRM", "edit");
   if (deny) return deny;
 
   const body = (await req.json()) as { stageId: string; isWonStage: boolean };

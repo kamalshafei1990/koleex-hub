@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { assertScopeShadowForRow, toScopeContext } from "@/lib/server/apply-scope";
 import { getScopeMode } from "@/lib/server/scope-flags";
 import { isCustomerEnforced, ownsQuotation } from "@/lib/server/customer-quotation-guard";
@@ -33,10 +33,10 @@ async function nextInvoiceNumber(tenantId: string): Promise<string> {
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const denyInv = await requireModuleAccess(auth, "Invoices");
+  const denyInv = await requireModuleAction(auth, "Invoices", "create");
   if (denyInv) return denyInv;
   // Caller also needs quotation view to read the source.
-  const denyQuote = await requireModuleAccess(auth, "Quotations");
+  const denyQuote = await requireModuleAction(auth, "Quotations", "create");
   if (denyQuote) return denyQuote;
 
   const body = (await req.json()) as { quotation_id: string; due_date?: string };
