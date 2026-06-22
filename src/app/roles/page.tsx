@@ -682,8 +682,16 @@ export default function RolesPage() {
   const handleDeleteConfirm = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
-    await deleteRole(deleteTarget.id);
+    const res = await deleteRole(deleteTarget.id);
     setDeleting(false);
+    // Surface the real outcome. The API now returns 409 when accounts still
+    // use the role (deleting would lock those users out), so a failure must
+    // NOT masquerade as "deleted". Keep the dialog open so the message has
+    // context and the admin can cancel.
+    if (!res.ok) {
+      setToast(res.error || t("err.generic"));
+      return;
+    }
     setDeleteTarget(null);
     if (selectedRoleId === deleteTarget.id) setSelectedRoleId(null);
     await loadRoles();
