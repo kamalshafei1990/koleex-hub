@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth } from "@/lib/server/auth";
+import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 
 /* GET /api/employees/[id] — full profile joined across tables.
  *
@@ -77,8 +77,10 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const auth = await requireAuth();
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
+  const denied = await requireModuleAction(auth, "Employees", "edit");
+  if (denied) return denied;
 
   let q = supabaseServer.from("koleex_employees").select("id").eq("id", id);
   if (auth.tenant_id) q = q.eq("tenant_id", auth.tenant_id);

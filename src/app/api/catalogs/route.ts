@@ -11,7 +11,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 
 /* Columns a client is allowed to set. Everything else (id, tenant_id,
    created_by, timestamps) is owned by the server. */
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
 
-  const deny = await requireModuleAccess(auth, "Suppliers");
+  const deny = await requireModuleAction(auth, "Suppliers", "create");
   if (deny) return deny;
 
   const body = (await req.json()) as Record<string, unknown>;

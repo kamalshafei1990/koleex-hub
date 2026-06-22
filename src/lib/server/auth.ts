@@ -312,3 +312,90 @@ export async function requireModuleAccess(
   }
   return null;
 }
+
+export type ModuleAction = "view" | "create" | "edit" | "delete";
+
+/**
+ * Require that the caller's role grants a SPECIFIC ACTION (create / edit /
+ * delete, or plain view) on a module. This is what makes the Add / Edit /
+ * Delete columns in the Roles & Permissions admin actually MEAN something on
+ * the server — `requireModuleAccess` only ever checked `can_view`, so a role
+ * with view-but-not-create could still POST.
+ *
+ * Semantics:
+ *   · Super Admin bypasses everything.
+ *   · No role assigned → 403.
+ *   · A per-account override that HIDES the module (can_view=false) denies all
+ *     actions on it (you can't act on something you can't see).
+ *   · Otherwise the role's koleex_permissions row must grant the action:
+ *       view   → can_view
+ *       create → can_create
+ *       edit   → can_edit
+ *       delete → can_delete
+ *   · Fail-closed on DB error (500) — never grant on an unverified query.
+ *
+ * Use at the top of mutation handlers, e.g.:
+ *   const denied = await requireModuleAction(auth, "Products", "create");
+ *   if (denied) return denied;
+ */
+export async function requireModuleAction(
+  auth: ServerAuthContext,
+  moduleName: string,
+  action: ModuleAction,
+): Promise<NextResponse | null> {
+  if (auth.is_super_admin) return null;
+
+  if (!auth.role_id) {
+    return NextResponse.json({ error: "No role assigned" }, { status: 403 });
+  }
+
+  const [rolePermRes, overrideRes] = await Promise.all([
+    supabaseServer
+      .from("koleex_permissions")
+      .select("can_view, can_create, can_edit, can_delete, module_name")
+      .eq("role_id", auth.role_id)
+      .ilike("module_name", moduleName)
+      .maybeSingle(),
+    supabaseServer
+      .from("account_permission_overrides")
+      .select("can_view, module_key")
+      .eq("account_id", auth.account_id)
+      .ilike("module_key", moduleName)
+      .maybeSingle(),
+  ]);
+
+  if (rolePermRes.error || overrideRes.error) {
+    console.error(
+      "[requireModuleAction]",
+      rolePermRes.error?.message ?? overrideRes.error?.message,
+    );
+    return NextResponse.json({ error: "Permission check failed" }, { status: 500 });
+  }
+
+  // A hide-override blocks every action on the module.
+  if (overrideRes.data !== null && overrideRes.data?.can_view === false) {
+    return NextResponse.json({ error: `No access to ${moduleName}` }, { status: 403 });
+  }
+
+  const row = rolePermRes.data as
+    | { can_view?: boolean; can_create?: boolean; can_edit?: boolean; can_delete?: boolean }
+    | null;
+  const col =
+    action === "create" ? row?.can_create
+    : action === "edit" ? row?.can_edit
+    : action === "delete" ? row?.can_delete
+    : row?.can_view;
+
+  if (col !== true) {
+    const verb =
+      action === "create" ? "create"
+      : action === "edit" ? "edit"
+      : action === "delete" ? "delete"
+      : "view";
+    return NextResponse.json(
+      { error: `Your role can't ${verb} ${moduleName}.` },
+      { status: 403 },
+    );
+  }
+  return null;
+}

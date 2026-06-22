@@ -10,7 +10,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 
 const BUCKET = "media";
 
@@ -28,7 +28,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
 
-  const deny = await requireModuleAccess(auth, "Suppliers");
+  const deny = await requireModuleAction(auth, "Suppliers", "edit");
   if (deny) return deny;
 
   const body = (await req.json()) as Record<string, unknown>;
@@ -54,7 +54,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
 
-  const deny = await requireModuleAccess(auth, "Suppliers");
+  const deny = await requireModuleAction(auth, "Suppliers", "delete");
   if (deny) return deny;
 
   // Load the row (tenant-scoped) so we know which storage files to remove and

@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 
 /* GET  /api/projects — list projects (tenant-scoped).
      Query:
@@ -60,7 +60,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Projects");
+  const deny = await requireModuleAction(auth, "Projects", "create");
   if (deny) return deny;
 
   const body = (await req.json()) as {

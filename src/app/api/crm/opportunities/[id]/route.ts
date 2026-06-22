@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 
 /* PATCH  /api/crm/opportunities/[id]  — partial update
    DELETE /api/crm/opportunities/[id]  — remove
@@ -62,7 +62,7 @@ export async function PATCH(
   const { id } = await params;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "CRM");
+  const deny = await requireModuleAction(auth, "CRM", "edit");
   if (deny) return deny;
 
   if (!(await existsInTenant(id, auth.tenant_id))) {
@@ -106,7 +106,7 @@ export async function DELETE(
   const { id } = await params;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "CRM");
+  const deny = await requireModuleAction(auth, "CRM", "delete");
   if (deny) return deny;
 
   if (!(await existsInTenant(id, auth.tenant_id))) {

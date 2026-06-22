@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth } from "@/lib/server/auth";
+import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 
 /* GET /api/employees — list every employee in the caller's tenant,
    joined with the person / assignment / department / position records
@@ -143,8 +143,10 @@ export async function GET(req: Request) {
 
 /* POST /api/employees — create a koleex_employees row (tenant_id enforced). */
 export async function POST(req: Request) {
-  const auth = await requireAuth();
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
+  const denied = await requireModuleAction(auth, "Employees", "create");
+  if (denied) return denied;
 
   const body = (await req.json()) as Record<string, unknown>;
   const row = { ...body, tenant_id: auth.tenant_id };

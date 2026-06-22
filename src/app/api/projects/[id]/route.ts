@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
@@ -31,7 +31,7 @@ export async function GET(_req: Request, { params }: RouteCtx) {
 export async function PATCH(req: Request, { params }: RouteCtx) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Projects");
+  const deny = await requireModuleAction(auth, "Projects", "edit");
   if (deny) return deny;
   const { id } = await params;
 
@@ -60,7 +60,7 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
 export async function DELETE(_req: Request, { params }: RouteCtx) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Projects");
+  const deny = await requireModuleAction(auth, "Projects", "delete");
   if (deny) return deny;
   const { id } = await params;
 

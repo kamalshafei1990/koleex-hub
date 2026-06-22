@@ -8,7 +8,7 @@ import "server-only";
    ========================================================================== */
 
 import { NextResponse } from "next/server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { listPurchaseOrders } from "@/lib/purchase/queries";
 import { resolveBaseCurrency } from "@/lib/finance/currency";
@@ -75,7 +75,7 @@ function generatePoNo(): string {
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, MODULE);
+  const deny = await requireModuleAction(auth, MODULE, "create");
   if (deny) return deny;
 
   const body = (await req.json().catch(() => null)) as CreatePoBody | null;
