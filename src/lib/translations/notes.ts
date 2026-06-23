@@ -43,6 +43,16 @@ export const notesT: Translations = {
   "share.sharedBy":    { en: "Shared by",            zh: "共享者",             ar: "تمت المشاركة بواسطة" },
   "share.noteColour":  { en: "Note colour",          zh: "笔记颜色",           ar: "لون الملاحظة" },
 
+  /* Toolbar tooltips */
+  "tt.alignLeft":      { en: "Align left",           zh: "左对齐",             ar: "محاذاة لليسار" },
+  "tt.alignCenter":    { en: "Align center",         zh: "居中对齐",           ar: "محاذاة للوسط" },
+  "tt.alignRight":     { en: "Align right",          zh: "右对齐",             ar: "محاذاة لليمين" },
+  "tt.textColour":     { en: "Text colour",          zh: "文字颜色",           ar: "لون النص" },
+  "tt.image":          { en: "Insert image",         zh: "插入图片",           ar: "إدراج صورة" },
+  "tt.divider":        { en: "Divider",              zh: "分隔线",             ar: "فاصل" },
+  "tt.table":          { en: "Insert table",         zh: "插入表格",           ar: "إدراج جدول" },
+  "tt.clear":          { en: "Clear formatting",     zh: "清除格式",           ar: "مسح التنسيق" },
+
   "folders":           { en: "Folders",              zh: "文件夹",             ar: "المجلدات" },
   "newFolder":         { en: "New Folder",           zh: "新建文件夹",         ar: "مجلد جديد" },
   "newSubfolder":      { en: "New Subfolder",        zh: "新建子文件夹",       ar: "مجلد فرعي جديد" },

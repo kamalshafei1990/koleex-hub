@@ -593,15 +593,21 @@ function EditorToolbar({
   if (!editor) return null;
 
   const TB = ({ active, onClick, title, children }: { active?: boolean; onClick: () => void; title: string; children: React.ReactNode }) => (
-    <button
-      type="button"
-      disabled={readOnly}
-      onClick={onClick}
-      title={title}
-      className={`h-8 min-w-[32px] px-2 rounded-lg text-[12px] font-semibold flex items-center justify-center transition-all border ${active ? "bg-[var(--bg-surface-active)] border-[var(--border-focus)] text-[var(--text-primary)]" : "bg-transparent border-transparent text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"} disabled:opacity-40 disabled:cursor-not-allowed`}
-    >
-      {children}
-    </button>
+    <span className="relative inline-flex group/tt">
+      <button
+        type="button"
+        disabled={readOnly}
+        onClick={onClick}
+        aria-label={title}
+        className={`h-8 min-w-[32px] px-2 rounded-lg text-[12px] font-semibold flex items-center justify-center transition-all border ${active ? "bg-[var(--bg-surface-active)] border-[var(--border-focus)] text-[var(--text-primary)]" : "bg-transparent border-transparent text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"} disabled:opacity-40 disabled:cursor-not-allowed`}
+      >
+        {children}
+      </button>
+      {/* Branded tooltip — fades in after ~0.5s of hover (delay on enter only) */}
+      <span className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 z-[70] whitespace-nowrap rounded-md bg-[var(--bg-inverted)] px-2 py-1 text-[10.5px] font-medium text-[var(--text-inverted)] shadow-lg opacity-0 transition-opacity duration-150 [transition-delay:0ms] group-hover/tt:opacity-100 group-hover/tt:[transition-delay:500ms]">
+        {title}
+      </span>
+    </span>
   );
 
   const inTable = editor.isActive("table");
@@ -637,7 +643,7 @@ function EditorToolbar({
         <TB active={editor.isActive("strike")} onClick={() => editor.chain().focus().toggleStrike().run()} title={t("fmt.strike")}><StrikethroughIcon className="h-3.5 w-3.5" /></TB>
         <TB active={editor.isActive("highlight")} onClick={() => editor.chain().focus().toggleHighlight().run()} title={t("fmt.highlight")}><HighlighterIcon className="h-3.5 w-3.5" /></TB>
         <div className="relative">
-          <TB active={editor.isActive("textStyle")} onClick={() => setTextColorOpen((v) => !v)} title="Text colour">
+          <TB active={editor.isActive("textStyle")} onClick={() => setTextColorOpen((v) => !v)} title={t("tt.textColour")}>
             <span className="flex flex-col items-center justify-center leading-none">
               <span className="text-[11px] font-bold">A</span>
               <span className="h-[2px] w-3.5 rounded mt-0.5" style={{ background: "#0066FF" }} />
@@ -659,13 +665,13 @@ function EditorToolbar({
 
       {/* Align */}
       <Group>
-        <TB active={editor.isActive({ textAlign: "left" })} onClick={() => editor.chain().focus().setTextAlign("left").run()} title="Align left">
+        <TB active={editor.isActive({ textAlign: "left" })} onClick={() => editor.chain().focus().setTextAlign("left").run()} title={t("tt.alignLeft")}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="14" y2="12" /><line x1="4" y1="18" x2="18" y2="18" /></svg>
         </TB>
-        <TB active={editor.isActive({ textAlign: "center" })} onClick={() => editor.chain().focus().setTextAlign("center").run()} title="Align center">
+        <TB active={editor.isActive({ textAlign: "center" })} onClick={() => editor.chain().focus().setTextAlign("center").run()} title={t("tt.alignCenter")}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="4" y1="6" x2="20" y2="6" /><line x1="7" y1="12" x2="17" y2="12" /><line x1="5" y1="18" x2="19" y2="18" /></svg>
         </TB>
-        <TB active={editor.isActive({ textAlign: "right" })} onClick={() => editor.chain().focus().setTextAlign("right").run()} title="Align right">
+        <TB active={editor.isActive({ textAlign: "right" })} onClick={() => editor.chain().focus().setTextAlign("right").run()} title={t("tt.alignRight")}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="4" y1="6" x2="20" y2="6" /><line x1="10" y1="12" x2="20" y2="12" /><line x1="6" y1="18" x2="20" y2="18" /></svg>
         </TB>
       </Group>
@@ -683,20 +689,20 @@ function EditorToolbar({
         <TB active={editor.isActive("code")} onClick={() => editor.chain().focus().toggleCode().run()} title={t("fmt.code")}><CodeIcon className="h-3.5 w-3.5" /></TB>
         <TB active={editor.isActive("codeBlock")} onClick={() => editor.chain().focus().toggleCodeBlock().run()} title={t("fmt.codeBlock")}><FileCode2Icon className="h-3.5 w-3.5" /></TB>
         <TB active={editor.isActive("link")} onClick={onOpenLink} title={t("fmt.link")}><LinkIcon className="h-3.5 w-3.5" /></TB>
-        <TB active={false} onClick={onUploadImage} title="Insert image">
+        <TB active={false} onClick={onUploadImage} title={t("tt.image")}>
           {uploading ? <span className="h-3.5 w-3.5 rounded-full border-2 border-[var(--text-primary)] border-t-transparent animate-spin" /> : <ImageRawIcon className="h-3.5 w-3.5" />}
         </TB>
-        <TB active={false} onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Divider">
+        <TB active={false} onClick={() => editor.chain().focus().setHorizontalRule().run()} title={t("tt.divider")}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="4" y1="12" x2="20" y2="12" /></svg>
         </TB>
-        <TB active={inTable} onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} title="Insert table">
+        <TB active={inTable} onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} title={t("tt.table")}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="1" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /><line x1="9" y1="3" x2="9" y2="21" /><line x1="15" y1="3" x2="15" y2="21" /></svg>
         </TB>
       </Group>
 
       {/* Clear + history */}
       <Group>
-        <TB active={false} onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} title="Clear formatting">
+        <TB active={false} onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} title={t("tt.clear")}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M10 11l4 8M14 11l-4 8M7 7l3-3h4" /></svg>
         </TB>
         <TB onClick={() => editor.chain().focus().undo().run()} title={t("fmt.undo")}><Undo2Icon className="h-3.5 w-3.5" /></TB>
