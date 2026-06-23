@@ -317,16 +317,18 @@ export default function NoteEditor({
 
   return (
     <div className="h-full flex flex-col" style={noteTint ? { background: `linear-gradient(${noteTint}22, transparent 220px)` } : undefined}>
-      {/* Toolbar */}
-      <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] px-3 md:px-5 py-2 flex items-center gap-1.5 flex-wrap">
-        <EditorToolbar
-          editor={editor}
-          t={t}
-          readOnly={editingDisabled}
-          onOpenLink={openLinkDialog}
-          onUploadImage={triggerImageUpload}
-          uploading={uploading}
-        />
+      {/* Toolbar — tools live inside a bordered "shell" panel */}
+      <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] px-3 md:px-5 py-2.5 flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-0.5 flex-wrap rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] px-1.5 py-1">
+          <EditorToolbar
+            editor={editor}
+            t={t}
+            readOnly={editingDisabled}
+            onOpenLink={openLinkDialog}
+            onUploadImage={triggerImageUpload}
+            uploading={uploading}
+          />
+        </div>
 
         <input
           ref={fileInputRef}
