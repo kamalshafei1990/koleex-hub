@@ -2055,6 +2055,31 @@ export default function Quotations() {
     return serverView;
   }, [current, markSaved]);
 
+  /* ── Live collaboration: apply a peer's save in real time, no refresh ──
+     When another user saves this quotation and we have NO unsaved edits,
+     pull their version straight into the editor so the change appears
+     instantly. If we DO have unsaved edits we leave the notice + buttons so
+     the user decides (auto-applying would replace their own work). The ref
+     keys on the specific notice so loadLatest re-renders don't re-apply or
+     loop. The pill self-dismisses a few seconds after applying. */
+  const appliedNoticeRef = useRef<string>("");
+  useEffect(() => {
+    if (!saveNotice || dirty) return;
+    const key = `${saveNotice.by}:${saveNotice.version}:${saveNotice.at}`;
+    if (appliedNoticeRef.current === key) return;
+    appliedNoticeRef.current = key;
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    void loadLatest().finally(() => {
+      if (!alive) return;
+      timer = setTimeout(() => clearNotice(), 3500);
+    });
+    return () => {
+      alive = false;
+      if (timer) clearTimeout(timer);
+    };
+  }, [saveNotice, dirty, loadLatest, clearNotice]);
+
   useEffect(() => {
     if (!dirty) return;
     /* Browser-native "Leave site?" prompt for tab close / refresh /
@@ -2459,44 +2484,54 @@ export default function Quotations() {
         </div>
       )}
 
-      {/* ── Realtime "updated by another user" notice (non-blocking) ──
-          Shown when a peer saved while we're viewing. We NEVER auto-refresh
-          if there are unsaved edits — the user chooses Load Latest or dismiss. */}
+      {/* ── Realtime "updated by another user" notice ──
+          When we have no unsaved edits the peer's save is applied live (see
+          the auto-apply effect) and this pill is just a brief confirmation.
+          When we DO have unsaved edits we never clobber them — the user
+          chooses Load Latest or dismiss. */}
       {saveNotice && (
         <div
           className="no-print"
           style={{
             display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
-            padding: "10px 16px", background: "rgba(51,133,255,0.10)",
-            borderBottom: "1px solid rgba(51,133,255,0.30)",
+            padding: "10px 16px",
+            background: dirty ? "rgba(255,204,0,0.10)" : "rgba(51,133,255,0.10)",
+            borderBottom: `1px solid ${dirty ? "rgba(255,204,0,0.30)" : "rgba(51,133,255,0.30)"}`,
             fontSize: 13, color: "rgba(255,255,255,0.88)",
           }}
         >
-          <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#3385FF", flexShrink: 0 }} />
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: dirty ? "#FFCC00" : "#3385FF", flexShrink: 0 }} />
           <span style={{ flex: 1, minWidth: 180 }}>
-            <b>{saveNotice.byName}</b> updated this quotation just now
-            {dirty ? " — you have unsaved edits, so it was not refreshed." : "."}
+            {dirty ? (
+              <><b>{saveNotice.byName}</b> updated this quotation — you have unsaved edits, so it wasn&apos;t applied automatically.</>
+            ) : (
+              <>Applied <b>{saveNotice.byName}</b>&apos;s latest changes in real time.</>
+            )}
           </span>
-          <button
-            type="button"
-            onClick={async () => {
-              if (dirty && !window.confirm("Load the latest version? Your unsaved edits will be replaced.")) return;
-              await loadLatest();
-              clearNotice();
-            }}
-            className="px-3 py-1.5 text-xs font-bold rounded-lg"
-            style={{ border: "1px solid #3385FF", background: "rgba(51,133,255,0.18)", color: "#3385FF" }}
-          >
-            Load Latest
-          </button>
-          <button
-            type="button"
-            onClick={clearNotice}
-            className="px-3 py-1.5 text-xs font-semibold rounded-lg"
-            style={{ border: "1px solid rgba(255,255,255,0.18)", background: "transparent", color: "rgba(255,255,255,0.7)" }}
-          >
-            Ignore for now
-          </button>
+          {dirty && (
+            <>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!window.confirm("Load the latest version? Your unsaved edits will be replaced.")) return;
+                  await loadLatest();
+                  clearNotice();
+                }}
+                className="px-3 py-1.5 text-xs font-bold rounded-lg"
+                style={{ border: "1px solid #3385FF", background: "rgba(51,133,255,0.18)", color: "#3385FF" }}
+              >
+                Load Latest
+              </button>
+              <button
+                type="button"
+                onClick={clearNotice}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg"
+                style={{ border: "1px solid rgba(255,255,255,0.18)", background: "transparent", color: "rgba(255,255,255,0.7)" }}
+              >
+                Ignore for now
+              </button>
+            </>
+          )}
         </div>
       )}
 
