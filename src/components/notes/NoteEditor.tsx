@@ -497,7 +497,9 @@ function TableFloatingControls({ editor, enabled }: { editor: Editor | null; ena
   useEffect(() => {
     if (!editor || !enabled) { setBox(null); return; }
     const update = () => {
-      if (!editor.isActive("table")) { setBox(null); return; }
+      // Only while the editor itself is focused — otherwise the bar would
+      // float over modals/popovers (Share dialog, link prompt, etc.).
+      if (!editor.isFocused || !editor.isActive("table")) { setBox(null); return; }
       const { from } = editor.state.selection;
       let node: Node | null = null;
       try { node = editor.view.domAtPos(from).node; } catch { setBox(null); return; }
@@ -512,11 +514,15 @@ function TableFloatingControls({ editor, enabled }: { editor: Editor | null; ena
     update();
     editor.on("selectionUpdate", update);
     editor.on("transaction", update);
+    editor.on("focus", update);
+    editor.on("blur", update);
     window.addEventListener("scroll", update, true);
     window.addEventListener("resize", update);
     return () => {
       editor.off("selectionUpdate", update);
       editor.off("transaction", update);
+      editor.off("focus", update);
+      editor.off("blur", update);
       window.removeEventListener("scroll", update, true);
       window.removeEventListener("resize", update);
     };

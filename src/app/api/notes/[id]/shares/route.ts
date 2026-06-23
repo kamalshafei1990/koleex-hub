@@ -15,6 +15,7 @@ interface AccountLite {
   username: string | null;
   login_email: string | null;
   role: string | null;
+  avatar_url: string | null;
 }
 
 async function loadAccounts(ids: string[]): Promise<Map<string, AccountLite>> {
@@ -22,7 +23,7 @@ async function loadAccounts(ids: string[]): Promise<Map<string, AccountLite>> {
   if (ids.length === 0) return map;
   const { data } = await supabaseServer
     .from("accounts")
-    .select("id, username, login_email, role:roles(name)")
+    .select("id, username, login_email, avatar_url, role:roles(name)")
     .in("id", ids);
   for (const row of (data ?? []) as Array<Record<string, unknown>>) {
     const roleRel = row.role as { name?: string } | { name?: string }[] | null;
@@ -32,6 +33,7 @@ async function loadAccounts(ids: string[]): Promise<Map<string, AccountLite>> {
       username: (row.username as string) ?? null,
       login_email: (row.login_email as string) ?? null,
       role: roleName ?? null,
+      avatar_url: (row.avatar_url as string) ?? null,
     });
   }
   return map;

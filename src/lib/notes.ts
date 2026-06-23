@@ -60,6 +60,7 @@ export interface ShareAccount {
   username: string | null;
   login_email: string | null;
   role: string | null;
+  avatar_url?: string | null;
 }
 
 export interface NoteShareRow {

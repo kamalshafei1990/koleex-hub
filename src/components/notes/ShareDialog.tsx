@@ -26,7 +26,7 @@ import {
   type ShareAccount,
 } from "@/lib/notes";
 
-function Avatar({ name }: { name: string }) {
+function Avatar({ name, src }: { name: string; src?: string | null }) {
   const initials = name
     .split(/\s+/)
     .map((p) => p[0])
@@ -34,6 +34,16 @@ function Avatar({ name }: { name: string }) {
     .slice(0, 2)
     .join("")
     .toUpperCase();
+  if (src) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt={name}
+        className="h-8 w-8 shrink-0 rounded-full object-cover border border-[var(--border-subtle)]"
+      />
+    );
+  }
   return (
     <div className="h-8 w-8 shrink-0 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[11px] font-bold text-[var(--text-secondary)]">
       {initials || "?"}
@@ -169,7 +179,7 @@ export default function ShareDialog({
                       disabled={busyId === a.id}
                       className="w-full flex items-center gap-3 px-3 py-2 hover:bg-[var(--bg-surface-hover)] transition-colors text-left disabled:opacity-50"
                     >
-                      <Avatar name={shareAccountLabel(a)} />
+                      <Avatar name={shareAccountLabel(a)} src={a.avatar_url} />
                       <div className="flex-1 min-w-0">
                         <div className="text-[12.5px] font-medium text-[var(--text-primary)] truncate">{shareAccountLabel(a)}</div>
                         <div className="text-[11px] text-[var(--text-dim)] truncate">{a.login_email || a.role || ""}</div>
@@ -204,7 +214,7 @@ export default function ShareDialog({
                 {/* Owner */}
                 {data?.owner && (
                   <div className="flex items-center gap-3 px-2 py-1.5 rounded-lg">
-                    <Avatar name={shareAccountLabel(data.owner.account)} />
+                    <Avatar name={shareAccountLabel(data.owner.account)} src={data.owner.account?.avatar_url} />
                     <div className="flex-1 min-w-0">
                       <div className="text-[12.5px] font-medium text-[var(--text-primary)] truncate">
                         {shareAccountLabel(data.owner.account)}
@@ -222,7 +232,7 @@ export default function ShareDialog({
                 {/* Shares */}
                 {(data?.shares ?? []).map((s) => (
                   <div key={s.id} className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] transition-colors">
-                    <Avatar name={shareAccountLabel(s.account)} />
+                    <Avatar name={shareAccountLabel(s.account)} src={s.account?.avatar_url} />
                     <div className="flex-1 min-w-0">
                       <div className="text-[12.5px] font-medium text-[var(--text-primary)] truncate">{shareAccountLabel(s.account)}</div>
                       <div className="text-[11px] text-[var(--text-dim)] truncate">{s.account?.login_email || ""}</div>

@@ -20,7 +20,7 @@ export async function GET(req: Request) {
 
   let query = supabaseServer
     .from("accounts")
-    .select("id, username, login_email, role:roles(name)")
+    .select("id, username, login_email, avatar_url, role:roles(name)")
     .eq("tenant_id", auth.tenant_id)
     .eq("status", "active")
     .neq("id", auth.account_id)
@@ -46,6 +46,7 @@ export async function GET(req: Request) {
       username: (row.username as string) ?? null,
       login_email: (row.login_email as string) ?? null,
       role: roleName ?? null,
+      avatar_url: (row.avatar_url as string) ?? null,
     };
   });
 
