@@ -36,6 +36,7 @@ import PaletteIcon from "@/components/icons/ui/PaletteIcon";
 import TypeIcon from "@/components/icons/ui/TypeIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import { ScreenshotCaptureModal } from "@/components/quotations/ScreenshotCaptureModal";
+import { ImageLightbox } from "@/components/quotations/ImageLightbox";
 
 /* Mirrors the Quotation type in Quotations.tsx — kept local to avoid
    a circular import. */
@@ -7332,6 +7333,7 @@ function PictureCell({
 }) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [shotOpen, setShotOpen] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   /* dragenter fires for every child element the cursor enters, so
      we use a counter to know when the cursor has truly left the
      cell. Without it the highlight flickers as the cursor moves
@@ -7376,7 +7378,14 @@ function PictureCell({
     <>
     <div
       className={`quot-img-cell${image ? " has-img" : ""}`}
-      onClick={() => fileInputRefs.current[idx]?.click()}
+      title={image ? "Click to view full size" : "Click to choose a photo"}
+      onClick={() => {
+        // With a photo: open the full-size viewer. Empty: open the file
+        // picker (unchanged). Replace via the × then re-add, drag-drop, or
+        // the screenshot button.
+        if (image) setLightboxOpen(true);
+        else fileInputRefs.current[idx]?.click();
+      }}
       onDragEnter={(e) => {
         e.preventDefault();
         dragDepth.current += 1;
@@ -7547,6 +7556,11 @@ function PictureCell({
       open={shotOpen}
       onCapture={(f) => onUpload(f)}
       onClose={() => setShotOpen(false)}
+    />
+    <ImageLightbox
+      src={image}
+      open={lightboxOpen}
+      onClose={() => setLightboxOpen(false)}
     />
     </>
   );
