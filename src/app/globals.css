@@ -348,6 +348,35 @@ body {
 .notes-editor [style*="text-align: center"] { text-align: center; }
 .notes-editor [style*="text-align: right"] { text-align: right; }
 
+/* ── Light "paper" surfaces — flip the ink dark so writing stays readable on
+   white/yellow ruled, grid, dotted, and legal-pad pages. ─────────────────── */
+.notes-surface-light .notes-editor,
+.notes-surface-light .notes-editor h1,
+.notes-surface-light .notes-editor h2,
+.notes-surface-light .notes-editor h3,
+.notes-surface-light .notes-editor p,
+.notes-surface-light .notes-editor li,
+.notes-surface-light .notes-editor strong {
+  color: #1c1c1c;
+}
+.notes-surface-light .notes-editor li::marker { color: #555; }
+.notes-surface-light .notes-editor p.is-editor-empty:first-child::before { color: #9a9a9a; }
+.notes-surface-light .notes-editor blockquote {
+  color: #444;
+  border-inline-start-color: #b9b9b9;
+}
+.notes-surface-light .notes-editor a { color: #0052cc; }
+.notes-surface-light .notes-editor code,
+.notes-surface-light .notes-editor pre {
+  background: rgba(0, 0, 0, 0.06);
+  color: #1c1c1c;
+}
+.notes-surface-light .notes-editor mark { color: #1c1c1c; }
+.notes-surface-light .notes-editor hr { border-top-color: #c9c9c9; }
+.notes-surface-light .notes-editor table td,
+.notes-surface-light .notes-editor table th { border-color: #d2d2d2; }
+.notes-surface-light .notes-editor table th { background: rgba(0, 0, 0, 0.04); }
+
 /* ── Utility: hide scrollbars on horizontally-scrollable rows ────
    Used by tab strips, day pickers, filter pills — anywhere we want
    swipe/drag scrolling without the chunky browser scrollbar taking

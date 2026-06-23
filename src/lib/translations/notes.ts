@@ -42,6 +42,9 @@ export const notesT: Translations = {
   "share.viewOnly":    { en: "View only",            zh: "仅查看",             ar: "عرض فقط" },
   "share.sharedBy":    { en: "Shared by",            zh: "共享者",             ar: "تمت المشاركة بواسطة" },
   "share.noteColour":  { en: "Note colour",          zh: "笔记颜色",           ar: "لون الملاحظة" },
+  "share.noteStyle":   { en: "Note style",           zh: "笔记样式",           ar: "نمط الملاحظة" },
+  "share.styleColour": { en: "Colour",               zh: "颜色",               ar: "اللون" },
+  "share.stylePaper":  { en: "Paper",                zh: "纸张",               ar: "الورق" },
 
   /* Toolbar tooltips */
   "tt.alignLeft":      { en: "Align left",           zh: "左对齐",             ar: "محاذاة لليسار" },

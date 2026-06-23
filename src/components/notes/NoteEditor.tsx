@@ -17,6 +17,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
 } from "react";
 import { createPortal } from "react-dom";
 import { useEditor, EditorContent } from "@tiptap/react";
@@ -61,16 +62,96 @@ import Redo2Icon from "@/components/icons/ui/Redo2Icon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import { PromptDialog } from "./NotesDialog";
 
-/* Soft note-background tints (Keep-style). Muted so they stay on-brand. */
-const NOTE_COLORS: { key: string; value: string | null; label: string }[] = [
-  { key: "default", value: null, label: "Default" },
-  { key: "gray", value: "#3a3a3a", label: "Gray" },
-  { key: "blue", value: "#16324f", label: "Blue" },
-  { key: "green", value: "#173a2b", label: "Green" },
-  { key: "amber", value: "#3d3014", label: "Amber" },
-  { key: "red", value: "#3d1c1c", label: "Red" },
-  { key: "purple", value: "#2c1f3d", label: "Purple" },
+/* ---------------------------------------------------------------------------
+   Note surfaces — the value stored in `notes.color`. Two families:
+     • Colour tints (muted dark washes, on-brand, dark ink stays white)
+     • Paper styles (realistic light pages — ruled / grid / dots / legal pad).
+       Light pages flip the ink to dark via the `notes-surface-light` class.
+   No DB change: everything is encoded in the existing `color` text column.
+   --------------------------------------------------------------------------- */
+type NoteSurface = {
+  key: string;                 // stored value ("default" → null)
+  label: string;
+  light?: boolean;             // light page → dark ink
+  surface: CSSProperties;      // applied to the writing area
+  swatch: CSSProperties;       // mini preview in the picker
+};
+
+const RULE = "#c2d2ee";        // notebook rule colour
+const GRID = "#e1e1e1";        // grid line colour
+const DOT = "#cdcdcd";         // dot colour
+const PAD = "#fbf5c9";         // legal-pad paper
+const PAD_RULE = "#d9c987";    // legal-pad rule
+
+const NOTE_SURFACES: NoteSurface[] = [
+  { key: "default", label: "Default", surface: {}, swatch: { background: "var(--bg-surface)" } },
+  // Colour tints (dark washes)
+  { key: "#3a3a3a", label: "Gray",   surface: { background: "#3a3a3a" }, swatch: { background: "#3a3a3a" } },
+  { key: "#16324f", label: "Blue",   surface: { background: "#16324f" }, swatch: { background: "#16324f" } },
+  { key: "#173a2b", label: "Green",  surface: { background: "#173a2b" }, swatch: { background: "#173a2b" } },
+  { key: "#3d3014", label: "Amber",  surface: { background: "#3d3014" }, swatch: { background: "#3d3014" } },
+  { key: "#3d1c1c", label: "Red",    surface: { background: "#3d1c1c" }, swatch: { background: "#3d1c1c" } },
+  { key: "#2c1f3d", label: "Purple", surface: { background: "#2c1f3d" }, swatch: { background: "#2c1f3d" } },
+  // Paper styles (light pages)
+  {
+    key: "paper-lined", label: "Ruled paper", light: true,
+    surface: {
+      backgroundColor: "#ffffff",
+      backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent 30px, ${RULE} 31px)`,
+    },
+    swatch: {
+      backgroundColor: "#ffffff",
+      backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent 3px, ${RULE} 4px)`,
+    },
+  },
+  {
+    key: "paper-grid", label: "Grid paper", light: true,
+    surface: {
+      backgroundColor: "#ffffff",
+      backgroundImage: `linear-gradient(to right, ${GRID} 1px, transparent 1px), linear-gradient(to bottom, ${GRID} 1px, transparent 1px)`,
+      backgroundSize: "24px 24px",
+    },
+    swatch: {
+      backgroundColor: "#ffffff",
+      backgroundImage: `linear-gradient(to right, ${GRID} 1px, transparent 1px), linear-gradient(to bottom, ${GRID} 1px, transparent 1px)`,
+      backgroundSize: "5px 5px",
+    },
+  },
+  {
+    key: "paper-dots", label: "Dotted paper", light: true,
+    surface: {
+      backgroundColor: "#ffffff",
+      backgroundImage: `radial-gradient(${DOT} 1.3px, transparent 1.4px)`,
+      backgroundSize: "20px 20px",
+    },
+    swatch: {
+      backgroundColor: "#ffffff",
+      backgroundImage: `radial-gradient(${DOT} 1px, transparent 1.2px)`,
+      backgroundSize: "5px 5px",
+    },
+  },
+  {
+    key: "pad-yellow", label: "Legal pad", light: true,
+    surface: {
+      backgroundColor: PAD,
+      backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent 30px, ${PAD_RULE} 31px)`,
+    },
+    swatch: {
+      backgroundColor: PAD,
+      backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent 3px, ${PAD_RULE} 4px)`,
+    },
+  },
 ];
+
+const DEFAULT_SURFACE = NOTE_SURFACES[0];
+
+function resolveSurface(value: string | null | undefined): NoteSurface {
+  if (!value) return DEFAULT_SURFACE;
+  const found = NOTE_SURFACES.find((s) => s.key === value);
+  if (found) return found;
+  // Legacy / arbitrary hex → treat as a solid tint.
+  return { key: value, label: "Colour", surface: { background: value }, swatch: { background: value } };
+}
 
 /* Inline font colours for the text-colour picker. */
 const TEXT_COLORS = ["#0066FF", "#E5484D", "#0FA968", "#E8A33D", "#9B7BE0", "#888888", "#FFFFFF"];
@@ -320,7 +401,11 @@ export default function NoteEditor({
     );
   }
 
-  const noteTint = note.color ?? null;
+  const surface = resolveSurface(note.color);
+  const activeSurfaceKey = note.color ?? "default";
+  // On a light paper page, flip title/tag ink to dark so it stays readable.
+  const inkClass = surface.light ? "text-[#1c1c1c]" : "text-[var(--text-primary)]";
+  const ghostClass = surface.light ? "placeholder:text-[#9a9a9a]" : "placeholder:text-[var(--text-ghost)]";
   const ownerControls = !editingDisabled && !isSharee; // owner-only chrome
 
   return (
@@ -385,19 +470,28 @@ export default function NoteEditor({
 
         <div className="flex-1" />
 
-        {/* Note colour (anyone who can edit) */}
+        {/* Note style — colour tints + realistic paper styles (anyone who can edit) */}
         {!editingDisabled && (
           <div className="relative">
-            <button onClick={() => setColorOpen((v) => !v)} title={t("share.noteColour")} className="w-8 h-8 rounded-lg flex items-center justify-center bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-all">
-              <span className="h-3.5 w-3.5 rounded-full border border-[var(--border-color)]" style={{ background: noteTint ?? "transparent" }} />
+            <button onClick={() => setColorOpen((v) => !v)} title={t("share.noteStyle")} className="w-8 h-8 rounded-lg flex items-center justify-center bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-all">
+              <span className="h-3.5 w-3.5 rounded-[5px] border border-[var(--border-color)]" style={surface.swatch} />
             </button>
             {colorOpen && (
               <>
                 <div className="fixed inset-0 z-[55]" onClick={() => setColorOpen(false)} />
-                <div className="absolute right-0 mt-1 z-[56] p-2 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl flex gap-1.5">
-                  {NOTE_COLORS.map((c) => (
-                    <button key={c.key} title={c.label} onClick={() => { onChange({ color: c.value }); setColorOpen(false); }} className={`h-6 w-6 rounded-full border ${note.color === c.value ? "ring-2 ring-[#0066FF]" : "border-[var(--border-color)]"}`} style={{ background: c.value ?? "var(--bg-surface)" }} />
-                  ))}
+                <div className="absolute right-0 mt-1 z-[56] w-[208px] p-2.5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl space-y-2.5">
+                  <SurfaceGroup
+                    title={t("share.styleColour")}
+                    items={NOTE_SURFACES.slice(0, 7)}
+                    activeKey={activeSurfaceKey}
+                    onPick={(key) => { onChange({ color: key === "default" ? null : key }); setColorOpen(false); }}
+                  />
+                  <SurfaceGroup
+                    title={t("share.stylePaper")}
+                    items={NOTE_SURFACES.slice(7)}
+                    activeKey={activeSurfaceKey}
+                    onPick={(key) => { onChange({ color: key === "default" ? null : key }); setColorOpen(false); }}
+                  />
                 </div>
               </>
             )}
@@ -439,16 +533,17 @@ export default function NoteEditor({
         )}
       </div>
 
-      {/* Title + tags + body — scrollable area. The note tint washes the
-          actual writing surface (Keep-style) so the chosen colour is visible. */}
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 lg:px-12 py-6 transition-colors duration-300" style={noteTint ? { background: noteTint } : undefined}>
+      {/* Title + tags + body — scrollable area. The chosen surface (colour
+          tint or realistic paper) washes the actual writing area. Light paper
+          flips the ink dark via `notes-surface-light`. */}
+      <div className={`flex-1 overflow-y-auto px-4 md:px-8 lg:px-12 py-6 transition-colors duration-300 ${surface.light ? "notes-surface-light" : ""}`} style={surface.surface}>
         <input
           type="text"
           value={titleDraft}
           disabled={editingDisabled}
           placeholder={t("untitled")}
           onChange={(e) => { setTitleDraft(e.target.value); lastLocalEditAt.current = Date.now(); scheduleSave({ title: e.target.value }); }}
-          className="w-full bg-transparent text-[24px] md:text-[28px] font-bold text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none mb-2 disabled:cursor-not-allowed"
+          className={`w-full bg-transparent text-[24px] md:text-[28px] font-bold ${inkClass} ${ghostClass} outline-none mb-2 disabled:cursor-not-allowed`}
         />
 
         {/* Tags */}
@@ -467,7 +562,7 @@ export default function NoteEditor({
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addTag(); } if (e.key === "Backspace" && !tagInput && tagsDraft.length) commitTags(tagsDraft.slice(0, -1)); }}
               onBlur={addTag}
               placeholder={tagsDraft.length ? "Add tag" : "Add tags…"}
-              className="h-6 min-w-[80px] bg-transparent text-[11px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none"
+              className={`h-6 min-w-[80px] bg-transparent text-[11px] ${inkClass} ${surface.light ? "placeholder:text-[#8a8a8a]" : "placeholder:text-[var(--text-dim)]"} outline-none`}
             />
           )}
         </div>
@@ -489,6 +584,44 @@ export default function NoteEditor({
         onConfirm={(url) => applyLink(url)}
         onClose={() => setLinkOpen(false)}
       />
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SurfaceGroup — one labelled row of note-style swatches in the picker.
+   ═══════════════════════════════════════════════════════════════════════════ */
+function SurfaceGroup({
+  title,
+  items,
+  activeKey,
+  onPick,
+}: {
+  title: string;
+  items: NoteSurface[];
+  activeKey: string;
+  onPick: (key: string) => void;
+}) {
+  return (
+    <div>
+      <div className="px-0.5 mb-1.5 text-[9.5px] uppercase tracking-[1.2px] font-semibold text-[var(--text-dim)]">
+        {title}
+      </div>
+      <div className="grid grid-cols-7 gap-1.5">
+        {items.map((s) => (
+          <button
+            key={s.key}
+            title={s.label}
+            onClick={() => onPick(s.key)}
+            className={`h-6 w-6 rounded-md border transition-all hover:scale-110 ${
+              activeKey === s.key
+                ? "ring-2 ring-[#0066FF] ring-offset-1 ring-offset-[var(--bg-secondary)] border-transparent"
+                : "border-[var(--border-color)]"
+            }`}
+            style={s.swatch}
+          />
+        ))}
+      </div>
     </div>
   );
 }
