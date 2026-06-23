@@ -78,9 +78,10 @@ export default function AppHomeMenu({
         aria-label="App navigation"
         className="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:gap-2 sm:px-0 sm:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        {navItems.map((item, i) => (
-          <HomePill key={item.key ?? item.href ?? `nav-${i}`} {...item} />
-        ))}
+        {navItems.map((item, i) => {
+          const { key: itemKey, ...rest } = item;
+          return <HomePill key={itemKey ?? item.href ?? `nav-${i}`} {...rest} />;
+        })}
       </nav>
     </section>
   );

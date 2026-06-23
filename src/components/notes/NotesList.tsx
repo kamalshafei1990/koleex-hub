@@ -226,9 +226,14 @@ function NoteRowItem({
     return plain.length > 80 ? plain.slice(0, 80) + "…" : plain;
   })();
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => onSelect(note.id)}
-      className={`group w-full text-start px-3 py-2.5 border-b border-[var(--border-faint)] transition-all ${
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(note.id); }
+      }}
+      className={`group w-full text-start px-3 py-2.5 border-b border-[var(--border-faint)] transition-all cursor-pointer outline-none focus-visible:bg-[var(--bg-surface)] ${
         active
           ? "bg-amber-500/[0.14] border-s-[3px] border-s-amber-400"
           : "hover:bg-[var(--bg-surface)]"
@@ -320,6 +325,6 @@ function NoteRowItem({
           )}
         </div>
       </div>
-    </button>
+    </div>
   );
 }
