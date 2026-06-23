@@ -30,10 +30,11 @@ export interface NotePeer {
   at: string;
 }
 
+/* A change PING carries NO note content — just "someone edited, go refetch".
+   The actual content is then pulled through the authorized API, so note text
+   never travels over the anon realtime socket. */
 export interface NoteUpdate {
   by: string;
-  title?: string;
-  body_json?: unknown;
   at: string;
 }
 
@@ -47,7 +48,7 @@ export function useNoteCollab(opts: {
   onRemoteUpdate: (u: NoteUpdate) => void;
 }): {
   peers: NotePeer[];
-  broadcastUpdate: (u: { title?: string; body_json?: unknown }) => void;
+  broadcastUpdate: () => void;
 } {
   const { noteId, me, status, enabled, onRemoteUpdate } = opts;
   const [peers, setPeers] = useState<NotePeer[]>([]);
@@ -94,13 +95,11 @@ export function useNoteCollab(opts: {
       .on("presence", { event: "sync" }, syncPeers)
       .on("presence", { event: "join" }, syncPeers)
       .on("presence", { event: "leave" }, syncPeers)
-      .on("broadcast", { event: "update" }, ({ payload }) => {
+      .on("broadcast", { event: "ping" }, ({ payload }) => {
         const p = payload as Partial<NoteUpdate>;
         if (!p || p.by === me.id) return; // ignore our own echo
         onRemoteRef.current({
           by: String(p.by ?? ""),
-          title: typeof p.title === "string" ? p.title : undefined,
-          body_json: "body_json" in (p as object) ? p.body_json : undefined,
           at: typeof p.at === "string" ? p.at : new Date().toISOString(),
         });
       })
@@ -126,14 +125,14 @@ export function useNoteCollab(opts: {
   }, [status]);
 
   const broadcastUpdate = useCallback(
-    (u: { title?: string; body_json?: unknown }) => {
+    () => {
       const ch = channelRef.current;
       if (!ch || !me) return;
       try {
         ch.send({
           type: "broadcast",
-          event: "update",
-          payload: { by: me.id, title: u.title, body_json: u.body_json, at: new Date().toISOString() } satisfies NoteUpdate,
+          event: "ping",
+          payload: { by: me.id, at: new Date().toISOString() } satisfies NoteUpdate,
         });
       } catch { /* ignore */ }
     },

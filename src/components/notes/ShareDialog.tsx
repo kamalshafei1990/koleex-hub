@@ -10,6 +10,8 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { notesT } from "@/lib/translations/notes";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
@@ -63,6 +65,7 @@ export default function ShareDialog({
   /** Fired after any share mutation so the parent can refresh badges. */
   onChanged?: () => void;
 }) {
+  const { t } = useTranslation(notesT);
   const [data, setData] = useState<NoteSharesResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -144,9 +147,9 @@ export default function ShareDialog({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-subtle)] shrink-0">
           <div>
-            <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">Share note</h2>
+            <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">{t("share.title")}</h2>
             <p className="text-[11px] text-[var(--text-dim)] mt-0.5">
-              {isOwner ? "Invite people in your organization to collaborate" : "People with access to this note"}
+              {isOwner ? t("share.subtitle") : t("share.subtitleRO")}
             </p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] transition-colors">
@@ -164,7 +167,7 @@ export default function ShareDialog({
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search people by name or email…"
+                  placeholder={t("share.search")}
                   className="flex-1 bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none h-10"
                 />
                 {searching && <SpinnerIcon className="h-3.5 w-3.5 animate-spin text-[var(--text-dim)]" />}
@@ -187,14 +190,14 @@ export default function ShareDialog({
                       {busyId === a.id ? (
                         <SpinnerIcon className="h-3.5 w-3.5 animate-spin text-[var(--text-dim)]" />
                       ) : (
-                        <span className="text-[11px] font-semibold text-[#0066FF]">Add</span>
+                        <span className="text-[11px] font-semibold text-[#0066FF]">{t("share.add")}</span>
                       )}
                     </button>
                   ))}
                 </div>
               )}
               {query.trim() && !searching && candidates.length === 0 && (
-                <p className="mt-2 text-[11.5px] text-[var(--text-dim)] px-1">No matching people.</p>
+                <p className="mt-2 text-[11.5px] text-[var(--text-dim)] px-1">{t("share.noMatch")}</p>
               )}
             </div>
           )}
@@ -202,12 +205,12 @@ export default function ShareDialog({
           {/* Roster */}
           <div className="px-5 py-4">
             <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)] mb-2">
-              People with access
+              {t("share.peopleWithAccess")}
             </div>
 
             {loading ? (
               <div className="flex items-center gap-2 text-[12px] text-[var(--text-dim)] py-3">
-                <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> Loading…
+                <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> {t("share.loading")}
               </div>
             ) : (
               <div className="space-y-1.5">
@@ -224,7 +227,7 @@ export default function ShareDialog({
                       </div>
                     </div>
                     <span className="text-[10.5px] font-semibold px-2 py-1 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-secondary)]">
-                      Owner
+                      {t("share.owner")}
                     </span>
                   </div>
                 )}
@@ -246,8 +249,8 @@ export default function ShareDialog({
                           onChange={(e) => void changePermission(s.id, e.target.value as "view" | "edit")}
                           className="h-7 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
                         >
-                          <option value="edit">Can edit</option>
-                          <option value="view">Can view</option>
+                          <option value="edit">{t("share.canEdit")}</option>
+                          <option value="view">{t("share.canView")}</option>
                         </select>
                         <button
                           onClick={() => void remove(s.id)}
@@ -260,7 +263,7 @@ export default function ShareDialog({
                       </>
                     ) : (
                       <span className="text-[10.5px] font-semibold px-2 py-1 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-secondary)]">
-                        {s.permission === "view" ? "Can view" : "Can edit"}
+                        {s.permission === "view" ? t("share.canView") : t("share.canEdit")}
                       </span>
                     )}
                   </div>
@@ -268,7 +271,7 @@ export default function ShareDialog({
 
                 {!loading && (data?.shares?.length ?? 0) === 0 && (
                   <p className="text-[11.5px] text-[var(--text-dim)] px-2 py-1">
-                    {isOwner ? "Not shared yet — add someone above." : "Only you and the owner."}
+                    {isOwner ? t("share.emptyOwner") : t("share.emptyOther")}
                   </p>
                 )}
               </div>
@@ -282,7 +285,7 @@ export default function ShareDialog({
             onClick={onClose}
             className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12.5px] font-semibold hover:opacity-90 transition-all"
           >
-            Done
+            {t("share.done")}
           </button>
         </div>
       </div>

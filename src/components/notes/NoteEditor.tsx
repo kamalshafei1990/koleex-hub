@@ -39,8 +39,8 @@ import TableCell from "@tiptap/extension-table-cell";
 
 import { useTranslation } from "@/lib/i18n";
 import { notesT } from "@/lib/translations/notes";
-import type { NoteFull, NotesFolderRow } from "@/lib/notes";
-import { useNoteCollab, type NoteUpdate } from "@/lib/note-collab";
+import { fetchNote, type NoteFull, type NotesFolderRow } from "@/lib/notes";
+import { useNoteCollab } from "@/lib/note-collab";
 import PinIcon from "@/components/icons/ui/PinIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import NotesIcon from "@/components/icons/NotesIcon";
@@ -185,7 +185,7 @@ export default function NoteEditor({
         const payload = pendingRef.current;
         pendingRef.current = {};
         onChange(payload);
-        broadcastRef.current?.({ title: payload.title, body_json: payload.body_json });
+        broadcastRef.current?.();
       }, 500);
     },
     [onChange, editingDisabled],
@@ -194,18 +194,25 @@ export default function NoteEditor({
   const scheduleSaveRef = useRef(scheduleSave);
   useEffect(() => { scheduleSaveRef.current = scheduleSave; }, [scheduleSave]);
 
-  /* ── Realtime collaboration ──────────────────────────────────────── */
-  const handleRemote = useCallback((u: NoteUpdate) => {
-    if (!editor) return;
-    const recentlyTyped = Date.now() - lastLocalEditAt.current < 2000;
-    if (recentlyTyped && editor.isFocused) return; // don't clobber active typing
-    if (typeof u.title === "string") setTitleDraft(u.title);
-    if (u.body_json) {
-      try {
-        editor.commands.setContent(u.body_json as never, { emitUpdate: false });
-      } catch { /* malformed payload — ignore */ }
-    }
-  }, [editor]);
+  /* ── Realtime collaboration ──────────────────────────────────────────
+     A peer's save sends a content-free PING. We then pull the fresh note
+     through the AUTHORIZED API (so note text never rides the anon socket)
+     and apply it — unless the user is actively typing. */
+  const handleRemote = useCallback(async () => {
+    if (!editor || !note) return;
+    const busyTyping = () => Date.now() - lastLocalEditAt.current < 2000 && editor.isFocused;
+    if (busyTyping()) return;
+    const fresh = await fetchNote(note.id);
+    if (!fresh || busyTyping()) return; // re-check after the await
+    setTitleDraft(fresh.title ?? "");
+    setTagsDraft(fresh.tags ?? []);
+    try {
+      editor.commands.setContent(
+        (fresh.body_json ?? { type: "doc", content: [{ type: "paragraph" }] }) as never,
+        { emitUpdate: false },
+      );
+    } catch { /* malformed — ignore */ }
+  }, [editor, note]);
 
   const { peers, broadcastUpdate } = useNoteCollab({
     noteId: note?.id,
@@ -354,10 +361,10 @@ export default function NoteEditor({
       {/* Meta row — collaborators · colour · share · folder · pin · delete */}
       <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] px-3 md:px-5 py-2 flex items-center gap-2 flex-wrap">
         {isViewer && (
-          <span className="text-[10.5px] font-semibold px-2 py-1 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-secondary)]">View only</span>
+          <span className="text-[10.5px] font-semibold px-2 py-1 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-secondary)]">{t("share.viewOnly")}</span>
         )}
         {note.owner_name && isSharee && (
-          <span className="text-[11px] text-[var(--text-dim)]">Shared by {note.owner_name}</span>
+          <span className="text-[11px] text-[var(--text-dim)]">{t("share.sharedBy")} {note.owner_name}</span>
         )}
 
         {peers.length > 0 && (
@@ -381,7 +388,7 @@ export default function NoteEditor({
         {/* Note colour (anyone who can edit) */}
         {!editingDisabled && (
           <div className="relative">
-            <button onClick={() => setColorOpen((v) => !v)} title="Note colour" className="w-8 h-8 rounded-lg flex items-center justify-center bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-all">
+            <button onClick={() => setColorOpen((v) => !v)} title={t("share.noteColour")} className="w-8 h-8 rounded-lg flex items-center justify-center bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-all">
               <span className="h-3.5 w-3.5 rounded-full border border-[var(--border-color)]" style={{ background: noteTint ?? "transparent" }} />
             </button>
             {colorOpen && (
@@ -399,9 +406,9 @@ export default function NoteEditor({
 
         {/* Share */}
         {!isTrashed && (
-          <button onClick={onShare} title="Share note" className="h-8 px-2.5 rounded-lg flex items-center gap-1.5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all text-[11.5px] font-semibold">
+          <button onClick={onShare} title={t("share.title")} className="h-8 px-2.5 rounded-lg flex items-center gap-1.5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all text-[11.5px] font-semibold">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" /></svg>
-            <span className="hidden md:inline">Share</span>
+            <span className="hidden md:inline">{t("share.button")}</span>
           </button>
         )}
 
