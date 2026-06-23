@@ -6,7 +6,7 @@
    seeded from the customer's sheet; edits live in local state (DB persistence,
    product photos and convert-to-quotation come next). */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import KoleexLogo from "@/components/layout/KoleexLogo";
 import { ScreenshotCaptureModal } from "@/components/quotations/ScreenshotCaptureModal";
 import { PREORDER_SECTIONS, PREORDER_BUYERS, PREORDER_META } from "./data";
@@ -62,6 +62,58 @@ function freshDoc(): Doc {
 }
 
 interface PreorderListItem { id: string; title: string | null; customer_ar: string | null; updated_at: string }
+
+/* Row-action button — same look/behaviour as the quotation's RowActionBtn
+   (dark rounded square, hover lift, disabled + destructive variants). */
+function PreRowBtn({
+  title,
+  icon,
+  onClick,
+  disabled,
+  destructive,
+  span2,
+}: {
+  title: string;
+  icon: ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  destructive?: boolean;
+  span2?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      disabled={disabled}
+      onClick={onClick}
+      style={{
+        gridColumn: span2 ? "1 / -1" : undefined,
+        width: span2 ? 60 : 28,
+        height: 28,
+        borderRadius: 7,
+        border: "none",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 0,
+        cursor: disabled ? "not-allowed" : "pointer",
+        background: disabled
+          ? "rgba(255,255,255,0.02)"
+          : destructive
+            ? "rgba(255,51,51,0.14)"
+            : "rgba(255,255,255,0.06)",
+        color: disabled
+          ? "rgba(255,255,255,0.3)"
+          : destructive
+            ? "#ff6b6b"
+            : "rgba(255,255,255,0.92)",
+        transition: "background-color 120ms, color 120ms",
+      }}
+    >
+      {icon}
+    </button>
+  );
+}
 
 export default function PreorderPage() {
   const [doc, setDoc] = useState<Doc>(freshDoc);
@@ -298,6 +350,27 @@ export default function PreorderPage() {
   /* Which photo cell (if any) is currently capturing a screenshot. */
   const [shotCell, setShotCell] = useState<{ si: number; ii: number } | null>(null);
 
+  /* Row actions — mirror the quotation's move-up / move-down / delete. */
+  const moveItemPre = (si: number, ii: number, dir: -1 | 1) =>
+    setDoc((d) => ({
+      ...d,
+      sections: d.sections.map((s, i) => {
+        if (i !== si) return s;
+        const items = [...s.items];
+        const j = ii + dir;
+        if (j < 0 || j >= items.length) return s;
+        [items[ii], items[j]] = [items[j], items[ii]];
+        return { ...s, items };
+      }),
+    }));
+  const removeItemPre = (si: number, ii: number) =>
+    setDoc((d) => ({
+      ...d,
+      sections: d.sections.map((s, i) =>
+        i !== si ? s : { ...s, items: s.items.filter((_, j) => j !== ii) },
+      ),
+    }));
+
   const totals = useMemo(() => {
     let units = 0, value = 0, lines = 0, priced = 0;
     const bq = doc.buyers.map(() => 0);
@@ -470,10 +543,52 @@ export default function PreorderPage() {
                     const line = qty * it.price;
                     const fkey = `${si}-${ii}`;
                     return (
-                      <tr key={ii} className="pre-row align-middle border-b border-neutral-200 last:border-b-0">
-                        {/* No. (running, 1,2,3…) */}
-                        <td className="px-1 py-2.5 text-center text-[12.5px] font-bold tabular-nums text-neutral-500">
+                      <tr key={ii} className="pre-row group/prerow align-middle border-b border-neutral-200 last:border-b-0">
+                        {/* No. (running, 1,2,3…) + row actions (move/delete),
+                            mirroring the quotation's pq-row-actions panel. */}
+                        <td className="relative px-1 py-2.5 text-center text-[12.5px] font-bold tabular-nums text-neutral-500">
                           {sectionStartOffsets[si] + ii + 1}
+                          <div
+                            className="no-print pre-row-actions opacity-0 transition-opacity duration-150 group-hover/prerow:opacity-100"
+                            style={{
+                              position: "absolute",
+                              top: "50%",
+                              insetInlineStart: 2,
+                              transform: "translateY(-50%)",
+                              display: "grid",
+                              gridTemplateColumns: "28px 28px",
+                              gridAutoRows: "28px",
+                              gap: 4,
+                              alignContent: "center",
+                              justifyItems: "center",
+                              background: "#1A1A1A",
+                              border: "1px solid #2D2D2D",
+                              borderRadius: 10,
+                              padding: 4,
+                              boxShadow: "0 6px 20px rgba(0,0,0,0.45)",
+                              zIndex: 5,
+                            }}
+                          >
+                            <PreRowBtn
+                              title="تحريك لأعلى"
+                              disabled={ii === 0}
+                              onClick={() => moveItemPre(si, ii, -1)}
+                              icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M18 15l-6-6-6 6" /></svg>}
+                            />
+                            <PreRowBtn
+                              title="تحريك لأسفل"
+                              disabled={ii === sec.items.length - 1}
+                              onClick={() => moveItemPre(si, ii, 1)}
+                              icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>}
+                            />
+                            <PreRowBtn
+                              title="حذف الصف"
+                              span2
+                              destructive
+                              onClick={() => removeItemPre(si, ii)}
+                              icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m2 0v14a1 1 0 01-1 1H7a1 1 0 01-1-1V6" /></svg>}
+                            />
+                          </div>
                         </td>
                         {/* Photo — fits without crop, replace / remove */}
                         <td className="px-2 py-2.5 text-center">
