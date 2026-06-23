@@ -73,6 +73,8 @@ type NoteSurface = {
   key: string;                 // stored value ("default" → null)
   label: string;
   light?: boolean;             // light page → dark ink
+  ruled?: boolean;             // draw notebook rules on the prose itself
+  ruleColor?: string;          // rule colour (used when ruled)
   surface: CSSProperties;      // applied to the writing area
   swatch: CSSProperties;       // mini preview in the picker
 };
@@ -94,11 +96,8 @@ const NOTE_SURFACES: NoteSurface[] = [
   { key: "#2c1f3d", label: "Purple", surface: { background: "#2c1f3d" }, swatch: { background: "#2c1f3d" } },
   // Paper styles (light pages)
   {
-    key: "paper-lined", label: "Ruled paper", light: true,
-    surface: {
-      backgroundColor: "#ffffff",
-      backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent 30px, ${RULE} 31px)`,
-    },
+    key: "paper-lined", label: "Ruled paper", light: true, ruled: true, ruleColor: RULE,
+    surface: { backgroundColor: "#ffffff" },
     swatch: {
       backgroundColor: "#ffffff",
       backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent 3px, ${RULE} 4px)`,
@@ -131,11 +130,8 @@ const NOTE_SURFACES: NoteSurface[] = [
     },
   },
   {
-    key: "pad-yellow", label: "Legal pad", light: true,
-    surface: {
-      backgroundColor: PAD,
-      backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent 30px, ${PAD_RULE} 31px)`,
-    },
+    key: "pad-yellow", label: "Legal pad", light: true, ruled: true, ruleColor: PAD_RULE,
+    surface: { backgroundColor: PAD },
     swatch: {
       backgroundColor: PAD,
       backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent 3px, ${PAD_RULE} 4px)`,
@@ -536,7 +532,10 @@ export default function NoteEditor({
       {/* Title + tags + body — scrollable area. The chosen surface (colour
           tint or realistic paper) washes the actual writing area. Light paper
           flips the ink dark via `notes-surface-light`. */}
-      <div className={`flex-1 overflow-y-auto px-4 md:px-8 lg:px-12 py-6 transition-colors duration-300 ${surface.light ? "notes-surface-light" : ""}`} style={surface.surface}>
+      <div
+        className={`flex-1 overflow-y-auto px-4 md:px-8 lg:px-12 py-6 transition-colors duration-300 ${surface.light ? "notes-surface-light" : ""} ${surface.ruled ? "notes-surface-ruled" : ""}`}
+        style={surface.ruled ? { ...surface.surface, ["--note-rule" as string]: surface.ruleColor } : surface.surface}
+      >
         <input
           type="text"
           value={titleDraft}

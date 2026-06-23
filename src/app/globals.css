@@ -377,6 +377,35 @@ body {
 .notes-surface-light .notes-editor table th { border-color: #d2d2d2; }
 .notes-surface-light .notes-editor table th { background: rgba(0, 0, 0, 0.04); }
 
+/* ── Ruled pages — draw the rules on the prose itself and lock the text line
+   rhythm to the rule height so every line of writing SITS ON a rule (like a
+   real notebook). --rule-h is the line period; --note-rule is the rule colour
+   set inline per style (ruled = blue, legal pad = tan). ──────────────────── */
+.notes-surface-ruled .notes-editor {
+  --rule-h: 28px;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(var(--rule-h) - 1px),
+    var(--note-rule, #c2d2ee) calc(var(--rule-h) - 1px),
+    var(--note-rule, #c2d2ee) var(--rule-h)
+  );
+  background-size: 100% var(--rule-h);
+  background-position: 0 0;
+}
+/* Body lines ride the rules: line-height = rule height, no stray margins. */
+.notes-surface-ruled .notes-editor p,
+.notes-surface-ruled .notes-editor li {
+  line-height: var(--rule-h);
+  margin: 0;
+}
+.notes-surface-ruled .notes-editor ul,
+.notes-surface-ruled .notes-editor ol { margin: 0; }
+/* Headings span whole multiples of the rule so following text stays aligned. */
+.notes-surface-ruled .notes-editor h1 { line-height: calc(var(--rule-h) * 2); margin: 0; }
+.notes-surface-ruled .notes-editor h2,
+.notes-surface-ruled .notes-editor h3 { line-height: var(--rule-h); margin: 0; }
+
 /* ── Utility: hide scrollbars on horizontally-scrollable rows ────
    Used by tab strips, day pickers, filter pills — anywhere we want
    swipe/drag scrolling without the chunky browser scrollbar taking
