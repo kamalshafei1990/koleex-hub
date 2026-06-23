@@ -50,7 +50,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const auth = await requireAuth();
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
   /* Creating products is an internal operation — requires full
      Product Data access. Customers posting to this endpoint get

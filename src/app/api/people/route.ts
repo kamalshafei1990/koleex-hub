@@ -27,7 +27,7 @@ export async function GET() {
 
 /* POST /api/people — create a person row (tenant_id enforced). */
 export async function POST(req: Request) {
-  const auth = await requireAuth();
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
 
   const body = (await req.json()) as Record<string, unknown>;

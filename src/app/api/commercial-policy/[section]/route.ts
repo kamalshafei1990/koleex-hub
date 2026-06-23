@@ -315,7 +315,7 @@ export async function PATCH(
     return NextResponse.json({ error: `Unknown section '${section}'` }, { status: 404 });
   }
 
-  const auth = await requireAuth();
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
   const allowed = await callerHasPolicyAccess(auth.role_id, auth.is_super_admin);
   if (!allowed) {

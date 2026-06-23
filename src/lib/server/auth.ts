@@ -343,6 +343,18 @@ export async function requireModuleAction(
   moduleName: string,
   action: ModuleAction,
 ): Promise<NextResponse | null> {
+  /* View-as is a READ-ONLY preview. Block every write (create/edit/delete)
+     while the SA is viewing as another user/role, regardless of whether the
+     route passed `req` to requireAuth. Uses the already-validated viewing_as
+     flag from getServerAuth, so it never false-blocks a real session. View
+     (read) actions stay allowed — that's the whole point of the preview. */
+  if (auth.viewing_as && action !== "view") {
+    return NextResponse.json(
+      { error: "Read-only while viewing as another user/role. Exit view-as to make changes." },
+      { status: 403 },
+    );
+  }
+
   if (auth.is_super_admin) return null;
 
   if (!auth.role_id) {

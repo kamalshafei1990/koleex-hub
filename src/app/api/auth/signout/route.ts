@@ -7,9 +7,12 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
-import { clearSessionCookie } from "@/lib/server/session";
+import { clearSessionCookie, clearViewAsCookie } from "@/lib/server/session";
 
 export async function POST() {
   await clearSessionCookie();
+  /* Also drop any active view-as cookies so they can't linger after sign-out
+     and be presented by the next account to log in on the same browser. */
+  await clearViewAsCookie();
   return NextResponse.json({ ok: true });
 }
