@@ -1,27 +1,34 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   ScreenshotCaptureModal — lets the user grab an image straight from their
-   screen (or clipboard) and hand it back as a File, so it can flow through
-   the exact same upload pipeline as a picked file.
+   ScreenshotCaptureModal — WeChat-style "mark a region" screen capture that
+   hands the cropped area back as a File (so it flows through the same upload
+   pipeline as a picked file).
 
-   Two paths, both ending in onCapture(file):
-     1. Screen capture (navigator.mediaDevices.getDisplayMedia) — the user
-        picks a screen / window / tab in the browser's native sheet, arranges
-        what they want, then clicks Capture; we grab that video frame to a
-        canvas → PNG File.
-     2. Clipboard paste — for the common "Cmd/Ctrl+Shift+4 → region to
-        clipboard" flow: a Paste button + a global paste listener.
+   Browser reality: a web page cannot freeze the real OS screen and let you
+   drag on it the way a native app does — the only way to read screen pixels
+   is getDisplayMedia, which first asks the user to pick a screen/window/tab.
+   So the flow is:
+     1. Ask once via getDisplayMedia (the browser's share prompt).
+     2. Grab a single frame, stop the stream, and show that frame FROZEN,
+        full-screen, dimmed.
+     3. The user drags a rectangle over the part they want (everything
+        outside the box stays dimmed — the WeChat marquee look).
+     4. Confirm → we crop exactly that rectangle from the full-resolution
+        frame → PNG File.
 
-   Rendered through a portal to <body> so it's never clipped by a transformed
-   ancestor (the editor's animated containers). Cleans up the media stream on
-   close / unmount / when the user stops sharing from the browser UI.
+   Also supports clipboard paste (Cmd/Ctrl+V or button) for the OS
+   "screenshot-to-clipboard" flow, which drops straight in.
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-type Stage = "starting" | "preview" | "error";
+type Stage = "starting" | "marking" | "error";
+interface Frame { url: string; w: number; h: number }
+interface Sel { x: number; y: number; w: number; h: number }
+
+const ACCENT = "#0066FF";
 
 export function ScreenshotCaptureModal({
   open,
@@ -35,87 +42,83 @@ export function ScreenshotCaptureModal({
   const [mounted, setMounted] = useState(false);
   const [stage, setStage] = useState<Stage>("starting");
   const [error, setError] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const [frame, setFrame] = useState<Frame | null>(null);
+  const [sel, setSel] = useState<Sel | null>(null);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const dragStart = useRef<{ x: number; y: number } | null>(null);
 
-  const stopStream = useCallback(() => {
-    const s = streamRef.current;
-    if (s) {
-      s.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-    if (videoRef.current) videoRef.current.srcObject = null;
-  }, []);
+  useEffect(() => { setMounted(true); }, []);
 
-  const close = useCallback(() => {
-    stopStream();
-    onClose();
-  }, [stopStream, onClose]);
-
-  /* Filenames carry a timestamp; computed at call time (not render) so it's
-     fine in a client component. */
-  const stampName = (prefix: string) => `${prefix}-${Date.now()}.png`;
+  const stampName = (p: string) => `${p}-${Date.now()}.png`;
 
   const emit = useCallback(
     (file: File) => {
-      stopStream();
       onCapture(file);
       onClose();
     },
-    [stopStream, onCapture, onClose],
+    [onCapture, onClose],
   );
 
-  /* Kick off screen capture as soon as the modal opens — the native picker
-     appears immediately, which is the smoothest flow. */
+  const reset = useCallback(() => {
+    setFrame(null);
+    setSel(null);
+    dragStart.current = null;
+  }, []);
+
+  /* Ask for the screen, grab ONE frame, stop the stream, freeze it. */
   const startCapture = useCallback(async () => {
     setError(null);
+    reset();
     setStage("starting");
     const md = typeof navigator !== "undefined" ? navigator.mediaDevices : undefined;
     if (!md || typeof md.getDisplayMedia !== "function") {
       setStage("error");
       setError(
-        "This browser can't capture the screen here. You can still take a screenshot with your OS (Cmd/Ctrl+Shift+4) and click “Paste from clipboard”.",
+        "This browser can't capture the screen here. Take a screenshot with your OS (Cmd/Ctrl+Shift+4) and click “Paste from clipboard”.",
       );
       return;
     }
+    let stream: MediaStream | null = null;
     try {
-      const stream = await md.getDisplayMedia({
-        video: { frameRate: 30 },
-        audio: false,
-      });
-      streamRef.current = stream;
-      const v = videoRef.current;
-      if (v) {
-        v.srcObject = stream;
-        await v.play().catch(() => {});
-      }
-      // If the user ends sharing from the browser's own control, bail out.
-      const track = stream.getVideoTracks()[0];
-      if (track) track.addEventListener("ended", () => close());
-      setStage("preview");
+      stream = await md.getDisplayMedia({ video: { frameRate: 30 }, audio: false });
+      const video = document.createElement("video");
+      video.muted = true;
+      video.playsInline = true;
+      video.srcObject = stream;
+      await video.play().catch(() => {});
+      // give the pipeline a couple of frames so the first paint isn't black
+      await new Promise((r) => setTimeout(r, 250));
+      const w = video.videoWidth || 1920;
+      const h = video.videoHeight || 1080;
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext("2d")?.drawImage(video, 0, 0, w, h);
+      const url = canvas.toDataURL("image/png");
+      stream.getTracks().forEach((t) => t.stop()); // we only needed one frame
+      video.srcObject = null;
+      setFrame({ url, w, h });
+      setStage("marking");
     } catch {
-      // User cancelled the picker or denied permission.
+      if (stream) stream.getTracks().forEach((t) => t.stop());
       setStage("error");
       setError("Screen capture was cancelled. Try again, or paste a screenshot from your clipboard.");
     }
-  }, [close]);
+  }, [reset]);
 
   useEffect(() => {
     if (!open) return;
     void startCapture();
-    return () => stopStream();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  /* Esc closes; global paste while open grabs an image from the clipboard. */
+  /* Esc cancels; Enter confirms a selection; global paste drops an image in. */
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      if (e.key === "Escape") onClose();
+      else if (e.key === "Enter" && sel && sel.w > 4 && sel.h > 4) confirmCrop();
     };
     const onPaste = (e: ClipboardEvent) => {
       const items = e.clipboardData?.items;
@@ -137,32 +140,15 @@ export function ScreenshotCaptureModal({
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("paste", onPaste);
     };
-  }, [open, close, emit]);
-
-  const capture = useCallback(() => {
-    const v = videoRef.current;
-    if (!v || !v.videoWidth || !v.videoHeight) return;
-    const canvas = document.createElement("canvas");
-    canvas.width = v.videoWidth;
-    canvas.height = v.videoHeight;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob(
-      (blob) => {
-        if (blob) emit(new File([blob], stampName("screenshot"), { type: "image/png" }));
-      },
-      "image/png",
-    );
-  }, [emit]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, sel, emit, onClose]);
 
   const pasteFromClipboard = useCallback(async () => {
     setError(null);
     try {
-      // navigator.clipboard.read is the explicit-permission path (Chrome).
       const anyNav = navigator as Navigator & { clipboard?: { read?: () => Promise<ClipboardItem[]> } };
       if (!anyNav.clipboard?.read) {
-        setError("Press Cmd/Ctrl+V to paste your screenshot, or use Screen Capture.");
+        setError("Press Cmd/Ctrl+V to paste your screenshot.");
         return;
       }
       const items = await anyNav.clipboard.read();
@@ -174,30 +160,203 @@ export function ScreenshotCaptureModal({
           return;
         }
       }
-      setError("No image in the clipboard yet. Take a screenshot (Cmd/Ctrl+Shift+4) then click Paste.");
+      setError("No image in the clipboard yet. Take a screenshot, then click Paste.");
     } catch {
-      setError("Clipboard access was blocked — press Cmd/Ctrl+V instead, or use Screen Capture.");
+      setError("Clipboard access was blocked — press Cmd/Ctrl+V instead.");
     }
   }, [emit]);
 
-  if (!mounted || !open) return null;
-
-  const btnBase: React.CSSProperties = {
-    padding: "10px 18px",
-    borderRadius: 10,
-    fontSize: 13,
-    fontWeight: 700,
-    cursor: "pointer",
-    border: "1px solid rgba(255,255,255,0.18)",
-    background: "transparent",
-    color: "rgba(255,255,255,0.85)",
+  /* ---- region marking (drag a rectangle over the frozen frame) -------- */
+  const clampToImage = (clientX: number, clientY: number) => {
+    const r = imgRef.current?.getBoundingClientRect();
+    if (!r) return { x: clientX, y: clientY };
+    return {
+      x: Math.min(Math.max(clientX, r.left), r.right),
+      y: Math.min(Math.max(clientY, r.top), r.bottom),
+    };
   };
 
+  const onDown = (e: React.MouseEvent) => {
+    if (stage !== "marking") return;
+    const p = clampToImage(e.clientX, e.clientY);
+    dragStart.current = p;
+    setSel({ x: p.x, y: p.y, w: 0, h: 0 });
+  };
+  const onMove = (e: React.MouseEvent) => {
+    if (!dragStart.current) return;
+    const p = clampToImage(e.clientX, e.clientY);
+    const s = dragStart.current;
+    setSel({
+      x: Math.min(s.x, p.x),
+      y: Math.min(s.y, p.y),
+      w: Math.abs(p.x - s.x),
+      h: Math.abs(p.y - s.y),
+    });
+  };
+  const onUp = () => {
+    dragStart.current = null;
+    if (sel && (sel.w < 5 || sel.h < 5)) setSel(null);
+  };
+
+  const confirmCrop = useCallback(() => {
+    const img = imgRef.current;
+    if (!img || !frame || !sel || sel.w < 5 || sel.h < 5) return;
+    const r = img.getBoundingClientRect();
+    const scaleX = frame.w / r.width;
+    const scaleY = frame.h / r.height;
+    const sx = Math.max(0, (sel.x - r.left) * scaleX);
+    const sy = Math.max(0, (sel.y - r.top) * scaleY);
+    const sw = Math.min(frame.w - sx, sel.w * scaleX);
+    const sh = Math.min(frame.h - sy, sel.h * scaleY);
+    if (sw < 1 || sh < 1) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(sw);
+    canvas.height = Math.round(sh);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+      if (blob) emit(new File([blob], stampName("screenshot"), { type: "image/png" }));
+    }, "image/png");
+  }, [frame, sel, emit]);
+
+  if (!mounted || !open) return null;
+
+  const hasSel = !!sel && sel.w > 4 && sel.h > 4;
+
+  /* ---- MARKING: full-screen frozen frame + marquee -------------------- */
+  if (stage === "marking" && frame) {
+    return createPortal(
+      <div
+        onMouseDown={onDown}
+        onMouseMove={onMove}
+        onMouseUp={onUp}
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 2147483000,
+          background: "#000",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "crosshair",
+          userSelect: "none",
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          ref={imgRef}
+          src={frame.url}
+          alt=""
+          draggable={false}
+          style={{ maxWidth: "100vw", maxHeight: "100vh", objectFit: "contain", pointerEvents: "none" }}
+        />
+
+        {/* Dim everything until the user starts marking. */}
+        {!hasSel && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", pointerEvents: "none" }} />
+        )}
+
+        {/* Selection rectangle — box-shadow spotlights it (dims the rest). */}
+        {sel && (
+          <div
+            style={{
+              position: "fixed",
+              left: sel.x,
+              top: sel.y,
+              width: sel.w,
+              height: sel.h,
+              border: `1.5px solid ${ACCENT}`,
+              boxShadow: "0 0 0 100vmax rgba(0,0,0,0.45)",
+              pointerEvents: "none",
+            }}
+          />
+        )}
+
+        {/* Hint while idle. */}
+        {!hasSel && (
+          <div
+            style={{
+              position: "fixed",
+              top: 18,
+              left: "50%",
+              transform: "translateX(-50%)",
+              padding: "8px 16px",
+              borderRadius: 999,
+              background: "rgba(0,0,0,0.75)",
+              color: "#fff",
+              fontSize: 13,
+              fontWeight: 600,
+              pointerEvents: "none",
+            }}
+          >
+            Drag to mark the area you want · Esc to cancel
+          </div>
+        )}
+
+        {/* Confirm toolbar near the bottom-right of the selection. */}
+        {hasSel && (
+          <div
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              position: "fixed",
+              left: Math.max(8, Math.min(sel!.x + sel!.w - 150, window.innerWidth - 158)),
+              top: Math.min(sel!.y + sel!.h + 8, window.innerHeight - 48),
+              display: "flex",
+              gap: 8,
+              padding: 6,
+              borderRadius: 10,
+              background: "#0D0D0D",
+              border: "1px solid #2E2E2E",
+              boxShadow: "0 8px 30px rgba(0,0,0,0.5)",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setSel(null)}
+              style={{ padding: "6px 12px", borderRadius: 7, border: "1px solid rgba(255,255,255,0.18)", background: "transparent", color: "rgba(255,255,255,0.85)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+            >
+              Redo
+            </button>
+            <button
+              type="button"
+              onClick={confirmCrop}
+              style={{ padding: "6px 14px", borderRadius: 7, border: `1px solid ${ACCENT}`, background: ACCENT, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+            >
+              Use selection
+            </button>
+          </div>
+        )}
+
+        {/* Always-available exits, top-right. */}
+        <div
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{ position: "fixed", top: 14, right: 16, display: "flex", gap: 8 }}
+        >
+          <button
+            type="button"
+            onClick={() => void startCapture()}
+            style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.25)", background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+          >
+            Re-capture
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.25)", background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>,
+      document.body,
+    );
+  }
+
+  /* ---- STARTING / ERROR: small centered dialog ------------------------ */
   return createPortal(
     <div
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) close();
-      }}
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
       style={{
         position: "fixed",
         inset: 0,
@@ -207,136 +366,37 @@ export function ScreenshotCaptureModal({
         alignItems: "center",
         justifyContent: "center",
         padding: 24,
-        backdropFilter: "blur(2px)",
       }}
     >
-      <div
-        style={{
-          width: "min(760px, 94vw)",
-          maxHeight: "90vh",
-          display: "flex",
-          flexDirection: "column",
-          background: "#0D0D0D",
-          border: "1px solid #2E2E2E",
-          borderRadius: 16,
-          overflow: "hidden",
-          boxShadow: "0 24px 80px rgba(0,0,0,0.6)",
-        }}
-      >
-        {/* header */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "14px 18px",
-            borderBottom: "1px solid #2E2E2E",
-          }}
-        >
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", letterSpacing: "0.01em" }}>
-            Capture a screenshot
-          </div>
+      <div style={{ width: "min(440px, 92vw)", background: "#0D0D0D", border: "1px solid #2E2E2E", borderRadius: 16, padding: 22, color: "#fff", textAlign: "center" }}>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>Capture a screenshot</div>
+        <p style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", lineHeight: 1.6, margin: "0 0 18px" }}>
+          {stage === "starting"
+            ? "Choose the screen or window to capture in the prompt — then drag to mark the part you want."
+            : error}
+        </p>
+        <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
           <button
             type="button"
-            onClick={close}
-            aria-label="Close"
-            style={{ ...btnBase, padding: "4px 10px", fontSize: 16, lineHeight: 1 }}
+            onClick={pasteFromClipboard}
+            style={{ padding: "10px 16px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.18)", background: "transparent", color: "rgba(255,255,255,0.85)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
           >
-            ×
-          </button>
-        </div>
-
-        {/* body */}
-        <div style={{ padding: 18, flex: 1, minHeight: 0, overflow: "auto" }}>
-          <div
-            style={{
-              width: "100%",
-              aspectRatio: "16 / 9",
-              background: "#111",
-              border: "1px solid #2E2E2E",
-              borderRadius: 10,
-              overflow: "hidden",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {/* live preview of the shared screen */}
-            <video
-              ref={videoRef}
-              muted
-              playsInline
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "contain",
-                display: stage === "preview" ? "block" : "none",
-                background: "#000",
-              }}
-            />
-            {stage !== "preview" && (
-              <div style={{ textAlign: "center", padding: 24, maxWidth: 460 }}>
-                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.75)", lineHeight: 1.6 }}>
-                  {stage === "starting"
-                    ? "Choose the screen, window, or tab to capture in the prompt…"
-                    : error}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <p
-            style={{
-              margin: "12px 2px 0",
-              fontSize: 12,
-              color: "rgba(255,255,255,0.5)",
-              lineHeight: 1.6,
-            }}
-          >
-            Pick a window or your whole screen, arrange what you want, then{" "}
-            <b style={{ color: "rgba(255,255,255,0.8)" }}>Capture</b>. Or take an OS screenshot to
-            your clipboard and <b style={{ color: "rgba(255,255,255,0.8)" }}>Paste</b> it.
-          </p>
-        </div>
-
-        {/* footer actions */}
-        <div
-          style={{
-            display: "flex",
-            gap: 10,
-            justifyContent: "flex-end",
-            flexWrap: "wrap",
-            padding: "14px 18px",
-            borderTop: "1px solid #2E2E2E",
-          }}
-        >
-          <button type="button" onClick={pasteFromClipboard} style={btnBase}>
             Paste from clipboard
           </button>
-          {stage === "error" ? (
-            <button
-              type="button"
-              onClick={() => void startCapture()}
-              style={{ ...btnBase, border: "1px solid #3385FF", color: "#3385FF" }}
-            >
-              Try screen capture again
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={capture}
-              disabled={stage !== "preview"}
-              style={{
-                ...btnBase,
-                border: "1px solid #0066FF",
-                background: stage === "preview" ? "#0066FF" : "rgba(0,102,255,0.35)",
-                color: "#fff",
-                cursor: stage === "preview" ? "pointer" : "not-allowed",
-              }}
-            >
-              Capture
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => void startCapture()}
+            style={{ padding: "10px 16px", borderRadius: 10, border: `1px solid ${ACCENT}`, background: stage === "error" ? "transparent" : ACCENT, color: stage === "error" ? ACCENT : "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+          >
+            {stage === "error" ? "Try again" : "Choosing…"}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ padding: "10px 16px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.18)", background: "transparent", color: "rgba(255,255,255,0.6)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+          >
+            Cancel
+          </button>
         </div>
       </div>
     </div>,
