@@ -84,14 +84,14 @@ export default function FoldersSidebar({
         <SmartItem
           label={t("smart.allNotes")}
           Icon={NotesIcon}
-          tint="text-amber-400"
+          tint="text-[var(--text-muted)]"
           active={selection.kind === "smart" && selection.key === "all"}
           onClick={() => onSelect({ kind: "smart", key: "all" })}
         />
         <SmartItem
           label={t("smart.pinned")}
           Icon={PinIcon}
-          tint="text-amber-400"
+          tint="text-[#0066FF]"
           active={selection.kind === "smart" && selection.key === "pinned"}
           onClick={() => onSelect({ kind: "smart", key: "pinned" })}
         />
@@ -253,7 +253,7 @@ function FolderTree({
               >
                 <FolderIcon
                   className={`h-3.5 w-3.5 shrink-0 ${
-                    isActive ? "text-amber-400" : "text-[var(--text-faint)]"
+                    isActive ? "text-[#0066FF]" : "text-[var(--text-faint)]"
                   }`}
                 />
                 <span className="truncate flex-1">{f.name}</span>

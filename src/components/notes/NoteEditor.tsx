@@ -353,7 +353,7 @@ export default function NoteEditor({
         </span>
 
         <span className={`text-[10.5px] font-medium tabular-nums flex items-center gap-1.5 transition-opacity duration-300 ${saving === "idle" ? "opacity-0" : "opacity-100"}`}>
-          <span className={`h-1.5 w-1.5 rounded-full ${saving === "saving" ? "bg-amber-400 animate-pulse" : saving === "saved" ? "bg-emerald-400" : "bg-transparent"}`} />
+          <span className={`h-1.5 w-1.5 rounded-full ${saving === "saving" ? "bg-[#0066FF] animate-pulse" : saving === "saved" ? "bg-[#00CC66]" : "bg-transparent"}`} />
           <span className="text-[var(--text-dim)]">{saving === "saving" ? t("saving") : saving === "saved" ? t("saved") : ""}</span>
         </span>
       </div>
@@ -423,7 +423,7 @@ export default function NoteEditor({
         {!isTrashed ? (
           ownerControls && (
             <>
-              <button onClick={onTogglePin} title={note.is_pinned ? t("unpin") : t("pin")} className={`w-8 h-8 rounded-lg flex items-center justify-center border transition-all ${note.is_pinned ? "bg-amber-500/15 border-amber-500/30 text-amber-400" : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"}`}>
+              <button onClick={onTogglePin} title={note.is_pinned ? t("unpin") : t("pin")} className={`w-8 h-8 rounded-lg flex items-center justify-center border transition-all ${note.is_pinned ? "bg-[#0066FF]/15 border-[#0066FF]/30 text-[#0066FF]" : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"}`}>
                 <PinIcon className="h-3.5 w-3.5" />
               </button>
               <button onClick={onDelete} title={t("moveToTrash")} className="w-8 h-8 rounded-lg flex items-center justify-center bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-red-400 transition-all">

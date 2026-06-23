@@ -235,7 +235,7 @@ function NoteRowItem({
       }}
       className={`group w-full text-start px-3 py-2.5 border-b border-[var(--border-faint)] transition-all cursor-pointer outline-none focus-visible:bg-[var(--bg-surface)] ${
         active
-          ? "bg-amber-500/[0.14] border-s-[3px] border-s-amber-400"
+          ? "bg-[#0066FF]/[0.10] border-s-[3px] border-s-[#0066FF]"
           : "hover:bg-[var(--bg-surface)]"
       }`}
     >
@@ -243,7 +243,7 @@ function NoteRowItem({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 mb-0.5">
             {note.is_pinned && (
-              <PinIcon className="h-2.5 w-2.5 text-amber-400 shrink-0" />
+              <PinIcon className="h-2.5 w-2.5 text-[#0066FF] shrink-0" />
             )}
             {(note.is_shared || note.shared_role) && (
               <UsersIcon
@@ -284,7 +284,7 @@ function NoteRowItem({
                   onTogglePin(note.id, !note.is_pinned);
                 }}
                 title={note.is_pinned ? "Unpin" : "Pin"}
-                className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-amber-400 hover:bg-[var(--bg-surface-subtle)]"
+                className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[#0066FF] hover:bg-[var(--bg-surface-subtle)]"
               >
                 <PinIcon className="h-3 w-3" />
               </button>
