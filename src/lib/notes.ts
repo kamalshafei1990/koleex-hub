@@ -31,15 +31,53 @@ export interface NoteRow {
   folder_id: string | null;
   title: string;
   body_plain: string;
+  color?: string | null;
+  tags?: string[];
   is_pinned: boolean;
   is_locked: boolean;
   deleted_at: string | null;
   created_at: string;
   updated_at: string;
+  /* Present only for rows returned by the "Shared with me" view. */
+  shared_role?: "viewer" | "editor";
+  owner_name?: string | null;
 }
 
 export interface NoteFull extends NoteRow {
   body_json: unknown | null;
+  /** The caller's role on this note — resolved server-side. */
+  role?: NoteRole;
+}
+
+/* ── Sharing ── */
+
+export type NoteRole = "owner" | "editor" | "viewer";
+
+export interface ShareAccount {
+  id: string;
+  username: string | null;
+  login_email: string | null;
+  role: string | null;
+}
+
+export interface NoteShareRow {
+  id: string;
+  account_id: string;
+  permission: "view" | "edit";
+  created_at: string;
+  account: ShareAccount | null;
+}
+
+export interface NoteSharesResponse {
+  role: NoteRole | null;
+  isOwner: boolean;
+  owner: { account_id: string; account: ShareAccount | null } | null;
+  shares: NoteShareRow[];
+}
+
+export function shareAccountLabel(a: ShareAccount | null | undefined): string {
+  if (!a) return "Unknown";
+  return (a.username || a.login_email || "Account").trim();
 }
 
 /* ── Folders ── */
@@ -112,8 +150,8 @@ export async function deleteFolder(id: string): Promise<boolean> {
 
 export interface FetchNotesOptions {
   folderId?: string | null;
-  /** "all" | "none" (loose) | "pinned" | "trash" — overrides folderId */
-  smartFolder?: "all" | "none" | "pinned" | "trash";
+  /** "all" | "none" (loose) | "pinned" | "trash" | "shared" — overrides folderId */
+  smartFolder?: "all" | "none" | "pinned" | "trash" | "shared";
   search?: string;
 }
 
@@ -142,8 +180,8 @@ export async function fetchNote(id: string): Promise<NoteFull | null> {
   try {
     const res = await fetch("/api/notes/" + id, { credentials: "include" });
     if (!res.ok) return null;
-    const json = (await res.json()) as { note: NoteFull };
-    return json.note;
+    const json = (await res.json()) as { note: NoteFull; role?: NoteRole };
+    return { ...json.note, role: json.role };
   } catch {
     return null;
   }
@@ -179,6 +217,8 @@ export async function updateNote(
     body_plain: string;
     folder_id: string | null;
     is_pinned: boolean;
+    color: string | null;
+    tags: string[];
   }>,
 ): Promise<boolean> {
   try {
@@ -239,6 +279,78 @@ export async function emptyTrash(): Promise<boolean> {
     return res.ok;
   } catch {
     return false;
+  }
+}
+
+/* ── Sharing API ── */
+
+export async function fetchNoteShares(noteId: string): Promise<NoteSharesResponse | null> {
+  try {
+    const res = await fetch(`/api/notes/${noteId}/shares`, { credentials: "include" });
+    if (!res.ok) return null;
+    return (await res.json()) as NoteSharesResponse;
+  } catch {
+    return null;
+  }
+}
+
+export async function addNoteShare(
+  noteId: string,
+  accountId: string,
+  permission: "view" | "edit",
+): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/notes/${noteId}/shares`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ account_id: accountId, permission }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function updateNoteShare(
+  noteId: string,
+  shareId: string,
+  permission: "view" | "edit",
+): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/notes/${noteId}/shares/${shareId}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ permission }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function removeNoteShare(noteId: string, shareId: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/notes/${noteId}/shares/${shareId}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchShareCandidates(q: string): Promise<ShareAccount[]> {
+  try {
+    const qs = q.trim() ? `?q=${encodeURIComponent(q.trim())}` : "";
+    const res = await fetch(`/api/notes/share-candidates${qs}`, { credentials: "include" });
+    if (!res.ok) return [];
+    const json = (await res.json()) as { accounts: ShareAccount[] };
+    return json.accounts ?? [];
+  } catch {
+    return [];
   }
 }
 

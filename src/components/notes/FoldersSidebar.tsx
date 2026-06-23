@@ -16,13 +16,14 @@ import PencilIcon from "@/components/icons/ui/PencilIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import FolderIcon from "@/components/icons/ui/FolderIcon";
 import FileIcon from "@/components/icons/ui/FileIcon";
+import UsersIcon from "@/components/icons/ui/UsersIcon";
 import PinIcon from "@/components/icons/ui/PinIcon";
 import NotesIcon from "@/components/icons/NotesIcon";
 import type { NotesFolderRow } from "@/lib/notes";
 
 export type FolderSelection =
   | { kind: "folder"; id: string }
-  | { kind: "smart"; key: "all" | "pinned" | "none" | "trash" };
+  | { kind: "smart"; key: "all" | "pinned" | "none" | "shared" | "trash" };
 
 export default function FoldersSidebar({
   folders,
@@ -100,6 +101,13 @@ export default function FoldersSidebar({
           tint="text-[var(--text-muted)]"
           active={selection.kind === "smart" && selection.key === "none"}
           onClick={() => onSelect({ kind: "smart", key: "none" })}
+        />
+        <SmartItem
+          label={t("smart.shared")}
+          Icon={UsersIcon}
+          tint="text-[#0066FF]"
+          active={selection.kind === "smart" && selection.key === "shared"}
+          onClick={() => onSelect({ kind: "smart", key: "shared" })}
         />
       </nav>
 

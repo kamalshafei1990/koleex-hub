@@ -10,6 +10,7 @@ export const notesT: Translations = {
   "smart.allNotes":    { en: "All Notes",            zh: "所有笔记",           ar: "كل الملاحظات" },
   "smart.pinned":      { en: "Pinned",               zh: "固定",               ar: "مثبّتة" },
   "smart.none":        { en: "Unfiled",              zh: "未分类",             ar: "غير مصنفة" },
+  "smart.shared":      { en: "Shared with me",       zh: "与我共享",           ar: "مشاركة معي" },
   "smart.trash":       { en: "Recently Deleted",     zh: "最近删除",           ar: "المحذوفة مؤخرًا" },
 
   "folders":           { en: "Folders",              zh: "文件夹",             ar: "المجلدات" },

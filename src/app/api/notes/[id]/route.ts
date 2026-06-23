@@ -2,22 +2,13 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
+import { getNoteRole, canRead, canWrite, SHARED_EDITOR_FIELDS } from "@/lib/server/note-access";
 
-/* GET    /api/notes/[id] — full note including body_json
-   PATCH  /api/notes/[id] — update any fields
-   DELETE /api/notes/[id] — SOFT delete (move to Recently Deleted).
-                            Use /purge to permanently remove. */
-
-async function ownsNote(id: string, accountId: string): Promise<boolean> {
-  const { data } = await supabaseServer
-    .from("notes")
-    .select("id")
-    .eq("id", id)
-    .eq("account_id", accountId)
-    .maybeSingle();
-  return data !== null;
-}
+/* GET    /api/notes/[id] — full note including body_json. Owner OR anyone the
+                            note is shared with (view/edit) may read.
+   PATCH  /api/notes/[id] — owner: any field. Shared editor: content only.
+   DELETE /api/notes/[id] — owner only. Soft delete (Recently Deleted). */
 
 export async function GET(
   _req: Request,
@@ -29,11 +20,15 @@ export async function GET(
   const deny = await requireModuleAccess(auth, "Notes");
   if (deny) return deny;
 
+  const access = await getNoteRole(id, auth.account_id);
+  if (!canRead(access.role)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const { data, error } = await supabaseServer
     .from("notes")
     .select("*")
     .eq("id", id)
-    .eq("account_id", auth.account_id)
     .maybeSingle();
 
   if (error) {
@@ -41,7 +36,7 @@ export async function GET(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   if (!data) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json({ note: data });
+  return NextResponse.json({ note: data, role: access.role });
 }
 
 export async function PATCH(
@@ -49,20 +44,35 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const auth = await requireAuth();
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
   const deny = await requireModuleAction(auth, "Notes", "edit");
   if (deny) return deny;
 
-  if (!(await ownsNote(id, auth.account_id))) {
+  const access = await getNoteRole(id, auth.account_id);
+  if (!canWrite(access.role)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const patch = (await req.json()) as Record<string, unknown>;
-  delete patch.id;
-  delete patch.account_id;
-  delete patch.tenant_id;
-  delete patch.created_at;
+  const incoming = (await req.json()) as Record<string, unknown>;
+  delete incoming.id;
+  delete incoming.account_id;
+  delete incoming.tenant_id;
+  delete incoming.created_at;
+  delete incoming.deleted_at;
+
+  // A shared editor may only change CONTENT — never the owner's folder /
+  // pin / lock state. The owner keeps full control.
+  let patch = incoming;
+  if (access.role !== "owner") {
+    patch = {};
+    for (const k of SHARED_EDITOR_FIELDS) {
+      if (k in incoming) patch[k] = incoming[k];
+    }
+    if (Object.keys(patch).length === 0) {
+      return NextResponse.json({ ok: true });
+    }
+  }
 
   const { data, error } = await supabaseServer
     .from("notes")
@@ -78,16 +88,17 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const auth = await requireAuth();
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
   const deny = await requireModuleAction(auth, "Notes", "delete");
   if (deny) return deny;
 
-  if (!(await ownsNote(id, auth.account_id))) {
+  const access = await getNoteRole(id, auth.account_id);
+  if (access.role !== "owner") {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

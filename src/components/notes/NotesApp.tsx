@@ -39,14 +39,26 @@ import {
   type NoteFull,
 } from "@/lib/notes";
 
+import { useMeBootstrap } from "@/lib/me-bootstrap";
 import FoldersSidebar, { type FolderSelection } from "./FoldersSidebar";
 import NotesList from "./NotesList";
 import NoteEditor from "./NoteEditor";
+import ShareDialog from "./ShareDialog";
 import { PromptDialog, ConfirmDialog } from "./NotesDialog";
 
 export default function NotesApp() {
   const { t } = useTranslation(notesT);
   const searchPlaceholder = useSearchPlaceholder("notes");
+  const { data: meBootstrap } = useMeBootstrap();
+
+  /** Collaboration identity (account id + display name) for realtime. */
+  const collabMe = useMemo(() => {
+    const a = meBootstrap?.auth as { account_id?: string; username?: string } | undefined;
+    if (!a?.account_id) return null;
+    return { id: a.account_id, name: a.username || "You" };
+  }, [meBootstrap]);
+
+  const [shareOpen, setShareOpen] = useState(false);
 
   const [folders, setFolders] = useState<NotesFolderRow[]>([]);
   const [notes, setNotes] = useState<NoteRow[]>([]);
@@ -348,7 +360,7 @@ export default function NotesApp() {
   const onNoteChange = useCallback(
     async (
       id: string,
-      updates: { title?: string; body_json?: unknown },
+      updates: { title?: string; body_json?: unknown; color?: string | null; tags?: string[] },
     ) => {
       setSaving("saving");
       const body_plain =
@@ -378,6 +390,8 @@ export default function NotesApp() {
       if (title !== undefined) patch.title = title;
       if (updates.body_json !== undefined) patch.body_json = updates.body_json;
       if (body_plain !== undefined) patch.body_plain = body_plain;
+      if (updates.color !== undefined) patch.color = updates.color;
+      if (updates.tags !== undefined) patch.tags = updates.tags;
       const ok = await updateNote(id, patch);
       setSaving(ok ? "saved" : "idle");
 
@@ -470,6 +484,7 @@ export default function NotesApp() {
                 { key: "all",     onClick: () => setSelection({ kind: "smart", key: "all" }),    icon: "document",   label: "All Notes" },
                 { key: "pinned",  onClick: () => setSelection({ kind: "smart", key: "pinned" }), icon: "star",       label: "Pinned"    },
                 { key: "none",    onClick: () => setSelection({ kind: "smart", key: "none" }),   icon: "file",       label: "Unfiled"   },
+                { key: "shared",  onClick: () => setSelection({ kind: "smart", key: "shared" }), icon: "share",      label: "Shared"    },
                 { key: "trash",   onClick: () => setSelection({ kind: "smart", key: "trash" }),  icon: "recycle",    label: "Trash"     },
                 { key: "new",     onClick: onCreateNote,                                          icon: "plus",       label: "New Note"  },
               ]}
@@ -572,6 +587,8 @@ export default function NotesApp() {
               folders={folders}
               readOnly={isTrashView}
               saving={saving}
+              me={collabMe}
+              onShare={() => { if (activeNote) setShareOpen(true); }}
               onChange={(updates) => {
                 if (!activeNote) return;
                 void onNoteChange(activeNote.id, updates);
@@ -621,6 +638,13 @@ export default function NotesApp() {
         initialValue={notePrompt.open ? notePrompt.initial : ""}
         onConfirm={submitRenameNote}
         onClose={() => setNotePrompt({ open: false })}
+      />
+
+      <ShareDialog
+        noteId={shareOpen && activeNote ? activeNote.id : null}
+        open={shareOpen && !!activeNote}
+        onClose={() => setShareOpen(false)}
+        onChanged={() => { void reloadNotes(); }}
       />
 
       <ConfirmDialog

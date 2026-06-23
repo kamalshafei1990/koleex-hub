@@ -25,11 +25,53 @@ export async function GET(req: Request) {
   const folder = url.searchParams.get("folder");
   const search = url.searchParams.get("search")?.trim();
 
+  const COLS =
+    "id, account_id, folder_id, title, body_plain, color, tags, is_pinned, is_locked, deleted_at, created_at, updated_at";
+
+  /* ── "Shared with me" — notes owned by OTHER accounts that have been
+        shared with the caller. Driven by note_shares, not account_id. ── */
+  if (folder === "shared") {
+    const { data: shares } = await supabaseServer
+      .from("note_shares")
+      .select("note_id, permission")
+      .eq("shared_with_account_id", auth.account_id);
+    const shareRows = shares ?? [];
+    const ids = shareRows.map((s) => s.note_id as string);
+    if (ids.length === 0) return NextResponse.json({ notes: [] });
+    const permByNote = new Map(shareRows.map((s) => [s.note_id as string, s.permission as string]));
+
+    let sq = supabaseServer
+      .from("notes")
+      .select(COLS + ", account:accounts!notes_account_id_fkey(username)")
+      .in("id", ids)
+      .is("deleted_at", null);
+    if (search) {
+      const term = `%${search}%`;
+      sq = sq.or(`title.ilike.${term},body_plain.ilike.${term}`);
+    }
+    sq = sq.order("updated_at", { ascending: false });
+    const { data: sdata, error: serr } = await sq;
+    if (serr) {
+      console.error("[api/notes GET shared]", serr.message);
+      return NextResponse.json({ error: "Failed to load shared notes" }, { status: 500 });
+    }
+    const notes = ((sdata ?? []) as unknown as Array<Record<string, unknown>>).map((n) => {
+      const acc = n.account as { username?: string } | { username?: string }[] | null;
+      const ownerName = Array.isArray(acc) ? acc[0]?.username : acc?.username;
+      const { account: _drop, ...rest } = n;
+      void _drop;
+      return {
+        ...rest,
+        shared_role: permByNote.get(n.id as string) === "view" ? "viewer" : "editor",
+        owner_name: ownerName ?? null,
+      };
+    });
+    return NextResponse.json({ notes });
+  }
+
   let q = supabaseServer
     .from("notes")
-    .select(
-      "id, folder_id, title, body_plain, is_pinned, is_locked, deleted_at, created_at, updated_at",
-    )
+    .select(COLS)
     .eq("account_id", auth.account_id);
 
   if (folder === "trash") {

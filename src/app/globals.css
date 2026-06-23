@@ -302,6 +302,52 @@ body {
   border: 1px solid var(--border-subtle);
 }
 
+/* ── Tables ───────────────────────────────────────────────────── */
+.notes-editor table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 12px 0;
+  table-layout: fixed;
+  overflow: hidden;
+}
+.notes-editor table td,
+.notes-editor table th {
+  border: 1px solid var(--border-color);
+  padding: 6px 10px;
+  vertical-align: top;
+  min-width: 48px;
+  position: relative;
+}
+.notes-editor table th {
+  background: var(--bg-surface);
+  font-weight: 700;
+  text-align: start;
+}
+.notes-editor table .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 102, 255, 0.12);
+  pointer-events: none;
+}
+.notes-editor table .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--border-focus);
+  cursor: col-resize;
+}
+.notes-editor hr {
+  border: none;
+  border-top: 1px solid var(--border-color);
+  margin: 16px 0;
+}
+/* Text alignment marks applied by extension-text-align */
+.notes-editor [style*="text-align: center"] { text-align: center; }
+.notes-editor [style*="text-align: right"] { text-align: right; }
+
 /* ── Utility: hide scrollbars on horizontally-scrollable rows ────
    Used by tab strips, day pickers, filter pills — anywhere we want
    swipe/drag scrolling without the chunky browser scrollbar taking
