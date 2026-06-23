@@ -603,8 +603,9 @@ function EditorToolbar({
       >
         {children}
       </button>
-      {/* Branded tooltip — fades in after ~0.5s of hover (delay on enter only) */}
-      <span className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 z-[70] whitespace-nowrap rounded-md bg-[var(--bg-inverted)] px-2 py-1 text-[10.5px] font-medium text-[var(--text-inverted)] shadow-lg opacity-0 transition-opacity duration-150 [transition-delay:0ms] group-hover/tt:opacity-100 group-hover/tt:[transition-delay:500ms]">
+      {/* Branded tooltip — below the button so it never collides with the
+          page header above; fades in after ~0.5s of hover (delay on enter). */}
+      <span className="pointer-events-none absolute top-full left-1/2 mt-1.5 -translate-x-1/2 z-[70] whitespace-nowrap rounded-md bg-[var(--bg-inverted)] px-2 py-1 text-[10.5px] font-medium text-[var(--text-inverted)] shadow-lg opacity-0 transition-opacity duration-150 [transition-delay:0ms] group-hover/tt:opacity-100 group-hover/tt:[transition-delay:500ms]">
         {title}
       </span>
     </span>
