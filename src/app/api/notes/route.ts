@@ -101,7 +101,20 @@ export async function GET(req: Request) {
     console.error("[api/notes GET]", error.message);
     return NextResponse.json({ error: "Failed to load notes" }, { status: 500 });
   }
-  return NextResponse.json({ notes: data ?? [] });
+
+  // Flag which of the caller's notes are shared with someone, so the list can
+  // show a "shared" indicator. (Skip for trash.)
+  const rows = (data ?? []) as Array<Record<string, unknown>>;
+  if (folder !== "trash" && rows.length) {
+    const ids = rows.map((r) => r.id as string);
+    const { data: shares } = await supabaseServer
+      .from("note_shares")
+      .select("note_id")
+      .in("note_id", ids);
+    const sharedSet = new Set((shares ?? []).map((s) => s.note_id as string));
+    for (const r of rows) r.is_shared = sharedSet.has(r.id as string);
+  }
+  return NextResponse.json({ notes: rows });
 }
 
 export async function POST(req: Request) {

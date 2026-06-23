@@ -10,6 +10,7 @@ import { useTranslation } from "@/lib/i18n";
 import { notesT } from "@/lib/translations/notes";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import PinIcon from "@/components/icons/ui/PinIcon";
+import UsersIcon from "@/components/icons/ui/UsersIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import NotesIcon from "@/components/icons/NotesIcon";
@@ -239,9 +240,18 @@ function NoteRowItem({
             {note.is_pinned && (
               <PinIcon className="h-2.5 w-2.5 text-amber-400 shrink-0" />
             )}
+            {(note.is_shared || note.shared_role) && (
+              <UsersIcon
+                className="h-3 w-3 text-[#0066FF] shrink-0"
+                aria-label={note.shared_role ? "Shared with you" : "Shared"}
+              />
+            )}
             <div className="text-[13px] font-semibold text-[var(--text-primary)] truncate flex-1">
               {displayTitle}
             </div>
+            {note.shared_role && note.owner_name && (
+              <span className="text-[10px] text-[var(--text-dim)] shrink-0 truncate max-w-[80px]">{note.owner_name}</span>
+            )}
           </div>
           <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-dim)]">
             <span className="shrink-0">{formatNoteTimestamp(note.updated_at)}</span>

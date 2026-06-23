@@ -38,6 +38,8 @@ export interface NoteRow {
   deleted_at: string | null;
   created_at: string;
   updated_at: string;
+  /** True for notes the caller owns and has shared with at least one person. */
+  is_shared?: boolean;
   /* Present only for rows returned by the "Shared with me" view. */
   shared_role?: "viewer" | "editor";
   owner_name?: string | null;
