@@ -599,9 +599,13 @@ function EditorToolbar({
 
       {inTable && (
         <>
-          <TB active={false} onClick={() => editor.chain().focus().addRowAfter().run()} title="Add row">+Row</TB>
-          <TB active={false} onClick={() => editor.chain().focus().addColumnAfter().run()} title="Add column">+Col</TB>
-          <TB active={false} onClick={() => editor.chain().focus().deleteTable().run()} title="Delete table"><TrashIcon className="h-3.5 w-3.5" /></TB>
+          <span className="ml-0.5 mr-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">Table</span>
+          <TB active={false} onClick={() => editor.chain().focus().addRowAfter().run()} title="Add row below">+ Row</TB>
+          <TB active={false} onClick={() => editor.chain().focus().deleteRow().run()} title="Delete current row">− Row</TB>
+          <TB active={false} onClick={() => editor.chain().focus().addColumnAfter().run()} title="Add column right">+ Col</TB>
+          <TB active={false} onClick={() => editor.chain().focus().deleteColumn().run()} title="Delete current column">− Col</TB>
+          <TB active={false} onClick={() => editor.chain().focus().toggleHeaderRow().run()} title="Toggle header row">H</TB>
+          <TB active={false} onClick={() => editor.chain().focus().deleteTable().run()} title="Delete whole table"><TrashIcon className="h-3.5 w-3.5" /></TB>
         </>
       )}
 
