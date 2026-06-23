@@ -51,6 +51,8 @@ interface AppHomeMenuProps {
   searchPlaceholder: string;
   searchHref?: string;
   onSearchSubmit?: (term: string) => void;
+  /** When true, hide the built-in search bar (the host page provides its own). */
+  hideSearch?: boolean;
 }
 
 export default function AppHomeMenu({
@@ -58,15 +60,18 @@ export default function AppHomeMenu({
   searchPlaceholder,
   searchHref,
   onSearchSubmit,
+  hideSearch = false,
 }: AppHomeMenuProps) {
   return (
     <section data-testid="app-home-menu" aria-label="Quick navigate" className="space-y-3">
       {/* Compact, clean search bar */}
-      <HomeSearchBar
-        placeholder={searchPlaceholder}
-        searchHref={searchHref}
-        onSearchSubmit={onSearchSubmit}
-      />
+      {!hideSearch && (
+        <HomeSearchBar
+          placeholder={searchPlaceholder}
+          searchHref={searchHref}
+          onSearchSubmit={onSearchSubmit}
+        />
+      )}
 
       {/* Single horizontal pill row — scrolls on mobile, wraps on desktop */}
       <nav

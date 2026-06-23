@@ -15,6 +15,8 @@ import AppHomeMenu from "@/components/ui/AppHomeMenu";
 import Button from "@/components/ui/Button";
 import { useSearchPlaceholder } from "@/lib/searchPlaceholders";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
+import PinIcon from "@/components/icons/ui/PinIcon";
+import UsersIcon from "@/components/icons/ui/UsersIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import { useTranslation } from "@/lib/i18n";
@@ -480,16 +482,16 @@ export default function NotesApp() {
           {/* Brand-aligned tile menu + search — same across every Hub app */}
           <div className="mt-5 mb-3">
             <AppHomeMenu
+              hideSearch
               navItems={[
-                { key: "all",     onClick: () => setSelection({ kind: "smart", key: "all" }),    icon: "document",   label: "All Notes" },
-                { key: "pinned",  onClick: () => setSelection({ kind: "smart", key: "pinned" }), icon: "star",       label: "Pinned"    },
-                { key: "none",    onClick: () => setSelection({ kind: "smart", key: "none" }),   icon: "file",       label: "Unfiled"   },
-                { key: "shared",  onClick: () => setSelection({ kind: "smart", key: "shared" }), icon: "share",      label: "Shared"    },
-                { key: "trash",   onClick: () => setSelection({ kind: "smart", key: "trash" }),  icon: "recycle",    label: "Trash"     },
-                { key: "new",     onClick: onCreateNote,                                          icon: "plus",       label: "New Note"  },
+                { key: "all",     onClick: () => setSelection({ kind: "smart", key: "all" }),    icon: "document", label: "All Notes", active: selection.kind === "smart" && selection.key === "all" },
+                { key: "pinned",  onClick: () => setSelection({ kind: "smart", key: "pinned" }), icon: <PinIcon className="h-[13px] w-[13px]" />,   label: "Pinned",  active: selection.kind === "smart" && selection.key === "pinned" },
+                { key: "none",    onClick: () => setSelection({ kind: "smart", key: "none" }),   icon: "file",     label: "Unfiled", active: selection.kind === "smart" && selection.key === "none" },
+                { key: "shared",  onClick: () => setSelection({ kind: "smart", key: "shared" }), icon: <UsersIcon className="h-[13px] w-[13px]" />, label: "Shared",  active: selection.kind === "smart" && selection.key === "shared" },
+                { key: "trash",   onClick: () => setSelection({ kind: "smart", key: "trash" }),  icon: "recycle",  label: "Trash",   active: selection.kind === "smart" && selection.key === "trash" },
+                { key: "new",     onClick: onCreateNote,                                          icon: "plus",     label: "New Note" },
               ]}
               searchPlaceholder={searchPlaceholder}
-              onSearchSubmit={(term) => setSearch(term)}
             />
           </div>
 
