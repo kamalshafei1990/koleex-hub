@@ -8,6 +8,9 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import KoleexLogo from "@/components/layout/KoleexLogo";
+import ArrowUpIcon from "@/components/icons/ui/ArrowUpIcon";
+import ArrowDownIcon from "@/components/icons/ui/ArrowDownIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
 import { ScreenshotCaptureModal } from "@/components/quotations/ScreenshotCaptureModal";
 import { PREORDER_SECTIONS, PREORDER_BUYERS, PREORDER_META } from "./data";
 
@@ -573,20 +576,19 @@ export default function PreorderPage() {
                               title="تحريك لأعلى"
                               disabled={ii === 0}
                               onClick={() => moveItemPre(si, ii, -1)}
-                              icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M18 15l-6-6-6 6" /></svg>}
+                              icon={<ArrowUpIcon size={14} />}
                             />
                             <PreRowBtn
                               title="تحريك لأسفل"
                               disabled={ii === sec.items.length - 1}
                               onClick={() => moveItemPre(si, ii, 1)}
-                              icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>}
+                              icon={<ArrowDownIcon size={14} />}
                             />
                             <PreRowBtn
                               title="حذف الصف"
-                              span2
                               destructive
                               onClick={() => removeItemPre(si, ii)}
-                              icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m2 0v14a1 1 0 01-1 1H7a1 1 0 01-1-1V6" /></svg>}
+                              icon={<TrashIcon size={13} />}
                             />
                           </div>
                         </td>
