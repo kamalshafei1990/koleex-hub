@@ -324,7 +324,7 @@ export default function NoteEditor({
   const ownerControls = !editingDisabled && !isSharee; // owner-only chrome
 
   return (
-    <div className="h-full flex flex-col" style={noteTint ? { background: `linear-gradient(${noteTint}22, transparent 220px)` } : undefined}>
+    <div className="h-full flex flex-col">
       {/* Toolbar — tools live inside a bordered "shell" panel */}
       <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] px-3 md:px-5 py-2.5 flex items-center gap-2 flex-wrap">
         <div className="flex items-center gap-1.5 flex-wrap rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] px-1.5 py-1">
@@ -439,8 +439,9 @@ export default function NoteEditor({
         )}
       </div>
 
-      {/* Title + tags + body — scrollable area */}
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 lg:px-12 py-6">
+      {/* Title + tags + body — scrollable area. The note tint washes the
+          actual writing surface (Keep-style) so the chosen colour is visible. */}
+      <div className="flex-1 overflow-y-auto px-4 md:px-8 lg:px-12 py-6 transition-colors duration-300" style={noteTint ? { background: noteTint } : undefined}>
         <input
           type="text"
           value={titleDraft}
