@@ -876,6 +876,9 @@ export default function Quotations() {
      stay mounted across A4-page renders without each page mounting
      its own copy. */
   const [pickerOpen, setPickerOpen] = useState(false);
+  /* When the product picker was opened via a row's "+ → product" action,
+     this holds the index to insert AFTER (null = append, the old behaviour). */
+  const [insertAt, setInsertAt] = useState<number | null>(null);
   /* "Link customer" picker — same pattern as the product picker:
      parent owns the modal, the preview triggers it via prop. */
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
@@ -1485,11 +1488,13 @@ export default function Quotations() {
         !last.image &&
         !last.unitPrice &&
         last.qty === 1;
-      if (lastIsEmpty) items[items.length - 1] = fresh;
+      if (insertAt != null) items.splice(insertAt + 1, 0, fresh);
+      else if (lastIsEmpty) items[items.length - 1] = fresh;
       else items.push(fresh);
       setCurrent({ ...current, items });
+      setInsertAt(null);
     },
-    [current],
+    [current, insertAt],
   );
 
   /* ── Stamp + Signature handlers ──
@@ -1593,6 +1598,40 @@ export default function Quotations() {
     },
     [current]
   );
+
+  /* Row-action parity with the quotation: duplicate / insert-empty-below /
+     clear / insert-product-below. The shared QuotationA4Preview renders the
+     extra panel buttons only when these props are supplied. */
+  const duplicateItem = useCallback(
+    (idx: number) => {
+      if (!current) return;
+      const items = current.items.slice();
+      items.splice(idx + 1, 0, { ...items[idx] });
+      setCurrent({ ...current, items });
+    },
+    [current],
+  );
+  const insertItemBelow = useCallback(
+    (idx: number) => {
+      if (!current) return;
+      const items = current.items.slice();
+      items.splice(idx + 1, 0, { ...EMPTY_ITEM });
+      setCurrent({ ...current, items });
+    },
+    [current],
+  );
+  const clearItem = useCallback(
+    (idx: number) => {
+      if (!current) return;
+      const items = current.items.map((it, i) => (i === idx ? { ...EMPTY_ITEM } : it));
+      setCurrent({ ...current, items });
+    },
+    [current],
+  );
+  const insertProductBelow = useCallback((idx: number) => {
+    setInsertAt(idx);
+    setPickerOpen(true);
+  }, []);
 
   const handleImageUpload = useCallback(
     async (idx: number, file: File) => {
@@ -2016,6 +2055,10 @@ export default function Quotations() {
         onClearSignature={clearSignature}
         removeItem={removeItem}
         moveItem={moveItem}
+        duplicateItem={duplicateItem}
+        insertItemBelow={insertItemBelow}
+        onInsertProductBelow={insertProductBelow}
+        clearItem={clearItem}
         handleImageUpload={handleImageUpload}
         fileInputRefs={fileInputRefs}
         subTotal={subTotal}
@@ -2025,7 +2068,7 @@ export default function Quotations() {
       />
       <ProductPickerModal
         open={pickerOpen}
-        onClose={() => setPickerOpen(false)}
+        onClose={() => { setPickerOpen(false); setInsertAt(null); }}
         onPick={addItemFromCatalog}
       />
       <CustomerPickerModal
