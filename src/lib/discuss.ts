@@ -62,6 +62,40 @@ function isMissingTable(message: string): boolean {
   );
 }
 
+/** Route a write through the authenticated server endpoint. Every Discuss
+ *  mutation goes through /api/discuss/mutate, so the browser's anon key can
+ *  no longer write to the discuss_* tables directly. The signed-in identity
+ *  is derived from the koleex_session cookie server-side; account/author ids
+ *  passed by callers are used only for channel/message targeting, never for
+ *  authorship. */
+async function discussMutate<T = unknown>(
+  action: string,
+  payload: Record<string, unknown>,
+): Promise<{ ok: boolean; data?: T; error?: string }> {
+  try {
+    const res = await fetch("/api/discuss/mutate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ action, payload }),
+    });
+    const json = (await res.json().catch(() => ({}))) as {
+      ok?: boolean;
+      data?: T;
+      error?: string;
+    };
+    if (!res.ok || !json.ok) {
+      console.error("[Discuss] mutate", action, json.error ?? `HTTP ${res.status}`);
+      return { ok: false, error: json.error ?? `HTTP ${res.status}` };
+    }
+    return { ok: true, data: json.data };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!isTransientFetch(msg)) console.error("[Discuss] mutate", action, msg);
+    return { ok: false, error: msg };
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    Channels
    ═══════════════════════════════════════════════════════════════════════ */
@@ -73,15 +107,9 @@ export async function findOrCreateDirectChannel(
   accountA: string,
   accountB: string,
 ): Promise<string | null> {
-  const { data, error } = await supabase.rpc("find_or_create_direct_channel", {
-    p_account_a: accountA,
-    p_account_b: accountB,
-  });
-  if (error) {
-    console.error("[Discuss] findOrCreateDirectChannel:", error.message);
-    return null;
-  }
-  return (data as string) ?? null;
+  void accountA; // identity comes from the session server-side
+  const res = await discussMutate<string>("directChannel", { otherId: accountB });
+  return res.ok ? (res.data ?? null) : null;
 }
 
 /** Create a new group or channel. The creator is auto-added as admin.
@@ -97,48 +125,15 @@ export async function createChannel(input: {
   createdBy: string;
   memberIds?: string[];
 }): Promise<DiscussChannelRow | null> {
-  const { data: channel, error: channelErr } = await supabase
-    .from(CHANNELS)
-    .insert({
-      kind: input.kind,
-      name: input.name,
-      description: input.description ?? null,
-      icon: input.icon ?? null,
-      color: input.color ?? null,
-      created_by: input.createdBy,
-    })
-    .select("*")
-    .single();
-
-  if (channelErr) {
-    console.error("[Discuss] Create channel:", channelErr.message);
-    if (isMissingTable(channelErr.message)) {
-      console.error(
-        "[Discuss] `discuss_channels` is missing from Supabase. Apply " +
-          "supabase/migrations/create_discuss_chat_system.sql (and " +
-          "extend_discuss_phase_bcde.sql) in Supabase Studio → SQL Editor.",
-      );
-    }
-    return null;
-  }
-
-  const allMembers = new Set([input.createdBy, ...(input.memberIds ?? [])]);
-  const rows = Array.from(allMembers).map((accountId) => ({
-    channel_id: (channel as DiscussChannelRow).id,
-    account_id: accountId,
-    role: accountId === input.createdBy ? ("admin" as const) : ("member" as const),
-  }));
-
-  const { error: memberErr } = await supabase.from(MEMBERS).insert(rows);
-  if (memberErr) {
-    console.error("[Discuss] Create channel members:", memberErr.message);
-    /* Best-effort rollback. If the channel row lingers without any
-       members, the sidebar fetch will still omit it because it filters
-       by account_id in the join. Not worth a transaction for a dev
-       failure mode. */
-  }
-
-  return channel as DiscussChannelRow;
+  const res = await discussMutate<DiscussChannelRow>("createChannel", {
+    kind: input.kind,
+    name: input.name,
+    description: input.description ?? null,
+    icon: input.icon ?? null,
+    color: input.color ?? null,
+    memberIds: input.memberIds ?? [],
+  });
+  return res.ok ? (res.data ?? null) : null;
 }
 
 /** Update a channel's editable metadata (name, description, icon, color).
@@ -147,29 +142,13 @@ export async function updateChannel(
   channelId: string,
   patch: Partial<Pick<DiscussChannelRow, "name" | "description" | "icon" | "color">>,
 ): Promise<boolean> {
-  const { error } = await supabase
-    .from(CHANNELS)
-    .update(patch)
-    .eq("id", channelId);
-  if (error) {
-    console.error("[Discuss] Update channel:", error.message);
-    return false;
-  }
-  return true;
+  return (await discussMutate("updateChannel", { channelId, patch })).ok;
 }
 
 /** Soft-archive a channel. We never hard-delete so message history
  *  stays intact for audit. */
 export async function archiveChannel(channelId: string): Promise<boolean> {
-  const { error } = await supabase
-    .from(CHANNELS)
-    .update({ archived_at: new Date().toISOString() })
-    .eq("id", channelId);
-  if (error) {
-    console.error("[Discuss] Archive channel:", error.message);
-    return false;
-  }
-  return true;
+  return (await discussMutate("archiveChannel", { channelId })).ok;
 }
 
 /** Fetch every channel the account is a member of, enriched with:
@@ -481,19 +460,8 @@ export async function addMembers(
   accountIds: string[],
 ): Promise<number> {
   if (accountIds.length === 0) return 0;
-  const rows = accountIds.map((id) => ({
-    channel_id: channelId,
-    account_id: id,
-    role: "member" as const,
-  }));
-  const { error, count } = await supabase
-    .from(MEMBERS)
-    .insert(rows, { count: "exact" });
-  if (error && !/duplicate/i.test(error.message)) {
-    console.error("[Discuss] Add members:", error.message);
-    return 0;
-  }
-  return count ?? accountIds.length;
+  const res = await discussMutate<number>("addMembers", { channelId, accountIds });
+  return res.ok ? (res.data ?? accountIds.length) : 0;
 }
 
 /** Soft-leave: sets `left_at` so the user stops seeing the channel in
@@ -503,16 +471,8 @@ export async function leaveChannel(
   channelId: string,
   accountId: string,
 ): Promise<boolean> {
-  const { error } = await supabase
-    .from(MEMBERS)
-    .update({ left_at: new Date().toISOString() })
-    .eq("channel_id", channelId)
-    .eq("account_id", accountId);
-  if (error) {
-    console.error("[Discuss] Leave channel:", error.message);
-    return false;
-  }
-  return true;
+  void accountId; // identity comes from the session server-side
+  return (await discussMutate("leaveChannel", { channelId })).ok;
 }
 
 /** Fetch active members of a channel with their account + person info.
@@ -580,16 +540,8 @@ export async function markChannelRead(
   channelId: string,
   accountId: string,
 ): Promise<boolean> {
-  const { error } = await supabase
-    .from(MEMBERS)
-    .update({ last_read_at: new Date().toISOString() })
-    .eq("channel_id", channelId)
-    .eq("account_id", accountId);
-  if (error) {
-    console.error("[Discuss] Mark channel read:", error.message);
-    return false;
-  }
-  return true;
+  void accountId; // identity comes from the session server-side
+  return (await discussMutate("markRead", { channelId })).ok;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -810,23 +762,14 @@ export async function sendDiscussMessage(input: {
   replyToMessageId?: string | null;
   metadata?: DiscussMessageMetadata;
 }): Promise<DiscussMessageRow | null> {
-  const { data, error } = await supabase
-    .from(MESSAGES)
-    .insert({
-      channel_id: input.channelId,
-      author_account_id: input.authorId,
-      body: input.body,
-      kind: input.kind ?? "text",
-      reply_to_message_id: input.replyToMessageId ?? null,
-      metadata: input.metadata ?? {},
-    })
-    .select("*")
-    .single();
-  if (error) {
-    console.error("[Discuss] Send message:", error.message);
-    return null;
-  }
-  return data as DiscussMessageRow;
+  const res = await discussMutate<DiscussMessageRow>("sendMessage", {
+    channelId: input.channelId,
+    body: input.body,
+    kind: input.kind ?? "text",
+    replyToMessageId: input.replyToMessageId ?? null,
+    metadata: input.metadata ?? {},
+  });
+  return res.ok ? (res.data ?? null) : null;
 }
 
 /** Edit the body of an existing message. Sets `edited_at` so the UI
@@ -836,32 +779,12 @@ export async function editDiscussMessage(
   body: string,
   metadata?: DiscussMessageMetadata,
 ): Promise<boolean> {
-  const { error } = await supabase
-    .from(MESSAGES)
-    .update({
-      body,
-      metadata: metadata ?? {},
-      edited_at: new Date().toISOString(),
-    })
-    .eq("id", id);
-  if (error) {
-    console.error("[Discuss] Edit message:", error.message);
-    return false;
-  }
-  return true;
+  return (await discussMutate("editMessage", { id, body, metadata: metadata ?? {} })).ok;
 }
 
 /** Soft-delete. The UI will render a "message deleted" placeholder. */
 export async function deleteDiscussMessage(id: string): Promise<boolean> {
-  const { error } = await supabase
-    .from(MESSAGES)
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) {
-    console.error("[Discuss] Delete message:", error.message);
-    return false;
-  }
-  return true;
+  return (await discussMutate("deleteMessage", { id })).ok;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -876,35 +799,9 @@ export async function toggleReaction(
   accountId: string,
   emoji: string,
 ): Promise<boolean> {
-  /* Check current state first so we can decide insert vs delete. */
-  const { data: existing } = await supabase
-    .from(REACTIONS)
-    .select("id")
-    .eq("message_id", messageId)
-    .eq("account_id", accountId)
-    .eq("emoji", emoji)
-    .maybeSingle();
-
-  if (existing) {
-    const { error } = await supabase
-      .from(REACTIONS)
-      .delete()
-      .eq("id", (existing as { id: string }).id);
-    if (error) {
-      console.error("[Discuss] Remove reaction:", error.message);
-    }
-    return false;
-  }
-  const { error } = await supabase.from(REACTIONS).insert({
-    message_id: messageId,
-    account_id: accountId,
-    emoji,
-  });
-  if (error) {
-    console.error("[Discuss] Add reaction:", error.message);
-    return false;
-  }
-  return true;
+  void accountId; // identity comes from the session server-side
+  const res = await discussMutate<boolean>("toggleReaction", { messageId, emoji });
+  return res.ok ? (res.data ?? false) : false;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -916,56 +813,24 @@ export async function pinMessage(
   messageId: string,
   pinnedBy: string,
 ): Promise<boolean> {
-  const { error } = await supabase.from(PINNED).insert({
-    channel_id: channelId,
-    message_id: messageId,
-    pinned_by: pinnedBy,
-  });
-  if (error && !/duplicate/i.test(error.message)) {
-    console.error("[Discuss] Pin message:", error.message);
-    return false;
-  }
-  return true;
+  void pinnedBy; // identity comes from the session server-side
+  return (await discussMutate("pinMessage", { channelId, messageId })).ok;
 }
 
 export async function unpinMessage(
   channelId: string,
   messageId: string,
 ): Promise<boolean> {
-  const { error } = await supabase
-    .from(PINNED)
-    .delete()
-    .eq("channel_id", channelId)
-    .eq("message_id", messageId);
-  if (error) {
-    console.error("[Discuss] Unpin message:", error.message);
-    return false;
-  }
-  return true;
+  return (await discussMutate("unpinMessage", { channelId, messageId })).ok;
 }
 
 export async function toggleStar(
   accountId: string,
   messageId: string,
 ): Promise<boolean> {
-  const { data: existing } = await supabase
-    .from(STARRED)
-    .select("id")
-    .eq("account_id", accountId)
-    .eq("message_id", messageId)
-    .maybeSingle();
-  if (existing) {
-    await supabase
-      .from(STARRED)
-      .delete()
-      .eq("id", (existing as { id: string }).id);
-    return false;
-  }
-  await supabase.from(STARRED).insert({
-    account_id: accountId,
-    message_id: messageId,
-  });
-  return true;
+  void accountId; // identity comes from the session server-side
+  const res = await discussMutate<boolean>("toggleStar", { messageId });
+  return res.ok ? (res.data ?? false) : false;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -980,22 +845,13 @@ export async function saveDraft(input: {
   body: string;
   metadata?: DiscussMessageMetadata;
 }): Promise<boolean> {
-  const { error } = await supabase
-    .from(DRAFTS)
-    .upsert(
-      {
-        account_id: input.accountId,
-        channel_id: input.channelId,
-        body: input.body,
-        metadata: input.metadata ?? {},
-      },
-      { onConflict: "account_id,channel_id" },
-    );
-  if (error) {
-    console.error("[Discuss] Save draft:", error.message);
-    return false;
-  }
-  return true;
+  return (
+    await discussMutate("saveDraft", {
+      channelId: input.channelId,
+      body: input.body,
+      metadata: input.metadata ?? {},
+    })
+  ).ok;
 }
 
 export async function fetchDraft(
@@ -1019,16 +875,8 @@ export async function clearDraft(
   accountId: string,
   channelId: string,
 ): Promise<boolean> {
-  const { error } = await supabase
-    .from(DRAFTS)
-    .delete()
-    .eq("account_id", accountId)
-    .eq("channel_id", channelId);
-  if (error) {
-    console.error("[Discuss] Clear draft:", error.message);
-    return false;
-  }
-  return true;
+  void accountId; // identity comes from the session server-side
+  return (await discussMutate("clearDraft", { channelId })).ok;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -1879,16 +1727,8 @@ export async function setNotificationPref(
   accountId: string,
   pref: DiscussNotificationPref,
 ): Promise<boolean> {
-  const { error } = await supabase
-    .from(MEMBERS)
-    .update({ notification_pref: pref })
-    .eq("channel_id", channelId)
-    .eq("account_id", accountId);
-  if (error) {
-    console.error("[Discuss] Set notification pref:", error.message);
-    return false;
-  }
-  return true;
+  void accountId; // identity comes from the session server-side
+  return (await discussMutate("setNotificationPref", { channelId, pref })).ok;
 }
 
 /** Toggle the mute flag for a (channel, member) pair. Muted channels
@@ -1899,16 +1739,8 @@ export async function setChannelMuted(
   accountId: string,
   muted: boolean,
 ): Promise<boolean> {
-  const { error } = await supabase
-    .from(MEMBERS)
-    .update({ muted })
-    .eq("channel_id", channelId)
-    .eq("account_id", accountId);
-  if (error) {
-    console.error("[Discuss] Set muted:", error.message);
-    return false;
-  }
-  return true;
+  void accountId; // identity comes from the session server-side
+  return (await discussMutate("setChannelMuted", { channelId, muted })).ok;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
