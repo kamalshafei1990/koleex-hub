@@ -7373,6 +7373,7 @@ function PictureCell({
   };
 
   return (
+    <>
     <div
       className={`quot-img-cell${image ? " has-img" : ""}`}
       onClick={() => fileInputRefs.current[idx]?.click()}
@@ -7541,12 +7542,13 @@ function PictureCell({
           <circle cx="12" cy="13" r="4" />
         </svg>
       </button>
-      <ScreenshotCaptureModal
-        open={shotOpen}
-        onCapture={(f) => onUpload(f)}
-        onClose={() => setShotOpen(false)}
-      />
     </div>
+    <ScreenshotCaptureModal
+      open={shotOpen}
+      onCapture={(f) => onUpload(f)}
+      onClose={() => setShotOpen(false)}
+    />
+    </>
   );
 }
 

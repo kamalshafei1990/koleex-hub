@@ -231,6 +231,10 @@ export function ScreenshotCaptureModal({
         onMouseDown={onDown}
         onMouseMove={onMove}
         onMouseUp={onUp}
+        /* Portals bubble events through the React tree, so without this a
+           click here would reach the photo cell's onClick (which opens the
+           file picker). Stop it at the modal root. */
+        onClick={(e) => e.stopPropagation()}
         style={{
           position: "fixed",
           inset: 0,
@@ -357,6 +361,7 @@ export function ScreenshotCaptureModal({
   return createPortal(
     <div
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => e.stopPropagation()}
       style={{
         position: "fixed",
         inset: 0,
