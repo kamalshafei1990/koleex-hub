@@ -18,6 +18,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { useEditor, EditorContent } from "@tiptap/react";
 import type { Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -466,6 +467,9 @@ export default function NoteEditor({
         <EditorContent editor={editor} />
       </div>
 
+      {/* Floating table controls — appear anchored to the table you're editing */}
+      <TableFloatingControls editor={editor} enabled={!editingDisabled} />
+
       {/* Link prompt */}
       <PromptDialog
         open={linkOpen}
@@ -478,6 +482,78 @@ export default function NoteEditor({
         onClose={() => setLinkOpen(false)}
       />
     </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TableFloatingControls — a small contextual bar that floats just above the
+   table you're editing (Notion-style). Add/remove rows + columns, toggle the
+   header row, delete the table. Only visible when the caret is inside a table.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function TableFloatingControls({ editor, enabled }: { editor: Editor | null; enabled: boolean }) {
+  const [box, setBox] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    if (!editor || !enabled) { setBox(null); return; }
+    const update = () => {
+      if (!editor.isActive("table")) { setBox(null); return; }
+      const { from } = editor.state.selection;
+      let node: Node | null = null;
+      try { node = editor.view.domAtPos(from).node; } catch { setBox(null); return; }
+      const el = node instanceof HTMLElement ? node : node?.parentElement ?? null;
+      const table = el?.closest("table") as HTMLElement | null;
+      if (!table) { setBox(null); return; }
+      const r = table.getBoundingClientRect();
+      // Place the bar above the table; if too close to the top, place it just inside.
+      const top = r.top < 96 ? r.top + 6 : r.top - 40;
+      setBox({ top, left: r.left });
+    };
+    update();
+    editor.on("selectionUpdate", update);
+    editor.on("transaction", update);
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      editor.off("selectionUpdate", update);
+      editor.off("transaction", update);
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [editor, enabled]);
+
+  if (!editor || !box) return null;
+
+  // onMouseDown + preventDefault keeps the table selection so the command lands.
+  const Btn = ({ title, onRun, children, danger }: { title: string; onRun: () => void; children: React.ReactNode; danger?: boolean }) => (
+    <button
+      type="button"
+      title={title}
+      onMouseDown={(e) => { e.preventDefault(); onRun(); }}
+      className={`h-7 min-w-[28px] px-2 rounded-md text-[11px] font-semibold flex items-center justify-center transition-colors ${danger ? "text-[var(--text-dim)] hover:text-red-400 hover:bg-[var(--bg-surface)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"}`}
+    >
+      {children}
+    </button>
+  );
+  const Sep = () => <span className="w-px h-4 bg-[var(--border-subtle)] mx-0.5" />;
+
+  return createPortal(
+    <div
+      style={{ position: "fixed", top: box.top, left: box.left, zIndex: 60 }}
+      className="flex items-center gap-0.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl px-1 py-0.5"
+    >
+      <Btn title="Add row below" onRun={() => editor.chain().focus().addRowAfter().run()}>+ Row</Btn>
+      <Btn title="Delete current row" onRun={() => editor.chain().focus().deleteRow().run()}>− Row</Btn>
+      <Sep />
+      <Btn title="Add column right" onRun={() => editor.chain().focus().addColumnAfter().run()}>+ Col</Btn>
+      <Btn title="Delete current column" onRun={() => editor.chain().focus().deleteColumn().run()}>− Col</Btn>
+      <Sep />
+      <Btn title="Toggle header row" onRun={() => editor.chain().focus().toggleHeaderRow().run()}>H</Btn>
+      <Btn title="Delete whole table" danger onRun={() => editor.chain().focus().deleteTable().run()}>
+        <TrashIcon className="h-3.5 w-3.5" />
+      </Btn>
+    </div>,
+    document.body,
   );
 }
 
@@ -596,18 +672,6 @@ function EditorToolbar({
       <TB active={inTable} onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} title="Insert table">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="1" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /><line x1="9" y1="3" x2="9" y2="21" /><line x1="15" y1="3" x2="15" y2="21" /></svg>
       </TB>
-
-      {inTable && (
-        <>
-          <span className="ml-0.5 mr-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">Table</span>
-          <TB active={false} onClick={() => editor.chain().focus().addRowAfter().run()} title="Add row below">+ Row</TB>
-          <TB active={false} onClick={() => editor.chain().focus().deleteRow().run()} title="Delete current row">− Row</TB>
-          <TB active={false} onClick={() => editor.chain().focus().addColumnAfter().run()} title="Add column right">+ Col</TB>
-          <TB active={false} onClick={() => editor.chain().focus().deleteColumn().run()} title="Delete current column">− Col</TB>
-          <TB active={false} onClick={() => editor.chain().focus().toggleHeaderRow().run()} title="Toggle header row">H</TB>
-          <TB active={false} onClick={() => editor.chain().focus().deleteTable().run()} title="Delete whole table"><TrashIcon className="h-3.5 w-3.5" /></TB>
-        </>
-      )}
 
       <Divider />
 
