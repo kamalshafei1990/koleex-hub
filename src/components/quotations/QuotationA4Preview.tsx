@@ -35,6 +35,7 @@ import UnderlineIcon from "@/components/icons/ui/UnderlineIcon";
 import PaletteIcon from "@/components/icons/ui/PaletteIcon";
 import TypeIcon from "@/components/icons/ui/TypeIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
+import { ScreenshotCaptureModal } from "@/components/quotations/ScreenshotCaptureModal";
 
 /* Mirrors the Quotation type in Quotations.tsx — kept local to avoid
    a circular import. */
@@ -7330,6 +7331,7 @@ function PictureCell({
   onClear: () => void;
 }) {
   const [isDragOver, setIsDragOver] = useState(false);
+  const [shotOpen, setShotOpen] = useState(false);
   /* dragenter fires for every child element the cursor enters, so
      we use a counter to know when the cursor has truly left the
      cell. Without it the highlight flickers as the cursor moves
@@ -7504,6 +7506,45 @@ function PictureCell({
           if (f) onUpload(f);
           e.currentTarget.value = "";
         }}
+      />
+      {/* Screenshot capture — sits in the bottom-right; click opens the
+          screen-capture / paste modal (stopPropagation so it doesn't also
+          trigger the cell's file picker). */}
+      <button
+        type="button"
+        className="no-print quot-img-shot"
+        title="Take a screenshot from your screen"
+        onClick={(e) => {
+          e.stopPropagation();
+          setShotOpen(true);
+        }}
+        style={{
+          position: "absolute",
+          bottom: 2,
+          right: 2,
+          width: 18,
+          height: 18,
+          borderRadius: 9,
+          border: "none",
+          background: "rgba(0,0,0,0.55)",
+          color: "#fff",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "pointer",
+          padding: 0,
+          lineHeight: 1,
+        }}
+      >
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+          <circle cx="12" cy="13" r="4" />
+        </svg>
+      </button>
+      <ScreenshotCaptureModal
+        open={shotOpen}
+        onCapture={(f) => onUpload(f)}
+        onClose={() => setShotOpen(false)}
       />
     </div>
   );

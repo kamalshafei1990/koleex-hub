@@ -8,6 +8,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import KoleexLogo from "@/components/layout/KoleexLogo";
+import { ScreenshotCaptureModal } from "@/components/quotations/ScreenshotCaptureModal";
 import { PREORDER_SECTIONS, PREORDER_BUYERS, PREORDER_META } from "./data";
 
 // Each customer/buyer gets a distinct colour so their quantities read at a glance.
@@ -294,6 +295,8 @@ export default function PreorderPage() {
     r.onload = () => patchItem(si, ii, { photo: String(r.result) });
     r.readAsDataURL(file);
   };
+  /* Which photo cell (if any) is currently capturing a screenshot. */
+  const [shotCell, setShotCell] = useState<{ si: number; ii: number } | null>(null);
 
   const totals = useMemo(() => {
     let units = 0, value = 0, lines = 0, priced = 0;
@@ -500,6 +503,16 @@ export default function PreorderPage() {
                                 title="حذف الصورة"
                               >✕</button>
                             )}
+                            {/* Screenshot capture (bottom-start so it never
+                                overlaps the top-end remove button). */}
+                            <button
+                              type="button"
+                              onClick={() => setShotCell({ si, ii })}
+                              className="no-print absolute -bottom-2 -start-2 flex h-5 w-5 items-center justify-center rounded-full border border-neutral-300 bg-white text-neutral-600 shadow-sm hover:border-[#0066FF] hover:text-[#0066FF]"
+                              title="لقطة شاشة من شاشتك"
+                            >
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                            </button>
                           </div>
                           <input
                             ref={(el) => { fileRefs.current[fkey] = el; }}
@@ -615,6 +628,11 @@ export default function PreorderPage() {
           </footer>
         </div>
       </div>
+      <ScreenshotCaptureModal
+        open={!!shotCell}
+        onCapture={(f) => { if (shotCell) onPhoto(shotCell.si, shotCell.ii, f); }}
+        onClose={() => setShotCell(null)}
+      />
     </div>
   );
 }
