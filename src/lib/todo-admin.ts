@@ -552,6 +552,19 @@ export async function createTodoLabel(
 /* ── Assignable employees ── */
 
 export async function fetchAssignableEmployees(): Promise<TodoAssigneeInfo[]> {
+  /* API-first: accounts/people/koleex_employees are service-role-only
+     (P0 lockdown), so the anon client below returns nothing. The
+     /api/todos/assignees route resolves the list server-side. */
+  try {
+    const res = await fetch("/api/todos/assignees", { credentials: "include" });
+    if (res.ok) {
+      const json = (await res.json()) as { assignees?: TodoAssigneeInfo[] };
+      if (Array.isArray(json.assignees)) return json.assignees;
+    }
+  } catch {
+    /* fall through to the legacy anon path */
+  }
+
   const { data: accounts } = await supabase
     .from("accounts")
     .select("id, username, avatar_url, person_id")
@@ -565,6 +578,17 @@ export async function fetchAssignableEmployees(): Promise<TodoAssigneeInfo[]> {
 /* ── Departments ── */
 
 export async function fetchDepartments(): Promise<string[]> {
+  /* API-first for the same reason as fetchAssignableEmployees. */
+  try {
+    const res = await fetch("/api/todos/assignees", { credentials: "include" });
+    if (res.ok) {
+      const json = (await res.json()) as { departments?: string[] };
+      if (Array.isArray(json.departments)) return json.departments;
+    }
+  } catch {
+    /* fall through */
+  }
+
   const { data } = await supabase
     .from("koleex_employees")
     .select("department")
