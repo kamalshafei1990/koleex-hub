@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n";
 import { invoicesT } from "@/lib/translations/invoices";
+import { downloadXlsx, money } from "@/lib/excel-export";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
 import RrIcon from "@/components/ui/RrIcon";
 import PageHeader from "@/components/ui/PageHeader";
@@ -412,6 +413,47 @@ function InvoiceDetailView({
   const effectiveStatus: InvoiceStatus = overdue ? "overdue" : inv.status;
   const cur = inv.currency || "USD";
 
+  /* Export this invoice as a real .xlsx — header + line items + the same
+     totals shown live in the editor. Numbers stay numeric. */
+  const exportExcel = async () => {
+    const rows: (string | number | null)[][] = [
+      ["INVOICE", inv.inv_no || ""],
+      ["Status", effectiveStatus],
+      ["Issue date", inv.issue_date || ""],
+      ["Due date", inv.due_date || ""],
+      ["Bill to", customerName],
+      ["Currency", cur],
+      [],
+      ["#", "Description", "Qty", `Unit Price (${cur})`, "Discount %", "Tax %", `Line Total (${cur})`],
+    ];
+    lines.forEach((l, i) => {
+      const gross = Number(l.qty ?? 0) * Number(l.unit_price ?? 0);
+      const net = gross - (gross * Number(l.line_discount_percent ?? 0)) / 100;
+      const lineTotal = net + (net * Number(l.tax_rate ?? 0)) / 100;
+      rows.push([
+        i + 1,
+        l.description || "",
+        Number(l.qty ?? 0),
+        money(l.unit_price),
+        Number(l.line_discount_percent ?? 0),
+        Number(l.tax_rate ?? 0),
+        money(lineTotal),
+      ]);
+    });
+    rows.push([]);
+    rows.push(["", "", "", "", "", "Subtotal", money(liveTotals.subtotal)]);
+    if (liveTotals.discount_total) rows.push(["", "", "", "", "", "Discount", money(-liveTotals.discount_total)]);
+    if (liveTotals.tax_total) rows.push(["", "", "", "", "", "Tax", money(liveTotals.tax_total)]);
+    rows.push(["", "", "", "", "", `TOTAL (${cur})`, money(liveTotals.total)]);
+    rows.push(["", "", "", "", "", "Paid", money(inv.amount_paid)]);
+    rows.push(["", "", "", "", "", "Balance", money(liveTotals.balance)]);
+
+    const fileBase = `invoice-${(inv.inv_no || inv.id).replace(/[^\w-]+/g, "_")}`;
+    await downloadXlsx(fileBase, [
+      { name: "Invoice", rows, colWidths: [6, 40, 8, 16, 11, 8, 16] },
+    ]);
+  };
+
   return (
     <div
       className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
@@ -468,6 +510,13 @@ function InvoiceDetailView({
                   {t("btn.markPaid")}
                 </button>
               )}
+              <button
+                onClick={exportExcel}
+                className="h-9 px-3 rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center gap-1.5 text-[12px] font-semibold"
+                title={t("btn.exportExcel", "Download this invoice as an Excel (.xlsx) spreadsheet.")}
+              >
+                <RrIcon name="file-invoice" size={14} /> {t("btn.excel", "Excel")}
+              </button>
               <button
                 onClick={() => window.print()}
                 className="h-9 w-9 rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center"

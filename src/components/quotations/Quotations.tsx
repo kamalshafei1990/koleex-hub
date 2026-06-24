@@ -10,6 +10,8 @@ import TrashIcon from "@/components/icons/ui/TrashIcon";
 import PrintIcon from "@/components/icons/ui/PrintIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";
+import TableIcon from "@/components/icons/ui/TableIcon";
+import { downloadXlsx, money } from "@/lib/excel-export";
 import CopyIcon from "@/components/icons/ui/CopyIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
@@ -1447,6 +1449,58 @@ export default function Quotations() {
      same. The /api/...pdf endpoint stays in the codebase for a
      future "email this quote" feature where we genuinely need a
      server-rendered buffer to attach. */
+  /* Export the active quotation as a real .xlsx spreadsheet. Numbers stay
+     numeric so the recipient can re-sum / re-format in Excel. Section-band
+     rows ("header" kind) become a labelled separator row; only priced lines
+     feed the totals — mirroring computeGrandTotal exactly. */
+  const handleExportExcel = useCallback(async () => {
+    if (!current) return;
+    const q = current;
+    const cur = q.currency || "USD";
+    const priced = q.items.filter((i) => i.kind !== "header");
+    const subtotal = priced.reduce((s, i) => s + (Number(i.unitPrice) || 0) * (Number(i.qty) || 0), 0);
+    const taxPct = Math.max(0, Math.min(100, Number(q.taxPct) || 0));
+    const taxAmt = subtotal * (taxPct / 100);
+    const discPct = Math.max(0, Math.min(100, Number(q.discountPct) || 0));
+    const base = subtotal + taxAmt + (Number(q.shipping) || 0) + (Number(q.others) || 0);
+    const grand = +(base * (1 - discPct / 100)).toFixed(2);
+
+    const rows: (string | number | null)[][] = [
+      ["QUOTATION", q.invoiceNo || ""],
+      ["Date", q.date || ""],
+      ["Valid till", q.validTill || ""],
+      ["Customer", q.customerName || ""],
+      ["Company", q.companyName || ""],
+      ["Email", q.toEmail || ""],
+      ["Phone", q.toPhone || q.toMobile || ""],
+      ["Currency", cur],
+      [],
+      ["#", "Description", "Model", "Qty", `Unit Price (${cur})`, `Line Total (${cur})`],
+    ];
+    let n = 0;
+    for (const it of q.items) {
+      if (it.kind === "header") {
+        rows.push([`— ${it.description || ""} —`, "", "", "", "", ""]);
+        continue;
+      }
+      n += 1;
+      const lineTotal = money((Number(it.unitPrice) || 0) * (Number(it.qty) || 0));
+      rows.push([n, it.description || "", it.model || "", Number(it.qty) || 0, money(it.unitPrice), lineTotal]);
+    }
+    rows.push([]);
+    rows.push(["", "", "", "", "Subtotal", money(subtotal)]);
+    if (taxPct) rows.push(["", "", "", "", `Tax (${taxPct}%)`, money(taxAmt)]);
+    if (Number(q.shipping)) rows.push(["", "", "", "", "Shipping", money(q.shipping)]);
+    if (Number(q.others)) rows.push(["", "", "", "", "Others", money(q.others)]);
+    if (discPct) rows.push(["", "", "", "", `Discount (${discPct}%)`, money(-(base * discPct) / 100)]);
+    rows.push(["", "", "", "", `GRAND TOTAL (${cur})`, money(grand)]);
+
+    const fileBase = `quotation-${(q.invoiceNo || q.id).replace(/[^\w-]+/g, "_")}`;
+    await downloadXlsx(fileBase, [
+      { name: "Quotation", rows, colWidths: [6, 44, 18, 8, 16, 16] },
+    ]);
+  }, [current]);
+
   const handleExportPdf = useCallback(async () => {
     if (!current) return;
     /* Print via a HIDDEN IFRAME pointing at the dedicated
@@ -2444,6 +2498,14 @@ export default function Quotations() {
         >
           <DownloadIcon size={14} />
           {pdfState === "loading" ? "Opening…" : t("btn.exportPDF")}
+        </button>
+        <button
+          onClick={handleExportExcel}
+          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
+          title="Download this quotation as an Excel (.xlsx) spreadsheet."
+        >
+          <TableIcon size={14} />
+          {t("btn.exportExcel", "Excel")}
         </button>
         <button
           onClick={handleSendEmail}
