@@ -19,6 +19,7 @@ import "server-only";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import type { ServerAuthContext } from "@/lib/server/auth";
 import { requestMeta } from "@/lib/server/activity";
+import { notifySuperAdmins, type AlertKind } from "@/lib/server/sa-notify";
 
 export type AuditSeverity = "info" | "warning" | "critical";
 
@@ -107,9 +108,39 @@ export async function logAudit(input: AuditInput): Promise<void> {
       ip,
       metadata: input.metadata ?? {},
     });
+
+    // Fan out a Super-Admin alert for sensitive (non-info) actions.
+    const severity = input.severity ?? "info";
+    if (severity !== "info") {
+      const label = input.entity_label || input.entity_id || input.entity_type || "record";
+      await notifySuperAdmins({
+        kind: alertKindForAction(input.action_type),
+        subject: `${humanizeAction(input.action_type)} — ${input.entity_type ?? "record"}: ${label}`,
+        body: input.module ? `In ${input.module}${input.route ? ` (${input.route})` : ""}` : null,
+        severity,
+        link: "/super-admin/activity",
+        actorAccountId: accountId,
+        tenantId: input.auth.tenant_id,
+        metadata: { entity_type: input.entity_type, entity_id: input.entity_id, action: input.action_type },
+      });
+    }
   } catch (e) {
     console.error("[audit.logAudit]", e instanceof Error ? e.message : e);
   }
+}
+
+function humanizeAction(action: string): string {
+  return action.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function alertKindForAction(action: string): AlertKind {
+  if (/delete|remove|purge|destroy/i.test(action)) return "data_delete";
+  if (/price|cost/i.test(action)) return "price_cost_change";
+  if (/permission|role|admin/i.test(action)) return "admin_role_change";
+  if (/setting|policy/i.test(action)) return "settings_change";
+  if (/export/i.test(action)) return "sensitive_export";
+  if (/upload|file/i.test(action)) return "file_change";
+  return "suspicious";
 }
 
 /** Convenience severity for common destructive/sensitive actions. */

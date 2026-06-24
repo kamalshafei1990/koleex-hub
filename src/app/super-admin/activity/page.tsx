@@ -23,6 +23,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import GlobeIcon from "@/components/icons/ui/GlobeIcon";
 import LockIcon from "@/components/icons/ui/LockIcon";
 import UserActivityDrawer from "@/components/super-admin/UserActivityDrawer";
+import AlertPreferencesModal from "@/components/super-admin/AlertPreferencesModal";
 import { routeToModule } from "@/lib/activity/modules";
 
 /* ── client-side mirror types ── */
@@ -153,6 +154,7 @@ export default function SuperAdminActivityPage() {
   const [loadingFeed, setLoadingFeed] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [drawerId, setDrawerId] = useState<string | null>(null);
+  const [prefsOpen, setPrefsOpen] = useState(false);
 
   // filters
   const [search, setSearch] = useState("");
@@ -259,6 +261,16 @@ export default function SuperAdminActivityPage() {
         subtitle="Live users, sessions, and the system-wide activity feed"
         icon={<ActivityIcon className="h-5 w-5" />}
         backHref="/"
+        action={
+          <button
+            type="button"
+            onClick={() => setPrefsOpen(true)}
+            className="h-9 px-3 rounded-xl border border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] inline-flex items-center gap-1.5"
+          >
+            <LockIcon className="h-3.5 w-3.5" />
+            Alert preferences
+          </button>
+        }
       />
 
       <div className="flex-1 min-h-0 overflow-y-auto px-4 md:px-6 py-5 space-y-6">
@@ -398,6 +410,7 @@ export default function SuperAdminActivityPage() {
       </div>
 
       {drawerId && <UserActivityDrawer accountId={drawerId} onClose={() => setDrawerId(null)} onChanged={loadMonitor} />}
+      {prefsOpen && <AlertPreferencesModal onClose={() => setPrefsOpen(false)} />}
     </div>
   );
 }

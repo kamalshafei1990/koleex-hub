@@ -14,6 +14,7 @@ import { NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/server/auth";
 import { requestMeta, heartbeat, touchDevice } from "@/lib/server/activity";
 import { routeToModule } from "@/lib/activity/modules";
+import { notifySuperAdmins } from "@/lib/server/sa-notify";
 
 const STATUSES = new Set(["active", "idle", "offline"]);
 
@@ -48,7 +49,7 @@ export async function POST(req: Request) {
   // Real account id even under view-as, so presence reflects the operator.
   const accountId = auth.real_account_id ?? auth.account_id;
 
-  const [hb] = await Promise.all([
+  const [hb, dev] = await Promise.all([
     heartbeat({
       account_id: accountId,
       tenant_id: auth.tenant_id,
@@ -61,6 +62,19 @@ export async function POST(req: Request) {
     }),
     touchDevice({ account_id: accountId, tenant_id: auth.tenant_id, device_id: deviceId, meta }),
   ]);
+
+  // First time we've seen this browser for the account → "new device" alert.
+  if (dev.isNew) {
+    await notifySuperAdmins({
+      kind: "new_device",
+      subject: `${auth.username || "A user"} signed in from a new device`,
+      body: `${meta.browser} on ${meta.os}${meta.country ? ` · ${meta.country}` : ""}`,
+      severity: "warning",
+      actorAccountId: accountId,
+      tenantId: auth.tenant_id,
+      metadata: { device_id: deviceId, browser: meta.browser, os: meta.os, ip: meta.ip },
+    }).catch(() => undefined);
+  }
 
   return NextResponse.json({ ok: true, revoked: hb.revoked });
 }

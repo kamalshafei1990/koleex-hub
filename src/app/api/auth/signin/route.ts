@@ -28,6 +28,7 @@ import {
 } from "@/lib/server/rate-limit";
 import { recordSessionShadow } from "@/lib/server/session-shadow";
 import { requestMeta, logActivity } from "@/lib/server/activity";
+import { notifySuperAdmins } from "@/lib/server/sa-notify";
 
 export async function POST(req: Request) {
   // Outer try/catch so an unexpected throw (missing env var, DB outage,
@@ -135,6 +136,29 @@ export async function POST(req: Request) {
           ip, identifier, userAgent, accountId: account.id, tenantId: account.tenant_id,
           outcome: "failure", reason: "invalid_password", wouldBlock, mode: rlMode,
         });
+        // Brute-force signal: alert Super Admins when failures for this account
+        // cross a threshold in a short window. Best-effort; never blocks the 401.
+        try {
+          const since = new Date(Date.now() - 15 * 60_000).toISOString();
+          const { count } = await supabaseServer
+            .from("login_attempts")
+            .select("id", { count: "exact", head: true })
+            .eq("account_id", account.id)
+            .in("outcome", ["failure", "blocked"])
+            .gte("created_at", since);
+          if ((count ?? 0) >= 5) {
+            await notifySuperAdmins({
+              kind: "failed_login_threshold",
+              subject: `Repeated failed logins for ${account.username || account.login_email}`,
+              body: `${count} failed attempts in the last 15 minutes${ip ? ` · ${ip}` : ""}`,
+              severity: "critical",
+              tenantId: account.tenant_id,
+              metadata: { account_id: account.id, attempts: count, ip },
+            });
+          }
+        } catch {
+          /* never block the 401 on the alert path */
+        }
       }
       return NextResponse.json(
         { ok: false, error: "Invalid email/username or password" },
@@ -214,6 +238,16 @@ export async function POST(req: Request) {
       title: "Signed in",
       meta: requestMeta(req),
       metadata: { via: "password" },
+    }).catch(() => undefined);
+
+    // Super-Admin "user logged in" alert (other admins; never self).
+    await notifySuperAdmins({
+      kind: "login",
+      subject: `${account.username || account.login_email} signed in`,
+      severity: "info",
+      actorAccountId: account.id,
+      tenantId: account.tenant_id,
+      metadata: { username: account.username },
     }).catch(() => undefined);
 
     return NextResponse.json({
