@@ -1486,30 +1486,38 @@ export default function Quotations() {
       { label: `GRAND TOTAL (${cur})`, value: grand, strong: true },
     ];
 
+    const incoterm = q.incotermCode
+      ? `${q.incotermCode}${q.loadingPort ? ` · ${q.loadingPort}` : ""}${q.dischargePort ? ` → ${q.dischargePort}` : ""}`
+      : "";
+    const toLines = [
+      q.companyName || q.customerName || "",
+      q.toAddress || "",
+      q.customerName && q.companyName ? `Attn:  ${q.customerName}` : "",
+      q.toPhone ? `Phone:  ${q.toPhone}` : "",
+      q.toMobile ? `Mobile:  ${q.toMobile}` : "",
+      q.toEmail ? `Email:  ${q.toEmail}` : "",
+      q.toWebsite ? `Web:  ${q.toWebsite}` : "",
+      incoterm ? `Incoterm:  ${incoterm}` : "",
+    ].filter((l) => l.trim() !== "");
+
     const fileBase = `quotation-${(q.invoiceNo || q.id).replace(/[^\w-]+/g, "_")}`;
     await downloadDocXlsx(fileBase, {
-      title: "QUOTATION",
+      docTitle: "QUOTATION",
       number: q.invoiceNo || q.id,
-      meta: [
-        ["Date", q.date || ""],
-        ["Valid till", q.validTill || ""],
-        ["Client No", q.clientNo || ""],
-        ["Customer", q.customerName || ""],
-        ["Company", q.companyName || ""],
-        ["Address", q.toAddress || ""],
-        ["Phone", q.toPhone || q.toMobile || ""],
-        ["Email", q.toEmail || ""],
-        ["Website", q.toWebsite || ""],
-        ["Currency", cur],
-        ...(q.incotermCode ? [["Incoterm", `${q.incotermCode}${q.loadingPort ? ` · ${q.loadingPort}` : ""}${q.dischargePort ? ` → ${q.dischargePort}` : ""}`] as [string, string]] : []),
-      ].filter(([, v]) => String(v).trim() !== "") as [string, string][],
+      metaStrip: [
+        ["DATE", q.date || ""],
+        ["QUOTATION NO", q.invoiceNo || ""],
+        ["CLIENT NO", q.clientNo || ""],
+        ["VALID TILL", q.validTill || ""],
+      ],
+      toLines,
       columns: [
-        { header: "#", width: 5, align: "center" },
-        { header: "Description", width: 46 },
-        { header: "Model", width: 18 },
-        { header: "Qty", width: 8, align: "center" },
-        { header: `Unit Price (${cur})`, width: 16, money: true },
-        { header: `Line Total (${cur})`, width: 16, money: true },
+        { header: "NO.", width: 5, align: "center" },
+        { header: "ITEM", width: 46 },
+        { header: "MODEL", width: 18 },
+        { header: "QTY", width: 8, align: "center" },
+        { header: `UNIT PRICE (${incoterm ? incoterm + ", " : ""}${cur})`, width: 16, money: true },
+        { header: `TOTAL (${cur})`, width: 16, money: true },
       ],
       rows,
       totals,

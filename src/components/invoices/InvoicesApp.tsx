@@ -440,25 +440,31 @@ function InvoiceDetailView({
       { label: "Balance", value: liveTotals.balance },
     ];
 
+    const toLines = [
+      inv.customer?.company_name || customerName,
+      inv.customer?.company_name && customerName !== inv.customer?.company_name ? `Attn:  ${customerName}` : "",
+      `Status:  ${effectiveStatus}`,
+    ].filter((l) => l.trim() !== "");
+
     const fileBase = `invoice-${(inv.inv_no || inv.id).replace(/[^\w-]+/g, "_")}`;
     await downloadDocXlsx(fileBase, {
-      title: "INVOICE",
+      docTitle: "COMMERCIAL INVOICE",
       number: inv.inv_no || inv.id,
-      meta: [
-        ["Status", effectiveStatus],
-        ["Issue date", inv.issue_date || ""],
-        ["Due date", inv.due_date || ""],
-        ["Bill to", customerName],
-        ["Currency", cur],
+      metaStrip: [
+        ["DATE", inv.issue_date || ""],
+        ["INVOICE NO", inv.inv_no || ""],
+        ["DUE DATE", inv.due_date || ""],
+        ["CURRENCY", cur],
       ],
+      toLines,
       columns: [
-        { header: "#", width: 5, align: "center" },
-        { header: "Description", width: 44 },
-        { header: "Qty", width: 8, align: "center" },
-        { header: `Unit Price (${cur})`, width: 16, money: true },
-        { header: "Discount %", width: 11, align: "center" },
-        { header: "Tax %", width: 8, align: "center" },
-        { header: `Line Total (${cur})`, width: 16, money: true },
+        { header: "NO.", width: 5, align: "center" },
+        { header: "ITEM", width: 44 },
+        { header: "QTY", width: 8, align: "center" },
+        { header: `UNIT PRICE (${cur})`, width: 16, money: true },
+        { header: "DISC %", width: 11, align: "center" },
+        { header: "TAX %", width: 8, align: "center" },
+        { header: `TOTAL (${cur})`, width: 16, money: true },
       ],
       rows,
       totals,
