@@ -11,7 +11,7 @@
    role) → public todo-attachments bucket; only the returned metadata is kept.
    --------------------------------------------------------------------------- */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type {
   TodoMetadata,
   TodoAttachment,
@@ -19,7 +19,7 @@ import type {
   TodoProductRef,
   TodoAssigneeInfo,
 } from "@/types/supabase";
-import { fetchProducts } from "@/lib/products-admin";
+import ProductPicker from "@/components/todo/ProductPicker";
 import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
 import CameraIcon from "@/components/icons/ui/CameraIcon";
 import AtSignIcon from "@/components/icons/ui/AtSignIcon";
@@ -27,12 +27,9 @@ import PackageIcon from "@/components/icons/ui/PackageIcon";
 import FileIcon from "@/components/icons/ui/FileIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
-import SearchIcon from "@/components/icons/ui/SearchIcon";
 
 const lbl = "block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5";
 const isImage = (t: string) => t.startsWith("image/");
-
-type ProductPick = { id: string; name: string; code: string | null };
 
 export default function TaskExtras({
   value,
@@ -152,45 +149,14 @@ export default function TaskExtras({
   };
   const removeMention = (id: string) => patch({ mentions: mentions.filter((m) => m.account_id !== id) });
 
-  /* ── Products ── */
-  const [allProducts, setAllProducts] = useState<ProductPick[]>([]);
-  const [pq, setPq] = useState("");
-  const [loadedProducts, setLoadedProducts] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    fetchProducts()
-      .then((rows) => {
-        if (cancelled) return;
-        setAllProducts(
-          rows.map((r) => ({
-            id: r.id,
-            name: r.product_name,
-            code: r.internal_sku ?? r.legacy_code ?? null,
-          })),
-        );
-      })
-      .catch(() => {})
-      .finally(() => !cancelled && setLoadedProducts(true));
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const productMatches = useMemo(() => {
-    const taken = new Set(products.map((p) => p.id));
-    const q = pq.trim().toLowerCase();
-    if (!q) return [];
-    return allProducts
-      .filter((p) => !taken.has(p.id))
-      .filter((p) => p.name.toLowerCase().includes(q) || (p.code || "").toLowerCase().includes(q))
-      .slice(0, 6);
-  }, [allProducts, products, pq]);
-
-  const addProduct = (p: ProductPick) => {
-    const ref: TodoProductRef = { id: p.id, name: p.name, code: p.code };
-    patch({ products: [...products, ref] });
-    setPq("");
-  };
+  /* ── Products ── (grid picker with photos + division/category filters) */
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const toggleProduct = (ref: TodoProductRef) =>
+    patch({
+      products: products.some((p) => p.id === ref.id)
+        ? products.filter((p) => p.id !== ref.id)
+        : [...products, ref],
+    });
   const removeProduct = (id: string) => patch({ products: products.filter((p) => p.id !== id) });
 
   const chip =
@@ -286,33 +252,16 @@ export default function TaskExtras({
       {/* ── Products ── */}
       <div>
         <label className={lbl}>Link products</label>
-        <div className="relative">
-          <SearchIcon className="h-4 w-4 absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
-          <input
-            className={miniInput}
-            placeholder={loadedProducts ? "Search products…" : "Loading products…"}
-            value={pq}
-            onChange={(e) => setPq(e.target.value)}
-            disabled={!loadedProducts}
-          />
-          {pq && productMatches.length > 0 && (
-            <div className="absolute z-20 mt-1 w-full rounded-xl bg-[var(--bg-elevated,var(--bg-surface))] border border-[var(--border-subtle)] shadow-[0_12px_40px_rgba(0,0,0,0.45)] overflow-hidden">
-              {productMatches.map((p) => (
-                <button key={p.id} type="button" onClick={() => addProduct(p)} className="w-full text-start px-3 h-9 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-inverted)]/[0.06] flex items-center gap-2">
-                  <PackageIcon className="h-3.5 w-3.5 text-[var(--text-dim)] shrink-0" />
-                  <span className="font-medium truncate">{p.name}</span>
-                  {p.code && <span className="text-[10.5px] text-[var(--text-ghost)] shrink-0">· {p.code}</span>}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <button type="button" onClick={() => setPickerOpen(true)} className={actionBtn}>
+          <PackageIcon className="h-4 w-4" /> Browse products
+        </button>
         {products.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
             {products.map((p) => (
               <span key={p.id} className={chip}>
                 <PackageIcon className="h-3 w-3 text-[var(--text-dim)]" />
                 {p.name}
+                {p.code && <span className="text-[10.5px] text-[var(--text-ghost)]">· {p.code}</span>}
                 <button type="button" onClick={() => removeProduct(p.id)} className={chipX} aria-label="Remove product">
                   <CrossIcon className="h-3 w-3" />
                 </button>
@@ -321,6 +270,13 @@ export default function TaskExtras({
           </div>
         )}
       </div>
+
+      <ProductPicker
+        open={pickerOpen}
+        selectedIds={products.map((p) => p.id)}
+        onToggle={toggleProduct}
+        onClose={() => setPickerOpen(false)}
+      />
     </div>
   );
 }
