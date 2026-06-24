@@ -8,14 +8,94 @@
    cards get an accent ring + check. Opens above the Task modal.
    --------------------------------------------------------------------------- */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { TodoProductRef, ProductRow, DivisionRow, CategoryRow } from "@/types/supabase";
-import { fetchProducts, fetchDivisions, fetchCategories } from "@/lib/products-admin";
+import { fetchProducts, fetchDivisions, fetchCategories, fetchClassificationIcons } from "@/lib/products-admin";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+
+/* Storage base for taxonomy icons (divisions/categories live as SVGs under
+   media/<level>/<slug>.svg; the classification-icon hub overrides win). */
+const STORAGE_BASE = `${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""}/storage/v1/object/public/media`;
+const taxoStorageIcon = (level: "divisions" | "categories", slug: string) =>
+  `${STORAGE_BASE}/${level}/${slug}.svg`;
+
+type Opt = { value: string; label: string; icon?: string };
+
+/* A small SVG icon that falls back to a neutral tag glyph if it 404s. */
+function TaxoIcon({ src, className = "" }: { src?: string; className?: string }) {
+  const [bad, setBad] = useState(false);
+  if (!src || bad) return <PackageIcon className={`${className} text-[var(--text-ghost)]`} />;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt="" className={`${className} object-contain`} onError={() => setBad(true)} />;
+}
+
+/* Brand-styled select that shows each option's icon (native <select> can't).
+   Keyboard-light: click to open, click an option to choose, outside-click to close. */
+function IconSelect({
+  value,
+  onChange,
+  options,
+  allLabel,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: Opt[];
+  allLabel: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+  const current = options.find((o) => o.value === value);
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="h-9 px-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none flex items-center gap-2 min-w-[150px] focus:border-[var(--border-focus)]"
+      >
+        {current?.icon && <TaxoIcon src={current.icon} className="h-4 w-4 shrink-0" />}
+        <span className="truncate flex-1 text-start">{current ? current.label : allLabel}</span>
+        <AngleDownIcon className="h-3.5 w-3.5 text-[var(--text-dim)] shrink-0" />
+      </button>
+      {/* Solid bg (--bg-secondary) — the popover floats over bright product
+          cards, so a translucent --bg-elevated would be unreadable. */}
+      {open && (
+        <div className="absolute z-50 mt-1 w-[230px] max-h-72 overflow-y-auto rounded-xl bg-[var(--bg-secondary,#111)] border border-[var(--border-subtle)] shadow-[0_12px_40px_rgba(0,0,0,0.55)] p-1">
+          <button
+            type="button"
+            onClick={() => { onChange(""); setOpen(false); }}
+            className={`w-full text-start px-2.5 h-9 rounded-lg text-[12px] flex items-center gap-2 ${value === "" ? "bg-[var(--accent)]/[0.12] text-[var(--text-primary)]" : "text-[var(--text-dim)] hover:bg-[var(--bg-inverted)]/[0.06]"}`}
+          >
+            {allLabel}
+          </button>
+          {options.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => { onChange(o.value); setOpen(false); }}
+              className={`w-full text-start px-2.5 h-9 rounded-lg text-[12px] flex items-center gap-2 ${o.value === value ? "bg-[var(--accent)]/[0.12] text-[var(--text-primary)]" : "text-[var(--text-primary)] hover:bg-[var(--bg-inverted)]/[0.06]"}`}
+            >
+              <TaxoIcon src={o.icon} className="h-4 w-4 shrink-0" />
+              <span className="truncate">{o.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 type Pick = {
   id: string;
@@ -40,6 +120,7 @@ export default function ProductPicker({
   const [products, setProducts] = useState<Pick[]>([]);
   const [divisions, setDivisions] = useState<DivisionRow[]>([]);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
+  const [icons, setIcons] = useState<Record<string, Record<string, string>>>({});
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [div, setDiv] = useState("");
@@ -56,10 +137,12 @@ export default function ProductPicker({
         models: j.models ?? {},
       }))
       .catch(() => ({ thumbs: {} as Record<string, string>, models: {} as Record<string, string> }));
-    Promise.all([fetchProducts(), fetchDivisions(), fetchCategories(), metaP])
-      .then(([prods, divs, cats, meta]) => {
+    const iconsP = fetchClassificationIcons().catch(() => ({} as Record<string, Record<string, string>>));
+    Promise.all([fetchProducts(), fetchDivisions(), fetchCategories(), metaP, iconsP])
+      .then(([prods, divs, cats, meta, ico]) => {
         if (cancelled) return;
         const { thumbs, models } = meta;
+        setIcons(ico);
         setProducts(
           (prods as ProductRow[]).map((p) => ({
             id: p.id,
@@ -92,6 +175,26 @@ export default function ProductPicker({
     [categories, divisionId],
   );
 
+  /* Options with icons: hub override wins, else the storage SVG by slug. */
+  const divisionOpts = useMemo<Opt[]>(
+    () =>
+      divisions.map((d) => ({
+        value: d.slug,
+        label: d.name,
+        icon: icons.division?.[d.slug] ?? taxoStorageIcon("divisions", d.slug),
+      })),
+    [divisions, icons],
+  );
+  const categoryOpts = useMemo<Opt[]>(
+    () =>
+      visibleCategories.map((c) => ({
+        value: c.slug,
+        label: c.name,
+        icon: icons.category?.[c.slug] ?? taxoStorageIcon("categories", c.slug),
+      })),
+    [visibleCategories, icons],
+  );
+
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return products
@@ -110,8 +213,6 @@ export default function ProductPicker({
   if (!open) return null;
 
   const sel = new Set(selectedIds);
-  const selectStyle =
-    "h-9 px-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
 
   return (
     <div className="fixed inset-0 z-[60] flex items-start justify-center p-3 md:p-4 pt-20 md:pt-24 pb-6 bg-black/60 backdrop-blur-sm" onClick={onClose}>
@@ -145,18 +246,13 @@ export default function ProductPicker({
               onChange={(e) => setQ(e.target.value)}
             />
           </div>
-          <select className={selectStyle} value={div} onChange={(e) => { setDiv(e.target.value); setCat(""); }}>
-            <option value="">All divisions</option>
-            {divisions.map((d) => (
-              <option key={d.id} value={d.slug}>{d.name}</option>
-            ))}
-          </select>
-          <select className={selectStyle} value={cat} onChange={(e) => setCat(e.target.value)}>
-            <option value="">All categories</option>
-            {visibleCategories.map((c) => (
-              <option key={c.id} value={c.slug}>{c.name}</option>
-            ))}
-          </select>
+          <IconSelect
+            value={div}
+            onChange={(v) => { setDiv(v); setCat(""); }}
+            options={divisionOpts}
+            allLabel="All divisions"
+          />
+          <IconSelect value={cat} onChange={setCat} options={categoryOpts} allLabel="All categories" />
         </div>
 
         {/* Grid */}
