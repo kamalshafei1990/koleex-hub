@@ -88,13 +88,17 @@ export default function ProductPicker({
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return products.filter((p) => {
-      if (div && p.division_slug !== div) return false;
-      if (cat && p.category_slug !== cat) return false;
-      if (needle && !(p.name.toLowerCase().includes(needle) || (p.code || "").toLowerCase().includes(needle)))
-        return false;
-      return true;
-    });
+    return products
+      .filter((p) => {
+        if (div && p.division_slug !== div) return false;
+        if (cat && p.category_slug !== cat) return false;
+        if (needle && !(p.name.toLowerCase().includes(needle) || (p.code || "").toLowerCase().includes(needle)))
+          return false;
+        return true;
+      })
+      // Photos first so the grid opens on real product imagery, not the
+      // placeholder cards (products without a photo sink to the bottom).
+      .sort((a, b) => (a.image ? 0 : 1) - (b.image ? 0 : 1));
   }, [products, q, div, cat]);
 
   if (!open) return null;
