@@ -31,6 +31,8 @@ import UserIcon from "@/components/icons/ui/UserIcon";
 import InboxRawIcon from "@/components/icons/ui/InboxRawIcon";
 import Settings2Icon from "@/components/icons/ui/Settings2Icon";
 import { useInboxUnread } from "@/lib/inbox-unread-store";
+import { useMeBootstrap } from "@/lib/me-bootstrap";
+import ActivityIcon from "@/components/icons/ui/ActivityIcon";
 import {
   getCurrentUser,
   isSupabaseAuthEnabled,
@@ -102,6 +104,10 @@ export default function UserMenu({ dk }: { dk: boolean }) {
      a second, duplicate 60 s poll for the same account. Account-scoped:
      returns 0 for any account other than the published one. */
   const unread = useInboxUnread(account?.id ?? null);
+
+  /* Super Admin gets a quick link to the live Activity Monitor. */
+  const { data: meBoot } = useMeBootstrap();
+  const isSuperAdmin = !!meBoot?.isSuperAdmin;
 
   const profile = useMemo(() => {
     if (!account) return null;
@@ -423,6 +429,23 @@ export default function UserMenu({ dk }: { dk: boolean }) {
                   <Settings2Icon className="h-4 w-4" />
                   <span className="flex-1 text-start">Account Settings</span>
                 </button>
+                {isSuperAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpen(false);
+                      router.push("/super-admin/activity");
+                    }}
+                    className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium transition-colors ${
+                      dk
+                        ? "text-white/80 hover:text-white hover:bg-white/[0.04]"
+                        : "text-black/80 hover:text-black hover:bg-black/[0.04]"
+                    }`}
+                  >
+                    <ActivityIcon className="h-4 w-4" />
+                    <span className="flex-1 text-start">Activity Monitor</span>
+                  </button>
+                )}
                 <div className={`my-1 border-t ${dk ? "border-white/[0.06]" : "border-black/[0.06]"}`} />
                 <button
                   type="button"
