@@ -1226,12 +1226,16 @@ export default function Quotations() {
       meta: [
         ["Date", q.date || ""],
         ["Due", q.validTill || ""],
+        ["Client No", q.clientNo || ""],
         ["Customer", q.customerName || ""],
         ["Company", q.companyName || ""],
-        ["Email", q.toEmail || ""],
+        ["Address", q.toAddress || ""],
         ["Phone", q.toPhone || q.toMobile || ""],
+        ["Email", q.toEmail || ""],
+        ["Website", q.toWebsite || ""],
         ["Currency", cur],
-      ],
+        ...(q.incotermCode ? [["Incoterm", `${q.incotermCode}${q.loadingPort ? ` · ${q.loadingPort}` : ""}${q.dischargePort ? ` → ${q.dischargePort}` : ""}`] as [string, string]] : []),
+      ].filter(([, v]) => String(v).trim() !== "") as [string, string][],
       columns: [
         { header: "#", width: 5, align: "center" },
         { header: "Description", width: 46 },
