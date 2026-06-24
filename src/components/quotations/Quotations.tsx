@@ -11,7 +11,7 @@ import PrintIcon from "@/components/icons/ui/PrintIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import TableIcon from "@/components/icons/ui/TableIcon";
-import { downloadXlsx, money } from "@/lib/excel-export";
+import { downloadDocXlsx, money } from "@/lib/excel-export";
 import CopyIcon from "@/components/icons/ui/CopyIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
@@ -1465,40 +1465,51 @@ export default function Quotations() {
     const base = subtotal + taxAmt + (Number(q.shipping) || 0) + (Number(q.others) || 0);
     const grand = +(base * (1 - discPct / 100)).toFixed(2);
 
-    const rows: (string | number | null)[][] = [
-      ["QUOTATION", q.invoiceNo || ""],
-      ["Date", q.date || ""],
-      ["Valid till", q.validTill || ""],
-      ["Customer", q.customerName || ""],
-      ["Company", q.companyName || ""],
-      ["Email", q.toEmail || ""],
-      ["Phone", q.toPhone || q.toMobile || ""],
-      ["Currency", cur],
-      [],
-      ["#", "Description", "Model", "Qty", `Unit Price (${cur})`, `Line Total (${cur})`],
-    ];
+    const rows: (string | number | null)[][] = [];
     let n = 0;
     for (const it of q.items) {
       if (it.kind === "header") {
-        rows.push([`— ${it.description || ""} —`, "", "", "", "", ""]);
+        rows.push(["", `▸ ${it.description || ""}`, "", "", "", ""]);
         continue;
       }
       n += 1;
       const lineTotal = money((Number(it.unitPrice) || 0) * (Number(it.qty) || 0));
       rows.push([n, it.description || "", it.model || "", Number(it.qty) || 0, money(it.unitPrice), lineTotal]);
     }
-    rows.push([]);
-    rows.push(["", "", "", "", "Subtotal", money(subtotal)]);
-    if (taxPct) rows.push(["", "", "", "", `Tax (${taxPct}%)`, money(taxAmt)]);
-    if (Number(q.shipping)) rows.push(["", "", "", "", "Shipping", money(q.shipping)]);
-    if (Number(q.others)) rows.push(["", "", "", "", "Others", money(q.others)]);
-    if (discPct) rows.push(["", "", "", "", `Discount (${discPct}%)`, money(-(base * discPct) / 100)]);
-    rows.push(["", "", "", "", `GRAND TOTAL (${cur})`, money(grand)]);
+
+    const totals = [
+      { label: "Subtotal", value: subtotal },
+      ...(taxPct ? [{ label: `Tax (${taxPct}%)`, value: taxAmt }] : []),
+      ...(Number(q.shipping) ? [{ label: "Shipping", value: Number(q.shipping) }] : []),
+      ...(Number(q.others) ? [{ label: "Others", value: Number(q.others) }] : []),
+      ...(discPct ? [{ label: `Discount (${discPct}%)`, value: -(base * discPct) / 100 }] : []),
+      { label: `GRAND TOTAL (${cur})`, value: grand, strong: true },
+    ];
 
     const fileBase = `quotation-${(q.invoiceNo || q.id).replace(/[^\w-]+/g, "_")}`;
-    await downloadXlsx(fileBase, [
-      { name: "Quotation", rows, colWidths: [6, 44, 18, 8, 16, 16] },
-    ]);
+    await downloadDocXlsx(fileBase, {
+      title: "QUOTATION",
+      number: q.invoiceNo || q.id,
+      meta: [
+        ["Date", q.date || ""],
+        ["Valid till", q.validTill || ""],
+        ["Customer", q.customerName || ""],
+        ["Company", q.companyName || ""],
+        ["Email", q.toEmail || ""],
+        ["Phone", q.toPhone || q.toMobile || ""],
+        ["Currency", cur],
+      ],
+      columns: [
+        { header: "#", width: 5, align: "center" },
+        { header: "Description", width: 46 },
+        { header: "Model", width: 18 },
+        { header: "Qty", width: 8, align: "center" },
+        { header: `Unit Price (${cur})`, width: 16, money: true },
+        { header: `Line Total (${cur})`, width: 16, money: true },
+      ],
+      rows,
+      totals,
+    });
   }, [current]);
 
   const handleExportPdf = useCallback(async () => {

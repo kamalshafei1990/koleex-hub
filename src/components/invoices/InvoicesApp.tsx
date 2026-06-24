@@ -17,7 +17,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n";
 import { invoicesT } from "@/lib/translations/invoices";
-import { downloadXlsx, money } from "@/lib/excel-export";
+import { downloadDocXlsx, money } from "@/lib/excel-export";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
 import RrIcon from "@/components/ui/RrIcon";
 import PageHeader from "@/components/ui/PageHeader";
@@ -416,21 +416,11 @@ function InvoiceDetailView({
   /* Export this invoice as a real .xlsx — header + line items + the same
      totals shown live in the editor. Numbers stay numeric. */
   const exportExcel = async () => {
-    const rows: (string | number | null)[][] = [
-      ["INVOICE", inv.inv_no || ""],
-      ["Status", effectiveStatus],
-      ["Issue date", inv.issue_date || ""],
-      ["Due date", inv.due_date || ""],
-      ["Bill to", customerName],
-      ["Currency", cur],
-      [],
-      ["#", "Description", "Qty", `Unit Price (${cur})`, "Discount %", "Tax %", `Line Total (${cur})`],
-    ];
-    lines.forEach((l, i) => {
+    const rows: (string | number | null)[][] = lines.map((l, i) => {
       const gross = Number(l.qty ?? 0) * Number(l.unit_price ?? 0);
       const net = gross - (gross * Number(l.line_discount_percent ?? 0)) / 100;
       const lineTotal = net + (net * Number(l.tax_rate ?? 0)) / 100;
-      rows.push([
+      return [
         i + 1,
         l.description || "",
         Number(l.qty ?? 0),
@@ -438,20 +428,41 @@ function InvoiceDetailView({
         Number(l.line_discount_percent ?? 0),
         Number(l.tax_rate ?? 0),
         money(lineTotal),
-      ]);
+      ];
     });
-    rows.push([]);
-    rows.push(["", "", "", "", "", "Subtotal", money(liveTotals.subtotal)]);
-    if (liveTotals.discount_total) rows.push(["", "", "", "", "", "Discount", money(-liveTotals.discount_total)]);
-    if (liveTotals.tax_total) rows.push(["", "", "", "", "", "Tax", money(liveTotals.tax_total)]);
-    rows.push(["", "", "", "", "", `TOTAL (${cur})`, money(liveTotals.total)]);
-    rows.push(["", "", "", "", "", "Paid", money(inv.amount_paid)]);
-    rows.push(["", "", "", "", "", "Balance", money(liveTotals.balance)]);
+
+    const totals = [
+      { label: "Subtotal", value: liveTotals.subtotal },
+      ...(liveTotals.discount_total ? [{ label: "Discount", value: -liveTotals.discount_total }] : []),
+      ...(liveTotals.tax_total ? [{ label: "Tax", value: liveTotals.tax_total }] : []),
+      { label: `TOTAL (${cur})`, value: liveTotals.total, strong: true },
+      { label: "Paid", value: Number(inv.amount_paid) },
+      { label: "Balance", value: liveTotals.balance },
+    ];
 
     const fileBase = `invoice-${(inv.inv_no || inv.id).replace(/[^\w-]+/g, "_")}`;
-    await downloadXlsx(fileBase, [
-      { name: "Invoice", rows, colWidths: [6, 40, 8, 16, 11, 8, 16] },
-    ]);
+    await downloadDocXlsx(fileBase, {
+      title: "INVOICE",
+      number: inv.inv_no || inv.id,
+      meta: [
+        ["Status", effectiveStatus],
+        ["Issue date", inv.issue_date || ""],
+        ["Due date", inv.due_date || ""],
+        ["Bill to", customerName],
+        ["Currency", cur],
+      ],
+      columns: [
+        { header: "#", width: 5, align: "center" },
+        { header: "Description", width: 44 },
+        { header: "Qty", width: 8, align: "center" },
+        { header: `Unit Price (${cur})`, width: 16, money: true },
+        { header: "Discount %", width: 11, align: "center" },
+        { header: "Tax %", width: 8, align: "center" },
+        { header: `Line Total (${cur})`, width: 16, money: true },
+      ],
+      rows,
+      totals,
+    });
   };
 
   return (
