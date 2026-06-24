@@ -256,6 +256,7 @@ export default function SuperAdminActivityPage() {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col">
+      <div className="px-4 md:px-6 pt-4 md:pt-6">
       <PageHeader
         title="Activity Monitor"
         subtitle="Live users, sessions, and the system-wide activity feed"
@@ -272,6 +273,7 @@ export default function SuperAdminActivityPage() {
           </button>
         }
       />
+      </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-4 md:px-6 py-5 space-y-6">
         {/* ── KPI cards ── */}
