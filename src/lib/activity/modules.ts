@@ -58,3 +58,38 @@ export function routeToModule(pathname: string | null | undefined): string {
   if (seg in MODULE_BY_SEGMENT) return MODULE_BY_SEGMENT[seg];
   return seg ? titleCase(seg) : "Home";
 }
+
+/* The global document.title is the same on every page ("KOLEEX — …"), so it's
+   noise in the activity feed. Treat it (and anything starting with KOLEEX) as
+   generic and fall back to a meaningful, event-based label instead. */
+const GENERIC_TITLE = /^koleex/i;
+
+/** Human-readable label for an activity event — what the user actually did. */
+export function eventLabel(e: {
+  event_type: string;
+  module?: string | null;
+  route?: string | null;
+  title?: string | null;
+}): string {
+  const mod = e.module || routeToModule(e.route);
+  switch (e.event_type) {
+    case "page_view":
+      return `Viewed ${mod}`;
+    case "session_start":
+      return "Opened the app";
+    case "session_end":
+      return "Left the app";
+    case "idle":
+      return "Went idle";
+    case "active":
+      return "Became active";
+    case "login":
+      return e.title && !GENERIC_TITLE.test(e.title) ? e.title : "Signed in";
+    case "logout":
+      return "Signed out";
+    case "session_revoked":
+      return e.title || "Session force-logged-out by admin";
+  }
+  if (e.title && !GENERIC_TITLE.test(e.title)) return e.title;
+  return e.event_type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}

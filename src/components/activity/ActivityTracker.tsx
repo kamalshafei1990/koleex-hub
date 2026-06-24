@@ -133,7 +133,9 @@ export default function ActivityTracker() {
           deviceId,
           eventType: "page_view",
           route: pathname,
-          title: typeof document !== "undefined" ? document.title : null,
+          // The document title is the same global string on every page, so we
+          // don't store it — the feed labels page views by module instead.
+          title: null,
           referrer,
         }),
       }).catch(() => {});

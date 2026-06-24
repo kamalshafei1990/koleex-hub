@@ -24,7 +24,7 @@ import GlobeIcon from "@/components/icons/ui/GlobeIcon";
 import LockIcon from "@/components/icons/ui/LockIcon";
 import UserActivityDrawer from "@/components/super-admin/UserActivityDrawer";
 import AlertPreferencesModal from "@/components/super-admin/AlertPreferencesModal";
-import { routeToModule } from "@/lib/activity/modules";
+import { routeToModule, eventLabel } from "@/lib/activity/modules";
 
 /* ── client-side mirror types ── */
 interface AccountInfo {
@@ -389,7 +389,7 @@ export default function SuperAdminActivityPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="text-[12.5px] font-medium text-[var(--text-primary)] truncate">{f.account.name || f.account.username || "Unknown"}</span>
-                            <span className="text-[11.5px] text-[var(--text-secondary)] truncate">{f.title || f.event_type}</span>
+                            <span className="text-[11.5px] text-[var(--text-secondary)] truncate">{eventLabel(f)}</span>
                             {f.severity !== "info" && <SeverityPill severity={f.severity} />}
                           </div>
                           <div className="text-[10.5px] text-[var(--text-dim)] truncate">

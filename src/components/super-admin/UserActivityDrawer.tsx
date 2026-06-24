@@ -16,6 +16,7 @@ import MonitorIcon from "@/components/icons/ui/MonitorIcon";
 import ActivityIcon from "@/components/icons/ui/ActivityIcon";
 import ShieldExclamationIcon from "@/components/icons/ui/ShieldExclamationIcon";
 import GlobeIcon from "@/components/icons/ui/GlobeIcon";
+import { eventLabel } from "@/lib/activity/modules";
 
 interface AccountInfo {
   account_id: string;
@@ -203,7 +204,7 @@ export default function UserActivityDrawer({
                     <li key={a.id} className="flex items-start gap-2 text-[12px]">
                       <span className={`mt-1.5 h-1.5 w-1.5 rounded-full shrink-0 ${a.severity === "critical" ? "bg-[#FF3333]" : a.severity === "warning" ? "bg-[#FFCC00]" : "bg-[var(--text-ghost)]"}`} />
                       <div className="flex-1 min-w-0">
-                        <span className="text-[var(--text-primary)]">{a.title || a.event_type}</span>
+                        <span className="text-[var(--text-primary)]">{eventLabel(a)}</span>
                         <span className="text-[var(--text-dim)]"> · {a.module || a.route || "—"}</span>
                       </div>
                       <span className="text-[10.5px] text-[var(--text-ghost)] shrink-0">{fmt(a.created_at)}</span>
