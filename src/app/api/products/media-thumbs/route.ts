@@ -1,11 +1,13 @@
 import "server-only";
 
-/* GET /api/products/media-thumbs — { thumbs: { [product_id]: url } }
+/* GET /api/products/media-thumbs — { thumbs: {...}, models: {...} }
 
    The product photos live in product_media (service-role-only, so the browser
    anon client can't read them). This resolves one thumbnail per product — the
    `hero` image when present, otherwise the lowest-ordered row — for the To-do
-   product picker grid. Gated by To-do module access. */
+   product picker grid. It also returns one model code per product (the KOLEEX
+   primary_model when set, otherwise model_name) so cards can show model + name.
+   Gated by To-do module access. */
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
@@ -57,8 +59,23 @@ export async function GET() {
     }
   }
 
+  /* One model code per product: primary_model (official KOLEEX code) wins,
+     otherwise model_name. Both live in product_models (service-role-only). */
+  const models: Record<string, string> = {};
+  const { data: mData } = await supabaseServer
+    .from("product_models")
+    .select("product_id, model_name, primary_model");
+  for (const m of (mData ?? []) as Array<{
+    product_id: string;
+    model_name: string | null;
+    primary_model: string | null;
+  }>) {
+    const code = (m.primary_model || m.model_name || "").trim();
+    if (code && !models[m.product_id]) models[m.product_id] = code;
+  }
+
   return NextResponse.json(
-    { thumbs },
+    { thumbs, models },
     { headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=600" } },
   );
 }

@@ -49,18 +49,24 @@ export default function ProductPicker({
     if (!open) return;
     let cancelled = false;
     setLoading(true);
-    const thumbsP = fetch("/api/products/media-thumbs", { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : { thumbs: {} }))
-      .then((j: { thumbs?: Record<string, string> }) => j.thumbs ?? {})
-      .catch(() => ({} as Record<string, string>));
-    Promise.all([fetchProducts(), fetchDivisions(), fetchCategories(), thumbsP])
-      .then(([prods, divs, cats, thumbs]) => {
+    const metaP = fetch("/api/products/media-thumbs", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : { thumbs: {}, models: {} }))
+      .then((j: { thumbs?: Record<string, string>; models?: Record<string, string> }) => ({
+        thumbs: j.thumbs ?? {},
+        models: j.models ?? {},
+      }))
+      .catch(() => ({ thumbs: {} as Record<string, string>, models: {} as Record<string, string> }));
+    Promise.all([fetchProducts(), fetchDivisions(), fetchCategories(), metaP])
+      .then(([prods, divs, cats, meta]) => {
         if (cancelled) return;
+        const { thumbs, models } = meta;
         setProducts(
           (prods as ProductRow[]).map((p) => ({
             id: p.id,
             name: p.product_name,
-            code: p.internal_sku ?? p.legacy_code ?? null,
+            // Model code is the identifier buyers recognise: KOLEEX model_name /
+            // primary_model first, then any legacy SKU.
+            code: models[p.id] ?? p.internal_sku ?? p.legacy_code ?? null,
             image: thumbs[p.id] ?? p.hero_poster_url ?? p.og_image_url ?? null,
             division_slug: p.division_slug,
             category_slug: p.category_slug,
@@ -190,8 +196,16 @@ export default function ProductPicker({
                       </span>
                     )}
                     <div className="p-2">
-                      <p className="text-[12px] font-medium text-[var(--text-primary)] truncate" title={p.name}>{p.name}</p>
-                      {p.code && <p className="text-[10.5px] text-[var(--text-dim)] truncate">{p.code}</p>}
+                      {/* Model code first (the identifier), product name beneath. */}
+                      {p.code && (
+                        <p className="text-[11.5px] font-semibold text-[var(--text-primary)] truncate" title={p.code}>{p.code}</p>
+                      )}
+                      <p
+                        className={`text-[10.5px] truncate ${p.code ? "text-[var(--text-dim)]" : "font-medium text-[var(--text-primary)]"}`}
+                        title={p.name}
+                      >
+                        {p.name}
+                      </p>
                     </div>
                   </button>
                 );
