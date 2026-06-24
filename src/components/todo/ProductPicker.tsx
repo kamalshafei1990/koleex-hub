@@ -49,15 +49,19 @@ export default function ProductPicker({
     if (!open) return;
     let cancelled = false;
     setLoading(true);
-    Promise.all([fetchProducts(), fetchDivisions(), fetchCategories()])
-      .then(([prods, divs, cats]) => {
+    const thumbsP = fetch("/api/products/media-thumbs", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : { thumbs: {} }))
+      .then((j: { thumbs?: Record<string, string> }) => j.thumbs ?? {})
+      .catch(() => ({} as Record<string, string>));
+    Promise.all([fetchProducts(), fetchDivisions(), fetchCategories(), thumbsP])
+      .then(([prods, divs, cats, thumbs]) => {
         if (cancelled) return;
         setProducts(
           (prods as ProductRow[]).map((p) => ({
             id: p.id,
             name: p.product_name,
             code: p.internal_sku ?? p.legacy_code ?? null,
-            image: p.hero_poster_url ?? p.og_image_url ?? null,
+            image: thumbs[p.id] ?? p.hero_poster_url ?? p.og_image_url ?? null,
             division_slug: p.division_slug,
             category_slug: p.category_slug,
           })),
