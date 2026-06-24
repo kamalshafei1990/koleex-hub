@@ -20,6 +20,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
+import { logAudit } from "@/lib/server/audit";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { bustPolicySnapshot } from "@/lib/server/commercial-policy";
 
@@ -482,6 +483,19 @@ export async function PATCH(
      read endpoint's snapshot keys. */
   bustPolicySnapshot(auth.tenant_id); // so the Price tab / Calculator see the edit immediately
   const fresh = await readSection(section, auth.tenant_id);
+
+  await logAudit({
+    auth,
+    action_type: "change_pricing_policy",
+    entity_type: "commercial_policy_section",
+    entity_id: section,
+    entity_label: section,
+    severity: "warning",
+    module: "Commercial Policy",
+    route: "/commercial-policy",
+    req,
+  });
+
   return NextResponse.json({ ok: true, section, payload: fresh });
 }
 

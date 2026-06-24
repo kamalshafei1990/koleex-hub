@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
+import { logAudit } from "@/lib/server/audit";
 
 /* PATCH  /api/roles/[id]  — update a role (Super Admin only)
    DELETE /api/roles/[id]  — delete a role (Super Admin only)
@@ -66,11 +67,24 @@ export async function PATCH(
     }
   }
 
+  await logAudit({
+    auth,
+    action_type: "change_permissions",
+    entity_type: "role",
+    entity_id: id,
+    entity_label: typeof patch.name === "string" ? patch.name : undefined,
+    new_values: patch,
+    severity: "warning",
+    module: "Roles & Permissions",
+    route: "/roles",
+    req,
+  });
+
   return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
@@ -117,5 +131,17 @@ export async function DELETE(
     console.error("[api/roles/[id] DELETE]", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  await logAudit({
+    auth,
+    action_type: "delete",
+    entity_type: "role",
+    entity_id: id,
+    severity: "critical",
+    module: "Roles & Permissions",
+    route: "/roles",
+    req,
+  });
+
   return NextResponse.json({ ok: true });
 }

@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
+import { logAudit } from "@/lib/server/audit";
 
 /* GET  /api/roles    — list roles (any authenticated user)
    POST /api/roles    — create a new role (Super Admin only)
@@ -152,6 +153,19 @@ export async function POST(req: Request) {
   if (mirrorErr) {
     console.error("[api/roles POST] roles-mirror failed:", mirrorErr.message);
   }
+
+  await logAudit({
+    auth,
+    action_type: "create",
+    entity_type: "role",
+    entity_id: koleexRow.id,
+    entity_label: koleexRow.name,
+    new_values: { name: koleexRow.name, is_super_admin: koleexRow.is_super_admin, can_view_private: koleexRow.can_view_private },
+    severity: "warning",
+    module: "Roles & Permissions",
+    route: "/roles",
+    req,
+  });
 
   return NextResponse.json({ role: data });
 }

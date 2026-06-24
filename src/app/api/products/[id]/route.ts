@@ -14,6 +14,7 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
+import { logAudit } from "@/lib/server/audit";
 import { hasProductDataAccess, PUBLIC_PRODUCT_COLUMNS } from "@/lib/server/product-access";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -101,15 +102,31 @@ export async function PATCH(
     console.error("[api/products/[id] PATCH]", error.message);
     return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   }
+
+  // A price/cost touch is a sensitive change; flag it as such for the feed.
+  const touchesMoney = Object.keys(body).some((k) => /price|cost/i.test(k));
+  await logAudit({
+    auth,
+    action_type: touchesMoney ? "change_price" : "update",
+    entity_type: "product",
+    entity_id: targetId,
+    entity_label: typeof body.product_name === "string" ? body.product_name : undefined,
+    new_values: body,
+    severity: touchesMoney ? "warning" : "info",
+    module: "Product Data",
+    route: "/product-data",
+    req,
+  });
+
   return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const auth = await requireAuth(_req);
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
   if (!(await hasProductDataAccess(auth))) {
     return NextResponse.json(
@@ -127,5 +144,17 @@ export async function DELETE(
     console.error("[api/products/[id] DELETE]", error.message);
     return NextResponse.json({ error: humanizeError(error) }, { status: 500 });
   }
+
+  await logAudit({
+    auth,
+    action_type: "delete",
+    entity_type: "product",
+    entity_id: id,
+    severity: "critical",
+    module: "Product Data",
+    route: "/product-data",
+    req,
+  });
+
   return NextResponse.json({ ok: true });
 }
