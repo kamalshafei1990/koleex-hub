@@ -298,16 +298,20 @@ export async function fetchUnreadCount(accountId: string): Promise<number> {
   return count ?? 0;
 }
 
-/** Count unread (not archived) inbox messages of category `task` for one
-    account. Feeds the To-do app-tile notification badge on the home page —
-    these rows are created by the todo assignment fan-out (POST/PATCH
-    /api/todos), so the count = "task assignments I haven't read yet". */
+/** Count unread (not archived) TO-DO assignment notifications for one account.
+    Feeds the To-do app-tile notification badge on the home page.
+
+    Note: category `task` is shared — the QA system also writes task-category
+    inbox rows (qa_issue_assigned / qa_status_changed). To-do assignments are
+    the ones the todo fan-out tags with metadata.type = 'todo_assignment', so
+    we filter on that to keep the badge strictly to-do related. */
 export async function fetchUnreadTaskCount(accountId: string): Promise<number> {
   const { count, error } = await supabase
     .from(INBOX)
     .select("*", { count: "exact", head: true })
     .eq("recipient_account_id", accountId)
     .eq("category", "task")
+    .eq("metadata->>type", "todo_assignment")
     .is("read_at", null)
     .is("archived_at", null);
   if (error) {
