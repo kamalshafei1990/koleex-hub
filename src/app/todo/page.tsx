@@ -15,6 +15,7 @@ import SquareIcon from "@/components/icons/ui/SquareIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import CalendarRawIcon from "@/components/icons/ui/CalendarRawIcon";
+import DatePicker from "@/components/ui/DatePicker";
 import FlagIcon from "@/components/icons/ui/FlagIcon";
 import TagsIcon from "@/components/icons/ui/TagsIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
@@ -408,8 +409,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
             </div>
             <div>
               <label className={lbl}>Due Date</label>
-              <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)}
-                className={inp + " text-[12px]"} />
+              <DatePicker value={dueDate} onChange={setDueDate} placeholder="Select date" />
             </div>
           </div>
 
