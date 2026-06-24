@@ -1867,6 +1867,35 @@ export interface TodoRow {
   completed_at: string | null;
   created_at: string;
   updated_at: string;
+  /* Free-form bag for task extras: file attachments, @mentioned accounts,
+     and referenced products. All optional / future-safe. */
+  metadata: TodoMetadata;
+}
+/** A file/screenshot attached to a task (stored in the public todo-attachments bucket). */
+export interface TodoAttachment {
+  path: string;
+  url: string;
+  name: string;
+  type: string;
+  size: number;
+}
+/** An account mentioned on a task. */
+export interface TodoMention {
+  account_id: string;
+  username?: string | null;
+  full_name?: string | null;
+}
+/** A product referenced on a task. */
+export interface TodoProductRef {
+  id: string;
+  name: string;
+  code?: string | null;
+}
+export interface TodoMetadata {
+  attachments?: TodoAttachment[];
+  mentions?: TodoMention[];
+  products?: TodoProductRef[];
+  [key: string]: unknown;
 }
 export type TodoInsert = Omit<TodoRow, "id" | "created_at" | "updated_at" | "completed_at">;
 export type TodoUpdate = Partial<TodoInsert> & { completed_at?: string | null };

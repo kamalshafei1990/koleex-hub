@@ -228,12 +228,14 @@ export async function POST(req: Request) {
     assigned_department?: string | null;
     assign_to_all?: boolean;
     is_private?: boolean;
+    metadata?: Record<string, unknown>;
   };
 
   const { data: todo, error } = await supabaseServer
     .from("koleex_todos")
     .insert({
       title: body.title,
+      metadata: body.metadata && typeof body.metadata === "object" ? body.metadata : {},
       description: body.description ?? null,
       completed: false,
       priority: body.priority ?? "medium",

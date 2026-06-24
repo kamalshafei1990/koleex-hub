@@ -23,6 +23,7 @@ import type {
   TodoLabelRow,
   TodoWithRelations,
   TodoAssigneeInfo,
+  TodoMetadata,
   AccountRow,
   EmployeeRow,
 } from "@/types/supabase";
@@ -225,6 +226,7 @@ export async function createTodo(input: {
   assignee_account_ids?: string[];
   assigned_department?: string | null;
   assign_to_all?: boolean;
+  metadata?: TodoMetadata;
 }): Promise<TodoRow | null> {
   // API-first — server enforces creator/tenant and handles fan-out.
   try {
@@ -243,6 +245,7 @@ export async function createTodo(input: {
         assignee_account_ids: input.assignee_account_ids,
         assigned_department: input.assigned_department,
         assign_to_all: input.assign_to_all,
+        metadata: input.metadata,
       }),
     });
     if (res.ok) {
@@ -275,6 +278,7 @@ export async function createTodo(input: {
       source_id: input.source_id ?? null,
       assigned_department: input.assigned_department ?? null,
       assign_to_all: input.assign_to_all ?? false,
+      metadata: input.metadata ?? {},
     })
     .select("*")
     .single();

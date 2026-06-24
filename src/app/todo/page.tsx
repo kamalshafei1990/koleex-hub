@@ -16,6 +16,7 @@ import TrashIcon from "@/components/icons/ui/TrashIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import CalendarRawIcon from "@/components/icons/ui/CalendarRawIcon";
 import DatePicker from "@/components/ui/DatePicker";
+import TaskExtras from "@/components/todo/TaskExtras";
 import FlagIcon from "@/components/icons/ui/FlagIcon";
 import TagsIcon from "@/components/icons/ui/TagsIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
@@ -45,7 +46,7 @@ import {
   subscribeToTodos,
 } from "@/lib/todo-admin";
 import type {
-  TodoWithRelations, TodoAssigneeInfo, TodoLabelRow, TodoPriority,
+  TodoWithRelations, TodoAssigneeInfo, TodoLabelRow, TodoPriority, TodoMetadata,
 } from "@/types/supabase";
 import { getCurrentAccountIdSync } from "@/lib/identity";
 import { loadScopeContext, type ScopeContext } from "@/lib/scope";
@@ -168,6 +169,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
   const [newLabelName, setNewLabelName] = useState("");
   const [showNewLabel, setShowNewLabel] = useState(false);
   const [empSearch, setEmpSearch] = useState("");
+  const [extras, setExtras] = useState<TodoMetadata>({});
   const inputRef = useRef<HTMLInputElement>(null);
   const accountId = getCurrentAccountIdSync();
 
@@ -182,9 +184,11 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
         setSelectedAssignees(editEntry.assignees.map((a) => a.account_id));
         setSelectedDept(editEntry.assigned_department || "");
         setAssignAll(editEntry.assign_to_all);
+        setExtras(editEntry.metadata && typeof editEntry.metadata === "object" ? editEntry.metadata : {});
       } else {
         setTitle(""); setDescription(""); setPriority("medium"); setLabel(""); setDueDate("");
         setSelectedAssignees([]); setSelectedDept(""); setAssignAll(false);
+        setExtras({});
       }
       setError(""); setEmpSearch(""); setNewLabelName(""); setShowNewLabel(false);
       setTimeout(() => inputRef.current?.focus(), 100);
@@ -234,6 +238,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
           due_date: dueDate || null,
           assigned_department: selectedDept || null,
           assign_to_all: assignAll,
+          metadata: extras,
         }, selectedAssignees);
       } else {
         await createTodo({
@@ -247,6 +252,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
           assignee_account_ids: selectedAssignees,
           assigned_department: selectedDept || null,
           assign_to_all: assignAll,
+          metadata: extras,
         });
       }
       onSave(); onClose();
@@ -446,6 +452,9 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
               )}
             </div>
           </div>
+
+          {/* Attachments · Mentions · Products */}
+          <TaskExtras value={extras} onChange={setExtras} employees={employees} />
         </div>
 
         {/* Footer */}
