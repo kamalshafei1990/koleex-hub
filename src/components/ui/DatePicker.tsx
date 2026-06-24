@@ -135,7 +135,9 @@ export default function DatePicker({
       {open && (
         <div
           role="dialog"
-          className="absolute z-50 mt-2 w-[280px] p-3 rounded-2xl bg-[var(--bg-elevated,var(--bg-surface))] border border-[var(--border-subtle)] shadow-[0_12px_40px_rgba(0,0,0,0.45)]"
+          /* In-flow (not absolute) so it never gets clipped by a scrollable
+             modal and always fits the available width on mobile. */
+          className="mt-2 w-full max-w-[300px] p-3 rounded-2xl bg-[var(--bg-elevated,var(--bg-surface))] border border-[var(--border-subtle)] shadow-[0_12px_40px_rgba(0,0,0,0.45)]"
         >
           {/* Month nav */}
           <div className="flex items-center justify-between mb-2">

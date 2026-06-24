@@ -394,8 +394,8 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
             )}
           </div>
 
-          {/* Priority + Due Date */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Priority + Due Date — stack on mobile so the date picker gets full width */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className={lbl}>Priority</label>
               <div className="flex gap-1.5">

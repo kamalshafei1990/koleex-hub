@@ -176,12 +176,12 @@ export default function ProductPicker({
                         : "border-[var(--border-subtle)] hover:border-[var(--border-focus)]"
                     } bg-[var(--bg-surface)]`}
                   >
-                    <div className="aspect-square w-full bg-[var(--bg-inverted)]/[0.04] flex items-center justify-center overflow-hidden">
+                    <div className="aspect-square w-full bg-white flex items-center justify-center overflow-hidden p-2">
                       {p.image ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={p.image} alt={p.name} className="h-full w-full object-cover" />
+                        <img src={p.image} alt={p.name} className="max-h-full max-w-full object-contain" />
                       ) : (
-                        <PackageIcon className="h-8 w-8 text-[var(--text-ghost)]" />
+                        <PackageIcon className="h-8 w-8 text-black/20" />
                       )}
                     </div>
                     {isSel && (
