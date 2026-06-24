@@ -270,6 +270,10 @@ export async function POST(req: Request) {
         const messageId = str(p.messageId);
         const emoji = str(p.emoji);
         if (!messageId || !emoji) return bad("messageId and emoji required");
+        /* A reaction is a single emoji (possibly multi-codepoint, e.g. a
+           skin-tone / ZWJ sequence). Cap length so a malformed client can't
+           stuff arbitrarily large strings into the reactions table. */
+        if (emoji.length > 16) return bad("Invalid emoji");
         const msg = await channelOfMessage(messageId);
         if (!msg) return bad("Message not found", 404);
         if (!(await isMember(msg.channel_id))) return bad("Not a member of this channel", 403);

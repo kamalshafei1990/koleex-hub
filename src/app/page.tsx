@@ -35,6 +35,7 @@ import {
 import { usePermittedModules } from "@/lib/use-scope";
 import { getMeBootstrapLastError, retryMeBootstrap } from "@/lib/me-bootstrap";
 import { useShortcutHint } from "@/lib/ui/use-shortcut-hint";
+import { fetchMyChannels, subscribeToMyChannels } from "@/lib/discuss";
 
 const PRIMARY_CATS = ["operations", "commercial", "people", "communication", "system"];
 
@@ -222,6 +223,11 @@ export default function HomePage() {
   const [recentIds, setRecentIds] = useState<string[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
   const accountIdRef = useRef<string | null>(null);
+  /* Unread Discuss messages → notification badge on the Discuss app tile.
+     Mirrors the NotificationBell source of truth (fetchMyChannels +
+     subscribeToMyChannels + the "discuss:unread-changed" event) so the
+     home badge stays in lock-step with the bell and the in-app sidebar. */
+  const [discussUnread, setDiscussUnread] = useState(0);
 
   useEffect(() => {
     const id = getCurrentAccountIdSync();
@@ -233,6 +239,51 @@ export default function HomePage() {
       setDataLoaded(true);
     });
   }, []);
+
+  /* ── Discuss unread badge ──
+     Recompute the total across all my channels, then keep it live via
+     realtime inserts, the cross-component "discuss:unread-changed" event
+     (fired when a channel is read to the bottom), and a slow poll that
+     covers any realtime gaps. Cheap: one small query set per refresh. */
+  useEffect(() => {
+    const id = account?.id ?? getCurrentAccountIdSync();
+    if (!id) return;
+    let cancelled = false;
+
+    const recount = async () => {
+      try {
+        const rows = await fetchMyChannels(id);
+        if (cancelled) return;
+        setDiscussUnread(rows.reduce((acc, c) => acc + (c.unread_count ?? 0), 0));
+      } catch {
+        /* keep prior count on transient failure */
+      }
+    };
+
+    void recount();
+
+    const unsubscribe = subscribeToMyChannels({
+      onMessageInsert: (msg) => {
+        if (msg.author_account_id === id) return;
+        void recount();
+      },
+      onChannelChange: () => void recount(),
+    });
+
+    const onUnreadChanged = () => void recount();
+    window.addEventListener("discuss:unread-changed", onUnreadChanged);
+
+    const poll = window.setInterval(() => {
+      if (document.visibilityState === "visible") void recount();
+    }, 60_000);
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+      window.removeEventListener("discuss:unread-changed", onUnreadChanged);
+      window.clearInterval(poll);
+    };
+  }, [account?.id]);
 
   /* ── Handlers ── */
   const handleAppClick = useCallback(
@@ -379,6 +430,9 @@ export default function HomePage() {
        of the tile. getAppBadge auto-expires after APP_BADGE_TTL_MS
        (3 days) so dev sets newSince / updatedSince once and forgets. */
     const badge = getAppBadge(app);
+    /* Per-app live notification count. Today only Discuss feeds it;
+       other apps fall through to 0 (no badge). */
+    const appUnread = app.id === "discuss" ? discussUnread : 0;
 
     return (
       <div
@@ -457,17 +511,31 @@ export default function HomePage() {
           {/* The shared AppIcon type only declares size + className, but
               AiFaceIcon also accepts `animated`. Render through a widened
               component reference when isAi so we can pass the animation
-              flag without mutating the shared type. */}
-          {(() => {
-            if (isAi) {
-              const AnimatedIcon = Icon as React.ComponentType<{
-                size?: number;
-                animated?: boolean;
-              }>;
-              return <AnimatedIcon size={44} animated />;
-            }
-            return <Icon size={34} />;
-          })()}
+              flag without mutating the shared type.
+              The icon is wrapped in a relative span so the Discuss unread
+              badge can pin to the icon's top-right corner (an app-style
+              notification badge that never collides with the hover star). */}
+          <span className="relative inline-flex">
+            {appUnread > 0 && (
+              <span
+                className={`absolute -top-2 -end-2.5 z-10 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full bg-[#FF3333] text-white text-[10px] font-bold leading-none ring-2 ${dk ? "ring-[#111]" : "ring-white"} pointer-events-none select-none`}
+                aria-label={`${appUnread} unread`}
+                title={`${appUnread} unread message${appUnread === 1 ? "" : "s"}`}
+              >
+                {appUnread > 99 ? "99+" : appUnread}
+              </span>
+            )}
+            {(() => {
+              if (isAi) {
+                const AnimatedIcon = Icon as React.ComponentType<{
+                  size?: number;
+                  animated?: boolean;
+                }>;
+                return <AnimatedIcon size={44} animated />;
+              }
+              return <Icon size={34} />;
+            })()}
+          </span>
         </span>
         <span className={`text-[12px] font-medium text-center leading-tight transition-all duration-200 ${
           app.active
