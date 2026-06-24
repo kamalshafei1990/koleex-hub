@@ -1,23 +1,20 @@
 /* ---------------------------------------------------------------------------
-   excel-export — branded, styled XLSX export for Quotations & Invoices.
+   excel-export — exports a Quotation/Invoice as an Excel workbook that mirrors
+   the on-screen A4 document: real embedded KOLEEX logo, the company header
+   band, a document title + details block, the items table, the totals block,
+   and the terms section. Built on ExcelJS (the only mainstream lib that embeds
+   images + full cell styling). Loaded lazily so it never weighs first paint.
 
-   Uses `xlsx-js-style` (a drop-in SheetJS fork that actually writes cell
-   styling: fonts, fills, borders, number formats, alignment, merges). Loaded
-   lazily so it never weighs down first paint.
-
-   The document model is intentionally small: a title, a meta block, a typed
-   column set, item rows, and a totals block. The renderer turns that into a
-   clean Koleex-monochrome sheet — black header band, hairline borders, money
-   columns right-aligned with thousands separators, and a bold black grand-total
-   row. All free-text is HTML-stripped first (rich-editor descriptions carry
-   tags like <b>/<font> that must never reach the spreadsheet).
+   The document model stays small and is shared by quotations & invoices. All
+   free-text is HTML-stripped first (rich-editor descriptions carry <b>/<font>
+   tags that must never reach the sheet).
    --------------------------------------------------------------------------- */
 
 export interface DocColumn {
   header: string;
   /** Column width in character units. */
   width: number;
-  /** Render as money: number type, right-aligned, #,##0.00. */
+  /** Render as money: number, right-aligned, #,##0.00. */
   money?: boolean;
   align?: "left" | "right" | "center";
 }
@@ -25,23 +22,22 @@ export interface DocColumn {
 export interface DocTotal {
   label: string;
   value: number;
-  /** Emphasised row (e.g. Grand Total) — black band, bold white text. */
+  /** Emphasised row (Grand Total) — black band, bold white text. */
   strong?: boolean;
 }
 
 export interface DocExport {
-  /** Top brand line. Defaults to "KOLEEX". */
-  brand?: string;
   /** Document kind, e.g. "QUOTATION" or "INVOICE". */
   title: string;
-  /** Document number shown next to the title. */
   number: string;
-  /** Label / value pairs (Date, Customer, Currency, …). */
+  /** Label / value pairs (Date, Customer, Currency, …) shown in the details block. */
   meta: [string, string][];
   columns: DocColumn[];
   /** Item rows, each aligned to `columns`. */
   rows: (string | number | null)[][];
   totals: DocTotal[];
+  /** Optional free-text terms block (rendered at the bottom, HTML-stripped). */
+  terms?: string;
 }
 
 /** Round to 2dp, keep numeric (so Excel treats it as money, not text). */
@@ -53,6 +49,8 @@ export function money(n: unknown): number {
 function stripHtml(s: unknown): string {
   if (s == null) return "";
   return String(s)
+    .replace(/<br\s*\/?>(?=.)/gi, " ")
+    .replace(/<\/(p|div|li)>/gi, " ")
     .replace(/<[^>]*>/g, "")
     .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")
@@ -64,108 +62,261 @@ function stripHtml(s: unknown): string {
     .trim();
 }
 
-/* ── Koleex monochrome style presets ─────────────────────────────────────── */
-const HAIRLINE = { style: "thin", color: { rgb: "D0D0D0" } };
-const BORDER_ALL = { top: HAIRLINE, bottom: HAIRLINE, left: HAIRLINE, right: HAIRLINE };
-
-const S_BRAND = { font: { bold: true, sz: 20, color: { rgb: "000000" } } };
-const S_TITLE = { font: { bold: true, sz: 12, color: { rgb: "555555" } } };
-const S_META_LABEL = { font: { bold: true, sz: 10, color: { rgb: "777777" } } };
-const S_META_VALUE = { font: { sz: 11, color: { rgb: "111111" } } };
-const S_HEADER = {
-  font: { bold: true, sz: 11, color: { rgb: "FFFFFF" } },
-  fill: { fgColor: { rgb: "000000" } },
-  alignment: { horizontal: "center", vertical: "center" },
-  border: BORDER_ALL,
+/* ── KOLEEX letterhead constants (mirror the printed A4 header) ──────────── */
+const COMPANY = {
+  legal: "KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO., LTD.",
+  cn: "科莱恪斯国际商业管理（台州）有限公司",
+  tagline: "SHAPING THE FUTURE.",
+  contact:
+    "Room 206, Building 88, West Feiyue Technological Innovative Park, Jiaojiang District, Taizhou City, Zhejiang, China  ·  +86 0576 8892 7796  ·  info@koleexgroup.com  ·  www.koleexgroup.com",
 };
-const S_CELL_TEXT = { font: { sz: 10.5, color: { rgb: "111111" } }, alignment: { horizontal: "left", vertical: "center", wrapText: true }, border: BORDER_ALL };
-const S_CELL_NUM = { font: { sz: 10.5, color: { rgb: "111111" } }, alignment: { horizontal: "right", vertical: "center" }, border: BORDER_ALL, numFmt: "#,##0.00" };
-const S_CELL_CENTER = { font: { sz: 10.5, color: { rgb: "111111" } }, alignment: { horizontal: "center", vertical: "center" }, border: BORDER_ALL };
-const S_TOTAL_LABEL = { font: { bold: true, sz: 10.5, color: { rgb: "333333" } }, alignment: { horizontal: "right", vertical: "center" } };
-const S_TOTAL_VALUE = { font: { bold: true, sz: 10.5, color: { rgb: "111111" } }, alignment: { horizontal: "right", vertical: "center" }, numFmt: "#,##0.00" };
-const S_GRAND_LABEL = { font: { bold: true, sz: 11.5, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "000000" } }, alignment: { horizontal: "right", vertical: "center" } };
-const S_GRAND_VALUE = { font: { bold: true, sz: 11.5, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "000000" } }, alignment: { horizontal: "right", vertical: "center" }, numFmt: "#,##0.00" };
 
-type Cell = { v: string | number; t: "s" | "n"; s: object } | null;
+const BLACK = "FF000000";
+const WHITE = "FFFFFFFF";
+const HAIR = "FFD0D0D0";
+const INK = "FF111111";
+const GRAY = "FF777777";
+
+const thin = { style: "thin" as const, color: { argb: HAIR } };
+const borderAll = { top: thin, left: thin, bottom: thin, right: thin };
+
+/** Fetch the public logo PNG and return base64 (no data: prefix). null on failure. */
+async function loadLogoBase64(): Promise<string | null> {
+  try {
+    const res = await fetch("/koleex-hub-logo.png", { cache: "force-cache" });
+    if (!res.ok) return null;
+    const buf = await res.arrayBuffer();
+    let binary = "";
+    const bytes = new Uint8Array(buf);
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary);
+  } catch {
+    return null;
+  }
+}
 
 /**
- * Build a styled, branded single-sheet workbook for a quotation/invoice and
- * trigger a browser download. Must be called from a client handler.
+ * Build a letterhead Excel that mirrors the A4 document and trigger a browser
+ * download. Must be called from a client handler.
  */
 export async function downloadDocXlsx(filename: string, doc: DocExport): Promise<void> {
-  const XLSX = await import("xlsx-js-style");
-  const nCols = Math.max(doc.columns.length, 2);
-  const lastCol = nCols - 1;
-  const grid: Cell[][] = [];
-  const merges: { s: { r: number; c: number }; e: { r: number; c: number } }[] = [];
-
-  const blank = (): Cell[] => Array(nCols).fill(null);
-
-  // Brand + title (each merged across the full width).
-  grid.push([{ v: doc.brand || "KOLEEX", t: "s", s: S_BRAND }, ...Array(nCols - 1).fill(null)]);
-  merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } });
-  grid.push([{ v: `${doc.title} · ${doc.number}`, t: "s", s: S_TITLE }, ...Array(nCols - 1).fill(null)]);
-  merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } });
-  grid.push(blank());
-
-  // Meta block — label in col 0, value merged across col 1..last.
-  for (const [label, value] of doc.meta) {
-    const row: Cell[] = blank();
-    row[0] = { v: label, t: "s", s: S_META_LABEL };
-    row[1] = { v: stripHtml(value), t: "s", s: S_META_VALUE };
-    const r = grid.length;
-    if (lastCol > 1) merges.push({ s: { r, c: 1 }, e: { r, c: lastCol } });
-    grid.push(row);
-  }
-  grid.push(blank());
-
-  // Header row.
-  grid.push(doc.columns.map((c) => ({ v: c.header, t: "s", s: S_HEADER } as Cell)));
-
-  // Item rows.
-  for (const r of doc.rows) {
-    const row: Cell[] = doc.columns.map((col, i) => {
-      const raw = r[i];
-      if (col.money) return { v: money(raw), t: "n", s: S_CELL_NUM };
-      if (typeof raw === "number") {
-        return { v: raw, t: "n", s: col.align === "center" ? S_CELL_CENTER : { ...S_CELL_NUM, numFmt: "0" } };
-      }
-      const txt = stripHtml(raw);
-      return { v: txt, t: "s", s: col.align === "center" ? S_CELL_CENTER : S_CELL_TEXT };
-    });
-    grid.push(row);
-  }
-  grid.push(blank());
-
-  // Totals — label in the second-to-last column, value in the last.
-  const labelCol = Math.max(0, lastCol - 1);
-  for (const tot of doc.totals) {
-    const row: Cell[] = blank();
-    row[labelCol] = { v: tot.label, t: "s", s: tot.strong ? S_GRAND_LABEL : S_TOTAL_LABEL };
-    row[lastCol] = { v: money(tot.value), t: "n", s: tot.strong ? S_GRAND_VALUE : S_TOTAL_VALUE };
-    if (labelCol > 0) {
-      const r = grid.length;
-      merges.push({ s: { r, c: 0 }, e: { r, c: labelCol - 1 } });
-    }
-    grid.push(row);
-  }
-
-  // Assemble worksheet.
-  const ws: Record<string, unknown> = {};
-  grid.forEach((row, r) => {
-    row.forEach((cell, c) => {
-      if (!cell) return;
-      ws[XLSX.utils.encode_cell({ r, c })] = cell;
-    });
+  const ExcelJSmod = await import("exceljs");
+  const ExcelJS = (ExcelJSmod as unknown as { default?: typeof ExcelJSmod }).default ?? ExcelJSmod;
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet(doc.title.slice(0, 31) || "Document", {
+    properties: { defaultRowHeight: 16 },
+    pageSetup: { paperSize: 9, orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: 0.5, right: 0.5, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 } },
+    views: [{ showGridLines: false }],
   });
-  ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: grid.length - 1, c: lastCol } });
-  ws["!cols"] = doc.columns.map((c) => ({ wch: c.width }));
-  ws["!merges"] = merges;
-  // Freeze the brand/title/meta + header so item rows scroll under them.
-  ws["!freeze"] = { xSplit: 0, ySplit: doc.meta.length + 5 };
 
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, doc.title.slice(0, 31) || "Sheet");
-  const safeName = filename.toLowerCase().endsWith(".xlsx") ? filename : `${filename}.xlsx`;
-  XLSX.writeFile(wb, safeName);
+  const nCols = Math.max(doc.columns.length, 4);
+  const lastColLetter = String.fromCharCode(64 + nCols); // A=65
+  ws.columns = doc.columns.map((c) => ({ width: c.width }));
+
+  let r = 0;
+  const next = () => (r += 1);
+
+  /* ── Letterhead: logo (left) + company text (right of it) ── */
+  next(); // row 1
+  ws.getRow(1).height = 22;
+  ws.getRow(2).height = 16;
+  ws.getRow(3).height = 14;
+  ws.mergeCells(`A1:B3`);
+  // Company text — to the right of the logo.
+  ws.mergeCells(`C1:${lastColLetter}1`);
+  ws.getCell("C1").value = COMPANY.legal;
+  ws.getCell("C1").font = { bold: true, size: 11, color: { argb: INK } };
+  ws.getCell("C1").alignment = { vertical: "middle", horizontal: "right" };
+  next(); // 2
+  ws.mergeCells(`C2:${lastColLetter}2`);
+  ws.getCell("C2").value = COMPANY.cn;
+  ws.getCell("C2").font = { size: 9.5, color: { argb: GRAY } };
+  ws.getCell("C2").alignment = { vertical: "middle", horizontal: "right" };
+  next(); // 3
+  ws.mergeCells(`C3:${lastColLetter}3`);
+  ws.getCell("C3").value = COMPANY.tagline;
+  ws.getCell("C3").font = { bold: true, size: 9, color: { argb: INK } };
+  ws.getCell("C3").alignment = { vertical: "middle", horizontal: "right" };
+
+  // Embed the real logo over A1:B3.
+  const logo = await loadLogoBase64();
+  if (logo) {
+    const imgId = wb.addImage({ base64: logo, extension: "png" });
+    ws.addImage(imgId, { tl: { col: 0.15, row: 0.2 }, ext: { width: 188, height: 52 } });
+  } else {
+    ws.getCell("A1").value = "KOLEEX";
+    ws.getCell("A1").font = { bold: true, size: 20, color: { argb: BLACK } };
+    ws.getCell("A1").alignment = { vertical: "middle" };
+  }
+
+  // Contact line (full width, gray).
+  next(); // 4
+  ws.getRow(4).height = 22;
+  ws.mergeCells(`A4:${lastColLetter}4`);
+  ws.getCell("A4").value = COMPANY.contact;
+  ws.getCell("A4").font = { size: 8, color: { argb: GRAY } };
+  ws.getCell("A4").alignment = { vertical: "middle", horizontal: "left", wrapText: true };
+
+  // Black divider band.
+  next(); // 5
+  ws.getRow(5).height = 4;
+  ws.mergeCells(`A5:${lastColLetter}5`);
+  ws.getCell("A5").fill = { type: "pattern", pattern: "solid", fgColor: { argb: BLACK } };
+
+  next(); // 6 spacer
+  ws.getRow(6).height = 8;
+
+  /* ── Title + details block ── */
+  next(); // 7
+  ws.getRow(7).height = 26;
+  const half = Math.max(1, Math.ceil(nCols / 2));
+  const titleEnd = String.fromCharCode(64 + half);
+  const numStart = String.fromCharCode(64 + half + 1);
+  ws.mergeCells(`A7:${titleEnd}7`);
+  ws.getCell("A7").value = doc.title;
+  ws.getCell("A7").font = { bold: true, size: 18, color: { argb: BLACK } };
+  ws.getCell("A7").alignment = { vertical: "middle" };
+  ws.mergeCells(`${numStart}7:${lastColLetter}7`);
+  ws.getCell(`${numStart}7`).value = `No.  ${doc.number}`;
+  ws.getCell(`${numStart}7`).font = { bold: true, size: 12, color: { argb: INK } };
+  ws.getCell(`${numStart}7`).alignment = { vertical: "middle", horizontal: "right" };
+
+  // Details / Bill-to: each meta pair on its own row (label bold | value).
+  for (const [label, value] of doc.meta) {
+    next();
+    const row = ws.getRow(r);
+    row.height = 15;
+    ws.getCell(`A${r}`).value = label;
+    ws.getCell(`A${r}`).font = { bold: true, size: 9.5, color: { argb: GRAY } };
+    ws.getCell(`A${r}`).alignment = { vertical: "middle" };
+    ws.mergeCells(`B${r}:${lastColLetter}${r}`);
+    ws.getCell(`B${r}`).value = stripHtml(value);
+    ws.getCell(`B${r}`).font = { size: 10.5, color: { argb: INK } };
+    ws.getCell(`B${r}`).alignment = { vertical: "middle", horizontal: "left" };
+  }
+
+  next(); // spacer
+  ws.getRow(r).height = 8;
+
+  /* ── Items table ── */
+  next();
+  const headerRowIdx = r;
+  const hdr = ws.getRow(headerRowIdx);
+  hdr.height = 20;
+  doc.columns.forEach((c, i) => {
+    const cell = hdr.getCell(i + 1);
+    cell.value = c.header;
+    cell.font = { bold: true, size: 10.5, color: { argb: WHITE } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BLACK } };
+    cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+    cell.border = borderAll;
+  });
+
+  for (const dataRow of doc.rows) {
+    next();
+    const row = ws.getRow(r);
+    row.height = 16;
+    // Section band: ["", "▸ Title", ...] → merge across, light fill, bold.
+    const isBand = (dataRow[0] === "" || dataRow[0] == null) && typeof dataRow[1] === "string" && String(dataRow[1]).trim().startsWith("▸");
+    if (isBand) {
+      ws.mergeCells(`A${r}:${lastColLetter}${r}`);
+      const cell = ws.getCell(`A${r}`);
+      cell.value = stripHtml(dataRow[1]);
+      cell.font = { bold: true, size: 10, color: { argb: INK } };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF0F0F0" } };
+      cell.alignment = { vertical: "middle", horizontal: "left" };
+      cell.border = borderAll;
+      continue;
+    }
+    doc.columns.forEach((col, i) => {
+      const cell = row.getCell(i + 1);
+      const raw = dataRow[i];
+      cell.border = borderAll;
+      if (col.money) {
+        cell.value = money(raw);
+        cell.numFmt = "#,##0.00";
+        cell.alignment = { vertical: "middle", horizontal: "right" };
+        cell.font = { size: 10.5, color: { argb: INK } };
+      } else if (typeof raw === "number") {
+        cell.value = raw;
+        cell.alignment = { vertical: "middle", horizontal: col.align === "center" ? "center" : "right" };
+        cell.font = { size: 10.5, color: { argb: INK } };
+      } else {
+        cell.value = stripHtml(raw);
+        cell.alignment = { vertical: "middle", horizontal: col.align === "center" ? "center" : "left", wrapText: true };
+        cell.font = { size: 10.5, color: { argb: INK } };
+      }
+    });
+  }
+
+  next(); // spacer
+  ws.getRow(r).height = 6;
+
+  /* ── Totals block (right-aligned, last two columns) ── */
+  const labelColIdx = Math.max(1, nCols - 1);
+  const labelColLetter = String.fromCharCode(64 + labelColIdx);
+  const valueColLetter = lastColLetter;
+  for (const tot of doc.totals) {
+    next();
+    const row = ws.getRow(r);
+    row.height = 17;
+    if (labelColIdx > 1) ws.mergeCells(`A${r}:${String.fromCharCode(64 + labelColIdx - 1)}${r}`);
+    const lc = ws.getCell(`${labelColLetter}${r}`);
+    const vc = ws.getCell(`${valueColLetter}${r}`);
+    lc.value = tot.label;
+    vc.value = money(tot.value);
+    vc.numFmt = "#,##0.00";
+    lc.alignment = { vertical: "middle", horizontal: "right" };
+    vc.alignment = { vertical: "middle", horizontal: "right" };
+    if (tot.strong) {
+      lc.font = { bold: true, size: 11.5, color: { argb: WHITE } };
+      vc.font = { bold: true, size: 11.5, color: { argb: WHITE } };
+      lc.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BLACK } };
+      vc.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BLACK } };
+    } else {
+      lc.font = { bold: true, size: 10.5, color: { argb: "FF333333" } };
+      vc.font = { bold: true, size: 10.5, color: { argb: INK } };
+    }
+  }
+
+  /* ── Terms ── */
+  const termsText = stripHtml(doc.terms);
+  if (termsText) {
+    next();
+    ws.getRow(r).height = 8;
+    next();
+    ws.mergeCells(`A${r}:${lastColLetter}${r}`);
+    ws.getCell(`A${r}`).value = "TERMS & CONDITIONS";
+    ws.getCell(`A${r}`).font = { bold: true, size: 10, color: { argb: WHITE } };
+    ws.getCell(`A${r}`).fill = { type: "pattern", pattern: "solid", fgColor: { argb: BLACK } };
+    ws.getCell(`A${r}`).alignment = { vertical: "middle", horizontal: "left" };
+    next();
+    ws.mergeCells(`A${r}:${lastColLetter}${r}`);
+    ws.getCell(`A${r}`).value = termsText;
+    ws.getCell(`A${r}`).font = { size: 9.5, color: { argb: INK } };
+    ws.getCell(`A${r}`).alignment = { vertical: "top", horizontal: "left", wrapText: true };
+    ws.getRow(r).height = Math.min(160, 26 + Math.ceil(termsText.length / 90) * 13);
+    ws.getCell(`A${r}`).border = borderAll;
+  }
+
+  /* ── Footer ── */
+  next();
+  ws.getRow(r).height = 6;
+  next();
+  ws.mergeCells(`A${r}:${lastColLetter}${r}`);
+  ws.getCell(`A${r}`).value = `${COMPANY.legal}  ·  ${COMPANY.tagline}`;
+  ws.getCell(`A${r}`).font = { size: 8, italic: true, color: { argb: GRAY } };
+  ws.getCell(`A${r}`).alignment = { vertical: "middle", horizontal: "center" };
+
+  // Write + download.
+  const out = await wb.xlsx.writeBuffer();
+  const blob = new Blob([out], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename.toLowerCase().endsWith(".xlsx") ? filename : `${filename}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }

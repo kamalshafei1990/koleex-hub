@@ -1509,6 +1509,7 @@ export default function Quotations() {
       ],
       rows,
       totals,
+      terms: q.terms,
     });
   }, [current]);
 

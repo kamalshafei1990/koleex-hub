@@ -462,6 +462,7 @@ function InvoiceDetailView({
       ],
       rows,
       totals,
+      terms: inv.terms ?? inv.notes ?? undefined,
     });
   };
 
