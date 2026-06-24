@@ -1207,8 +1207,10 @@ export default function Quotations() {
 
     const rows: (string | number | null)[][] = q.items.map((it, idx) => {
       const lineTotal = money((Number(it.unitPrice) || 0) * (Number(it.qty) || 0));
-      return [idx + 1, it.description || "", it.model || "", Number(it.qty) || 0, money(it.unitPrice), lineTotal];
+      // Column order matches the document: NO. · ITEM · MODEL · PICTURE · UNIT PRICE · QTY · TOTAL
+      return [idx + 1, it.description || "", it.model || "", "", money(it.unitPrice), Number(it.qty) || 0, lineTotal];
     });
+    const images: (string | null)[] = q.items.map((it) => it.image || null);
 
     const totals = [
       { label: "Subtotal", value: subtotal },
@@ -1246,13 +1248,15 @@ export default function Quotations() {
       toLines,
       columns: [
         { header: "NO.", width: 5, align: "center" },
-        { header: "ITEM", width: 46 },
-        { header: "MODEL", width: 18 },
-        { header: "QTY", width: 8, align: "center" },
-        { header: `UNIT PRICE (${incoterm ? incoterm + ", " : ""}${cur})`, width: 16, money: true },
-        { header: `TOTAL (${cur})`, width: 16, money: true },
+        { header: "ITEM", width: 40 },
+        { header: "MODEL", width: 16 },
+        { header: "PICTURE", width: 12, align: "center", image: true },
+        { header: `UNIT PRICE (${incoterm ? incoterm + ", " : ""}${cur})`, width: 15, money: true },
+        { header: "QTY", width: 7, align: "center" },
+        { header: `TOTAL (${cur})`, width: 15, money: true },
       ],
       rows,
+      images,
       totals,
       terms: q.terms,
     });

@@ -15,6 +15,8 @@ export interface DocColumn {
   /** Render as money: number, right-aligned, #,##0.00. */
   money?: boolean;
   align?: "left" | "right" | "center";
+  /** Picture column — cell value is an image URL embedded as a real image. */
+  image?: boolean;
 }
 
 export interface DocTotal {
@@ -36,6 +38,8 @@ export interface DocExport {
   columns: DocColumn[];
   /** Item rows, each aligned to `columns`. */
   rows: (string | number | null)[][];
+  /** Optional per-row product image URLs (aligned with `rows`), embedded in the picture column. */
+  images?: (string | null | undefined)[];
   totals: DocTotal[];
   /** Optional free-text terms block (rendered at the bottom, HTML-stripped). */
   terms?: string;
@@ -149,6 +153,27 @@ async function loadLogoBase64(): Promise<string | null> {
     });
     URL.revokeObjectURL(url);
     return base64;
+  } catch {
+    return null;
+  }
+}
+
+/** Fetch a product image URL → { base64, ext } for embedding. null on failure. */
+async function fetchImageBase64(url: string): Promise<{ base64: string; ext: "png" | "jpeg" | "gif" } | null> {
+  try {
+    if (!url || !/^https?:|^\//.test(url)) return null;
+    const res = await fetch(url, { mode: "cors", cache: "force-cache" });
+    if (!res.ok) return null;
+    const ct = (res.headers.get("content-type") || "").toLowerCase();
+    let ext: "png" | "jpeg" | "gif" = "png";
+    if (/jpe?g/.test(ct) || /\.jpe?g(\?|$)/i.test(url)) ext = "jpeg";
+    else if (/gif/.test(ct) || /\.gif(\?|$)/i.test(url)) ext = "gif";
+    else ext = "png";
+    const buf = await res.arrayBuffer();
+    let bin = "";
+    const bytes = new Uint8Array(buf);
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return { base64: btoa(bin), ext };
   } catch {
     return null;
   }
@@ -310,19 +335,32 @@ export async function downloadDocXlsx(filename: string, doc: DocExport): Promise
     cell.border = borderAll;
   });
 
-  for (const dataRow of doc.rows) {
+  // Pre-fetch the per-row product images (in parallel) and register them.
+  const picCol = doc.columns.findIndex((c) => c.image);
+  const imageIds: (number | null)[] = [];
+  if (picCol >= 0 && doc.images && doc.images.length) {
+    const fetched = await Promise.all(
+      doc.images.map((u) => (u ? fetchImageBase64(u) : Promise.resolve(null))),
+    );
+    fetched.forEach((f, idx) => {
+      imageIds[idx] = f ? wb.addImage({ base64: f.base64, extension: f.ext }) : null;
+    });
+  }
+
+  doc.rows.forEach((dataRow, rowIdx) => {
     r += 1;
     const row = ws.getRow(r);
     let maxLines = 1;
     doc.columns.forEach((col, i) => {
-      if (col.money) return;
+      if (col.money || col.image) return;
       const raw = dataRow[i];
       if (typeof raw === "string") {
         const t = stripHtml(raw);
         maxLines = Math.max(maxLines, Math.ceil(t.length / Math.max(8, Math.floor(col.width * 1.05))));
       }
     });
-    row.height = Math.min(70, Math.max(16, maxLines * 13 + 2));
+    const hasImage = picCol >= 0 && imageIds[rowIdx] != null;
+    row.height = Math.min(80, Math.max(hasImage ? 52 : 16, maxLines * 13 + 2));
     const isBand = (dataRow[0] === "" || dataRow[0] == null) && typeof dataRow[1] === "string" && String(dataRow[1]).trim().startsWith("▸");
     if (isBand) {
       ws.mergeCells(`A${r}:${LAST}${r}`);
@@ -332,12 +370,17 @@ export async function downloadDocXlsx(filename: string, doc: DocExport): Promise
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: SOFT } };
       cell.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
       cell.border = borderAll;
-      continue;
+      return;
     }
     doc.columns.forEach((col, i) => {
       const cell = row.getCell(i + 1);
       const raw = dataRow[i];
       cell.border = borderAll;
+      if (col.image) {
+        // Picture cell — keep empty; the image floats over it.
+        cell.alignment = { vertical: "middle", horizontal: "center" };
+        return;
+      }
       if (col.money) {
         cell.value = money(raw);
         cell.numFmt = "#,##0.00";
@@ -353,7 +396,20 @@ export async function downloadDocXlsx(filename: string, doc: DocExport): Promise
         cell.font = { size: 10.5, color: { argb: INK } };
       }
     });
-  }
+    // Float the product image over its cell, centered.
+    if (hasImage) {
+      const id = imageIds[rowIdx] as number;
+      const colPx = Math.max(40, doc.columns[picCol].width * 7);
+      const w = Math.min(64, colPx - 10);
+      const h = 44;
+      const xOffset = (colPx - w) / 2 / colPx; // centre horizontally within the column
+      ws.addImage(id, {
+        tl: { col: picCol + Math.max(0.05, xOffset), row: r - 1 + 0.08 },
+        ext: { width: w, height: h },
+        editAs: "oneCell",
+      });
+    }
+  });
 
   r += 1;
   ws.getRow(r).height = 6;

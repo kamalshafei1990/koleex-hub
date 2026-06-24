@@ -1466,15 +1466,19 @@ export default function Quotations() {
     const grand = +(base * (1 - discPct / 100)).toFixed(2);
 
     const rows: (string | number | null)[][] = [];
+    const images: (string | null)[] = [];
     let n = 0;
     for (const it of q.items) {
       if (it.kind === "header") {
-        rows.push(["", `▸ ${it.description || ""}`, "", "", "", ""]);
+        rows.push(["", `▸ ${it.description || ""}`, "", "", "", "", ""]);
+        images.push(null);
         continue;
       }
       n += 1;
       const lineTotal = money((Number(it.unitPrice) || 0) * (Number(it.qty) || 0));
-      rows.push([n, it.description || "", it.model || "", Number(it.qty) || 0, money(it.unitPrice), lineTotal]);
+      // Column order matches the document: NO. · ITEM · MODEL · PICTURE · UNIT PRICE · QTY · TOTAL
+      rows.push([n, it.description || "", it.model || "", "", money(it.unitPrice), Number(it.qty) || 0, lineTotal]);
+      images.push(it.image || null);
     }
 
     const totals = [
@@ -1513,13 +1517,15 @@ export default function Quotations() {
       toLines,
       columns: [
         { header: "NO.", width: 5, align: "center" },
-        { header: "ITEM", width: 46 },
-        { header: "MODEL", width: 18 },
-        { header: "QTY", width: 8, align: "center" },
-        { header: `UNIT PRICE (${incoterm ? incoterm + ", " : ""}${cur})`, width: 16, money: true },
-        { header: `TOTAL (${cur})`, width: 16, money: true },
+        { header: "ITEM", width: 40 },
+        { header: "MODEL", width: 16 },
+        { header: "PICTURE", width: 12, align: "center", image: true },
+        { header: `UNIT PRICE (${incoterm ? incoterm + ", " : ""}${cur})`, width: 15, money: true },
+        { header: "QTY", width: 7, align: "center" },
+        { header: `TOTAL (${cur})`, width: 15, money: true },
       ],
       rows,
+      images,
       totals,
       terms: q.terms,
     });
