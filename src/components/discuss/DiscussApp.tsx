@@ -1693,14 +1693,24 @@ export default function DiscussApp() {
                 <p className="text-[11px] text-[var(--text-dim)] max-w-[220px]">
                   {t("sidebar.emptyHint")}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setNewChannelOpen(true)}
-                  className="mt-1 h-8 px-3 rounded-lg bg-blue-500/15 text-blue-300 text-[11.5px] font-semibold flex items-center gap-1.5 hover:bg-blue-500/25 transition-colors"
-                >
-                  <PlusIcon className="h-3.5 w-3.5" />
-                  {t("sidebar.newChannel")}
-                </button>
+                <div className="mt-1 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewChannelOpen(true)}
+                    className="h-8 px-3 rounded-lg bg-blue-500/15 text-blue-300 text-[11.5px] font-semibold flex items-center gap-1.5 hover:bg-blue-500/25 transition-colors"
+                  >
+                    <PlusIcon className="h-3.5 w-3.5" />
+                    {t("sidebar.newChannel")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewDmOpen(true)}
+                    className="h-8 px-3 rounded-lg border border-[var(--border-subtle)] text-[var(--text-muted)] text-[11.5px] font-semibold flex items-center gap-1.5 hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] transition-colors"
+                  >
+                    <AtSignIcon className="h-3.5 w-3.5" />
+                    {t("sidebar.newDirect")}
+                  </button>
+                </div>
               </div>
             ) : (
               <>
@@ -1721,11 +1731,25 @@ export default function DiscussApp() {
                     </ul>
                   </div>
                 )}
-                {groupedChannels.dms.length > 0 && (
-                  <div>
-                    <div className="px-4 pt-3 pb-1 text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
+                {/* Directs — header always carries a "+ New" so a 1-to-1 DM is
+                    reachable on every screen (the header button is desktop-only,
+                    and this list IS the mobile view). */}
+                <div>
+                  <div className="px-4 pt-3 pb-1 flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
                       {t("sidebar.directs")}
-                    </div>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setNewDmOpen(true)}
+                      title={t("sidebar.newDirect")}
+                      aria-label={t("sidebar.newDirect")}
+                      className="h-6 w-6 -me-1 inline-flex items-center justify-center rounded-md text-[var(--text-dim)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] transition-colors"
+                    >
+                      <PlusIcon className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  {groupedChannels.dms.length > 0 ? (
                     <ul>
                       {groupedChannels.dms.map((c) => (
                         <ChannelRow
@@ -1736,8 +1760,17 @@ export default function DiscussApp() {
                         />
                       ))}
                     </ul>
-                  </div>
-                )}
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setNewDmOpen(true)}
+                      className="mx-2 mb-1 w-[calc(100%-1rem)] h-9 px-3 rounded-lg flex items-center gap-2 text-[12px] font-medium text-[var(--text-dim)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] transition-colors"
+                    >
+                      <AtSignIcon className="h-3.5 w-3.5" />
+                      {t("sidebar.newDirect")}
+                    </button>
+                  )}
+                </div>
               </>
             )}
           </div>

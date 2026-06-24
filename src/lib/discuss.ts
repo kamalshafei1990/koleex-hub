@@ -1946,6 +1946,28 @@ export async function fetchMessageableAccounts(): Promise<
     role_name: string | null;
   }>
 > {
+  /* API-first: accounts/people/roles are service-role-only (P0 lockdown), so the
+     anon query below returns nothing for normal users. The server route resolves
+     the tenant-scoped list with the service role. Fall back to the anon query
+     only if the endpoint is unavailable. */
+  try {
+    const res = await fetch("/api/discuss/recipients", { credentials: "include" });
+    if (res.ok) {
+      const json = (await res.json()) as {
+        recipients?: Array<{
+          id: string;
+          username: string;
+          full_name: string | null;
+          avatar_url: string | null;
+          role_name: string | null;
+        }>;
+      };
+      if (Array.isArray(json.recipients)) return json.recipients;
+    }
+  } catch {
+    /* network error → fall through to anon query */
+  }
+
   const { data, error } = await supabase
     .from("accounts")
     .select(
