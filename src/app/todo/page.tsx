@@ -286,7 +286,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
   const lbl = "block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5";
 
   return (
-    <ScrollLockOverlay className="fixed inset-0 z-50 flex items-start justify-center p-3 md:p-4 pt-[3vh] md:pt-[5vh] overflow-y-auto bg-black/60 backdrop-blur-sm">
+    <ScrollLockOverlay className="fixed inset-0 z-50 flex items-start justify-center p-3 md:p-4 pt-20 md:pt-24 pb-6 overflow-y-auto bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-xl rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl overflow-hidden mb-10 max-h-[94vh] md:max-h-none flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)]">
