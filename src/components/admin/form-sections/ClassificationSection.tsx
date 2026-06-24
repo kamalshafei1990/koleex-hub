@@ -8,6 +8,7 @@ import CheckIcon from "@/components/icons/ui/CheckIcon";
 import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
 import FolderTreeIcon from "@/components/icons/ui/FolderTreeIcon";
+import StandTableIcon from "@/components/icons/ui/StandTableIcon";
 import TagsIcon from "@/components/icons/ui/TagsIcon";
 import Image from "next/image";
 import { getDivisionIcon } from "@/components/icons/divisions";
@@ -354,6 +355,8 @@ export default function ClassificationSection({
                       <MonoIcon src={ovr} className="h-10 w-10 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]" />
                     ) : logo ? (
                       <Image src={logo} alt={cat.name} width={48} height={48} className="h-12 w-12 object-contain" unoptimized />
+                    ) : /stand|table/i.test(`${cat.slug} ${cat.name}`) ? (
+                      <StandTableIcon className="h-10 w-10 text-[var(--text-ghost)]" />
                     ) : (
                       <FolderTreeIcon className="h-10 w-10 text-[var(--text-ghost)]" />
                     )}
