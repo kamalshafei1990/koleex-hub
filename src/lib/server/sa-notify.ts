@@ -15,6 +15,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { sendPushToAccounts } from "@/lib/server/web-push";
 
 export type AlertKind =
   | "login"
@@ -108,6 +109,24 @@ export async function notifySuperAdmins(alert: SaAlert): Promise<void> {
       }));
     if (rows.length === 0) return;
     await supabaseServer.from("inbox_messages").insert(rows);
+
+    // Also deliver as a Web Push to those recipients' devices (iPhone lock
+    // screen / Notification Center, even when the app is closed). Best-effort;
+    // no-op if VAPID keys aren't configured. Recipients = same in-app set.
+    const pushTargets = recipients.filter((id) => !off.has(id));
+    if (pushTargets.length) {
+      await sendPushToAccounts(
+        pushTargets,
+        {
+          title: "Koleex Hub",
+          body: alert.subject,
+          url: alert.link ?? "/super-admin/activity",
+          tag: alert.kind,
+          kind: alert.kind,
+        },
+        { actorAccountId: alert.actorAccountId },
+      );
+    }
   } catch (e) {
     console.error("[sa-notify.notifySuperAdmins]", e instanceof Error ? e.message : e);
   }

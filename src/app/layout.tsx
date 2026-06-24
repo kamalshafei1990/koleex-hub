@@ -13,6 +13,16 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "KOLEEX — Enterprise Platform",
   description: "Koleex ERP — Manage products, operations, and more",
+  /* Links /manifest.webmanifest → installable PWA (required for iOS Web Push). */
+  manifest: "/manifest.webmanifest",
+  applicationName: "Koleex Hub",
+  /* iOS standalone mode: open from the Home Screen icon as a full-screen app
+     (also a prerequisite for iOS 16.4+ Web Push). */
+  appleWebApp: {
+    capable: true,
+    title: "Koleex Hub",
+    statusBarStyle: "black-translucent",
+  },
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },

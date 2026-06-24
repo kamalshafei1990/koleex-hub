@@ -19,6 +19,7 @@ import ScrollToEdges from "@/components/ui/ScrollToEdges";
 import { Suspense } from "react";
 import QaFocusHighlight from "@/components/qa/QaFocusHighlight";
 import ActivityTracker from "@/components/activity/ActivityTracker";
+import ServiceWorkerRegistrar from "@/components/pwa/ServiceWorkerRegistrar";
 import { QAInspectorProvider } from "@/lib/qa/inspector";
 import {
   SidebarProvider,
@@ -96,6 +97,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       <Suspense fallback={null}><QaFocusHighlight /></Suspense>
       {/* Headless presence heartbeat + page tracking (Super Admin monitoring). */}
       <ActivityTracker />
+      {/* Registers the push service worker (PWA / Web Push). */}
+      <ServiceWorkerRegistrar />
     </QAInspectorProvider>
   );
 }

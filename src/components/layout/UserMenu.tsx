@@ -33,6 +33,7 @@ import Settings2Icon from "@/components/icons/ui/Settings2Icon";
 import { useInboxUnread } from "@/lib/inbox-unread-store";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import ActivityIcon from "@/components/icons/ui/ActivityIcon";
+import BellRawIcon from "@/components/icons/ui/BellIcon";
 import {
   getCurrentUser,
   isSupabaseAuthEnabled,
@@ -444,6 +445,23 @@ export default function UserMenu({ dk }: { dk: boolean }) {
                   >
                     <ActivityIcon className="h-4 w-4" />
                     <span className="flex-1 text-start">Activity Monitor</span>
+                  </button>
+                )}
+                {isSuperAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpen(false);
+                      router.push("/settings/notifications");
+                    }}
+                    className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium transition-colors ${
+                      dk
+                        ? "text-white/80 hover:text-white hover:bg-white/[0.04]"
+                        : "text-black/80 hover:text-black hover:bg-black/[0.04]"
+                    }`}
+                  >
+                    <BellRawIcon className="h-4 w-4" />
+                    <span className="flex-1 text-start">Mobile Notifications</span>
                   </button>
                 )}
                 <div className={`my-1 border-t ${dk ? "border-white/[0.06]" : "border-black/[0.06]"}`} />
