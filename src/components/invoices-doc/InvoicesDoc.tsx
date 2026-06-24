@@ -10,7 +10,7 @@ import PrintIcon from "@/components/icons/ui/PrintIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import TableIcon from "@/components/icons/ui/TableIcon";
-import { downloadDocXlsx, money } from "@/lib/excel-export";
+import { downloadDocXlsx, downloadDocSnapshotXlsx, money } from "@/lib/excel-export";
 import CopyIcon from "@/components/icons/ui/CopyIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
@@ -1196,6 +1196,20 @@ export default function Quotations() {
      items, and totals (matching computeGrandTotal). Numbers stay numeric. */
   const handleExportExcel = useCallback(async () => {
     if (!current) return;
+    // Pixel-perfect first: save, then capture the real print page into the .xlsx
+    // so it looks EXACTLY like the document. Fall back to the structured sheet.
+    const snapBase = `invoice-${(current.invoiceNo || current.id).replace(/[^\w-]+/g, "_")}`;
+    try {
+      let id = current.id;
+      const saved = await saveInvoiceRemote({ ...current, updatedAt: new Date().toISOString() });
+      if (saved && saved.id.length === 36) { id = saved.id; setCurrent(saved); }
+      if (id && id.length === 36) {
+        await downloadDocSnapshotXlsx(snapBase, `/invoices/${encodeURIComponent(id)}/print`);
+        return;
+      }
+    } catch {
+      /* fall through to the structured cell-based sheet */
+    }
     const q = current;
     const cur = q.currency || "USD";
     const subtotal = q.items.reduce((s, i) => s + (Number(i.unitPrice) || 0) * (Number(i.qty) || 0), 0);

@@ -78,6 +78,7 @@
     "@types/papaparse": "^5.5.2",
     "country-state-city": "^3.2.1",
     "exceljs": "^4.4.0",
+    "html2canvas": "^1.4.1",
     "html2canvas-pro": "^2.0.4",
     "jsbarcode": "^3.12.3",
     "lottie-react": "^2.4.1",
