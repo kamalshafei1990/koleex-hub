@@ -27,6 +27,7 @@ import {
   type WouldBlockResult,
 } from "@/lib/server/rate-limit";
 import { recordSessionShadow } from "@/lib/server/session-shadow";
+import { requestMeta, logActivity } from "@/lib/server/activity";
 
 export async function POST(req: Request) {
   // Outer try/catch so an unexpected throw (missing env var, DB outage,
@@ -199,6 +200,20 @@ export async function POST(req: Request) {
       accountId: account.id,
       accountStatus: account.status,
       req,
+    }).catch(() => undefined);
+
+    /* Super Admin activity monitoring — record the login in the activity feed.
+       Best-effort + awaited (Vercel freezes the lambda after the response);
+       logActivity self-guards so it can never block a successful login. The
+       client's first heartbeat will register the device with its real id. */
+    await logActivity({
+      account_id: account.id,
+      tenant_id: account.tenant_id,
+      event_type: "login",
+      module: "Auth",
+      title: "Signed in",
+      meta: requestMeta(req),
+      metadata: { via: "password" },
     }).catch(() => undefined);
 
     return NextResponse.json({

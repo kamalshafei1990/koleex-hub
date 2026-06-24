@@ -18,6 +18,7 @@ import ReportIssueButton from "@/components/qa/ReportIssueButton";
 import ScrollToEdges from "@/components/ui/ScrollToEdges";
 import { Suspense } from "react";
 import QaFocusHighlight from "@/components/qa/QaFocusHighlight";
+import ActivityTracker from "@/components/activity/ActivityTracker";
 import { QAInspectorProvider } from "@/lib/qa/inspector";
 import {
   SidebarProvider,
@@ -93,6 +94,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       {/* QA Open Route highlighter — reads ?qa_focus=… and outlines the
           picked component on arrival (issue dc295123 follow-up). */}
       <Suspense fallback={null}><QaFocusHighlight /></Suspense>
+      {/* Headless presence heartbeat + page tracking (Super Admin monitoring). */}
+      <ActivityTracker />
     </QAInspectorProvider>
   );
 }
