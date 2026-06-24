@@ -36,6 +36,7 @@ import { usePermittedModules } from "@/lib/use-scope";
 import { getMeBootstrapLastError, retryMeBootstrap } from "@/lib/me-bootstrap";
 import { useShortcutHint } from "@/lib/ui/use-shortcut-hint";
 import { fetchMyChannels, subscribeToMyChannels } from "@/lib/discuss";
+import { fetchUnreadTaskCount, subscribeToInboxMessages } from "@/lib/inbox";
 
 const PRIMARY_CATS = ["operations", "commercial", "people", "communication", "system"];
 
@@ -228,6 +229,12 @@ export default function HomePage() {
      subscribeToMyChannels + the "discuss:unread-changed" event) so the
      home badge stays in lock-step with the bell and the in-app sidebar. */
   const [discussUnread, setDiscussUnread] = useState(0);
+  /* Unread task assignments → notification badge on the To-do app tile.
+     Sourced from inbox_messages (category "task") which the todo
+     assignment fan-out writes, so the count = "tasks assigned to me I
+     haven't read". Kept live via inbox realtime + the inbox recount
+     event + a slow poll, mirroring the Discuss badge below. */
+  const [todoUnread, setTodoUnread] = useState(0);
 
   useEffect(() => {
     const id = getCurrentAccountIdSync();
@@ -281,6 +288,46 @@ export default function HomePage() {
       cancelled = true;
       unsubscribe();
       window.removeEventListener("discuss:unread-changed", onUnreadChanged);
+      window.clearInterval(poll);
+    };
+  }, [account?.id]);
+
+  /* ── To-do unread badge ──
+     Count unread task-assignment inbox messages, kept live via the inbox
+     realtime INSERT stream (recount only when a new TASK arrives), the
+     shared "inbox:force-recount" event (fired when a task is read/edited),
+     and a slow visible-tab poll. */
+  useEffect(() => {
+    const id = account?.id ?? getCurrentAccountIdSync();
+    if (!id) return;
+    let cancelled = false;
+
+    const recount = async () => {
+      try {
+        const n = await fetchUnreadTaskCount(id);
+        if (!cancelled) setTodoUnread(n);
+      } catch {
+        /* keep prior count on transient failure */
+      }
+    };
+
+    void recount();
+
+    const unsubscribe = subscribeToInboxMessages(id, (msg) => {
+      if (msg.category === "task") void recount();
+    });
+
+    const onRecount = () => void recount();
+    window.addEventListener("inbox:force-recount", onRecount);
+
+    const poll = window.setInterval(() => {
+      if (document.visibilityState === "visible") void recount();
+    }, 60_000);
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+      window.removeEventListener("inbox:force-recount", onRecount);
       window.clearInterval(poll);
     };
   }, [account?.id]);
@@ -430,9 +477,11 @@ export default function HomePage() {
        of the tile. getAppBadge auto-expires after APP_BADGE_TTL_MS
        (3 days) so dev sets newSince / updatedSince once and forgets. */
     const badge = getAppBadge(app);
-    /* Per-app live notification count. Today only Discuss feeds it;
-       other apps fall through to 0 (no badge). */
-    const appUnread = app.id === "discuss" ? discussUnread : 0;
+    /* Per-app live notification count. Discuss = unread messages,
+       To-do = unread task assignments; other apps fall through to 0. */
+    const appUnread =
+      app.id === "discuss" ? discussUnread : app.id === "todo" ? todoUnread : 0;
+    const appUnreadNoun = app.id === "todo" ? "task" : "message";
 
     return (
       <div
@@ -520,7 +569,7 @@ export default function HomePage() {
               <span
                 className={`absolute -top-2 -end-2.5 z-10 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full bg-[#FF3333] text-white text-[10px] font-bold leading-none ring-2 ${dk ? "ring-[#111]" : "ring-white"} pointer-events-none select-none`}
                 aria-label={`${appUnread} unread`}
-                title={`${appUnread} unread message${appUnread === 1 ? "" : "s"}`}
+                title={`${appUnread} unread ${appUnreadNoun}${appUnread === 1 ? "" : "s"}`}
               >
                 {appUnread > 99 ? "99+" : appUnread}
               </span>

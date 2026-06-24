@@ -80,6 +80,16 @@ export async function PATCH(
   }
 
   if (body.newAssigneeIds !== undefined) {
+    /* Capture the prior assignee set BEFORE resyncing so we can notify only
+       the people who are newly added (not everyone, every edit). */
+    const { data: priorRows } = await supabaseServer
+      .from("koleex_todo_assignees")
+      .select("account_id")
+      .eq("todo_id", id);
+    const priorIds = new Set(
+      (priorRows ?? []).map((r) => (r as { account_id: string }).account_id),
+    );
+
     await supabaseServer
       .from("koleex_todo_assignees")
       .delete()
@@ -91,6 +101,34 @@ export async function PATCH(
           account_id: accountId,
         })),
       );
+    }
+
+    /* Fan out inbox notifications to newly-added assignees (excluding self),
+       mirroring the POST create fan-out so assigning via edit also notifies. */
+    const addedIds = body.newAssigneeIds.filter(
+      (aid) => aid !== auth.account_id && !priorIds.has(aid),
+    );
+    if (addedIds.length > 0) {
+      const { data: t } = await supabaseServer
+        .from("koleex_todos")
+        .select("title, description, priority")
+        .eq("id", id)
+        .maybeSingle();
+      const td = (t as { title?: string; description?: string | null; priority?: string } | null) ?? {};
+      const notifs = addedIds.map((recipientId) => ({
+        recipient_account_id: recipientId,
+        sender_account_id: auth.account_id,
+        category: "task",
+        subject: `New task: ${td.title ?? "Task"}`,
+        body: td.description || td.title || "You have a new task.",
+        link: `/todo?task=${id}`,
+        metadata: {
+          type: "todo_assignment",
+          todo_id: id,
+          priority: td.priority ?? "medium",
+        },
+      }));
+      await supabaseServer.from("inbox_messages").insert(notifs);
     }
   }
 

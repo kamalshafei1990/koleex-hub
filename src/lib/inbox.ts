@@ -298,6 +298,27 @@ export async function fetchUnreadCount(accountId: string): Promise<number> {
   return count ?? 0;
 }
 
+/** Count unread (not archived) inbox messages of category `task` for one
+    account. Feeds the To-do app-tile notification badge on the home page —
+    these rows are created by the todo assignment fan-out (POST/PATCH
+    /api/todos), so the count = "task assignments I haven't read yet". */
+export async function fetchUnreadTaskCount(accountId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from(INBOX)
+    .select("*", { count: "exact", head: true })
+    .eq("recipient_account_id", accountId)
+    .eq("category", "task")
+    .is("read_at", null)
+    .is("archived_at", null);
+  if (error) {
+    if (!isMissingTable(error.message) && !isTransientFetch(error.message)) {
+      console.error("[Inbox] Unread task count:", error.message);
+    }
+    return 0;
+  }
+  return count ?? 0;
+}
+
 export async function markMessageRead(id: string): Promise<boolean> {
   const { error } = await supabase
     .from(INBOX)
