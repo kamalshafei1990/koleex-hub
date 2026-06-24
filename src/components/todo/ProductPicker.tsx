@@ -108,7 +108,7 @@ export default function ProductPicker({
     "h-9 px-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center p-3 md:p-4 pt-[4vh] bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-start justify-center p-3 md:p-4 pt-20 md:pt-24 pb-6 bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
         className="w-full max-w-3xl max-h-[88vh] flex flex-col rounded-2xl bg-[var(--bg-elevated,var(--bg-primary))] border border-[var(--border-subtle)] shadow-[0_24px_80px_rgba(0,0,0,0.55)]"
         onClick={(e) => e.stopPropagation()}
