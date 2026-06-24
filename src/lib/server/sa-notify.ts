@@ -42,6 +42,31 @@ export interface SaAlert {
   metadata?: Record<string, unknown>;
 }
 
+/** Send a Web Push to every Super Admin's devices (no in-app row). The actor is
+ *  excluded. Thin convenience wrapper around sendPushToAccounts() — note that
+ *  notifySuperAdmins() already does both in-app + push with per-recipient
+ *  preference filtering; use this only when you want push-only delivery. */
+export async function sendPushToSuperAdmins(alert: SaAlert): Promise<void> {
+  try {
+    const admins = await superAdminAccountIds(alert.tenantId);
+    const targets = admins.filter((id) => id !== alert.actorAccountId);
+    if (targets.length === 0) return;
+    await sendPushToAccounts(
+      targets,
+      {
+        title: "Koleex Hub",
+        body: alert.subject,
+        url: alert.link ?? "/super-admin/activity",
+        tag: alert.kind,
+        kind: alert.kind,
+      },
+      { actorAccountId: alert.actorAccountId },
+    );
+  } catch (e) {
+    console.error("[sa-notify.sendPushToSuperAdmins]", e instanceof Error ? e.message : e);
+  }
+}
+
 /** Effective Super-Admin account ids in a tenant (account flag OR role flag). */
 export async function superAdminAccountIds(tenantId?: string | null): Promise<string[]> {
   let q = supabaseServer

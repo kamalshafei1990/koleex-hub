@@ -98,8 +98,8 @@ export async function unsubscribeCurrent(): Promise<void> {
     const reg = await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.getSubscription();
     if (sub) {
-      await fetch("/api/push/devices", {
-        method: "DELETE",
+      await fetch("/api/push/unsubscribe", {
+        method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ endpoint: sub.endpoint }),
