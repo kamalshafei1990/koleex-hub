@@ -20,6 +20,7 @@ import {
   nativeImage,
   ipcMain,
   session,
+  shell,
   type IpcMainEvent,
 } from "electron";
 import path from "node:path";
@@ -32,8 +33,9 @@ import {
 } from "./config";
 import { applyContentsSecurity, applySessionSecurity } from "./security";
 import { getInitialBounds, track } from "./window-state";
-import { buildMenu, showAboutDialog } from "./menu";
-import { initAutoUpdates } from "./updater";
+import { buildMenu, showAboutDialog, type MenuActions } from "./menu";
+import { initAutoUpdates, checkForUpdatesManual } from "./updater";
+import { installCrashHandlers, logStartup, log, getLogsDir } from "./logger";
 import { IpcChannels, type AppInfo, type NotifyPayload } from "./ipc";
 
 const RES = path.join(__dirname, "..", "resources");
@@ -46,7 +48,41 @@ let splashWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 
+/* Offline auto-reconnect state. */
+let reconnectTimer: NodeJS.Timeout | null = null;
+let reconnectAttempts = 0;
+/* Guard against renderer-crash reload loops. */
+let crashReloads = 0;
+
 const getMainWindow = () => mainWindow;
+
+/* ── Native menu actions (wired into the menu) ──────────────────────────── */
+function restartApp(): void {
+  log("info", "user requested app restart");
+  isQuitting = true;
+  app.relaunch();
+  app.exit(0);
+}
+
+function openLogsFolder(): void {
+  const dir = getLogsDir();
+  if (dir) void shell.openPath(dir);
+}
+
+function openDownloadsFolder(): void {
+  try {
+    void shell.openPath(app.getPath("downloads"));
+  } catch {
+    /* no downloads dir on this platform — ignore */
+  }
+}
+
+const menuActions: MenuActions = {
+  checkForUpdates: () => checkForUpdatesManual(getMainWindow),
+  restart: restartApp,
+  openLogsFolder,
+  openDownloadsFolder,
+};
 
 /* ── Splash ──────────────────────────────────────────────────────────── */
 function createSplash(): void {
@@ -111,16 +147,45 @@ async function createMainWindow(): Promise<void> {
   mainWindow.once("ready-to-show", reveal);
   mainWindow.webContents.once("did-finish-load", reveal);
 
-  // Surface a minimal offline/error state if production can't be reached.
+  // A successful load clears any pending reconnect/backoff + crash counters.
+  mainWindow.webContents.on("did-finish-load", () => {
+    reconnectAttempts = 0;
+    crashReloads = 0;
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  });
+
+  // Offline / unreachable production → show a friendly screen and auto-retry
+  // with capped backoff (also reachable via the manual Retry link).
   mainWindow.webContents.on("did-fail-load", (_e, code, desc, validatedURL, isMainFrame) => {
     if (!isMainFrame || code === -3 /* ERR_ABORTED (benign) */) return;
+    log("warn", `did-fail-load ${code} ${desc} ${validatedURL}`);
+
+    reconnectAttempts += 1;
+    const delayMs = Math.min(30_000, 2_000 * reconnectAttempts);
+    const nextInSec = Math.round(delayMs / 1000);
+
     void mainWindow?.loadURL(
       "data:text/html;charset=utf-8," +
         encodeURIComponent(
-          `<body style="margin:0;background:#0A0A0A;color:#e5e5e5;font:14px -apple-system,Segoe UI,Roboto,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;text-align:center"><div><div style="font-size:18px;font-weight:600;margin-bottom:8px">Can't reach Koleex Hub</div><div style="color:#888">${desc || "Network error"} (${code})</div><div style="margin-top:6px;color:#666;font-size:12px">${validatedURL}</div><div style="margin-top:18px"><a href="#" onclick="location.replace('${APP_URL}')" style="color:#3385FF;text-decoration:none">Retry</a></div></div></body>`,
+          `<body style="margin:0;background:#0A0A0A;color:#e5e5e5;font:14px -apple-system,Segoe UI,Roboto,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;text-align:center"><div><div style="font-size:18px;font-weight:600;margin-bottom:8px">Can't reach Koleex Hub</div><div style="color:#888">${desc || "Network error"} (${code})</div><div style="margin-top:10px;color:#666;font-size:12px">Reconnecting in ${nextInSec}s…</div><div style="margin-top:18px"><a href="#" onclick="location.replace('${APP_URL}')" style="color:#3385FF;text-decoration:none">Retry now</a></div></div></body>`,
         ),
     );
     reveal();
+
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(() => {
+      if (mainWindow && !mainWindow.isDestroyed()) void mainWindow.loadURL(APP_URL);
+    }, delayMs);
+  });
+
+  // Crash-safe: if the renderer dies, log it and reload once (bounded) instead
+  // of leaving a blank window. A repeated crash falls back to the error screen.
+  mainWindow.webContents.on("render-process-gone", (_e, details) => {
+    log("error", "renderer gone — recovering", details);
+    if (crashReloads < 3 && mainWindow && !mainWindow.isDestroyed()) {
+      crashReloads += 1;
+      void mainWindow.loadURL(APP_URL);
+    }
   });
 
   // Minimize-to-tray (only when tray is enabled).
@@ -199,9 +264,12 @@ if (!gotLock) {
     app.setName(APP_NAME);
     if (process.platform === "win32") app.setAppUserModelId(APP_ID);
 
+    installCrashHandlers();
+    logStartup(APP_URL);
+
     applySessionSecurity(session.defaultSession);
     registerIpc();
-    Menu.setApplicationMenu(buildMenu(getMainWindow));
+    Menu.setApplicationMenu(buildMenu(getMainWindow, menuActions));
 
     createSplash();
     await createMainWindow();

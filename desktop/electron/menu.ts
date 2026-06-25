@@ -1,8 +1,9 @@
 /* ---------------------------------------------------------------------------
    Native application menu + About dialog.
 
-   A professional, minimal menu: app menu (macOS), Edit, View, Window, Help.
-   Developer tools are only present in dev. The About item shows app + runtime
+   App menu (macOS), File, Edit, View, Window, Tools, Help. Developer tools are
+   dev-only. Tools/Help expose production actions: Check for Updates, Restart,
+   Open Logs Folder, Open Downloads Folder. The About item shows app + runtime
    versions in a native dialog.
    --------------------------------------------------------------------------- */
 
@@ -15,6 +16,14 @@ import {
   type MenuItemConstructorOptions,
 } from "electron";
 import { APP_NAME, APP_URL, IS_DEV } from "./config";
+
+/** Callbacks wired by main.ts so the menu stays decoupled from app internals. */
+export interface MenuActions {
+  checkForUpdates: () => void;
+  restart: () => void;
+  openLogsFolder: () => void;
+  openDownloadsFolder: () => void;
+}
 
 export function showAboutDialog(win?: BrowserWindow): void {
   const v = process.versions;
@@ -32,7 +41,7 @@ export function showAboutDialog(win?: BrowserWindow): void {
   });
 }
 
-export function buildMenu(getWindow: () => BrowserWindow | null): Menu {
+export function buildMenu(getWindow: () => BrowserWindow | null, actions: MenuActions): Menu {
   const isMac = process.platform === "darwin";
 
   const appMenu: MenuItemConstructorOptions[] = isMac
@@ -41,6 +50,7 @@ export function buildMenu(getWindow: () => BrowserWindow | null): Menu {
           label: APP_NAME,
           submenu: [
             { label: `About ${APP_NAME}`, click: () => showAboutDialog(getWindow() ?? undefined) },
+            { label: "Check for Updates…", click: actions.checkForUpdates },
             { type: "separator" },
             { role: "services" },
             { type: "separator" },
@@ -85,6 +95,17 @@ export function buildMenu(getWindow: () => BrowserWindow | null): Menu {
       ],
     },
     { label: "View", submenu: viewSubmenu },
+    {
+      label: "Tools",
+      submenu: [
+        { label: "Check for Updates…", click: actions.checkForUpdates },
+        { type: "separator" },
+        { label: "Open Logs Folder", click: actions.openLogsFolder },
+        { label: "Open Downloads Folder", click: actions.openDownloadsFolder },
+        { type: "separator" },
+        { label: `Restart ${APP_NAME}`, click: actions.restart },
+      ],
+    },
     {
       label: "Window",
       submenu: isMac

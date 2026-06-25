@@ -1,59 +1,103 @@
 /* ---------------------------------------------------------------------------
-   Auto-update scaffold (electron-updater) — DISABLED by default.
+   Auto-update (electron-updater) — DISABLED by default; manual check wired.
 
-   IMPORTANT: This only updates the DESKTOP SHELL (the .exe/.dmg). The Koleex
-   Hub *content* always updates instantly via Vercel because the shell loads
-   the live production URL — that path needs no app update.
+   IMPORTANT: This only updates the DESKTOP SHELL (the .exe/.dmg). Koleex Hub
+   *content* always updates instantly via Vercel because the shell loads the
+   live production URL — that path needs no app update.
 
-   Shell auto-update is intentionally OFF this round because:
-     · It is unsafe without code signing (Windows SmartScreen / macOS Gatekeeper
-       will reject unsigned auto-updates), and we have no certificates yet.
-     · A publish provider (GitHub Releases recommended) must be configured in
-       electron-builder.yml (`publish:` is currently null).
-
-   To ENABLE later (after signing + publish are set up):
-     1. Set `publish:` in electron-builder.yml (GitHub or a generic server).
-     2. Provide signing certs (CSC_LINK / CSC_KEY_PASSWORD; Apple notarization).
-     3. Launch the app with KOLEEX_ENABLE_UPDATER=1 (or hardcode ENABLE_UPDATER).
-   The wiring below is ready; it no-ops safely until those are in place.
+   Shell auto-update stays OFF until:
+     1. `publish:` is configured in electron-builder.yml (GitHub Releases
+        recommended — see RELEASE.md).
+     2. Code signing is in place (unsigned auto-update is rejected by Windows
+        SmartScreen / macOS Gatekeeper).
+     3. The app is launched with KOLEEX_ENABLE_UPDATER=1.
+   Until then `initAutoUpdates` no-ops and the "Check for Updates" menu item
+   tells the user updates aren't configured yet (instead of failing silently).
    --------------------------------------------------------------------------- */
 
-import { app, type BrowserWindow } from "electron";
+import { app, dialog, type BrowserWindow } from "electron";
 import { ENABLE_UPDATER } from "./config";
 import { IpcChannels, type UpdateStatus } from "./ipc";
+import { log } from "./logger";
 
-export function initAutoUpdates(getWindow: () => BrowserWindow | null): void {
-  const send = (status: UpdateStatus) => {
-    const win = getWindow();
-    if (win && !win.isDestroyed()) win.webContents.send(IpcChannels.updateStatus, status);
-  };
+type AutoUpdater = import("electron-updater").AppUpdater;
 
-  // Never run in dev or when explicitly disabled (the default this round).
-  if (!app.isPackaged || !ENABLE_UPDATER) {
-    send({ state: "disabled" });
-    return;
-  }
+let cached: AutoUpdater | null = null;
 
-  // Lazy-require so the dependency is never loaded unless updates are enabled.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  let autoUpdater: import("electron-updater").AppUpdater;
+/** Lazily load electron-updater only when updates are actually enabled. */
+function loadUpdater(getWindow: () => BrowserWindow | null): AutoUpdater | null {
+  if (cached) return cached;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    autoUpdater = (require("electron-updater") as typeof import("electron-updater")).autoUpdater;
-  } catch {
-    send({ state: "disabled" });
+    const mod = require("electron-updater") as typeof import("electron-updater");
+    const au = mod.autoUpdater;
+    au.autoDownload = true;
+    au.autoInstallOnAppQuit = true;
+    au.logger = { info: (m: unknown) => log("info", `updater ${String(m)}`), warn: (m: unknown) => log("warn", `updater ${String(m)}`), error: (m: unknown) => log("error", `updater ${String(m)}`), debug: () => {} } as unknown as AutoUpdater["logger"];
+
+    const send = (status: UpdateStatus) => {
+      const win = getWindow();
+      if (win && !win.isDestroyed()) win.webContents.send(IpcChannels.updateStatus, status);
+    };
+    au.on("checking-for-update", () => send({ state: "checking" }));
+    au.on("update-available", (i) => { log("info", `update available ${i?.version}`); send({ state: "available", version: i?.version }); });
+    au.on("update-not-available", () => send({ state: "not-available" }));
+    au.on("download-progress", (p) => send({ state: "downloading", percent: p?.percent }));
+    au.on("update-downloaded", (i) => { log("info", `update downloaded ${i?.version}`); send({ state: "downloaded", version: i?.version }); });
+    au.on("error", (err) => { log("error", "updater error", err); send({ state: "error", message: err?.message }); });
+
+    cached = au;
+    return au;
+  } catch (e) {
+    log("warn", "electron-updater unavailable", e);
+    return null;
+  }
+}
+
+/** Background check on launch (only when fully enabled). */
+export function initAutoUpdates(getWindow: () => BrowserWindow | null): void {
+  if (!app.isPackaged || !ENABLE_UPDATER) {
+    log("info", `auto-update disabled (packaged=${app.isPackaged}, enabled=${ENABLE_UPDATER})`);
+    const win = getWindow();
+    if (win && !win.isDestroyed()) win.webContents.send(IpcChannels.updateStatus, { state: "disabled" } satisfies UpdateStatus);
+    return;
+  }
+  const au = loadUpdater(getWindow);
+  if (au) void au.checkForUpdatesAndNotify().catch((e) => log("error", "checkForUpdatesAndNotify failed", e));
+}
+
+/** Manual "Check for Updates" from the native menu — always gives feedback. */
+export function checkForUpdatesManual(getWindow: () => BrowserWindow | null): void {
+  const win = getWindow() ?? undefined;
+
+  if (!app.isPackaged || !ENABLE_UPDATER) {
+    void dialog.showMessageBox(win as BrowserWindow, {
+      type: "info",
+      title: "Check for Updates",
+      message: "You're on the latest version.",
+      detail:
+        "Koleex Hub itself updates automatically — the desktop app always loads " +
+        "the latest deployed version, so there's nothing to install.\n\n" +
+        "Automatic desktop-app updates will be enabled in a future release once " +
+        "code signing is configured.",
+      buttons: ["OK"],
+      noLink: true,
+    });
     return;
   }
 
-  autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
-
-  autoUpdater.on("checking-for-update", () => send({ state: "checking" }));
-  autoUpdater.on("update-available", (info) => send({ state: "available", version: info?.version }));
-  autoUpdater.on("update-not-available", () => send({ state: "not-available" }));
-  autoUpdater.on("download-progress", (p) => send({ state: "downloading", percent: p?.percent }));
-  autoUpdater.on("update-downloaded", (info) => send({ state: "downloaded", version: info?.version }));
-  autoUpdater.on("error", (err) => send({ state: "error", message: err?.message }));
-
-  void autoUpdater.checkForUpdatesAndNotify().catch(() => send({ state: "error" }));
+  const au = loadUpdater(getWindow);
+  if (!au) {
+    void dialog.showMessageBox(win as BrowserWindow, {
+      type: "warning",
+      title: "Check for Updates",
+      message: "Update service unavailable.",
+      detail: "Could not start the updater. Please try again later.",
+      buttons: ["OK"],
+      noLink: true,
+    });
+    return;
+  }
+  log("info", "manual update check requested");
+  void au.checkForUpdates().catch((e) => log("error", "manual checkForUpdates failed", e));
 }

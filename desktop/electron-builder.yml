@@ -1,6 +1,10 @@
 # electron-builder — Koleex Hub desktop packaging.
-# Produces unsigned local installers this round. Code signing + notarization +
-# auto-update publishing are wired as commented hooks (enable when certs exist).
+# Produces unsigned local installers. Code signing + notarization + auto-update
+# publishing are wired as SAFE hooks (no-op until certs/creds are provided).
+#
+# Versioning: the installer/app version comes from package.json "version"
+# (semver). Bump it per release (see RELEASE.md). The desktop shell version is
+# independent of the web app, which updates continuously via Vercel.
 
 appId: com.koleex.hub
 productName: Koleex Hub
@@ -17,28 +21,52 @@ files:
   - resources/**/*
   - package.json
 
+# macOS notarization runs here ONLY when Apple creds are set (safe no-op
+# otherwise — see scripts/notarize.cjs).
+afterSign: scripts/notarize.cjs
+
 # Auto-update publishing is intentionally DISABLED this round.
-# To enable later: set this to a GitHub (recommended) or generic provider, e.g.
+# Enable later (GitHub Releases recommended — see RELEASE.md):
 #   publish:
 #     provider: github
 #     owner: kamalshafei1990
 #     repo: koleex-hub
 publish: null
 
+# ── File associations (architecture for future PDF/catalog support) ─────────
+# Prepared but commented: enabling lets the desktop app register as a handler
+# for catalog/PDF files (double-click → open in Koleex Hub). Requires per-type
+# icons (resources/pdf.icns / pdf.ico) and renderer handling before turning on.
+# fileAssociations:
+#   - ext: pdf
+#     name: PDF Document
+#     role: Viewer
+#     icon: resources/pdf
+#   - ext: koleex
+#     name: Koleex Catalog
+#     role: Editor
+#     icon: resources/icon
+
 # ── macOS ────────────────────────────────────────────────────────────────
 mac:
   category: public.app-category.business
   icon: resources/icon.png
   target:
-    - dmg
-    - zip
+    - target: dmg
+    - target: zip
   hardenedRuntime: true
   gatekeeperAssess: false
-  # Notarization hook — enable once an Apple Developer ID is configured and the
-  # APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID env vars are set:
-  # notarize: true
+  entitlements: resources/entitlements.mac.plist
+  entitlementsInherit: resources/entitlements.mac.plist
+  extendInfo:
+    CFBundleDisplayName: Koleex Hub
+    NSHumanReadableCopyright: © Koleex International Group
+  # Signing: set CSC_LINK + CSC_KEY_PASSWORD (Developer ID Application) to sign.
+  # Notarization: set APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID
+  # (handled by afterSign hook above).
 dmg:
-  title: Koleex Hub
+  title: ${productName} ${version}
+  artifactName: ${productName}-${version}.${ext}
 
 # ── Windows ──────────────────────────────────────────────────────────────
 win:
@@ -46,16 +74,27 @@ win:
   target:
     - target: nsis
     - target: portable
-  # Signing hook — provide an Authenticode cert via CSC_LINK / CSC_KEY_PASSWORD
-  # (or a hardware/EV signer) to produce signed builds. Unsigned for now.
+  # Signing: provide an Authenticode/EV cert via CSC_LINK + CSC_KEY_PASSWORD
+  # (or a cloud/HSM signer). Unsigned for now.
 nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
+  allowElevation: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
+  menuCategory: Koleex
   shortcutName: Koleex Hub
+  uninstallDisplayName: Koleex Hub ${version}
+  deleteAppDataOnUninstall: false
+  runAfterFinish: true
   artifactName: ${productName}-Setup-${version}.${ext}
+  # Branded installer header/sidebar (provide the assets to enable):
+  #   installerIcon: resources/icon.ico
+  #   uninstallerIcon: resources/icon.ico
+  #   installerHeaderIcon: resources/icon.ico
+  #   installerHeader: resources/installerHeader.bmp   # 150x57
+  #   installerSidebar: resources/installerSidebar.bmp # 164x314
 portable:
   artifactName: ${productName}-Portable-${version}.${ext}
 

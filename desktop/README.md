@@ -106,10 +106,30 @@ generate platform icons before release:
 - [ ] **Print** (Ctrl/Cmd+P or a print button) opens the native print dialog
 - [ ] Native notification fires (in‑app bell event / `window.koleex.notify`)
 - [ ] Native menu: Edit clipboard ops, View zoom/reload/fullscreen, Help → About shows version
-- [ ] Offline: pull network → friendly "Can't reach Koleex Hub" + Retry; restore → loads
+- [ ] Offline: pull network → friendly "Can't reach Koleex Hub" + countdown; **auto‑reconnects** (and "Retry now"); restore → loads
+- [ ] **Tools → Check for Updates** shows the "you're on the latest" dialog (auto‑update disabled)
+- [ ] **Tools → Restart Koleex Hub** relaunches the app
+- [ ] **Tools → Open Logs Folder** opens the logs dir; `main.log` has a startup line
+- [ ] **Tools → Open Downloads Folder** opens the OS downloads dir
+- [ ] Renderer crash (devtools → kill) → app logs it and reloads (bounded)
 - [ ] (If `KOLEEX_TRAY=1`) tray icon + minimize‑to‑tray + Quit work
 - [ ] Second launch focuses the existing window (single‑instance)
 - [ ] `npm run dist:dir` produces a runnable unpacked app
+
+---
+
+## Diagnostics & logs (local only)
+
+Local, on‑device logging — **nothing is ever sent externally** (`logger.ts`).
+- **Open via:** Tools → **Open Logs Folder**.
+- **Location:** OS logs dir (macOS `~/Library/Logs/Koleex Hub/`, Windows
+  `%APPDATA%\Koleex Hub\logs\`), file `main.log` (size‑rotated → `.1`, `.2`).
+- **Captures:** startup banner (version/runtime), warnings, errors, and crashes
+  (`uncaughtException`, `unhandledRejection`, renderer/child process gone,
+  `did-fail-load`, updater events). Keep entries diagnostic — never log secrets.
+
+Build, signing, notarization, auto‑update activation, the release checklist, and
+troubleshooting all live in **[RELEASE.md](./RELEASE.md)**.
 
 ---
 
