@@ -15,7 +15,7 @@ export const GITHUB_RELEASES_URL =
   "https://github.com/kamalshafei1990/koleex-hub/releases";
 export const CURRENT_RELEASE_URL = `${GITHUB_RELEASES_URL}/tag/${GITHUB_RELEASE_TAG}`;
 const DL = `${GITHUB_RELEASES_URL}/download/${GITHUB_RELEASE_TAG}`;
-export const LATEST_DESKTOP_VERSION = "1.0.0";
+export const LATEST_DESKTOP_VERSION = "1.0.1";
 
 /** Koleex Hub app icon (public asset, served by the web app / desktop shell). */
 export const KOLEEX_APP_ICON = "/icon-512.png";
@@ -81,7 +81,7 @@ export const DOWNLOAD_GROUPS: DownloadGroup[] = [
         name: "macOS",
         sublabel: "Apple Silicon",
         logo: OS_LOGOS.apple,
-        url: `${DL}/Koleex.Hub-1.0.0.dmg`,
+        url: `${DL}/Koleex.Hub-${LATEST_DESKTOP_VERSION}.dmg`,
         status: "available",
         matchOs: "macos",
         meta: `94 MB · v${LATEST_DESKTOP_VERSION}`,
@@ -91,7 +91,7 @@ export const DOWNLOAD_GROUPS: DownloadGroup[] = [
         name: "Windows",
         sublabel: "Windows 10 / 11 · 64-bit",
         logo: OS_LOGOS.windows,
-        url: `${DL}/Koleex.Hub-Setup-1.0.0.exe`,
+        url: `${DL}/Koleex.Hub-Setup-${LATEST_DESKTOP_VERSION}.exe`,
         status: "available",
         matchOs: "windows",
         meta: `78 MB · v${LATEST_DESKTOP_VERSION}`,
@@ -206,7 +206,7 @@ export const INSTALL_GUIDES: InstallGuide[] = [
     intro:
       "Koleex Hub Desktop is a native window around the live Hub — you always get the latest web app, plus native notifications, downloads and offline recovery. Built for Apple Silicon (M1 and newer).",
     steps: [
-      { title: "Download the .dmg", detail: "From the macOS card above, click Download (Koleex Hub-1.0.0.dmg, about 94 MB)." },
+      { title: "Download the .dmg", detail: "From the macOS card above, click Download (Koleex Hub-1.0.1.dmg, about 98 MB)." },
       { title: "Open and install", detail: "Double-click the downloaded .dmg, then drag the Koleex Hub icon into the Applications folder." },
       { title: "First launch — right-click → Open", detail: "This build isn't code-signed yet, so a normal double-click shows an “unidentified developer” warning. Instead, right-click (or Control-click) the app in Applications → Open → Open. You only do this the first time." },
       { title: "Sign in", detail: "Log in with your Koleex account. Your session is remembered across restarts." },
@@ -225,7 +225,7 @@ export const INSTALL_GUIDES: InstallGuide[] = [
     intro:
       "Koleex Hub Desktop runs the live Hub in a native window on Windows 10 and 11, with notifications, downloads and automatic reconnect.",
     steps: [
-      { title: "Download the installer", detail: "From the Windows card above, click Download (Koleex Hub-Setup-1.0.0.exe, about 78 MB)." },
+      { title: "Download the installer", detail: "From the Windows card above, click Download (Koleex Hub-Setup-1.0.1.exe, about 78 MB)." },
       { title: "Run Setup", detail: "Double-click the .exe. If Windows SmartScreen appears, click More info → Run anyway — this is expected for an unsigned build." },
       { title: "Choose location and finish", detail: "Pick an install folder and complete setup. Desktop and Start-menu shortcuts are created automatically." },
       { title: "Sign in", detail: "Launch Koleex Hub and log in with your account." },
