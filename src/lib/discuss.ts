@@ -209,7 +209,14 @@ export async function fetchMyChannels(
     .is("archived_at", null)
     .order("last_message_at", { ascending: false });
   if (chanErr) {
-    console.error("[Discuss] Fetch channels:", chanErr.message);
+    // Same discipline as the membership fetch above: a background poller's
+    // transient "Failed to fetch" (offline / aborted nav) must not spam the
+    // console — Next's dev overlay even promotes console.error to an "Issue".
+    if (!isMissingTable(chanErr.message) && !isTransientFetch(chanErr.message)) {
+      console.error("[Discuss] Fetch channels:", chanErr.message);
+    } else if (isTransientFetch(chanErr.message)) {
+      warnOnce("discuss-channels-transient", "[Discuss] channels: network unavailable (silenced; will retry)");
+    }
     return [];
   }
   const chanRows = (channels ?? []) as DiscussChannelRow[];
