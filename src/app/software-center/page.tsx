@@ -15,7 +15,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
-import MonitorIcon from "@/components/icons/ui/MonitorIcon";
+import WrenchIcon from "@/components/icons/ui/WrenchIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import {
@@ -179,7 +179,16 @@ function DownloadCenterContent() {
                 className="group text-left rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 hover:border-[var(--border-strong)] hover:bg-[var(--bg-surface-subtle)] transition-all"
               >
                 <div className="h-9 w-9 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] group-hover:text-[var(--text-primary)] transition-colors mb-3">
-                  <MonitorIcon size={16} />
+                  {g.logo ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={g.logo}
+                      alt=""
+                      className="h-4 w-4 object-contain [filter:brightness(0)] dark:[filter:brightness(0)_invert(1)]"
+                    />
+                  ) : (
+                    <WrenchIcon size={16} />
+                  )}
                 </div>
                 <div className="text-[14px] font-semibold mb-1">{g.title}</div>
                 <p className="text-[12.5px] text-[var(--text-dim)] leading-relaxed">{g.summary}</p>
@@ -404,13 +413,28 @@ function GuideDialog({ guide, onClose }: { guide: InstallGuide; onClose: () => v
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-[var(--bg-overlay)] backdrop-blur-sm" />
       <div
-        className="relative w-full max-w-lg rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-secondary)] shadow-2xl"
+        className="relative w-full max-w-lg max-h-[85vh] flex flex-col rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-secondary)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4 p-5 border-b border-[var(--border-subtle)]">
-          <div>
-            <h3 className="text-[15px] font-bold tracking-tight">{guide.title}</h3>
-            <p className="text-[12.5px] text-[var(--text-dim)] mt-0.5">{guide.summary}</p>
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 p-5 border-b border-[var(--border-subtle)] shrink-0">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="h-9 w-9 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
+              {guide.logo ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={guide.logo}
+                  alt=""
+                  className="h-4 w-4 object-contain [filter:brightness(0)] dark:[filter:brightness(0)_invert(1)]"
+                />
+              ) : (
+                <WrenchIcon size={16} />
+              )}
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-[15px] font-bold tracking-tight">{guide.title}</h3>
+              <p className="text-[12.5px] text-[var(--text-dim)] mt-0.5">{guide.summary}</p>
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -420,16 +444,50 @@ function GuideDialog({ guide, onClose }: { guide: InstallGuide; onClose: () => v
             <CrossIcon size={16} />
           </button>
         </div>
-        <ol className="p-5 space-y-3">
-          {guide.steps.map((s, i) => (
-            <li key={i} className="flex items-start gap-3">
-              <span className="mt-[1px] h-5 w-5 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-bold flex items-center justify-center shrink-0">
-                {i + 1}
-              </span>
-              <span className="text-[13px] text-[var(--text-muted)] leading-relaxed">{s}</span>
-            </li>
-          ))}
-        </ol>
+
+        {/* Scrollable body */}
+        <div className="overflow-y-auto p-5">
+          <p className="text-[13px] text-[var(--text-muted)] leading-relaxed mb-5">
+            {guide.intro}
+          </p>
+          <ol className="space-y-4">
+            {guide.steps.map((s, i) => (
+              <li key={i} className="flex items-start gap-3">
+                <span className="mt-[1px] h-6 w-6 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-bold flex items-center justify-center shrink-0">
+                  {i + 1}
+                </span>
+                <div className="min-w-0">
+                  <div className="text-[13.5px] font-semibold text-[var(--text-primary)] leading-snug">
+                    {s.title}
+                  </div>
+                  {s.detail && (
+                    <p className="text-[12.5px] text-[var(--text-dim)] leading-relaxed mt-1">
+                      {s.detail}
+                    </p>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ol>
+          {guide.notes.length > 0 && (
+            <div className="mt-6 pt-4 border-t border-[var(--border-subtle)]">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-ghost)] mb-2">
+                Good to know
+              </div>
+              <ul className="space-y-1.5">
+                {guide.notes.map((n, i) => (
+                  <li
+                    key={i}
+                    className="flex items-start gap-2 text-[12.5px] text-[var(--text-muted)] leading-relaxed"
+                  >
+                    <span className="mt-[7px] h-1 w-1 rounded-full bg-[var(--text-ghost)] shrink-0" />
+                    {n}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -179,45 +179,76 @@ export const RELEASE_NOTES: ReleaseNote[] = [
   },
 ];
 
-/* ── Installation guides (dialogs) ──────────────────────────────────────── */
+/* ── Installation guides (detailed dialogs) ─────────────────────────────── */
+export interface GuideStep {
+  title: string;
+  detail?: string;
+}
 export interface InstallGuide {
   id: string;
   title: string;
   summary: string;
-  steps: string[];
+  /** Card icon: a platform logo URL (Apple/Windows) — omit for a glyph. */
+  logo?: string;
+  /** Short framing paragraph at the top of the dialog. */
+  intro: string;
+  steps: GuideStep[];
+  /** "Good to know" bullets shown under the steps. */
+  notes: string[];
 }
 export const INSTALL_GUIDES: InstallGuide[] = [
   {
     id: "macos",
     title: "macOS Installation Guide",
     summary: "Install Koleex Hub Desktop on a Mac (Apple Silicon).",
+    logo: OS_LOGOS.apple,
+    intro:
+      "Koleex Hub Desktop is a native window around the live Hub — you always get the latest web app, plus native notifications, downloads and offline recovery. Built for Apple Silicon (M1 and newer).",
     steps: [
-      "Download the .dmg for macOS.",
-      "Open the .dmg and drag Koleex Hub into the Applications folder.",
-      "First launch only: right-click the app → Open, then confirm (the build is not yet code-signed).",
-      "Sign in once — your session persists across restarts.",
+      { title: "Download the .dmg", detail: "From the macOS card above, click Download (Koleex Hub-1.0.0.dmg, about 94 MB)." },
+      { title: "Open and install", detail: "Double-click the downloaded .dmg, then drag the Koleex Hub icon into the Applications folder." },
+      { title: "First launch — right-click → Open", detail: "This build isn't code-signed yet, so a normal double-click shows an “unidentified developer” warning. Instead, right-click (or Control-click) the app in Applications → Open → Open. You only do this the first time." },
+      { title: "Sign in", detail: "Log in with your Koleex account. Your session is remembered across restarts." },
+    ],
+    notes: [
+      "Requires macOS 12 or later on Apple Silicon. Intel Macs aren't supported yet.",
+      "Updates are automatic — the app loads the live Hub, so you never need to reinstall for web updates.",
+      "To remove it: drag Koleex Hub from Applications to the Trash.",
     ],
   },
   {
     id: "windows",
     title: "Windows Installation Guide",
-    summary: "Install Koleex Hub Desktop on Windows 10/11.",
+    summary: "Install Koleex Hub Desktop on Windows 10 / 11.",
+    logo: OS_LOGOS.windows,
+    intro:
+      "Koleex Hub Desktop runs the live Hub in a native window on Windows 10 and 11, with notifications, downloads and automatic reconnect.",
     steps: [
-      "Download the Setup .exe (or the Portable build for no-install use).",
-      "Run the installer. If SmartScreen appears, click More info → Run anyway (the build is not yet code-signed).",
-      "Choose an install location and finish — a desktop + Start-menu shortcut are created.",
-      "Launch Koleex Hub and sign in.",
+      { title: "Download the installer", detail: "From the Windows card above, click Download (Koleex Hub-Setup-1.0.0.exe, about 78 MB)." },
+      { title: "Run Setup", detail: "Double-click the .exe. If Windows SmartScreen appears, click More info → Run anyway — this is expected for an unsigned build." },
+      { title: "Choose location and finish", detail: "Pick an install folder and complete setup. Desktop and Start-menu shortcuts are created automatically." },
+      { title: "Sign in", detail: "Launch Koleex Hub and log in with your account." },
+    ],
+    notes: [
+      "Works on Windows 10 and 11 (64-bit).",
+      "Updates are automatic — no reinstall needed for web updates.",
+      "To remove it: uninstall from Settings → Apps → Installed apps.",
     ],
   },
   {
     id: "troubleshooting",
     title: "Troubleshooting",
     summary: "Common issues and how to resolve them.",
+    intro:
+      "Most issues are quick to fix. Find the symptom below and follow the steps.",
     steps: [
-      "Blank window on launch: the app auto-retries; check Tools → Open Logs Folder for details.",
-      "“App can't be opened” (macOS) / SmartScreen (Windows): expected for an unsigned build — use the right-click Open / Run anyway steps above.",
-      "Login doesn't persist: ensure you reached the app over HTTPS and relaunch.",
-      "Need diagnostics: Tools → Open Logs Folder (logs are local only — nothing is sent externally).",
+      { title: "“App can't be opened” / SmartScreen warning", detail: "Expected for an unsigned build. macOS: right-click the app → Open. Windows: click More info → Run anyway. Signed builds will remove these prompts in future." },
+      { title: "Blank or stuck window on launch", detail: "The app couldn't reach the server. It auto-retries and shows a countdown with a Retry button — check your internet connection and wait, or click Retry." },
+      { title: "Login doesn't persist after restart", detail: "Make sure you opened the app over HTTPS, then quit and relaunch. Clearing the app data and signing in again also resolves it." },
+      { title: "Need diagnostics or logs", detail: "In the desktop app menu choose Tools → Open Logs Folder. Logs are stored locally on your device only — nothing is sent anywhere." },
+    ],
+    notes: [
+      "Still stuck? Share the log file with your administrator, or ask in the Discuss app.",
     ],
   },
 ];
