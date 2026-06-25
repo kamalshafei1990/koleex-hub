@@ -22,6 +22,7 @@ import SearchIcon from "@/components/icons/ui/SearchIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import GlobeIcon from "@/components/icons/ui/GlobeIcon";
 import LockIcon from "@/components/icons/ui/LockIcon";
+import Settings2Icon from "@/components/icons/ui/Settings2Icon";
 import UserActivityDrawer from "@/components/super-admin/UserActivityDrawer";
 import AlertPreferencesModal from "@/components/super-admin/AlertPreferencesModal";
 import { routeToModule, eventLabel } from "@/lib/activity/modules";
@@ -268,7 +269,7 @@ export default function SuperAdminActivityPage() {
             onClick={() => setPrefsOpen(true)}
             className="h-9 px-3 rounded-xl border border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] inline-flex items-center gap-1.5"
           >
-            <LockIcon className="h-3.5 w-3.5" />
+            <Settings2Icon className="h-3.5 w-3.5" />
             Alert preferences
           </button>
         }
