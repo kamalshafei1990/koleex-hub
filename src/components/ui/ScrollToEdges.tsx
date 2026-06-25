@@ -100,7 +100,8 @@ export default function ScrollToEdges() {
          so it never sits on top of the assistant/discuss FAB, which lives on the
          END corner at bottom-6 end-6 (FloatingPanel). Issue 46dba6b3 reopen:
          the scroll button was covering the smart-assistant + discussion FAB. */
-      className="fixed bottom-6 start-6 z-[120] flex flex-col gap-2 print:hidden"
+      /* Hidden on phones (< md) — the scroll-edge control is desktop/tablet only. */
+      className="fixed bottom-6 start-6 z-[120] hidden md:flex flex-col gap-2 print:hidden"
       role="group"
       aria-label="Page navigation"
     >
