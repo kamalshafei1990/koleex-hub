@@ -144,6 +144,174 @@ function SeverityPill({ severity }: { severity: string }) {
   );
 }
 
+/* ── Live activity graph ─────────────────────────────────────────────────
+   A continuously-scrolling waveform (macOS "CPU LOAD" style). Samples the live
+   KPIs once a second into a rolling ring buffer so the trace is always moving;
+   the value is real (active sessions / online users), only the x-axis advances
+   on idle. Interactive: switch the metric and hover to read any point. */
+const GRAPH_MAX = 90; // samples kept (~90s window)
+const GRAPH_SAMPLE_MS = 1000;
+
+function LiveActivityGraph({ kpis }: { kpis: Kpis | null }) {
+  type Sample = { sessions: number; online: number };
+  const [samples, setSamples] = useState<Sample[]>([]);
+  const [metric, setMetric] = useState<"sessions" | "online">("sessions");
+  const [hover, setHover] = useState<number | null>(null);
+  const kpiRef = useRef<Kpis | null>(kpis);
+  useEffect(() => {
+    kpiRef.current = kpis;
+  }, [kpis]);
+
+  // Append a sample every second; seed a full window on first tick so the
+  // trace spans the whole card immediately instead of growing in.
+  useEffect(() => {
+    const tick = () => {
+      const k = kpiRef.current;
+      const s: Sample = { sessions: k?.active_sessions ?? 0, online: k?.online_users ?? 0 };
+      setSamples((prev) => {
+        const base = prev.length === 0 ? Array.from({ length: GRAPH_MAX }, () => s) : prev;
+        const next = base.concat(s);
+        return next.slice(Math.max(0, next.length - GRAPH_MAX));
+      });
+    };
+    tick();
+    const t = window.setInterval(tick, GRAPH_SAMPLE_MS);
+    return () => window.clearInterval(t);
+  }, []);
+
+  const values = useMemo(
+    () => samples.map((s) => (metric === "sessions" ? s.sessions : s.online)),
+    [samples, metric],
+  );
+
+  const W = 1000;
+  const H = 110;
+  const PADY = 10;
+  const peak = Math.max(1, ...values);
+  const stepX = W / (GRAPH_MAX - 1);
+  const yFor = (v: number) => H - PADY - (v / (peak * 1.15)) * (H - PADY * 2);
+  const pts = values.map((v, i) => [i * stepX, yFor(v)] as const);
+  const line = pts.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const area = pts.length ? `${line} L${W},${H} L0,${H} Z` : "";
+
+  const cur = values.length ? values[values.length - 1] : 0;
+  const shown = hover != null && hover < values.length ? values[hover] : cur;
+  const metricLabel = metric === "sessions" ? "Active sessions" : "Online users";
+
+  const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * W;
+    setHover(Math.max(0, Math.min(GRAPH_MAX - 1, Math.round(x / stepX))));
+  };
+
+  const Pill = ({ id, label }: { id: "sessions" | "online"; label: string }) => (
+    <button
+      type="button"
+      onClick={() => setMetric(id)}
+      className={`h-7 px-2.5 rounded-lg text-[11px] font-medium transition-colors ${
+        metric === id
+          ? "bg-[var(--accent)] text-white"
+          : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+      }`}
+    >
+      {label}
+    </button>
+  );
+
+  return (
+    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4 md:p-5">
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">
+            <ActivityIcon className="h-3.5 w-3.5" />
+            Activity load
+            <span className="inline-flex items-center gap-1 text-[10px] normal-case font-medium text-[#00CC66]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#00CC66] animate-pulse" /> live
+            </span>
+          </div>
+          <div className="mt-1 flex items-baseline gap-2">
+            <span className="text-[28px] leading-none font-bold text-[var(--text-primary)] tabular-nums">
+              {shown}
+            </span>
+            <span className="text-[12px] text-[var(--text-dim)]">
+              {hover != null ? `${metricLabel} · −${GRAPH_MAX - 1 - hover}s` : `${metricLabel} · now`}
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <Pill id="sessions" label="Sessions" />
+          <Pill id="online" label="Online" />
+        </div>
+      </div>
+
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        preserveAspectRatio="none"
+        className="w-full h-[110px] block cursor-crosshair"
+        onMouseMove={onMove}
+        onMouseLeave={() => setHover(null)}
+      >
+        <defs>
+          <linearGradient id="kx-load-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.28" />
+            <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {/* baseline grid */}
+        {[0.25, 0.5, 0.75].map((g) => (
+          <line
+            key={g}
+            x1={0}
+            x2={W}
+            y1={H * g}
+            y2={H * g}
+            stroke="var(--border-subtle)"
+            strokeWidth={1}
+            opacity={0.5}
+          />
+        ))}
+        {area && <path d={area} fill="url(#kx-load-fill)" />}
+        {line && (
+          <path
+            d={line}
+            fill="none"
+            stroke="var(--accent)"
+            strokeWidth={2}
+            vectorEffect="non-scaling-stroke"
+            strokeLinejoin="round"
+          />
+        )}
+        {/* hover guide + dot, else leading dot */}
+        {hover != null && pts[hover] ? (
+          <>
+            <line
+              x1={pts[hover][0]}
+              x2={pts[hover][0]}
+              y1={0}
+              y2={H}
+              stroke="var(--text-dim)"
+              strokeWidth={1}
+              vectorEffect="non-scaling-stroke"
+              opacity={0.6}
+            />
+            <circle cx={pts[hover][0]} cy={pts[hover][1]} r={3.5} fill="var(--accent)" vectorEffect="non-scaling-stroke" />
+          </>
+        ) : (
+          pts.length > 0 && (
+            <circle cx={pts[pts.length - 1][0]} cy={pts[pts.length - 1][1]} r={3.5} fill="var(--accent)" vectorEffect="non-scaling-stroke" />
+          )
+        )}
+      </svg>
+
+      <div className="mt-1 flex items-center justify-between text-[10px] text-[var(--text-ghost)]">
+        <span>−{GRAPH_MAX - 1}s</span>
+        <span>peak {peak}</span>
+        <span>now</span>
+      </div>
+    </div>
+  );
+}
+
 export default function SuperAdminActivityPage() {
   const { data: boot, loading: bootLoading } = useMeBootstrap();
   const isSA = !!boot?.isSuperAdmin;
@@ -285,6 +453,9 @@ export default function SuperAdminActivityPage() {
           <KpiCard label="Failed logins today" value={kpis?.failed_logins_today ?? "—"} icon={<TriangleWarningIcon className="h-4 w-4" />} loading={loadingMonitor && !kpis} tone={kpis && kpis.failed_logins_today > 0 ? "warning" : "default"} />
           <KpiCard label="Sensitive actions today" value={kpis?.sensitive_actions_today ?? "—"} icon={<LockIcon className="h-4 w-4" />} loading={loadingMonitor && !kpis} />
         </div>
+
+        {/* ── Live activity load graph (full-width, always moving) ── */}
+        <LiveActivityGraph kpis={kpis} />
 
         {/* ── Two-column: live users + activity feed ── */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
