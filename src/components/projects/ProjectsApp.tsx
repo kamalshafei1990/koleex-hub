@@ -31,6 +31,9 @@ import CogIcon from "@/components/icons/ui/CogIcon";
 import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
 import CheckSquareIcon from "@/components/icons/ui/CheckSquareIcon";
 import ListTodoIcon from "@/components/icons/ui/ListTodoIcon";
+import LinkIcon from "@/components/icons/ui/LinkIcon";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
+import CheckIcon from "@/components/icons/ui/CheckIcon";
 import ProjectsIcon from "@/components/icons/ProjectsIcon";
 import PageHeader from "@/components/ui/PageHeader";
 import AppHomeMenu from "@/components/ui/AppHomeMenu";
@@ -48,11 +51,13 @@ import {
   deleteStage,
   deleteTag,
   deleteTask,
+  fetchAccounts,
   fetchProjects,
   fetchStages,
   fetchTags,
   fetchTasks,
   formatDueDate,
+  type AccountLite,
   isOverdue,
   PRIORITY_COLOR,
   updateProject,
@@ -150,11 +155,11 @@ export default function ProjectsApp() {
           {/* Brand-aligned tile menu + search — same across every Hub app */}
           <AppHomeMenu
             navItems={[
-              { key: "projects",  onClick: () => setTab("projects"),  icon: "layout-grid",   label: "Projects"     },
-              { key: "mine",      onClick: () => setTab("mine"),      icon: "user",          label: "My Tasks"     },
-              { key: "all",       onClick: () => setTab("all"),       icon: "list-todo",     label: "All Tasks"    },
-              { key: "reporting", onClick: () => setTab("reporting"), icon: "chart-pie",     label: "Reporting"    },
-              { key: "config",    onClick: () => setTab("config"),    icon: "cog",           label: "Configuration"},
+              { key: "projects",  onClick: () => setTab("projects"),  active: tab === "projects",  icon: <LayoutGridIcon size={13} />,  label: t("tab.projects")      },
+              { key: "mine",      onClick: () => setTab("mine"),      active: tab === "mine",      icon: <CheckSquareIcon size={13} />, label: t("tab.myTasks")       },
+              { key: "all",       onClick: () => setTab("all"),       active: tab === "all",       icon: <ListTodoIcon size={13} />,    label: t("tab.allTasks")      },
+              { key: "reporting", onClick: () => setTab("reporting"), active: tab === "reporting", icon: <BarChart3Icon size={13} />,   label: t("tab.reporting")     },
+              { key: "config",    onClick: () => setTab("config"),    active: tab === "config",    icon: <CogIcon size={13} />,         label: t("tab.configuration") },
             ]}
             searchPlaceholder={searchPlaceholder}
           />
@@ -171,32 +176,33 @@ export default function ProjectsApp() {
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   TAB BUTTON
+   ACCOUNT PICKER — assignee / manager selector (shared)
    ══════════════════════════════════════════════════════════════════ */
 
-function Tab({
-  active,
-  onClick,
-  icon,
-  label,
+function AccountSelect({
+  value,
+  onChange,
+  placeholder,
 }: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  label: string;
+  value: string | null;
+  onChange: (id: string | null) => void;
+  placeholder: string;
 }) {
+  const [accounts, setAccounts] = useState<AccountLite[]>([]);
+  useEffect(() => {
+    fetchAccounts().then(setAccounts);
+  }, []);
   return (
-    <button
-      onClick={onClick}
-      className={`h-8 px-3 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 transition-all whitespace-nowrap border ${
-        active
-          ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
-          : "bg-transparent border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
-      }`}
+    <select
+      value={value ?? ""}
+      onChange={(e) => onChange(e.target.value || null)}
+      className="w-full h-10 px-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
     >
-      {icon}
-      {label}
-    </button>
+      <option value="">{placeholder}</option>
+      {accounts.map((a) => (
+        <option key={a.id} value={a.id}>{a.username}</option>
+      ))}
+    </select>
   );
 }
 
@@ -763,8 +769,8 @@ function TaskCard({
           </span>
         )}
         {task.linked_entity_label && (
-          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[var(--bg-surface-subtle)] text-[var(--text-muted)] truncate max-w-[120px]">
-            🔗 {task.linked_entity_label}
+          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[var(--bg-surface-subtle)] text-[var(--text-muted)] truncate max-w-[120px]">
+            <LinkIcon size={9} className="shrink-0" /> {task.linked_entity_label}
           </span>
         )}
       </div>
@@ -800,15 +806,23 @@ function TasksListView({ mine, tags }: { mine: boolean; tags: ProjectTag[] }) {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "all">("open");
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | "all">("all");
+  const [search, setSearch] = useState("");
   const [taskModal, setTaskModal] = useState<{ open: boolean; editing: TaskRow | null }>({ open: false, editing: null });
 
   const reload = useCallback(() => {
     setLoading(true);
-    fetchTasks({ mine, status: statusFilter, priority: priorityFilter === "all" ? undefined : priorityFilter }).then((rows) => {
+    fetchTasks({ mine, status: statusFilter, priority: priorityFilter === "all" ? undefined : priorityFilter, search: search.trim() || undefined }).then((rows) => {
       setTasks(rows);
       setLoading(false);
     });
-  }, [mine, statusFilter, priorityFilter]);
+  }, [mine, statusFilter, priorityFilter, search]);
+
+  // Debounce search so each keystroke doesn't fire a request.
+  const [searchInput, setSearchInput] = useState("");
+  useEffect(() => {
+    const id = setTimeout(() => setSearch(searchInput), 300);
+    return () => clearTimeout(id);
+  }, [searchInput]);
 
   useEffect(() => {
     reload();
@@ -827,6 +841,15 @@ function TasksListView({ mine, tags }: { mine: boolean; tags: ProjectTag[] }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
+        <div className="relative w-full sm:w-56">
+          <SearchIcon size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
+          <input
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder={t("task.searchPh", "Search tasks…")}
+            className="h-7 w-full pl-8 pr-3 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
+          />
+        </div>
         <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
           {(["open", "done", "cancelled", "all"] as const).map((s) => (
             <button
@@ -889,6 +912,7 @@ function TasksListView({ mine, tags }: { mine: boolean; tags: ProjectTag[] }) {
                       task={tk}
                       tags={tags}
                       onClick={() => setTaskModal({ open: true, editing: tk })}
+                      onToggleStatus={async (next) => { await updateTask(tk.id, { status: next }); reload(); }}
                     />
                   ))}
                 </div>
@@ -913,23 +937,39 @@ function FlatTaskRow({
   task,
   tags,
   onClick,
+  onToggleStatus,
 }: {
   task: TaskRow;
   tags: ProjectTag[];
   onClick: () => void;
+  onToggleStatus: (next: TaskStatus) => void;
 }) {
   const dueLabel = formatDueDate(task.due_date);
   const overdue = isOverdue(task.due_date) && task.status === "open";
   const color = PRIORITY_COLOR[task.priority];
   const projectColor = task.project?.color ?? "#818cf8";
   const visibleTags = tags.filter((tg) => task.tag_ids.includes(tg.id)).slice(0, 2);
+  const done = task.status === "done";
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className="w-full text-start rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] hover:border-[var(--border-focus)] p-3 transition-all space-y-1.5"
+      onKeyDown={(e) => { if (e.key === "Enter") onClick(); }}
+      className="w-full cursor-pointer text-start rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] hover:border-[var(--border-focus)] p-3 transition-all space-y-1.5"
     >
       <div className="flex items-start gap-2">
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onToggleStatus(done ? "open" : "done"); }}
+          aria-label={done ? "Reopen task" : "Mark done"}
+          className={`mt-0.5 h-4 w-4 shrink-0 rounded-full border flex items-center justify-center transition-colors ${
+            done ? "bg-emerald-500 border-emerald-500 text-white" : "border-[var(--border-color)] text-transparent hover:border-emerald-400"
+          }`}
+        >
+          <CheckIcon size={10} />
+        </button>
         <div className="w-1 self-stretch rounded-full shrink-0" style={{ background: color, minHeight: 20 }} />
         <div className="flex-1 min-w-0">
           <div className={`text-[12px] font-semibold text-[var(--text-primary)] truncate ${task.status === "done" ? "line-through opacity-60" : ""}`}>
@@ -965,7 +1005,7 @@ function FlatTaskRow({
           </span>
         ))}
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -1128,7 +1168,7 @@ function ConfigurationView({ tags, reloadTags }: { tags: ProjectTag[]; reloadTag
             <TagRow key={tg.id} tag={tg} onReload={reloadTags} />
           ))}
           {tags.length === 0 && (
-            <div className="text-[12px] text-[var(--text-dim)] py-3">{t("empty.noTasks")}</div>
+            <div className="text-[12px] text-[var(--text-dim)] py-3">{t("cfg.tags.empty", "No tags yet — add your first above.")}</div>
           )}
         </div>
       </div>
@@ -1255,6 +1295,7 @@ function ProjectFormModal({
   const [status, setStatus] = useState<"active" | "on_hold" | "completed" | "archived">("active");
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [customerLabel, setCustomerLabel] = useState<string>("");
+  const [managerId, setManagerId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -1270,6 +1311,7 @@ function ProjectFormModal({
       setStatus(editing.status);
       setCustomerId(editing.customer_id);
       setCustomerLabel(editing.customer?.display_name ?? editing.customer?.company_name ?? "");
+      setManagerId(editing.manager_account_id);
     } else {
       setName("");
       setCode("");
@@ -1282,6 +1324,7 @@ function ProjectFormModal({
       setStatus("active");
       setCustomerId(null);
       setCustomerLabel("");
+      setManagerId(null);
     }
   }, [open, editing]);
 
@@ -1300,6 +1343,7 @@ function ProjectFormModal({
       budget_hours: budgetHours ? Number(budgetHours) : null,
       status,
       customer_id: customerId,
+      manager_account_id: managerId,
     };
     if (editing) {
       await updateProject(editing.id, payload);
@@ -1350,6 +1394,9 @@ function ProjectFormModal({
               onChange={(id, label) => { setCustomerId(id); setCustomerLabel(label ?? ""); }}
               placeholder={t("form.customer")}
             />
+          </Field>
+          <Field label={t("form.manager", "Project manager")}>
+            <AccountSelect value={managerId} onChange={setManagerId} placeholder={t("form.manager", "Project manager")} />
           </Field>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <Field label={t("form.plannedStart")}>
@@ -1444,6 +1491,7 @@ function TaskFormModal({
   const [logged, setLogged] = useState<string>("");
   const [progress, setProgress] = useState<number>(0);
   const [status, setStatus] = useState<TaskStatus>("open");
+  const [assigneeId, setAssigneeId] = useState<string | null>(null);
   const [tagIds, setTagIds] = useState<string[]>([]);
   const [linkedType, setLinkedType] = useState<string>("");
   const [linkedId, setLinkedId] = useState<string | null>(null);
@@ -1461,6 +1509,7 @@ function TaskFormModal({
       setLogged(editing.logged_hours.toString());
       setProgress(editing.progress_pct);
       setStatus(editing.status);
+      setAssigneeId(editing.assignee_account_id);
       setTagIds(editing.tag_ids);
       setLinkedType(editing.linked_entity_type ?? "");
       setLinkedId(editing.linked_entity_id);
@@ -1475,6 +1524,7 @@ function TaskFormModal({
       setLogged("0");
       setProgress(0);
       setStatus("open");
+      setAssigneeId(null);
       setTagIds([]);
       setLinkedType("");
       setLinkedId(null);
@@ -1497,6 +1547,7 @@ function TaskFormModal({
       logged_hours: logged ? Number(logged) : 0,
       progress_pct: progress,
       status,
+      assignee_account_id: assigneeId,
       tag_ids: tagIds,
       linked_entity_type: linkedType || null,
       linked_entity_id: linkedId,
@@ -1567,6 +1618,10 @@ function TaskFormModal({
               </div>
             </Field>
           </div>
+
+          <Field label={t("task.assignee", "Assignee")}>
+            <AccountSelect value={assigneeId} onChange={setAssigneeId} placeholder={t("task.unassigned", "Unassigned")} />
+          </Field>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <Field label={t("task.dueDate")}>

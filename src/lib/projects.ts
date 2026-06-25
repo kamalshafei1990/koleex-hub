@@ -278,6 +278,29 @@ export async function deleteTag(id: string): Promise<boolean> {
   return res.ok;
 }
 
+/* ── Accounts (assignee / manager pickers) ────────── */
+
+export interface AccountLite {
+  id: string;
+  username: string;
+}
+
+let _accountsCache: AccountLite[] | null = null;
+export async function fetchAccounts(): Promise<AccountLite[]> {
+  if (_accountsCache) return _accountsCache;
+  const res = await fetch("/api/accounts", { credentials: "include" });
+  if (!res.ok) return [];
+  const { accounts } = (await res.json()) as {
+    accounts: { id: string; username: string; status?: string }[];
+  };
+  const list = (accounts ?? [])
+    .filter((a) => a.status !== "inactive" && a.status !== "disabled")
+    .map((a) => ({ id: a.id, username: a.username }))
+    .sort((a, b) => a.username.localeCompare(b.username));
+  _accountsCache = list;
+  return list;
+}
+
 /* ── Helpers ──────────────────────────────────────── */
 
 export function formatDueDate(iso: string | null): string {
