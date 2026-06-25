@@ -1,0 +1,67 @@
+# electron-builder — Koleex Hub desktop packaging.
+# Produces unsigned local installers this round. Code signing + notarization +
+# auto-update publishing are wired as commented hooks (enable when certs exist).
+
+appId: com.koleex.hub
+productName: Koleex Hub
+copyright: © Koleex International Group
+
+directories:
+  output: release
+  buildResources: resources
+
+# Only the compiled shell + resources ship — no Next.js/web assets are bundled
+# (the app loads the live production URL at runtime).
+files:
+  - dist/**/*
+  - resources/**/*
+  - package.json
+
+# Auto-update publishing is intentionally DISABLED this round.
+# To enable later: set this to a GitHub (recommended) or generic provider, e.g.
+#   publish:
+#     provider: github
+#     owner: kamalshafei1990
+#     repo: koleex-hub
+publish: null
+
+# ── macOS ────────────────────────────────────────────────────────────────
+mac:
+  category: public.app-category.business
+  icon: resources/icon.png
+  target:
+    - dmg
+    - zip
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  # Notarization hook — enable once an Apple Developer ID is configured and the
+  # APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID env vars are set:
+  # notarize: true
+dmg:
+  title: Koleex Hub
+
+# ── Windows ──────────────────────────────────────────────────────────────
+win:
+  icon: resources/icon.png
+  target:
+    - target: nsis
+    - target: portable
+  # Signing hook — provide an Authenticode cert via CSC_LINK / CSC_KEY_PASSWORD
+  # (or a hardware/EV signer) to produce signed builds. Unsigned for now.
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Koleex Hub
+  artifactName: ${productName}-Setup-${version}.${ext}
+portable:
+  artifactName: ${productName}-Portable-${version}.${ext}
+
+# ── Linux (future / optional) ──────────────────────────────────────────────
+linux:
+  icon: resources/icon.png
+  category: Office
+  target:
+    - AppImage

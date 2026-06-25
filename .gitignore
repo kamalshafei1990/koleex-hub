@@ -2,6 +2,10 @@
 
 # dependencies
 /node_modules
+# Electron desktop shell — build artifacts + deps (source is committed)
+/desktop/node_modules
+/desktop/dist
+/desktop/release
 /.pnp
 .pnp.*
 .yarn/*

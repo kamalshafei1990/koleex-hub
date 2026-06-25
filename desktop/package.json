@@ -1,0 +1,33 @@
+{
+  "name": "koleex-hub-desktop",
+  "productName": "Koleex Hub",
+  "version": "1.0.0",
+  "description": "Koleex Hub — native desktop shell around the live cloud app (Vercel + Supabase).",
+  "author": "Koleex International Group",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "dist/main.js",
+  "scripts": {
+    "clean": "rimraf dist release",
+    "compile": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "npm run clean && npm run compile",
+    "start": "npm run compile && electron .",
+    "dev": "KOLEEX_DEV=1 npm run start",
+    "dist": "npm run build && electron-builder",
+    "dist:dir": "npm run build && electron-builder --dir",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:linux": "npm run build && electron-builder --linux"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "electron": "^33.3.0",
+    "electron-builder": "^25.1.8",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.7.2"
+  }
+}
