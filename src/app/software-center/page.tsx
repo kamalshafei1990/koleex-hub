@@ -273,7 +273,7 @@ function HeroPlatformButton({ target }: { target: DownloadTarget }) {
   const inner = (
     <>
       {/* Original colours on a white chip so the logo reads on the button in any theme. */}
-      <span className="h-7 w-7 rounded-md bg-white ring-1 ring-black/10 flex items-center justify-center p-1 shrink-0">
+      <span className="h-7 w-7 rounded-md bg-white flex items-center justify-center p-1 shrink-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={target.logo} alt="" className="max-h-full max-w-full object-contain" />
       </span>
