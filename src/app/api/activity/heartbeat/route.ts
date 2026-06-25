@@ -12,7 +12,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/server/auth";
-import { requestMeta, heartbeat, touchDevice } from "@/lib/server/activity";
+import { requestMeta, heartbeat, touchDevice, locationLabel } from "@/lib/server/activity";
 import { routeToModule } from "@/lib/activity/modules";
 import { notifySuperAdmins } from "@/lib/server/sa-notify";
 
@@ -68,6 +68,9 @@ export async function POST(req: Request) {
     await notifySuperAdmins({
       kind: "new_device",
       subject: `${auth.username || "A user"} signed in from a new device`,
+      actorName: auth.username || null,
+      action: `New device · ${meta.browser} on ${meta.os}`,
+      location: locationLabel(meta),
       body: `${meta.browser} on ${meta.os}${meta.country ? ` · ${meta.country}` : ""}`,
       severity: "warning",
       actorAccountId: accountId,

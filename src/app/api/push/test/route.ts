@@ -6,8 +6,9 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { getServerAuth } from "@/lib/server/auth";
 import { sendPushToAccounts, isPushConfigured } from "@/lib/server/web-push";
+import { requestMeta, locationLabel } from "@/lib/server/activity";
 
-export async function POST() {
+export async function POST(req: Request) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   if (!auth.is_super_admin) return NextResponse.json({ error: "forbidden" }, { status: 403 });
@@ -20,11 +21,14 @@ export async function POST() {
   }
 
   const accountId = auth.real_account_id ?? auth.account_id;
+  // Mirror the live alert format so the test previews the real thing:
+  //   Koleex Hub (app) › {account name} › Sent a test notification · from {loc}
+  const loc = locationLabel(requestMeta(req));
   const summary = await sendPushToAccounts(
     [accountId],
     {
-      title: "Koleex Hub",
-      body: "Push notifications are working successfully.",
+      title: auth.username || "Koleex Hub",
+      body: `Sent a test notification${loc ? ` · from ${loc}` : ""}`,
       url: "/settings/notifications",
       tag: "test",
       kind: "test",

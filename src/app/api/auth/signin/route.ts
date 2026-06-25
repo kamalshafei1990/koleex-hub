@@ -27,7 +27,7 @@ import {
   type WouldBlockResult,
 } from "@/lib/server/rate-limit";
 import { recordSessionShadow } from "@/lib/server/session-shadow";
-import { requestMeta, logActivity } from "@/lib/server/activity";
+import { requestMeta, logActivity, locationLabel } from "@/lib/server/activity";
 import { notifySuperAdmins } from "@/lib/server/sa-notify";
 
 export async function POST(req: Request) {
@@ -150,6 +150,9 @@ export async function POST(req: Request) {
             await notifySuperAdmins({
               kind: "failed_login_threshold",
               subject: `Repeated failed logins for ${account.username || account.login_email}`,
+              actorName: account.username || account.login_email,
+              action: `${count} failed sign-in attempts in 15 min`,
+              location: locationLabel(requestMeta(req)),
               body: `${count} failed attempts in the last 15 minutes${ip ? ` · ${ip}` : ""}`,
               severity: "critical",
               tenantId: account.tenant_id,
@@ -241,9 +244,13 @@ export async function POST(req: Request) {
     }).catch(() => undefined);
 
     // Super-Admin "user logged in" alert (other admins; never self).
+    const loginMeta = requestMeta(req);
     await notifySuperAdmins({
       kind: "login",
       subject: `${account.username || account.login_email} signed in`,
+      actorName: account.username || account.login_email,
+      action: "Signed in",
+      location: locationLabel(loginMeta),
       severity: "info",
       actorAccountId: account.id,
       tenantId: account.tenant_id,

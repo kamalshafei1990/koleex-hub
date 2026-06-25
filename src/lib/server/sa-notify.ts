@@ -38,8 +38,64 @@ export interface SaAlert {
   link?: string | null;
   /** The account that triggered the alert (becomes sender; excluded as recipient). */
   actorAccountId?: string | null;
+  /** Display name of the actor → used as the push notification's bold title
+   *  ("Koleex Hub" › actor name › action). Resolved from actorAccountId if omitted. */
+  actorName?: string | null;
+  /** Short human action for the push body, e.g. "Signed in", "Deleted a product".
+   *  Falls back to `subject` when omitted. */
+  action?: string | null;
+  /** Where it happened, e.g. "Singapore" or "Belgrade, Serbia". Appended to the
+   *  push body as "… · from {location}". */
+  location?: string | null;
   tenantId?: string | null;
   metadata?: Record<string, unknown>;
+}
+
+/* The mobile push reads as three lines on the iPhone lock screen, matching the
+   Wix-style format Kamal asked for:
+     Koleex Hub            ← the PWA name (supplied automatically by iOS)
+     {actor name}          ← push title (bold)
+     {action} · from {loc} ← push body
+   so we deliberately DON'T set title to "Koleex Hub" (that would duplicate the
+   app-name line); the actor's name goes in the title instead. */
+function buildPushPayload(alert: SaAlert, actorName: string | null) {
+  const actionText = alert.action || alert.subject;
+  const body = alert.location ? `${actionText} · from ${alert.location}` : actionText;
+  return {
+    title: actorName || "Koleex Hub",
+    body,
+    url: alert.link ?? "/super-admin/activity",
+    tag: alert.kind,
+    kind: alert.kind,
+  };
+}
+
+/** Resolve an account's display name (people.full_name › username › email). */
+async function resolveActorName(id?: string | null): Promise<string | null> {
+  if (!id) return null;
+  try {
+    const { data } = await supabaseServer
+      .from("accounts")
+      .select("username, login_email, person_id")
+      .eq("id", id)
+      .maybeSingle();
+    const acc = data as
+      | { username: string | null; login_email: string | null; person_id: string | null }
+      | null;
+    if (!acc) return null;
+    if (acc.person_id) {
+      const { data: p } = await supabaseServer
+        .from("people")
+        .select("full_name")
+        .eq("id", acc.person_id)
+        .maybeSingle();
+      const full = (p as { full_name: string | null } | null)?.full_name;
+      if (full) return full;
+    }
+    return acc.username || acc.login_email || null;
+  } catch {
+    return null;
+  }
 }
 
 /** Send a Web Push to every Super Admin's devices (no in-app row). The actor is
@@ -51,17 +107,10 @@ export async function sendPushToSuperAdmins(alert: SaAlert): Promise<void> {
     const admins = await superAdminAccountIds(alert.tenantId);
     const targets = admins.filter((id) => id !== alert.actorAccountId);
     if (targets.length === 0) return;
-    await sendPushToAccounts(
-      targets,
-      {
-        title: "Koleex Hub",
-        body: alert.subject,
-        url: alert.link ?? "/super-admin/activity",
-        tag: alert.kind,
-        kind: alert.kind,
-      },
-      { actorAccountId: alert.actorAccountId },
-    );
+    const actorName = alert.actorName ?? (await resolveActorName(alert.actorAccountId));
+    await sendPushToAccounts(targets, buildPushPayload(alert, actorName), {
+      actorAccountId: alert.actorAccountId,
+    });
   } catch (e) {
     console.error("[sa-notify.sendPushToSuperAdmins]", e instanceof Error ? e.message : e);
   }
@@ -140,17 +189,10 @@ export async function notifySuperAdmins(alert: SaAlert): Promise<void> {
     // no-op if VAPID keys aren't configured. Recipients = same in-app set.
     const pushTargets = recipients.filter((id) => !off.has(id));
     if (pushTargets.length) {
-      await sendPushToAccounts(
-        pushTargets,
-        {
-          title: "Koleex Hub",
-          body: alert.subject,
-          url: alert.link ?? "/super-admin/activity",
-          tag: alert.kind,
-          kind: alert.kind,
-        },
-        { actorAccountId: alert.actorAccountId },
-      );
+      const actorName = alert.actorName ?? (await resolveActorName(alert.actorAccountId));
+      await sendPushToAccounts(pushTargets, buildPushPayload(alert, actorName), {
+        actorAccountId: alert.actorAccountId,
+      });
     }
   } catch (e) {
     console.error("[sa-notify.notifySuperAdmins]", e instanceof Error ? e.message : e);

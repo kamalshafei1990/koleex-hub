@@ -18,7 +18,7 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import type { ServerAuthContext } from "@/lib/server/auth";
-import { requestMeta } from "@/lib/server/activity";
+import { requestMeta, locationLabel } from "@/lib/server/activity";
 import { notifySuperAdmins, type AlertKind } from "@/lib/server/sa-notify";
 
 export type AuditSeverity = "info" | "warning" | "critical";
@@ -90,7 +90,8 @@ export async function logAudit(input: AuditInput): Promise<void> {
         : null;
 
     const accountId = input.auth.real_account_id ?? input.auth.account_id;
-    const ip = input.req ? requestMeta(input.req).ip : null;
+    const meta = input.req ? requestMeta(input.req) : null;
+    const ip = meta?.ip ?? null;
 
     await supabaseServer.from("audit_logs").insert({
       account_id: accountId,
@@ -113,9 +114,13 @@ export async function logAudit(input: AuditInput): Promise<void> {
     const severity = input.severity ?? "info";
     if (severity !== "info") {
       const label = input.entity_label || input.entity_id || input.entity_type || "record";
+      // Push body reads "{action} {entity}: {label}" — e.g. "Deleted product: NEXD 9000".
+      const entity = input.entity_type ?? "record";
       await notifySuperAdmins({
         kind: alertKindForAction(input.action_type),
-        subject: `${humanizeAction(input.action_type)} — ${input.entity_type ?? "record"}: ${label}`,
+        subject: `${humanizeAction(input.action_type)} — ${entity}: ${label}`,
+        action: `${humanizeAction(input.action_type)} ${entity}: ${label}`,
+        location: locationLabel(meta),
         body: input.module ? `In ${input.module}${input.route ? ` (${input.route})` : ""}` : null,
         severity,
         link: "/super-admin/activity",

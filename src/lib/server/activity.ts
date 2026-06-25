@@ -52,6 +52,28 @@ export function requestMeta(req: Request): RequestMeta {
   };
 }
 
+/** Human label for a request's geo, e.g. "Singapore" or "Belgrade, Serbia".
+ *  `country` is an ISO-3166 alpha-2 code (Vercel edge header); we expand it to a
+ *  full country name. Returns null when no geo is available (e.g. local dev). */
+export function locationLabel(
+  meta: { country: string | null; city: string | null } | null | undefined,
+): string | null {
+  if (!meta) return null;
+  const code = meta.country?.trim() || null;
+  let countryName: string | null = null;
+  if (code) {
+    try {
+      countryName =
+        new Intl.DisplayNames(["en"], { type: "region" }).of(code.toUpperCase()) || code;
+    } catch {
+      countryName = code;
+    }
+  }
+  const city = meta.city?.trim() || null;
+  if (city && countryName) return `${city}, ${countryName}`;
+  return city || countryName || null;
+}
+
 /* ── Generic activity-event insert ─────────────────────────────────────── */
 
 export interface ActivityEventInput {
