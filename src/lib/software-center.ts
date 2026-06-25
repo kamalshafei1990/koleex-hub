@@ -94,7 +94,6 @@ export const DOWNLOAD_GROUPS: DownloadGroup[] = [
         status: "available",
         matchOs: "windows",
         meta: `78 MB · v${LATEST_DESKTOP_VERSION}`,
-        secondary: { label: "Portable (no install)", url: `${DL}/Koleex.Hub-Portable-1.0.0.exe` },
       },
       {
         id: "linux",

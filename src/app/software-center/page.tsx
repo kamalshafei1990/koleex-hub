@@ -238,9 +238,11 @@ function Hero({
           )}
           {/* Explicit per-OS download buttons */}
           <div className="mt-3 md:mt-4 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2.5 sm:gap-3">
-            {desktopTargets.map((t) => (
-              <HeroPlatformButton key={t.id} target={t} />
-            ))}
+            {desktopTargets
+              .filter((t) => t.status === "available" && t.url)
+              .map((t) => (
+                <HeroPlatformButton key={t.id} target={t} />
+              ))}
             <a
               href={CURRENT_RELEASE_URL}
               target="_blank"
