@@ -125,16 +125,16 @@ function SoftwareCenterContent() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <PageHeader
-        title="Software Center"
-        subtitle="Download apps, updates, drivers and installers"
-        icon="download"
-        backHref="/"
-        searchPlaceholder="Search downloads…"
-        onSearchSubmit={setQuery}
-      />
+      <div className="max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 pt-5 md:pt-7 pb-16">
+        <PageHeader
+          title="Software Center"
+          subtitle="Download apps, updates, drivers and installers"
+          icon="download"
+          backHref="/"
+          searchPlaceholder="Search downloads…"
+          onSearchSubmit={setQuery}
+        />
 
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 pb-16">
         {/* ── HERO ── */}
         <Hero platform={platform} recommended={recommended} />
 
