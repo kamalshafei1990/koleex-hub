@@ -3664,7 +3664,7 @@ function ProductPicker({
   const [search, setSearch] = useState("");
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return products.slice(0, 40);
+    if (!q) return products.slice(0, 60);
     return products
       .filter(
         (p) =>
@@ -3672,11 +3672,11 @@ function ProductPicker({
           p.slug.toLowerCase().includes(q) ||
           (p.brand ?? "").toLowerCase().includes(q),
       )
-      .slice(0, 60);
+      .slice(0, 90);
   }, [products, search]);
 
   return (
-    <ModalShell title={t("composer.product")} onCancel={onCancel} width={520}>
+    <ModalShell title={t("composer.product")} onCancel={onCancel} width={640}>
       <div className="p-5 flex flex-col gap-3">
         <div className="h-10 px-3 flex items-center gap-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors">
           <SearchIcon className="h-4 w-4 text-[var(--text-dim)]" />
@@ -3689,46 +3689,61 @@ function ProductPicker({
             className="flex-1 bg-transparent text-[12.5px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none"
           />
         </div>
-        <div className="max-h-[400px] overflow-y-auto flex flex-col gap-0.5">
-          {filtered.length === 0 && (
-            <div className="p-4 text-center text-[11px] text-[var(--text-dim)]">
-              {t("search.noResults")}
-            </div>
-          )}
-          {filtered.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => onSelect(p)}
-              className="w-full px-3 py-2 flex items-center gap-3 text-start rounded-lg hover:bg-[var(--bg-surface)] transition-colors"
-            >
-              <div className="h-10 w-10 shrink-0 rounded bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center overflow-hidden">
-                {images[p.id] ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
-                    src={images[p.id]}
-                    alt={p.product_name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <PackageIcon className="h-4 w-4 text-[var(--text-muted)]" />
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-[12.5px] font-semibold text-[var(--text-primary)] truncate">
-                  {p.product_name}
+        {filtered.length === 0 ? (
+          <div className="p-8 text-center text-[11px] text-[var(--text-dim)]">
+            {t("search.noResults")}
+          </div>
+        ) : (
+          /* Grid of photo cards — same grammar as the To-do product picker:
+             white photo area (object-contain so machines aren't cropped),
+             model code first, product name beneath. */
+          <div className="max-h-[420px] overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-3 p-0.5">
+            {filtered.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => onSelect(p)}
+                className="group text-start rounded-xl border border-[var(--border-subtle)] hover:border-[var(--border-focus)] bg-[var(--bg-surface)] overflow-hidden transition-all"
+                title={stripHtmlText(p.product_name)}
+              >
+                <div className="aspect-square w-full bg-white flex items-center justify-center overflow-hidden p-2">
+                  {images[p.id] ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={images[p.id]}
+                      alt={stripHtmlText(p.product_name)}
+                      className="max-h-full max-w-full object-contain"
+                    />
+                  ) : (
+                    <PackageIcon className="h-8 w-8 text-black/20" />
+                  )}
                 </div>
-                <div className="text-[10.5px] text-[var(--text-dim)] truncate">
-                  {p.brand ? `${p.brand} · ` : ""}
-                  {p.slug}
+                <div className="p-2">
+                  <p className="text-[11.5px] font-semibold text-[var(--text-primary)] truncate">
+                    {p.slug}
+                  </p>
+                  <p className="text-[10.5px] text-[var(--text-dim)] truncate">
+                    {stripHtmlText(p.product_name)}
+                  </p>
                 </div>
-              </div>
-            </button>
-          ))}
-        </div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </ModalShell>
   );
+}
+
+/* Some legacy product names carry raw HTML (e.g. "…with 2 iron<div>Table
+   size…</div>" or "<b>With Air Trimmer</b>"). Strip tags so the picker shows
+   clean text instead of leaking markup. */
+function stripHtmlText(s: string): string {
+  return s
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
