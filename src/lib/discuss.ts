@@ -19,6 +19,7 @@
 import { supabaseAdmin as supabase } from "./supabase-admin";
 import { uploadToStorage } from "./storage-client";
 import { isTransientFetch, warnOnce } from "./util/transient-fetch";
+import { loadDiscussDirectory } from "./discuss-directory";
 import type {
   DiscussAttachment,
   DiscussAuthor,
@@ -232,6 +233,7 @@ export async function fetchMyChannels(
       .select(
         `
         channel_id,
+        account_id,
         account:accounts!discuss_members_account_id_fkey (
           id,
           username,
@@ -243,8 +245,13 @@ export async function fetchMyChannels(
       .in("channel_id", directChannelIds)
       .neq("account_id", accountId);
 
+    // The embedded account join is null under anon RLS (accounts are
+    // service-role-only) — so we also keep the raw account_id and resolve the
+    // peer's name/avatar from the Discuss directory below.
+    const peerIdByChannel = new Map<string, string>();
     for (const row of (otherMembers ?? []) as unknown as Array<{
       channel_id: string;
+      account_id: string | null;
       account:
         | {
             id: string;
@@ -261,14 +268,32 @@ export async function fetchMyChannels(
         | null;
     }>) {
       const acc = Array.isArray(row.account) ? row.account[0] ?? null : row.account;
-      if (!acc) continue;
-      const person = Array.isArray(acc.person) ? acc.person[0] ?? null : acc.person;
-      otherByChannel.set(row.channel_id, {
-        id: acc.id,
-        username: acc.username,
-        avatar_url: acc.avatar_url,
-        full_name: person?.full_name ?? null,
-      });
+      if (acc) {
+        const person = Array.isArray(acc.person) ? acc.person[0] ?? null : acc.person;
+        otherByChannel.set(row.channel_id, {
+          id: acc.id,
+          username: acc.username,
+          avatar_url: acc.avatar_url,
+          full_name: person?.full_name ?? null,
+        });
+      } else if (row.account_id) {
+        peerIdByChannel.set(row.channel_id, row.account_id);
+      }
+    }
+
+    if (peerIdByChannel.size > 0) {
+      const dir = await loadDiscussDirectory();
+      for (const [channelId, peerId] of peerIdByChannel) {
+        const p = dir.get(peerId);
+        if (p) {
+          otherByChannel.set(channelId, {
+            id: p.id,
+            username: p.username,
+            avatar_url: p.avatar_url,
+            full_name: p.full_name,
+          });
+        }
+      }
     }
   }
 
@@ -506,7 +531,7 @@ export async function fetchChannelMembers(
     console.error("[Discuss] Fetch members:", error.message);
     return [];
   }
-  return ((data ?? []) as unknown as Array<
+  const members = ((data ?? []) as unknown as Array<
     DiscussMemberRow & {
       account:
         | {
@@ -538,6 +563,21 @@ export async function fetchChannelMembers(
         : { id: "", username: "unknown", avatar_url: null, full_name: null },
     };
   });
+
+  // Backfill members whose embedded account join was blocked by anon RLS
+  // (accounts are service-role-only) using the Discuss directory.
+  if (members.some((m) => !m.author.id && m.account_id)) {
+    const dir = await loadDiscussDirectory();
+    for (const m of members) {
+      if (!m.author.id && m.account_id) {
+        const p = dir.get(m.account_id);
+        if (p) {
+          m.author = { id: p.id, username: p.username, avatar_url: p.avatar_url, full_name: p.full_name };
+        }
+      }
+    }
+  }
+  return members;
 }
 
 /** Update the read cursor for a (channel, member) pair. Called from
@@ -623,6 +663,21 @@ export async function fetchChannelMessages(
       : null;
     return { ...row, author };
   });
+
+  /* accounts/people are service-role-only now, so the embedded author join
+     above returns null under anon RLS → "Unknown". Backfill author identity
+     from the Discuss directory (service-role API) for any unresolved row. */
+  if (rows.some((r) => !r.author && r.author_account_id)) {
+    const dir = await loadDiscussDirectory();
+    for (const r of rows) {
+      if (!r.author && r.author_account_id) {
+        const p = dir.get(r.author_account_id);
+        if (p) {
+          r.author = { id: p.id, username: p.username, avatar_url: p.avatar_url, full_name: p.full_name };
+        }
+      }
+    }
+  }
 
   /* Reactions in one batched query so we don't N+1. */
   const messageIds = rows.map((r) => r.id);
