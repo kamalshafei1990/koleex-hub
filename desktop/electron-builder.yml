@@ -6,7 +6,7 @@
 # (semver). Bump it per release (see RELEASE.md). The desktop shell version is
 # independent of the web app, which updates continuously via Vercel.
 
-appId: com.koleex.hub
+appId: com.koleexgroup.desktop
 productName: Koleex Hub
 copyright: © Koleex International Group
 

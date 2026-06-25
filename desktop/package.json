@@ -1,7 +1,7 @@
 {
   "name": "koleex-hub-desktop",
   "productName": "Koleex Hub",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Koleex Hub — native desktop shell around the live cloud app (Vercel + Supabase).",
   "author": "Koleex International Group",
   "license": "UNLICENSED",
