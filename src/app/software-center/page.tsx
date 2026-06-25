@@ -20,7 +20,6 @@ import CheckIcon from "@/components/icons/ui/CheckIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import {
   DOWNLOAD_GROUPS,
-  ALL_TARGETS,
   RELEASE_NOTES,
   INSTALL_GUIDES,
   CURRENT_RELEASE_URL,
@@ -98,13 +97,8 @@ function DownloadCenterContent() {
   const [query, setQuery] = useState("");
   const [guide, setGuide] = useState<InstallGuide | null>(null);
 
-  const recommended = useMemo(
-    () =>
-      platform?.recommendedId
-        ? ALL_TARGETS.find((t) => t.id === platform.recommendedId) ?? null
-        : null,
-    [platform],
-  );
+  const desktopTargets =
+    DOWNLOAD_GROUPS.find((g) => g.id === "desktop")?.targets ?? [];
 
   const groups = useMemo<DownloadGroup[]>(() => {
     const q = query.trim().toLowerCase();
@@ -129,18 +123,14 @@ function DownloadCenterContent() {
           onSearchSubmit={setQuery}
         />
 
-        <Hero platform={platform} recommended={recommended} />
+        <Hero platform={platform} desktopTargets={desktopTargets} />
 
         {/* Platform groups */}
         {groups.map((g) => (
           <Section key={g.id} title={g.title} subtitle={g.subtitle}>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
               {g.targets.map((t) => (
-                <DownloadCard
-                  key={t.id}
-                  target={t}
-                  recommended={t.id === recommended?.id}
-                />
+                <DownloadCard key={t.id} target={t} />
               ))}
             </div>
           </Section>
@@ -208,12 +198,11 @@ function DownloadCenterContent() {
 /* ── Hero ───────────────────────────────────────────────────────────────── */
 function Hero({
   platform,
-  recommended,
+  desktopTargets,
 }: {
   platform: DetectedPlatform | null;
-  recommended: DownloadTarget | null;
+  desktopTargets: DownloadTarget[];
 }) {
-  const canDownload = recommended?.status === "available" && !!recommended.url;
   return (
     <div className="relative overflow-hidden rounded-3xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] mt-4 md:mt-6">
       <div
@@ -238,7 +227,7 @@ function Hero({
             Get Koleex Hub
           </h1>
           <p className="hidden sm:block text-[13.5px] md:text-[15px] text-[var(--text-muted)] max-w-xl leading-relaxed">
-            One workspace, every device — pick your platform below. Desktop is
+            One workspace, every device — choose your platform below. Desktop is
             live today; mobile and China app stores are on the way.
           </p>
           {platform && (
@@ -247,22 +236,11 @@ function Hero({
               <span className="text-[var(--text-primary)] font-medium">{platform.label}</span>
             </p>
           )}
+          {/* Explicit per-OS download buttons */}
           <div className="mt-3 md:mt-4 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2.5 sm:gap-3">
-            {canDownload ? (
-              <a
-                href={recommended!.url}
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 h-11 md:h-12 w-full sm:w-auto px-6 rounded-2xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[14px] font-semibold hover:opacity-90 transition-all shadow-lg"
-              >
-                <DownloadIcon size={18} />
-                Download for {osName(platform?.os)}
-              </a>
-            ) : (
-              <div className="inline-flex items-center justify-center gap-2 h-11 md:h-12 w-full sm:w-auto px-6 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] text-[13.5px] md:text-[14px] font-semibold">
-                <DownloadIcon size={18} />
-                {platform?.os === "mobile" ? "Open on a computer to download" : "Choose a platform below"}
-              </div>
-            )}
+            {desktopTargets.map((t) => (
+              <HeroPlatformButton key={t.id} target={t} />
+            ))}
             <a
               href={CURRENT_RELEASE_URL}
               target="_blank"
@@ -278,24 +256,46 @@ function Hero({
   );
 }
 
+/* One hero button per desktop OS, each with its platform logo. Available =
+   solid download; coming-soon (Linux) = muted, non-clickable. */
+function HeroPlatformButton({ target }: { target: DownloadTarget }) {
+  const available = target.status === "available" && !!target.url;
+  const label = available ? `Download for ${target.name}` : `${target.name} · Soon`;
+  const inner = (
+    <>
+      <span className="h-6 w-6 rounded-md bg-white ring-1 ring-black/10 flex items-center justify-center p-1 shrink-0">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={target.logo} alt="" className="max-h-full max-w-full object-contain" />
+      </span>
+      {label}
+    </>
+  );
+  if (available) {
+    return (
+      <a
+        href={target.url}
+        rel="noopener noreferrer"
+        className="inline-flex items-center justify-center gap-2.5 h-11 md:h-12 w-full sm:w-auto pl-2 pr-5 rounded-2xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[14px] font-semibold hover:opacity-90 transition-all shadow-lg"
+      >
+        {inner}
+      </a>
+    );
+  }
+  return (
+    <span className="inline-flex items-center justify-center gap-2.5 h-11 md:h-12 w-full sm:w-auto pl-2 pr-5 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] text-[14px] font-semibold">
+      {inner}
+    </span>
+  );
+}
+
 /* ── Download card ──────────────────────────────────────────────────────── */
-function DownloadCard({ target, recommended }: { target: DownloadTarget; recommended: boolean }) {
+function DownloadCard({ target }: { target: DownloadTarget }) {
   const available = target.status === "available" && !!target.url;
   return (
-    <div
-      className={
-        "relative flex flex-col rounded-2xl border bg-[var(--bg-secondary)] p-5 transition-all " +
-        (recommended
-          ? "border-[var(--accent)]/45"
-          : "border-[var(--border-subtle)] hover:border-[var(--border-strong)]")
-      }
-    >
+    <div className="relative flex flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 transition-all hover:border-[var(--border-strong)]">
       <div className="flex items-start justify-between gap-3 mb-4">
         <PlatformLogo logo={target.logo} />
-        <div className="flex items-center gap-1.5">
-          {recommended && <Badge tone="accent">Recommended</Badge>}
-          {target.status === "coming-soon" && <Badge tone="neutral">Coming soon</Badge>}
-        </div>
+        {target.status === "coming-soon" && <Badge tone="neutral">Coming soon</Badge>}
       </div>
 
       <div className="text-[16px] font-semibold leading-tight">{target.name}</div>
@@ -425,14 +425,6 @@ function GuideDialog({ guide, onClose }: { guide: InstallGuide; onClose: () => v
 }
 
 /* ── helpers ────────────────────────────────────────────────────────────── */
-function osName(os: DetectedPlatform["os"] | undefined): string {
-  switch (os) {
-    case "windows": return "Windows";
-    case "macos": return "macOS";
-    case "linux": return "Linux";
-    default: return "your device";
-  }
-}
 function formatDate(iso: string): string {
   const d = new Date(iso + "T00:00:00");
   if (Number.isNaN(d.getTime())) return iso;

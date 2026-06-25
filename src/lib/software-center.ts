@@ -21,19 +21,22 @@ export const LATEST_DESKTOP_VERSION = "1.0.0";
 export const KOLEEX_APP_ICON = "/icon-512.png";
 
 /* ── Platform logos (Database → "Operation Systems" collection) ─────────── */
-const MEDIA = "https://yxyizbnfjrwrnmwhkvme.supabase.co/storage/v1/object/public/media/visual-library/business/";
+const MEDIA = "https://yxyizbnfjrwrnmwhkvme.supabase.co/storage/v1/object/public/media/";
+const BIZ = `${MEDIA}visual-library/business/`;
 export const OS_LOGOS = {
-  apple: `${MEDIA}apple-logo.svg`,
-  windows: `${MEDIA}windows-ivsvbw.svg`,
-  appStore: `${MEDIA}app-store-nhfezg.svg`,
-  googlePlay: `${MEDIA}google-play-7ih6vy.svg`,
-  huaweiGallery: `${MEDIA}huawei-app-gallery-m8du3b.svg`,
-  huawei: `${MEDIA}huawei-4yiva1.svg`,
-  xiaomi: `${MEDIA}xiaomi-hq7rvo.svg`,
-  getApps: `${MEDIA}get-apps-m9970t.svg`,
-  oppo: `${MEDIA}oppo-z98wzx.svg`,
-  vivo: `${MEDIA}vivo-1y8br4.svg`,
-  tencent: `${MEDIA}tencent-yi4ahb.svg`,
+  apple: `${BIZ}apple-logo.svg`,
+  windows: `${BIZ}windows-ivsvbw.svg`,
+  linux: `${BIZ}linux-platform-oz2vao.svg`,
+  appStore: `${BIZ}app-store-nhfezg.svg`,
+  googlePlay: `${BIZ}google-play-7ih6vy.svg`,
+  apk: `${MEDIA}visual-library/files/apk-jf5ar6.svg`,
+  huaweiGallery: `${BIZ}huawei-app-gallery-m8du3b.svg`,
+  huawei: `${BIZ}huawei-4yiva1.svg`,
+  xiaomi: `${BIZ}xiaomi-hq7rvo.svg`,
+  getApps: `${BIZ}get-apps-m9970t.svg`,
+  oppo: `${BIZ}oppo-z98wzx.svg`,
+  vivo: `${BIZ}vivo-1y8br4.svg`,
+  tencent: `${BIZ}tencent-yi4ahb.svg`,
 } as const;
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
@@ -97,7 +100,7 @@ export const DOWNLOAD_GROUPS: DownloadGroup[] = [
         id: "linux",
         name: "Linux",
         sublabel: "AppImage · 64-bit",
-        logo: "",
+        logo: OS_LOGOS.linux,
         status: "coming-soon",
         matchOs: "linux",
         meta: `v${LATEST_DESKTOP_VERSION}`,
@@ -125,14 +128,7 @@ export const DOWNLOAD_GROUPS: DownloadGroup[] = [
         status: "coming-soon",
         matchOs: "mobile",
       },
-      {
-        id: "android-apk",
-        name: "Android APK",
-        sublabel: "Direct install (.apk)",
-        logo: "",
-        status: "coming-soon",
-        matchOs: "mobile",
-      },
+      { id: "huawei", name: "Huawei", sublabel: "AppGallery", logo: OS_LOGOS.huaweiGallery, status: "coming-soon", matchOs: "mobile" },
     ],
   },
   {
@@ -140,11 +136,18 @@ export const DOWNLOAD_GROUPS: DownloadGroup[] = [
     title: "China App Stores",
     subtitle: "Android distribution for Mainland China",
     targets: [
-      { id: "huawei", name: "Huawei", sublabel: "AppGallery", logo: OS_LOGOS.huaweiGallery, status: "coming-soon" },
       { id: "xiaomi", name: "Xiaomi", sublabel: "GetApps", logo: OS_LOGOS.getApps, status: "coming-soon" },
       { id: "oppo", name: "OPPO", sublabel: "App Market", logo: OS_LOGOS.oppo, status: "coming-soon" },
       { id: "vivo", name: "vivo", sublabel: "V-AppStore", logo: OS_LOGOS.vivo, status: "coming-soon" },
       { id: "tencent", name: "Tencent", sublabel: "MyApp · 应用宝", logo: OS_LOGOS.tencent, status: "coming-soon" },
+    ],
+  },
+  {
+    id: "apk",
+    title: "APK",
+    subtitle: "Direct Android install — no store required",
+    targets: [
+      { id: "android-apk", name: "Android APK", sublabel: "Direct install (.apk)", logo: OS_LOGOS.apk, status: "coming-soon", matchOs: "mobile" },
     ],
   },
 ];
