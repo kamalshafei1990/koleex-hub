@@ -215,50 +215,50 @@ function Hero({
 }) {
   const canDownload = recommended?.status === "available" && !!recommended.url;
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] mt-5 md:mt-6">
+    <div className="relative overflow-hidden rounded-3xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] mt-4 md:mt-6">
       <div
         aria-hidden
         className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full opacity-[0.12] blur-3xl"
         style={{ background: "var(--accent)" }}
       />
-      <div className="relative p-6 md:p-10 flex flex-col md:flex-row md:items-center gap-6 md:gap-8">
+      <div className="relative p-5 md:p-10 flex flex-row md:items-center gap-4 md:gap-8">
         {/* Koleex Hub app icon */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={KOLEEX_APP_ICON}
           alt="Koleex Hub"
-          className="h-16 w-16 md:h-20 md:w-20 rounded-2xl shrink-0 shadow-lg ring-1 ring-[var(--border-subtle)]"
+          className="h-12 w-12 md:h-20 md:w-20 rounded-2xl shrink-0 shadow-lg ring-1 ring-[var(--border-subtle)]"
         />
         <div className="flex-1 min-w-0">
           <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1 text-[11px] font-medium text-[var(--text-muted)] mb-3">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
             Koleex Hub Desktop v{LATEST_DESKTOP_VERSION}
           </div>
-          <h1 className="text-2xl md:text-[34px] font-bold tracking-tight leading-[1.05] mb-2">
+          <h1 className="text-xl md:text-[34px] font-bold tracking-tight leading-[1.1] mb-1.5">
             Get Koleex Hub
           </h1>
-          <p className="text-[13.5px] md:text-[15px] text-[var(--text-muted)] max-w-xl leading-relaxed">
+          <p className="hidden sm:block text-[13.5px] md:text-[15px] text-[var(--text-muted)] max-w-xl leading-relaxed">
             One workspace, every device — pick your platform below. Desktop is
             live today; mobile and China app stores are on the way.
           </p>
           {platform && (
-            <p className="mt-4 text-[13px] text-[var(--text-dim)]">
+            <p className="mt-1.5 sm:mt-4 text-[12.5px] md:text-[13px] text-[var(--text-dim)]">
               You&apos;re using{" "}
               <span className="text-[var(--text-primary)] font-medium">{platform.label}</span>
             </p>
           )}
-          <div className="mt-3 flex flex-wrap items-center gap-3">
+          <div className="mt-3 md:mt-4 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2.5 sm:gap-3">
             {canDownload ? (
               <a
                 href={recommended!.url}
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 h-12 px-6 rounded-2xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[14px] font-semibold hover:opacity-90 transition-all shadow-lg"
+                className="inline-flex items-center justify-center gap-2 h-11 md:h-12 w-full sm:w-auto px-6 rounded-2xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[14px] font-semibold hover:opacity-90 transition-all shadow-lg"
               >
                 <DownloadIcon size={18} />
                 Download for {osName(platform?.os)}
               </a>
             ) : (
-              <div className="inline-flex items-center gap-2 h-12 px-6 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] text-[14px] font-semibold">
+              <div className="inline-flex items-center justify-center gap-2 h-11 md:h-12 w-full sm:w-auto px-6 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] text-[13.5px] md:text-[14px] font-semibold">
                 <DownloadIcon size={18} />
                 {platform?.os === "mobile" ? "Open on a computer to download" : "Choose a platform below"}
               </div>
@@ -267,7 +267,7 @@ function Hero({
               href={CURRENT_RELEASE_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center h-12 px-5 rounded-2xl border border-[var(--border-subtle)] text-[13px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-colors"
+              className="inline-flex items-center justify-center h-11 md:h-12 w-full sm:w-auto px-5 rounded-2xl border border-[var(--border-subtle)] text-[13px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-colors"
             >
               All releases
             </a>
@@ -352,8 +352,8 @@ function PlatformLogo({ logo }: { logo: string }) {
 /* ── Building blocks ────────────────────────────────────────────────────── */
 function Section({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   return (
-    <section className="mt-10 md:mt-12">
-      <div className="mb-4 md:mb-5">
+    <section className="mt-8 md:mt-12">
+      <div className="mb-3 md:mb-5">
         <h2 className="text-[18px] md:text-[20px] font-bold tracking-tight">{title}</h2>
         <p className="text-[12.5px] text-[var(--text-dim)] mt-0.5">{subtitle}</p>
       </div>
