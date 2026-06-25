@@ -25,10 +25,11 @@ const MEDIA = "https://yxyizbnfjrwrnmwhkvme.supabase.co/storage/v1/object/public
 const BIZ = `${MEDIA}visual-library/business/`;
 export const OS_LOGOS = {
   apple: `${BIZ}apple-logo.svg`,
-  windows: `${BIZ}windows-ivsvbw.svg`,
-  linux: `${BIZ}linux-platform-oz2vao.svg`,
-  appStore: `${BIZ}app-store-nhfezg.svg`,
-  googlePlay: `${BIZ}google-play-7ih6vy.svg`,
+  // Colorful brand SVGs served from /public (uploaded by Kamal).
+  windows: "/os-logos/windows.svg",
+  linux: "/os-logos/linux.svg",
+  appStore: "/os-logos/app-store.svg",
+  googlePlay: "/os-logos/google-play.svg",
   apk: `${MEDIA}visual-library/files/apk-jf5ar6.svg`,
   huaweiGallery: `${BIZ}huawei-app-gallery-m8du3b.svg`,
   huawei: `${BIZ}huawei-4yiva1.svg`,

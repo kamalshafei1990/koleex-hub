@@ -178,18 +178,16 @@ function DownloadCenterContent() {
                 onClick={() => setGuide(g)}
                 className="group text-left rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 hover:border-[var(--border-strong)] hover:bg-[var(--bg-surface-subtle)] transition-all"
               >
-                <div className="h-9 w-9 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] group-hover:text-[var(--text-primary)] transition-colors mb-3">
-                  {g.logo ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
-                      src={g.logo}
-                      alt=""
-                      className="h-4 w-4 object-contain [filter:brightness(0)] dark:[filter:brightness(0)_invert(1)]"
-                    />
-                  ) : (
+                {g.logo ? (
+                  <div className="h-9 w-9 rounded-xl bg-white border border-[var(--border-subtle)] flex items-center justify-center p-1.5 mb-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={g.logo} alt="" className="max-h-full max-w-full object-contain" />
+                  </div>
+                ) : (
+                  <div className="h-9 w-9 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] group-hover:text-[var(--text-primary)] transition-colors mb-3">
                     <WrenchIcon size={16} />
-                  )}
-                </div>
+                  </div>
+                )}
                 <div className="text-[14px] font-semibold mb-1">{g.title}</div>
                 <p className="text-[12.5px] text-[var(--text-dim)] leading-relaxed">{g.summary}</p>
                 <span className="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent)]">Read guide →</span>
@@ -274,13 +272,11 @@ function HeroPlatformButton({ target }: { target: DownloadTarget }) {
   const label = available ? `Download for ${target.name}` : `${target.name} · Soon`;
   const inner = (
     <>
-      {/* Monochrome: matches the button's inverted text colour in both themes. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={target.logo}
-        alt=""
-        className="h-5 w-5 object-contain shrink-0 [filter:brightness(0)_invert(1)] dark:[filter:brightness(0)]"
-      />
+      {/* Original colours on a white chip so the logo reads on the button in any theme. */}
+      <span className="h-7 w-7 rounded-md bg-white ring-1 ring-black/10 flex items-center justify-center p-1 shrink-0">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={target.logo} alt="" className="max-h-full max-w-full object-contain" />
+      </span>
       {label}
     </>
   );
@@ -356,15 +352,10 @@ function PlatformLogo({ logo }: { logo: string }) {
     );
   }
   return (
-    <div className="h-12 w-12 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center p-2.5 shrink-0">
-      {/* Monochrome: white logo on dark, black on light — matches the UI. */}
+    <div className="h-12 w-12 rounded-xl bg-white border border-[var(--border-subtle)] flex items-center justify-center p-2 shrink-0">
+      {/* Original brand colours on a white tile (keeps dark/black logos visible). */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={logo}
-        alt=""
-        loading="lazy"
-        className="max-h-full max-w-full object-contain [filter:brightness(0)] dark:[filter:brightness(0)_invert(1)]"
-      />
+      <img src={logo} alt="" loading="lazy" className="max-h-full max-w-full object-contain" />
     </div>
   );
 }
@@ -419,18 +410,16 @@ function GuideDialog({ guide, onClose }: { guide: InstallGuide; onClose: () => v
         {/* Header */}
         <div className="flex items-start justify-between gap-4 p-5 border-b border-[var(--border-subtle)] shrink-0">
           <div className="flex items-start gap-3 min-w-0">
-            <div className="h-9 w-9 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-              {guide.logo ? (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  src={guide.logo}
-                  alt=""
-                  className="h-4 w-4 object-contain [filter:brightness(0)] dark:[filter:brightness(0)_invert(1)]"
-                />
-              ) : (
+            {guide.logo ? (
+              <div className="h-9 w-9 rounded-xl bg-white border border-[var(--border-subtle)] flex items-center justify-center p-1.5 shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={guide.logo} alt="" className="max-h-full max-w-full object-contain" />
+              </div>
+            ) : (
+              <div className="h-9 w-9 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
                 <WrenchIcon size={16} />
-              )}
-            </div>
+              </div>
+            )}
             <div className="min-w-0">
               <h3 className="text-[15px] font-bold tracking-tight">{guide.title}</h3>
               <p className="text-[12.5px] text-[var(--text-dim)] mt-0.5">{guide.summary}</p>
