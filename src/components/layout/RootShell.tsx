@@ -15,7 +15,6 @@ import Sidebar from "./Sidebar";
 import FloatingPanel from "./FloatingPanel";
 import ViewAsBanner from "./ViewAsBanner";
 import ReportIssueButton from "@/components/qa/ReportIssueButton";
-import ScrollToEdges from "@/components/ui/ScrollToEdges";
 import { Suspense } from "react";
 import QaFocusHighlight from "@/components/qa/QaFocusHighlight";
 import ActivityTracker from "@/components/activity/ActivityTracker";
@@ -90,8 +89,6 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       <FloatingPanel />
       {/* Global QA issue reporter (floating button + modal). */}
       <ReportIssueButton />
-      {/* System-wide scroll-to-top/bottom (issue 46dba6b3). */}
-      <ScrollToEdges />
       {/* QA Open Route highlighter — reads ?qa_focus=… and outlines the
           picked component on arrival (issue dc295123 follow-up). */}
       <Suspense fallback={null}><QaFocusHighlight /></Suspense>
