@@ -349,6 +349,19 @@ export default function HomePage() {
     [router],
   );
 
+  /* Warm a route's JS chunk + RSC payload BEFORE the user clicks, so opening
+     an app is near-instant instead of cold-loading on tap. Guarded so each
+     route is only prefetched once. */
+  const prefetchedRef = useRef<Set<string>>(new Set());
+  const prefetchApp = useCallback(
+    (app: AppDef) => {
+      if (!app.active || prefetchedRef.current.has(app.route)) return;
+      prefetchedRef.current.add(app.route);
+      try { router.prefetch(app.route); } catch { /* ignore */ }
+    },
+    [router],
+  );
+
   const toggleFavorite = useCallback(
     async (appId: string) => {
       const id = accountIdRef.current;
@@ -438,6 +451,26 @@ export default function HomePage() {
     [recentIds, favoriteIds, visibleRegistry],
   );
 
+  /* When the dashboard goes idle, warm the most-likely destinations (favorites
+     + recent) so the very first tap on mobile is instant too — hover/touch
+     prefetch can't help on a cold first interaction. */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const targets = [...favoriteApps, ...recentApps];
+    if (targets.length === 0) return;
+    const warm = () => targets.forEach((a) => prefetchApp(a));
+    const w = window as unknown as {
+      requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    if (w.requestIdleCallback) {
+      const id = w.requestIdleCallback(warm, { timeout: 2500 });
+      return () => w.cancelIdleCallback?.(id);
+    }
+    const id = window.setTimeout(warm, 1000);
+    return () => window.clearTimeout(id);
+  }, [favoriteApps, recentApps, prefetchApp]);
+
   const isSearching = search.trim() !== "";
   const isFiltered = activeCategory !== "all";
   const isSearchOrFilter = isSearching || isFiltered;
@@ -496,6 +529,9 @@ export default function HomePage() {
         tabIndex={app.active ? 0 : -1}
         onClick={() => handleAppClick(app)}
         onKeyDown={(e) => { if (e.key === "Enter") handleAppClick(app); }}
+        onPointerEnter={() => prefetchApp(app)}
+        onTouchStart={() => prefetchApp(app)}
+        onFocus={() => prefetchApp(app)}
         className={`relative flex flex-col items-center justify-center gap-2.5 p-3 aspect-square rounded-2xl transition-all duration-200 select-none ${
           isAi
             ? "ai-card-neon cursor-default"
@@ -628,6 +664,9 @@ export default function HomePage() {
         tabIndex={app.active ? 0 : -1}
         onClick={() => handleAppClick(app)}
         onKeyDown={(e) => { if (e.key === "Enter") handleAppClick(app); }}
+        onPointerEnter={() => prefetchApp(app)}
+        onTouchStart={() => prefetchApp(app)}
+        onFocus={() => prefetchApp(app)}
         className={`relative flex items-center gap-2.5 px-3.5 py-2.5 border rounded-xl transition-all duration-200 shrink-0 select-none ${
           app.active
             ? `cursor-pointer group ${
