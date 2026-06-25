@@ -87,4 +87,5 @@ export const hubT: Translations = {
   "app.roles":           { en: "Roles & Permissions", zh: "角色与权限",      ar: "الأدوار والصلاحيات" },
   "app.activity-monitor":{ en: "Activity Monitor",     zh: "活动监控",        ar: "مراقبة النشاط" },
   "app.commercial-policy": { en: "Commercial Setup", zh: "商务设置",          ar: "الإعداد التجاري" },
+  "app.software-center": { en: "Software Center",  zh: "软件中心",          ar: "مركز البرامج" },
 };
