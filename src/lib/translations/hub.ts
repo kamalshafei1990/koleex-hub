@@ -85,5 +85,6 @@ export const hubT: Translations = {
   "app.accounts":        { en: "Accounts",         zh: "账户管理",          ar: "الحسابات" },
   "app.brands":          { en: "Brands",           zh: "品牌",              ar: "العلامات التجارية" },
   "app.roles":           { en: "Roles & Permissions", zh: "角色与权限",      ar: "الأدوار والصلاحيات" },
+  "app.activity-monitor":{ en: "Activity Monitor",     zh: "活动监控",        ar: "مراقبة النشاط" },
   "app.commercial-policy": { en: "Commercial Setup", zh: "商务设置",          ar: "الإعداد التجاري" },
 };

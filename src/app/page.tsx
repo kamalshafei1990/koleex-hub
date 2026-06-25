@@ -33,7 +33,7 @@ import {
   trackAppOpen,
 } from "@/lib/app-launcher";
 import { usePermittedModules } from "@/lib/use-scope";
-import { getMeBootstrapLastError, retryMeBootstrap } from "@/lib/me-bootstrap";
+import { getMeBootstrapLastError, retryMeBootstrap, useMeBootstrap } from "@/lib/me-bootstrap";
 import { useShortcutHint } from "@/lib/ui/use-shortcut-hint";
 import { fetchMyChannels, subscribeToMyChannels } from "@/lib/discuss";
 import { fetchUnreadTaskCount, subscribeToInboxMessages } from "@/lib/inbox";
@@ -392,13 +392,20 @@ export default function HomePage() {
   const { modules: permittedModules, loading: permLoading } =
     usePermittedModules();
 
+  const { data: meBoot } = useMeBootstrap();
+  const isSuperAdmin = !!meBoot?.isSuperAdmin;
+
   const visibleRegistry = useMemo(() => {
     // Fail-closed: while perms load, show no apps at all.
     if (permLoading) return [];
-    return APP_REGISTRY.filter(
-      (a) => !a.hideFromLauncher && permittedModules.has(a.name),
-    );
-  }, [permLoading, permittedModules]);
+    return APP_REGISTRY.filter((a) => {
+      if (a.hideFromLauncher) return false;
+      // Super-Admin-only apps (e.g. Activity Monitor) gate on the bootstrap flag,
+      // not on a module permission name.
+      if (a.superAdminOnly) return isSuperAdmin;
+      return permittedModules.has(a.name);
+    });
+  }, [permLoading, permittedModules, isSuperAdmin]);
 
   /* ── Derived ── */
   const filteredApps = useMemo(() => {

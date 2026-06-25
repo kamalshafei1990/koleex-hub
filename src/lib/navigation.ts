@@ -12,6 +12,7 @@
    --------------------------------------------------------------------------- */
 
 import AppsIcon from "@/components/icons/ui/AppsIcon";
+import ActivityMonitorIcon from "@/components/icons/ui/ActivityIcon";
 import CalendarCheckIcon from "@/components/icons/ui/CalendarCheckIcon";
 import ManagementIcon from "@/components/icons/ManagementIcon";
 import CrmIcon from "@/components/icons/CrmIcon";
@@ -98,6 +99,14 @@ export interface AppDef {
    * ["admin","sales"] → only those roles.
    */
   visibleTo?: string[];
+
+  /**
+   * Show this app ONLY to effective Super Admins (account or role flag). Used
+   * for admin-only tools like the Activity Monitor. Gated in both the home App
+   * Launcher and the sidebar via the bootstrap isSuperAdmin flag — normal users
+   * never see the tile (and the page itself 403s server-side regardless).
+   */
+  superAdminOnly?: boolean;
 
   /**
    * ISO-date (YYYY-MM-DD) marking when the app was first launched.
@@ -225,6 +234,7 @@ export const APP_REGISTRY: AppDef[] = [
   /* ── System ── */
   { id: "accounts",         tKey: "app.accounts",         name: "Accounts",          icon: AccountsIcon,  route: "/accounts",         active: true  },
   { id: "roles",            tKey: "app.roles",            name: "Roles & Permissions", icon: RolesPermissionsIcon, route: "/roles",   active: true  },
+  { id: "activity-monitor", tKey: "app.activity-monitor", name: "Activity Monitor",  icon: ActivityMonitorIcon, route: "/super-admin/activity", active: true, superAdminOnly: true },
   { id: "commercial-policy", tKey: "app.commercial-policy", name: "Commercial Policy", icon: CommercialPolicyIcon, route: "/commercial-policy", active: true },
   { id: "settings",         tKey: "app.settings",         name: "Settings",          icon: SettingsIcon,  route: "/settings",         active: true,  newSince: "2026-04-19" },
 
@@ -302,7 +312,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.system",
     label: "System",
     icon: SystemSidebarIcon,
-    appIds: ["accounts", "roles", "commercial-policy", "settings"],
+    appIds: ["accounts", "roles", "activity-monitor", "commercial-policy", "settings"],
   },
 ];
 

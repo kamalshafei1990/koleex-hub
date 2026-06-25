@@ -28,6 +28,7 @@ import {
 import { useTranslation } from "@/lib/i18n";
 import { hubT } from "@/lib/translations/hub";
 import { usePermittedModules } from "@/lib/use-scope";
+import { useMeBootstrap } from "@/lib/me-bootstrap";
 import {
   useSidebar,
   SIDEBAR_EXPANDED_W,
@@ -65,13 +66,18 @@ export default function Sidebar() {
   // stays empty for a few hundred ms instead.
   const { modules: permittedModules, loading: permLoading } =
     usePermittedModules();
+  const { data: meBoot } = useMeBootstrap();
+  const isSuperAdmin = !!meBoot?.isSuperAdmin;
 
   const filterApps = useCallback(
     (apps: AppDef[]): AppDef[] => {
       if (permLoading) return [];
-      return apps.filter((a) => permittedModules.has(a.name));
+      return apps.filter((a) =>
+        // Super-Admin-only apps (e.g. Activity Monitor) gate on the SA flag.
+        a.superAdminOnly ? isSuperAdmin : permittedModules.has(a.name),
+      );
     },
-    [permLoading, permittedModules],
+    [permLoading, permittedModules, isSuperAdmin],
   );
 
   const activeGroupId = getActiveGroupId(pathname);
