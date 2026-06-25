@@ -145,29 +145,47 @@ function SeverityPill({ severity }: { severity: string }) {
 }
 
 /* ── Live activity graph ─────────────────────────────────────────────────
-   A continuously-scrolling waveform (macOS "CPU LOAD" style). Samples the live
-   KPIs once a second into a rolling ring buffer so the trace is always moving;
-   the value is real (active sessions / online users), only the x-axis advances
-   on idle. Interactive: switch the metric and hover to read any point. */
+   A continuously-scrolling multi-line waveform (macOS "CPU LOAD" style).
+   Samples the live KPIs once a second into a rolling ring buffer so the traces
+   are always moving; values are real, only the x-axis advances on idle.
+   Plots several signals at once (active sessions · online users · idle) on a
+   shared scale. Interactive: legend chips toggle each line; hover reads every
+   line at that second. */
 const GRAPH_MAX = 90; // samples kept (~90s window)
 const GRAPH_SAMPLE_MS = 1000;
 
+type GraphSample = { sessions: number; online: number; idle: number };
+type SeriesKey = keyof GraphSample;
+
+const GRAPH_SERIES: Array<{
+  key: SeriesKey;
+  label: string;
+  color: string;
+  area: boolean;
+  dash?: string;
+}> = [
+  { key: "sessions", label: "Active sessions", color: "var(--accent)", area: true },
+  { key: "online", label: "Online users", color: "var(--text-secondary)", area: false, dash: "5 4" },
+  { key: "idle", label: "Idle", color: "var(--text-ghost)", area: false, dash: "2 4" },
+];
+
 function LiveActivityGraph({ kpis }: { kpis: Kpis | null }) {
-  type Sample = { sessions: number; online: number };
-  const [samples, setSamples] = useState<Sample[]>([]);
-  const [metric, setMetric] = useState<"sessions" | "online">("sessions");
+  const [samples, setSamples] = useState<GraphSample[]>([]);
   const [hover, setHover] = useState<number | null>(null);
+  const [hidden, setHidden] = useState<Set<SeriesKey>>(new Set());
   const kpiRef = useRef<Kpis | null>(kpis);
   useEffect(() => {
     kpiRef.current = kpis;
   }, [kpis]);
 
   // Append a sample every second; seed a full window on first tick so the
-  // trace spans the whole card immediately instead of growing in.
+  // traces span the whole card immediately instead of growing in.
   useEffect(() => {
     const tick = () => {
       const k = kpiRef.current;
-      const s: Sample = { sessions: k?.active_sessions ?? 0, online: k?.online_users ?? 0 };
+      const sessions = k?.active_sessions ?? 0;
+      const online = k?.online_users ?? 0;
+      const s: GraphSample = { sessions, online, idle: Math.max(0, sessions - online) };
       setSamples((prev) => {
         const base = prev.length === 0 ? Array.from({ length: GRAPH_MAX }, () => s) : prev;
         const next = base.concat(s);
@@ -179,24 +197,27 @@ function LiveActivityGraph({ kpis }: { kpis: Kpis | null }) {
     return () => window.clearInterval(t);
   }, []);
 
-  const values = useMemo(
-    () => samples.map((s) => (metric === "sessions" ? s.sessions : s.online)),
-    [samples, metric],
-  );
-
   const W = 1000;
   const H = 110;
   const PADY = 10;
-  const peak = Math.max(1, ...values);
   const stepX = W / (GRAPH_MAX - 1);
-  const yFor = (v: number) => H - PADY - (v / (peak * 1.15)) * (H - PADY * 2);
-  const pts = values.map((v, i) => [i * stepX, yFor(v)] as const);
-  const line = pts.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
-  const area = pts.length ? `${line} L${W},${H} L0,${H} Z` : "";
 
-  const cur = values.length ? values[values.length - 1] : 0;
-  const shown = hover != null && hover < values.length ? values[hover] : cur;
-  const metricLabel = metric === "sessions" ? "Active sessions" : "Online users";
+  const visible = GRAPH_SERIES.filter((s) => !hidden.has(s.key));
+  // Shared y-scale across every visible line, so they're comparable.
+  const peak = useMemo(() => {
+    let m = 1;
+    for (const s of samples) for (const v of visible) m = Math.max(m, s[v.key]);
+    return m;
+  }, [samples, visible]);
+
+  const yFor = (v: number) => H - PADY - (v / (peak * 1.15)) * (H - PADY * 2);
+  const ptsFor = (key: SeriesKey) => samples.map((s, i) => [i * stepX, yFor(s[key])] as const);
+  const linePath = (pts: ReadonlyArray<readonly [number, number]>) =>
+    pts.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+
+  const last = samples.length - 1;
+  const at = hover != null && hover <= last ? hover : last;
+  const valueOf = (key: SeriesKey) => (samples[at] ? samples[at][key] : 0);
 
   const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -204,23 +225,18 @@ function LiveActivityGraph({ kpis }: { kpis: Kpis | null }) {
     setHover(Math.max(0, Math.min(GRAPH_MAX - 1, Math.round(x / stepX))));
   };
 
-  const Pill = ({ id, label }: { id: "sessions" | "online"; label: string }) => (
-    <button
-      type="button"
-      onClick={() => setMetric(id)}
-      className={`h-7 px-2.5 rounded-lg text-[11px] font-medium transition-colors ${
-        metric === id
-          ? "bg-[var(--accent)] text-white"
-          : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
-      }`}
-    >
-      {label}
-    </button>
-  );
+  const toggle = (key: SeriesKey) =>
+    setHidden((prev) => {
+      const next = new Set(prev);
+      // Keep at least one line visible.
+      if (next.has(key)) next.delete(key);
+      else if (next.size < GRAPH_SERIES.length - 1) next.add(key);
+      return next;
+    });
 
   return (
     <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4 md:p-5">
-      <div className="flex items-start justify-between gap-3 mb-3">
+      <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">
             <ActivityIcon className="h-3.5 w-3.5" />
@@ -229,18 +245,38 @@ function LiveActivityGraph({ kpis }: { kpis: Kpis | null }) {
               <span className="h-1.5 w-1.5 rounded-full bg-[#00CC66] animate-pulse" /> live
             </span>
           </div>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-[28px] leading-none font-bold text-[var(--text-primary)] tabular-nums">
-              {shown}
-            </span>
-            <span className="text-[12px] text-[var(--text-dim)]">
-              {hover != null ? `${metricLabel} · −${GRAPH_MAX - 1 - hover}s` : `${metricLabel} · now`}
-            </span>
+          <div className="mt-1 text-[12px] text-[var(--text-dim)]">
+            {hover != null ? `${GRAPH_MAX - 1 - hover}s ago` : "now"}
           </div>
         </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <Pill id="sessions" label="Sessions" />
-          <Pill id="online" label="Online" />
+
+        {/* Legend — each chip shows the current/hovered value and toggles its line. */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {GRAPH_SERIES.map((s) => {
+            const off = hidden.has(s.key);
+            return (
+              <button
+                key={s.key}
+                type="button"
+                onClick={() => toggle(s.key)}
+                title={`Toggle ${s.label}`}
+                className={`group inline-flex items-center gap-2 h-8 px-2.5 rounded-lg border transition-colors ${
+                  off
+                    ? "border-transparent opacity-45 hover:opacity-80"
+                    : "border-[var(--border-subtle)] hover:bg-[var(--bg-surface)]"
+                }`}
+              >
+                <span
+                  className="h-2 w-2 rounded-full shrink-0"
+                  style={{ backgroundColor: s.color }}
+                />
+                <span className="text-[11px] text-[var(--text-secondary)]">{s.label}</span>
+                <span className="text-[13px] font-bold tabular-nums text-[var(--text-primary)]">
+                  {off ? "—" : valueOf(s.key)}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -253,54 +289,54 @@ function LiveActivityGraph({ kpis }: { kpis: Kpis | null }) {
       >
         <defs>
           <linearGradient id="kx-load-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.28" />
+            <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.26" />
             <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
           </linearGradient>
         </defs>
+
         {/* baseline grid */}
         {[0.25, 0.5, 0.75].map((g) => (
-          <line
-            key={g}
-            x1={0}
-            x2={W}
-            y1={H * g}
-            y2={H * g}
-            stroke="var(--border-subtle)"
-            strokeWidth={1}
-            opacity={0.5}
-          />
+          <line key={g} x1={0} x2={W} y1={H * g} y2={H * g} stroke="var(--border-subtle)" strokeWidth={1} opacity={0.5} />
         ))}
-        {area && <path d={area} fill="url(#kx-load-fill)" />}
-        {line && (
-          <path
-            d={line}
-            fill="none"
-            stroke="var(--accent)"
-            strokeWidth={2}
-            vectorEffect="non-scaling-stroke"
-            strokeLinejoin="round"
-          />
-        )}
-        {/* hover guide + dot, else leading dot */}
-        {hover != null && pts[hover] ? (
-          <>
-            <line
-              x1={pts[hover][0]}
-              x2={pts[hover][0]}
-              y1={0}
-              y2={H}
-              stroke="var(--text-dim)"
-              strokeWidth={1}
+
+        {/* one area + line per visible series (areas first so lines sit on top) */}
+        {visible
+          .filter((s) => s.area)
+          .map((s) => {
+            const pts = ptsFor(s.key);
+            return pts.length ? (
+              <path key={`a-${s.key}`} d={`${linePath(pts)} L${W},${H} L0,${H} Z`} fill="url(#kx-load-fill)" />
+            ) : null;
+          })}
+        {visible.map((s) => {
+          const pts = ptsFor(s.key);
+          if (!pts.length) return null;
+          return (
+            <path
+              key={`l-${s.key}`}
+              d={linePath(pts)}
+              fill="none"
+              stroke={s.color}
+              strokeWidth={2}
+              strokeDasharray={s.dash}
               vectorEffect="non-scaling-stroke"
-              opacity={0.6}
+              strokeLinejoin="round"
             />
-            <circle cx={pts[hover][0]} cy={pts[hover][1]} r={3.5} fill="var(--accent)" vectorEffect="non-scaling-stroke" />
-          </>
-        ) : (
-          pts.length > 0 && (
-            <circle cx={pts[pts.length - 1][0]} cy={pts[pts.length - 1][1]} r={3.5} fill="var(--accent)" vectorEffect="non-scaling-stroke" />
-          )
+          );
+        })}
+
+        {/* hover guide + a dot on every visible line */}
+        {hover != null && samples[hover] && (
+          <line x1={hover * stepX} x2={hover * stepX} y1={0} y2={H} stroke="var(--text-dim)" strokeWidth={1} vectorEffect="non-scaling-stroke" opacity={0.6} />
         )}
+        {visible.map((s) => {
+          const pts = ptsFor(s.key);
+          const idx = hover != null && pts[hover] ? hover : pts.length - 1;
+          const p = pts[idx];
+          return p ? (
+            <circle key={`d-${s.key}`} cx={p[0]} cy={p[1]} r={3.2} fill={s.color} vectorEffect="non-scaling-stroke" />
+          ) : null;
+        })}
       </svg>
 
       <div className="mt-1 flex items-center justify-between text-[10px] text-[var(--text-ghost)]">
