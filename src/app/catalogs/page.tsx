@@ -2652,21 +2652,28 @@ export default function CatalogsPage() {
 
   const loadAll = useCallback(async () => {
     setLoading(true);
-    const [cats, conts, divs, catgs, dLogos, cLogos] = await Promise.all([
-      fetchCatalogs(),
-      fetchCatalogContacts(),
-      fetchDivisions(),
-      fetchCategories(),
-      fetchDivisionLogos(),
-      fetchCategoryLogos(),
-    ]);
-    setCatalogs(cats);
-    setContacts(conts);
-    setDivisions(divs);
-    setCategories(catgs);
-    setDivLogos(dLogos);
-    setCatLogos(cLogos);
-    setLoading(false);
+    /* Each source is independently guarded: the catalogs come from a working
+       API, but the taxonomy/logo helpers can throw under RLS — a bare
+       Promise.all would reject and leave the page stuck on "Loading…" forever.
+       Guard every fetch + finally so the page always renders what loaded. */
+    try {
+      const [cats, conts, divs, catgs, dLogos, cLogos] = await Promise.all([
+        fetchCatalogs().catch(() => [] as CatalogEntry[]),
+        fetchCatalogContacts().catch(() => [] as ContactOption[]),
+        fetchDivisions().catch(() => [] as DivisionRow[]),
+        fetchCategories().catch(() => [] as CategoryRow[]),
+        fetchDivisionLogos().catch(() => ({}) as Record<string, string>),
+        fetchCategoryLogos().catch(() => ({}) as Record<string, string>),
+      ]);
+      setCatalogs(cats);
+      setContacts(conts);
+      setDivisions(divs);
+      setCategories(catgs);
+      setDivLogos(dLogos);
+      setCatLogos(cLogos);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { loadAll(); }, [loadAll]);
