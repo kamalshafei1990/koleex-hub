@@ -21,6 +21,10 @@ files:
   - resources/**/*
   - package.json
 
+# Ad-hoc sign the macOS app so it launches on Apple Silicon (unsigned arm64
+# apps are reported as "damaged"). No-op when a real Developer ID is set.
+afterPack: scripts/afterpack-adhoc-sign.cjs
+
 # macOS notarization runs here ONLY when Apple creds are set (safe no-op
 # otherwise — see scripts/notarize.cjs).
 afterSign: scripts/notarize.cjs
