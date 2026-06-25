@@ -265,10 +265,13 @@ function HeroPlatformButton({ target }: { target: DownloadTarget }) {
   const label = available ? `Download for ${target.name}` : `${target.name} · Soon`;
   const inner = (
     <>
-      <span className="h-6 w-6 rounded-md bg-white ring-1 ring-black/10 flex items-center justify-center p-1 shrink-0">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={target.logo} alt="" className="max-h-full max-w-full object-contain" />
-      </span>
+      {/* Monochrome: matches the button's inverted text colour in both themes. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={target.logo}
+        alt=""
+        className="h-5 w-5 object-contain shrink-0 [filter:brightness(0)_invert(1)] dark:[filter:brightness(0)]"
+      />
       {label}
     </>
   );
@@ -277,14 +280,14 @@ function HeroPlatformButton({ target }: { target: DownloadTarget }) {
       <a
         href={target.url}
         rel="noopener noreferrer"
-        className="inline-flex items-center justify-center gap-2.5 h-11 md:h-12 w-full sm:w-auto pl-2 pr-5 rounded-2xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[14px] font-semibold hover:opacity-90 transition-all shadow-lg"
+        className="inline-flex items-center justify-center gap-2.5 h-11 md:h-12 w-full sm:w-auto px-5 rounded-2xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[14px] font-semibold hover:opacity-90 transition-all shadow-lg"
       >
         {inner}
       </a>
     );
   }
   return (
-    <span className="inline-flex items-center justify-center gap-2.5 h-11 md:h-12 w-full sm:w-auto pl-2 pr-5 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] text-[14px] font-semibold">
+    <span className="inline-flex items-center justify-center gap-2.5 h-11 md:h-12 w-full sm:w-auto px-5 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] text-[14px] font-semibold">
       {inner}
     </span>
   );
@@ -344,9 +347,15 @@ function PlatformLogo({ logo }: { logo: string }) {
     );
   }
   return (
-    <div className="h-12 w-12 rounded-xl bg-white border border-[var(--border-subtle)] flex items-center justify-center p-2 shrink-0">
+    <div className="h-12 w-12 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center p-2.5 shrink-0">
+      {/* Monochrome: white logo on dark, black on light — matches the UI. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={logo} alt="" loading="lazy" className="max-h-full max-w-full object-contain" />
+      <img
+        src={logo}
+        alt=""
+        loading="lazy"
+        className="max-h-full max-w-full object-contain [filter:brightness(0)] dark:[filter:brightness(0)_invert(1)]"
+      />
     </div>
   );
 }
