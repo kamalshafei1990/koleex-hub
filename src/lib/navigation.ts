@@ -237,7 +237,7 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "roles",            tKey: "app.roles",            name: "Roles & Permissions", icon: RolesPermissionsIcon, route: "/roles",   active: true  },
   { id: "activity-monitor", tKey: "app.activity-monitor", name: "Activity Monitor",  icon: ActivityMonitorIcon, route: "/super-admin/activity", active: true, superAdminOnly: true },
   { id: "commercial-policy", tKey: "app.commercial-policy", name: "Commercial Policy", icon: CommercialPolicyIcon, route: "/commercial-policy", active: true },
-  { id: "software-center",  tKey: "app.software-center",  name: "Software Center",   icon: SoftwareCenterIcon, route: "/software-center", active: true, superAdminOnly: true, newSince: "2026-06-25" },
+  { id: "software-center",  tKey: "app.software-center",  name: "Download Center",   icon: SoftwareCenterIcon, route: "/software-center", active: true, superAdminOnly: true, newSince: "2026-06-25" },
   { id: "settings",         tKey: "app.settings",         name: "Settings",          icon: SettingsIcon,  route: "/settings",         active: true,  newSince: "2026-04-19" },
 
   /* ── Not in sidebar — accessible via All Apps or direct URL ── */

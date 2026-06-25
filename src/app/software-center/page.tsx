@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Software Center (Super-Admin) — central place to download Koleex apps,
+ * Download Center (Super-Admin) — central place to download Koleex apps,
  * updates, drivers and installers. Premium, responsive, dark-mode native.
  * Data is local for now (src/lib/software-center.ts); page reuses the
  * canonical PageHeader + AuthGate + design tokens. Additive — no web app
@@ -35,7 +35,7 @@ import {
 export default function SoftwareCenterPage() {
   return (
     <AuthGate
-      title="Software Center"
+      title="Download Center"
       subtitle="Download apps, updates, drivers and installers"
     >
       <SoftwareCenterView />
@@ -68,7 +68,7 @@ function SoftwareCenterView() {
             Access restricted
           </h2>
           <p className="text-[13px] text-[var(--text-dim)] leading-relaxed mb-5">
-            Software Center is available to Super Admins only. Contact your
+            Download Center is available to Super Admins only. Contact your
             administrator if you need access.
           </p>
           <Link
@@ -127,7 +127,7 @@ function SoftwareCenterContent() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 pt-5 md:pt-7 pb-16">
         <PageHeader
-          title="Software Center"
+          title="Download Center"
           subtitle="Download apps, updates, drivers and installers"
           icon="download"
           backHref="/"
@@ -306,7 +306,7 @@ function Hero({
             Koleex Hub Desktop v{LATEST_DESKTOP_VERSION}
           </div>
           <h1 className="text-3xl md:text-[44px] font-bold tracking-tight leading-[1.05] mb-3">
-            Software Center
+            Download Center
           </h1>
           <p className="text-[14px] md:text-[15px] text-[var(--text-muted)] max-w-xl leading-relaxed">
             Download Koleex applications, updates, drivers and utilities — always
