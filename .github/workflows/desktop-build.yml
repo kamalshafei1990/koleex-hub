@@ -1,0 +1,68 @@
+name: Desktop Build
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "desktop-v*"
+permissions:
+  contents: write
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            script: dist:mac
+          - os: windows-latest
+            script: dist:win
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install
+      - run: npm run typecheck
+      - name: Build installers (unsigned)
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npm run ${{ matrix.script }}
+      - name: List build output
+        shell: bash
+        run: ls -la release || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: koleex-hub-${{ runner.os }}
+          if-no-files-found: warn
+          path: |
+            desktop/release/*.dmg
+            desktop/release/*.zip
+            desktop/release/*.exe
+  release:
+    name: Publish prerelease
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Create / update prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then TAG="${GITHUB_REF_NAME}"; else TAG="desktop-build-${GITHUB_RUN_NUMBER}"; fi
+          mapfile -t FILES < <(find artifacts -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' \))
+          echo "Publishing ${#FILES[@]} file(s) under ${TAG}"; printf '  %s\n' "${FILES[@]}"
+          gh release create "$TAG" "${FILES[@]}" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "Koleex Hub Desktop — $TAG" \
+            --notes "Unsigned test build. macOS: open the .dmg, drag to Applications, right-click the app → Open (first launch). Windows: run Setup .exe; on SmartScreen click More info → Run anyway. Signing/notarization/auto-update disabled." \
+            --prerelease || gh release upload "$TAG" "${FILES[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url --jq .url
