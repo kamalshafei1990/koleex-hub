@@ -1,110 +1,164 @@
 /**
- * Software Center — local data source (Super-Admin module).
+ * Download Center — local data source (Super-Admin module).
  *
- * Central catalog of downloadable Koleex software: desktop installers, future
- * mobile apps, drivers/utilities, release notes and install guides. Data is
- * kept LOCAL for now (direct GitHub Release URLs); later this migrates to
- * Supabase behind an API without changing the page contract.
- *
- * Everything here is additive and presentational — no business logic.
+ * Central catalog of Koleex software downloads, organised the way real product
+ * download pages are: by platform group (Desktop / Mobile / China app stores),
+ * each option carrying its real platform logo. Logos come from the Database
+ * app → "Operation Systems" collection (public `media` bucket). Data is local
+ * for now; later this can read the collection + releases live without changing
+ * the page contract.
  */
 
-/* ── Core type (per spec) ───────────────────────────────────────────────── */
-export interface SoftwareRelease {
-  id: string;
-  name: string;
-  version: string;
-  platform: "windows" | "macos" | "linux";
-  architecture?: "arm64" | "x64";
-  fileSize: string;
-  releaseDate: string; // ISO yyyy-mm-dd
-  downloadUrl: string;
-  releaseNotesUrl?: string;
-  status: "stable" | "beta";
-  recommended?: boolean;
-  /** True when the artifact isn't published yet (renders as a disabled card). */
-  comingSoon?: boolean;
-  /** Short human label for the platform/arch, e.g. "macOS · Apple Silicon". */
-  platformLabel?: string;
-}
-
-/* The GitHub release these artifacts come from (first real build). */
+/* ── GitHub release (real desktop installers) ───────────────────────────── */
 export const GITHUB_RELEASE_TAG = "desktop-build-1";
 export const GITHUB_RELEASES_URL =
   "https://github.com/kamalshafei1990/koleex-hub/releases";
 export const CURRENT_RELEASE_URL = `${GITHUB_RELEASES_URL}/tag/${GITHUB_RELEASE_TAG}`;
 const DL = `${GITHUB_RELEASES_URL}/download/${GITHUB_RELEASE_TAG}`;
-
-/** Latest shipped desktop version (independent of the web app). */
 export const LATEST_DESKTOP_VERSION = "1.0.0";
 
-/* ── Stable releases ────────────────────────────────────────────────────── */
-export const STABLE_RELEASES: SoftwareRelease[] = [
+/** Koleex Hub app icon (public asset, served by the web app / desktop shell). */
+export const KOLEEX_APP_ICON = "/icon-512.png";
+
+/* ── Platform logos (Database → "Operation Systems" collection) ─────────── */
+const MEDIA = "https://yxyizbnfjrwrnmwhkvme.supabase.co/storage/v1/object/public/media/visual-library/business/";
+export const OS_LOGOS = {
+  apple: `${MEDIA}apple-logo.svg`,
+  windows: `${MEDIA}windows-ivsvbw.svg`,
+  appStore: `${MEDIA}app-store-nhfezg.svg`,
+  googlePlay: `${MEDIA}google-play-7ih6vy.svg`,
+  huaweiGallery: `${MEDIA}huawei-app-gallery-m8du3b.svg`,
+  huawei: `${MEDIA}huawei-4yiva1.svg`,
+  xiaomi: `${MEDIA}xiaomi-hq7rvo.svg`,
+  getApps: `${MEDIA}get-apps-m9970t.svg`,
+  oppo: `${MEDIA}oppo-z98wzx.svg`,
+  vivo: `${MEDIA}vivo-1y8br4.svg`,
+  tencent: `${MEDIA}tencent-yi4ahb.svg`,
+} as const;
+
+/* ── Types ──────────────────────────────────────────────────────────────── */
+export type DetectedOS = "windows" | "macos" | "linux" | "mobile" | "unknown";
+
+export interface DownloadTarget {
+  id: string;
+  /** Platform / store name, e.g. "macOS", "Windows", "Google Play". */
+  name: string;
+  /** Short qualifier under the name, e.g. "Apple Silicon", "App Store". */
+  sublabel: string;
+  /** Logo image URL (empty → page renders a neutral fallback glyph). */
+  logo: string;
+  /** Download / store URL (omitted when coming soon). */
+  url?: string;
+  status: "available" | "coming-soon";
+  /** OS this target satisfies — used for the smart recommendation. */
+  matchOs?: DetectedOS;
+  /** Right-aligned meta on the card, e.g. "94 MB · v1.0.0". */
+  meta?: string;
+  /** Optional secondary link, e.g. the Windows portable build. */
+  secondary?: { label: string; url: string };
+}
+
+export interface DownloadGroup {
+  id: string;
+  title: string;
+  subtitle: string;
+  targets: DownloadTarget[];
+}
+
+/* ── Download groups ────────────────────────────────────────────────────── */
+export const DOWNLOAD_GROUPS: DownloadGroup[] = [
   {
-    id: "macos-arm64",
-    name: "Koleex Hub Desktop",
-    version: LATEST_DESKTOP_VERSION,
-    platform: "macos",
-    architecture: "arm64",
-    platformLabel: "macOS · Apple Silicon",
-    fileSize: "94 MB",
-    releaseDate: "2026-06-25",
-    downloadUrl: `${DL}/Koleex.Hub-1.0.0.dmg`,
-    releaseNotesUrl: CURRENT_RELEASE_URL,
-    status: "stable",
+    id: "desktop",
+    title: "Desktop",
+    subtitle: "Full Koleex Hub experience on your computer",
+    targets: [
+      {
+        id: "macos",
+        name: "macOS",
+        sublabel: "Apple Silicon",
+        logo: OS_LOGOS.apple,
+        url: `${DL}/Koleex.Hub-1.0.0.dmg`,
+        status: "available",
+        matchOs: "macos",
+        meta: `94 MB · v${LATEST_DESKTOP_VERSION}`,
+      },
+      {
+        id: "windows",
+        name: "Windows",
+        sublabel: "Windows 10 / 11 · 64-bit",
+        logo: OS_LOGOS.windows,
+        url: `${DL}/Koleex.Hub-Setup-1.0.0.exe`,
+        status: "available",
+        matchOs: "windows",
+        meta: `78 MB · v${LATEST_DESKTOP_VERSION}`,
+        secondary: { label: "Portable (no install)", url: `${DL}/Koleex.Hub-Portable-1.0.0.exe` },
+      },
+      {
+        id: "linux",
+        name: "Linux",
+        sublabel: "AppImage · 64-bit",
+        logo: "",
+        status: "coming-soon",
+        matchOs: "linux",
+        meta: `v${LATEST_DESKTOP_VERSION}`,
+      },
+    ],
   },
   {
-    id: "windows-x64",
-    name: "Koleex Hub Desktop",
-    version: LATEST_DESKTOP_VERSION,
-    platform: "windows",
-    architecture: "x64",
-    platformLabel: "Windows · 64-bit",
-    fileSize: "78 MB",
-    releaseDate: "2026-06-25",
-    downloadUrl: `${DL}/Koleex.Hub-Setup-1.0.0.exe`,
-    releaseNotesUrl: CURRENT_RELEASE_URL,
-    status: "stable",
+    id: "mobile",
+    title: "Mobile",
+    subtitle: "Koleex Hub on your phone and tablet",
+    targets: [
+      {
+        id: "ios",
+        name: "iOS",
+        sublabel: "iPhone & iPad",
+        logo: OS_LOGOS.appStore,
+        status: "coming-soon",
+        matchOs: "mobile",
+      },
+      {
+        id: "android-play",
+        name: "Android",
+        sublabel: "Google Play",
+        logo: OS_LOGOS.googlePlay,
+        status: "coming-soon",
+        matchOs: "mobile",
+      },
+      {
+        id: "android-apk",
+        name: "Android APK",
+        sublabel: "Direct install (.apk)",
+        logo: "",
+        status: "coming-soon",
+        matchOs: "mobile",
+      },
+    ],
   },
   {
-    id: "windows-portable",
-    name: "Koleex Hub Portable",
-    version: LATEST_DESKTOP_VERSION,
-    platform: "windows",
-    architecture: "x64",
-    platformLabel: "Windows · No install",
-    fileSize: "78 MB",
-    releaseDate: "2026-06-25",
-    downloadUrl: `${DL}/Koleex.Hub-Portable-1.0.0.exe`,
-    releaseNotesUrl: CURRENT_RELEASE_URL,
-    status: "stable",
-  },
-  {
-    id: "linux",
-    name: "Koleex Hub for Linux",
-    version: LATEST_DESKTOP_VERSION,
-    platform: "linux",
-    architecture: "x64",
-    platformLabel: "Linux · AppImage",
-    fileSize: "—",
-    releaseDate: "2026-06-25",
-    downloadUrl: "",
-    status: "stable",
-    comingSoon: true,
+    id: "china",
+    title: "China App Stores",
+    subtitle: "Android distribution for Mainland China",
+    targets: [
+      { id: "huawei", name: "Huawei", sublabel: "AppGallery", logo: OS_LOGOS.huaweiGallery, status: "coming-soon" },
+      { id: "xiaomi", name: "Xiaomi", sublabel: "GetApps", logo: OS_LOGOS.getApps, status: "coming-soon" },
+      { id: "oppo", name: "OPPO", sublabel: "App Market", logo: OS_LOGOS.oppo, status: "coming-soon" },
+      { id: "vivo", name: "vivo", sublabel: "V-AppStore", logo: OS_LOGOS.vivo, status: "coming-soon" },
+      { id: "tencent", name: "Tencent", sublabel: "MyApp · 应用宝", logo: OS_LOGOS.tencent, status: "coming-soon" },
+    ],
   },
 ];
 
-/* ── Beta releases ──────────────────────────────────────────────────────── */
-export const BETA_RELEASES: SoftwareRelease[] = [];
+/** All targets flattened (search + recommendation lookup). */
+export const ALL_TARGETS: DownloadTarget[] = DOWNLOAD_GROUPS.flatMap((g) => g.targets);
 
-/* ── Release notes (timeline, data-driven) ──────────────────────────────── */
+/* ── Release notes (timeline) ───────────────────────────────────────────── */
 export interface ReleaseNote {
   version: string;
-  date: string; // ISO yyyy-mm-dd
+  date: string;
   channel: "stable" | "beta";
   highlights: string[];
 }
-
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
     version: "1.0.0",
@@ -123,25 +177,13 @@ export const RELEASE_NOTES: ReleaseNote[] = [
   },
 ];
 
-/* ── Drivers & utilities (empty for now) ────────────────────────────────── */
-export interface DriverItem {
-  id: string;
-  name: string;
-  description: string;
-  downloadUrl: string;
-  platform: "windows" | "macos" | "linux" | "all";
-}
-
-export const DRIVERS: DriverItem[] = [];
-
-/* ── Installation guides (placeholder dialogs) ──────────────────────────── */
+/* ── Installation guides (dialogs) ──────────────────────────────────────── */
 export interface InstallGuide {
   id: string;
   title: string;
   summary: string;
   steps: string[];
 }
-
 export const INSTALL_GUIDES: InstallGuide[] = [
   {
     id: "macos",
@@ -179,22 +221,12 @@ export const INSTALL_GUIDES: InstallGuide[] = [
 ];
 
 /* ── Smart platform detection (client-only) ─────────────────────────────── */
-export type DetectedOS = "windows" | "macos" | "linux" | "mobile" | "unknown";
-
 export interface DetectedPlatform {
   os: DetectedOS;
-  /** Human label for the hero, e.g. "macOS · Apple Silicon". */
   label: string;
-  /** Best stable release to recommend, or null if none applies. */
   recommendedId: string | null;
 }
 
-/**
- * Best-effort OS/arch detection from the browser. Reliable for OS; macOS
- * architecture can't be read synchronously, so we default the recommendation
- * to the Apple Silicon build (the only mac artifact today) and surface a note
- * in the UI for Intel users.
- */
 export function detectPlatform(): DetectedPlatform {
   if (typeof navigator === "undefined") {
     return { os: "unknown", label: "your device", recommendedId: null };
@@ -207,10 +239,10 @@ export function detectPlatform(): DetectedPlatform {
     return { os: "mobile", label: "a mobile device", recommendedId: null };
   }
   if (/win/i.test(plat) || /windows/i.test(ua)) {
-    return { os: "windows", label: "Windows", recommendedId: "windows-x64" };
+    return { os: "windows", label: "Windows", recommendedId: "windows" };
   }
   if (/mac/i.test(plat) || /mac os x|macintosh/i.test(ua)) {
-    return { os: "macos", label: "macOS · Apple Silicon", recommendedId: "macos-arm64" };
+    return { os: "macos", label: "macOS · Apple Silicon", recommendedId: "macos" };
   }
   if (/linux|x11/i.test(plat) || /linux/i.test(ua)) {
     return { os: "linux", label: "Linux", recommendedId: "linux" };
