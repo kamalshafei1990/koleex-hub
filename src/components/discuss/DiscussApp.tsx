@@ -3662,18 +3662,27 @@ function ProductPicker({
   t: (key: string, fallback?: string) => string;
 }) {
   const [search, setSearch] = useState("");
+
+  // Full-text haystack per product (built once): name, code, brand, the whole
+  // classification path, tags, copy, compliance, specs — everything. Lets the
+  // search match on any attribute, not just name/code/brand.
+  const haystacks = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of products) m.set(p.id, buildProductHaystack(p));
+    return m;
+  }, [products]);
+
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return products.slice(0, 60);
+    const tokens = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) return products.slice(0, 60);
+    // Every token must appear (AND) so multi-word queries narrow results.
     return products
-      .filter(
-        (p) =>
-          p.product_name.toLowerCase().includes(q) ||
-          p.slug.toLowerCase().includes(q) ||
-          (p.brand ?? "").toLowerCase().includes(q),
-      )
-      .slice(0, 90);
-  }, [products, search]);
+      .filter((p) => {
+        const h = haystacks.get(p.id) ?? "";
+        return tokens.every((tok) => h.includes(tok));
+      })
+      .slice(0, 120);
+  }, [products, search, haystacks]);
 
   return (
     <ModalShell title={t("composer.product")} onCancel={onCancel} width={640}>
@@ -3685,7 +3694,7 @@ function ProductPicker({
             autoFocus
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder={t("sidebar.search")}
+            placeholder={t("composer.productSearch", "Search by name, code, brand, category, tags…")}
             className="flex-1 bg-transparent text-[12.5px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none"
           />
         </div>
@@ -3744,6 +3753,42 @@ function stripHtmlText(s: string): string {
     .replace(/&nbsp;/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/* Flatten every searchable field of a product into one lowercase string so the
+   picker search matches on anything — identity, classification, copy, specs. */
+function buildProductHaystack(p: ProductRow): string {
+  const parts: Array<string | null | undefined> = [
+    p.product_name,
+    p.slug,
+    p.brand,
+    p.division_slug,
+    p.category_slug,
+    p.subcategory_slug,
+    p.level,
+    p.excerpt,
+    p.description,
+    p.hs_code,
+    p.machine_dimensions,
+    p.warranty,
+    p.warranty_type,
+    ...(p.tags ?? []),
+    ...(p.highlights ?? []),
+    ...(p.colors ?? []),
+    ...(p.voltage ?? []),
+    ...(p.plug_types ?? []),
+  ];
+  // Spec values (sizes, RPM, needle counts…) so they're searchable too.
+  if (p.specs && typeof p.specs === "object") {
+    for (const v of Object.values(p.specs)) {
+      if (v != null && (typeof v === "string" || typeof v === "number")) parts.push(String(v));
+    }
+  }
+  return parts
+    .filter(Boolean)
+    .map((s) => stripHtmlText(String(s)))
+    .join(" ")
+    .toLowerCase();
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
