@@ -10,7 +10,7 @@
  */
 
 /* ── GitHub release (real desktop installers) ───────────────────────────── */
-export const GITHUB_RELEASE_TAG = "desktop-build-4";
+export const GITHUB_RELEASE_TAG = "desktop-build-5";
 export const GITHUB_RELEASES_URL =
   "https://github.com/kamalshafei1990/koleex-hub/releases";
 export const CURRENT_RELEASE_URL = `${GITHUB_RELEASES_URL}/tag/${GITHUB_RELEASE_TAG}`;
