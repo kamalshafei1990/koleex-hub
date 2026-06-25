@@ -15,7 +15,7 @@ import Sidebar from "./Sidebar";
 import FloatingPanel from "./FloatingPanel";
 import ViewAsBanner from "./ViewAsBanner";
 import ReportIssueButton from "@/components/qa/ReportIssueButton";
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import QaFocusHighlight from "@/components/qa/QaFocusHighlight";
 import ActivityTracker from "@/components/activity/ActivityTracker";
 import ServiceWorkerRegistrar from "@/components/pwa/ServiceWorkerRegistrar";
@@ -56,8 +56,37 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   const { expanded } = useSidebar();
   const desktopPad = expanded ? SIDEBAR_EXPANDED_W : SIDEBAR_COLLAPSED_W;
 
+  /* Desktop (Electron) shell uses a frameless window (titleBarStyle:
+     hiddenInset on macOS), so the macOS traffic-light buttons float over the
+     top-left of the web content and cover the KOLEEX logo. The preload exposes
+     `window.koleex.isDesktop`; when present we tag <html> so the CSS below
+     pushes the fixed header + content down past the title-bar zone and reserves
+     a draggable strip. No-op in a normal browser. */
+  useEffect(() => {
+    const isDesktop = !!(
+      window as unknown as { koleex?: { isDesktop?: boolean } }
+    ).koleex?.isDesktop;
+    if (isDesktop) document.documentElement.classList.add("kx-desktop");
+  }, []);
+
   return (
     <QAInspectorProvider>
+      <style>{`
+        :root { --kx-titlebar: 0px; }
+        html.kx-desktop { --kx-titlebar: 30px; }
+        /* Push the fixed top header down below the macOS traffic lights. */
+        html.kx-desktop .kx-mainheader { top: var(--kx-titlebar) !important; }
+        /* Match the content offset so nothing slips under the header. */
+        html.kx-desktop .kx-shell-top { padding-top: calc(3.5rem + var(--kx-titlebar)) !important; }
+        /* Draggable, transparent strip occupying the reserved title-bar zone. */
+        .kx-titlebar-drag { display: none; }
+        html.kx-desktop .kx-titlebar-drag {
+          display: block; position: fixed; top: 0; left: 0; right: 0;
+          height: var(--kx-titlebar); z-index: 300;
+          -webkit-app-region: drag; background: var(--bg-primary);
+        }
+      `}</style>
+      <div className="kx-titlebar-drag" aria-hidden />
       <MainHeader />
       {/* Persistent banner shown when a Super Admin is "viewing as"
           another user. Sits below MainHeader (fixed, top-14) and is
@@ -68,7 +97,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       {/* pt-14 = header height. The view-as indicator is now a compact floating
           pill (overlay), so it no longer needs to push content down. */}
       <div
-        className={`pt-14 flex-1 flex flex-col min-h-0 h-[calc(100vh-0px)] overflow-hidden transition-all duration-300 ease-in-out`}
+        className={`kx-shell-top pt-14 flex-1 flex flex-col min-h-0 h-[calc(100vh-0px)] overflow-hidden transition-all duration-300 ease-in-out`}
         style={{
           /* @ts-ignore — inline style for responsive sidebar offset */
           paddingInlineStart: undefined,

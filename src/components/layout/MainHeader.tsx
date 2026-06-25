@@ -110,7 +110,7 @@ export default function MainHeader() {
   return (
     <header
       dir="ltr"
-      className={`fixed top-0 left-0 right-0 z-[100] h-14 flex items-center justify-between px-3 md:px-6 border-b transition-colors duration-300 ${
+      className={`kx-mainheader fixed top-0 left-0 right-0 z-[100] h-14 flex items-center justify-between px-3 md:px-6 border-b transition-colors duration-300 ${
         dk
           ? "border-white/[0.08] bg-[#0A0A0A]"
           : "border-black/[0.08] bg-white"
