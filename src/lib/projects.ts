@@ -148,6 +148,34 @@ export async function deleteProject(id: string): Promise<boolean> {
   return res.ok;
 }
 
+/** Duplicate a project as a fresh starter — copies core fields + its stage
+ *  pipeline (not the tasks). Returns the new project. */
+export async function duplicateProject(source: ProjectRow): Promise<ProjectRow | null> {
+  const created = await createProject({
+    name: `${source.name} (copy)`,
+    code: source.code,
+    description: source.description,
+    color: source.color,
+    is_billable: source.is_billable,
+    customer_id: source.customer_id,
+    manager_account_id: source.manager_account_id,
+    budget_hours: source.budget_hours,
+    status: "active",
+  });
+  if (!created) return null;
+  const stages = await fetchStages(source.id);
+  for (const s of stages.sort((a, b) => a.sort_order - b.sort_order)) {
+    await createStage(created.id, {
+      name: s.name,
+      color: s.color,
+      sort_order: s.sort_order,
+      is_closed: s.is_closed,
+      is_default_new: s.is_default_new,
+    });
+  }
+  return created;
+}
+
 /* ── Stages ───────────────────────────────────────── */
 
 export async function fetchStages(projectId: string): Promise<ProjectStage[]> {

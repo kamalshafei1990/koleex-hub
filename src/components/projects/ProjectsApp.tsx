@@ -34,6 +34,7 @@ import ListTodoIcon from "@/components/icons/ui/ListTodoIcon";
 import LinkIcon from "@/components/icons/ui/LinkIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
+import CopyIcon from "@/components/icons/ui/CopyIcon";
 import ProjectsIcon from "@/components/icons/ProjectsIcon";
 import PageHeader from "@/components/ui/PageHeader";
 import AppHomeMenu from "@/components/ui/AppHomeMenu";
@@ -52,6 +53,7 @@ import {
   deleteStage,
   deleteTag,
   deleteTask,
+  duplicateProject,
   fetchAccounts,
   fetchProjects,
   fetchStages,
@@ -307,6 +309,10 @@ function ProjectsListView({ onOpenProject }: { onOpenProject: (id: string) => vo
                 await updateProject(p.id, { is_favorite: !p.is_favorite });
                 reload();
               }}
+              onDuplicate={async () => {
+                await duplicateProject(p);
+                reload();
+              }}
             />
           ))}
         </div>
@@ -329,12 +335,14 @@ function ProjectCard({
   onOpen,
   onEdit,
   onToggleFavourite,
+  onDuplicate,
 }: {
   project: ProjectRow;
   tasks: TaskRow[];
   onOpen: () => void;
   onEdit: () => void;
   onToggleFavourite: () => void;
+  onDuplicate: () => void;
 }) {
   const { t } = useTranslation(projectsT);
   const openCount = tasks.filter((x) => x.status === "open").length;
@@ -372,6 +380,13 @@ function ProjectCard({
               {customerName ?? t("card.noCustomer")}{project.code ? ` · ${project.code}` : ""}
             </div>
           </div>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDuplicate(); }}
+            title={t("action.duplicate", "Duplicate project")}
+            className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-opacity"
+          >
+            <CopyIcon className="h-3 w-3" />
+          </button>
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(); }}
             className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-opacity"
