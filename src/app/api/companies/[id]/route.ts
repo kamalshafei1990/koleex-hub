@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth } from "@/lib/server/auth";
+import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 
 export async function PATCH(
   req: Request,
@@ -11,6 +11,8 @@ export async function PATCH(
   const { id } = await params;
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
+  const deny = await requireModuleAction(auth, "Accounts", "edit");
+  if (deny) return deny;
 
   let q = supabaseServer.from("companies").select("id").eq("id", id);
   if (auth.tenant_id) q = q.eq("tenant_id", auth.tenant_id);

@@ -2,11 +2,11 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth } from "@/lib/server/auth";
+import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 
 /* PATCH /api/people/[id] — update a person row.
-   Any authenticated user in the same tenant can patch (same as legacy
-   anon-key behaviour); tenant_id is guarded server-side. */
+   Dual-use: a signed-in user may edit their OWN person profile (Settings
+   self-service); editing anyone else's record is an Accounts-admin action. */
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -14,6 +14,18 @@ export async function PATCH(
   const { id } = await params;
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
+
+  // Self-service exemption: allow editing your own linked person row.
+  const { data: me } = await supabaseServer
+    .from("accounts")
+    .select("person_id")
+    .eq("id", auth.account_id)
+    .maybeSingle();
+  const isSelf = (me as { person_id?: string | null } | null)?.person_id === id;
+  if (!isSelf) {
+    const deny = await requireModuleAction(auth, "Accounts", "edit");
+    if (deny) return deny;
+  }
 
   // Tenant check.
   let q = supabaseServer.from("people").select("id").eq("id", id);
