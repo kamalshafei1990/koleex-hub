@@ -23,7 +23,31 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
+/* Row shape returned by GET /api/purchase/dashboard (superset of all 7 feeds;
+   fields are optional since each feed only populates the ones it selects). */
+interface PurchaseDashRow {
+  id: string;
+  status?: string | null;
+  total?: number | null;
+  balance?: number | null;
+  amount?: number | null;
+  total_estimated?: number | null;
+  is_active?: boolean | null;
+  supplier_id?: string | null;
+  po_id?: string | null;
+  supplier_type?: string | null;
+  po_no?: string | null;
+  bill_no?: string | null;
+  pr_no?: string | null;
+  rfq_no?: string | null;
+  gr_no?: string | null;
+  created_at?: string | null;
+  paid_at?: string | null;
+  order_date?: string | null;
+  bill_date?: string | null;
+  due_date?: string | null;
+  expected_delivery_date?: string | null;
+}
 import KpiCard from "@/components/ui/KpiCard";
 import Button from "@/components/ui/Button";
 import RrIcon from "@/components/ui/RrIcon";
@@ -158,24 +182,17 @@ export default function PurchaseHome() {
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
         const dayStart   = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-        const [posR, billsR, paymentsR, reqsR, rfqsR, receiptsR, suppR] = await Promise.all([
-          supabase.from("purchase_orders").select("id,po_no,supplier_id,status,total,expected_delivery_date,order_date,created_at").order("created_at", { ascending: false }).limit(100),
-          supabase.from("vendor_bills").select("id,bill_no,supplier_id,status,total,balance,due_date,bill_date,created_at").order("created_at", { ascending: false }).limit(100),
-          supabase.from("vendor_payments").select("id,supplier_id,amount,paid_at,created_at").order("paid_at", { ascending: false, nullsFirst: false }).limit(100),
-          supabase.from("purchase_requisitions").select("id,pr_no,status,total_estimated,created_at").order("created_at", { ascending: false }).limit(50),
-          supabase.from("purchase_rfqs").select("id,rfq_no,status,supplier_id,total_estimated,created_at").order("created_at", { ascending: false }).limit(50),
-          supabase.from("purchase_receipts").select("id,gr_no,po_id,status,created_at").order("created_at", { ascending: false }).limit(50),
-          supabase.from("contacts").select("id,supplier_type,is_active").eq("contact_type", "supplier"),
-        ]);
+        const res = await fetch("/api/purchase/dashboard", { credentials: "include" });
         if (cancelled) return;
+        const d = (res.ok ? await res.json() : {}) as Record<string, PurchaseDashRow[]>;
 
-        const pos      = posR.data ?? [];
-        const bills    = billsR.data ?? [];
-        const payments = paymentsR.data ?? [];
-        const reqs     = reqsR.data ?? [];
-        const rfqs     = rfqsR.data ?? [];
-        const receipts = receiptsR.data ?? [];
-        const supps    = suppR.data ?? [];
+        const pos      = d.pos ?? [];
+        const bills    = d.bills ?? [];
+        const payments = d.payments ?? [];
+        const reqs     = d.reqs ?? [];
+        const rfqs     = d.rfqs ?? [];
+        const receipts = d.receipts ?? [];
+        const supps    = d.supps ?? [];
 
         const lc = (s: string | null | undefined) => (s ?? "").toLowerCase();
 
@@ -226,12 +243,12 @@ export default function PurchaseHome() {
         });
 
         const feed: RecentItem[] = [];
-        for (const p of pos.slice(0, 4))      feed.push({ id: p.id, kind: "po",      label: `PO ${p.po_no || ""} — ${formatMoney(Number(p.total) || 0)}`, ts: p.created_at, href: "/purchase/orders" });
-        for (const b of bills.slice(0, 4))    feed.push({ id: b.id, kind: "bill",    label: `Bill ${b.bill_no || ""} — ${formatMoney(Number(b.total) || 0)}`, ts: b.created_at, href: "/purchase/bills" });
-        for (const r of reqs.slice(0, 3))     feed.push({ id: r.id, kind: "req",     label: `Requisition ${r.pr_no || ""}`, ts: r.created_at, href: "/purchase/requisitions" });
-        for (const r of rfqs.slice(0, 3))     feed.push({ id: r.id, kind: "rfq",     label: `RFQ ${r.rfq_no || ""}`, ts: r.created_at, href: "/purchase/rfqs" });
-        for (const r of receipts.slice(0, 3)) feed.push({ id: r.id, kind: "receipt", label: `Receipt ${r.gr_no || ""}`, ts: r.created_at, href: "/purchase/receipts" });
-        for (const p of payments.slice(0, 2)) feed.push({ id: p.id, kind: "payment", label: `Payment — ${formatMoney(Number(p.amount) || 0)}`, ts: p.created_at, href: "/purchase/payments" });
+        for (const p of pos.slice(0, 4))      feed.push({ id: p.id, kind: "po",      label: `PO ${p.po_no || ""} — ${formatMoney(Number(p.total) || 0)}`, ts: p.created_at ?? "", href: "/purchase/orders" });
+        for (const b of bills.slice(0, 4))    feed.push({ id: b.id, kind: "bill",    label: `Bill ${b.bill_no || ""} — ${formatMoney(Number(b.total) || 0)}`, ts: b.created_at ?? "", href: "/purchase/bills" });
+        for (const r of reqs.slice(0, 3))     feed.push({ id: r.id, kind: "req",     label: `Requisition ${r.pr_no || ""}`, ts: r.created_at ?? "", href: "/purchase/requisitions" });
+        for (const r of rfqs.slice(0, 3))     feed.push({ id: r.id, kind: "rfq",     label: `RFQ ${r.rfq_no || ""}`, ts: r.created_at ?? "", href: "/purchase/rfqs" });
+        for (const r of receipts.slice(0, 3)) feed.push({ id: r.id, kind: "receipt", label: `Receipt ${r.gr_no || ""}`, ts: r.created_at ?? "", href: "/purchase/receipts" });
+        for (const p of payments.slice(0, 2)) feed.push({ id: p.id, kind: "payment", label: `Payment — ${formatMoney(Number(p.amount) || 0)}`, ts: p.created_at ?? "", href: "/purchase/payments" });
         feed.sort((a, b) => (a.ts < b.ts ? 1 : -1));
         setRecent(feed.slice(0, 10));
       } finally {
