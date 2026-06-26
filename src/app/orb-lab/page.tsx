@@ -14,6 +14,9 @@ const STATES: { key: OrbState; label: string }[] = [
   { key: "typing", label: "Typing" },
   { key: "success", label: "Success (correct)" },
   { key: "error", label: "Error (wrong)" },
+  { key: "surprised", label: "Surprised" },
+  { key: "wink", label: "Wink" },
+  { key: "celebrate", label: "Celebrate" },
 ];
 
 export default function OrbLab() {
