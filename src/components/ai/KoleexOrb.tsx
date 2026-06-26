@@ -32,6 +32,7 @@ export default function KoleexOrb({
   size = 96,
   className,
   animated = true,
+  emphasize = false,
 }: {
   /** Drives the orb: idle · loading (thinking) · typing (streaming) · success · error. */
   state?: OrbState;
@@ -42,6 +43,11 @@ export default function KoleexOrb({
   className?: string;
   /** When false, the orb renders once then freezes (no animation loop). */
   animated?: boolean;
+  /** Amplify reactions with a state-coloured glow + motion so each reaction
+      is unmistakable even though the .riv's own expressions are subtle.
+      Status colours are used functionally only (thinking=blue, success=green,
+      error=red). */
+  emphasize?: boolean;
 }) {
   const { rive, RiveComponent } = useRive({
     src: SRC,
@@ -97,8 +103,37 @@ export default function KoleexOrb({
     }
   }, [greetKey, jump]);
 
+  /* Code-level reaction amplifier. The .riv's own expressions are subtle
+     (small eye movements), so when `emphasize` is on we add a state-coloured
+     halo + a brief scale bounce on transitions, making each reaction read
+     clearly at a glance. */
+  const glow = !emphasize
+    ? "none"
+    : state === "loading" || state === "typing"
+      ? "0 0 0 2px rgba(0,102,255,.55), 0 0 22px 5px rgba(0,102,255,.40)"
+      : state === "success"
+        ? "0 0 0 2px rgba(0,204,102,.65), 0 0 24px 6px rgba(0,204,102,.45)"
+        : state === "error"
+          ? "0 0 0 2px rgba(255,51,51,.65), 0 0 24px 6px rgba(255,51,51,.45)"
+          : "none";
+  const pulse = emphasize && (state === "loading" || state === "typing");
+  const bounce = emphasize && (state === "success" || state === "error");
+
   return (
-    <div style={{ width: size, height: size }} className={className} aria-hidden>
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "9999px",
+        boxShadow: glow,
+        transition: "box-shadow .25s ease, transform .25s ease",
+        transform: bounce ? "scale(1.06)" : "scale(1)",
+      }}
+      className={
+        (className ? className + " " : "") + (pulse ? "animate-pulse" : "")
+      }
+      aria-hidden
+    >
       <RiveComponent style={{ width: "100%", height: "100%" }} />
     </div>
   );
