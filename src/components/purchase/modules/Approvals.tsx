@@ -6,7 +6,6 @@
    Odoo "Approval Rules", Coupa "Approval Chains". */
 
 import { useEffect, useState } from "react";
-import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import type { PurchaseModuleProps } from "../shared";
 import { cardCls, formatMoney, sectionTitleCls } from "../shared";
 import HandCoinsIcon from "@/components/icons/ui/HandCoinsIcon";
@@ -34,12 +33,10 @@ export default function ApprovalsModule({ t }: PurchaseModuleProps) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const r = await supabase
-        .from("purchase_approval_rules")
-        .select("id,code,name,applies_to,min_amount_usd,max_amount_usd,approver_role,sort_order,is_active")
-        .order("applies_to").order("sort_order", { ascending: true, nullsFirst: false });
+      const res = await fetch("/api/purchase/list?resource=approvals", { credentials: "include" });
+      const data = (res.ok ? await res.json() : { rows: [] }) as { rows: Rule[] };
       if (cancelled) return;
-      setRows((r.data ?? []) as Rule[]);
+      setRows(data.rows);
       setLoading(false);
     })();
     return () => { cancelled = true; };

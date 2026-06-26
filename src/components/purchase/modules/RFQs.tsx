@@ -5,7 +5,6 @@
    supplier responds with a price, the RFQ converts into a PO. */
 
 import { useEffect, useState } from "react";
-import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import type { PurchaseModuleProps } from "../shared";
 import { cardCls, formatMoney, formatDate, sectionTitleCls } from "../shared";
 import FileBadge2Icon from "@/components/icons/ui/FileBadge2Icon";
@@ -35,18 +34,15 @@ export default function RFQsModule({ t }: PurchaseModuleProps) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [rR, cR] = await Promise.all([
-        supabase
-          .from("purchase_rfqs")
-          .select("id,rfq_no,status,supplier_id,total_estimated,response_due,sent_at,created_at")
-          .order("created_at", { ascending: false })
-          .limit(30),
-        supabase.from("contacts").select("id,display_name,company_name,full_name").eq("contact_type", "supplier"),
-      ]);
+      const res = await fetch("/api/purchase/list?resource=rfqs", { credentials: "include" });
+      const data = (res.ok ? await res.json() : { rows: [], suppliers: [] }) as {
+        rows: RFQ[];
+        suppliers: { id: string; display_name: string | null; company_name: string | null; full_name: string | null }[];
+      };
       if (cancelled) return;
-      setRows((rR.data ?? []) as RFQ[]);
+      setRows(data.rows);
       const m = new Map<string, string>();
-      for (const c of (cR.data ?? []) as { id: string; display_name: string | null; company_name: string | null; full_name: string | null }[]) {
+      for (const c of data.suppliers) {
         m.set(c.id, c.company_name || c.display_name || c.full_name || "—");
       }
       setSupplierName(m);

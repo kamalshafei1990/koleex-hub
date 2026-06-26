@@ -11,7 +11,6 @@
      · capex    — equipment, furniture, durable assets */
 
 import { useEffect, useMemo, useState } from "react";
-import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import type { PurchaseModuleProps } from "../shared";
 import { cardCls, sectionTitleCls } from "../shared";
 import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
@@ -44,12 +43,10 @@ export default function CategoriesModule({ t }: PurchaseModuleProps) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const r = await supabase
-        .from("purchase_categories")
-        .select("id,code,name,kind,description,is_active")
-        .order("kind").order("name");
+      const res = await fetch("/api/purchase/list?resource=categories", { credentials: "include" });
+      const data = (res.ok ? await res.json() : { rows: [] }) as { rows: Category[] };
       if (cancelled) return;
-      setRows((r.data ?? []) as Category[]);
+      setRows(data.rows);
       setLoading(false);
     })();
     return () => { cancelled = true; };

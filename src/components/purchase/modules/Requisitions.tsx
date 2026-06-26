@@ -8,7 +8,6 @@
    off before becoming an RFQ or PO. */
 
 import { useCallback, useEffect, useState } from "react";
-import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import type { PurchaseModuleProps } from "../shared";
 import { cardCls, formatMoney, formatDate, sectionTitleCls, STATUS_TONE_REQ } from "../shared";
 import { NewRequisitionDialog } from "../dialogs";
@@ -38,12 +37,9 @@ export default function RequisitionsModule({ t }: PurchaseModuleProps) {
   const [newOpen, setNewOpen] = useState(false);
 
   const load = useCallback(async () => {
-    const r = await supabase
-      .from("purchase_requisitions")
-      .select("id,pr_no,status,department,priority,needed_by,total_estimated,currency,created_at")
-      .order("created_at", { ascending: false })
-      .limit(30);
-    setRows((r.data ?? []) as Requisition[]);
+    const res = await fetch("/api/purchase/list?resource=requisitions", { credentials: "include" });
+    const data = (res.ok ? await res.json() : { rows: [] }) as { rows: Requisition[] };
+    setRows(data.rows);
     setLoading(false);
   }, []);
 
