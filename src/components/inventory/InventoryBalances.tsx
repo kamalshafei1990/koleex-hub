@@ -170,49 +170,49 @@ export default function InventoryBalances() {
         <Panel className="px-3 py-2.5">
           <div className="flex flex-wrap items-end gap-3">
             <label className="flex flex-col">
-              <span className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Search item</span>
+              <span className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Search item</span>
               <span className="relative">
-                <span aria-hidden className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-gray-500">
+                <span aria-hidden className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-[var(--text-dim)]">
                   <RrIcon name="search" size={12} />
                 </span>
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Code or item name…"
-                  className="w-[220px] rounded-md border border-white/[0.06] bg-[var(--bg-primary)] py-1.5 pl-7 pr-2 text-[12px]"
+                  className="w-[220px] rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] py-1.5 pl-7 pr-2 text-[12px]"
                 />
               </span>
             </label>
             <label className="flex flex-col">
-              <span className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Location</span>
-              <select value={filterWh} onChange={(e) => setFilterWh(e.target.value)} className="rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]">
+              <span className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Location</span>
+              <select value={filterWh} onChange={(e) => setFilterWh(e.target.value)} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]">
                 <option value="">All locations</option>
                 {warehouses.map((w) => (
                   <option key={w.id} value={w.id}>{w.code} — {w.name}</option>
                 ))}
               </select>
             </label>
-            <label className="flex items-end gap-2 text-[11.5px] text-gray-400 pb-1.5">
+            <label className="flex items-end gap-2 text-[11.5px] text-[var(--text-muted)] pb-1.5">
               <input type="checkbox" checked={onlyPositive} onChange={(e) => setOnlyPositive(e.target.checked)} />
               Hide zero on-hand
             </label>
             {/* INV-H4A — Group-by */}
             <label className="flex flex-col">
-              <span className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Group by</span>
+              <span className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Group by</span>
               <select
                 value={groupBy}
                 onChange={(e) => setGroupBy(e.target.value as GroupBy)}
-                className="rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
               >
                 <option value="item">Item</option>
                 <option value="variant">Item + Variant</option>
                 <option value="batch">Item + Variant + Batch</option>
               </select>
             </label>
-            <div className="ml-auto flex items-end gap-4 self-end text-[10.5px] text-gray-500 tabular-nums">
+            <div className="ml-auto flex items-end gap-4 self-end text-[10.5px] text-[var(--text-dim)] tabular-nums">
               <div>{filteredRows.length} row{filteredRows.length === 1 ? "" : "s"}</div>
-              <div>Σ on-hand <span className="ml-1 font-mono text-gray-300">{fmtQty(totals.onHand)}</span></div>
-              <div>Σ available <span className="ml-1 font-mono text-gray-300">{fmtQty(totals.available)}</span></div>
+              <div>Σ on-hand <span className="ml-1 font-mono text-[var(--text-muted)]">{fmtQty(totals.onHand)}</span></div>
+              <div>Σ available <span className="ml-1 font-mono text-[var(--text-muted)]">{fmtQty(totals.available)}</span></div>
             </div>
           </div>
         </Panel>
@@ -221,7 +221,7 @@ export default function InventoryBalances() {
           <Panel>
             <table className="min-w-full text-[12.5px]">
               <thead>
-                <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.10em] text-gray-500">
+                <tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
                   <th className="px-4 py-2 text-left">Item</th>
                   <th className="px-4 py-2 text-left">Variant</th>
                   {groupBy === "batch" && <th className="px-4 py-2 text-left">Batch</th>}
@@ -233,7 +233,7 @@ export default function InventoryBalances() {
               </thead>
               <tbody>
                 {loading && drilled.length === 0 ? (
-                  <tr><td colSpan={groupBy === "batch" ? 7 : 6} className="px-4 py-6 text-center text-[11px] text-gray-600">Loading…</td></tr>
+                  <tr><td colSpan={groupBy === "batch" ? 7 : 6} className="px-4 py-6 text-center text-[11px] text-[var(--text-dim)]">Loading…</td></tr>
                 ) : drilled.length === 0 ? (
                   <tr><td colSpan={groupBy === "batch" ? 7 : 6} className="px-0 py-0">
                     <InventoryEmpty icon="badge-check" title="No balances yet" hint="Drilled balances appear when posted movements carry variants or batches." />
@@ -264,24 +264,24 @@ export default function InventoryBalances() {
                         buckets.set(key, cur);
                       }
                       return Array.from(buckets.values()).map((r, idx) => (
-                        <tr key={`v-${idx}`} className="border-b border-white/[0.03] last:border-b-0 hover:bg-white/[0.02]">
-                          <td className="px-4 py-2 font-mono text-[11.5px] text-gray-300">{r.inventory_item_id.slice(0, 8)}…</td>
-                          <td className="px-4 py-2 text-gray-200">{r.variant_id ? variantNames.get(r.variant_id) ?? r.variant_id.slice(0, 8) : "—"}</td>
-                          <td className="px-4 py-2 text-gray-400">{whMap.get(r.warehouse_id)?.code ?? r.warehouse_id.slice(0, 8)}</td>
+                        <tr key={`v-${idx}`} className="border-b border-[var(--border-subtle)] last:border-b-0 hover:bg-[var(--bg-surface-subtle)]">
+                          <td className="px-4 py-2 font-mono text-[11.5px] text-[var(--text-muted)]">{r.inventory_item_id.slice(0, 8)}…</td>
+                          <td className="px-4 py-2 text-[var(--text-primary)]">{r.variant_id ? variantNames.get(r.variant_id) ?? r.variant_id.slice(0, 8) : "—"}</td>
+                          <td className="px-4 py-2 text-[var(--text-muted)]">{whMap.get(r.warehouse_id)?.code ?? r.warehouse_id.slice(0, 8)}</td>
                           <td className="px-4 py-2 text-right tabular-nums font-mono">{fmtQty(r.qty_on_hand)}</td>
-                          <td className="px-4 py-2 text-right tabular-nums font-mono text-gray-400">{r.avg_cost.toFixed(4)}</td>
+                          <td className="px-4 py-2 text-right tabular-nums font-mono text-[var(--text-muted)]">{r.avg_cost.toFixed(4)}</td>
                           <td className="px-4 py-2 text-right tabular-nums font-mono">{r.inventory_value.toFixed(2)} {r.currency}</td>
                         </tr>
                       ));
                     }
                     return drilled.map((r, idx) => (
-                      <tr key={`b-${idx}`} className="border-b border-white/[0.03] last:border-b-0 hover:bg-white/[0.02]">
-                        <td className="px-4 py-2 font-mono text-[11.5px] text-gray-300">{r.inventory_item_id.slice(0, 8)}…</td>
-                        <td className="px-4 py-2 text-gray-200">{r.variant_id ? variantNames.get(r.variant_id) ?? r.variant_id.slice(0, 8) : "—"}</td>
-                        <td className="px-4 py-2 text-gray-200">{r.batch_id ? batchNos.get(r.batch_id) ?? r.batch_id.slice(0, 8) : "—"}</td>
-                        <td className="px-4 py-2 text-gray-400">{whMap.get(r.warehouse_id)?.code ?? r.warehouse_id.slice(0, 8)}</td>
+                      <tr key={`b-${idx}`} className="border-b border-[var(--border-subtle)] last:border-b-0 hover:bg-[var(--bg-surface-subtle)]">
+                        <td className="px-4 py-2 font-mono text-[11.5px] text-[var(--text-muted)]">{r.inventory_item_id.slice(0, 8)}…</td>
+                        <td className="px-4 py-2 text-[var(--text-primary)]">{r.variant_id ? variantNames.get(r.variant_id) ?? r.variant_id.slice(0, 8) : "—"}</td>
+                        <td className="px-4 py-2 text-[var(--text-primary)]">{r.batch_id ? batchNos.get(r.batch_id) ?? r.batch_id.slice(0, 8) : "—"}</td>
+                        <td className="px-4 py-2 text-[var(--text-muted)]">{whMap.get(r.warehouse_id)?.code ?? r.warehouse_id.slice(0, 8)}</td>
                         <td className="px-4 py-2 text-right tabular-nums font-mono">{fmtQty(r.qty_on_hand)}</td>
-                        <td className="px-4 py-2 text-right tabular-nums font-mono text-gray-400">{r.avg_cost.toFixed(4)}</td>
+                        <td className="px-4 py-2 text-right tabular-nums font-mono text-[var(--text-muted)]">{r.avg_cost.toFixed(4)}</td>
                         <td className="px-4 py-2 text-right tabular-nums font-mono">{r.inventory_value.toFixed(2)} {r.currency}</td>
                       </tr>
                     ));
@@ -296,7 +296,7 @@ export default function InventoryBalances() {
         <Panel>
           <table className="min-w-full text-[12.5px]">
             <thead>
-              <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.10em] text-gray-500">
+              <tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
                 <th className="px-4 py-2 text-left">Code</th>
                 <th className="px-4 py-2 text-left">Item</th>
                 <th className="px-4 py-2 text-left">Type</th>
@@ -309,7 +309,7 @@ export default function InventoryBalances() {
             </thead>
             <tbody>
               {loading && rows.length === 0 ? (
-                <tr><td colSpan={8} className="px-4 py-6 text-center text-[11px] text-gray-600">Loading…</td></tr>
+                <tr><td colSpan={8} className="px-4 py-6 text-center text-[11px] text-[var(--text-dim)]">Loading…</td></tr>
               ) : filteredRows.length === 0 ? (
                 <tr><td colSpan={8} className="px-0 py-0">
                   <InventoryEmpty
@@ -322,9 +322,9 @@ export default function InventoryBalances() {
                 filteredRows.map((r) => {
                   const wh = whMap.get(r.warehouse_id);
                   return (
-                    <tr key={r.id} {...kxInspectAttrs({ component: "InventoryBalanceRow", module: "Inventory", section: "Balances", recordId: r.id })} className="border-b border-white/[0.03] last:border-b-0 hover:bg-white/[0.02]">
-                      <td className="px-4 py-2 font-mono text-[11.5px] text-gray-300 whitespace-nowrap">{r.item_code}</td>
-                      <td className="px-4 py-2 text-gray-200">
+                    <tr key={r.id} {...kxInspectAttrs({ component: "InventoryBalanceRow", module: "Inventory", section: "Balances", recordId: r.id })} className="border-b border-[var(--border-subtle)] last:border-b-0 hover:bg-[var(--bg-surface-subtle)]">
+                      <td className="px-4 py-2 font-mono text-[11.5px] text-[var(--text-muted)] whitespace-nowrap">{r.item_code}</td>
+                      <td className="px-4 py-2 text-[var(--text-primary)]">
                         <span className="inline-flex items-center gap-2">
                           {r.product_image_url && (
                             /* eslint-disable-next-line @next/next/no-img-element */
@@ -333,23 +333,23 @@ export default function InventoryBalances() {
                           <span className="inline-flex flex-col min-w-0">
                             <span className="truncate">{r.product_name ?? r.item_name ?? "—"}</span>
                             {r.product_name && r.item_name && r.product_name !== r.item_name && (
-                              <span className="text-[10.5px] text-gray-500 truncate">{r.item_name}</span>
+                              <span className="text-[10.5px] text-[var(--text-dim)] truncate">{r.item_name}</span>
                             )}
                           </span>
                         </span>
                       </td>
-                      <td className="px-4 py-2 text-[11px] text-gray-500">{r.item_type_name ?? "—"}</td>
+                      <td className="px-4 py-2 text-[11px] text-[var(--text-dim)]">{r.item_type_name ?? "—"}</td>
                       <td className="px-4 py-2">
                         <div className="inline-flex items-center gap-2">
-                          <span className="text-gray-300">{r.warehouse_code}</span>
-                          <span className="text-gray-500 text-[11px]">· {r.warehouse_name}</span>
+                          <span className="text-[var(--text-muted)]">{r.warehouse_code}</span>
+                          <span className="text-[var(--text-dim)] text-[11px]">· {r.warehouse_name}</span>
                           <LocationTypeChip type={wh?.location_type ?? "warehouse"} />
                         </div>
                       </td>
                       <td className="px-4 py-2 text-right tabular-nums font-mono">{fmtQty(r.qty_on_hand)}</td>
-                      <td className="px-4 py-2 text-right tabular-nums font-mono text-gray-400">{fmtQty(r.qty_reserved)}</td>
-                      <td className="px-4 py-2 text-right tabular-nums font-mono text-gray-300">{fmtQty(r.qty_available)}</td>
-                      <td className="px-4 py-2 text-[11px] text-gray-500">{r.last_movement_at ? r.last_movement_at.slice(0, 10) : "—"}</td>
+                      <td className="px-4 py-2 text-right tabular-nums font-mono text-[var(--text-muted)]">{fmtQty(r.qty_reserved)}</td>
+                      <td className="px-4 py-2 text-right tabular-nums font-mono text-[var(--text-muted)]">{fmtQty(r.qty_available)}</td>
+                      <td className="px-4 py-2 text-[11px] text-[var(--text-dim)]">{r.last_movement_at ? r.last_movement_at.slice(0, 10) : "—"}</td>
                     </tr>
                   );
                 })

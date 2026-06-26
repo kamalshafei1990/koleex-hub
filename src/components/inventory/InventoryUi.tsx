@@ -39,7 +39,7 @@ import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
 /* ─── Tone (color token → tailwind classes) ──────────────────── */
 
 export const COLOR_TONE: Record<ColorToken, { chip: string; dot: string; text: string }> = {
-  gray:   { chip: "border-gray-500/30 bg-gray-500/10 text-gray-300",         dot: "bg-gray-400",       text: "text-gray-300" },
+  gray:   { chip: "border-gray-500/30 bg-gray-500/10 text-[var(--text-muted)]",         dot: "bg-gray-400",       text: "text-[var(--text-muted)]" },
   blue:   { chip: "border-blue-500/30 bg-blue-500/10 text-blue-200",         dot: "bg-blue-400",       text: "text-blue-200" },
   cyan:   { chip: "border-cyan-500/30 bg-cyan-500/10 text-cyan-200",         dot: "bg-cyan-400",       text: "text-cyan-200" },
   teal:   { chip: "border-teal-500/30 bg-teal-500/10 text-teal-200",         dot: "bg-teal-400",       text: "text-teal-200" },
@@ -129,9 +129,9 @@ export function StatusBadge({ status }: { status: string }) {
   const cls =
     s === "posted"   || s === "active"   || s === "approved" || s === "completed" ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200" :
     s === "received" || s === "closed"   || s === "shipped"  || s === "in_transit" ? "border-sky-400/30 bg-sky-500/10 text-sky-200" :
-    s === "voided"   || s === "archived" || s === "cancelled" || s === "canceled"  ? "border-gray-500/30 bg-gray-500/10 text-gray-400" :
+    s === "voided"   || s === "archived" || s === "cancelled" || s === "canceled"  ? "border-gray-500/30 bg-gray-500/10 text-[var(--text-muted)]" :
     s === "draft"    || s === "inactive" || s === "pending"   || s === "approval_required" || s === "submitted" ? "border-amber-400/30 bg-amber-500/10 text-amber-200" :
-                                                                                     "border-white/[0.10] bg-white/[0.04] text-gray-300";
+                                                                                     "border-[var(--border-color)] bg-[var(--bg-surface-subtle)] text-[var(--text-muted)]";
   return (
     <span className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.10em] ${cls}`}>
       <span aria-hidden className="opacity-80"><StatusGlyph status={status} /></span>
@@ -190,7 +190,7 @@ export function TypeChip({
     return (
       <span className="inline-flex items-center gap-1.5">
         <TypeIcon icon={icon} color={color} size={10} />
-        <span className="text-[11.5px] text-gray-300">{name}</span>
+        <span className="text-[11.5px] text-[var(--text-muted)]">{name}</span>
       </span>
     );
   }
@@ -211,7 +211,7 @@ export function DirectionDelta({ direction, quantity, unit }: { direction: "in" 
   return (
     <span className={`inline-flex items-baseline gap-0.5 tabular-nums font-mono ${cls}`}>
       <span>{sign}{fmt}</span>
-      {unit && <span className="text-[10px] text-gray-500">{unit}</span>}
+      {unit && <span className="text-[10px] text-[var(--text-dim)]">{unit}</span>}
     </span>
   );
 }
@@ -255,7 +255,7 @@ export function PageTitleIcon({ icon, size = 14 }: { icon: RrIconName; size?: nu
 
 export function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`overflow-hidden rounded-xl border border-white/[0.05] bg-white/[0.012] ${className}`}>
+    <div className={`overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] ${className}`}>
       {children}
     </div>
   );
@@ -279,11 +279,11 @@ export function InventoryKpi({
     tone === "info"     ? "bg-blue-300/50"    :
                           "bg-white/30";
   return (
-    <div className="relative rounded-xl border border-white/[0.05] bg-white/[0.012] px-4 py-3.5">
+    <div className="relative rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-4 py-3.5">
       <div aria-hidden className={`absolute left-4 top-0 h-px w-8 ${accent}`} />
-      <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">{label}</div>
+      <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-dim)]">{label}</div>
       <div className="mt-2 text-[24px] font-medium leading-none tabular-nums tracking-[-0.01em]">{value}</div>
-      {hint && <div className="mt-1.5 text-[10.5px] text-gray-600">{hint}</div>}
+      {hint && <div className="mt-1.5 text-[10.5px] text-[var(--text-dim)]">{hint}</div>}
     </div>
   );
 }

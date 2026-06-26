@@ -451,14 +451,14 @@ function DrawerShell({
       <div
         onClick={(e) => e.stopPropagation()}
         /* INV-H5C — full-screen on mobile, side drawer on desktop. */
-        className="flex w-full sm:max-w-md flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-l border-white/[0.08]"
+        className="flex w-full sm:max-w-md flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-l border-[var(--border-color)]"
       >
-        <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
+        <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
           <h2 className="text-[14px] font-semibold">{title}</h2>
           <button onClick={onClose} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-dim)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] text-[20px] leading-none">×</button>
         </div>
         <div className="flex-1 overflow-y-auto p-4">{children}</div>
-        {footer && <div className="border-t border-white/[0.06] px-4 py-3">{footer}</div>}
+        {footer && <div className="border-t border-[var(--border-subtle)] px-4 py-3">{footer}</div>}
       </div>
     </div>
   );
@@ -577,13 +577,13 @@ function QuickAddDrawer({
       onClose={onClose}
       footer={
         <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-md border border-white/[0.08] px-3 py-1.5 text-[12px] text-gray-400 hover:text-gray-200">
+          <button onClick={onClose} className="rounded-md border border-[var(--border-color)] px-3 py-1.5 text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)]">
             Cancel
           </button>
           <button
             onClick={submit}
             disabled={submitting}
-            className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.12] bg-white/[0.06] px-3 py-1.5 text-[12px] hover:bg-white/[0.10] disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface)] disabled:opacity-50"
           >
             {!submitting && <RrIcon name="check" size={12} />}
             {submitting ? "Saving…" : "Create Item"}
@@ -593,24 +593,24 @@ function QuickAddDrawer({
     >
       <div className="space-y-3">
         <label className="block">
-          <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Item Name *</div>
+          <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Item Name *</div>
           <input
             value={itemName}
             onChange={(e) => setItemName(e.target.value)}
             autoFocus
             placeholder="e.g. Lockstitch Machine LX-9000"
-            className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+            className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
           />
         </label>
         <label className="block">
-          <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-[0.12em] text-gray-500">
+          <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
             <span>Type *</span>
             {selectedType && <TypeChip name={selectedType.type_name} icon={selectedType.icon} color={selectedType.color} compact />}
           </div>
           <select
             value={typeId}
             onChange={(e) => setTypeId(e.target.value)}
-            className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+            className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
           >
             <optgroup label="Internal use (no product needed)">
               {types.filter((tt) => tt.is_active && (tt.usage_scope === "internal_use" || tt.requires_product === false)).map((tt) => (
@@ -656,15 +656,15 @@ function QuickAddDrawer({
             items where the taxonomy file has hints. Optional, free-text. */}
         {isInternalUse && subcategorySuggestions.length > 0 && (
           <label className="block">
-            <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">
-              Subcategory <span className="text-gray-600 normal-case tracking-normal">(optional)</span>
+            <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
+              Subcategory <span className="text-[var(--text-dim)] normal-case tracking-normal">(optional)</span>
             </div>
             <input
               list={`subcat-${selectedType?.type_key ?? "all"}`}
               value={subcategory}
               onChange={(e) => setSubcategory(e.target.value)}
               placeholder={`e.g. ${subcategorySuggestions[0]}`}
-              className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+              className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
             />
             <datalist id={`subcat-${selectedType?.type_key ?? "all"}`}>
               {subcategorySuggestions.map((s) => (
@@ -675,18 +675,18 @@ function QuickAddDrawer({
         )}
 
         <label className="block">
-          <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Unit of Measure</div>
+          <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Unit of Measure</div>
           <select
             value={unit}
             onChange={(e) => setUnit(e.target.value as UnitOfMeasure)}
-            className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+            className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
           >
             {ALLOWED_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
           </select>
         </label>
         <div className="grid grid-cols-2 gap-2">
           <label className="block">
-            <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Initial Qty (optional)</div>
+            <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Initial Qty (optional)</div>
             <input
               type="number"
               min="0"
@@ -694,16 +694,16 @@ function QuickAddDrawer({
               value={initialQty}
               onChange={(e) => setInitialQty(e.target.value)}
               placeholder="0"
-              className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] tabular-nums"
+              className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] tabular-nums"
             />
           </label>
           <label className="block">
-            <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Warehouse</div>
+            <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Warehouse</div>
             <select
               value={warehouseId}
               onChange={(e) => setWarehouseId(e.target.value)}
               disabled={warehouses.length === 0}
-              className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] disabled:opacity-50"
+              className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] disabled:opacity-50"
             >
               {warehouses.length === 0 && <option value="">—</option>}
               {warehouses.map((w) => (
@@ -723,7 +723,7 @@ function QuickAddDrawer({
           <button
             type="button"
             onClick={() => setNotesOpen((s) => !s)}
-            className="inline-flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-200"
+            className="inline-flex items-center gap-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
           >
             <span aria-hidden>{notesOpen ? "−" : "+"}</span>
             {notesOpen ? "Hide notes" : "Add notes (optional)"}
@@ -734,14 +734,14 @@ function QuickAddDrawer({
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Anything the next person should know about this item…"
               rows={2}
-              className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+              className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
             />
           )}
         </div>
 
         <button
           onClick={() => setAdvanced((s) => !s)}
-          className="inline-flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-200"
+          className="inline-flex items-center gap-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
         >
           <span aria-hidden>{advanced ? "−" : "+"}</span>
           {isInternalUse
@@ -750,18 +750,18 @@ function QuickAddDrawer({
         </button>
 
         {advanced && (
-          <div className="space-y-3 rounded-md border border-white/[0.06] p-3">
+          <div className="space-y-3 rounded-md border border-[var(--border-subtle)] p-3">
             <div className="grid grid-cols-2 gap-2">
-              <input placeholder="Brand"        value={brand}        onChange={(e) => setBrand(e.target.value)}        className="rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
-              <input placeholder="SKU"          value={sku}          onChange={(e) => setSku(e.target.value)}          className="rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
-              <input placeholder="Barcode"      value={barcode}      onChange={(e) => setBarcode(e.target.value)}      className="rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
-              <input placeholder="Currency"     value={currency}     onChange={(e) => setCurrency(e.target.value)}     className="rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
-              <input type="number" placeholder="Cost price"    value={costPrice}    onChange={(e) => setCostPrice(e.target.value)}    className="rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] tabular-nums" />
-              <input type="number" placeholder="Reorder point" value={reorderPoint} onChange={(e) => setReorderPoint(e.target.value)} className="rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] tabular-nums" />
-              <input type="number" placeholder="Min stock"     value={minStock}     onChange={(e) => setMinStock(e.target.value)}     className="rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] tabular-nums" />
-              <input type="number" placeholder="Max stock"     value={maxStock}     onChange={(e) => setMaxStock(e.target.value)}     className="rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] tabular-nums" />
+              <input placeholder="Brand"        value={brand}        onChange={(e) => setBrand(e.target.value)}        className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
+              <input placeholder="SKU"          value={sku}          onChange={(e) => setSku(e.target.value)}          className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
+              <input placeholder="Barcode"      value={barcode}      onChange={(e) => setBarcode(e.target.value)}      className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
+              <input placeholder="Currency"     value={currency}     onChange={(e) => setCurrency(e.target.value)}     className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
+              <input type="number" placeholder="Cost price"    value={costPrice}    onChange={(e) => setCostPrice(e.target.value)}    className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] tabular-nums" />
+              <input type="number" placeholder="Reorder point" value={reorderPoint} onChange={(e) => setReorderPoint(e.target.value)} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] tabular-nums" />
+              <input type="number" placeholder="Min stock"     value={minStock}     onChange={(e) => setMinStock(e.target.value)}     className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] tabular-nums" />
+              <input type="number" placeholder="Max stock"     value={maxStock}     onChange={(e) => setMaxStock(e.target.value)}     className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] tabular-nums" />
             </div>
-            <textarea placeholder="Description / notes" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
+            <textarea placeholder="Description / notes" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
           </div>
         )}
 
@@ -924,7 +924,7 @@ function ItemDetailDrawer({
                 <RrIcon name="trash" size={12} /> Archive
               </button>
             )}
-            <button onClick={onClose} className="rounded-md border border-white/[0.08] px-3 py-1.5 text-[12px] text-gray-400 hover:text-gray-200">
+            <button onClick={onClose} className="rounded-md border border-[var(--border-color)] px-3 py-1.5 text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)]">
               Close
             </button>
           </div>
@@ -936,7 +936,7 @@ function ItemDetailDrawer({
       {item && (
         <div className="space-y-4">
           <div>
-            <div className="font-mono text-[11px] text-gray-500">{item.item_code}</div>
+            <div className="font-mono text-[11px] text-[var(--text-dim)]">{item.item_code}</div>
             <div className="mt-1 text-[16px] font-medium tracking-tight">{item.item_name}</div>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               {type && <TypeChip name={type.type_name} icon={type.icon} color={type.color} />}
@@ -948,26 +948,26 @@ function ItemDetailDrawer({
 
           {/* Stock summary */}
           <div>
-            <div className="text-[10px] uppercase tracking-[0.12em] text-gray-500 mb-2">Stock</div>
+            <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)] mb-2">Stock</div>
             <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-md border border-white/[0.05] bg-white/[0.012] px-3 py-2">
-                <div className="text-[9.5px] uppercase tracking-[0.10em] text-gray-500">On hand</div>
+              <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
+                <div className="text-[9.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">On hand</div>
                 <div className="mt-0.5 text-[16px] tabular-nums font-mono">{fmtQty(stock?.total_on_hand ?? 0)}</div>
               </div>
-              <div className="rounded-md border border-white/[0.05] bg-white/[0.012] px-3 py-2">
-                <div className="text-[9.5px] uppercase tracking-[0.10em] text-gray-500">Reserved</div>
-                <div className="mt-0.5 text-[16px] tabular-nums font-mono text-gray-300">{fmtQty(stock?.total_reserved ?? 0)}</div>
+              <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
+                <div className="text-[9.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">Reserved</div>
+                <div className="mt-0.5 text-[16px] tabular-nums font-mono text-[var(--text-muted)]">{fmtQty(stock?.total_reserved ?? 0)}</div>
               </div>
-              <div className="rounded-md border border-white/[0.05] bg-white/[0.012] px-3 py-2">
-                <div className="text-[9.5px] uppercase tracking-[0.10em] text-gray-500">Available</div>
+              <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
+                <div className="text-[9.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">Available</div>
                 <div className="mt-0.5 text-[16px] tabular-nums font-mono">{fmtQty(stock?.total_available ?? 0)}</div>
               </div>
             </div>
             {(stock?.warehouses?.length ?? 0) > 0 && (
-              <div className="mt-3 overflow-hidden rounded-md border border-white/[0.05]">
+              <div className="mt-3 overflow-hidden rounded-md border border-[var(--border-subtle)]">
                 <table className="min-w-full text-[11.5px]">
                   <thead>
-                    <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.10em] text-gray-500">
+                    <tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
                       <th className="px-2 py-1.5 text-left">Location</th>
                       <th className="px-2 py-1.5 text-right">On hand</th>
                       <th className="px-2 py-1.5 text-right">Available</th>
@@ -975,10 +975,10 @@ function ItemDetailDrawer({
                   </thead>
                   <tbody>
                     {stock!.warehouses.map((w) => (
-                      <tr key={w.warehouse_id} className="border-b border-white/[0.03] last:border-b-0">
-                        <td className="px-2 py-1.5 text-gray-300">{w.warehouse_code} <span className="text-gray-500">· {w.warehouse_name}</span></td>
+                      <tr key={w.warehouse_id} className="border-b border-[var(--border-subtle)] last:border-b-0">
+                        <td className="px-2 py-1.5 text-[var(--text-muted)]">{w.warehouse_code} <span className="text-[var(--text-dim)]">· {w.warehouse_name}</span></td>
                         <td className="px-2 py-1.5 text-right tabular-nums font-mono">{fmtQty(w.qty_on_hand)}</td>
-                        <td className="px-2 py-1.5 text-right tabular-nums font-mono text-gray-400">{fmtQty(w.qty_available)}</td>
+                        <td className="px-2 py-1.5 text-right tabular-nums font-mono text-[var(--text-muted)]">{fmtQty(w.qty_available)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -990,31 +990,31 @@ function ItemDetailDrawer({
           {/* Valuation — Phase O.5 */}
           {valuation && valuation.total_qty > 0 && (
             <div>
-              <div className="text-[10px] uppercase tracking-[0.12em] text-gray-500 mb-2">Valuation</div>
+              <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)] mb-2">Valuation</div>
               <div className="grid grid-cols-3 gap-2">
-                <div className="rounded-md border border-white/[0.05] bg-white/[0.012] px-3 py-2">
-                  <div className="text-[9.5px] uppercase tracking-[0.10em] text-gray-500">Avg cost</div>
+                <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
+                  <div className="text-[9.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">Avg cost</div>
                   <div className="mt-0.5 text-[15px] tabular-nums font-mono">{fmtMoney(valuation.weighted_avg_cost)}</div>
-                  <div className="mt-0.5 text-[10px] text-gray-500">{valuation.currency}</div>
+                  <div className="mt-0.5 text-[10px] text-[var(--text-dim)]">{valuation.currency}</div>
                 </div>
-                <div className="rounded-md border border-white/[0.05] bg-white/[0.012] px-3 py-2">
-                  <div className="text-[9.5px] uppercase tracking-[0.10em] text-gray-500">Stock value</div>
+                <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
+                  <div className="text-[9.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">Stock value</div>
                   <div className="mt-0.5 text-[15px] tabular-nums font-mono text-emerald-200">{fmtMoney(valuation.total_value)}</div>
-                  <div className="mt-0.5 text-[10px] text-gray-500">{valuation.currency}</div>
+                  <div className="mt-0.5 text-[10px] text-[var(--text-dim)]">{valuation.currency}</div>
                 </div>
-                <div className="rounded-md border border-white/[0.05] bg-white/[0.012] px-3 py-2">
-                  <div className="text-[9.5px] uppercase tracking-[0.10em] text-gray-500">Last in cost</div>
-                  <div className="mt-0.5 text-[15px] tabular-nums font-mono text-gray-300">
+                <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
+                  <div className="text-[9.5px] uppercase tracking-[0.10em] text-[var(--text-dim)]">Last in cost</div>
+                  <div className="mt-0.5 text-[15px] tabular-nums font-mono text-[var(--text-muted)]">
                     {valuation.last_in_cost != null ? fmtMoney(valuation.last_in_cost) : "—"}
                   </div>
-                  <div className="mt-0.5 text-[10px] text-gray-500">{valuation.currency}</div>
+                  <div className="mt-0.5 text-[10px] text-[var(--text-dim)]">{valuation.currency}</div>
                 </div>
               </div>
               {valuation.locations.length > 0 && (
-                <div className="mt-3 overflow-hidden rounded-md border border-white/[0.05]">
+                <div className="mt-3 overflow-hidden rounded-md border border-[var(--border-subtle)]">
                   <table className="min-w-full text-[11.5px]">
                     <thead>
-                      <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.10em] text-gray-500">
+                      <tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
                         <th className="px-2 py-1.5 text-left">Location</th>
                         <th className="px-2 py-1.5 text-right">Qty</th>
                         <th className="px-2 py-1.5 text-right">Avg cost</th>
@@ -1023,10 +1023,10 @@ function ItemDetailDrawer({
                     </thead>
                     <tbody>
                       {valuation.locations.map((l) => (
-                        <tr key={l.warehouse_id} className="border-b border-white/[0.03] last:border-b-0">
-                          <td className="px-2 py-1.5 text-gray-300">{l.warehouse_code} <span className="text-gray-500">· {l.warehouse_name}</span></td>
+                        <tr key={l.warehouse_id} className="border-b border-[var(--border-subtle)] last:border-b-0">
+                          <td className="px-2 py-1.5 text-[var(--text-muted)]">{l.warehouse_code} <span className="text-[var(--text-dim)]">· {l.warehouse_name}</span></td>
                           <td className="px-2 py-1.5 text-right tabular-nums font-mono">{fmtQty(l.qty_on_hand)}</td>
-                          <td className="px-2 py-1.5 text-right tabular-nums font-mono text-gray-400">{fmtMoney(l.average_cost)}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums font-mono text-[var(--text-muted)]">{fmtMoney(l.average_cost)}</td>
                           <td className="px-2 py-1.5 text-right tabular-nums font-mono">{fmtMoney(l.inventory_value)}</td>
                         </tr>
                       ))}
@@ -1042,7 +1042,7 @@ function ItemDetailDrawer({
 
           {/* Details grid */}
           <div>
-            <div className="text-[10px] uppercase tracking-[0.12em] text-gray-500 mb-2">Details</div>
+            <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)] mb-2">Details</div>
             <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11.5px]">
               <DT label="Unit"        value={item.unit_of_measure} />
               <DT label="Brand"       value={item.brand ?? "—"} />
@@ -1059,8 +1059,8 @@ function ItemDetailDrawer({
 
           {(item.description || item.notes) && (
             <div>
-              <div className="text-[10px] uppercase tracking-[0.12em] text-gray-500 mb-1">Description</div>
-              <div className="rounded-md border border-white/[0.05] bg-white/[0.012] px-3 py-2 text-[11.5px] text-gray-300 whitespace-pre-wrap">
+              <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)] mb-1">Description</div>
+              <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[11.5px] text-[var(--text-muted)] whitespace-pre-wrap">
                 {item.description || item.notes}
               </div>
             </div>
@@ -1074,8 +1074,8 @@ function ItemDetailDrawer({
 function DT({ label, value }: { label: string; value: string }) {
   return (
     <>
-      <dt className="text-gray-500">{label}</dt>
-      <dd className="text-gray-200 tabular-nums">{value}</dd>
+      <dt className="text-[var(--text-dim)]">{label}</dt>
+      <dd className="text-[var(--text-primary)] tabular-nums">{value}</dd>
     </>
   );
 }
@@ -1138,32 +1138,32 @@ function TypesPanel({
   return (
     <DrawerShell title="Item Types" onClose={onClose}>
       <div className="space-y-4">
-        <div className="rounded-md border border-white/[0.06] p-3 space-y-2">
+        <div className="rounded-md border border-[var(--border-subtle)] p-3 space-y-2">
           <div className="flex items-center justify-between">
-            <div className="text-[10px] uppercase tracking-[0.12em] text-gray-500">New custom type</div>
+            <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">New custom type</div>
             <TypeChip name={name || "Preview"} icon={icon} color={color} compact />
           </div>
           <input
             placeholder="e.g. CEO Office Items, Exhibition Screens…"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+            className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
           />
           <div className="grid grid-cols-2 gap-2">
             <label className="block text-[11px]">
-              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Icon</div>
-              <select value={icon} onChange={(e) => setIcon(e.target.value as IconName)} className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]">
+              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Icon</div>
+              <select value={icon} onChange={(e) => setIcon(e.target.value as IconName)} className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]">
                 {ALLOWED_ICONS.map((i) => <option key={i} value={i}>{i}</option>)}
               </select>
             </label>
             <label className="block text-[11px]">
-              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Color</div>
-              <select value={color} onChange={(e) => setColor(e.target.value as ColorToken)} className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]">
+              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Color</div>
+              <select value={color} onChange={(e) => setColor(e.target.value as ColorToken)} className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]">
                 {ALLOWED_COLORS.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </label>
           </div>
-          <textarea placeholder="Optional description" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
+          <textarea placeholder="Optional description" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
 
           {/* INV-H5B — Usage scope */}
           <div className="space-y-1.5">
@@ -1199,23 +1199,23 @@ function TypesPanel({
           {error && (
             <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-300">{error}</div>
           )}
-          <button onClick={submit} disabled={submitting} className="w-full rounded-md border border-white/[0.12] bg-white/[0.06] px-3 py-1.5 text-[12px] hover:bg-white/[0.10] disabled:opacity-50">
+          <button onClick={submit} disabled={submitting} className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface)] disabled:opacity-50">
             {submitting ? "Creating…" : "Create custom type"}
           </button>
         </div>
 
         <div>
-          <div className="text-[10px] uppercase tracking-[0.12em] text-gray-500 mb-2">All types ({sorted.length})</div>
+          <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)] mb-2">All types ({sorted.length})</div>
           <ul className="space-y-1">
             {sorted.map((tt) => (
-              <li key={tt.id} className="flex items-center justify-between rounded-md border border-white/[0.04] px-2 py-1.5">
+              <li key={tt.id} className="flex items-center justify-between rounded-md border border-[var(--border-subtle)] px-2 py-1.5">
                 <div className="flex items-center gap-2 min-w-0">
                   <TypeIcon icon={tt.icon} color={tt.color} />
-                  <span className="text-[12px] text-gray-200 truncate">{tt.type_name}</span>
+                  <span className="text-[12px] text-[var(--text-primary)] truncate">{tt.type_name}</span>
                   <span className="shrink-0 rounded-full border border-[var(--border-color)] bg-[var(--bg-surface)] px-1.5 py-0.5 text-[9.5px] uppercase tracking-[0.06em] text-[var(--text-dim)]">
                     {tt.usage_scope === "internal_use" || tt.requires_product === false ? t("inv.badge_internal_use") : t("inv.badge_product_linked")}
                   </span>
-                  <span className="text-[10px] text-gray-500 shrink-0">
+                  <span className="text-[10px] text-[var(--text-dim)] shrink-0">
                     {tt.is_system ? "system" : "custom"}{!tt.is_active ? " · archived" : ""}
                   </span>
                 </div>
@@ -1323,7 +1323,7 @@ function ItemVariantsSection({ itemId }: { itemId: string }) {
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <div className="text-[10px] uppercase tracking-[0.12em] text-gray-500">Variants</div>
+        <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Variants</div>
         <button
           type="button"
           onClick={() => setAddOpen((s) => !s)}
@@ -1341,10 +1341,10 @@ function ItemVariantsSection({ itemId }: { itemId: string }) {
       )}
 
       {addOpen && (
-        <div className="mb-3 rounded-md border border-white/[0.05] bg-white/[0.012] p-3 dark:border-white/[0.05]">
+        <div className="mb-3 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3 dark:border-[var(--border-subtle)]">
           <div className="grid grid-cols-2 gap-2 text-[11.5px]">
             <label className="col-span-2 block">
-              <div className="mb-0.5 text-[10px] uppercase tracking-[0.10em] text-gray-500">Name</div>
+              <div className="mb-0.5 text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">Name</div>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -1353,7 +1353,7 @@ function ItemVariantsSection({ itemId }: { itemId: string }) {
               />
             </label>
             <label className="block">
-              <div className="mb-0.5 text-[10px] uppercase tracking-[0.10em] text-gray-500">Color</div>
+              <div className="mb-0.5 text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">Color</div>
               <input
                 value={color}
                 onChange={(e) => setColorAttr(e.target.value)}
@@ -1361,7 +1361,7 @@ function ItemVariantsSection({ itemId }: { itemId: string }) {
               />
             </label>
             <label className="block">
-              <div className="mb-0.5 text-[10px] uppercase tracking-[0.10em] text-gray-500">Voltage</div>
+              <div className="mb-0.5 text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">Voltage</div>
               <input
                 value={voltage}
                 onChange={(e) => setVoltage(e.target.value)}
@@ -1369,7 +1369,7 @@ function ItemVariantsSection({ itemId }: { itemId: string }) {
               />
             </label>
             <label className="col-span-2 block">
-              <div className="mb-0.5 text-[10px] uppercase tracking-[0.10em] text-gray-500">Size</div>
+              <div className="mb-0.5 text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">Size</div>
               <input
                 value={size}
                 onChange={(e) => setSize(e.target.value)}
@@ -1391,16 +1391,16 @@ function ItemVariantsSection({ itemId }: { itemId: string }) {
       )}
 
       {loading ? (
-        <div className="text-[11px] text-gray-500">Loading…</div>
+        <div className="text-[11px] text-[var(--text-dim)]">Loading…</div>
       ) : variants.length === 0 ? (
-        <div className="rounded-md border border-white/[0.05] bg-white/[0.012] px-3 py-3 text-[11.5px] text-gray-500">
+        <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-3 text-[11.5px] text-[var(--text-dim)]">
           No variants yet. Add a variant when this item exists in multiple flavours (color, voltage, size).
         </div>
       ) : (
-        <div className="overflow-hidden rounded-md border border-white/[0.05]">
+        <div className="overflow-hidden rounded-md border border-[var(--border-subtle)]">
           <table className="min-w-full text-[11.5px]">
             <thead>
-              <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.10em] text-gray-500">
+              <tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
                 <th className="px-2 py-1.5 text-left">Name</th>
                 <th className="px-2 py-1.5 text-left">Attributes</th>
                 <th className="px-2 py-1.5 text-right">Cost</th>
@@ -1410,17 +1410,17 @@ function ItemVariantsSection({ itemId }: { itemId: string }) {
             </thead>
             <tbody>
               {variants.map((v) => (
-                <tr key={v.id} className="border-b border-white/[0.03] last:border-b-0">
-                  <td className="px-2 py-1.5 text-gray-300">
+                <tr key={v.id} className="border-b border-[var(--border-subtle)] last:border-b-0">
+                  <td className="px-2 py-1.5 text-[var(--text-muted)]">
                     <div>{v.variant_name}</div>
-                    <div className="font-mono text-[10px] text-gray-500">{v.variant_code}</div>
+                    <div className="font-mono text-[10px] text-[var(--text-dim)]">{v.variant_code}</div>
                   </td>
-                  <td className="px-2 py-1.5 text-gray-400">
+                  <td className="px-2 py-1.5 text-[var(--text-muted)]">
                     {Object.entries(v.attributes ?? {})
                       .map(([k, val]) => `${k}: ${String(val)}`)
                       .join(", ") || "—"}
                   </td>
-                  <td className="px-2 py-1.5 text-right tabular-nums font-mono text-gray-400">
+                  <td className="px-2 py-1.5 text-right tabular-nums font-mono text-[var(--text-muted)]">
                     {v.cost_price != null
                       ? Number(v.cost_price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                       : "—"}

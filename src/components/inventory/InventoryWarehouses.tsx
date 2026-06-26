@@ -100,9 +100,9 @@ export default function InventoryWarehouses() {
         <div className="flex flex-wrap items-center gap-2 text-[11.5px]">
           <button
             onClick={() => setFilterType("")}
-            className={`rounded-md border px-2.5 py-1 ${filterType === "" ? "border-white/[0.14] bg-white/[0.06] text-[var(--text-primary)]" : "border-white/[0.06] text-gray-400 hover:text-gray-200"}`}
+            className={`rounded-md border px-2.5 py-1 ${filterType === "" ? "border-[var(--border-color)] bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]" : "border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}
           >
-            All <span className="text-gray-500 tabular-nums ml-1">{rows.length}</span>
+            All <span className="text-[var(--text-dim)] tabular-nums ml-1">{rows.length}</span>
           </button>
           {ALLOWED_LOCATION_TYPES.map((t) => {
             const c = counts.get(t) ?? 0;
@@ -111,10 +111,10 @@ export default function InventoryWarehouses() {
               <button
                 key={t}
                 onClick={() => setFilterType(t)}
-                className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 ${filterType === t ? "border-white/[0.14] bg-white/[0.06] text-[var(--text-primary)]" : "border-white/[0.06] text-gray-400 hover:text-gray-200"}`}
+                className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 ${filterType === t ? "border-[var(--border-color)] bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]" : "border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}
               >
                 <LocationTypeChip type={t} />
-                <span className="text-gray-500 tabular-nums">{c}</span>
+                <span className="text-[var(--text-dim)] tabular-nums">{c}</span>
               </button>
             );
           })}
@@ -123,7 +123,7 @@ export default function InventoryWarehouses() {
         <Panel>
           <table className="min-w-full text-[12.5px]">
             <thead>
-              <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.10em] text-gray-500">
+              <tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
                 <th className="px-4 py-2 text-left">Code</th>
                 <th className="px-4 py-2 text-left">Name</th>
                 <th className="px-4 py-2 text-left">Type</th>
@@ -134,7 +134,7 @@ export default function InventoryWarehouses() {
             </thead>
             <tbody>
               {loading && rows.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-6 text-center text-[11px] text-gray-600">Loading…</td></tr>
+                <tr><td colSpan={6} className="px-4 py-6 text-center text-[11px] text-[var(--text-dim)]">Loading…</td></tr>
               ) : visible.length === 0 ? (
                 <tr><td colSpan={6} className="px-0 py-0">
                   <InventoryEmpty
@@ -144,7 +144,7 @@ export default function InventoryWarehouses() {
                     action={
                       <button
                         onClick={() => setDrawerOpen(true)}
-                        className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.06] px-3 py-1 text-[11.5px] hover:bg-white/[0.10]"
+                        className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] px-3 py-1 text-[11.5px] hover:bg-[var(--bg-surface)]"
                       >
                         <RrIcon name="plus" size={11} />
                         New Location
@@ -154,26 +154,26 @@ export default function InventoryWarehouses() {
                 </td></tr>
               ) : (
                 visible.map((w) => (
-                  <tr key={w.id} {...kxInspectAttrs({ component: "InventoryWarehouseRow", module: "Inventory", section: "Warehouses", recordId: w.id })} className="border-b border-white/[0.03] last:border-b-0 hover:bg-white/[0.02]">
-                    <td className="px-4 py-2 font-mono text-[11.5px] text-gray-300 whitespace-nowrap">{w.code}</td>
-                    <td className="px-4 py-2 text-gray-200">{w.name}</td>
+                  <tr key={w.id} {...kxInspectAttrs({ component: "InventoryWarehouseRow", module: "Inventory", section: "Warehouses", recordId: w.id })} className="border-b border-[var(--border-subtle)] last:border-b-0 hover:bg-[var(--bg-surface-subtle)]">
+                    <td className="px-4 py-2 font-mono text-[11.5px] text-[var(--text-muted)] whitespace-nowrap">{w.code}</td>
+                    <td className="px-4 py-2 text-[var(--text-primary)]">{w.name}</td>
                     <td className="px-4 py-2"><LocationTypeChip type={w.location_type} /></td>
-                    <td className="px-4 py-2 text-[11.5px] text-gray-300">
+                    <td className="px-4 py-2 text-[11.5px] text-[var(--text-muted)]">
                       {w.contact_person ? (
                         <>
                           {w.contact_person}
-                          {w.contact_phone && <span className="text-gray-500"> · {w.contact_phone}</span>}
+                          {w.contact_phone && <span className="text-[var(--text-dim)]"> · {w.contact_phone}</span>}
                         </>
                       ) : (
-                        <span className="text-gray-500">—</span>
+                        <span className="text-[var(--text-dim)]">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-2 text-[11.5px] text-gray-400 truncate max-w-[260px]">{w.address ?? w.location ?? "—"}</td>
+                    <td className="px-4 py-2 text-[11.5px] text-[var(--text-muted)] truncate max-w-[260px]">{w.address ?? w.location ?? "—"}</td>
                     <td className="px-4 py-2">
                       <div className="flex flex-wrap items-center gap-1.5">
                         {w.is_default && <span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.10em] text-emerald-200">Default</span>}
                         {w.is_virtual && <span className="rounded-full border border-violet-400/30 bg-violet-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.10em] text-violet-200">Virtual</span>}
-                        {!w.is_active && <span className="rounded-full border border-gray-500/30 bg-gray-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.10em] text-gray-400">Inactive</span>}
+                        {!w.is_active && <span className="rounded-full border border-gray-500/30 bg-gray-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.10em] text-[var(--text-muted)]">Inactive</span>}
                       </div>
                     </td>
                   </tr>
@@ -258,89 +258,89 @@ function NewLocationDrawer({
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           <div className="grid grid-cols-2 gap-2">
             <label className="block">
-              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Code *</div>
+              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Code *</div>
               <input
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 placeholder="WH-MAIN"
-                className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] font-mono"
+                className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] font-mono"
               />
             </label>
             <label className="block">
-              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Name *</div>
+              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Name *</div>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Main Warehouse"
-                className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
               />
             </label>
           </div>
 
           <label className="block">
-            <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-[0.12em] text-gray-500">
+            <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
               <span>Type</span>
               <LocationTypeChip type={locationType} />
             </div>
             <select
               value={locationType}
               onChange={(e) => setLocationType(e.target.value as LocationType)}
-              className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+              className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
             >
               {ALLOWED_LOCATION_TYPES.map((t) => (
                 <option key={t} value={t}>{LOCATION_TYPE_LABELS[t]}</option>
               ))}
             </select>
-            <div className="mt-1 text-[10.5px] text-gray-500">
+            <div className="mt-1 text-[10.5px] text-[var(--text-dim)]">
               {isPhysical ? "Physical location — stock will count as actually held." : "Virtual location — used for traceability without physical custody."}
             </div>
           </label>
 
           {canBeDefault && (
-            <label className="flex items-center gap-2 text-[11.5px] text-gray-400">
+            <label className="flex items-center gap-2 text-[11.5px] text-[var(--text-muted)]">
               <input type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} />
               Set as default warehouse for movements
             </label>
           )}
 
           <label className="block">
-            <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Address</div>
+            <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Address</div>
             <input
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               placeholder="Street, city, country"
-              className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+              className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
             />
           </label>
 
           <div className="grid grid-cols-2 gap-2">
             <label className="block">
-              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Contact person</div>
+              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Contact person</div>
               <input
                 value={contactPerson}
                 onChange={(e) => setContactPerson(e.target.value)}
                 placeholder="Warehouse manager / agent"
-                className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
               />
             </label>
             <label className="block">
-              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Contact phone</div>
+              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Contact phone</div>
               <input
                 value={contactPhone}
                 onChange={(e) => setContactPhone(e.target.value)}
                 placeholder="+86 21 5555 0000"
-                className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
               />
             </label>
           </div>
 
           <label className="block">
-            <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Notes</div>
+            <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Notes</div>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+              className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
             />
           </label>
 
@@ -349,14 +349,14 @@ function NewLocationDrawer({
           )}
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-white/[0.06] px-4 py-3">
-          <button type="button" onClick={onClose} className="rounded-md border border-white/[0.08] px-3 py-1.5 text-[12px] text-gray-400 hover:text-gray-200">
+        <div className="flex justify-end gap-2 border-t border-[var(--border-subtle)] px-4 py-3">
+          <button type="button" onClick={onClose} className="rounded-md border border-[var(--border-color)] px-3 py-1.5 text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)]">
             Cancel
           </button>
           <button
             type="submit"
             disabled={submitting}
-            className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.12] bg-white/[0.06] px-3 py-1.5 text-[12px] hover:bg-white/[0.10] disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] px-3 py-1.5 text-[12px] hover:bg-[var(--bg-surface)] disabled:opacity-50"
           >
             {!submitting && <RrIcon name="check" size={12} />}
             {submitting ? "Saving…" : "Create Location"}

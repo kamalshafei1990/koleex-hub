@@ -130,7 +130,7 @@ const CATEGORY_COLOR: Record<string, CategoryColor> = {
   cleaning_supply:     { chipBg: "bg-sky-500/20",     chipText: "text-sky-400",     hoverBorder: "hover:border-sky-500/50",     topLine: "bg-sky-400/70",     labelText: "text-sky-400" },
   kitchen_pantry:      { chipBg: "bg-green-500/20",   chipText: "text-green-400",   hoverBorder: "hover:border-green-500/50",   topLine: "bg-green-400/70",   labelText: "text-green-400" },
   first_aid:           { chipBg: "bg-red-500/20",     chipText: "text-red-400",     hoverBorder: "hover:border-red-500/50",     topLine: "bg-red-400/70",     labelText: "text-red-400" },
-  vehicle_fleet:       { chipBg: "bg-gray-500/20",    chipText: "text-gray-300",    hoverBorder: "hover:border-gray-500/50",    topLine: "bg-gray-400/70",    labelText: "text-gray-300" },
+  vehicle_fleet:       { chipBg: "bg-gray-500/20",    chipText: "text-[var(--text-muted)]",    hoverBorder: "hover:border-gray-500/50",    topLine: "bg-gray-400/70",    labelText: "text-[var(--text-muted)]" },
   photo_video:         { chipBg: "bg-purple-500/20",  chipText: "text-purple-400",  hoverBorder: "hover:border-purple-500/50",  topLine: "bg-purple-400/70",  labelText: "text-purple-400" },
   furniture:           { chipBg: "bg-lime-500/20",    chipText: "text-lime-400",    hoverBorder: "hover:border-lime-500/50",    topLine: "bg-lime-400/70",    labelText: "text-lime-400" },
 };
