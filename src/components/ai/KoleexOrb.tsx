@@ -31,6 +31,7 @@ export default function KoleexOrb({
   greetKey,
   size = 96,
   className,
+  animated = true,
 }: {
   /** Drives the orb: idle · loading (thinking) · typing (streaming) · success · error. */
   state?: OrbState;
@@ -39,12 +40,27 @@ export default function KoleexOrb({
   /** Square pixel size of the orb. */
   size?: number;
   className?: string;
+  /** When false, the orb renders once then freezes (no animation loop). */
+  animated?: boolean;
 }) {
   const { rive, RiveComponent } = useRive({
     src: SRC,
     stateMachines: STATE_MACHINE,
-    autoplay: true,
+    autoplay: true, // always autoplay so the canvas initialises + sizes
   });
+
+  /* Freeze for a static icon: let Rive paint + size a couple of frames, then
+     pause. (autoplay:false leaves the canvas at 0×0, so we pause instead.) */
+  useEffect(() => {
+    if (!rive || animated) return;
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        try { rive.pause(); } catch { /* noop */ }
+      });
+    });
+    return () => { cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); };
+  }, [rive, animated]);
 
   const loading = useStateMachineInput(rive, STATE_MACHINE, "loadingBoolean");
   const typing = useStateMachineInput(rive, STATE_MACHINE, "typingBoolean");
