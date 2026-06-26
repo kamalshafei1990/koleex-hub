@@ -813,6 +813,7 @@ function TasksListView({ mine, tags }: { mine: boolean; tags: ProjectTag[] }) {
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "all">("open");
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | "all">("all");
   const [search, setSearch] = useState("");
+  const [overdueOnly, setOverdueOnly] = useState(false);
   const [taskModal, setTaskModal] = useState<{ open: boolean; editing: TaskRow | null }>({ open: false, editing: null });
 
   const reload = useCallback(() => {
@@ -837,10 +838,11 @@ function TasksListView({ mine, tags }: { mine: boolean; tags: ProjectTag[] }) {
   const grouped = useMemo(() => {
     const byStatus: Record<string, TaskRow[]> = { open: [], done: [], cancelled: [] };
     for (const tk of tasks) {
+      if (overdueOnly && !(tk.status === "open" && isOverdue(tk.due_date))) continue;
       byStatus[tk.status]?.push(tk);
     }
     return byStatus;
-  }, [tasks]);
+  }, [tasks, overdueOnly]);
 
   const priorities: (TaskPriority | "all")[] = ["all", "urgent", "high", "normal", "low"];
 
@@ -891,6 +893,17 @@ function TasksListView({ mine, tags }: { mine: boolean; tags: ProjectTag[] }) {
             </button>
           ))}
         </div>
+        <div className="w-px h-4 bg-[var(--border-subtle)]" />
+        <button
+          onClick={() => setOverdueOnly((v) => !v)}
+          className={`h-7 px-3 rounded-full text-[11px] font-semibold border whitespace-nowrap transition-colors ${
+            overdueOnly
+              ? "bg-rose-500/15 text-rose-400 border-rose-500/30"
+              : "bg-transparent border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+          }`}
+        >
+          {t("filter.overdue", "Overdue")}
+        </button>
       </div>
 
       {loading ? (
