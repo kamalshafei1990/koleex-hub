@@ -450,7 +450,7 @@ function QuotationDetail({ params }: { params: Promise<{ id: string }> }) {
                     const disc = l.line_discount_percent ?? 0;
                     const lineTotal = l.qty * l.unit_price * (1 - disc / 100);
                     return (
-                      <tr key={i} className="border-b border-[var(--border-faint)] last:border-0">
+                      <tr key={`${l.product_id ?? "line"}-${i}`} className="border-b border-[var(--border-faint)] last:border-0">
                         <td className="py-2.5 px-2">
                           {l.product_slug ? (
                             <Link

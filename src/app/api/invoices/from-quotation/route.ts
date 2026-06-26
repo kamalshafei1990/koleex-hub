@@ -49,7 +49,7 @@ export async function POST(req: Request) {
       // created_by is selected for DS1b-2a shadow scope evaluation only; it is
       // NOT echoed (the response is the new invoice). Used to read the source
       // quote's owner for the scope-shadow log.
-      .select("id, quote_no, customer_id, currency, discount_percent, notes, created_by")
+      .select("id, quote_no, customer_id, currency, discount_percent, notes, created_by, doc")
       .eq("id", body.quotation_id)
       .eq("tenant_id", auth.tenant_id)
       .maybeSingle(),
@@ -107,8 +107,15 @@ export async function POST(req: Request) {
     line_discount_percent: Number(row.line_discount_percent ?? 0),
     sort_order: i,
   }));
+  /* The quote's tax % lives in the doc jsonb (doc.taxPct), not a column.
+     Carry it onto the invoice so converting a taxed quote keeps its tax
+     instead of silently zeroing it. */
+  const quoteTaxPct = Math.max(
+    0,
+    Math.min(100, Number((quote.doc as { taxPct?: number } | null)?.taxPct ?? 0) || 0),
+  );
   const { hydrated, subtotal, tax_total, discount_total, total } =
-    calcInvoiceTotals(lines, 0, Number(quote.discount_percent ?? 0));
+    calcInvoiceTotals(lines, quoteTaxPct, Number(quote.discount_percent ?? 0));
 
   const inv_no = await nextInvoiceNumber(auth.tenant_id);
 
@@ -122,7 +129,7 @@ export async function POST(req: Request) {
       issue_date: new Date().toISOString().slice(0, 10),
       due_date: body.due_date ?? null,
       discount_percent: Number(quote.discount_percent ?? 0),
-      tax_rate: 0,
+      tax_rate: quoteTaxPct,
       subtotal,
       tax_total,
       discount_total,
