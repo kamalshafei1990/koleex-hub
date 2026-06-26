@@ -443,7 +443,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
   if (!key) {
     if (!aiProviderConfigured()) {
       return fallback(
-        "Koleex AI isn't configured. Ask an admin to add an AI provider key (Groq, Gemini, Anthropic, or OpenAI) in the Vercel env vars.",
+        "Koleex AI isn't configured. Ask an admin to add an AI provider key (DeepSeek, Groq, Gemini, Anthropic, or OpenAI) in the Vercel env vars.",
         conversationId,
         userMessage,
       );
