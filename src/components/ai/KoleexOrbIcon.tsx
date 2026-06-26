@@ -15,5 +15,14 @@ export default function KoleexOrbIcon({
   className?: string;
 }) {
   const px = typeof size === "string" ? parseInt(size, 10) || 24 : size;
-  return <KoleexOrb state="idle" size={px} className={className} />;
+  /* The orb artboard has transparent margin, so it reads ~40% smaller than its
+     box. Scale it up (layout box stays `px`, only the visual grows) so it fills
+     an app-icon slot with the same weight as the other line icons. */
+  return (
+    <KoleexOrb
+      state="idle"
+      size={px}
+      className={(className ? className + " " : "") + "scale-150"}
+    />
+  );
 }
