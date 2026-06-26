@@ -943,6 +943,8 @@ function PaymentModal({
   const [reference, setReference] = useState("");
   const [receivedAt, setReceivedAt] = useState(() => new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -951,22 +953,38 @@ function PaymentModal({
     setReference("");
     setReceivedAt(new Date().toISOString().slice(0, 10));
     setNotes("");
+    setSaving(false);
+    setErr(null);
   }, [open, invoice]);
 
   if (!open) return null;
 
+  const amt = Number(amount);
+  const amountValid = !!amt && amt > 0;
+
   const save = async () => {
-    const amt = Number(amount);
-    if (!amt || amt <= 0) return;
-    await recordPayment(invoice.id, {
-      amount: amt,
-      method,
-      reference: reference || null,
-      received_at: receivedAt,
-      notes: notes || null,
-      currency: invoice.currency,
-    });
-    onRecorded();
+    if (!amountValid || saving) return; // guard against double-submit → duplicate payments
+    setSaving(true);
+    setErr(null);
+    try {
+      const ok = await recordPayment(invoice.id, {
+        amount: amt,
+        method,
+        reference: reference || null,
+        received_at: receivedAt,
+        notes: notes || null,
+        currency: invoice.currency,
+      });
+      if (!ok) {
+        setErr(t("pay.error"));
+        setSaving(false);
+        return;
+      }
+      onRecorded();
+    } catch {
+      setErr(t("pay.error"));
+      setSaving(false);
+    }
   };
 
   return (
@@ -1003,10 +1021,11 @@ function PaymentModal({
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] outline-none resize-none" />
           </Field>
         </div>
+        {err && <p className="px-5 -mt-1 pb-1 text-[12px] font-medium text-rose-400">{err}</p>}
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)]">
-          <button onClick={onClose} className="h-9 px-3 text-[var(--text-dim)] hover:text-[var(--text-primary)] text-[12px] font-semibold">{t("btn.cancel")}</button>
-          <button onClick={save} className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold">
-            {t("btn.recordPayment")}
+          <button onClick={onClose} disabled={saving} className="h-9 px-3 text-[var(--text-dim)] hover:text-[var(--text-primary)] text-[12px] font-semibold disabled:opacity-50">{t("btn.cancel")}</button>
+          <button onClick={save} disabled={saving || !amountValid} className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold disabled:opacity-50">
+            {saving ? "…" : t("btn.recordPayment")}
           </button>
         </div>
       </div>

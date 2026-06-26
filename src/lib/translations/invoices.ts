@@ -72,6 +72,7 @@ export const invoicesT: Translations = {
   "pay.method.other": { en: "Other",               zh: "其他",              ar: "أخرى" },
   "pay.reference":    { en: "Reference",           zh: "参考号",            ar: "المرجع" },
   "pay.date":         { en: "Received on",         zh: "收款日期",          ar: "تاريخ الاستلام" },
+  "pay.error":        { en: "Couldn't record the payment. Please try again.", zh: "无法记录付款，请重试。", ar: "تعذّر تسجيل الدفعة. حاول مرة أخرى." },
   "pay.noPayments":   { en: "No payments recorded yet.",
                         zh: "尚未记录任何付款。",
                         ar: "لم يتم تسجيل أي مدفوعات." },
