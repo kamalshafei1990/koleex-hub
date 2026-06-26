@@ -1359,7 +1359,7 @@ export default function KoleexAiApp() {
           </button>
           {/* Koleex AI character — the live Rive orb, reacting to the
               conversation lifecycle (thinking / typing / done). */}
-          <KoleexOrb state={orbState} size={34} className="shrink-0" />
+          <KoleexOrb state={orbState} size={44} className="shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="text-[13px] font-semibold truncate text-[var(--text-primary)]">
               {active?.title ?? "Koleex AI"}
@@ -1399,7 +1399,7 @@ export default function KoleexAiApp() {
           >
             <ArrowLeftIcon className="h-4 w-4" />
           </Link>
-          <KoleexOrb state={orbState} size={34} className="shrink-0" />
+          <KoleexOrb state={orbState} size={44} className="shrink-0" />
           <div className="min-w-0 flex-1">
             <h1 className="text-[16px] md:text-[17px] font-bold tracking-tight text-[var(--text-primary)] truncate leading-snug">
               {active?.title || "Koleex AI"}
@@ -2305,7 +2305,7 @@ function WelcomeCard({
   const greeting = firstName ? `${copy.welcomeTitle}, ${firstName}.` : copy.welcomeTitle;
   return (
     <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-2 py-8">
-      <KoleexOrb state="idle" size={104} className="mb-4" />
+      <KoleexOrb state="idle" size={132} className="mb-5" />
       <h2 className="text-[22px] md:text-[26px] font-bold tracking-tight text-[var(--text-primary)] mb-2 leading-tight">
         {greeting}
       </h2>

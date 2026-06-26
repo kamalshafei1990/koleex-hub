@@ -55,7 +55,7 @@ import SettingsIcon from "@/components/icons/SettingsIcon";
 import CommercialPolicyIcon from "@/components/icons/CommercialPolicyIcon";
 import SoftwareCenterIcon from "@/components/icons/ui/DownloadIcon";
 import MailIcon from "@/components/icons/MailIcon";
-import AiFaceIcon from "@/components/icons/AiFaceIcon";
+import KoleexOrbIcon from "@/components/ai/KoleexOrbIcon";
 import HrIcon from "@/components/icons/HrIcon";
 import OperationsSidebarIcon from "@/components/icons/OperationsSidebarIcon";
 import CommercialSidebarIcon from "@/components/icons/CommercialSidebarIcon";
@@ -230,7 +230,7 @@ export const APP_REGISTRY: AppDef[] = [
   /* ── Knowledge ── */
   { id: "knowledge",        tKey: "app.knowledge",        name: "Knowledge",         icon: KnowledgeIcon, route: "/knowledge",        active: true  },
   { id: "database",         tKey: "app.database",         name: "Database",          icon: DatabaseIcon,  route: "/database",         active: true,  newSince: "2026-06-03" },
-  { id: "ai",               tKey: "app.ai",               name: "AI",                icon: AiFaceIcon,  route: "/ai",               active: true  },
+  { id: "ai",               tKey: "app.ai",               name: "AI",                icon: KoleexOrbIcon,  route: "/ai",            active: true  },
 
   /* ── System ── */
   { id: "accounts",         tKey: "app.accounts",         name: "Accounts",          icon: AccountsIcon,  route: "/accounts",         active: true  },

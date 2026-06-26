@@ -25,6 +25,7 @@ import MicButton, { speakText, type TtsHandle } from "@/components/ai/MicButton"
 import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import AiFaceIcon from "@/components/icons/AiFaceIcon";
+import KoleexOrb from "@/components/ai/KoleexOrb";
 import DiscussIcon from "@/components/icons/DiscussIcon";
 import {
   fetchMyChannels,
@@ -726,7 +727,7 @@ export default function FloatingPanel() {
                 <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
                   {aiMessages.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-8 px-6 text-center">
-                      <AiFaceIcon size={56} animated />
+                      <KoleexOrb state={aiSending ? "loading" : "idle"} size={72} />
                       <p className={`text-[13px] font-semibold mt-3 ${textM}`}>Operator briefing</p>
                       <p className={`text-[11px] mt-1 ${textG}`}>Embedded finance intelligence</p>
 
@@ -1086,7 +1087,7 @@ export default function FloatingPanel() {
                     }`}
                     style={{ pointerEvents: showAi ? "auto" : "none" }}
                   >
-                    <AiFaceIcon size={16} className={tab === "ai" ? "ai-lottie-glow" : "opacity-30"} animated={tab === "ai"} />
+                    <KoleexOrb state={aiSending ? "loading" : "idle"} size={22} className={tab === "ai" ? "" : "opacity-40"} />
                     <span className={`hidden md:inline text-[11px] font-bold tracking-wide ${tab === "ai" ? "ai-neon-text" : ""}`}>
                       AI
                     </span>
