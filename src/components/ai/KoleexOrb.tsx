@@ -48,15 +48,16 @@ type Expr =
 const STYLE_ID = "kxorb-keyframes";
 const KEYFRAMES = `
 @keyframes kxorb-spin    { to { transform: rotate(360deg); } }
-@keyframes kxorb-breathe { 0%,100%{ transform: scale(1);} 50%{ transform: scale(1.04);} }
-@keyframes kxorb-bob     { 0%,100%{ transform: translateY(0);} 50%{ transform: translateY(-7%);} }
-@keyframes kxorb-pop     { 0%{ transform: scale(1);} 35%{ transform: scale(1.18);} 70%{ transform: scale(.97);} 100%{ transform: scale(1);} }
-@keyframes kxorb-shake   { 0%,100%{ transform: translateX(0) rotate(0);} 15%{ transform: translateX(-11%) rotate(-3deg);} 35%{ transform: translateX(9%) rotate(2deg);} 55%{ transform: translateX(-7%) rotate(-2deg);} 75%{ transform: translateX(5%) rotate(1deg);} }
-@keyframes kxorb-jump    { 0%,100%{ transform: translateY(0) scale(1);} 28%{ transform: translateY(-24%) scale(1.05);} 52%{ transform: translateY(0) scale(.96);} 70%{ transform: translateY(-9%) scale(1.02);} 86%{ transform: translateY(0) scale(1);} }
+@keyframes kxorb-breathe { 0%,100%{ transform: scale(1);} 50%{ transform: scale(1.025);} }
+@keyframes kxorb-bob     { 0%,100%{ transform: translateY(0);} 50%{ transform: translateY(-5%);} }
+@keyframes kxorb-pop     { 0%{ transform: scale(1);} 45%{ transform: scale(1.09);} 100%{ transform: scale(1);} }
+@keyframes kxorb-shake   { 0%,100%{ transform: translateX(0);} 25%{ transform: translateX(-7%);} 50%{ transform: translateX(6%);} 75%{ transform: translateX(-4%);} }
+@keyframes kxorb-jump    { 0%,100%{ transform: translateY(0);} 40%{ transform: translateY(-16%);} 70%{ transform: translateY(0);} 85%{ transform: translateY(-5%);} }
 @keyframes kxorb-glow    { 0%,100%{ opacity:.55;} 50%{ opacity:1;} }
 `;
 
-const EASE = "cubic-bezier(.34,1.5,.5,1)"; // springy
+/* Gentle ease-in-out (no spring / overshoot) for a silky feel. */
+const EASE = "cubic-bezier(.45,0,.2,1)";
 
 function eyeTransform(expr: Expr, eye: 0 | 1): string {
   switch (expr) {
@@ -140,10 +141,10 @@ export default function KoleexOrb({
         if (!alive) return;
         toggle = !toggle;
         setDynExpr(toggle ? "look-left" : "look-right");
-        t = setTimeout(loop, 620);
+        t = setTimeout(loop, 1000);
       };
       setDynExpr("look-left");
-      t = setTimeout(loop, 620);
+      t = setTimeout(loop, 1000);
       return () => {
         alive = false;
         clearTimeout(t);
@@ -201,19 +202,19 @@ export default function KoleexOrb({
           ? "kxorb-spin 18s linear infinite"
           : "none";
 
-  /* Whole-orb reaction motion (springy). */
+  /* Whole-orb reaction motion (gentle ease-in-out, no bounce). */
   const orbAnim = jumping
-    ? `kxorb-jump .95s ${EASE}`
+    ? `kxorb-jump 1.1s ${EASE}`
     : state === "celebrate"
-      ? `kxorb-jump .9s ${EASE}`
+      ? `kxorb-jump 1.05s ${EASE}`
       : state === "success" || state === "surprised"
-        ? `kxorb-pop .6s ${EASE}`
+        ? `kxorb-pop .85s ${EASE}`
         : state === "error"
-          ? "kxorb-shake .55s ease"
+          ? "kxorb-shake .7s ease-in-out"
           : state === "typing" && animated
-            ? "kxorb-bob 1.1s ease-in-out infinite"
+            ? "kxorb-bob 1.6s ease-in-out infinite"
             : state === "idle" && animated
-              ? "kxorb-breathe 5s ease-in-out infinite"
+              ? "kxorb-breathe 6s ease-in-out infinite"
               : "none";
 
   /* Functional status glow. */
@@ -238,7 +239,7 @@ export default function KoleexOrb({
     background: "linear-gradient(180deg, #ffffff, #c7cedb)",
     display: "block",
     transformOrigin: "center",
-    transition: `transform .26s ${EASE}`,
+    transition: `transform .45s ${EASE}`,
     willChange: "transform",
   };
 
