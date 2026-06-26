@@ -1457,6 +1457,13 @@ export default function KoleexAiApp() {
                   onSpeak={handleSpeak}
                   onFeedback={handleFeedback}
                   lang={lang}
+                  /* Only the latest AI bubble reacts to the live
+                     conversation; older ones stay idle. */
+                  orbState={
+                    i === messages.length - 1 && m.role === "assistant"
+                      ? orbState
+                      : "idle"
+                  }
                 />
               ))
             )}
@@ -1847,11 +1854,16 @@ function Bubble({
   onSpeak,
   onFeedback,
   lang,
+  orbState = "idle",
 }: {
   msg: ChatMsg;
   userAvatar?: string | null;
   userInitial: string;
   isLast?: boolean;
+  /** Live orb reaction for THIS bubble — only the last assistant message
+      gets a non-idle value (thinking/typing/success/error); the rest stay
+      calm so the transcript doesn't twitch. */
+  orbState?: OrbState;
   canRegenerate?: boolean;
   canEdit?: boolean;
   onCopy?: (text: string) => Promise<boolean> | boolean;
@@ -1936,7 +1948,7 @@ function Bubble({
       className={`flex items-start gap-3 ${isUser ? "justify-end" : "justify-start"}`}
     >
       {!isUser && (
-        <KoleexOrb state="idle" size={64} className="shrink-0 scale-[1.9]" />
+        <KoleexOrb state={orbState} size={64} className="shrink-0 scale-[1.9]" />
       )}
       <div className={`flex flex-col gap-2 max-w-[85%] ${isUser ? "items-end" : "items-start"}`}>
         {/* Tool-call / tool-result chips render ABOVE the final assistant
@@ -2298,9 +2310,17 @@ function WelcomeCard({
      "What do you want to do?" pattern on /finance). No drop-shadow
      halos, no glass blur, no centered-pill chips. */
   const greeting = firstName ? `${copy.welcomeTitle}, ${firstName}.` : copy.welcomeTitle;
+  /* One-shot "jump" greet shortly after the welcome screen mounts, so the
+     orb waves hello when you open Koleex AI. greetKey starts at 0 (no fire
+     on mount) then flips to 1 → fires the jump reaction once. */
+  const [greet, setGreet] = useState(0);
+  useEffect(() => {
+    const t = setTimeout(() => setGreet(1), 350);
+    return () => clearTimeout(t);
+  }, []);
   return (
     <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-2 py-8">
-      <KoleexOrb state="idle" size={320} className="scale-125 -mt-10 -mb-14" />
+      <KoleexOrb state="idle" greetKey={greet} size={320} className="scale-125 -mt-10 -mb-14" />
       <h2 className="text-[22px] md:text-[26px] font-bold tracking-tight text-[var(--text-primary)] mb-2 leading-tight">
         {greeting}
       </h2>
