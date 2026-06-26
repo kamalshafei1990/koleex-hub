@@ -888,7 +888,7 @@ export function NewBillDialog({ open, onClose, onCreated }: DialogProps) {
    5. New Vendor Payment
    ════════════════════════════════════════════════════════════════════ */
 
-interface BillOption { id: string; label: string; supplier_id: string | null; balance: number | null }
+interface BillOption { id: string; label: string; supplier_id: string | null; balance: number | null; total: number | null }
 
 export function NewPaymentDialog({ open, onClose, onCreated }: DialogProps) {
   const suppliers = useSuppliers(open);
@@ -922,6 +922,7 @@ export function NewPaymentDialog({ open, onClose, onCreated }: DialogProps) {
       setBills((r.data ?? []).map((b: { id: string; bill_no: string | null; supplier_id: string | null; balance: number | null; total: number | null }) => ({
         id: b.id, label: b.bill_no || b.id.slice(0, 8), supplier_id: b.supplier_id,
         balance: b.balance ?? b.total,
+        total: b.total ?? b.balance,
       })));
     })();
   }, [open]);
@@ -973,11 +974,15 @@ export function NewPaymentDialog({ open, onClose, onCreated }: DialogProps) {
       const b = bills.find((x) => x.id === billId);
       const newBalance = Math.max(0, (b?.balance ?? 0) - amt);
       const next = newBalance <= 0 ? "paid" : "partial";
+      /* Cumulative amount_paid = bill total − remaining balance. (The old
+         formula used `balance` in place of `total`, which double-counted
+         the payment, e.g. a 40 payment on a 100 bill stored 80 paid.) */
+      const billTotal = Number(b?.total ?? b?.balance ?? 0);
       await supabase
         .from("vendor_bills")
         .update({
           balance: newBalance,
-          amount_paid: (Number((b?.balance ?? 0)) + amt) - newBalance,
+          amount_paid: Math.max(0, billTotal - newBalance),
           status: next,
           paid_at: newBalance <= 0 ? new Date().toISOString() : null,
         })

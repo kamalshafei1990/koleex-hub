@@ -198,20 +198,20 @@ export default function ReceiveDialog({
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-3xl rounded-xl border border-white/[0.08] bg-[var(--bg-primary)] text-[var(--text-primary)]">
-        <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
+      <div className="w-full max-w-3xl rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] text-[var(--text-primary)]">
+        <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
           <div>
             <h2 className="text-[14px] font-semibold">Receive Goods</h2>
-            <p className="text-[11px] text-gray-500">
+            <p className="text-[11px] text-[var(--text-dim)]">
               {detail?.order.po_no ? `PO ${detail.order.po_no}` : "Loading…"} ·{" "}
               {detail ? `${detail.items.length} line${detail.items.length === 1 ? "" : "s"}` : ""}
             </p>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-[18px]">×</button>
+          <button onClick={onClose} className="text-[var(--text-dim)] hover:text-[var(--text-muted)] text-[18px]">×</button>
         </div>
 
         <div className="max-h-[70vh] overflow-y-auto p-4 space-y-4">
-          {loading && !detail && <div className="text-[12px] text-gray-500">Loading PO…</div>}
+          {loading && !detail && <div className="text-[12px] text-[var(--text-dim)]">Loading PO…</div>}
 
           {error && (
             <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">
@@ -224,8 +224,8 @@ export default function ReceiveDialog({
               {/* Destination mode + helper banner. Trading flows often
                   route goods to port / forwarder / direct-to-customer,
                   so the user picks the destination before anything else. */}
-              <div className="rounded-md border border-white/[0.06] p-3 space-y-2">
-                <div className="text-[10px] uppercase tracking-[0.12em] text-gray-500">Receiving destination</div>
+              <div className="rounded-md border border-[var(--border-subtle)] p-3 space-y-2">
+                <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Receiving destination</div>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {([
                     { v: "warehouse", label: "Koleex warehouse", hint: "Affects inventory" },
@@ -245,16 +245,16 @@ export default function ReceiveDialog({
                         type="button"
                         onClick={() => setDestinationMode(opt.v)}
                         className={`rounded-md border px-2 py-1.5 text-left text-[11.5px] transition ${
-                          active ? "border-white/[0.18] bg-white/[0.06] text-[var(--text-primary)]" : "border-white/[0.06] bg-transparent text-gray-400 hover:text-gray-200"
+                          active ? "border-[var(--border-color)] bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]" : "border-[var(--border-subtle)] bg-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                         }`}
                       >
                         <div className="font-medium">{opt.label}</div>
-                        <div className="text-[10px] text-gray-500">{opt.hint}</div>
+                        <div className="text-[10px] text-[var(--text-dim)]">{opt.hint}</div>
                       </button>
                     );
                   })}
                 </div>
-                <div className={`mt-2 text-[11px] ${affectsInventory ? "text-emerald-300" : "text-gray-500"}`}>
+                <div className={`mt-2 text-[11px] ${affectsInventory ? "text-emerald-300" : "text-[var(--text-dim)]"}`}>
                   {affectsInventory ? "✓ Will affect inventory" : "✗ Will NOT affect inventory"}
                 </div>
               </div>
@@ -262,11 +262,11 @@ export default function ReceiveDialog({
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 {destinationMode === "warehouse" && (
                   <label className="block sm:col-span-1">
-                    <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Warehouse</div>
+                    <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Warehouse</div>
                     <select
                       value={warehouseId}
                       onChange={(e) => setWarehouseId(e.target.value)}
-                      className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                      className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
                     >
                       {warehouses.filter((w) => !("location_type" in w) || (w as { location_type?: string }).location_type === "warehouse" || (w as { location_type?: string }).location_type === undefined).map((w) => (
                         <option key={w.id} value={w.id}>{w.code} — {w.name}</option>
@@ -276,113 +276,113 @@ export default function ReceiveDialog({
                 )}
                 {destinationMode === "port" && (
                   <label className="block sm:col-span-1">
-                    <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Port name</div>
+                    <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Port name</div>
                     <input
                       value={portName}
                       onChange={(e) => setPortName(e.target.value)}
                       placeholder="e.g. Shanghai, Hamburg, Jeddah"
-                      className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                      className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
                     />
                   </label>
                 )}
                 {destinationMode === "forwarder" && (
                   <label className="block sm:col-span-1">
-                    <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Forwarder</div>
+                    <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Forwarder</div>
                     <input
                       value={forwarderName}
                       onChange={(e) => setForwarderName(e.target.value)}
                       placeholder="DHL, Schenker, …"
-                      className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                      className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
                     />
                   </label>
                 )}
                 {destinationMode === "direct_ship_to_customer" && (
                   <label className="block sm:col-span-1">
-                    <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Customer ID *</div>
+                    <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Customer ID *</div>
                     <input
                       value={customerId}
                       onChange={(e) => setCustomerId(e.target.value)}
                       placeholder="contact uuid"
-                      className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                      className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
                     />
                   </label>
                 )}
                 {destinationMode === "exhibition" && (
                   <label className="block sm:col-span-1">
-                    <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Exhibition</div>
+                    <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Exhibition</div>
                     <input
                       value={exhibitionName}
                       onChange={(e) => setExhibitionName(e.target.value)}
                       placeholder="ITMA Milan 2027, Texprocess…"
-                      className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                      className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
                     />
                   </label>
                 )}
                 {destinationMode === "demo_location" && (
                   <label className="block sm:col-span-1">
-                    <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Demo location</div>
+                    <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Demo location</div>
                     <input
                       value={demoLocationName}
                       onChange={(e) => setDemoLocationName(e.target.value)}
                       placeholder="Customer site, training center…"
-                      className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                      className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
                     />
                   </label>
                 )}
                 {(destinationMode === "port" || destinationMode === "forwarder" || destinationMode === "direct_ship_to_customer" || destinationMode === "in_transit" || destinationMode === "consolidation" || destinationMode === "exhibition" || destinationMode === "demo_location") && (
                   <>
                     <label className="block">
-                      <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Shipment ref</div>
+                      <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Shipment ref</div>
                       <input
                         value={shipmentReference}
                         onChange={(e) => setShipmentReference(e.target.value)}
                         placeholder="BL, AWB, ref#…"
-                        className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                        className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
                       />
                     </label>
                     <label className="block">
-                      <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Container #</div>
+                      <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Container #</div>
                       <input
                         value={containerNo}
                         onChange={(e) => setContainerNo(e.target.value)}
                         placeholder="MSCU1234567"
-                        className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                        className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
                       />
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                       <label className="block">
-                        <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Ship</div>
-                        <input type="date" value={expectedShipDate} onChange={(e) => setExpectedShipDate(e.target.value)} className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
+                        <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Ship</div>
+                        <input type="date" value={expectedShipDate} onChange={(e) => setExpectedShipDate(e.target.value)} className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
                       </label>
                       <label className="block">
-                        <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Arrival</div>
-                        <input type="date" value={expectedArrivalDate} onChange={(e) => setExpectedArrivalDate(e.target.value)} className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
+                        <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Arrival</div>
+                        <input type="date" value={expectedArrivalDate} onChange={(e) => setExpectedArrivalDate(e.target.value)} className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
                       </label>
                     </div>
                   </>
                 )}
                 <label className="block">
-                  <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Carrier</div>
+                  <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Carrier</div>
                   <input
                     value={carrier}
                     onChange={(e) => setCarrier(e.target.value)}
-                    className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                    className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
                   />
                 </label>
                 <label className="block">
-                  <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Tracking #</div>
+                  <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Tracking #</div>
                   <input
                     value={trackingNo}
                     onChange={(e) => setTrackingNo(e.target.value)}
-                    className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                    className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
                   />
                 </label>
               </div>
 
-              <div className="overflow-hidden rounded-xl border border-white/[0.05] bg-white/[0.012]">
+              <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
                 <table className="min-w-full text-[12.5px]">
                   <thead>
-                    <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.10em] text-gray-500">
+                    <tr className="border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-[0.10em] text-[var(--text-dim)]">
                       <th className="px-3 py-2 text-left">Item</th>
                       <th className="px-3 py-2 text-right">Ordered</th>
                       <th className="px-3 py-2 text-right">Already</th>
@@ -397,10 +397,10 @@ export default function ReceiveDialog({
                       const s = lineState[it.id] ?? { qty_received: "", qty_accepted: "", qty_rejected: "0" };
                       const remaining = remainingFor(it);
                       return (
-                        <tr key={it.id} className="border-b border-white/[0.03]">
-                          <td className="px-3 py-1.5 text-gray-300">{it.description ?? it.product_id?.slice(0, 8) ?? "—"}</td>
-                          <td className="px-3 py-1.5 text-right tabular-nums font-mono text-gray-400">{it.qty}</td>
-                          <td className="px-3 py-1.5 text-right tabular-nums font-mono text-gray-500">{it.qty_received}</td>
+                        <tr key={it.id} className="border-b border-[var(--border-subtle)]">
+                          <td className="px-3 py-1.5 text-[var(--text-muted)]">{it.description ?? it.product_id?.slice(0, 8) ?? "—"}</td>
+                          <td className="px-3 py-1.5 text-right tabular-nums font-mono text-[var(--text-muted)]">{it.qty}</td>
+                          <td className="px-3 py-1.5 text-right tabular-nums font-mono text-[var(--text-dim)]">{it.qty_received}</td>
                           <td className="px-3 py-1.5 text-right tabular-nums font-mono">{remaining}</td>
                           <td className="px-3 py-1.5 text-right">
                             <input
@@ -409,7 +409,7 @@ export default function ReceiveDialog({
                               step="0.0001"
                               value={s.qty_received}
                               onChange={(e) => updateLine(it.id, "qty_received", e.target.value)}
-                              className="w-20 rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-1.5 py-1 text-right text-[11.5px] tabular-nums"
+                              className="w-20 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-1.5 py-1 text-right text-[11.5px] tabular-nums"
                             />
                           </td>
                           <td className="px-3 py-1.5 text-right">
@@ -419,7 +419,7 @@ export default function ReceiveDialog({
                               step="0.0001"
                               value={s.qty_accepted}
                               onChange={(e) => updateLine(it.id, "qty_accepted", e.target.value)}
-                              className="w-20 rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-1.5 py-1 text-right text-[11.5px] tabular-nums"
+                              className="w-20 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-1.5 py-1 text-right text-[11.5px] tabular-nums"
                             />
                           </td>
                           <td className="px-3 py-1.5 text-right">
@@ -429,7 +429,7 @@ export default function ReceiveDialog({
                               step="0.0001"
                               value={s.qty_rejected}
                               onChange={(e) => updateLine(it.id, "qty_rejected", e.target.value)}
-                              className="w-20 rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-1.5 py-1 text-right text-[11.5px] tabular-nums"
+                              className="w-20 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-1.5 py-1 text-right text-[11.5px] tabular-nums"
                             />
                           </td>
                         </tr>
@@ -440,19 +440,19 @@ export default function ReceiveDialog({
               </div>
 
               <label className="block">
-                <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Notes</div>
+                <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">Notes</div>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   rows={2}
-                  className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                  className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
                 />
               </label>
 
               {detail.receipts.length > 0 && (
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.12em] text-gray-500 mb-2">Receipt history</div>
-                  <ul className="text-[11.5px] text-gray-400 space-y-0.5">
+                  <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)] mb-2">Receipt history</div>
+                  <ul className="text-[11.5px] text-[var(--text-muted)] space-y-0.5">
                     {detail.receipts.map((r) => (
                       <li key={r.id}>
                         <span className="font-mono">{r.gr_no ?? r.id.slice(0, 8)}</span> · {r.status}
@@ -466,18 +466,18 @@ export default function ReceiveDialog({
           )}
         </div>
 
-        <div className="flex items-center justify-between border-t border-white/[0.06] px-4 py-3">
-          <span className="text-[11px] text-gray-500">
+        <div className="flex items-center justify-between border-t border-[var(--border-subtle)] px-4 py-3">
+          <span className="text-[11px] text-[var(--text-dim)]">
             {totalToReceive > 0 ? `${totalToReceive} units will move into stock` : "No quantities entered"}
           </span>
           <div className="flex gap-2">
-            <button onClick={onClose} className="rounded-md border border-white/[0.08] px-3 py-1.5 text-[12px] text-gray-400 hover:text-gray-200">
+            <button onClick={onClose} className="rounded-md border border-[var(--border-color)] px-3 py-1.5 text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)]">
               Cancel
             </button>
             <button
               onClick={submit}
               disabled={submitting || !detail || totalToReceive <= 0}
-              className="rounded-md border border-white/[0.12] bg-white/[0.06] px-3 py-1.5 text-[12px] text-[var(--text-primary)] hover:bg-white/[0.10] disabled:opacity-50"
+              className="rounded-md border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] px-3 py-1.5 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface)] disabled:opacity-50"
             >
               {submitting ? "Posting…" : "Confirm receipt"}
             </button>
