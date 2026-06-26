@@ -55,6 +55,7 @@
   },
   "dependencies": {
     "@node-rs/argon2": "^2.0.2",
+    "@rive-app/react-canvas": "^4.29.3",
     "@sparticuz/chromium-min": "^148.0.0",
     "@supabase/supabase-js": "^2.101.1",
     "@tiptap/core": "3.22.3",
