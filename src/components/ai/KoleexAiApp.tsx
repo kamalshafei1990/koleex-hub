@@ -34,6 +34,7 @@ import PencilIcon from "@/components/icons/ui/PencilIcon";
 import MenuBurgerIcon from "@/components/icons/ui/MenuBurgerIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import AiFaceIcon from "@/components/icons/AiFaceIcon";
+import KoleexOrb, { type OrbState } from "@/components/ai/KoleexOrb";
 import TypingIndicator from "@/components/ai/TypingIndicator";
 import MessageMarkdown from "@/components/ai/MessageMarkdown";
 import EmojiButton from "@/components/ai/EmojiButton";
@@ -1170,6 +1171,40 @@ export default function KoleexAiApp() {
     };
   }, []);
 
+  /* ── Koleex AI character (Rive orb) — derive its reactive state from the
+     live chat lifecycle without touching the streaming internals.
+       • turn in flight + assistant bubble still empty → "loading" (thinking)
+       • turn in flight + tokens have arrived          → "typing"
+       • turn just finished                            → brief "success"/"error" pulse
+     The orb fires its correct/wrong triggers when it enters success/error. */
+  const lastMsg = messages[messages.length - 1];
+  const orbThinking =
+    sending && lastMsg?.role === "assistant" && (lastMsg.content?.length ?? 0) === 0;
+  const orbStreaming =
+    sending && lastMsg?.role === "assistant" && (lastMsg.content?.length ?? 0) > 0;
+
+  const [orbPulse, setOrbPulse] = useState<null | "success" | "error">(null);
+  const prevSendingRef = useRef(false);
+  useEffect(() => {
+    if (prevSendingRef.current && !sending) {
+      setOrbPulse(error ? "error" : "success");
+    }
+    prevSendingRef.current = sending;
+  }, [sending, error]);
+  useEffect(() => {
+    if (!orbPulse) return;
+    const t = setTimeout(() => setOrbPulse(null), 1500);
+    return () => clearTimeout(t);
+  }, [orbPulse]);
+
+  const orbState: OrbState = orbPulse
+    ? orbPulse
+    : orbStreaming
+      ? "typing"
+      : orbThinking
+        ? "loading"
+        : "idle";
+
   return (
     <div
       className="text-[var(--text-primary)] flex overflow-hidden w-full relative bg-[var(--bg-primary)]"
@@ -1322,11 +1357,9 @@ export default function KoleexAiApp() {
           >
             {sidebarOpen ? <CrossIcon size={14} /> : <MenuBurgerIcon size={14} />}
           </button>
-          {/* AI icon mark — same family as the Finance / Inventory app
-              icons in the Hub header, but uses the live AI face. */}
-          <div className="h-8 w-8 shrink-0 flex items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
-            <AiFaceIcon size={16} animated />
-          </div>
+          {/* Koleex AI character — the live Rive orb, reacting to the
+              conversation lifecycle (thinking / typing / done). */}
+          <KoleexOrb state={orbState} size={34} className="shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="text-[13px] font-semibold truncate text-[var(--text-primary)]">
               {active?.title ?? "Koleex AI"}
@@ -1366,9 +1399,7 @@ export default function KoleexAiApp() {
           >
             <ArrowLeftIcon className="h-4 w-4" />
           </Link>
-          <div className="h-8 w-8 shrink-0 flex items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
-            <AiFaceIcon size={16} animated />
-          </div>
+          <KoleexOrb state={orbState} size={34} className="shrink-0" />
           <div className="min-w-0 flex-1">
             <h1 className="text-[16px] md:text-[17px] font-bold tracking-tight text-[var(--text-primary)] truncate leading-snug">
               {active?.title || "Koleex AI"}
@@ -2274,9 +2305,7 @@ function WelcomeCard({
   const greeting = firstName ? `${copy.welcomeTitle}, ${firstName}.` : copy.welcomeTitle;
   return (
     <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-2 py-8">
-      <div className="h-14 w-14 inline-flex items-center justify-center rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] mb-4">
-        <AiFaceIcon size={32} animated />
-      </div>
+      <KoleexOrb state="idle" size={104} className="mb-4" />
       <h2 className="text-[22px] md:text-[26px] font-bold tracking-tight text-[var(--text-primary)] mb-2 leading-tight">
         {greeting}
       </h2>
