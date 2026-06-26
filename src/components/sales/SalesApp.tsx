@@ -88,7 +88,7 @@ export default function SalesApp() {
           subtitle={t("sales.subtitle")}
           icon={<SalesIcon size={16} />}
           searchPlaceholder={searchPlaceholder}
-          searchHref="/inventory/search"
+          searchHref="/sales/orders"
           tabs={SALES_TAB_IDS.map((tabId) => {
             const Icon = TAB_ICONS[tabId];
             return {

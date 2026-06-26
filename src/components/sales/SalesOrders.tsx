@@ -17,6 +17,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import RrIcon from "@/components/ui/RrIcon";
 import {
   InventoryEmpty,
@@ -78,8 +79,11 @@ export default function SalesOrders() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [search, setSearch] = useState("");
-  const [searchKey, setSearchKey] = useState("");
+  /* Seed the search box from ?q= so the Sales hub search box lands here
+     with the term already applied. */
+  const initialQ = useSearchParams().get("q")?.trim() ?? "";
+  const [search, setSearch] = useState(initialQ);
+  const [searchKey, setSearchKey] = useState(initialQ);
   const [filterStatus, setFilterStatus] = useState<StatusKey>("");
   const [dateRange, setDateRange] = useState<DateRangeKey>("90d");
 
