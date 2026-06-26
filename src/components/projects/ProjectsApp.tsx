@@ -452,8 +452,8 @@ function ProjectDetailView({
   const [projectFormOpen, setProjectFormOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"board" | "list">("board");
 
-  const reload = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     const [proj, stgs, tks] = await Promise.all([
       fetch(`/api/projects/${projectId}`, { credentials: "include" }).then((r) => (r.ok ? r.json() : null)),
       fetchStages(projectId),
@@ -462,12 +462,26 @@ function ProjectDetailView({
     setProject(proj?.project ?? null);
     setStages(stgs);
     setTasks(tks);
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, [projectId]);
+
+  const reload = useCallback(() => load(false), [load]);
 
   useEffect(() => {
     reload();
   }, [reload]);
+
+  /* Near-live collaboration: quietly re-fetch the board every 20s while the
+     tab is visible (and immediately on regaining focus) so a teammate's task
+     changes appear without a manual refresh. Silent = no spinner flash. True
+     websocket push would need project_tasks added to the realtime publication
+     plus a browser-readable RLS policy; this polling path needs neither. */
+  useEffect(() => {
+    const tick = () => { if (typeof document !== "undefined" && !document.hidden) load(true); };
+    const id = window.setInterval(tick, 20000);
+    document.addEventListener("visibilitychange", tick);
+    return () => { window.clearInterval(id); document.removeEventListener("visibilitychange", tick); };
+  }, [load]);
 
   const tasksByStage = useMemo(() => {
     const map = new Map<string, TaskRow[]>();
