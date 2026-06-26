@@ -3,8 +3,33 @@
 /* ---------------------------------------------------------------------------
    projects — client-side fetchers + shared types for the Projects app.
    Every call hits the authenticated /api/projects/* routes; no direct
-   supabase anon calls.
+   supabase anon calls — EXCEPT the realtime Broadcast channel below, which
+   is a pub/sub message bus carrying NO database rows (just a "changed" ping),
+   so it needs no table RLS exposure.
    --------------------------------------------------------------------------- */
+
+import { supabaseAdmin } from "./supabase-admin";
+
+/* ── Realtime: collaborative board sync via Broadcast ──────────────────────
+   We deliberately do NOT use postgres_changes here: project_tasks/stages are
+   RLS-locked to service_role and the browser uses the anon key with no tenant
+   JWT, so a readable policy would leak across tenants. Broadcast sidesteps
+   that — the editing client emits an empty ping on a per-project channel and
+   other open boards silently refetch through the tenant-scoped API. Channel
+   names use the project UUID (not enumerable); payloads carry no data. */
+export function openProjectBoardChannel(
+  projectId: string,
+  onRemoteChange: () => void,
+): { signal: () => void; close: () => void } {
+  const ch = supabaseAdmin
+    .channel(`project-board:${projectId}`, { config: { broadcast: { self: false } } })
+    .on("broadcast", { event: "changed" }, () => onRemoteChange())
+    .subscribe();
+  return {
+    signal: () => { void ch.send({ type: "broadcast", event: "changed", payload: {} }); },
+    close: () => { void ch.unsubscribe(); },
+  };
+}
 
 export type ProjectStatus = "active" | "on_hold" | "completed" | "archived";
 export type TaskPriority = "low" | "normal" | "high" | "urgent";

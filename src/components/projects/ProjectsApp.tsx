@@ -12,7 +12,7 @@
      • Configuration   — tag CRUD
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n";
 import { projectsT } from "@/lib/translations/projects";
@@ -54,6 +54,7 @@ import {
   deleteTag,
   deleteTask,
   duplicateProject,
+  openProjectBoardChannel,
   fetchAccounts,
   fetchProjects,
   fetchStages,
@@ -465,11 +466,25 @@ function ProjectDetailView({
     if (!silent) setLoading(false);
   }, [projectId]);
 
-  const reload = useCallback(() => load(false), [load]);
+  /* Broadcast channel handle — lets reload() ping other open boards. */
+  const boardChannel = useRef<{ signal: () => void; close: () => void } | null>(null);
+
+  const reload = useCallback(async () => {
+    await load(false);
+    boardChannel.current?.signal();
+  }, [load]);
 
   useEffect(() => {
-    reload();
-  }, [reload]);
+    load(false);
+  }, [load]);
+
+  /* Subscribe to the project's Broadcast channel: when a teammate edits the
+     board, they ping and we silently refetch (carries no row data → safe). */
+  useEffect(() => {
+    const h = openProjectBoardChannel(projectId, () => load(true));
+    boardChannel.current = h;
+    return () => { h.close(); boardChannel.current = null; };
+  }, [projectId, load]);
 
   /* Near-live collaboration: quietly re-fetch the board every 20s while the
      tab is visible (and immediately on regaining focus) so a teammate's task
