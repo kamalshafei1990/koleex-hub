@@ -587,7 +587,7 @@ export default function FloatingPanel() {
                       : dk ? "text-white/35 hover:text-white/55" : "text-black/35 hover:text-black/55"
                   }`}
                 >
-                  <KoleexOrb state="idle" size={18} className={tab === "ai" ? "" : "opacity-40"} />
+                  <KoleexOrb state="idle" size={20} className={(tab === "ai" ? "" : "opacity-40") + " scale-[2.2]"} />
                   <span>Copilot</span>
                 </button>
                 <button
