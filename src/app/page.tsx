@@ -623,7 +623,7 @@ export default function HomePage() {
                   size?: number;
                   animated?: boolean;
                 }>;
-                return <AnimatedIcon size={44} animated />;
+                return <AnimatedIcon size={80} animated />;
               }
               return <Icon size={34} />;
             })()}
