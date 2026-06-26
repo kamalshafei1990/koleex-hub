@@ -6,7 +6,6 @@
    one supplier and carries many product → unit_price rows. */
 
 import { useEffect, useState } from "react";
-import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import type { PurchaseModuleProps } from "../shared";
 import { cardCls, formatDate, sectionTitleCls } from "../shared";
 import TagsIcon from "@/components/icons/ui/TagsIcon";
@@ -27,23 +26,21 @@ export default function PriceListsModule({ t }: PurchaseModuleProps) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [pR, iR, cR] = await Promise.all([
-        supabase
-          .from("supplier_price_lists")
-          .select("id,supplier_id,name,currency,valid_from,valid_to,is_active,created_at")
-          .order("created_at", { ascending: false }),
-        supabase.from("supplier_price_list_items").select("price_list_id"),
-        supabase.from("contacts").select("id,display_name,company_name,full_name").eq("contact_type", "supplier"),
-      ]);
+      const res = await fetch("/api/purchase/list?resource=pricelists", { credentials: "include" });
+      const data = (res.ok ? await res.json() : { rows: [], items: [], suppliers: [] }) as {
+        rows: PriceList[];
+        items: { price_list_id: string }[];
+        suppliers: { id: string; display_name: string | null; company_name: string | null; full_name: string | null }[];
+      };
       if (cancelled) return;
-      setRows((pR.data ?? []) as PriceList[]);
+      setRows(data.rows);
       const counts: Record<string, number> = {};
-      for (const it of (iR.data ?? []) as { price_list_id: string }[]) {
+      for (const it of data.items) {
         counts[it.price_list_id] = (counts[it.price_list_id] || 0) + 1;
       }
       setItemCount(counts);
       const m = new Map<string, string>();
-      for (const c of (cR.data ?? []) as { id: string; display_name: string | null; company_name: string | null; full_name: string | null }[]) {
+      for (const c of data.suppliers) {
         m.set(c.id, c.company_name || c.display_name || c.full_name || "—");
       }
       setSupplierName(m);

@@ -5,7 +5,6 @@
    spend tiles plus a recent list with payment method tone. */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import type { PurchaseModuleProps } from "../shared";
 import { cardCls, formatMoney, formatDate, sectionTitleCls } from "../shared";
 import { NewPaymentDialog } from "../dialogs";
@@ -37,30 +36,19 @@ export default function PaymentsModule({ t }: PurchaseModuleProps) {
   const [newOpen, setNewOpen] = useState(false);
 
   const load = useCallback(async () => {
-    const r = await supabase
-      .from("vendor_payments")
-      .select("id,payment_no,bill_id,supplier_id,amount,currency,method,reference,paid_at,created_at")
-      .order("paid_at", { ascending: false, nullsFirst: false })
-      .limit(50);
-    const list = (r.data ?? []) as Payment[];
-    const billIds = list.map((p) => p.bill_id).filter((x): x is string => !!x);
-    const supIds  = list.map((p) => p.supplier_id).filter((x): x is string => !!x);
+    const res = await fetch("/api/purchase/list?resource=payments", { credentials: "include" });
+    const data = (res.ok ? await res.json() : { rows: [], bills: [], suppliers: [] }) as {
+      rows: Payment[];
+      bills: { id: string; bill_no: string | null }[];
+      suppliers: { id: string; display_name: string | null; company_name: string | null; full_name: string | null }[];
+    };
 
-    const [bR, cR] = await Promise.all([
-      billIds.length
-        ? supabase.from("vendor_bills").select("id,bill_no").in("id", billIds)
-        : Promise.resolve({ data: [] as { id: string; bill_no: string | null }[] }),
-      supIds.length
-        ? supabase.from("contacts").select("id,display_name,company_name,full_name").in("id", supIds)
-        : Promise.resolve({ data: [] as { id: string; display_name: string | null; company_name: string | null; full_name: string | null }[] }),
-    ]);
-
-    setRows(list);
+    setRows(data.rows);
     const bm = new Map<string, string>();
-    for (const b of (bR.data ?? [])) bm.set(b.id, b.bill_no || "");
+    for (const b of data.bills) bm.set(b.id, b.bill_no || "");
     setBillNo(bm);
     const sm = new Map<string, string>();
-    for (const c of (cR.data ?? [])) sm.set(c.id, c.company_name || c.display_name || c.full_name || "—");
+    for (const c of data.suppliers) sm.set(c.id, c.company_name || c.display_name || c.full_name || "—");
     setSupplierName(sm);
     setLoading(false);
   }, []);

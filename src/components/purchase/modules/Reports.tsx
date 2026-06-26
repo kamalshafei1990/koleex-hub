@@ -5,7 +5,6 @@
    Sales reports so the two apps look consistent. */
 
 import { useEffect, useMemo, useState } from "react";
-import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import type { PurchaseModuleProps } from "../shared";
 import { cardCls, formatMoney, sectionTitleCls } from "../shared";
 import LineChartIcon from "@/components/icons/ui/LineChartIcon";
@@ -28,17 +27,18 @@ export default function ReportsModule({ t }: PurchaseModuleProps) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [pR, biR, cR, sR] = await Promise.all([
-        supabase.from("vendor_payments").select("amount,paid_at,created_at,supplier_id"),
-        supabase.from("vendor_bill_items").select("line_total,category_id"),
-        supabase.from("purchase_categories").select("id,name,kind"),
-        supabase.from("contacts").select("id,display_name,company_name,full_name").eq("contact_type", "supplier"),
-      ]);
+      const res = await fetch("/api/purchase/list?resource=reports", { credentials: "include" });
+      const data = (res.ok ? await res.json() : { payments: [], billItems: [], categories: [], suppliers: [] }) as {
+        payments: PaymentRow[];
+        billItems: BillItemRow[];
+        categories: CategoryRow[];
+        suppliers: SupplierRow[];
+      };
       if (cancelled) return;
-      setPayments((pR.data ?? []) as PaymentRow[]);
-      setBillItems((biR.data ?? []) as BillItemRow[]);
-      setCategories((cR.data ?? []) as CategoryRow[]);
-      setSuppliers((sR.data ?? []) as SupplierRow[]);
+      setPayments(data.payments);
+      setBillItems(data.billItems);
+      setCategories(data.categories);
+      setSuppliers(data.suppliers);
       setLoading(false);
     })();
     return () => { cancelled = true; };

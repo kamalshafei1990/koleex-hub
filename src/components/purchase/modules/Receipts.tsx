@@ -6,7 +6,6 @@
    Bills in the standard 3-way match (PO ↔ Receipt ↔ Bill). */
 
 import { useCallback, useEffect, useState } from "react";
-import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import type { PurchaseModuleProps } from "../shared";
 import { cardCls, formatDate, sectionTitleCls } from "../shared";
 import { NewReceiptDialog } from "../dialogs";
@@ -37,30 +36,19 @@ export default function ReceiptsModule({ t }: PurchaseModuleProps) {
   const [newOpen, setNewOpen] = useState(false);
 
   const load = useCallback(async () => {
-    const r = await supabase
-      .from("purchase_receipts")
-      .select("id,gr_no,status,po_id,supplier_id,carrier,tracking_no,received_at,created_at")
-      .order("received_at", { ascending: false, nullsFirst: false })
-      .limit(30);
-    const list = (r.data ?? []) as Receipt[];
-    const supplierIds = list.map((x) => x.supplier_id).filter((x): x is string => !!x);
-    const poIds = list.map((x) => x.po_id).filter((x): x is string => !!x);
+    const res = await fetch("/api/purchase/list?resource=receipts", { credentials: "include" });
+    const data = (res.ok ? await res.json() : { rows: [], suppliers: [], pos: [] }) as {
+      rows: Receipt[];
+      suppliers: { id: string; display_name: string | null; company_name: string | null; full_name: string | null }[];
+      pos: { id: string; po_no: string | null }[];
+    };
 
-    const [cR, pR] = await Promise.all([
-      supplierIds.length
-        ? supabase.from("contacts").select("id,display_name,company_name,full_name").in("id", supplierIds)
-        : Promise.resolve({ data: [] as { id: string; display_name: string | null; company_name: string | null; full_name: string | null }[] }),
-      poIds.length
-        ? supabase.from("purchase_orders").select("id,po_no").in("id", poIds)
-        : Promise.resolve({ data: [] as { id: string; po_no: string | null }[] }),
-    ]);
-
-    setRows(list);
+    setRows(data.rows);
     const sm = new Map<string, string>();
-    for (const c of (cR.data ?? [])) sm.set(c.id, c.company_name || c.display_name || c.full_name || "—");
+    for (const c of data.suppliers) sm.set(c.id, c.company_name || c.display_name || c.full_name || "—");
     setSupplierName(sm);
     const pm = new Map<string, string>();
-    for (const p of (pR.data ?? [])) pm.set(p.id, p.po_no || "");
+    for (const p of data.pos) pm.set(p.id, p.po_no || "");
     setPoNo(pm);
     setLoading(false);
   }, []);

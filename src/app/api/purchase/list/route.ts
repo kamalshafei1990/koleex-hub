@@ -65,6 +65,107 @@ const RESOURCES: Record<string, Spec> = {
   },
 };
 
+const SUPP_MIN = "id,display_name,company_name,full_name";
+
+async function suppliersAll(tid: string) {
+  const r = await supabaseServer
+    .from("contacts")
+    .select(SUPP_MIN)
+    .eq("tenant_id", tid)
+    .eq("contact_type", "supplier");
+  return r.data ?? [];
+}
+
+/* Composite resources: joins / aggregates the generic spec can't express.
+   Item child tables (vendor_bill_items, supplier_price_list_items) carry NO
+   tenant_id, so they are scoped indirectly through their tenant-owned parents
+   — this both tenant-isolates them and fixes the prior cross-tenant leak. */
+async function buildComposite(
+  key: string,
+  tid: string,
+): Promise<Record<string, unknown> | null> {
+  switch (key) {
+    case "payments": {
+      const r = await supabaseServer
+        .from("vendor_payments")
+        .select("id,payment_no,bill_id,supplier_id,amount,currency,method,reference,paid_at,created_at")
+        .eq("tenant_id", tid)
+        .order("paid_at", { ascending: false, nullsFirst: false })
+        .limit(50);
+      const rows = (r.data ?? []) as { bill_id: string | null }[];
+      const billIds = rows.map((p) => p.bill_id).filter((x): x is string => !!x);
+      const [bR, suppliers] = await Promise.all([
+        billIds.length
+          ? supabaseServer.from("vendor_bills").select("id,bill_no").eq("tenant_id", tid).in("id", billIds)
+          : Promise.resolve({ data: [] }),
+        suppliersAll(tid),
+      ]);
+      return { rows, bills: bR.data ?? [], suppliers };
+    }
+    case "receipts": {
+      const r = await supabaseServer
+        .from("purchase_receipts")
+        .select("id,gr_no,status,po_id,supplier_id,carrier,tracking_no,received_at,created_at")
+        .eq("tenant_id", tid)
+        .order("received_at", { ascending: false, nullsFirst: false })
+        .limit(30);
+      const rows = (r.data ?? []) as { po_id: string | null }[];
+      const poIds = rows.map((x) => x.po_id).filter((x): x is string => !!x);
+      const [pR, suppliers] = await Promise.all([
+        poIds.length
+          ? supabaseServer.from("purchase_orders").select("id,po_no").eq("tenant_id", tid).in("id", poIds)
+          : Promise.resolve({ data: [] }),
+        suppliersAll(tid),
+      ]);
+      return { rows, pos: pR.data ?? [], suppliers };
+    }
+    case "pricelists": {
+      const [pR, suppliers] = await Promise.all([
+        supabaseServer
+          .from("supplier_price_lists")
+          .select("id,supplier_id,name,currency,valid_from,valid_to,is_active,created_at")
+          .eq("tenant_id", tid)
+          .order("created_at", { ascending: false }),
+        suppliersAll(tid),
+      ]);
+      const rows = (pR.data ?? []) as { id: string }[];
+      const plIds = rows.map((r) => r.id);
+      const iR = plIds.length
+        ? await supabaseServer.from("supplier_price_list_items").select("price_list_id").in("price_list_id", plIds)
+        : { data: [] };
+      return { rows, items: iR.data ?? [], suppliers };
+    }
+    case "suppliers": {
+      const [c, p] = await Promise.all([
+        supabaseServer
+          .from("contacts")
+          .select("id,display_name,full_name,company_name,company_name_en,country,supplier_type,preferred_payment_method,rating,is_active,certifications")
+          .eq("tenant_id", tid)
+          .eq("contact_type", "supplier")
+          .order("updated_at", { ascending: false, nullsFirst: false })
+          .limit(50),
+        supabaseServer.from("vendor_payments").select("supplier_id,amount").eq("tenant_id", tid),
+      ]);
+      return { rows: c.data ?? [], payments: p.data ?? [] };
+    }
+    case "reports": {
+      const billsR = await supabaseServer.from("vendor_bills").select("id").eq("tenant_id", tid);
+      const billIds = ((billsR.data ?? []) as { id: string }[]).map((b) => b.id);
+      const [pR, biR, cR, suppliers] = await Promise.all([
+        supabaseServer.from("vendor_payments").select("amount,paid_at,created_at,supplier_id").eq("tenant_id", tid),
+        billIds.length
+          ? supabaseServer.from("vendor_bill_items").select("line_total,category_id").in("bill_id", billIds)
+          : Promise.resolve({ data: [] }),
+        supabaseServer.from("purchase_categories").select("id,name,kind").eq("tenant_id", tid),
+        suppliersAll(tid),
+      ]);
+      return { payments: pR.data ?? [], billItems: biR.data ?? [], categories: cR.data ?? [], suppliers };
+    }
+    default:
+      return null;
+  }
+}
+
 export async function GET(req: Request) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
@@ -73,6 +174,10 @@ export async function GET(req: Request) {
   const tid = auth.tenant_id;
 
   const key = new URL(req.url).searchParams.get("resource") ?? "";
+
+  const composite = await buildComposite(key, tid);
+  if (composite) return NextResponse.json(composite);
+
   const spec = RESOURCES[key];
   if (!spec) return NextResponse.json({ error: "Unknown resource" }, { status: 400 });
 

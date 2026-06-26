@@ -7,7 +7,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import type { PurchaseModuleProps } from "../shared";
 import { cardCls, formatMoney, sectionTitleCls, linkBtnCls } from "../shared";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
@@ -32,20 +31,16 @@ export default function SuppliersModule({ t }: PurchaseModuleProps) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [c, p] = await Promise.all([
-        supabase
-          .from("contacts")
-          .select("id,display_name,full_name,company_name,company_name_en,country,supplier_type,preferred_payment_method,rating,is_active,certifications")
-          .eq("contact_type", "supplier")
-          .order("updated_at", { ascending: false, nullsFirst: false })
-          .limit(50),
-        supabase.from("vendor_payments").select("supplier_id,amount"),
-      ]);
+      const res = await fetch("/api/purchase/list?resource=suppliers", { credentials: "include" });
+      const data = (res.ok ? await res.json() : { rows: [], payments: [] }) as {
+        rows: Supplier[];
+        payments: { supplier_id: string | null; amount: number | null }[];
+      };
       if (cancelled) return;
 
-      setRows((c.data ?? []) as Supplier[]);
+      setRows(data.rows);
       const m: Record<string, number> = {};
-      for (const row of (p.data ?? []) as { supplier_id: string | null; amount: number | null }[]) {
+      for (const row of data.payments) {
         if (!row.supplier_id) continue;
         m[row.supplier_id] = (m[row.supplier_id] || 0) + (Number(row.amount) || 0);
       }
