@@ -2316,7 +2316,7 @@ function WelcomeCard({
             onClick={() => onPick(p)}
             className="group flex items-start gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3.5 py-3 text-start text-[12.5px] text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
           >
-            <KoleexOrb state="idle" size={22} className="mt-0.5 shrink-0" />
+            <KoleexOrb state="idle" size={30} className="mt-0.5 shrink-0 scale-[1.6]" />
             <span className="flex-1 leading-snug">{p}</span>
           </button>
         ))}
