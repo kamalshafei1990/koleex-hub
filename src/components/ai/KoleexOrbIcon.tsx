@@ -10,19 +10,23 @@ import KoleexOrb from "./KoleexOrb";
 export default function KoleexOrbIcon({
   size = 24,
   className,
+  scaleClass = "scale-150",
 }: {
   size?: number | string;
   className?: string;
+  /** Tailwind scale-* class — grows the orb visually without changing its
+     layout box (so it never enlarges the slot/card it sits in). */
+  scaleClass?: string;
 }) {
   const px = typeof size === "string" ? parseInt(size, 10) || 24 : size;
   /* The orb artboard has transparent margin, so it reads ~40% smaller than its
      box. Scale it up (layout box stays `px`, only the visual grows) so it fills
-     an app-icon slot with the same weight as the other line icons. */
+     an icon slot with the same weight as the other line icons. */
   return (
     <KoleexOrb
       state="idle"
       size={px}
-      className={(className ? className + " " : "") + "scale-150"}
+      className={(className ? className + " " : "") + scaleClass}
     />
   );
 }

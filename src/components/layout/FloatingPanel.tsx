@@ -1082,12 +1082,14 @@ export default function FloatingPanel() {
                     }}
                     aria-hidden={!showAi}
                     tabIndex={showAi ? 0 : -1}
-                    className={`relative flex items-center justify-center gap-2 w-16 md:w-[112px] py-3.5 md:py-4 transition-all duration-300 ${
+                    className={`relative flex items-center justify-center gap-1.5 w-10 md:w-[88px] py-2.5 md:py-3 transition-all duration-300 ${
                       tab !== "ai" ? dk ? "text-white/30 hover:text-white/55" : "text-black/30 hover:text-black/55" : ""
                     }`}
                     style={{ pointerEvents: showAi ? "auto" : "none" }}
                   >
-                    <KoleexOrb state={aiSending ? "loading" : "idle"} size={40} className={tab === "ai" ? "" : "opacity-40"} />
+                    {/* Small layout box keeps the FAB pill its original size;
+                        scale blows the orb face up visually only. */}
+                    <KoleexOrb state={aiSending ? "loading" : "idle"} size={22} className={(tab === "ai" ? "" : "opacity-40") + " scale-[1.7]"} />
                     <span className={`hidden md:inline text-[11px] font-bold tracking-wide ${tab === "ai" ? "ai-neon-text" : ""}`}>
                       AI
                     </span>
@@ -1124,15 +1126,15 @@ export default function FloatingPanel() {
                     }}
                     aria-hidden={!showDiscuss}
                     tabIndex={showDiscuss ? 0 : -1}
-                    className={`relative flex items-center justify-center gap-2 w-16 md:w-[112px] py-3.5 md:py-4 transition-all duration-300 ${
+                    className={`relative flex items-center justify-center gap-1.5 w-10 md:w-[88px] py-2.5 md:py-3 transition-all duration-300 ${
                       tab === "discuss"
                         ? dk ? "text-white/90" : "text-black/90"
                         : dk ? "text-white/30 hover:text-white/55" : "text-black/30 hover:text-black/55"
                     }`}
                     style={{ pointerEvents: showDiscuss ? "auto" : "none" }}
                   >
-                    <DiscussIcon size={20} />
-                    <span className="hidden md:inline text-[12px] font-semibold tracking-wide">Discuss</span>
+                    <DiscussIcon size={14} />
+                    <span className="hidden md:inline text-[11px] font-semibold tracking-wide">Discuss</span>
                   </button>
                 </div>
               </div>

@@ -622,8 +622,12 @@ export default function HomePage() {
                 const AnimatedIcon = Icon as React.ComponentType<{
                   size?: number;
                   animated?: boolean;
+                  scaleClass?: string;
                 }>;
-                return <AnimatedIcon size={80} animated />;
+                /* Small layout box (44) keeps the AI card the exact same size
+                   as every other app card; scaleClass blows the orb up visually
+                   without growing the card. */
+                return <AnimatedIcon size={44} animated scaleClass="scale-[2.3]" />;
               }
               return <Icon size={34} />;
             })()}
