@@ -2300,7 +2300,7 @@ function WelcomeCard({
   const greeting = firstName ? `${copy.welcomeTitle}, ${firstName}.` : copy.welcomeTitle;
   return (
     <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-2 py-8">
-      <KoleexOrb state="idle" size={320} className="mb-2 -mt-4" />
+      <KoleexOrb state="idle" size={320} className="scale-125 -mt-10 -mb-14" />
       <h2 className="text-[22px] md:text-[26px] font-bold tracking-tight text-[var(--text-primary)] mb-2 leading-tight">
         {greeting}
       </h2>
