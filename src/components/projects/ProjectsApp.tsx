@@ -447,6 +447,7 @@ function ProjectDetailView({
   const [loading, setLoading] = useState(true);
   const [taskModal, setTaskModal] = useState<{ open: boolean; editing: TaskRow | null; presetStageId?: string | null }>({ open: false, editing: null });
   const [dragOver, setDragOver] = useState<string | null>(null);
+  const [dropBeforeId, setDropBeforeId] = useState<string | null>(null);
   const [newStageName, setNewStageName] = useState("");
   const [projectFormOpen, setProjectFormOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"board" | "list">("board");
@@ -483,13 +484,48 @@ function ProjectDetailView({
     return map;
   }, [tasks]);
 
-  const handleTaskDrop = useCallback(
-    async (taskId: string, targetStageId: string) => {
-      const task = tasks.find((x) => x.id === taskId);
-      if (!task || task.stage_id === targetStageId) return;
+  /* Reorder within (or across) a stage. `beforeTaskId` = the card the dragged
+     task should land in front of, or null to append at the end of the column.
+     Renumbers sort_order sequentially for the target column and persists. */
+  const handleReorder = useCallback(
+    async (draggedId: string, targetStageId: string, beforeTaskId: string | null) => {
+      const dragged = tasks.find((x) => x.id === draggedId);
+      if (!dragged) return;
+      if (dragged.id === beforeTaskId) return;
       const stage = stages.find((s) => s.id === targetStageId);
-      const nextStatus: TaskStatus = stage?.is_closed ? "done" : "open";
-      await updateTask(taskId, { stage_id: targetStageId, status: nextStatus });
+      const crossStage = (dragged.stage_id ?? null) !== targetStageId;
+      const nextStatus: TaskStatus = stage?.is_closed
+        ? "done"
+        : crossStage && dragged.status === "done"
+          ? "open"
+          : dragged.status;
+
+      const col = tasks
+        .filter((tk) => (tk.stage_id ?? null) === targetStageId && tk.id !== draggedId)
+        .sort((a, b) => a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at));
+      const at = beforeTaskId ? col.findIndex((tk) => tk.id === beforeTaskId) : -1;
+      const insertAt = at < 0 ? col.length : at;
+      col.splice(insertAt, 0, dragged);
+
+      // Optimistic local update so the move feels instant.
+      setTasks((prev) =>
+        prev.map((tk) => {
+          const i = col.findIndex((c) => c.id === tk.id);
+          if (i < 0) return tk;
+          return tk.id === draggedId
+            ? { ...tk, sort_order: i, stage_id: targetStageId, status: nextStatus }
+            : { ...tk, sort_order: i };
+        }),
+      );
+
+      await Promise.all(
+        col.map((tk, i) => {
+          if (tk.id === draggedId) {
+            return updateTask(tk.id, { sort_order: i, stage_id: targetStageId, status: nextStatus });
+          }
+          return tk.sort_order === i ? Promise.resolve() : updateTask(tk.id, { sort_order: i });
+        }),
+      );
       reload();
     },
     [tasks, stages, reload],
@@ -626,12 +662,13 @@ function ProjectDetailView({
                 <div
                   key={stage.id}
                   onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (dragOver !== stage.id) setDragOver(stage.id); }}
-                  onDragLeave={() => { if (dragOver === stage.id) setDragOver(null); }}
+                  onDragLeave={() => { if (dragOver === stage.id) setDragOver(null); setDropBeforeId(null); }}
                   onDrop={(e) => {
                     e.preventDefault();
                     setDragOver(null);
+                    setDropBeforeId(null);
                     const taskId = e.dataTransfer.getData("text/plain");
-                    if (taskId) handleTaskDrop(taskId, stage.id);
+                    if (taskId) handleReorder(taskId, stage.id, null);
                   }}
                   className={`w-[280px] shrink-0 rounded-2xl border transition-colors ${
                     dropping ? "border-amber-400/50 bg-amber-500/5" : "border-[var(--border-subtle)] bg-[var(--bg-secondary)]"
@@ -644,12 +681,25 @@ function ProjectDetailView({
                   />
                   <div className="p-2 space-y-2 min-h-[120px]">
                     {cellTasks.map((tk) => (
-                      <TaskCard
+                      <div
                         key={tk.id}
-                        task={tk}
-                        tags={tags}
-                        onClick={() => setTaskModal({ open: true, editing: tk })}
-                      />
+                        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); if (dropBeforeId !== tk.id) setDropBeforeId(tk.id); }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setDropBeforeId(null);
+                          setDragOver(null);
+                          const draggedId = e.dataTransfer.getData("text/plain");
+                          if (draggedId && draggedId !== tk.id) handleReorder(draggedId, stage.id, tk.id);
+                        }}
+                        className={dropBeforeId === tk.id ? "rounded-xl ring-2 ring-amber-400/60" : ""}
+                      >
+                        <TaskCard
+                          task={tk}
+                          tags={tags}
+                          onClick={() => setTaskModal({ open: true, editing: tk })}
+                        />
+                      </div>
                     ))}
                     {cellTasks.length === 0 && (
                       <div className="text-[11px] text-[var(--text-dim)] text-center py-6">
