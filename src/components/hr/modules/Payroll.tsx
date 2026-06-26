@@ -68,6 +68,7 @@ export default function PayrollModule({ employees, t, lang }: HRModuleProps) {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [periodError, setPeriodError] = useState(false);
 
   /* ── translation helpers ── */
   const { tStatus } = makeTranslationHelpers(t);
@@ -134,6 +135,12 @@ export default function PayrollModule({ employees, t, lang }: HRModuleProps) {
 
   const handleCreatePayslip = async () => {
     if (!payslipForm.employee_id || !payslipForm.period_start || !payslipForm.period_end) return;
+    // Guard against an inverted pay period (end before start).
+    if (payslipForm.period_end < payslipForm.period_start) {
+      setPeriodError(true);
+      return;
+    }
+    setPeriodError(false);
     setSaving(true);
     try {
       await createPayslip({
@@ -481,11 +488,14 @@ export default function PayrollModule({ employees, t, lang }: HRModuleProps) {
             <input
               type="date"
               value={payslipForm.period_end}
-              onChange={(e) => setPayslipForm((f) => ({ ...f, period_end: e.target.value }))}
+              onChange={(e) => { setPayslipForm((f) => ({ ...f, period_end: e.target.value })); setPeriodError(false); }}
               className={inputCls}
             />
           </div>
         </div>
+        {periodError && (
+          <p className="text-[11px] text-rose-400 font-medium">{t("hr.periodInvalid")}</p>
+        )}
 
         {/* Gross / Net */}
         <div className="grid grid-cols-2 gap-3">

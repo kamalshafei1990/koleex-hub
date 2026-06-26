@@ -751,6 +751,8 @@ function Step2Employment({
           <input
             className={inputClass}
             type="number"
+            min="0"
+            step="0.01"
             placeholder="e.g. 5000"
             value={form.initial_salary}
             onChange={(e) => set("initial_salary", e.target.value)}

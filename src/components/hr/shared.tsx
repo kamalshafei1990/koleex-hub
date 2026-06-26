@@ -103,7 +103,13 @@ export function fmtTime(d: string | null | undefined): string {
 export function daysUntil(d: string): number {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
-  const target = new Date(d);
+  /* Parse a YYYY-MM-DD date as LOCAL midnight. `new Date("2026-12-25")` parses
+     as UTC midnight, which in UTC-negative timezones lands on the previous
+     local day — shifting visa/passport/document expiry alerts by a day. */
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d);
+  const target = m
+    ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+    : new Date(d);
   target.setHours(0, 0, 0, 0);
   return Math.ceil((target.getTime() - now.getTime()) / 86400000);
 }

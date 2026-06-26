@@ -183,6 +183,7 @@ export const hrT: Translations = {
   "hr.createPayslip":            { en: "Create Payslip",                  zh: "创建工资条",                    ar: "إنشاء قسيمة راتب" },
   "hr.periodStart":              { en: "Period Start",                    zh: "期间开始",                      ar: "بداية الفترة" },
   "hr.periodEnd":                { en: "Period End",                      zh: "期间结束",                      ar: "نهاية الفترة" },
+  "hr.periodInvalid":            { en: "Period end can't be before the start date.", zh: "结束日期不能早于开始日期。", ar: "لا يمكن أن يكون تاريخ النهاية قبل تاريخ البداية." },
   "hr.grossAmount":              { en: "Gross Amount",                    zh: "总金额",                        ar: "المبلغ الإجمالي" },
   "hr.netAmount":                { en: "Net Amount",                      zh: "净金额",                        ar: "المبلغ الصافي" },
   "hr.status":                   { en: "Status",                          zh: "状态",                          ar: "الحالة" },
