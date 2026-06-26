@@ -1075,6 +1075,24 @@ function ReportingView() {
   const assigneeRows = [...byAssignee.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
   const assigneeMax = Math.max(1, ...assigneeRows.map(([, c]) => c));
 
+  // Due in the next 7 days (open tasks).
+  const inSevenDays = new Date();
+  inSevenDays.setDate(inSevenDays.getDate() + 7);
+  const dueThisWeek = tasks.filter(
+    (x) => x.status === "open" && x.due_date && new Date(x.due_date) <= inSevenDays && !isOverdue(x.due_date),
+  ).length;
+
+  // Per-project progress (done / total), active projects with at least one task.
+  const projectProgress = projects
+    .map((p) => {
+      const pts = tasks.filter((x) => x.project_id === p.id);
+      const done = pts.filter((x) => x.status === "done").length;
+      return { id: p.id, name: p.name, color: p.color ?? "#818cf8", total: pts.length, done, pct: pts.length ? Math.round((done / pts.length) * 100) : 0 };
+    })
+    .filter((r) => r.total > 0)
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 8);
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -1082,7 +1100,31 @@ function ReportingView() {
         <SharedKpiCard label={t("report.openTasks")} value={openTasks} tone="warning" />
         <SharedKpiCard label={t("report.overdueTasks")} value={overdue} tone="rose" />
         <SharedKpiCard label={t("report.completedWk")} value={doneThisWeek} tone="positive" />
+        <SharedKpiCard label={t("report.dueThisWeek", "Due this week")} value={dueThisWeek} tone="info" />
       </div>
+
+      {/* By project progress */}
+      {projectProgress.length > 0 && (
+        <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-4 space-y-3">
+          <h3 className="text-[12px] font-bold uppercase tracking-wider text-[var(--text-dim)]">
+            {t("report.byProject", "Project progress")}
+          </h3>
+          {projectProgress.map((p) => (
+            <div key={p.id} className="space-y-1">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="flex items-center gap-1.5 text-[var(--text-muted)] min-w-0">
+                  <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: p.color }} />
+                  <span className="truncate">{p.name}</span>
+                </span>
+                <span className="text-[var(--text-muted)] font-semibold tabular-nums shrink-0 ml-2">{p.done}/{p.total} · {p.pct}%</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-[var(--bg-surface)] overflow-hidden">
+                <div className="h-full rounded-full transition-all" style={{ width: `${p.pct}%`, background: p.color }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         {/* By priority */}
