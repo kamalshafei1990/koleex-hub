@@ -42,6 +42,7 @@ import SharedKpiCard from "@/components/ui/KpiCard";
 import { useSearchPlaceholder } from "@/lib/searchPlaceholders";
 import EntityPlanningStrip from "@/components/planning/EntityPlanningStrip";
 import EntityPicker from "@/components/planning/EntityPicker";
+import { ChecklistPanel, CommentsPanel, TimePanel, AttachmentsPanel, MilestoneStrip } from "@/components/projects/TaskExtras";
 import {
   createProject,
   createStage,
@@ -618,8 +619,13 @@ function ProjectDetailView({
             </div>
           </div>
 
+          {/* Milestones */}
+          <div className="mt-3">
+            <MilestoneStrip projectId={project.id} />
+          </div>
+
           {/* Linked Planning strip */}
-          <div className="mt-2">
+          <div className="mt-3">
             <EntityPlanningStrip entityType="project" entityId={project.id} />
           </div>
         </div>
@@ -1496,6 +1502,11 @@ function TaskFormModal({
   const [linkedType, setLinkedType] = useState<string>("");
   const [linkedId, setLinkedId] = useState<string | null>(null);
   const [linkedLabel, setLinkedLabel] = useState<string>("");
+  const [detailTab, setDetailTab] = useState<"details" | "checklist" | "comments" | "time" | "files">("details");
+
+  useEffect(() => {
+    if (open) setDetailTab("details");
+  }, [open, editing]);
 
   useEffect(() => {
     if (!open) return;
@@ -1584,7 +1595,42 @@ function TaskFormModal({
           </button>
         </div>
 
-        <div className="px-5 py-4 space-y-3 overflow-y-auto">
+        {/* Workspace tabs — only for an existing task (panels need a task id). */}
+        {editing && (
+          <div className="flex items-center gap-1 px-3 pt-2 border-b border-[var(--border-color)] overflow-x-auto scrollbar-none">
+            {([
+              ["details", t("task.tab.details", "Details")],
+              ["checklist", t("task.tab.checklist", "Checklist")],
+              ["comments", t("task.tab.comments", "Comments")],
+              ["time", t("task.tab.time", "Time")],
+              ["files", t("task.tab.files", "Files")],
+            ] as const).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setDetailTab(key)}
+                className={`h-8 px-3 rounded-t-lg text-[12px] font-semibold whitespace-nowrap border-b-2 -mb-px transition-colors ${
+                  detailTab === key
+                    ? "border-[var(--text-primary)] text-[var(--text-primary)]"
+                    : "border-transparent text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {editing && detailTab !== "details" && (
+          <div className="px-5 py-4 overflow-y-auto">
+            {detailTab === "checklist" && <ChecklistPanel taskId={editing.id} />}
+            {detailTab === "comments" && <CommentsPanel taskId={editing.id} />}
+            {detailTab === "time" && <TimePanel taskId={editing.id} />}
+            {detailTab === "files" && <AttachmentsPanel taskId={editing.id} />}
+          </div>
+        )}
+
+        <div className={`px-5 py-4 space-y-3 overflow-y-auto ${editing && detailTab !== "details" ? "hidden" : ""}`}>
           <Field label={t("task.namePh")}>
             <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("task.namePh")} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] outline-none" />
           </Field>
