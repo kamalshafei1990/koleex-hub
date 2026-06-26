@@ -13,6 +13,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { resolveBaseCurrency } from "@/lib/finance/currency";
 
 const ALLOWED_CATEGORIES = [
   "cash", "owner_capital", "loan",
@@ -67,6 +68,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "amount must be a non-negative number" }, { status: 400 });
   }
 
+  const baseCurrency = await resolveBaseCurrency(auth.tenant_id);
   const { data, error } = await supabaseServer
     .from("finance_opening_balances")
     .insert({
@@ -74,7 +76,7 @@ export async function POST(req: Request) {
       category: body.category,
       label: body.label.trim(),
       amount,
-      currency: body.currency?.trim().toUpperCase() || "USD",
+      currency: body.currency?.trim().toUpperCase() || baseCurrency,
       customer_id: body.customer_id || null,
       supplier_id: body.supplier_id || null,
       notes: body.notes?.trim() || null,

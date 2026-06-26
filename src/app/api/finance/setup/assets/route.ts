@@ -8,6 +8,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { resolveBaseCurrency } from "@/lib/finance/currency";
 
 const ALLOWED_METHODS = ["straight_line", "declining_balance", "none"] as const;
 type Method = (typeof ALLOWED_METHODS)[number];
@@ -55,6 +56,7 @@ export async function POST(req: Request) {
     ? (body.depreciation_method as Method)
     : "straight_line";
 
+  const baseCurrency = await resolveBaseCurrency(auth.tenant_id);
   const { data, error } = await supabaseServer
     .from("finance_assets")
     .insert({
@@ -65,7 +67,7 @@ export async function POST(req: Request) {
       purchase_date: body.purchase_date || null,
       depreciation_method: method,
       useful_life_years: body.useful_life_years != null ? Number(body.useful_life_years) : null,
-      currency: body.currency?.trim().toUpperCase() || "USD",
+      currency: body.currency?.trim().toUpperCase() || baseCurrency,
       notes: body.notes?.trim() || null,
       created_by: auth.account_id,
     })
