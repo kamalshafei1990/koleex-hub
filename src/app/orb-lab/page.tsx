@@ -25,7 +25,7 @@ export default function OrbLab() {
       <h1 className="text-xl font-bold">Koleex Orb — Reaction Lab</h1>
 
       <div className="flex items-center justify-center h-[280px]">
-        <KoleexOrb state={state} greetKey={greet} size={240} emphasize />
+        <KoleexOrb state={state} greetKey={greet} size={240} />
       </div>
 
       <div className="text-sm text-[var(--text-dim)]">
