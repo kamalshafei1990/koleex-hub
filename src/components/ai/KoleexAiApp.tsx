@@ -1196,13 +1196,48 @@ export default function KoleexAiApp() {
     return () => clearTimeout(t);
   }, [orbPulse]);
 
-  const orbState: OrbState = orbPulse
+  const rawOrbState: OrbState = orbPulse
     ? orbPulse
     : orbStreaming
       ? "typing"
       : orbThinking
         ? "loading"
         : "idle";
+
+  /* The model often replies in well under a second, so the loader/typing
+     reaction would flash past before it's perceptible — the orb just looks
+     idle. Hold the thinking spinner for a minimum window so every turn shows
+     a clearly visible reaction before settling. */
+  const MIN_LOADING_MS = 1000;
+  const [orbState, setOrbState] = useState<OrbState>("idle");
+  const rawOrbRef = useRef<OrbState>(rawOrbState);
+  rawOrbRef.current = rawOrbState;
+  const loadStartRef = useRef<number | null>(null);
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    if (rawOrbState === "loading") {
+      if (loadStartRef.current === null) loadStartRef.current = Date.now();
+      setOrbState("loading");
+      return;
+    }
+    if (loadStartRef.current !== null) {
+      const remaining = MIN_LOADING_MS - (Date.now() - loadStartRef.current);
+      if (remaining > 0) {
+        setOrbState("loading");
+        holdTimerRef.current = setTimeout(() => {
+          loadStartRef.current = null;
+          setOrbState(rawOrbRef.current);
+        }, remaining);
+        return;
+      }
+      loadStartRef.current = null;
+    }
+    setOrbState(rawOrbState);
+  }, [rawOrbState]);
 
   return (
     <div
