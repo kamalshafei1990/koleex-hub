@@ -5,7 +5,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth } from "@/lib/server/auth";
+import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 
 const str = (v: unknown, n: number): string | null =>
   typeof v === "string" && v.trim() ? v.trim().slice(0, n) : null;
@@ -30,6 +30,8 @@ export async function GET() {
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
+  const deny = await requireModuleAction(auth, "Quotations", "create");
+  if (deny) return deny;
 
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   const doc = body?.doc && typeof body.doc === "object" && !Array.isArray(body.doc) ? body.doc : {};

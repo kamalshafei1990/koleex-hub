@@ -21,7 +21,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth } from "@/lib/server/auth";
+import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 import { hashForWrite } from "@/lib/server/password";
 
 /* ── Table names ── */
@@ -64,6 +64,11 @@ function bool(b: Body, k: string): boolean {
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
+  /* Creating an employee also mints a login account with an arbitrary
+     role_id — gate it to roles that can create Employees (Admin/HR/SA),
+     not just any signed-in internal user. */
+  const deny = await requireModuleAction(auth, "Employees", "create");
+  if (deny) return deny;
 
   let body: Body;
   try {

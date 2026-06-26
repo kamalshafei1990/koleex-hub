@@ -4,7 +4,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth } from "@/lib/server/auth";
+import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 
 const str = (v: unknown, n: number): string | null =>
   typeof v === "string" ? v.slice(0, n) : null;
@@ -31,6 +31,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
+  const deny = await requireModuleAction(auth, "Quotations", "edit");
+  if (deny) return deny;
   const { id } = await ctx.params;
 
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
@@ -59,6 +61,8 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
+  const deny = await requireModuleAction(auth, "Quotations", "delete");
+  if (deny) return deny;
   const { id } = await ctx.params;
 
   const { error } = await supabaseServer
