@@ -22,7 +22,8 @@ import {
   fetchTimeEntries, createTimeEntry, deleteTimeEntry,
   fetchAttachments, uploadAttachment, deleteAttachment,
   fetchMilestones, createMilestone, updateMilestone, deleteMilestone,
-  type ChecklistItem, type TaskComment, type TimeEntry, type TaskAttachment, type Milestone,
+  fetchTasks, createTask, updateTask, deleteTask,
+  type ChecklistItem, type TaskComment, type TimeEntry, type TaskAttachment, type Milestone, type TaskRow,
 } from "@/lib/projects";
 
 const card = "rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]";
@@ -235,6 +236,69 @@ export function AttachmentsPanel({ taskId }: { taskId: string }) {
         {busy ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <UploadIcon size={13} />}
         {busy ? "Uploading…" : "Upload file (max 25 MB)"}
       </button>
+    </div>
+  );
+}
+
+/* ── Subtasks (child tasks via parent_task_id) ──────────────────────── */
+export function SubtasksPanel({ taskId, projectId }: { taskId: string; projectId: string }) {
+  const [items, setItems] = useState<TaskRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [title, setTitle] = useState("");
+
+  const load = useCallback(() => {
+    fetchTasks({ project_id: projectId, status: "all" }).then((all) => {
+      setItems(all.filter((t) => t.parent_task_id === taskId));
+      setLoading(false);
+    });
+  }, [projectId, taskId]);
+  useEffect(() => { load(); }, [load]);
+
+  const add = async () => {
+    if (!title.trim()) return;
+    await createTask({ project_id: projectId, title: title.trim(), parent_task_id: taskId });
+    setTitle("");
+    load();
+  };
+  const toggle = async (s: TaskRow) => {
+    const next = s.status === "done" ? "open" : "done";
+    setItems((p) => p.map((x) => (x.id === s.id ? { ...x, status: next } : x)));
+    await updateTask(s.id, { status: next });
+  };
+  const remove = async (id: string) => { await deleteTask(id); load(); };
+
+  const done = items.filter((x) => x.status === "done").length;
+  const pct = items.length ? Math.round((done / items.length) * 100) : 0;
+  if (loading) return <PanelSpinner />;
+  return (
+    <div className="space-y-3">
+      {items.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between text-[11px] text-[var(--text-dim)] mb-1">
+            <span>{done} / {items.length} done</span><span>{pct}%</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-[var(--bg-surface)] overflow-hidden">
+            <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
+          </div>
+        </div>
+      )}
+      <div className="space-y-1.5">
+        {items.map((s) => (
+          <div key={s.id} className={`group flex items-center gap-2 px-2.5 py-2 ${card}`}>
+            <button
+              type="button" onClick={() => toggle(s)}
+              className={`h-4 w-4 shrink-0 rounded-full border flex items-center justify-center ${s.status === "done" ? "bg-emerald-500 border-emerald-500 text-white" : "border-[var(--border-color)] text-transparent hover:border-emerald-400"}`}
+            ><CheckIcon size={10} /></button>
+            <span className={`flex-1 text-[12.5px] ${s.status === "done" ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}`}>{s.title}</span>
+            <button type="button" onClick={() => remove(s.id)} className="opacity-0 group-hover:opacity-100 h-6 w-6 rounded text-[var(--text-dim)] hover:text-rose-400 flex items-center justify-center"><TrashIcon className="h-3 w-3" /></button>
+          </div>
+        ))}
+        {items.length === 0 && <Empty text="No subtasks yet." />}
+      </div>
+      <div className="flex items-center gap-2">
+        <input value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder="Add a subtask…" className={`flex-1 ${inputCls}`} />
+        <button type="button" onClick={add} className={btnCls}><PlusIcon size={12} /></button>
+      </div>
     </div>
   );
 }

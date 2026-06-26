@@ -42,7 +42,7 @@ import SharedKpiCard from "@/components/ui/KpiCard";
 import { useSearchPlaceholder } from "@/lib/searchPlaceholders";
 import EntityPlanningStrip from "@/components/planning/EntityPlanningStrip";
 import EntityPicker from "@/components/planning/EntityPicker";
-import { ChecklistPanel, CommentsPanel, TimePanel, AttachmentsPanel, MilestoneStrip } from "@/components/projects/TaskExtras";
+import { SubtasksPanel, ChecklistPanel, CommentsPanel, TimePanel, AttachmentsPanel, MilestoneStrip } from "@/components/projects/TaskExtras";
 import {
   createProject,
   createStage,
@@ -1557,7 +1557,7 @@ function TaskFormModal({
   const [linkedType, setLinkedType] = useState<string>("");
   const [linkedId, setLinkedId] = useState<string | null>(null);
   const [linkedLabel, setLinkedLabel] = useState<string>("");
-  const [detailTab, setDetailTab] = useState<"details" | "checklist" | "comments" | "time" | "files">("details");
+  const [detailTab, setDetailTab] = useState<"details" | "subtasks" | "checklist" | "comments" | "time" | "files">("details");
 
   useEffect(() => {
     if (open) setDetailTab("details");
@@ -1655,6 +1655,7 @@ function TaskFormModal({
           <div className="flex items-center gap-1 px-3 pt-2 border-b border-[var(--border-color)] overflow-x-auto scrollbar-none">
             {([
               ["details", t("task.tab.details", "Details")],
+              ["subtasks", t("task.tab.subtasks", "Subtasks")],
               ["checklist", t("task.tab.checklist", "Checklist")],
               ["comments", t("task.tab.comments", "Comments")],
               ["time", t("task.tab.time", "Time")],
@@ -1678,6 +1679,7 @@ function TaskFormModal({
 
         {editing && detailTab !== "details" && (
           <div className="px-5 py-4 overflow-y-auto">
+            {detailTab === "subtasks" && <SubtasksPanel taskId={editing.id} projectId={editing.project_id} />}
             {detailTab === "checklist" && <ChecklistPanel taskId={editing.id} />}
             {detailTab === "comments" && <CommentsPanel taskId={editing.id} />}
             {detailTab === "time" && <TimePanel taskId={editing.id} />}
