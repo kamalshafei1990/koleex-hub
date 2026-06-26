@@ -24,7 +24,6 @@ import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import MicButton, { speakText, type TtsHandle } from "@/components/ai/MicButton";
 import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
-import AiFaceIcon from "@/components/icons/AiFaceIcon";
 import KoleexOrb from "@/components/ai/KoleexOrb";
 import DiscussIcon from "@/components/icons/DiscussIcon";
 import {
@@ -588,7 +587,7 @@ export default function FloatingPanel() {
                       : dk ? "text-white/35 hover:text-white/55" : "text-black/35 hover:text-black/55"
                   }`}
                 >
-                  <AiFaceIcon size={14} className={tab === "ai" ? "opacity-90" : "opacity-40"} animated={tab === "ai"} />
+                  <KoleexOrb state="idle" size={18} className={tab === "ai" ? "" : "opacity-40"} />
                   <span>Copilot</span>
                 </button>
                 <button
@@ -727,7 +726,7 @@ export default function FloatingPanel() {
                 <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
                   {aiMessages.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-8 px-6 text-center">
-                      <KoleexOrb state={aiSending ? "loading" : "idle"} size={72} />
+                      <KoleexOrb state={aiSending ? "loading" : "idle"} size={120} className="scale-125" />
                       <p className={`text-[13px] font-semibold mt-3 ${textM}`}>Operator briefing</p>
                       <p className={`text-[11px] mt-1 ${textG}`}>Embedded finance intelligence</p>
 
@@ -786,7 +785,7 @@ export default function FloatingPanel() {
                             )}
                           </div>
                         ) : (
-                          <AiFaceIcon size={28} animated />
+                          <KoleexOrb state="idle" size={30} className="scale-110" />
                         )}
                       </div>
                       {/* Message bubble */}
@@ -802,7 +801,7 @@ export default function FloatingPanel() {
                   {aiSending && (
                     <div className="flex gap-2 flex-row">
                       <div className="shrink-0 mt-0.5">
-                        <AiFaceIcon size={28} animated />
+                        <KoleexOrb state="idle" size={30} className="scale-110" />
                       </div>
                       <div className={`px-3 py-2 rounded-2xl text-[13px] flex items-center gap-1.5 ${
                         dk ? "bg-white/[0.05] text-white/60" : "bg-black/[0.04] text-black/60"
