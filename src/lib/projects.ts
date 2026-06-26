@@ -278,6 +278,138 @@ export async function deleteTag(id: string): Promise<boolean> {
   return res.ok;
 }
 
+/* ── Phase 2: comments / checklist / milestones / time / files ───── */
+
+export interface TaskComment {
+  id: string;
+  task_id: string;
+  author_account_id: string | null;
+  body: string;
+  created_at: string;
+  updated_at: string;
+  author?: { id: string; username: string } | null;
+}
+export interface ChecklistItem {
+  id: string;
+  task_id: string;
+  title: string;
+  is_done: boolean;
+  sort_order: number;
+}
+export interface Milestone {
+  id: string;
+  project_id: string;
+  name: string;
+  due_date: string | null;
+  is_reached: boolean;
+  color: string | null;
+  sort_order: number;
+}
+export interface TimeEntry {
+  id: string;
+  project_id: string;
+  task_id: string | null;
+  account_id: string | null;
+  minutes: number;
+  entry_date: string;
+  note: string | null;
+  created_at: string;
+  account?: { id: string; username: string } | null;
+}
+export interface TaskAttachment {
+  id: string;
+  task_id: string;
+  file_name: string;
+  file_path: string;
+  file_size: number | null;
+  mime_type: string | null;
+  uploaded_by: string | null;
+  created_at: string;
+  url?: string | null;
+}
+
+async function getJson<T>(url: string): Promise<T | null> {
+  const res = await fetch(url, { credentials: "include" });
+  if (!res.ok) return null;
+  return (await res.json()) as T;
+}
+async function sendJson<T>(url: string, method: string, body?: unknown): Promise<T | null> {
+  const res = await fetch(url, {
+    method,
+    credentials: "include",
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) return null;
+  if (res.status === 204) return {} as T;
+  return (await res.json()) as T;
+}
+
+/* Comments */
+export async function fetchComments(taskId: string): Promise<TaskComment[]> {
+  return (await getJson<{ comments: TaskComment[] }>(`/api/projects/tasks/${taskId}/comments`))?.comments ?? [];
+}
+export async function createComment(taskId: string, body: string): Promise<TaskComment | null> {
+  return (await sendJson<{ comment: TaskComment }>(`/api/projects/tasks/${taskId}/comments`, "POST", { body }))?.comment ?? null;
+}
+export async function deleteComment(taskId: string, id: string): Promise<boolean> {
+  return !!(await sendJson(`/api/projects/tasks/${taskId}/comments/${id}`, "DELETE"));
+}
+
+/* Checklist */
+export async function fetchChecklist(taskId: string): Promise<ChecklistItem[]> {
+  return (await getJson<{ items: ChecklistItem[] }>(`/api/projects/tasks/${taskId}/checklist`))?.items ?? [];
+}
+export async function createChecklistItem(taskId: string, title: string): Promise<ChecklistItem | null> {
+  return (await sendJson<{ item: ChecklistItem }>(`/api/projects/tasks/${taskId}/checklist`, "POST", { title }))?.item ?? null;
+}
+export async function updateChecklistItem(taskId: string, id: string, patch: Partial<ChecklistItem>): Promise<boolean> {
+  return !!(await sendJson(`/api/projects/tasks/${taskId}/checklist/${id}`, "PATCH", patch));
+}
+export async function deleteChecklistItem(taskId: string, id: string): Promise<boolean> {
+  return !!(await sendJson(`/api/projects/tasks/${taskId}/checklist/${id}`, "DELETE"));
+}
+
+/* Milestones */
+export async function fetchMilestones(projectId: string): Promise<Milestone[]> {
+  return (await getJson<{ milestones: Milestone[] }>(`/api/projects/${projectId}/milestones`))?.milestones ?? [];
+}
+export async function createMilestone(projectId: string, body: Partial<Milestone> & { name: string }): Promise<Milestone | null> {
+  return (await sendJson<{ milestone: Milestone }>(`/api/projects/${projectId}/milestones`, "POST", body))?.milestone ?? null;
+}
+export async function updateMilestone(projectId: string, id: string, patch: Partial<Milestone>): Promise<boolean> {
+  return !!(await sendJson(`/api/projects/${projectId}/milestones/${id}`, "PATCH", patch));
+}
+export async function deleteMilestone(projectId: string, id: string): Promise<boolean> {
+  return !!(await sendJson(`/api/projects/${projectId}/milestones/${id}`, "DELETE"));
+}
+
+/* Time entries */
+export async function fetchTimeEntries(taskId: string): Promise<TimeEntry[]> {
+  return (await getJson<{ entries: TimeEntry[] }>(`/api/projects/tasks/${taskId}/time`))?.entries ?? [];
+}
+export async function createTimeEntry(taskId: string, body: { minutes: number; entry_date?: string; note?: string }): Promise<TimeEntry | null> {
+  return (await sendJson<{ entry: TimeEntry }>(`/api/projects/tasks/${taskId}/time`, "POST", body))?.entry ?? null;
+}
+export async function deleteTimeEntry(taskId: string, id: string): Promise<boolean> {
+  return !!(await sendJson(`/api/projects/tasks/${taskId}/time/${id}`, "DELETE"));
+}
+
+/* Attachments */
+export async function fetchAttachments(taskId: string): Promise<TaskAttachment[]> {
+  return (await getJson<{ attachments: TaskAttachment[] }>(`/api/projects/tasks/${taskId}/attachments`))?.attachments ?? [];
+}
+export async function uploadAttachment(taskId: string, file: File): Promise<TaskAttachment | null> {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch(`/api/projects/tasks/${taskId}/attachments`, { method: "POST", credentials: "include", body: fd });
+  if (!res.ok) return null;
+  return ((await res.json()) as { attachment: TaskAttachment }).attachment ?? null;
+}
+export async function deleteAttachment(taskId: string, id: string): Promise<boolean> {
+  return !!(await sendJson(`/api/projects/tasks/${taskId}/attachments/${id}`, "DELETE"));
+}
+
 /* ── Accounts (assignee / manager pickers) ────────── */
 
 export interface AccountLite {
