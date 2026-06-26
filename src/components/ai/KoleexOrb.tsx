@@ -31,7 +31,6 @@ export default function KoleexOrb({
   greetKey,
   size = 96,
   className,
-  animated = true,
 }: {
   /** Drives the orb: idle · loading (thinking) · typing (streaming) · success · error. */
   state?: OrbState;
@@ -40,13 +39,11 @@ export default function KoleexOrb({
   /** Square pixel size of the orb. */
   size?: number;
   className?: string;
-  /** When false, the orb is frozen (static first frame) — no animation loop. */
-  animated?: boolean;
 }) {
   const { rive, RiveComponent } = useRive({
     src: SRC,
     stateMachines: STATE_MACHINE,
-    autoplay: animated,
+    autoplay: true,
   });
 
   const loading = useStateMachineInput(rive, STATE_MACHINE, "loadingBoolean");

@@ -1936,7 +1936,7 @@ function Bubble({
       className={`flex items-start gap-3 ${isUser ? "justify-end" : "justify-start"}`}
     >
       {!isUser && (
-        <KoleexOrb state="idle" size={64} animated={false} className="shrink-0 scale-[1.9]" />
+        <KoleexOrb state="idle" size={64} className="shrink-0 scale-[1.9]" />
       )}
       <div className={`flex flex-col gap-2 max-w-[85%] ${isUser ? "items-end" : "items-start"}`}>
         {/* Tool-call / tool-result chips render ABOVE the final assistant
