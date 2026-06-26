@@ -33,7 +33,6 @@ import TrashIcon from "@/components/icons/ui/TrashIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import MenuBurgerIcon from "@/components/icons/ui/MenuBurgerIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
-import AiFaceIcon from "@/components/icons/AiFaceIcon";
 import KoleexOrb, { type OrbState } from "@/components/ai/KoleexOrb";
 import TypingIndicator from "@/components/ai/TypingIndicator";
 import MessageMarkdown from "@/components/ai/MessageMarkdown";
@@ -1309,9 +1308,7 @@ export default function KoleexAiApp() {
         <div className="flex-1 overflow-y-auto">
           {conversations.length === 0 ? (
             <div className="p-8 flex flex-col items-center text-center gap-2 text-[var(--text-dim)]">
-              <div className="h-10 w-10 rounded-full flex items-center justify-center border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
-                <AiFaceIcon size={20} animated />
-              </div>
+              <KoleexOrb state="idle" size={40} />
               <div className="text-[12px]">{copy.noChats}</div>
             </div>
           ) : filteredConversations.length === 0 ? (
@@ -1359,7 +1356,7 @@ export default function KoleexAiApp() {
           </button>
           {/* Koleex AI character — the live Rive orb, reacting to the
               conversation lifecycle (thinking / typing / done). */}
-          <KoleexOrb state={orbState} size={44} className="shrink-0" />
+          <KoleexOrb state={orbState} size={56} className="shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="text-[13px] font-semibold truncate text-[var(--text-primary)]">
               {active?.title ?? "Koleex AI"}
@@ -1399,7 +1396,7 @@ export default function KoleexAiApp() {
           >
             <ArrowLeftIcon className="h-4 w-4" />
           </Link>
-          <KoleexOrb state={orbState} size={44} className="shrink-0" />
+          <KoleexOrb state={orbState} size={56} className="shrink-0" />
           <div className="min-w-0 flex-1">
             <h1 className="text-[16px] md:text-[17px] font-bold tracking-tight text-[var(--text-primary)] truncate leading-snug">
               {active?.title || "Koleex AI"}
@@ -1939,9 +1936,7 @@ function Bubble({
       className={`flex items-start gap-3 ${isUser ? "justify-end" : "justify-start"}`}
     >
       {!isUser && (
-        <div className="h-8 w-8 rounded-full flex items-center justify-center shrink-0 border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
-          <AiFaceIcon size={18} animated />
-        </div>
+        <KoleexOrb state="idle" size={32} className="shrink-0" />
       )}
       <div className={`flex flex-col gap-2 max-w-[85%] ${isUser ? "items-end" : "items-start"}`}>
         {/* Tool-call / tool-result chips render ABOVE the final assistant
@@ -2305,7 +2300,7 @@ function WelcomeCard({
   const greeting = firstName ? `${copy.welcomeTitle}, ${firstName}.` : copy.welcomeTitle;
   return (
     <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-2 py-8">
-      <KoleexOrb state="idle" size={132} className="mb-5" />
+      <KoleexOrb state="idle" size={200} className="mb-5" />
       <h2 className="text-[22px] md:text-[26px] font-bold tracking-tight text-[var(--text-primary)] mb-2 leading-tight">
         {greeting}
       </h2>
@@ -2321,9 +2316,7 @@ function WelcomeCard({
             onClick={() => onPick(p)}
             className="group flex items-start gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3.5 py-3 text-start text-[12.5px] text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
           >
-            <span className="mt-0.5 h-5 w-5 shrink-0 inline-flex items-center justify-center rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] group-hover:text-[var(--text-primary)]">
-              <AiFaceIcon size={11} animated={false} />
-            </span>
+            <KoleexOrb state="idle" size={22} className="mt-0.5 shrink-0" />
             <span className="flex-1 leading-snug">{p}</span>
           </button>
         ))}
