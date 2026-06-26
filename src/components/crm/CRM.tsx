@@ -1606,7 +1606,7 @@ function ContactComboboxField({
           autoComplete="off"
         />
         {open && items.length > 0 && (
-          <div className="absolute left-0 right-0 top-full mt-1 z-[300] max-h-64 overflow-y-auto rounded-xl bg-[#1a1a1a] border border-white/[0.08] shadow-2xl py-1">
+          <div className="absolute left-0 right-0 top-full mt-1 z-[300] max-h-64 overflow-y-auto rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-2xl py-1">
             {items.map((it, i) => {
               const active = hi === i;
               if (it.kind === "contact") {
@@ -1630,7 +1630,7 @@ function ContactComboboxField({
                     onClick={() => pickItem(i)}
                     onMouseEnter={() => setHi(i)}
                     className={`w-full px-3 py-2 text-left flex items-center gap-2.5 transition-colors ${
-                      active ? "bg-white/[0.06]" : ""
+                      active ? "bg-[var(--bg-surface-subtle)]" : ""
                     }`}
                   >
                     <div className="h-7 w-7 rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[11px] font-semibold text-[var(--text-dim)] shrink-0 overflow-hidden">
@@ -1666,7 +1666,7 @@ function ContactComboboxField({
                   onClick={() => pickItem(i)}
                   onMouseEnter={() => setHi(i)}
                   className={`w-full px-3 py-2 text-left flex items-center gap-2.5 transition-colors border-t border-[var(--border-subtle)] ${
-                    active ? "bg-white/[0.06]" : ""
+                    active ? "bg-[var(--bg-surface-subtle)]" : ""
                   }`}
                 >
                   <div className="h-7 w-7 rounded-full bg-[var(--bg-inverted)]/[0.08] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-primary)] shrink-0">
@@ -2220,7 +2220,7 @@ function OpportunityModal({
                       disabled={saving || !lostReason.trim()}
                       className="h-8 px-3 rounded-lg bg-red-500 text-white text-[12px] font-semibold disabled:opacity-50"
                     >
-                      Confirm lost
+                      {t("form.markLost")}
                     </button>
                   </div>
                 </div>
