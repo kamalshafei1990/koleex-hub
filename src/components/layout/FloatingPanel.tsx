@@ -587,7 +587,7 @@ export default function FloatingPanel() {
                       : dk ? "text-white/35 hover:text-white/55" : "text-black/35 hover:text-black/55"
                   }`}
                 >
-                  <KoleexOrb state="idle" size={20} className={(tab === "ai" ? "" : "opacity-40") + " scale-[2.2]"} />
+                  <KoleexOrb state="idle" size={22} className={tab === "ai" ? "" : "opacity-40"} />
                   <span>Copilot</span>
                 </button>
                 <button
@@ -726,7 +726,7 @@ export default function FloatingPanel() {
                 <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
                   {aiMessages.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-8 px-6 text-center">
-                      <KoleexOrb state={aiSending ? "loading" : "idle"} size={120} className="scale-125" />
+                      <KoleexOrb state={aiSending ? "loading" : "idle"} size={72} />
                       <p className={`text-[13px] font-semibold mt-3 ${textM}`}>Operator briefing</p>
                       <p className={`text-[11px] mt-1 ${textG}`}>Embedded finance intelligence</p>
 
@@ -785,7 +785,7 @@ export default function FloatingPanel() {
                             )}
                           </div>
                         ) : (
-                          <KoleexOrb state="idle" size={30} className="scale-110" />
+                          <KoleexOrb state="idle" size={28} />
                         )}
                       </div>
                       {/* Message bubble */}
@@ -801,7 +801,7 @@ export default function FloatingPanel() {
                   {aiSending && (
                     <div className="flex gap-2 flex-row">
                       <div className="shrink-0 mt-0.5">
-                        <KoleexOrb state="idle" size={30} className="scale-110" />
+                        <KoleexOrb state="idle" size={28} />
                       </div>
                       <div className={`px-3 py-2 rounded-2xl text-[13px] flex items-center gap-1.5 ${
                         dk ? "bg-white/[0.05] text-white/60" : "bg-black/[0.04] text-black/60"
@@ -1088,7 +1088,7 @@ export default function FloatingPanel() {
                   >
                     {/* Small layout box keeps the FAB pill its original size;
                         scale blows the orb face up visually only. */}
-                    <KoleexOrb state={aiSending ? "loading" : "idle"} size={22} className={(tab === "ai" ? "" : "opacity-40") + " scale-[1.7]"} />
+                    <KoleexOrb state={aiSending ? "loading" : "idle"} size={26} className={tab === "ai" ? "" : "opacity-40"} />
                     <span className={`hidden md:inline text-[11px] font-bold tracking-wide ${tab === "ai" ? "ai-neon-text" : ""}`}>
                       AI
                     </span>

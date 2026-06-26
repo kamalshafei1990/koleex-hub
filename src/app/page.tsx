@@ -624,10 +624,9 @@ export default function HomePage() {
                   animated?: boolean;
                   scaleClass?: string;
                 }>;
-                /* Small layout box (44) keeps the AI card the exact same size
-                   as every other app card; scaleClass blows the orb up visually
-                   without growing the card. */
-                return <AnimatedIcon size={44} animated scaleClass="scale-[3.1]" />;
+                /* The custom orb fills its box, so size it like every other app
+                   icon (34) — no scale needed. */
+                return <AnimatedIcon size={34} animated scaleClass="scale-100" />;
               }
               return <Icon size={34} />;
             })()}

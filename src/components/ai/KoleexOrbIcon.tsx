@@ -10,7 +10,7 @@ import KoleexOrb from "./KoleexOrb";
 export default function KoleexOrbIcon({
   size = 24,
   className,
-  scaleClass = "scale-150",
+  scaleClass = "scale-100",
 }: {
   size?: number | string;
   className?: string;

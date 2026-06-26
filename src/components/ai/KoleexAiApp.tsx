@@ -1391,7 +1391,7 @@ export default function KoleexAiApp() {
           </button>
           {/* Koleex AI character — the live Rive orb, reacting to the
               conversation lifecycle (thinking / typing / done). */}
-          <KoleexOrb state={orbState} size={56} className="shrink-0 scale-[1.12]" />
+          <KoleexOrb state={orbState} size={38} className="shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="text-[13px] font-semibold truncate text-[var(--text-primary)]">
               {active?.title ?? "Koleex AI"}
@@ -1431,7 +1431,7 @@ export default function KoleexAiApp() {
           >
             <ArrowLeftIcon className="h-4 w-4" />
           </Link>
-          <KoleexOrb state={orbState} size={56} className="shrink-0 scale-[1.12]" />
+          <KoleexOrb state={orbState} size={38} className="shrink-0" />
           <div className="min-w-0 flex-1">
             <h1 className="text-[16px] md:text-[17px] font-bold tracking-tight text-[var(--text-primary)] truncate leading-snug">
               {active?.title || "Koleex AI"}
@@ -1983,7 +1983,7 @@ function Bubble({
       className={`flex items-start gap-3 ${isUser ? "justify-end" : "justify-start"}`}
     >
       {!isUser && (
-        <KoleexOrb state={orbState} size={64} className="shrink-0 scale-[1.9]" />
+        <KoleexOrb state={orbState} size={38} className="shrink-0" />
       )}
       <div className={`flex flex-col gap-2 max-w-[85%] ${isUser ? "items-end" : "items-start"}`}>
         {/* Tool-call / tool-result chips render ABOVE the final assistant
@@ -2355,7 +2355,7 @@ function WelcomeCard({
   }, []);
   return (
     <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-2 py-8">
-      <KoleexOrb state="idle" greetKey={greet} size={320} className="scale-125 -mt-10 -mb-14" />
+      <KoleexOrb state="idle" greetKey={greet} size={104} className="mb-1" />
       <h2 className="text-[22px] md:text-[26px] font-bold tracking-tight text-[var(--text-primary)] mb-2 leading-tight">
         {greeting}
       </h2>
