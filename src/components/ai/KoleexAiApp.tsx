@@ -1356,7 +1356,7 @@ export default function KoleexAiApp() {
           </button>
           {/* Koleex AI character — the live Rive orb, reacting to the
               conversation lifecycle (thinking / typing / done). */}
-          <KoleexOrb state={orbState} animated={false} size={64} className="shrink-0 scale-[1.9]" />
+          <KoleexOrb state={orbState} size={64} className="shrink-0 scale-[1.9]" />
           <div className="min-w-0 flex-1">
             <div className="text-[13px] font-semibold truncate text-[var(--text-primary)]">
               {active?.title ?? "Koleex AI"}
@@ -1396,7 +1396,7 @@ export default function KoleexAiApp() {
           >
             <ArrowLeftIcon className="h-4 w-4" />
           </Link>
-          <KoleexOrb state={orbState} animated={false} size={64} className="shrink-0 scale-[1.9]" />
+          <KoleexOrb state={orbState} size={64} className="shrink-0 scale-[1.9]" />
           <div className="min-w-0 flex-1">
             <h1 className="text-[16px] md:text-[17px] font-bold tracking-tight text-[var(--text-primary)] truncate leading-snug">
               {active?.title || "Koleex AI"}
