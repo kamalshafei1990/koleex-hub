@@ -434,6 +434,7 @@ function ProjectDetailView({
   const [dragOver, setDragOver] = useState<string | null>(null);
   const [newStageName, setNewStageName] = useState("");
   const [projectFormOpen, setProjectFormOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"board" | "list">("board");
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -533,6 +534,20 @@ function ProjectDetailView({
                 {project.is_billable ? ` · ${t("form.billable")}` : ""}
               </div>
             </div>
+            <div className="hidden sm:flex items-center rounded-lg border border-[var(--border-subtle)] overflow-hidden shrink-0">
+              {(["board", "list"] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setViewMode(m)}
+                  className={`h-8 px-2.5 flex items-center gap-1 text-[11px] font-semibold transition-colors ${
+                    viewMode === m ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  {m === "board" ? <LayoutGridIcon size={12} /> : <ListTodoIcon size={12} />}
+                  <span className="hidden md:inline">{m === "board" ? t("view.board", "Board") : t("view.list", "List")}</span>
+                </button>
+              ))}
+            </div>
             <button
               onClick={() => setProjectFormOpen(true)}
               className="h-8 w-8 rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center shrink-0"
@@ -546,10 +561,49 @@ function ProjectDetailView({
         </div>
       </div>
 
-      {/* Kanban */}
+      {/* Kanban / List */}
       <div className="flex-1 overflow-y-auto w-full">
         <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-4 min-w-0">
-          <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-none">
+          {viewMode === "list" && (
+            <div className="space-y-4 pb-4">
+              {stages.map((stage) => {
+                const cellTasks = tasksByStage.get(stage.id) ?? [];
+                return (
+                  <div key={stage.id} className="space-y-1.5">
+                    <div className="flex items-center gap-2 px-1">
+                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: stage.color ?? "var(--border-subtle)" }} />
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{stage.name}</span>
+                      <span className="text-[10px] font-semibold text-[var(--text-ghost)]">{cellTasks.length}</span>
+                    </div>
+                    {cellTasks.length === 0 ? (
+                      <div className="text-[11px] text-[var(--text-dim)] px-3 py-2">{t("empty.noTasks")}</div>
+                    ) : (
+                      cellTasks.map((tk) => {
+                        const overdue = isOverdue(tk.due_date) && tk.status === "open";
+                        const due = formatDueDate(tk.due_date);
+                        return (
+                          <div
+                            key={tk.id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => setTaskModal({ open: true, editing: tk })}
+                            onKeyDown={(e) => { if (e.key === "Enter") setTaskModal({ open: true, editing: tk }); }}
+                            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] hover:border-[var(--border-focus)] cursor-pointer transition-colors"
+                          >
+                            <span className="w-1 h-4 rounded-full shrink-0" style={{ background: PRIORITY_COLOR[tk.priority] }} />
+                            <span className={`flex-1 min-w-0 truncate text-[12.5px] ${tk.status === "done" ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}`}>{tk.title}</span>
+                            {due && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${overdue ? "bg-rose-500/15 text-rose-400" : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)]"}`}>{due}</span>}
+                            {tk.assignee?.username && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[var(--bg-surface-subtle)] text-[var(--text-muted)] shrink-0">@{tk.assignee.username}</span>}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <div className={`flex gap-3 overflow-x-auto pb-4 scrollbar-none ${viewMode === "list" ? "hidden" : ""}`}>
             {stages.map((stage) => {
               const cellTasks = tasksByStage.get(stage.id) ?? [];
               const dropping = dragOver === stage.id;
