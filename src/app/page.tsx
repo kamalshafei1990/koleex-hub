@@ -46,50 +46,137 @@ function getGreetingKey(): string {
   return "greeting.evening";
 }
 
-/* Daily work-motivation quotes — one per day, rotates by day-of-year so it
-   stays stable through the day and changes the next morning. */
-const DAILY_QUOTES: string[] = [
-  "Great work is done one focused decision at a time.",
-  "Plan the day before the day plans you.",
-  "Done beats perfect — ship, then refine.",
-  "Small disciplines repeated build remarkable results.",
-  "Clarity is the fastest shortcut to speed.",
-  "Solve the problem in front of you, fully.",
-  "Quality is a habit, not an accident.",
-  "Move with intention; momentum follows.",
-  "The best time to start was yesterday — the next best is now.",
-  "Focus on what only you can do today.",
-  "Progress, not pressure. One step, then the next.",
-  "Make the complex simple, then make it work.",
-  "Discipline today is freedom tomorrow.",
-  "Measure twice, decide once.",
-  "Energy goes where attention flows — choose well.",
-  "Finish strong; the last 10% is where trust is built.",
-  "A clear no protects a focused yes.",
-  "Build for the person who uses it, not the one who praises it.",
-  "Consistency compounds — show up again.",
-  "Slow is smooth, and smooth is fast.",
-  "Own the outcome, not just the task.",
-  "Curiosity beats certainty when the path is new.",
-  "Tidy inputs, clean results.",
-  "Decide with the data you have, adjust with the data you get.",
-  "Your standards are your signature — set them high.",
-  "One honest review saves ten reworks.",
-  "Start before you feel ready; readiness is earned.",
-  "Protect deep work like it's the asset it is.",
-  "Communicate early, communicate clearly.",
-  "Excellence is a direction, not a destination.",
-  "Turn friction into a checklist, not a complaint.",
-  "Today's effort is tomorrow's advantage.",
-  "Aim for clarity; speed is its byproduct.",
-  "Do the boring work brilliantly.",
-  "Ask better questions to get better answers.",
-  "Respect the deadline by respecting the scope.",
-  "Leave every file better than you found it.",
-  "Trust is built in small, kept promises.",
-  "Think in systems, act in steps.",
-  "Calm focus beats busy panic.",
-];
+/* Work-motivation quotes, localized (en / zh / ar). Same 40 entries per
+   language, kept in the same order so the daily/rotating index lines up across
+   locales. The page picks the pool for the active language. */
+const DAILY_QUOTES: Record<string, string[]> = {
+  en: [
+    "Great work is done one focused decision at a time.",
+    "Plan the day before the day plans you.",
+    "Done beats perfect — ship, then refine.",
+    "Small disciplines repeated build remarkable results.",
+    "Clarity is the fastest shortcut to speed.",
+    "Solve the problem in front of you, fully.",
+    "Quality is a habit, not an accident.",
+    "Move with intention; momentum follows.",
+    "The best time to start was yesterday — the next best is now.",
+    "Focus on what only you can do today.",
+    "Progress, not pressure. One step, then the next.",
+    "Make the complex simple, then make it work.",
+    "Discipline today is freedom tomorrow.",
+    "Measure twice, decide once.",
+    "Energy goes where attention flows — choose well.",
+    "Finish strong; the last 10% is where trust is built.",
+    "A clear no protects a focused yes.",
+    "Build for the person who uses it, not the one who praises it.",
+    "Consistency compounds — show up again.",
+    "Slow is smooth, and smooth is fast.",
+    "Own the outcome, not just the task.",
+    "Curiosity beats certainty when the path is new.",
+    "Tidy inputs, clean results.",
+    "Decide with the data you have, adjust with the data you get.",
+    "Your standards are your signature — set them high.",
+    "One honest review saves ten reworks.",
+    "Start before you feel ready; readiness is earned.",
+    "Protect deep work like it's the asset it is.",
+    "Communicate early, communicate clearly.",
+    "Excellence is a direction, not a destination.",
+    "Turn friction into a checklist, not a complaint.",
+    "Today's effort is tomorrow's advantage.",
+    "Aim for clarity; speed is its byproduct.",
+    "Do the boring work brilliantly.",
+    "Ask better questions to get better answers.",
+    "Respect the deadline by respecting the scope.",
+    "Leave every file better than you found it.",
+    "Trust is built in small, kept promises.",
+    "Think in systems, act in steps.",
+    "Calm focus beats busy panic.",
+  ],
+  zh: [
+    "伟大的成果，源于每次一个专注的决定。",
+    "在一天掌控你之前，先规划好这一天。",
+    "完成胜于完美——先交付，再打磨。",
+    "重复的小自律，造就非凡的成果。",
+    "清晰，是通往高效最快的捷径。",
+    "把眼前的问题彻底解决。",
+    "质量是一种习惯，而非偶然。",
+    "带着意图行动，势能自会随之而来。",
+    "最好的开始时机是昨天，其次是现在。",
+    "专注于只有你今天才能做的事。",
+    "要进步，别施压；走一步，再走一步。",
+    "先化繁为简，再让它运转起来。",
+    "今天的自律，是明天的自由。",
+    "量两次，决定一次。",
+    "精力随注意力而流动——请慎重选择。",
+    "收尾要有力；信任建立在最后的 10%。",
+    "一个明确的「不」，守护一个专注的「是」。",
+    "为使用它的人而造，而非为称赞它的人。",
+    "坚持会产生复利——请再次出现。",
+    "慢即是稳，稳即是快。",
+    "对结果负责，而不仅仅是任务。",
+    "当道路陌生时，好奇胜过笃定。",
+    "输入整洁，结果干净。",
+    "用现有的数据决策，用新得的数据调整。",
+    "你的标准就是你的签名——把它定高。",
+    "一次诚实的复盘，省去十次返工。",
+    "在你觉得准备好之前就开始；准备是干出来的。",
+    "像守护资产一样守护深度工作。",
+    "尽早沟通，清晰沟通。",
+    "卓越是一个方向，而非一个终点。",
+    "把摩擦变成清单，而不是抱怨。",
+    "今天的努力，是明天的优势。",
+    "追求清晰，速度自是其副产品。",
+    "把枯燥的工作做得出色。",
+    "提出更好的问题，得到更好的答案。",
+    "尊重范围，就是尊重截止日期。",
+    "让每个文件都比你接手时更好。",
+    "信任建立在一个个被兑现的小承诺上。",
+    "以系统思考，以步骤行动。",
+    "平静的专注，胜过忙乱的恐慌。",
+  ],
+  ar: [
+    "العمل العظيم يُنجَز بقرار واحد مركّز في كل مرة.",
+    "خطّط ليومك قبل أن يخطّط هو لك.",
+    "الإنجاز خير من الكمال — أطلِق أولًا ثم حسّن.",
+    "الانضباطات الصغيرة المتكررة تبني نتائج عظيمة.",
+    "الوضوح هو أسرع طريق إلى السرعة.",
+    "حُلّ المشكلة التي أمامك حلًّا كاملًا.",
+    "الجودة عادة، وليست صدفة.",
+    "تحرّك بنيّة واضحة، فالزخم يتبعك.",
+    "أفضل وقت للبدء كان بالأمس، والأفضل التالي هو الآن.",
+    "ركّز على ما لا يستطيع غيرك إنجازه اليوم.",
+    "تقدّم بلا ضغط؛ خطوة، ثم التي تليها.",
+    "بسّط المعقّد، ثم اجعله يعمل.",
+    "انضباط اليوم هو حرية الغد.",
+    "قِس مرتين، وقرّر مرة واحدة.",
+    "الطاقة تتبع الانتباه — فأحسِن الاختيار.",
+    "أنهِ بقوة؛ ففي آخر 10% تُبنى الثقة.",
+    "«لا» واضحة تحمي «نعم» مركّزة.",
+    "اِبنِ لمن يستخدمه، لا لمن يمتدحه.",
+    "الاستمرارية تتراكم — عُد وواظب.",
+    "التأنّي يصنع السلاسة، والسلاسة تصنع السرعة.",
+    "تملّك النتيجة، لا المهمة وحدها.",
+    "الفضول يتفوّق على اليقين حين يكون الطريق جديدًا.",
+    "مدخلات مرتّبة، نتائج نظيفة.",
+    "قرّر بالبيانات المتاحة، وعدّل بالبيانات القادمة.",
+    "معاييرك هي توقيعك — فاجعلها عالية.",
+    "مراجعة صادقة واحدة توفّر عشر إعادات.",
+    "اِبدأ قبل أن تشعر بالجاهزية؛ فالجاهزية تُكتسب.",
+    "اِحمِ العمل العميق فهو أثمن ما لديك.",
+    "تواصل مبكرًا، وتواصل بوضوح.",
+    "التميّز اتجاه، وليس وجهة.",
+    "حوّل العقبة إلى قائمة مهام، لا إلى شكوى.",
+    "جهد اليوم هو ميزة الغد.",
+    "اسعَ إلى الوضوح، فالسرعة نتيجته.",
+    "أنجِز العمل الممل بإتقان.",
+    "اطرح أسئلة أفضل تحصل على إجابات أفضل.",
+    "اِحترم الموعد النهائي باحترام نطاق العمل.",
+    "اترك كل ملف أفضل مما وجدته.",
+    "تُبنى الثقة بوعود صغيرة محفوظة.",
+    "فكّر بالأنظمة، ونفّذ بالخطوات.",
+    "التركيز الهادئ يتفوّق على الانشغال المذعور.",
+  ],
+};
 
 /* ── Clock Widget: Analog + Digital ── */
 function ClockWidget({ dk = true }: { dk?: boolean }) {
@@ -221,14 +308,15 @@ export default function HomePage() {
   const [quote, setQuote] = useState("");
   const [quoteTyped, setQuoteTyped] = useState("");
   useEffect(() => {
-    let i = Math.floor(Date.now() / 45_000) % DAILY_QUOTES.length;
-    setQuote(DAILY_QUOTES[i]);
+    const pool = DAILY_QUOTES[lang] ?? DAILY_QUOTES.en;
+    let i = Math.floor(Date.now() / 45_000) % pool.length;
+    setQuote(pool[i]);
     const id = setInterval(() => {
-      i = (i + 1) % DAILY_QUOTES.length;
-      setQuote(DAILY_QUOTES[i]); // typewriter effect (below) retypes it
+      i = (i + 1) % pool.length;
+      setQuote(pool[i]); // typewriter effect (below) retypes it
     }, 45_000); // new quote every 45s
     return () => clearInterval(id);
-  }, []);
+  }, [lang]); // re-pick from the active language's pool when language changes
 
   /* Type the current quote out once the greeting has finished typing. */
   const quoteTyping = quoteTyped.length < quote.length;
