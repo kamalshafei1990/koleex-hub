@@ -757,16 +757,31 @@ export default function HomePage() {
                   chat bubble with a tail pointing back at the face. */}
               <KoleexOrb state={orbState} greetKey={greet} size={72} className="shrink-0 hidden sm:block" />
               <div
-                className={`relative min-w-0 rounded-2xl border px-4 py-3 md:px-5 md:py-3.5 ${
-                  dk ? "bg-white/[0.04] border-white/[0.08]" : "bg-black/[0.025] border-black/[0.07]"
-                }`}
+                className="relative min-w-0 rounded-2xl px-4 py-3 md:px-5 md:py-3.5"
+                style={{
+                  /* Dark glassy core (like the orb's face) inside a thin
+                     rainbow gradient ring (like the orb's ring), with a
+                     soft iridescent glow — so the bubble is clearly the
+                     same "material" as the AI face. */
+                  border: "1px solid transparent",
+                  background: dk
+                    ? "linear-gradient(180deg,#15151c,#0c0c11) padding-box, conic-gradient(from 140deg,#3b82f6,#8b5cf6,#ec4899,#f59e0b,#22d3ee,#3b82f6) border-box"
+                    : "linear-gradient(180deg,#ffffff,#f4f5f7) padding-box, conic-gradient(from 140deg,#3b82f6,#8b5cf6,#ec4899,#f59e0b,#22d3ee,#3b82f6) border-box",
+                  boxShadow: dk
+                    ? "0 0 26px -8px rgba(139,92,246,.30)"
+                    : "0 0 26px -10px rgba(139,92,246,.22)",
+                }}
               >
-                {/* speech tail — a rotated square nub pointing at the orb */}
+                {/* speech tail — a little rainbow-edged gem pointing at the orb */}
                 <span
                   aria-hidden
-                  className={`hidden sm:block absolute top-1/2 -translate-y-1/2 -start-[6px] w-3 h-3 rotate-45 border-b border-s ${
-                    dk ? "bg-white/[0.04] border-white/[0.08]" : "bg-black/[0.025] border-black/[0.07]"
-                  }`}
+                  className="hidden sm:block absolute top-1/2 -translate-y-1/2 -start-[5px] w-3 h-3 rotate-45 rounded-[3px]"
+                  style={{
+                    border: "1px solid transparent",
+                    background: dk
+                      ? "linear-gradient(180deg,#15151c,#0c0c11) padding-box, conic-gradient(from 140deg,#3b82f6,#8b5cf6,#ec4899,#f59e0b,#22d3ee,#3b82f6) border-box"
+                      : "linear-gradient(180deg,#ffffff,#f4f5f7) padding-box, conic-gradient(from 140deg,#3b82f6,#8b5cf6,#ec4899,#f59e0b,#22d3ee,#3b82f6) border-box",
+                  }}
                 />
                 <h1
                   aria-label={greetingText}
