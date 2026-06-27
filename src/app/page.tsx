@@ -92,7 +92,7 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
       >
         <span className="text-[34px] md:text-[42px] font-semibold tracking-tight">
           {t.hh}
-          <span className={`mx-1 ${dk ? "text-white/25" : "text-black/25"}`}>:</span>
+          <span className={`mx-1 ${dk ? "text-white" : "text-black"}`}>:</span>
           {t.mm}
         </span>
         {/* seconds sit as a small superscript next to the minutes */}
