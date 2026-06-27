@@ -72,8 +72,10 @@ export default function Sidebar() {
     (apps: AppDef[]): AppDef[] => {
       if (permLoading) return [];
       return apps.filter((a) =>
+        // Hide not-yet-shipped apps from the rail (no dead/greyed links).
+        a.active &&
         // Super-Admin-only apps (e.g. Activity Monitor) gate on the SA flag.
-        a.superAdminOnly ? isSuperAdmin : permittedModules.has(a.name),
+        (a.superAdminOnly ? isSuperAdmin : permittedModules.has(a.name)),
       );
     },
     [permLoading, permittedModules, isSuperAdmin],
@@ -137,11 +139,9 @@ export default function Sidebar() {
 
     return (
       <Link
-        href={app.active ? app.route : "#"}
-        onClick={(e) => {
-          if (!app.active) e.preventDefault();
-          setMobileOpen(false);
-        }}
+        href={app.route}
+        aria-current={isActive ? "page" : undefined}
+        onClick={() => setMobileOpen(false)}
         /* Phase UI.4 — sidebar refinement.
            Active state painted with a thin 2px left-edge accent rule
            + full-opacity ink, NOT a background fill. Icon sizes
@@ -154,9 +154,7 @@ export default function Sidebar() {
             ? dk
               ? "text-white/95 font-medium"
               : "text-black/95 font-medium"
-            : app.active
-              ? `${textMuted} ${hoverBg} hover:${dk ? "text-white/80" : "text-black/80"}`
-              : `${textGhost} cursor-default opacity-30`
+            : `${textMuted} ${hoverBg} hover:${dk ? "text-white/80" : "text-black/80"}`
         }`}
       >
         {/* Active accent rail — 2px left-edge mark, calmer than a
@@ -185,6 +183,7 @@ export default function Sidebar() {
       <div>
         <button
           onClick={() => toggleGroup(group.id)}
+          aria-expanded={isOpen}
           className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[12.5px] font-semibold uppercase tracking-wider transition-all duration-150 ${
             isGroupActive
               ? dk
@@ -254,9 +253,9 @@ export default function Sidebar() {
           <GroupIcon size={16} />
         </button>
 
-        {/* Tooltip (shows group name on hover) */}
+        {/* Tooltip (shows group name on hover / keyboard focus) */}
         <div
-          className="hidden group-hover/fly:block absolute top-1/2 -translate-y-1/2 z-[60] pointer-events-none"
+          className="hidden group-hover/fly:block group-focus-within/fly:block absolute top-1/2 -translate-y-1/2 z-[60] pointer-events-none"
           style={{ insetInlineStart: "calc(100% + 14px)" }}
         >
           <div
