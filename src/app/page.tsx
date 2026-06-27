@@ -13,7 +13,6 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import StarIcon from "@/components/icons/ui/StarIcon";
-import ClockIcon from "@/components/icons/ui/ClockIcon";
 import KoleexOrb from "@/components/ai/KoleexOrb";
 import { useTranslation } from "@/lib/i18n";
 import { hubT } from "@/lib/translations/hub";
@@ -39,7 +38,6 @@ import { useShortcutHint } from "@/lib/ui/use-shortcut-hint";
 import { fetchMyChannels, subscribeToMyChannels } from "@/lib/discuss";
 import { fetchUnreadTaskCount, subscribeToInboxMessages } from "@/lib/inbox";
 
-const PRIMARY_CATS = ["operations", "commercial", "people", "communication", "system"];
 
 function getGreetingKey(): string {
   const h = new Date().getHours();
@@ -218,7 +216,6 @@ export default function HomePage() {
   const shortcut = useShortcutHint(); // platform-aware ⌘K / Ctrl K label + tooltip
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
-  const [showMore, setShowMore] = useState(false);
 
   /* Koleex AI greeter — fire a one-shot "jump" wave shortly after the home
      hero mounts, so the orb greets you alongside the message. */
@@ -483,8 +480,6 @@ export default function HomePage() {
   const isSearching = search.trim() !== "";
   const isFiltered = activeCategory !== "all";
   const isSearchOrFilter = isSearching || isFiltered;
-  const primaryCats = ALL_APPS_CATEGORIES.filter((c) => PRIMARY_CATS.includes(c.id));
-  const secondaryCats = ALL_APPS_CATEGORIES.filter((c) => !PRIMARY_CATS.includes(c.id));
 
   /* Group apps by category for the "All" view. Uses the role-filtered
      visibleRegistry so categories with no accessible apps disappear. */
@@ -504,16 +499,6 @@ export default function HomePage() {
   const activeCount = filteredApps.filter((a) => a.active).length;
   const totalCount = filteredApps.length;
 
-  const chipCls = (active: boolean) =>
-    `h-8 px-4 rounded-full text-[12px] font-semibold transition-all duration-200 border whitespace-nowrap ${
-      active
-        ? dk
-          ? "bg-white text-black border-white"
-          : "bg-black text-white border-black"
-        : dk
-          ? "bg-transparent border-white/[0.08] text-white/40 hover:text-white/70 hover:border-white/[0.16]"
-          : "bg-transparent border-black/[0.08] text-black/40 hover:text-black/70 hover:border-black/[0.16]"
-    }`;
 
   /* ── Full App Card (for grid) ── */
   const AppCard = ({ app, showStar = false }: { app: AppDef; showStar?: boolean }) => {
@@ -815,64 +800,10 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ── Zone C: Recent ── */}
-        {!isSearchOrFilter && recentApps.length > 0 && (
-          <div className="mb-5">
-            <div className="flex items-center gap-2 mb-2.5">
-              <ClockIcon size={11} className={dk ? "text-white/18" : "text-black/18"} />
-              <span className={`text-[10px] font-semibold tracking-[1.5px] uppercase ${dk ? "text-white/25" : "text-black/25"}`}>
-                {t("recent")}
-              </span>
-            </div>
-            <div className="flex gap-2.5 overflow-x-auto scrollbar-none py-2 -my-1 px-1 -mx-1 pb-0.5">
-              {recentApps.map((app) => (
-                <CompactCard key={app.id} app={app} showStar />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ── Divider ── */}
-        {!isSearchOrFilter && (favoriteApps.length > 0 || recentApps.length > 0) && (
+        {/* ── Divider (after favorites) ── */}
+        {!isSearchOrFilter && favoriteApps.length > 0 && (
           <div className={`border-b mb-5 ${dk ? "border-white/[0.04]" : "border-black/[0.04]"}`} />
         )}
-
-        {/* ── Zone D: All Apps ── */}
-        <div className="flex flex-wrap items-center gap-2 mb-5">
-          <button onClick={() => { setActiveCategory("all"); setShowMore(false); }} className={chipCls(activeCategory === "all")}>
-            {t("all")}
-          </button>
-          {primaryCats.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setActiveCategory(activeCategory === cat.id ? "all" : cat.id)}
-              className={chipCls(activeCategory === cat.id)}
-            >
-              {t(cat.tKey, cat.label)}
-            </button>
-          ))}
-          {secondaryCats.length > 0 && (
-            <button
-              onClick={() => setShowMore((v) => !v)}
-              className={`h-8 px-3.5 rounded-full text-[12px] font-semibold transition-all duration-200 border whitespace-nowrap ${
-                showMore || secondaryCats.some((c) => c.id === activeCategory)
-                  ? dk ? "bg-white/[0.08] border-white/[0.14] text-white/60" : "bg-black/[0.06] border-black/[0.12] text-black/60"
-                  : dk ? "bg-transparent border-white/[0.06] text-white/25 hover:text-white/50" : "bg-transparent border-black/[0.06] text-black/25 hover:text-black/50"
-              }`}
-            >
-              {t("more")}{showMore ? " -" : " +"}
-            </button>
-          )}
-          {showMore && secondaryCats.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setActiveCategory(activeCategory === cat.id ? "all" : cat.id)}
-              className={chipCls(activeCategory === cat.id)}
-            >
-              {t(cat.tKey, cat.label)}
-            </button>
-          ))}
-        </div>
 
         {/* Mobile-resilience: while the permission bootstrap is in
             flight or has failed (timeout / 5xx / lost mobile signal),
