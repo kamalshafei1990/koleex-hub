@@ -772,17 +772,6 @@ export default function HomePage() {
                     : "0 0 26px -10px rgba(139,92,246,.22)",
                 }}
               >
-                {/* speech tail — a little rainbow-edged gem pointing at the orb */}
-                <span
-                  aria-hidden
-                  className="hidden sm:block absolute top-1/2 -translate-y-1/2 -start-[5px] w-3 h-3 rotate-45 rounded-[3px]"
-                  style={{
-                    border: "1px solid transparent",
-                    background: dk
-                      ? "linear-gradient(180deg,#15151c,#0c0c11) padding-box, conic-gradient(from 140deg,#3b82f6,#8b5cf6,#ec4899,#f59e0b,#22d3ee,#3b82f6) border-box"
-                      : "linear-gradient(180deg,#ffffff,#f4f5f7) padding-box, conic-gradient(from 140deg,#3b82f6,#8b5cf6,#ec4899,#f59e0b,#22d3ee,#3b82f6) border-box",
-                  }}
-                />
                 <h1
                   aria-label={greetingText}
                   className={`text-[22px] md:text-[30px] font-bold tracking-tight ${dk ? "text-white" : "text-black"}`}
