@@ -84,7 +84,7 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
   /* Digital clock — monochrome, monospace, right-aligned. Matches the Hub's
      card/typography grammar: dimmed colon + seconds, quiet timezone meta. */
   return (
-    <div className="shrink-0 hidden sm:flex flex-col items-end justify-center">
+    <div className="shrink-0 hidden sm:flex flex-col items-center justify-center">
       <div
         className={`flex items-start font-mono tabular-nums leading-none ${
           dk ? "text-white/90" : "text-black/90"
