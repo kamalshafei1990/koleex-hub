@@ -15,7 +15,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import {
   SIDEBAR_GROUPS,
@@ -82,6 +81,12 @@ export default function Sidebar() {
 
   const activeGroupId = getActiveGroupId(pathname);
   const activeAppId = getActiveAppId(pathname);
+
+  /* Home ("/") is the launcher — it already shows every app grouped by
+     category, so the desktop rail there is redundant. Hide the persistent
+     rail on home; inner routes keep it. (Mobile drawer is on-demand, so it
+     stays available everywhere via the header menu button.) */
+  const isHome = pathname === "/";
 
   /* Track which groups are open (expanded mode) */
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
@@ -284,32 +289,25 @@ export default function Sidebar() {
     );
   };
 
-  /* ── Edge toggle — premium glass pill ── */
+  /* ── Edge toggle — minimal monochrome handle ──
+     Brand: precise, monochrome, no frosted-glass / colored shadow. A solid
+     surface circle that matches the rail, a hairline ring, and a single
+     chevron that rotates 180° between states (no icon swap). */
   const EdgeToggle = () => {
     return (
       <button
         onClick={toggle}
         aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
-        className={`flex items-center justify-center w-[18px] h-[48px] rounded-[10px] cursor-pointer transition-all duration-300 group/toggle ${
+        className={`group/toggle flex items-center justify-center w-7 h-7 rounded-full cursor-pointer transition-all duration-200 active:scale-90 ${
           dk
-            ? "text-white/25 hover:text-white/60"
-            : "text-black/20 hover:text-black/50"
+            ? "bg-[#161616] border border-white/[0.10] text-white/45 hover:text-white/90 hover:border-white/30 hover:bg-[#1f1f1f]"
+            : "bg-white border border-black/[0.10] text-black/40 hover:text-black/90 hover:border-black/30 hover:bg-[#f4f4f4]"
         }`}
-        style={{
-          background: dk
-            ? "linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)"
-            : "linear-gradient(180deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.02) 100%)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          border: dk ? "1px solid rgba(255,255,255,0.06)" : "1px solid rgba(0,0,0,0.06)",
-          boxShadow: dk
-            ? "0 4px 16px rgba(0,0,0,0.5)"
-            : "0 4px 16px rgba(0,0,0,0.08)",
-        }}
       >
-        <div className="transition-transform duration-300 group-hover/toggle:scale-110">
-          {expanded ? <AngleLeftIcon size={12} /> : <AngleRightIcon size={12} />}
-        </div>
+        <AngleRightIcon
+          size={12}
+          className={`transition-transform duration-300 ${expanded ? "rotate-180" : ""}`}
+        />
       </button>
     );
   };
@@ -349,21 +347,23 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* ── Desktop sidebar ── */}
-      <aside
-        className={`hidden md:flex flex-col fixed top-14 bottom-0 start-0 z-40 ${bg} border-e ${border} transition-all duration-300 ease-in-out`}
-        style={{ width: w }}
-      >
-        <SidebarContent />
-
-        {/* Edge toggle — floating circle, vertically centered */}
-        <div
-          className="absolute top-1/2 -translate-y-1/2 z-50 transition-all duration-300"
-          style={{ insetInlineStart: `${w - 11}px` }}
+      {/* ── Desktop sidebar (hidden on the home launcher) ── */}
+      {!isHome && (
+        <aside
+          className={`hidden md:flex flex-col fixed top-14 bottom-0 start-0 z-40 ${bg} border-e ${border} transition-all duration-300 ease-in-out`}
+          style={{ width: w }}
         >
-          <EdgeToggle />
-        </div>
-      </aside>
+          <SidebarContent />
+
+          {/* Edge toggle — floating handle, centered on the rail seam */}
+          <div
+            className="absolute top-1/2 -translate-y-1/2 z-50 transition-all duration-300"
+            style={{ insetInlineStart: `${w - 14}px` }}
+          >
+            <EdgeToggle />
+          </div>
+        </aside>
+      )}
 
       {/* ── Mobile backdrop ── */}
       {mobileOpen && (

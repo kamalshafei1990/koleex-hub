@@ -54,7 +54,17 @@ function isBypassed(pathname: string | null): boolean {
 /** Inner shell that consumes sidebar context for the padding offset. */
 function ShellContent({ children }: { children: React.ReactNode }) {
   const { expanded } = useSidebar();
-  const desktopPad = expanded ? SIDEBAR_EXPANDED_W : SIDEBAR_COLLAPSED_W;
+  const pathname = usePathname();
+  /* The home launcher already lists every app grouped by category, so the
+     persistent sidebar rail there is pure duplication. Hide it on "/" and
+     reclaim the horizontal space (full-width launcher). Every inner route
+     keeps the rail as global cross-app navigation. */
+  const isHome = pathname === "/";
+  const desktopPad = isHome
+    ? 0
+    : expanded
+      ? SIDEBAR_EXPANDED_W
+      : SIDEBAR_COLLAPSED_W;
 
   /* Desktop (Electron) shell uses a frameless window (titleBarStyle:
      hiddenInset on macOS), so the macOS traffic-light buttons float over the
