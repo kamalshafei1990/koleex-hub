@@ -1193,7 +1193,7 @@ export default function ProductList() {
                       blend in (no white box around the photo).
                       No scale on hover — the card lifts, image
                       stays put. */}
-                  <div className="relative aspect-[4/3] bg-white overflow-hidden">
+                  <div className="relative aspect-[4/3] bg-gradient-to-b from-white to-[#f4f5f7] overflow-hidden">
                     {imgUrl ? (
                       <img
                         src={imgUrl}

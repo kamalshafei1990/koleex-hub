@@ -1563,7 +1563,7 @@ export default function LegacyProductView() {
                   swap which image is currently displayed without
                   refetching anything. Falls back to mainImage if
                   the gallery is empty. */}
-              <div className="relative w-full aspect-[5/4] flex items-center justify-center rounded-2xl bg-white p-4">
+              <div className="relative w-full aspect-[5/4] flex items-center justify-center rounded-2xl bg-gradient-to-b from-white to-[#f4f5f7] p-4">
                 {(galleryImages[activeImageIdx]?.url || mainImage) ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
@@ -1923,7 +1923,7 @@ export default function LegacyProductView() {
               </div>
               {/* RIGHT — image */}
               <div className="lg:col-span-7 order-1 lg:order-2">
-                <div className="relative w-full aspect-[5/4] rounded-3xl overflow-hidden bg-white border border-[var(--border-subtle)]">
+                <div className="relative w-full aspect-[5/4] rounded-3xl overflow-hidden bg-gradient-to-b from-white to-[#f4f5f7] border border-[var(--border-subtle)]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={IMG.gallery(galleryImages[1]?.url || mainImage || "")}
