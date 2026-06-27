@@ -717,10 +717,22 @@ export default function HomePage() {
         {/* ── Header: Greeting + Clock + Date ── */}
         <div className="mb-5 md:mb-6 min-h-[160px] md:min-h-[180px] flex items-center">
           <div className="flex items-center justify-between gap-4 w-full">
-            <div className="flex items-center gap-4 md:gap-5 min-w-0">
-              {/* Koleex AI greeter — the orb "delivers" the greeting + date. */}
+            <div className="flex items-center gap-3 md:gap-4 min-w-0">
+              {/* Koleex AI greeter — the orb "speaks" the greeting through a
+                  chat bubble with a tail pointing back at the face. */}
               <KoleexOrb state="idle" greetKey={greet} size={72} className="shrink-0 hidden sm:block" />
-              <div className="min-w-0">
+              <div
+                className={`relative min-w-0 rounded-2xl border px-4 py-3 md:px-5 md:py-3.5 ${
+                  dk ? "bg-white/[0.04] border-white/[0.08]" : "bg-black/[0.025] border-black/[0.07]"
+                }`}
+              >
+                {/* speech tail — a rotated square nub pointing at the orb */}
+                <span
+                  aria-hidden
+                  className={`hidden sm:block absolute top-1/2 -translate-y-1/2 -start-[6px] w-3 h-3 rotate-45 border-b border-s ${
+                    dk ? "bg-white/[0.04] border-white/[0.08]" : "bg-black/[0.025] border-black/[0.07]"
+                  }`}
+                />
                 <h1 className={`text-[22px] md:text-[30px] font-bold tracking-tight ${dk ? "text-white" : "text-black"}`}>
                   {t(getGreetingKey())}{firstName ? `, ${firstName}` : ""}
                 </h1>
