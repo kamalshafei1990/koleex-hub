@@ -48,102 +48,21 @@ function getGreetingKey(): string {
 
 /* ── Clock Widget: Analog + Digital ── */
 function ClockWidget({ dk = true }: { dk?: boolean }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [digitalTime, setDigitalTime] = useState("");
+  const [t, setT] = useState<{ hh: string; mm: string; ss: string }>({
+    hh: "--",
+    mm: "--",
+    ss: "--",
+  });
   const [tzLabel, setTzLabel] = useState("");
-  const [size, setSize] = useState(120);
-
-  /* Responsive clock size */
-  useEffect(() => {
-    const update = () => setSize(window.innerWidth < 640 ? 80 : 120);
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
 
   useEffect(() => {
-    const cvs = canvasRef.current;
-    if (!cvs) return;
-    const ctx = cvs.getContext("2d");
-    if (!ctx) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    cvs.width = size * dpr;
-    cvs.height = size * dpr;
-    ctx.scale(dpr, dpr);
-
-    function draw() {
-      if (!ctx) return;
-      const r = size / 2;
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    const tick = () => {
       const now = new Date();
-      const h = now.getHours() % 12;
-      const m = now.getMinutes();
-      const s = now.getSeconds();
-
-      ctx.clearRect(0, 0, size, size);
-
-      /* Face */
-      ctx.beginPath();
-      ctx.arc(r, r, r - 1.5, 0, Math.PI * 2);
-      ctx.fillStyle = dk ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)";
-      ctx.fill();
-      ctx.strokeStyle = dk ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)";
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-
-      /* Hour ticks */
-      for (let i = 0; i < 12; i++) {
-        const angle = (i * Math.PI) / 6 - Math.PI / 2;
-        const outer = r - 6;
-        const inner = i % 3 === 0 ? r - 16 : r - 11;
-        ctx.beginPath();
-        ctx.moveTo(r + Math.cos(angle) * inner, r + Math.sin(angle) * inner);
-        ctx.lineTo(r + Math.cos(angle) * outer, r + Math.sin(angle) * outer);
-        ctx.strokeStyle = dk ? "rgba(255,255,255,0.30)" : "rgba(0,0,0,0.30)";
-        ctx.lineWidth = i % 3 === 0 ? 2.5 : 1.2;
-        ctx.stroke();
-      }
-
-      /* Hour hand */
-      const hAngle = ((h + m / 60) * Math.PI) / 6 - Math.PI / 2;
-      ctx.beginPath();
-      ctx.moveTo(r, r);
-      ctx.lineTo(r + Math.cos(hAngle) * (r * 0.45), r + Math.sin(hAngle) * (r * 0.45));
-      ctx.strokeStyle = dk ? "rgba(255,255,255,0.80)" : "rgba(0,0,0,0.80)";
-      ctx.lineWidth = 3.5;
-      ctx.lineCap = "round";
-      ctx.stroke();
-
-      /* Minute hand */
-      const mAngle = ((m + s / 60) * Math.PI) / 30 - Math.PI / 2;
-      ctx.beginPath();
-      ctx.moveTo(r, r);
-      ctx.lineTo(r + Math.cos(mAngle) * (r * 0.62), r + Math.sin(mAngle) * (r * 0.62));
-      ctx.strokeStyle = dk ? "rgba(255,255,255,0.60)" : "rgba(0,0,0,0.60)";
-      ctx.lineWidth = 2.5;
-      ctx.lineCap = "round";
-      ctx.stroke();
-
-      /* Second hand — thin red line */
-      const sAngle = (s * Math.PI) / 30 - Math.PI / 2;
-      ctx.beginPath();
-      ctx.moveTo(r + Math.cos(sAngle + Math.PI) * (r * 0.18), r + Math.sin(sAngle + Math.PI) * (r * 0.18));
-      ctx.lineTo(r + Math.cos(sAngle) * (r * 0.75), r + Math.sin(sAngle) * (r * 0.75));
-      ctx.strokeStyle = "rgba(239,68,68,0.7)";
-      ctx.lineWidth = 1.2;
-      ctx.lineCap = "round";
-      ctx.stroke();
-
-      /* Center dot */
-      ctx.beginPath();
-      ctx.arc(r, r, 3.5, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(239,68,68,0.8)";
-      ctx.fill();
-
-      /* Digital time */
-      const pad = (n: number) => n.toString().padStart(2, "0");
-      setDigitalTime(`${pad(now.getHours())}:${pad(m)}:${pad(s)}`);
-    }
+      setT({ hh: pad(now.getHours()), mm: pad(now.getMinutes()), ss: pad(now.getSeconds()) });
+    };
+    tick();
+    const id = setInterval(tick, 1000);
 
     /* Timezone label — e.g. "Dubai (GMT+4)" */
     try {
@@ -155,25 +74,33 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
       const mins = Math.abs(offset) % 60;
       const gmtStr = `GMT${sign}${hrs}${mins ? `:${mins.toString().padStart(2, "0")}` : ""}`;
       setTzLabel(`${city} (${gmtStr})`);
-    } catch { setTzLabel(""); }
+    } catch {
+      setTzLabel("");
+    }
 
-    draw();
-    const interval = setInterval(draw, 1000);
-    return () => clearInterval(interval);
-  }, [dk, size]);
+    return () => clearInterval(id);
+  }, []);
 
+  /* Digital clock — monochrome, monospace, right-aligned. Matches the Hub's
+     card/typography grammar: dimmed colon + seconds, quiet timezone meta. */
   return (
-    <div className="flex flex-col items-center gap-1.5 shrink-0">
-      <canvas ref={canvasRef} style={{ width: size, height: size }} />
-      <span className={`text-[12px] sm:text-[15px] font-mono font-semibold tracking-wider tabular-nums ${
-        dk ? "text-white/40" : "text-black/40"
-      }`}>
-        {digitalTime}
-      </span>
+    <div className="shrink-0 hidden sm:flex flex-col items-end justify-center">
+      <div
+        className={`flex items-baseline gap-1.5 font-mono tabular-nums leading-none ${
+          dk ? "text-white" : "text-black"
+        }`}
+      >
+        <span className="text-[32px] md:text-[40px] font-semibold tracking-tight">
+          {t.hh}
+          <span className={dk ? "text-white/25" : "text-black/25"}>:</span>
+          {t.mm}
+        </span>
+        <span className={`text-[15px] md:text-[17px] font-medium ${dk ? "text-white/35" : "text-black/35"}`}>
+          {t.ss}
+        </span>
+      </div>
       {tzLabel && (
-        <span className={`text-[10px] font-medium tracking-wide ${
-          dk ? "text-white/20" : "text-black/20"
-        }`}>
+        <span className={`mt-2 text-[11px] font-medium tracking-wide ${dk ? "text-white/30" : "text-black/30"}`}>
           {tzLabel}
         </span>
       )}
