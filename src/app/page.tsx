@@ -138,6 +138,12 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
      card/typography grammar: dimmed colon + seconds, quiet timezone meta. */
   return (
     <div className="shrink-0 hidden sm:flex flex-col items-center justify-center">
+      {/* date sits above the time */}
+      {dateLabel && (
+        <span className={`mb-2 text-[12px] font-medium ${dk ? "text-white/45" : "text-black/45"}`}>
+          {dateLabel}
+        </span>
+      )}
       <div
         className={`flex items-start font-mono tabular-nums leading-none ${
           dk ? "text-white/90" : "text-black/90"
@@ -153,14 +159,8 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
           {t.ss}
         </span>
       </div>
-      {/* date sits directly under the time */}
-      {dateLabel && (
-        <span className={`mt-2 text-[12px] font-medium ${dk ? "text-white/45" : "text-black/45"}`}>
-          {dateLabel}
-        </span>
-      )}
       {tzLabel && (
-        <span className={`mt-0.5 text-[11px] font-medium tracking-wide ${dk ? "text-white/30" : "text-black/35"}`}>
+        <span className={`mt-2 text-[11px] font-medium tracking-wide ${dk ? "text-white/30" : "text-black/35"}`}>
           {tzLabel}
         </span>
       )}
