@@ -289,21 +289,28 @@ export default function Sidebar() {
     );
   };
 
-  /* ── Edge toggle — minimal monochrome handle ──
-     Brand: precise, monochrome, no frosted-glass / colored shadow. A solid
-     surface circle that matches the rail, a hairline ring, and a single
-     chevron that rotates 180° between states (no icon swap). */
+  /* ── Collapse toggle — contained inside the rail, never crosses the
+     border. Lives in the footer: a full-width button on the expanded rail
+     (chevron + "Collapse" label) that shrinks to a centered square icon
+     button when collapsed. Brand: monochrome, hairline border, no shadow. */
   const EdgeToggle = () => {
     return (
       <button
         onClick={toggle}
         aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
-        className={`group/toggle flex items-center justify-center w-7 h-7 rounded-full cursor-pointer transition-all duration-200 active:scale-90 ${
+        className={`group/toggle flex items-center rounded-lg border transition-all duration-200 active:scale-[0.97] ${
+          expanded ? "w-full justify-between px-3 h-9" : "w-9 h-9 justify-center mx-auto"
+        } ${
           dk
-            ? "bg-[#161616] border border-white/[0.10] text-white/45 hover:text-white/90 hover:border-white/30 hover:bg-[#1f1f1f]"
-            : "bg-white border border-black/[0.10] text-black/40 hover:text-black/90 hover:border-black/30 hover:bg-[#f4f4f4]"
+            ? "border-white/[0.08] text-white/40 hover:text-white/90 hover:bg-white/[0.05] hover:border-white/20"
+            : "border-black/[0.08] text-black/40 hover:text-black/90 hover:bg-black/[0.05] hover:border-black/20"
         }`}
       >
+        {expanded && (
+          <span className="text-[10.5px] font-semibold uppercase tracking-[0.14em]">
+            Collapse
+          </span>
+        )}
         <AngleRightIcon
           size={12}
           className={`transition-transform duration-300 ${expanded ? "rotate-180" : ""}`}
@@ -331,15 +338,11 @@ export default function Sidebar() {
             ),
           )}
         </nav>
-        {/* Phase UI.4 — sidebar footer reduced to a quiet uppercase
-            mark in the expanded state. No border-top divider, no
-            "Platform v2.4" version string. */}
-        <div className="p-3 flex items-center justify-center">
-          {showExpanded && (
-            <span className={`text-[9px] font-semibold uppercase tracking-[0.22em] ${textGhost}`}>
-              KOLEEX HUB
-            </span>
-          )}
+        {/* Footer — collapse toggle, fully contained inside the rail
+            (never crosses the border). Desktop only; the mobile drawer
+            uses the header menu button instead. */}
+        <div className={`px-2.5 pb-3 pt-1 ${dk ? "border-t border-white/[0.05]" : "border-t border-black/[0.05]"} mt-1`}>
+          {!mobile && <EdgeToggle />}
         </div>
       </div>
     );
@@ -354,14 +357,6 @@ export default function Sidebar() {
           style={{ width: w }}
         >
           <SidebarContent />
-
-          {/* Edge toggle — floating handle, centered on the rail seam */}
-          <div
-            className="absolute top-1/2 -translate-y-1/2 z-50 transition-all duration-300"
-            style={{ insetInlineStart: `${w - 14}px` }}
-          >
-            <EdgeToggle />
-          </div>
         </aside>
       )}
 
