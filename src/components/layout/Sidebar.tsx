@@ -289,28 +289,64 @@ export default function Sidebar() {
     );
   };
 
-  /* ── Collapse toggle — a vertical handle, vertically centered on the
-     rail's inner right edge. Sits fully inside the rail (never crosses the
-     border). Brand: monochrome, hairline border, single chevron that
-     rotates 180° between states. */
-  const EdgeToggle = () => {
-    return (
+  /* ── Collapse toggle — a dimensional "bead on the seam".
+     Vertically centered on the rail's inner right edge (fully inside the
+     border). A subtle top-lit gradient capsule with an inner highlight and
+     a soft lift shadow reads as a tactile, engineered control rather than a
+     pasted-on flat pill. Two grip ticks frame the directional chevron,
+     which brightens + nudges on hover. A tooltip clarifies the action.
+     Brand: strictly monochrome, no color. */
+  const EdgeToggle = () => (
+    <div className="group/toggle relative">
       <button
         onClick={toggle}
         aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
-        className={`group/toggle flex items-center justify-center w-[17px] h-11 rounded-full cursor-pointer transition-all duration-200 active:scale-95 ${
-          dk
-            ? "bg-[#1a1a1a] border border-white/[0.10] text-white/40 hover:text-white/90 hover:border-white/30 hover:bg-[#242424]"
-            : "bg-white border border-black/[0.10] text-black/40 hover:text-black/90 hover:border-black/30 hover:bg-[#f0f0f0]"
-        }`}
+        className="relative flex items-center justify-center w-[20px] h-[52px] rounded-full cursor-pointer transition-all duration-200 active:scale-90 hover:h-[58px]"
+        style={{
+          background: dk
+            ? "linear-gradient(180deg,#262626 0%,#141414 100%)"
+            : "linear-gradient(180deg,#ffffff 0%,#ededed 100%)",
+          border: dk ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(0,0,0,0.10)",
+          boxShadow: dk
+            ? "inset 0 1px 0 rgba(255,255,255,0.07), 0 3px 10px rgba(0,0,0,0.5)"
+            : "inset 0 1px 0 rgba(255,255,255,0.9), 0 3px 10px rgba(0,0,0,0.10)",
+        }}
       >
+        {/* upper grip tick */}
+        <span
+          aria-hidden
+          className={`absolute top-[9px] left-1/2 -translate-x-1/2 h-[3px] w-[3px] rounded-full transition-colors duration-200 ${
+            dk ? "bg-white/15 group-hover/toggle:bg-white/35" : "bg-black/15 group-hover/toggle:bg-black/35"
+          }`}
+        />
         <AngleRightIcon
-          size={11}
-          className={`transition-transform duration-300 ${expanded ? "rotate-180" : ""}`}
+          size={12}
+          className={`transition-all duration-300 ${expanded ? "rotate-180" : ""} ${
+            dk ? "text-white/50 group-hover/toggle:text-white" : "text-black/45 group-hover/toggle:text-black"
+          } group-hover/toggle:scale-110`}
+        />
+        {/* lower grip tick */}
+        <span
+          aria-hidden
+          className={`absolute bottom-[9px] left-1/2 -translate-x-1/2 h-[3px] w-[3px] rounded-full transition-colors duration-200 ${
+            dk ? "bg-white/15 group-hover/toggle:bg-white/35" : "bg-black/15 group-hover/toggle:bg-black/35"
+          }`}
         />
       </button>
-    );
-  };
+
+      {/* Tooltip — appears on the inner side so it never overflows the edge. */}
+      <div
+        className="hidden group-hover/toggle:block absolute top-1/2 -translate-y-1/2 z-[60] pointer-events-none"
+        style={{ insetInlineEnd: "calc(100% + 10px)" }}
+      >
+        <div className={`${flyoutBg} border ${flyoutBorder} rounded-lg shadow-xl px-2.5 py-1 whitespace-nowrap`}>
+          <span className={`text-[10.5px] font-semibold ${dk ? "text-white/80" : "text-black/80"}`}>
+            {expanded ? "Collapse" : "Expand"}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
 
   /* ── Sidebar content ── */
   const SidebarContent = ({ mobile }: { mobile?: boolean }) => {
