@@ -84,23 +84,28 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
   /* Digital clock — monochrome, monospace, right-aligned. Matches the Hub's
      card/typography grammar: dimmed colon + seconds, quiet timezone meta. */
   return (
-    <div className="shrink-0 hidden sm:flex flex-col items-end justify-center">
+    <div
+      className={`shrink-0 hidden sm:flex flex-col items-end rounded-2xl border px-5 py-3.5 ${
+        dk ? "bg-white/[0.03] border-white/[0.06]" : "bg-black/[0.02] border-black/[0.06]"
+      }`}
+    >
       <div
-        className={`flex items-baseline gap-1.5 font-mono tabular-nums leading-none ${
-          dk ? "text-white" : "text-black"
+        className={`flex items-start font-mono tabular-nums leading-none ${
+          dk ? "text-white/90" : "text-black/90"
         }`}
       >
-        <span className="text-[32px] md:text-[40px] font-semibold tracking-tight">
+        <span className="text-[34px] md:text-[42px] font-semibold tracking-tight">
           {t.hh}
-          <span className={dk ? "text-white/25" : "text-black/25"}>:</span>
+          <span className={`mx-1 ${dk ? "text-white/25" : "text-black/25"}`}>:</span>
           {t.mm}
         </span>
-        <span className={`text-[15px] md:text-[17px] font-medium ${dk ? "text-white/35" : "text-black/35"}`}>
+        {/* seconds sit as a small superscript next to the minutes */}
+        <span className={`ms-1.5 mt-[5px] text-[13px] font-semibold ${dk ? "text-white/35" : "text-black/35"}`}>
           {t.ss}
         </span>
       </div>
       {tzLabel && (
-        <span className={`mt-2 text-[11px] font-medium tracking-wide ${dk ? "text-white/30" : "text-black/30"}`}>
+        <span className={`mt-2 text-[11px] font-medium tracking-wide ${dk ? "text-white/35" : "text-black/40"}`}>
           {tzLabel}
         </span>
       )}
@@ -708,7 +713,7 @@ export default function HomePage() {
 
         {/* ── Header: Greeting + Clock + Date ── */}
         <div className="mb-5 md:mb-6 min-h-[160px] md:min-h-[180px] flex items-center">
-          <div className="flex items-center justify-between gap-4 w-full">
+          <div className="flex items-center justify-between gap-5 md:gap-8 w-full">
             <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1">
               {/* Koleex AI greeter — the orb "speaks" the greeting through a
                   chat bubble with a tail pointing back at the face. */}
