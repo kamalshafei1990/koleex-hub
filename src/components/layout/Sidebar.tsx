@@ -311,8 +311,8 @@ export default function Sidebar() {
         }}
       >
         <AngleRightIcon
-          size={12}
-          className={`me-0.5 transition-all duration-300 ${expanded ? "rotate-180" : ""} ${
+          size={11}
+          className={`transition-all duration-300 ${expanded ? "rotate-180" : ""} ${
             dk ? "text-white/45 group-hover/toggle:text-white" : "text-black/45 group-hover/toggle:text-black"
           } group-hover/toggle:scale-110`}
         />
