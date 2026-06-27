@@ -46,6 +46,50 @@ function getGreetingKey(): string {
   return "greeting.evening";
 }
 
+/* Daily work-motivation quotes — one per day, rotates by day-of-year so it
+   stays stable through the day and changes the next morning. */
+const DAILY_QUOTES: string[] = [
+  "Great work is done one focused decision at a time.",
+  "Plan the day before the day plans you.",
+  "Done beats perfect — ship, then refine.",
+  "Small disciplines repeated build remarkable results.",
+  "Clarity is the fastest shortcut to speed.",
+  "Solve the problem in front of you, fully.",
+  "Quality is a habit, not an accident.",
+  "Move with intention; momentum follows.",
+  "The best time to start was yesterday — the next best is now.",
+  "Focus on what only you can do today.",
+  "Progress, not pressure. One step, then the next.",
+  "Make the complex simple, then make it work.",
+  "Discipline today is freedom tomorrow.",
+  "Measure twice, decide once.",
+  "Energy goes where attention flows — choose well.",
+  "Finish strong; the last 10% is where trust is built.",
+  "A clear no protects a focused yes.",
+  "Build for the person who uses it, not the one who praises it.",
+  "Consistency compounds — show up again.",
+  "Slow is smooth, and smooth is fast.",
+  "Own the outcome, not just the task.",
+  "Curiosity beats certainty when the path is new.",
+  "Tidy inputs, clean results.",
+  "Decide with the data you have, adjust with the data you get.",
+  "Your standards are your signature — set them high.",
+  "One honest review saves ten reworks.",
+  "Start before you feel ready; readiness is earned.",
+  "Protect deep work like it's the asset it is.",
+  "Communicate early, communicate clearly.",
+  "Excellence is a direction, not a destination.",
+  "Turn friction into a checklist, not a complaint.",
+  "Today's effort is tomorrow's advantage.",
+];
+
+function getDailyQuote(): string {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 0);
+  const day = Math.floor((now.getTime() - start.getTime()) / 86_400_000);
+  return DAILY_QUOTES[day % DAILY_QUOTES.length];
+}
+
 /* ── Clock Widget: Analog + Digital ── */
 function ClockWidget({ dk = true }: { dk?: boolean }) {
   const [t, setT] = useState<{ hh: string; mm: string; ss: string }>({
@@ -54,12 +98,21 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
     ss: "--",
   });
   const [tzLabel, setTzLabel] = useState("");
+  const [dateLabel, setDateLabel] = useState("");
 
   useEffect(() => {
     const pad = (n: number) => n.toString().padStart(2, "0");
     const tick = () => {
       const now = new Date();
       setT({ hh: pad(now.getHours()), mm: pad(now.getMinutes()), ss: pad(now.getSeconds()) });
+      setDateLabel(
+        now.toLocaleDateString(undefined, {
+          weekday: "long",
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+        }),
+      );
     };
     tick();
     const id = setInterval(tick, 1000);
@@ -100,8 +153,14 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
           {t.ss}
         </span>
       </div>
+      {/* date sits directly under the time */}
+      {dateLabel && (
+        <span className={`mt-2 text-[12px] font-medium ${dk ? "text-white/45" : "text-black/45"}`}>
+          {dateLabel}
+        </span>
+      )}
       {tzLabel && (
-        <span className={`mt-2 text-[11px] font-medium tracking-wide ${dk ? "text-white/35" : "text-black/40"}`}>
+        <span className={`mt-0.5 text-[11px] font-medium tracking-wide ${dk ? "text-white/30" : "text-black/35"}`}>
           {tzLabel}
         </span>
       )}
@@ -154,6 +213,9 @@ export default function HomePage() {
   const [typed, setTyped] = useState("");
   const [introDone, setIntroDone] = useState(false);
   const [celebrating, setCelebrating] = useState(false);
+  /* Daily motivational quote (client-only → no hydration mismatch). */
+  const [quote, setQuote] = useState("");
+  useEffect(() => setQuote(getDailyQuote()), []);
 
   useEffect(() => {
     if (!greetingText) return;
@@ -743,10 +805,11 @@ export default function HomePage() {
                     />
                   )}
                 </h1>
-                {/* date + subtitle fade in once the greeting finishes typing */}
+                {/* daily motivational quote fades in once the greeting types */}
                 <div className={`transition-opacity duration-500 ${introDone ? "opacity-100" : "opacity-0"}`}>
-                  <p className={`text-[14px] mt-1.5 font-medium ${dk ? "text-white/40" : "text-black/40"}`}>{today}</p>
-                  <p className={`text-[12px] mt-0.5 hidden md:block ${dk ? "text-white/25" : "text-black/25"}`}>{t("applicationsDesc")}</p>
+                  <p className={`text-[13px] md:text-[15px] mt-2 font-medium italic leading-snug ${dk ? "text-white/45" : "text-black/50"}`}>
+                    {quote}
+                  </p>
                 </div>
               </div>
             </div>
