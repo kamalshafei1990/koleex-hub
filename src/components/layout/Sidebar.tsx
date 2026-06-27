@@ -289,55 +289,39 @@ export default function Sidebar() {
     );
   };
 
-  /* ── Collapse toggle — a dimensional "bead on the seam".
-     Vertically centered on the rail's inner right edge (fully inside the
-     border). A subtle top-lit gradient capsule with an inner highlight and
-     a soft lift shadow reads as a tactile, engineered control rather than a
-     pasted-on flat pill. Two grip ticks frame the directional chevron,
-     which brightens + nudges on hover. A tooltip clarifies the action.
-     Brand: strictly monochrome, no color. */
+  /* ── Collapse toggle — a curved "pull tab" extruded from the rail edge.
+     Flat against the rail seam (no inline-start border, same surface tone)
+     and bulging into the content as a smooth semicircular tab, exactly like
+     the sketch. The directional chevron brightens + nudges and the tab
+     extends a touch on hover. Tooltip clarifies the action. Monochrome. */
   const EdgeToggle = () => (
     <div className="group/toggle relative">
       <button
         onClick={toggle}
         aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
-        className="relative flex items-center justify-center w-[20px] h-[52px] rounded-full cursor-pointer transition-all duration-200 active:scale-90 hover:h-[58px]"
+        className="relative flex items-center justify-center w-[19px] h-14 cursor-pointer transition-all duration-200 active:scale-95 hover:w-[23px]"
         style={{
-          background: dk
-            ? "linear-gradient(180deg,#262626 0%,#141414 100%)"
-            : "linear-gradient(180deg,#ffffff 0%,#ededed 100%)",
-          border: dk ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(0,0,0,0.10)",
-          boxShadow: dk
-            ? "inset 0 1px 0 rgba(255,255,255,0.07), 0 3px 10px rgba(0,0,0,0.5)"
-            : "inset 0 1px 0 rgba(255,255,255,0.9), 0 3px 10px rgba(0,0,0,0.10)",
+          background: dk ? "#0E0E0E" : "#F4F4F4",
+          borderTop: dk ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(0,0,0,0.10)",
+          borderBottom: dk ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(0,0,0,0.10)",
+          borderInlineEnd: dk ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(0,0,0,0.10)",
+          borderStartEndRadius: "999px",
+          borderEndEndRadius: "999px",
+          boxShadow: dk ? "3px 0 10px rgba(0,0,0,0.45)" : "3px 0 10px rgba(0,0,0,0.08)",
         }}
       >
-        {/* upper grip tick */}
-        <span
-          aria-hidden
-          className={`absolute top-[9px] left-1/2 -translate-x-1/2 h-[3px] w-[3px] rounded-full transition-colors duration-200 ${
-            dk ? "bg-white/15 group-hover/toggle:bg-white/35" : "bg-black/15 group-hover/toggle:bg-black/35"
-          }`}
-        />
         <AngleRightIcon
           size={12}
-          className={`transition-all duration-300 ${expanded ? "rotate-180" : ""} ${
-            dk ? "text-white/50 group-hover/toggle:text-white" : "text-black/45 group-hover/toggle:text-black"
+          className={`-ms-0.5 transition-all duration-300 ${expanded ? "rotate-180" : ""} ${
+            dk ? "text-white/45 group-hover/toggle:text-white" : "text-black/45 group-hover/toggle:text-black"
           } group-hover/toggle:scale-110`}
-        />
-        {/* lower grip tick */}
-        <span
-          aria-hidden
-          className={`absolute bottom-[9px] left-1/2 -translate-x-1/2 h-[3px] w-[3px] rounded-full transition-colors duration-200 ${
-            dk ? "bg-white/15 group-hover/toggle:bg-white/35" : "bg-black/15 group-hover/toggle:bg-black/35"
-          }`}
         />
       </button>
 
-      {/* Tooltip — appears on the inner side so it never overflows the edge. */}
+      {/* Tooltip — to the inner side so it never overflows the edge. */}
       <div
         className="hidden group-hover/toggle:block absolute top-1/2 -translate-y-1/2 z-[60] pointer-events-none"
-        style={{ insetInlineEnd: "calc(100% + 10px)" }}
+        style={{ insetInlineStart: "calc(100% + 8px)" }}
       >
         <div className={`${flyoutBg} border ${flyoutBorder} rounded-lg shadow-xl px-2.5 py-1 whitespace-nowrap`}>
           <span className={`text-[10.5px] font-semibold ${dk ? "text-white/80" : "text-black/80"}`}>
@@ -389,11 +373,11 @@ export default function Sidebar() {
         >
           <SidebarContent />
 
-          {/* Collapse handle — vertically centered, tucked just inside the
-              rail's right edge (does not cross the border). */}
+          {/* Collapse handle — anchored at the rail seam, bulging into the
+              content as a curved pull tab (per the sketch). */}
           <div
             className="absolute top-1/2 -translate-y-1/2 z-50"
-            style={{ insetInlineEnd: "5px" }}
+            style={{ insetInlineStart: `${w}px` }}
           >
             <EdgeToggle />
           </div>
