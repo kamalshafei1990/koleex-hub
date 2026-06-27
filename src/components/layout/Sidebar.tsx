@@ -142,18 +142,16 @@ export default function Sidebar() {
         href={app.route}
         aria-current={isActive ? "page" : undefined}
         onClick={() => setMobileOpen(false)}
-        /* Phase UI.4 — sidebar refinement.
-           Active state painted with a thin 2px left-edge accent rule
-           + full-opacity ink, NOT a background fill. Icon sizes
-           dropped from 14/17 → 13/15 so the row reads as Apple-thin
-           SF Symbols rather than the heavier uicons regular. */
+        /* Active state: a soft rounded background + the 2px left-edge
+           accent rail + full-opacity ink, so the current row is easy to
+           spot. Icons stay Apple-thin (13/15). */
         className={`relative flex items-center gap-2.5 rounded-md transition-colors duration-150 ${
           compact ? "px-2.5 py-1.5" : "px-3 py-2"
         } ${
           isActive
             ? dk
-              ? "text-white/95 font-medium"
-              : "text-black/95 font-medium"
+              ? "bg-white/[0.055] text-white/95 font-medium"
+              : "bg-black/[0.045] text-black/95 font-medium"
             : `${textMuted} ${hoverBg} hover:${dk ? "text-white/80" : "text-black/80"}`
         }`}
       >
@@ -189,7 +187,7 @@ export default function Sidebar() {
               ? dk
                 ? "text-white/90"
                 : "text-black/90"
-              : `${textGhost} ${hoverBg} hover:${dk ? "text-white/50" : "text-black/50"}`
+              : `${dk ? "text-white/40" : "text-black/45"} ${hoverBg} hover:${dk ? "text-white/70" : "text-black/70"}`
           }`}
         >
           <GroupIcon
@@ -213,7 +211,7 @@ export default function Sidebar() {
             isOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
           }`}
         >
-          <div className="ps-4 mt-0.5 mb-1 space-y-0.5">
+          <div className={`ms-[19px] ps-3 mt-0.5 mb-1 space-y-0.5 border-s ${dk ? "border-white/[0.07]" : "border-black/[0.07]"}`}>
             {apps.map((app) => (
               <AppLink key={app.id} app={app} />
             ))}
