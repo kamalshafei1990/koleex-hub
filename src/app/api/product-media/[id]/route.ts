@@ -5,26 +5,22 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { hasProductDataAccess } from "@/lib/server/product-access";
+import { requireProductDataAction } from "@/lib/server/product-access";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-async function gate(id: string) {
+async function gate(id: string, action: "edit" | "delete") {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  if (!(await hasProductDataAccess(auth))) {
-    return NextResponse.json(
-      { error: "Only Product Data admins can edit media." },
-      { status: 403 },
-    );
-  }
+  const denied = await requireProductDataAction(auth, action);
+  if (denied) return denied;
   if (!UUID_RE.test(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   return null;
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const deny = await gate(id);
+  const deny = await gate(id, "edit");
   if (deny) return deny;
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   delete body.id;
@@ -35,7 +31,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const deny = await gate(id);
+  const deny = await gate(id, "delete");
   if (deny) return deny;
   const { error } = await supabaseServer.from("product_media").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

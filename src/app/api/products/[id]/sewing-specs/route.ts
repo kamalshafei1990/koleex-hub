@@ -12,7 +12,7 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { hasProductDataAccess } from "@/lib/server/product-access";
+import { hasProductDataAccess, requireProductDataAction } from "@/lib/server/product-access";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -41,12 +41,8 @@ export async function PUT(
 ) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  if (!(await hasProductDataAccess(auth))) {
-    return NextResponse.json(
-      { error: "Only Product Data admins can edit sewing specs." },
-      { status: 403 },
-    );
-  }
+  const denied = await requireProductDataAction(auth, "edit");
+  if (denied) return denied;
   const { id } = await params;
   if (!UUID_RE.test(id)) {
     return NextResponse.json({ error: "Invalid product id" }, { status: 400 });
@@ -70,12 +66,8 @@ export async function DELETE(
 ) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  if (!(await hasProductDataAccess(auth))) {
-    return NextResponse.json(
-      { error: "Only Product Data admins can delete sewing specs." },
-      { status: 403 },
-    );
-  }
+  const denied = await requireProductDataAction(auth, "delete");
+  if (denied) return denied;
   const { id } = await params;
   if (!UUID_RE.test(id)) {
     return NextResponse.json({ error: "Invalid product id" }, { status: 400 });

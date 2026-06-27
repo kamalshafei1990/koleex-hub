@@ -36,7 +36,7 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { hasProductDataAccess } from "@/lib/server/product-access";
+import { hasProductDataAccess, requireProductDataAction } from "@/lib/server/product-access";
 
 function escapeLike(s: string): string {
   return s.replace(/([\\%_])/g, "\\$1");
@@ -60,9 +60,8 @@ type FoundModel = {
 export async function POST(req: Request) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  if (!(await hasProductDataAccess(auth))) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const denied = await requireProductDataAction(auth, "create");
+  if (denied) return denied;
 
   let body: {
     model?: string;

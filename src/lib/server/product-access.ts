@@ -17,7 +17,23 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "./supabase-server";
-import type { ServerAuthContext } from "./auth";
+import { requireModuleAction, type ModuleAction, type ServerAuthContext } from "./auth";
+import type { NextResponse } from "next/server";
+
+/** Granular write gate for every product-data mutation. Honors the role's
+ *  per-action Add/Edit/Delete toggles on the "Product Data" module (instead
+ *  of the binary can_view check `hasProductDataAccess` used for reads). Returns
+ *  a 403 NextResponse when denied, or null when allowed — use at the top of a
+ *  POST/PATCH/PUT/DELETE handler:
+ *    const denied = await requireProductDataAction(auth, "create");
+ *    if (denied) return denied;
+ */
+export function requireProductDataAction(
+  auth: ServerAuthContext,
+  action: ModuleAction,
+): Promise<NextResponse | null> {
+  return requireModuleAction(auth, "Product Data", action);
+}
 
 /** Columns safe to return on /products (public catalog). Anything NOT
  *  in this list becomes admin-only. Order doesn't matter; the list is

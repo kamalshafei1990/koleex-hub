@@ -15,7 +15,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { logAudit } from "@/lib/server/audit";
-import { hasProductDataAccess, PUBLIC_PRODUCT_COLUMNS } from "@/lib/server/product-access";
+import { hasProductDataAccess, PUBLIC_PRODUCT_COLUMNS, requireProductDataAction } from "@/lib/server/product-access";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -69,12 +69,8 @@ export async function PATCH(
   const { id } = await params;
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  if (!(await hasProductDataAccess(auth))) {
-    return NextResponse.json(
-      { error: "Only Product Data admins can edit products." },
-      { status: 403 },
-    );
-  }
+  const denied = await requireProductDataAction(auth, "edit");
+  if (denied) return denied;
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   delete body.id;
@@ -128,12 +124,8 @@ export async function DELETE(
   const { id } = await params;
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
-  if (!(await hasProductDataAccess(auth))) {
-    return NextResponse.json(
-      { error: "Only Product Data admins can delete products." },
-      { status: 403 },
-    );
-  }
+  const denied = await requireProductDataAction(auth, "delete");
+  if (denied) return denied;
 
   const { error } = await supabaseServer
     .from("products")

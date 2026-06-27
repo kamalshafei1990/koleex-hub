@@ -14,18 +14,23 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { hasProductDataAccess } from "@/lib/server/product-access";
+import { hasProductDataAccess, requireProductDataAction } from "@/lib/server/product-access";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-async function gateProductData(id: string) {
+async function gateProductData(id: string, action: "view" | "edit") {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  if (!(await hasProductDataAccess(auth))) {
-    return NextResponse.json(
-      { error: "Market prices require Product Data access." },
-      { status: 403 },
-    );
+  if (action === "view") {
+    if (!(await hasProductDataAccess(auth))) {
+      return NextResponse.json(
+        { error: "Market prices require Product Data access." },
+        { status: 403 },
+      );
+    }
+  } else {
+    const denied = await requireProductDataAction(auth, action);
+    if (denied) return denied;
   }
   if (!UUID_RE.test(id)) {
     return NextResponse.json({ error: "Invalid product id" }, { status: 400 });
@@ -38,7 +43,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const deny = await gateProductData(id);
+  const deny = await gateProductData(id, "view");
   if (deny) return deny;
 
   const mRes = await supabaseServer.from("product_models").select("id").eq("product_id", id);
@@ -59,7 +64,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const deny = await gateProductData(id);
+  const deny = await gateProductData(id, "edit");
   if (deny) return deny;
 
   const body = (await req.json().catch(() => ({}))) as {

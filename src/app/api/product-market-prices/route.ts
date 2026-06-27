@@ -9,21 +9,24 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { hasProductDataAccess } from "@/lib/server/product-access";
+import { hasProductDataAccess, requireProductDataAction } from "@/lib/server/product-access";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-async function gatePD() {
+async function gatePD(action: "view" | "create") {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  if (!(await hasProductDataAccess(auth))) {
-    return NextResponse.json({ error: "Market prices require Product Data access." }, { status: 403 });
+  if (action === "view") {
+    if (!(await hasProductDataAccess(auth))) {
+      return NextResponse.json({ error: "Market prices require Product Data access." }, { status: 403 });
+    }
+    return null;
   }
-  return null;
+  return requireProductDataAction(auth, action);
 }
 
 export async function GET(req: Request) {
-  const deny = await gatePD();
+  const deny = await gatePD("view");
   if (deny) return deny;
   const raw = new URL(req.url).searchParams.get("model_ids") ?? "";
   const ids = raw.split(",").map((s) => s.trim()).filter((s) => UUID_RE.test(s));
@@ -37,7 +40,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const deny = await gatePD();
+  const deny = await gatePD("create");
   if (deny) return deny;
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const { error } = await supabaseServer

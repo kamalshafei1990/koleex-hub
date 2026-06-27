@@ -18,7 +18,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { hasProductDataAccess } from "@/lib/server/product-access";
+import { hasProductDataAccess, requireProductDataAction } from "@/lib/server/product-access";
 
 interface BrandRow {
   id: string;
@@ -68,12 +68,8 @@ export async function GET() {
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  if (!(await hasProductDataAccess(auth))) {
-    return NextResponse.json(
-      { error: "Only Product Data admins can create brands." },
-      { status: 403 },
-    );
-  }
+  const denied = await requireProductDataAction(auth, "create");
+  if (denied) return denied;
 
   let body: { name?: string; logoUrl?: string | null };
   try {

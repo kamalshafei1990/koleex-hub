@@ -15,7 +15,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { hasProductDataAccess } from "@/lib/server/product-access";
+import { hasProductDataAccess, requireProductDataAction } from "@/lib/server/product-access";
 
 const TAXONOMY_KINDS = ["divisions", "categories", "subcategories"] as const;
 type Kind = (typeof TAXONOMY_KINDS)[number];
@@ -70,12 +70,8 @@ export async function POST(
 ) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  if (!(await hasProductDataAccess(auth))) {
-    return NextResponse.json(
-      { error: "Only Product Data admins can edit taxonomy." },
-      { status: 403 },
-    );
-  }
+  const denied = await requireProductDataAction(auth, "create");
+  if (denied) return denied;
   const kind = asKind((await params).kind);
   if (!kind) return NextResponse.json({ error: "Unknown taxonomy kind" }, { status: 404 });
 

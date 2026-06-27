@@ -17,7 +17,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { hasProductDataAccess } from "@/lib/server/product-access";
+import { hasProductDataAccess, requireProductDataAction } from "@/lib/server/product-access";
 import { humanizeError } from "@/lib/ui/humanize-error";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -63,9 +63,8 @@ export async function GET(req: Request) {
 export async function PUT(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  if (!(await hasProductDataAccess(auth))) {
-    return NextResponse.json({ error: "Only Product Data admins can edit set templates." }, { status: 403 });
-  }
+  const denied = await requireProductDataAction(auth, "edit");
+  if (denied) return denied;
 
   const body = (await req.json().catch(() => ({}))) as {
     subcategory?: string;

@@ -21,7 +21,7 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { hasProductDataAccess, PUBLIC_MODEL_COLUMNS } from "@/lib/server/product-access";
+import { hasProductDataAccess, PUBLIC_MODEL_COLUMNS, requireProductDataAction } from "@/lib/server/product-access";
 
 export async function GET(req: Request) {
   const auth = await requireAuth();
@@ -109,12 +109,8 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  if (!(await hasProductDataAccess(auth))) {
-    return NextResponse.json(
-      { error: "Only Product Data admins can create models." },
-      { status: 403 },
-    );
-  }
+  const denied = await requireProductDataAction(auth, "create");
+  if (denied) return denied;
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   delete body.id;
   if (!body.product_id || typeof body.product_id !== "string") {

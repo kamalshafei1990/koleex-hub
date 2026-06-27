@@ -9,23 +9,17 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { hasProductDataAccess } from "@/lib/server/product-access";
+import { requireProductDataAction } from "@/lib/server/product-access";
 
 const TAXONOMY_KINDS = ["divisions", "categories", "subcategories"] as const;
 type Kind = (typeof TAXONOMY_KINDS)[number];
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-async function gate(params: Promise<{ kind: string; rowId: string }>) {
+async function gate(params: Promise<{ kind: string; rowId: string }>, action: "edit" | "delete") {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return { deny: auth };
-  if (!(await hasProductDataAccess(auth))) {
-    return {
-      deny: NextResponse.json(
-        { error: "Only Product Data admins can edit taxonomy." },
-        { status: 403 },
-      ),
-    };
-  }
+  const denied = await requireProductDataAction(auth, action);
+  if (denied) return { deny: denied };
   const { kind: rawKind, rowId } = await params;
   if (!(TAXONOMY_KINDS as readonly string[]).includes(rawKind)) {
     return { deny: NextResponse.json({ error: "Unknown taxonomy kind" }, { status: 404 }) };
@@ -40,7 +34,7 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ kind: string; rowId: string }> },
 ) {
-  const g = await gate(params);
+  const g = await gate(params, "edit");
   if ("deny" in g) return g.deny;
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   delete body.id;
@@ -56,7 +50,7 @@ export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ kind: string; rowId: string }> },
 ) {
-  const g = await gate(params);
+  const g = await gate(params, "delete");
   if ("deny" in g) return g.deny;
   const { error } = await supabaseServer.from(g.kind).delete().eq("id", g.rowId);
   if (error) {
