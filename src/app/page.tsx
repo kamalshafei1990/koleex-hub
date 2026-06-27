@@ -14,6 +14,7 @@ import { useRouter, usePathname } from "next/navigation";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import StarIcon from "@/components/icons/ui/StarIcon";
 import ClockIcon from "@/components/icons/ui/ClockIcon";
+import KoleexOrb from "@/components/ai/KoleexOrb";
 import { useTranslation } from "@/lib/i18n";
 import { hubT } from "@/lib/translations/hub";
 import {
@@ -218,6 +219,14 @@ export default function HomePage() {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
   const [showMore, setShowMore] = useState(false);
+
+  /* Koleex AI greeter — fire a one-shot "jump" wave shortly after the home
+     hero mounts, so the orb greets you alongside the message. */
+  const [greet, setGreet] = useState(0);
+  useEffect(() => {
+    const id = setTimeout(() => setGreet(1), 450);
+    return () => clearTimeout(id);
+  }, []);
 
   /* ── Per-user data ── */
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
@@ -723,12 +732,16 @@ export default function HomePage() {
         {/* ── Header: Greeting + Clock + Date ── */}
         <div className="mb-5 md:mb-6 min-h-[160px] md:min-h-[180px] flex items-center">
           <div className="flex items-center justify-between gap-4 w-full">
-            <div className="min-w-0">
-              <h1 className={`text-[22px] md:text-[30px] font-bold tracking-tight ${dk ? "text-white" : "text-black"}`}>
-                {t(getGreetingKey())}{firstName ? `, ${firstName}` : ""}
-              </h1>
-              <p className={`text-[14px] mt-1.5 font-medium ${dk ? "text-white/40" : "text-black/40"}`}>{today}</p>
-              <p className={`text-[12px] mt-0.5 hidden md:block ${dk ? "text-white/25" : "text-black/25"}`}>{t("applicationsDesc")}</p>
+            <div className="flex items-center gap-4 md:gap-5 min-w-0">
+              {/* Koleex AI greeter — the orb "delivers" the greeting + date. */}
+              <KoleexOrb state="idle" greetKey={greet} size={72} className="shrink-0 hidden sm:block" />
+              <div className="min-w-0">
+                <h1 className={`text-[22px] md:text-[30px] font-bold tracking-tight ${dk ? "text-white" : "text-black"}`}>
+                  {t(getGreetingKey())}{firstName ? `, ${firstName}` : ""}
+                </h1>
+                <p className={`text-[14px] mt-1.5 font-medium ${dk ? "text-white/40" : "text-black/40"}`}>{today}</p>
+                <p className={`text-[12px] mt-0.5 hidden md:block ${dk ? "text-white/25" : "text-black/25"}`}>{t("applicationsDesc")}</p>
+              </div>
             </div>
             <ClockWidget dk={dk} />
           </div>
