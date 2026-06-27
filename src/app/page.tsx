@@ -13,7 +13,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import StarIcon from "@/components/icons/ui/StarIcon";
-import KoleexOrb from "@/components/ai/KoleexOrb";
+import KoleexOrb, { type OrbState } from "@/components/ai/KoleexOrb";
 import { useTranslation } from "@/lib/i18n";
 import { hubT } from "@/lib/translations/hub";
 import {
@@ -217,13 +217,48 @@ export default function HomePage() {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
 
-  /* Koleex AI greeter — fire a one-shot "jump" wave shortly after the home
-     hero mounts, so the orb greets you alongside the message. */
+  /* ── Koleex AI greeter — the orb "speaks" the greeting as it types ──
+     On mount the orb wakes (surprised), the greeting types out character by
+     character while the orb is in its "typing"/talking state, then it
+     celebrates with a one-shot jump and settles into the alive idle loop. */
+  const greetingText = `${t(getGreetingKey())}${firstName ? `, ${firstName}` : ""}`;
   const [greet, setGreet] = useState(0);
+  const [typed, setTyped] = useState("");
+  const [introDone, setIntroDone] = useState(false);
+  const [celebrating, setCelebrating] = useState(false);
+
   useEffect(() => {
-    const id = setTimeout(() => setGreet(1), 450);
-    return () => clearTimeout(id);
-  }, []);
+    if (!greetingText) return;
+    setTyped("");
+    setIntroDone(false);
+    let i = 0;
+    let stepTimer: ReturnType<typeof setTimeout>;
+    const step = () => {
+      i += 1;
+      setTyped(greetingText.slice(0, i));
+      if (i < greetingText.length) {
+        stepTimer = setTimeout(step, 45 + Math.random() * 50);
+      } else {
+        setIntroDone(true);
+        setGreet((g) => g + 1);        // fire the orb's celebrate jump
+        setCelebrating(true);
+        stepTimer = setTimeout(() => setCelebrating(false), 1100);
+      }
+    };
+    const startTimer = setTimeout(step, 550); // brief "wake up" beat
+    return () => {
+      clearTimeout(startTimer);
+      clearTimeout(stepTimer);
+    };
+  }, [greetingText]);
+
+  const orbState: OrbState = !introDone
+    ? typed.length === 0
+      ? "surprised"
+      : "typing"
+    : celebrating
+      ? "celebrate"
+      : "idle";
 
   /* ── Per-user data ── */
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
@@ -720,7 +755,7 @@ export default function HomePage() {
             <div className="flex items-center gap-3 md:gap-4 min-w-0">
               {/* Koleex AI greeter — the orb "speaks" the greeting through a
                   chat bubble with a tail pointing back at the face. */}
-              <KoleexOrb state="idle" greetKey={greet} size={72} className="shrink-0 hidden sm:block" />
+              <KoleexOrb state={orbState} greetKey={greet} size={72} className="shrink-0 hidden sm:block" />
               <div
                 className={`relative min-w-0 rounded-2xl border px-4 py-3 md:px-5 md:py-3.5 ${
                   dk ? "bg-white/[0.04] border-white/[0.08]" : "bg-black/[0.025] border-black/[0.07]"
@@ -733,11 +768,24 @@ export default function HomePage() {
                     dk ? "bg-white/[0.04] border-white/[0.08]" : "bg-black/[0.025] border-black/[0.07]"
                   }`}
                 />
-                <h1 className={`text-[22px] md:text-[30px] font-bold tracking-tight ${dk ? "text-white" : "text-black"}`}>
-                  {t(getGreetingKey())}{firstName ? `, ${firstName}` : ""}
+                <h1
+                  aria-label={greetingText}
+                  className={`text-[22px] md:text-[30px] font-bold tracking-tight ${dk ? "text-white" : "text-black"}`}
+                >
+                  <span aria-hidden>{typed || " "}</span>
+                  {/* blinking caret while the orb is "speaking" */}
+                  {!introDone && (
+                    <span
+                      aria-hidden
+                      className={`inline-block w-[2px] -mb-[2px] ms-[2px] h-[0.95em] align-middle animate-pulse ${dk ? "bg-white/70" : "bg-black/70"}`}
+                    />
+                  )}
                 </h1>
-                <p className={`text-[14px] mt-1.5 font-medium ${dk ? "text-white/40" : "text-black/40"}`}>{today}</p>
-                <p className={`text-[12px] mt-0.5 hidden md:block ${dk ? "text-white/25" : "text-black/25"}`}>{t("applicationsDesc")}</p>
+                {/* date + subtitle fade in once the greeting finishes typing */}
+                <div className={`transition-opacity duration-500 ${introDone ? "opacity-100" : "opacity-0"}`}>
+                  <p className={`text-[14px] mt-1.5 font-medium ${dk ? "text-white/40" : "text-black/40"}`}>{today}</p>
+                  <p className={`text-[12px] mt-0.5 hidden md:block ${dk ? "text-white/25" : "text-black/25"}`}>{t("applicationsDesc")}</p>
+                </div>
               </div>
             </div>
             <ClockWidget dk={dk} />

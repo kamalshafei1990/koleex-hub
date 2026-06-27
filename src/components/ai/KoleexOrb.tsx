@@ -43,7 +43,9 @@ type Expr =
   | "wink"
   | "blink"
   | "look-left"
-  | "look-right";
+  | "look-right"
+  | "look-up"
+  | "look-down";
 
 const STYLE_ID = "kxorb-keyframes";
 const KEYFRAMES = `
@@ -73,6 +75,10 @@ function eyeTransform(expr: Expr, eye: 0 | 1): string {
       return "translateX(-26%)";
     case "look-right":
       return "translateX(26%)";
+    case "look-up":
+      return "translateY(-22%)";
+    case "look-down":
+      return "translateY(20%)";
     case "wink":
       return eye === 1 ? "scaleY(.1)" : "";
     default:
@@ -151,21 +157,48 @@ export default function KoleexOrb({
       };
     }
 
-    if (state === "idle") {
+    /* "Talking" while typing: frequent blinks + small glances so the orb
+       feels like it's speaking the message as it types. */
+    if (state === "typing") {
+      const pool: Expr[] = ["blink", "blink", "blink", "look-left", "look-right", "look-down"];
       const tick = () => {
         if (!alive) return;
-        const r = Math.random();
-        const choice: Expr =
-          r < 0.5 ? "blink" : r < 0.72 ? "look-left" : r < 0.9 ? "look-right" : "wink";
+        const choice = pool[Math.floor(Math.random() * pool.length)];
         setDynExpr(choice);
         t = setTimeout(
           () => {
             if (!alive) return;
             setDynExpr(null);
-            t = setTimeout(tick, 1500 + Math.random() * 2600);
+            t = setTimeout(tick, 360 + Math.random() * 700);
           },
-          choice === "blink" ? 130 : 680,
+          choice === "blink" ? 120 : 360,
         );
+      };
+      t = setTimeout(tick, 350);
+      return () => {
+        alive = false;
+        clearTimeout(t);
+      };
+    }
+
+    if (state === "idle") {
+      /* Richer alive-idle repertoire: blinks, glances in 4 directions,
+         the occasional wink and a brief smile. */
+      const pool: Expr[] = [
+        "blink", "blink", "blink",
+        "look-left", "look-right", "look-up", "look-down",
+        "wink", "happy",
+      ];
+      const tick = () => {
+        if (!alive) return;
+        const choice = pool[Math.floor(Math.random() * pool.length)];
+        setDynExpr(choice);
+        const hold = choice === "blink" ? 130 : choice === "happy" ? 760 : 680;
+        t = setTimeout(() => {
+          if (!alive) return;
+          setDynExpr(null);
+          t = setTimeout(tick, 1500 + Math.random() * 2600);
+        }, hold);
       };
       t = setTimeout(tick, 1100 + Math.random() * 1800);
       return () => {
