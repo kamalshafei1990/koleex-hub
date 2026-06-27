@@ -242,10 +242,6 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
           <span className={`mx-1 ${dk ? "text-white" : "text-black"}`}>:</span>
           {t.mm}
         </span>
-        {/* seconds sit as a small superscript next to the minutes */}
-        <span className={`ms-1.5 mt-[5px] text-[13px] font-semibold ${dk ? "text-white/35" : "text-black/35"}`}>
-          {t.ss}
-        </span>
       </div>
       {tzLabel && (
         <span className={`mt-2 text-[11px] font-medium tracking-wide ${dk ? "text-white/30" : "text-black/35"}`}>
