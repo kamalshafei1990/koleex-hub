@@ -85,13 +85,34 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
      card/typography grammar: dimmed colon + seconds, quiet timezone meta. */
   return (
     <div
-      className={`shrink-0 hidden sm:flex flex-col items-end rounded-2xl border px-5 py-3.5 ${
-        dk ? "bg-white/[0.03] border-white/[0.06]" : "bg-black/[0.02] border-black/[0.06]"
-      }`}
+      className="relative shrink-0 hidden sm:flex flex-col items-end overflow-hidden rounded-[24px] px-6 py-4"
+      style={{
+        /* iOS 26 "Liquid Glass": translucent frosted fill, bright top edge
+           highlight, soft depth shadow. */
+        background: dk
+          ? "linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.035))"
+          : "linear-gradient(135deg, rgba(255,255,255,0.72), rgba(255,255,255,0.40))",
+        backdropFilter: "blur(22px) saturate(180%)",
+        WebkitBackdropFilter: "blur(22px) saturate(180%)",
+        border: dk ? "1px solid rgba(255,255,255,0.14)" : "1px solid rgba(255,255,255,0.65)",
+        boxShadow: dk
+          ? "inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -8px 24px rgba(255,255,255,0.04), 0 12px 34px -10px rgba(0,0,0,0.6)"
+          : "inset 0 1px 0 rgba(255,255,255,0.9), 0 12px 34px -10px rgba(0,0,0,0.18)",
+      }}
     >
+      {/* specular sheen across the top, like light on glass */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-1/2"
+        style={{
+          background: dk
+            ? "linear-gradient(180deg, rgba(255,255,255,0.10), transparent)"
+            : "linear-gradient(180deg, rgba(255,255,255,0.6), transparent)",
+        }}
+      />
       <div
-        className={`flex items-start font-mono tabular-nums leading-none ${
-          dk ? "text-white/90" : "text-black/90"
+        className={`relative flex items-start font-mono tabular-nums leading-none ${
+          dk ? "text-white" : "text-black/90"
         }`}
       >
         <span className="text-[34px] md:text-[42px] font-semibold tracking-tight">
