@@ -299,7 +299,7 @@ export default function Sidebar() {
       <button
         onClick={toggle}
         aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
-        className="relative flex items-center justify-center w-[19px] h-14 cursor-pointer transition-all duration-200 active:scale-95 hover:w-[23px]"
+        className="relative flex items-center justify-center w-[13px] h-12 cursor-pointer transition-all duration-200 active:scale-95 hover:w-[16px]"
         style={{
           background: dk ? "#0E0E0E" : "#F4F4F4",
           borderTop: dk ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(0,0,0,0.10)",
