@@ -1563,7 +1563,7 @@ export default function LegacyProductView() {
                   swap which image is currently displayed without
                   refetching anything. Falls back to mainImage if
                   the gallery is empty. */}
-              <div className="relative w-full aspect-[5/4] flex items-center justify-center rounded-2xl bg-gradient-to-b from-white to-[#f4f5f7] p-4">
+              <div className="relative w-full aspect-[5/4] flex items-center justify-center rounded-2xl bg-gradient-to-b from-white to-[#f4f5f7] p-4 border border-black/5">
                 {(galleryImages[activeImageIdx]?.url || mainImage) ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
