@@ -304,15 +304,15 @@ export default function Sidebar() {
           background: dk ? "#0E0E0E" : "#F4F4F4",
           borderTop: dk ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(0,0,0,0.10)",
           borderBottom: dk ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(0,0,0,0.10)",
-          borderInlineEnd: dk ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(0,0,0,0.10)",
-          borderStartEndRadius: "999px",
-          borderEndEndRadius: "999px",
-          boxShadow: dk ? "3px 0 10px rgba(0,0,0,0.45)" : "3px 0 10px rgba(0,0,0,0.08)",
+          borderInlineStart: dk ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(0,0,0,0.10)",
+          borderStartStartRadius: "999px",
+          borderEndStartRadius: "999px",
+          boxShadow: dk ? "-3px 0 10px rgba(0,0,0,0.45)" : "-3px 0 10px rgba(0,0,0,0.08)",
         }}
       >
         <AngleRightIcon
           size={12}
-          className={`-ms-0.5 transition-all duration-300 ${expanded ? "rotate-180" : ""} ${
+          className={`me-0.5 transition-all duration-300 ${expanded ? "rotate-180" : ""} ${
             dk ? "text-white/45 group-hover/toggle:text-white" : "text-black/45 group-hover/toggle:text-black"
           } group-hover/toggle:scale-110`}
         />
@@ -373,11 +373,11 @@ export default function Sidebar() {
         >
           <SidebarContent />
 
-          {/* Collapse handle — anchored at the rail seam, bulging into the
-              content as a curved pull tab (per the sketch). */}
+          {/* Collapse handle — anchored at the rail seam, curving inward
+              into the sidebar as a pull tab (stays inside the border). */}
           <div
             className="absolute top-1/2 -translate-y-1/2 z-50"
-            style={{ insetInlineStart: `${w}px` }}
+            style={{ insetInlineEnd: "0px" }}
           >
             <EdgeToggle />
           </div>
