@@ -252,76 +252,6 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
   );
 }
 
-/* ── Spline 3D AI character (NexBot) — large showcase presence on the home
-   hero. Heavy WebGL scene, so we (a) render only one instance, (b) defer the
-   iframe mount until the browser is idle so it never blocks first paint, and
-   (c) hide it below lg where there's no room. The small reactive KoleexOrb
-   stays as the functional in-product character everywhere else. */
-const SPLINE_AI_SCENE =
-  "https://my.spline.design/nexbotrobotcharacterconcept-50615fecd73069e7083b264ec4a4b53b/";
-
-function SplineAiRobot({ dk = true }: { dk?: boolean }) {
-  const [mounted, setMounted] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-  useEffect(() => {
-    /* Defer to idle so the 3D runtime download doesn't compete with the
-       home launcher's first paint. */
-    const w = window as unknown as {
-      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
-    };
-    let id: ReturnType<typeof setTimeout> | number;
-    if (w.requestIdleCallback) {
-      id = w.requestIdleCallback(() => setMounted(true), { timeout: 2500 });
-    } else {
-      id = setTimeout(() => setMounted(true), 1200);
-    }
-    return () => {
-      if (typeof id === "number" && w.requestIdleCallback) {
-        (window as unknown as { cancelIdleCallback?: (h: number) => void })
-          .cancelIdleCallback?.(id);
-      } else {
-        clearTimeout(id as ReturnType<typeof setTimeout>);
-      }
-    };
-  }, []);
-
-  return (
-    <div
-      className="relative hidden lg:block shrink-0 h-[200px] w-[220px] xl:h-[230px] xl:w-[260px] rounded-2xl overflow-hidden"
-      style={{
-        border: "1px solid transparent",
-        background: dk
-          ? "linear-gradient(180deg,#0e0e14,#08080c) padding-box, conic-gradient(from 140deg,#3b82f6,#8b5cf6,#ec4899,#f59e0b,#22d3ee,#3b82f6) border-box"
-          : "linear-gradient(180deg,#ffffff,#f1f2f4) padding-box, conic-gradient(from 140deg,#3b82f6,#8b5cf6,#ec4899,#f59e0b,#22d3ee,#3b82f6) border-box",
-        boxShadow: dk
-          ? "0 0 30px -10px rgba(139,92,246,.30)"
-          : "0 0 30px -12px rgba(139,92,246,.22)",
-      }}
-      aria-hidden
-    >
-      {mounted && (
-        <iframe
-          src={SPLINE_AI_SCENE}
-          title="Koleex AI"
-          loading="lazy"
-          onLoad={() => setLoaded(true)}
-          className={`absolute inset-0 h-full w-full transition-opacity duration-700 ${loaded ? "opacity-100" : "opacity-0"}`}
-          style={{ border: "none", background: "transparent" }}
-          allow="autoplay; fullscreen"
-        />
-      )}
-      {/* Loading shimmer until the scene paints */}
-      {!loaded && (
-        <div
-          className={`absolute inset-0 flex items-center justify-center ${dk ? "text-white/30" : "text-black/30"}`}
-        >
-          <div className="h-6 w-6 rounded-full border-2 border-current border-t-transparent animate-spin" />
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function HomePage() {
   const router = useRouter();
   const pathname = usePathname();
@@ -1002,11 +932,7 @@ export default function HomePage() {
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-4 md:gap-6 shrink-0">
-              <ClockWidget dk={dk} />
-              {/* Koleex AI — 3D character showcase (large hero presence) */}
-              <SplineAiRobot dk={dk} />
-            </div>
+            <ClockWidget dk={dk} />
           </div>
         </div>
 
