@@ -215,23 +215,36 @@ export default function HomePage() {
   const [introDone, setIntroDone] = useState(false);
   const [celebrating, setCelebrating] = useState(false);
   /* Motivational quote — cycles through the 40-quote pool while the page is
-     open (changes during the day), with a cross-fade. Client-only so there's
-     no hydration mismatch. */
+     open (changes during the day). `quote` is the full current target; it gets
+     typed out char-by-char (typewriter) like the greeting. Client-only so
+     there's no hydration mismatch. */
   const [quote, setQuote] = useState("");
-  const [quoteShown, setQuoteShown] = useState(true);
+  const [quoteTyped, setQuoteTyped] = useState("");
   useEffect(() => {
     let i = Math.floor(Date.now() / 45_000) % DAILY_QUOTES.length;
     setQuote(DAILY_QUOTES[i]);
     const id = setInterval(() => {
-      setQuoteShown(false); // fade out
-      window.setTimeout(() => {
-        i = (i + 1) % DAILY_QUOTES.length;
-        setQuote(DAILY_QUOTES[i]);
-        setQuoteShown(true); // fade in
-      }, 350);
+      i = (i + 1) % DAILY_QUOTES.length;
+      setQuote(DAILY_QUOTES[i]); // typewriter effect (below) retypes it
     }, 45_000); // new quote every 45s
     return () => clearInterval(id);
   }, []);
+
+  /* Type the current quote out once the greeting has finished typing. */
+  const quoteTyping = quoteTyped.length < quote.length;
+  useEffect(() => {
+    if (!introDone || !quote) return;
+    setQuoteTyped("");
+    let i = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const step = () => {
+      i += 1;
+      setQuoteTyped(quote.slice(0, i));
+      if (i < quote.length) timer = setTimeout(step, 26 + Math.random() * 42);
+    };
+    timer = setTimeout(step, 220); // small beat before it starts "speaking"
+    return () => clearTimeout(timer);
+  }, [quote, introDone]);
 
   useEffect(() => {
     if (!greetingText) return;
@@ -821,10 +834,16 @@ export default function HomePage() {
                     />
                   )}
                 </h1>
-                {/* daily motivational quote fades in once the greeting types */}
+                {/* daily motivational quote — types out like the greeting */}
                 <div className={`transition-opacity duration-500 ${introDone ? "opacity-100" : "opacity-0"}`}>
-                  <p className={`text-[13px] md:text-[15px] mt-2 font-medium italic leading-snug transition-opacity duration-300 ${quoteShown ? "opacity-100" : "opacity-0"} ${dk ? "text-white/45" : "text-black/50"}`}>
-                    {quote}
+                  <p className={`text-[13px] md:text-[15px] mt-2 font-medium italic leading-snug ${dk ? "text-white/45" : "text-black/50"}`}>
+                    <span aria-hidden>{quoteTyped || " "}</span>
+                    {quoteTyping && (
+                      <span
+                        aria-hidden
+                        className={`inline-block w-[2px] -mb-[1px] ms-[2px] h-[0.9em] align-middle animate-pulse ${dk ? "bg-white/50" : "bg-black/50"}`}
+                      />
+                    )}
                   </p>
                 </div>
               </div>
