@@ -1193,7 +1193,7 @@ export default function ProductList() {
                       blend in (no white box around the photo).
                       No scale on hover — the card lifts, image
                       stays put. */}
-                  <div className="relative aspect-[4/3] bg-[var(--bg-surface-subtle)] overflow-hidden">
+                  <div className="relative aspect-[4/3] bg-white overflow-hidden">
                     {imgUrl ? (
                       <img
                         src={imgUrl}
@@ -1204,7 +1204,7 @@ export default function ProductList() {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <ImageRawIcon className="h-10 w-10 text-[var(--text-ghost)]" />
+                        <ImageRawIcon className="h-10 w-10 text-gray-300" />
                       </div>
                     )}
 
@@ -1414,7 +1414,7 @@ export default function ProductList() {
                         instead of multi-MB originals). loading="lazy"
                         keeps off-screen rows from blocking the
                         first paint. */}
-                    <div className="h-12 w-12 md:h-14 md:w-14 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] overflow-hidden shrink-0 flex items-center justify-center">
+                    <div className="h-12 w-12 md:h-14 md:w-14 rounded-xl bg-white border border-[var(--border-subtle)] overflow-hidden shrink-0 flex items-center justify-center">
                       {imgUrl ? (
                         <img
                           src={IMG.thumb(imgUrl)}
@@ -1424,7 +1424,7 @@ export default function ProductList() {
                           decoding="async"
                         />
                       ) : (
-                        <ImageRawIcon className="h-5 w-5 text-[var(--text-ghost)]" />
+                        <ImageRawIcon className="h-5 w-5 text-gray-300" />
                       )}
                     </div>
 

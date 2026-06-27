@@ -1386,11 +1386,11 @@ export default function LegacyProductView() {
                       href={href}
                       className="group rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] overflow-hidden hover:border-[var(--border-focus)] transition-colors"
                     >
-                      <div className="aspect-[4/3] bg-[var(--bg-surface)] flex items-center justify-center overflow-hidden">
+                      <div className="aspect-[4/3] bg-white flex items-center justify-center overflow-hidden">
                         {img ? (
                           <img src={img} alt={label} loading="lazy" className="w-full h-full object-contain p-3" />
                         ) : (
-                          <ImageRawIcon className="h-8 w-8 text-[var(--text-ghost)]" />
+                          <ImageRawIcon className="h-8 w-8 text-gray-300" />
                         )}
                       </div>
                       <div className="p-2.5">
@@ -1563,7 +1563,7 @@ export default function LegacyProductView() {
                   swap which image is currently displayed without
                   refetching anything. Falls back to mainImage if
                   the gallery is empty. */}
-              <div className="relative w-full aspect-[5/4] flex items-center justify-center">
+              <div className="relative w-full aspect-[5/4] flex items-center justify-center rounded-2xl bg-white p-4">
                 {(galleryImages[activeImageIdx]?.url || mainImage) ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
@@ -1612,7 +1612,7 @@ export default function LegacyProductView() {
                         <img
                           src={IMG.thumb(img.url)}
                           alt=""
-                          className="absolute inset-0 w-full h-full object-contain p-1.5 bg-[var(--bg-card)]"
+                          className="absolute inset-0 w-full h-full object-contain p-1.5 bg-white"
                           loading="lazy"
                           decoding="async"
                         />
@@ -1923,7 +1923,7 @@ export default function LegacyProductView() {
               </div>
               {/* RIGHT — image */}
               <div className="lg:col-span-7 order-1 lg:order-2">
-                <div className="relative w-full aspect-[5/4] rounded-3xl overflow-hidden bg-[var(--bg-card)] border border-[var(--border-subtle)]">
+                <div className="relative w-full aspect-[5/4] rounded-3xl overflow-hidden bg-white border border-[var(--border-subtle)]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={IMG.gallery(galleryImages[1]?.url || mainImage || "")}
