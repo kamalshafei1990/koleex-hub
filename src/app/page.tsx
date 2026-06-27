@@ -252,13 +252,43 @@ export default function HomePage() {
     };
   }, [greetingText]);
 
+  /* After the intro, the orb periodically performs a spontaneous reaction
+     (wink / surprised / celebrate / success) every few seconds so the face
+     stays lively beyond the idle micro-expressions. */
+  const [spark, setSpark] = useState<OrbState | null>(null);
+  useEffect(() => {
+    if (!introDone) return;
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const pool: OrbState[] = ["wink", "surprised", "celebrate", "success", "wink"];
+    const schedule = () => {
+      timer = setTimeout(
+        () => {
+          if (!alive) return;
+          setSpark(pool[Math.floor(Math.random() * pool.length)]);
+          timer = setTimeout(() => {
+            if (!alive) return;
+            setSpark(null);
+            schedule();
+          }, 1100);
+        },
+        6000 + Math.random() * 7000,
+      );
+    };
+    schedule();
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [introDone]);
+
   const orbState: OrbState = !introDone
     ? typed.length === 0
       ? "surprised"
       : "typing"
     : celebrating
       ? "celebrate"
-      : "idle";
+      : spark ?? "idle";
 
   /* ── Per-user data ── */
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
@@ -752,12 +782,12 @@ export default function HomePage() {
         {/* ── Header: Greeting + Clock + Date ── */}
         <div className="mb-5 md:mb-6 min-h-[160px] md:min-h-[180px] flex items-center">
           <div className="flex items-center justify-between gap-4 w-full">
-            <div className="flex items-center gap-3 md:gap-4 min-w-0">
+            <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1">
               {/* Koleex AI greeter — the orb "speaks" the greeting through a
                   chat bubble with a tail pointing back at the face. */}
               <KoleexOrb state={orbState} greetKey={greet} size={72} className="shrink-0 hidden sm:block" />
               <div
-                className="relative min-w-0 rounded-2xl px-4 py-3 md:px-5 md:py-3.5"
+                className="relative min-w-0 w-full rounded-2xl px-4 py-3 md:px-5 md:py-3.5"
                 style={{
                   /* Dark glassy core (like the orb's face) inside a thin
                      rainbow gradient ring (like the orb's ring), with a
