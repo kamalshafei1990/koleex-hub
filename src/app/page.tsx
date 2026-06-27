@@ -81,14 +81,15 @@ const DAILY_QUOTES: string[] = [
   "Excellence is a direction, not a destination.",
   "Turn friction into a checklist, not a complaint.",
   "Today's effort is tomorrow's advantage.",
+  "Aim for clarity; speed is its byproduct.",
+  "Do the boring work brilliantly.",
+  "Ask better questions to get better answers.",
+  "Respect the deadline by respecting the scope.",
+  "Leave every file better than you found it.",
+  "Trust is built in small, kept promises.",
+  "Think in systems, act in steps.",
+  "Calm focus beats busy panic.",
 ];
-
-function getDailyQuote(): string {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), 0, 0);
-  const day = Math.floor((now.getTime() - start.getTime()) / 86_400_000);
-  return DAILY_QUOTES[day % DAILY_QUOTES.length];
-}
 
 /* ── Clock Widget: Analog + Digital ── */
 function ClockWidget({ dk = true }: { dk?: boolean }) {
@@ -213,9 +214,24 @@ export default function HomePage() {
   const [typed, setTyped] = useState("");
   const [introDone, setIntroDone] = useState(false);
   const [celebrating, setCelebrating] = useState(false);
-  /* Daily motivational quote (client-only → no hydration mismatch). */
+  /* Motivational quote — cycles through the 40-quote pool while the page is
+     open (changes during the day), with a cross-fade. Client-only so there's
+     no hydration mismatch. */
   const [quote, setQuote] = useState("");
-  useEffect(() => setQuote(getDailyQuote()), []);
+  const [quoteShown, setQuoteShown] = useState(true);
+  useEffect(() => {
+    let i = Math.floor(Date.now() / 45_000) % DAILY_QUOTES.length;
+    setQuote(DAILY_QUOTES[i]);
+    const id = setInterval(() => {
+      setQuoteShown(false); // fade out
+      window.setTimeout(() => {
+        i = (i + 1) % DAILY_QUOTES.length;
+        setQuote(DAILY_QUOTES[i]);
+        setQuoteShown(true); // fade in
+      }, 350);
+    }, 45_000); // new quote every 45s
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     if (!greetingText) return;
@@ -807,7 +823,7 @@ export default function HomePage() {
                 </h1>
                 {/* daily motivational quote fades in once the greeting types */}
                 <div className={`transition-opacity duration-500 ${introDone ? "opacity-100" : "opacity-0"}`}>
-                  <p className={`text-[13px] md:text-[15px] mt-2 font-medium italic leading-snug ${dk ? "text-white/45" : "text-black/50"}`}>
+                  <p className={`text-[13px] md:text-[15px] mt-2 font-medium italic leading-snug transition-opacity duration-300 ${quoteShown ? "opacity-100" : "opacity-0"} ${dk ? "text-white/45" : "text-black/50"}`}>
                     {quote}
                   </p>
                 </div>
