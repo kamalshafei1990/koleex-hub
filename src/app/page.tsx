@@ -924,7 +924,7 @@ export default function HomePage() {
                 </h1>
                 {/* daily motivational quote — types out like the greeting */}
                 <div className={`transition-opacity duration-500 ${introDone ? "opacity-100" : "opacity-0"}`}>
-                  <p className={`text-[13px] md:text-[15px] mt-2 font-medium italic leading-snug ${dk ? "text-white/45" : "text-black/50"}`}>
+                  <p className={`text-[13px] md:text-[15px] mt-2 font-medium leading-snug ${dk ? "text-white/45" : "text-black/50"}`}>
                     <span aria-hidden>{quoteTyped || " "}</span>
                     {quoteTyping && (
                       <span
