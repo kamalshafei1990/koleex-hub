@@ -8,8 +8,12 @@
      · Expanded: collapsible groups with direct app links.
    Mobile:  off-canvas drawer overlay (always expanded-width).
 
-   Toggle: a floating circular button on the sidebar right edge,
-   vertically centered. 36 px, always visible, glow on hover.
+   The presentational pieces (AppLink, ExpandedGroup, CollapsedGroup,
+   EdgeToggle, SidebarContent) live at MODULE scope and take props. Defining
+   them inside the Sidebar function would give them a new identity on every
+   render, forcing React to unmount/remount the whole nav subtree (losing
+   flyout/hover/focus state and restarting transitions). Hoisting them out
+   keeps the tree stable.
    --------------------------------------------------------------------------- */
 
 import { useState, useEffect, useCallback } from "react";
@@ -34,6 +38,16 @@ import {
   SIDEBAR_COLLAPSED_W,
 } from "./SidebarContext";
 
+type TFn = ReturnType<typeof useTranslation>["t"];
+
+/* Precomputed per-group data handed to the presentational layer. */
+type GroupView = {
+  group: SidebarGroup;
+  apps: AppDef[];
+  isOpen: boolean;
+  isGroupActive: boolean;
+};
+
 /* ── Theme hook ── */
 function useTheme() {
   const [dk, setDk] = useState(true);
@@ -48,253 +62,232 @@ function useTheme() {
   return dk;
 }
 
-/* ═══════════════════════════════════════════════════
-   SIDEBAR COMPONENT
-   ═══════════════════════════════════════════════════ */
-
-export default function Sidebar() {
-  const dk = useTheme();
-  const pathname = usePathname();
-  const { t } = useTranslation(hubT);
-  const { expanded, toggle, mobileOpen, setMobileOpen } = useSidebar();
-
-  // Role-based filtering: hide apps the viewer's role has no can_view on.
-  // Super Admin sees everything. While the permission check is
-  // loading we show NO apps (fail-closed) so a user never sees modules
-  // they aren't allowed to — even briefly on first paint. The sidebar
-  // stays empty for a few hundred ms instead.
-  const { modules: permittedModules, loading: permLoading } =
-    usePermittedModules();
-  const { data: meBoot } = useMeBootstrap();
-  const isSuperAdmin = !!meBoot?.isSuperAdmin;
-
-  const filterApps = useCallback(
-    (apps: AppDef[]): AppDef[] => {
-      if (permLoading) return [];
-      return apps.filter((a) =>
-        // Hide not-yet-shipped apps from the rail (no dead/greyed links).
-        a.active &&
-        // Super-Admin-only apps (e.g. Activity Monitor) gate on the SA flag.
-        (a.superAdminOnly ? isSuperAdmin : permittedModules.has(a.name)),
-      );
-    },
-    [permLoading, permittedModules, isSuperAdmin],
-  );
-
-  const activeGroupId = getActiveGroupId(pathname);
-  const activeAppId = getActiveAppId(pathname);
-
-  /* Home ("/") is the launcher — it already shows every app grouped by
-     category, so the desktop rail there is redundant. Hide the persistent
-     rail on home; inner routes keep it. (Mobile drawer is on-demand, so it
-     stays available everywhere via the header menu button.) */
-  const isHome = pathname === "/";
-
-  /* Track which groups are open (expanded mode) */
-  const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
-    const initial = new Set<string>();
-    if (activeGroupId) initial.add(activeGroupId);
-    return initial;
-  });
-
-  useEffect(() => {
-    if (activeGroupId) {
-      setOpenGroups((prev) => {
-        if (prev.has(activeGroupId)) return prev;
-        return new Set(prev).add(activeGroupId);
-      });
-    }
-  }, [activeGroupId]);
-
-  const toggleGroup = useCallback((id: string) => {
-    setOpenGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname, setMobileOpen]);
-
-  const w = expanded ? SIDEBAR_EXPANDED_W : SIDEBAR_COLLAPSED_W;
-
-  /* ── Tokens ── */
-  const bg = dk ? "bg-[#0A0A0A]" : "bg-[#FAFAFA]";
-  const border = dk ? "border-white/[0.06]" : "border-black/[0.06]";
-  const textPrimary = dk ? "text-white" : "text-black";
+/* ── App link (expanded list or collapsed flyout) ── */
+function AppLink({
+  app,
+  compact,
+  dk,
+  t,
+  isActive,
+  onNavigate,
+}: {
+  app: AppDef;
+  compact?: boolean;
+  dk: boolean;
+  t: TFn;
+  isActive: boolean;
+  onNavigate: () => void;
+}) {
+  const Icon = app.icon;
+  const label = t(app.tKey, app.name);
   const textMuted = dk ? "text-white/50" : "text-black/50";
-  const textGhost = dk ? "text-white/25" : "text-black/25";
   const hoverBg = dk ? "hover:bg-white/[0.05]" : "hover:bg-black/[0.05]";
-  const flyoutBg = dk ? "bg-[#141414]" : "bg-white";
-  const flyoutBorder = dk ? "border-white/[0.08]" : "border-black/[0.08]";
 
-  /* ── App link (expanded or flyout) ── */
-  const AppLink = ({ app, compact }: { app: AppDef; compact?: boolean }) => {
-    const Icon = app.icon;
-    const isActive = activeAppId === app.id;
-    const label = t(app.tKey, app.name);
+  return (
+    <Link
+      href={app.route}
+      aria-current={isActive ? "page" : undefined}
+      onClick={onNavigate}
+      /* Active state: a soft rounded background + the 2px left-edge accent
+         rail + full-opacity ink, so the current row is easy to spot. */
+      className={`relative flex items-center gap-2.5 rounded-md transition-colors duration-150 ${
+        compact ? "px-2.5 py-1.5" : "px-3 py-2"
+      } ${
+        isActive
+          ? dk
+            ? "bg-white/[0.055] text-white/95 font-medium"
+            : "bg-black/[0.045] text-black/95 font-medium"
+          : `${textMuted} ${hoverBg} hover:${dk ? "text-white/80" : "text-black/80"}`
+      }`}
+    >
+      {isActive && (
+        <span
+          aria-hidden
+          className={`pointer-events-none absolute top-1.5 bottom-1.5 left-0 w-[2px] rounded-r ${dk ? "bg-white/55" : "bg-black/60"}`}
+        />
+      )}
+      <Icon size={compact ? 13 : 15} className="shrink-0" />
+      <span className={`text-[13px] truncate ${compact ? "text-[12px]" : ""}`}>
+        {label}
+      </span>
+    </Link>
+  );
+}
 
-    return (
-      <Link
-        href={app.route}
-        aria-current={isActive ? "page" : undefined}
-        onClick={() => setMobileOpen(false)}
-        /* Active state: a soft rounded background + the 2px left-edge
-           accent rail + full-opacity ink, so the current row is easy to
-           spot. Icons stay Apple-thin (13/15). */
-        className={`relative flex items-center gap-2.5 rounded-md transition-colors duration-150 ${
-          compact ? "px-2.5 py-1.5" : "px-3 py-2"
-        } ${
-          isActive
+/* ── Expanded group (header + collapsible app list) ── */
+function ExpandedGroup({
+  group,
+  apps,
+  isOpen,
+  isGroupActive,
+  dk,
+  t,
+  activeAppId,
+  onToggleGroup,
+  onNavigate,
+}: {
+  group: SidebarGroup;
+  apps: AppDef[];
+  isOpen: boolean;
+  isGroupActive: boolean;
+  dk: boolean;
+  t: TFn;
+  activeAppId: string | null;
+  onToggleGroup: (id: string) => void;
+  onNavigate: () => void;
+}) {
+  const GroupIcon = group.icon;
+  const label = t(group.tKey, group.label);
+  const hoverBg = dk ? "hover:bg-white/[0.05]" : "hover:bg-black/[0.05]";
+
+  return (
+    <div>
+      <button
+        onClick={() => onToggleGroup(group.id)}
+        aria-expanded={isOpen}
+        className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[12.5px] font-semibold uppercase tracking-wider transition-all duration-150 ${
+          isGroupActive
             ? dk
-              ? "bg-white/[0.055] text-white/95 font-medium"
-              : "bg-black/[0.045] text-black/95 font-medium"
-            : `${textMuted} ${hoverBg} hover:${dk ? "text-white/80" : "text-black/80"}`
+              ? "text-white/90"
+              : "text-black/90"
+            : `${dk ? "text-white/40" : "text-black/45"} ${hoverBg} hover:${dk ? "text-white/70" : "text-black/70"}`
         }`}
       >
-        {/* Active accent rail — 2px left-edge mark, calmer than a
-            background fill and lets the icon weight do the work. */}
-        {isActive && (
-          <span aria-hidden className={`pointer-events-none absolute top-1.5 bottom-1.5 left-0 w-[2px] rounded-r ${dk ? "bg-white/55" : "bg-black/60"}`} />
+        <GroupIcon
+          size={15}
+          className={isGroupActive ? (dk ? "text-white/70" : "text-black/70") : ""}
+        />
+        <span className="flex-1 text-start truncate">{label}</span>
+        <AngleRightIcon
+          size={12}
+          className={`transition-transform duration-300 ${isOpen ? "rotate-90" : ""}`}
+        />
+      </button>
+      <div
+        className={`overflow-hidden transition-all duration-300 ${
+          isOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
+        }`}
+      >
+        <div className={`ms-[19px] ps-3 mt-0.5 mb-1 space-y-0.5 border-s ${dk ? "border-white/[0.07]" : "border-black/[0.07]"}`}>
+          {apps.map((app) => (
+            <AppLink
+              key={app.id}
+              app={app}
+              dk={dk}
+              t={t}
+              isActive={activeAppId === app.id}
+              onNavigate={onNavigate}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Collapsed group (icon + tooltip + hover/focus flyout) ── */
+function CollapsedGroup({
+  group,
+  apps,
+  isGroupActive,
+  dk,
+  t,
+  activeAppId,
+  onNavigate,
+}: {
+  group: SidebarGroup;
+  apps: AppDef[];
+  isGroupActive: boolean;
+  dk: boolean;
+  t: TFn;
+  activeAppId: string | null;
+  onNavigate: () => void;
+}) {
+  const GroupIcon = group.icon;
+  const label = t(group.tKey, group.label);
+  const hasActiveChild = apps.some((a) => a.id === activeAppId);
+  const flyoutBg = dk ? "bg-[#141414]" : "bg-white";
+  const flyoutBorder = dk ? "border-white/[0.08]" : "border-black/[0.08]";
+  const textGhost = dk ? "text-white/25" : "text-black/25";
+
+  return (
+    <div className="relative group/fly">
+      <button
+        className={`w-full flex items-center justify-center h-11 rounded-md transition-colors duration-150 relative ${
+          isGroupActive || hasActiveChild
+            ? dk
+              ? "text-white/90"
+              : "text-black/90"
+            : dk
+              ? "text-white/35 hover:text-white/65"
+              : "text-black/35 hover:text-black/65"
+        }`}
+        aria-label={label}
+      >
+        {(isGroupActive || hasActiveChild) && (
+          <span
+            aria-hidden
+            className={`pointer-events-none absolute top-2 bottom-2 left-0 w-[2px] rounded-r ${dk ? "bg-white/55" : "bg-black/60"}`}
+          />
         )}
-        <Icon size={compact ? 13 : 15} className="shrink-0" />
-        <span className={`text-[13px] truncate ${compact ? "text-[12px]" : ""}`}>
-          {label}
-        </span>
-      </Link>
-    );
-  };
+        <GroupIcon size={16} />
+      </button>
 
-  /* ── Expanded group ── */
-  const ExpandedGroup = ({ group }: { group: SidebarGroup }) => {
-    const GroupIcon = group.icon;
-    const isOpen = openGroups.has(group.id);
-    const isGroupActive = activeGroupId === group.id;
-    const apps = filterApps(getGroupApps(group));
-    if (apps.length === 0) return null;
-    const label = t(group.tKey, group.label);
+      {/* Tooltip (group name on hover / keyboard focus) */}
+      <div
+        className="hidden group-hover/fly:block group-focus-within/fly:block absolute top-1/2 -translate-y-1/2 z-[60] pointer-events-none"
+        style={{ insetInlineStart: "calc(100% + 14px)" }}
+      >
+        <div className={`${flyoutBg} border ${flyoutBorder} rounded-lg shadow-xl px-3 py-1.5 whitespace-nowrap`}>
+          <span className={`text-[11px] font-semibold ${dk ? "text-white/80" : "text-black/80"}`}>
+            {label}
+          </span>
+        </div>
+      </div>
 
-    return (
-      <div>
-        <button
-          onClick={() => toggleGroup(group.id)}
-          aria-expanded={isOpen}
-          className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[12.5px] font-semibold uppercase tracking-wider transition-all duration-150 ${
-            isGroupActive
-              ? dk
-                ? "text-white/90"
-                : "text-black/90"
-              : `${dk ? "text-white/40" : "text-black/45"} ${hoverBg} hover:${dk ? "text-white/70" : "text-black/70"}`
-          }`}
-        >
-          <GroupIcon
-            size={15}
-            className={
-              isGroupActive
-                ? dk
-                  ? "text-white/70"
-                  : "text-black/70"
-                : ""
-            }
-          />
-          <span className="flex-1 text-start truncate">{label}</span>
-          <AngleRightIcon
-            size={12}
-            className={`transition-transform duration-300 ${isOpen ? "rotate-90" : ""}`}
-          />
-        </button>
-        <div
-          className={`overflow-hidden transition-all duration-300 ${
-            isOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
-          }`}
-        >
-          <div className={`ms-[19px] ps-3 mt-0.5 mb-1 space-y-0.5 border-s ${dk ? "border-white/[0.07]" : "border-black/[0.07]"}`}>
+      {/* Flyout with apps (hover or keyboard focus) */}
+      <div className="hidden group-hover/fly:block group-focus-within/fly:block absolute top-0 start-full z-[60] ps-3">
+        <div className={`${flyoutBg} border ${flyoutBorder} rounded-xl shadow-2xl w-[200px] py-2 px-2`}>
+          <div className={`text-[10px] font-bold uppercase tracking-wider ${textGhost} px-2.5 py-1.5`}>
+            {label}
+          </div>
+          <div className="space-y-0.5">
             {apps.map((app) => (
-              <AppLink key={app.id} app={app} />
+              <AppLink
+                key={app.id}
+                app={app}
+                compact
+                dk={dk}
+                t={t}
+                isActive={activeAppId === app.id}
+                onNavigate={onNavigate}
+              />
             ))}
           </div>
         </div>
       </div>
-    );
-  };
+    </div>
+  );
+}
 
-  /* ── Collapsed group (icon + tooltip + flyout) ── */
-  const CollapsedGroup = ({ group }: { group: SidebarGroup }) => {
-    const GroupIcon = group.icon;
-    const isGroupActive = activeGroupId === group.id;
-    const apps = filterApps(getGroupApps(group));
-    if (apps.length === 0) return null;
-    const label = t(group.tKey, group.label);
-    const hasActiveChild = apps.some((a) => a.id === activeAppId);
-
-    return (
-      <div className="relative group/fly">
-        <button
-          className={`w-full flex items-center justify-center h-11 rounded-md transition-colors duration-150 relative ${
-            isGroupActive || hasActiveChild
-              ? dk
-                ? "text-white/90"
-                : "text-black/90"
-              : dk
-                ? "text-white/35 hover:text-white/65"
-                : "text-black/35 hover:text-black/65"
-          }`}
-          aria-label={label}
-        >
-          {/* Active accent rail for collapsed sidebar. */}
-          {(isGroupActive || hasActiveChild) && (
-            <span aria-hidden className={`pointer-events-none absolute top-2 bottom-2 left-0 w-[2px] rounded-r ${dk ? "bg-white/55" : "bg-black/60"}`} />
-          )}
-          <GroupIcon size={16} />
-        </button>
-
-        {/* Tooltip (shows group name on hover / keyboard focus) */}
-        <div
-          className="hidden group-hover/fly:block group-focus-within/fly:block absolute top-1/2 -translate-y-1/2 z-[60] pointer-events-none"
-          style={{ insetInlineStart: "calc(100% + 14px)" }}
-        >
-          <div
-            className={`${flyoutBg} border ${flyoutBorder} rounded-lg shadow-xl px-3 py-1.5 whitespace-nowrap`}
-          >
-            <span className={`text-[11px] font-semibold ${dk ? "text-white/80" : "text-black/80"}`}>
-              {label}
-            </span>
-          </div>
-        </div>
-
-        {/* Flyout with apps */}
-        <div className="hidden group-hover/fly:block absolute top-0 start-full z-[60] ps-3">
-          <div
-            className={`${flyoutBg} border ${flyoutBorder} rounded-xl shadow-2xl w-[200px] py-2 px-2`}
-          >
-            <div
-              className={`text-[10px] font-bold uppercase tracking-wider ${textGhost} px-2.5 py-1.5`}
-            >
-              {label}
-            </div>
-            <div className="space-y-0.5">
-              {apps.map((app) => (
-                <AppLink key={app.id} app={app} compact />
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  /* ── Collapse toggle — a curved "pull tab" extruded from the rail edge.
-     Flat against the rail seam (no inline-start border, same surface tone)
-     and bulging into the content as a smooth semicircular tab, exactly like
-     the sketch. The directional chevron brightens + nudges and the tab
-     extends a touch on hover. Tooltip clarifies the action. Monochrome. */
-  const EdgeToggle = () => (
+/* ── Collapse toggle — curved pull tab tucked inside the rail seam ── */
+function EdgeToggle({
+  dk,
+  expanded,
+  onToggle,
+  flyoutBg,
+  flyoutBorder,
+}: {
+  dk: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+  flyoutBg: string;
+  flyoutBorder: string;
+}) {
+  return (
     <div className="group/toggle relative">
       <button
-        onClick={toggle}
+        onClick={onToggle}
         aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
         className="relative flex items-center justify-center w-[13px] h-12 cursor-pointer transition-all duration-200 active:scale-95 hover:w-[16px]"
         style={{
@@ -328,37 +321,166 @@ export default function Sidebar() {
       </div>
     </div>
   );
+}
 
-  /* ── Sidebar content ── */
-  const SidebarContent = ({ mobile }: { mobile?: boolean }) => {
-    const showExpanded = mobile || expanded;
-    return (
-      <div className="flex flex-col h-full">
-        <div className="h-2" />
-        <nav
-          className={`flex-1 overflow-y-auto overflow-x-hidden scrollbar-none ${
-            showExpanded ? "px-3 py-1 space-y-0.5" : "px-2 py-1.5 space-y-1.5"
-          }`}
-        >
-          {SIDEBAR_GROUPS.map((group) =>
-            showExpanded ? (
-              <ExpandedGroup key={group.id} group={group} />
-            ) : (
-              <CollapsedGroup key={group.id} group={group} />
-            ),
-          )}
-        </nav>
-        {/* Footer — quiet brand mark in the expanded state. */}
-        <div className="p-3 flex items-center justify-center">
-          {showExpanded && (
-            <span className={`text-[9px] font-semibold uppercase tracking-[0.22em] ${textGhost}`}>
-              KOLEEX HUB
-            </span>
-          )}
-        </div>
+/* ── Sidebar content (shared by desktop rail + mobile drawer) ── */
+function SidebarContent({
+  mobile,
+  expanded,
+  dk,
+  t,
+  groups,
+  activeAppId,
+  onToggleGroup,
+  onNavigate,
+}: {
+  mobile?: boolean;
+  expanded: boolean;
+  dk: boolean;
+  t: TFn;
+  groups: GroupView[];
+  activeAppId: string | null;
+  onToggleGroup: (id: string) => void;
+  onNavigate: () => void;
+}) {
+  const showExpanded = mobile || expanded;
+  const textGhost = dk ? "text-white/25" : "text-black/25";
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="h-2" />
+      <nav
+        className={`flex-1 overflow-y-auto overflow-x-hidden scrollbar-none ${
+          showExpanded ? "px-3 py-1 space-y-0.5" : "px-2 py-1.5 space-y-1.5"
+        }`}
+      >
+        {groups.map(({ group, apps, isOpen, isGroupActive }) =>
+          showExpanded ? (
+            <ExpandedGroup
+              key={group.id}
+              group={group}
+              apps={apps}
+              isOpen={isOpen}
+              isGroupActive={isGroupActive}
+              dk={dk}
+              t={t}
+              activeAppId={activeAppId}
+              onToggleGroup={onToggleGroup}
+              onNavigate={onNavigate}
+            />
+          ) : (
+            <CollapsedGroup
+              key={group.id}
+              group={group}
+              apps={apps}
+              isGroupActive={isGroupActive}
+              dk={dk}
+              t={t}
+              activeAppId={activeAppId}
+              onNavigate={onNavigate}
+            />
+          ),
+        )}
+      </nav>
+      {/* Footer — quiet brand mark in the expanded state. */}
+      <div className="p-3 flex items-center justify-center">
+        {showExpanded && (
+          <span className={`text-[9px] font-semibold uppercase tracking-[0.22em] ${textGhost}`}>
+            KOLEEX HUB
+          </span>
+        )}
       </div>
-    );
-  };
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   SIDEBAR COMPONENT
+   ═══════════════════════════════════════════════════ */
+
+export default function Sidebar() {
+  const dk = useTheme();
+  const pathname = usePathname();
+  const { t } = useTranslation(hubT);
+  const { expanded, toggle, mobileOpen, setMobileOpen } = useSidebar();
+
+  // Role-based filtering: hide apps the viewer's role has no can_view on.
+  // Super Admin sees everything. While the permission check is loading we
+  // show NO apps (fail-closed) so a user never sees modules they aren't
+  // allowed to — even briefly on first paint.
+  const { modules: permittedModules, loading: permLoading } =
+    usePermittedModules();
+  const { data: meBoot } = useMeBootstrap();
+  const isSuperAdmin = !!meBoot?.isSuperAdmin;
+
+  const filterApps = useCallback(
+    (apps: AppDef[]): AppDef[] => {
+      if (permLoading) return [];
+      return apps.filter((a) =>
+        // Hide not-yet-shipped apps from the rail (no dead/greyed links).
+        a.active &&
+        // Super-Admin-only apps (e.g. Activity Monitor) gate on the SA flag.
+        (a.superAdminOnly ? isSuperAdmin : permittedModules.has(a.name)),
+      );
+    },
+    [permLoading, permittedModules, isSuperAdmin],
+  );
+
+  const activeGroupId = getActiveGroupId(pathname);
+  const activeAppId = getActiveAppId(pathname);
+
+  /* Home ("/") is the launcher — it already shows every app grouped by
+     category, so the desktop rail there is redundant. Hide the persistent
+     rail on home; inner routes keep it. (Mobile drawer is on-demand.) */
+  const isHome = pathname === "/";
+
+  /* Track which groups are open (expanded mode) */
+  const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
+    const initial = new Set<string>();
+    if (activeGroupId) initial.add(activeGroupId);
+    return initial;
+  });
+
+  useEffect(() => {
+    if (activeGroupId) {
+      setOpenGroups((prev) => {
+        if (prev.has(activeGroupId)) return prev;
+        return new Set(prev).add(activeGroupId);
+      });
+    }
+  }, [activeGroupId]);
+
+  const toggleGroup = useCallback((id: string) => {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname, setMobileOpen]);
+
+  const w = expanded ? SIDEBAR_EXPANDED_W : SIDEBAR_COLLAPSED_W;
+
+  /* ── Tokens (only those used by the shell chrome here) ── */
+  const bg = dk ? "bg-[#0A0A0A]" : "bg-[#FAFAFA]";
+  const border = dk ? "border-white/[0.06]" : "border-black/[0.06]";
+  const flyoutBg = dk ? "bg-[#141414]" : "bg-white";
+  const flyoutBorder = dk ? "border-white/[0.08]" : "border-black/[0.08]";
+
+  /* Precompute per-group view data once; presentational components are
+     pure and receive it as props. */
+  const groups: GroupView[] = SIDEBAR_GROUPS.map((group) => ({
+    group,
+    apps: filterApps(getGroupApps(group)),
+    isOpen: openGroups.has(group.id),
+    isGroupActive: activeGroupId === group.id,
+  })).filter((g) => g.apps.length > 0);
+
+  const onNavigate = useCallback(() => setMobileOpen(false), [setMobileOpen]);
 
   return (
     <>
@@ -368,7 +490,15 @@ export default function Sidebar() {
           className={`hidden md:flex flex-col fixed top-14 bottom-0 start-0 z-40 ${bg} border-e ${border} transition-all duration-300 ease-in-out`}
           style={{ width: w }}
         >
-          <SidebarContent />
+          <SidebarContent
+            expanded={expanded}
+            dk={dk}
+            t={t}
+            groups={groups}
+            activeAppId={activeAppId}
+            onToggleGroup={toggleGroup}
+            onNavigate={onNavigate}
+          />
 
           {/* Collapse handle — anchored at the rail seam, curving inward
               into the sidebar as a pull tab (stays inside the border). */}
@@ -376,7 +506,13 @@ export default function Sidebar() {
             className="absolute top-1/2 -translate-y-1/2 z-50"
             style={{ insetInlineEnd: "0px" }}
           >
-            <EdgeToggle />
+            <EdgeToggle
+              dk={dk}
+              expanded={expanded}
+              onToggle={toggle}
+              flyoutBg={flyoutBg}
+              flyoutBorder={flyoutBorder}
+            />
           </div>
         </aside>
       )}
@@ -398,7 +534,16 @@ export default function Sidebar() {
         }`}
         style={{ width: SIDEBAR_EXPANDED_W }}
       >
-        <SidebarContent mobile />
+        <SidebarContent
+          mobile
+          expanded={expanded}
+          dk={dk}
+          t={t}
+          groups={groups}
+          activeAppId={activeAppId}
+          onToggleGroup={toggleGroup}
+          onNavigate={onNavigate}
+        />
       </aside>
     </>
   );
