@@ -16,6 +16,7 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import KoleexLogo from "@/components/layout/KoleexLogo";
 
 export type RobotExpression =
   | "normal"
@@ -94,8 +95,13 @@ const WHITE = "#ffffff";
    white with a soft glow; a few expressions add functional colour (tears,
    money, cool tint) which is acceptable for an AI character. */
 function Eyes({ expr }: { expr: RobotExpression }) {
+  // Glowing spherical eye: gradient orb (bright top hotspot → dim edge) + bloom
+  // + a soft specular highlight, matching the Figma "glowing lens" look.
   const circle = (cx: number, cy: number, r: number, key: string, extra?: CSSProperties) => (
-    <circle key={key} cx={cx} cy={cy} r={r} fill={WHITE} style={{ ...GLOW, ...extra }} />
+    <g key={key}>
+      <circle cx={cx} cy={cy} r={r} fill="url(#kxr-eye)" style={{ ...GLOW, ...extra }} />
+      <ellipse cx={cx} cy={cy - r * 0.34} rx={r * 0.44} ry={r * 0.3} fill="rgba(255,255,255,.92)" />
+    </g>
   );
 
   switch (expr) {
@@ -396,16 +402,17 @@ export default function KoleexRobot({
           willChange: "transform",
         }}
       >
-        {/* KOLEEX wordmark embossed on the top bezel */}
+        {/* Real KOLEEX wordmark embossed on the top bezel */}
         <div
           style={{
-            position: "absolute", top: Math.round(h * 0.055), left: 0, right: 0,
-            textAlign: "center", fontSize: Math.max(9, Math.round(h * 0.052)),
-            fontWeight: 800, letterSpacing: "0.22em", color: "rgba(60,66,74,.65)",
-            textShadow: "0 1px 0 rgba(255,255,255,.6)", pointerEvents: "none", userSelect: "none",
+            position: "absolute", top: Math.round(h * 0.062), left: "50%",
+            transform: "translateX(-50%)", width: Math.round(w * 0.26),
+            color: "rgba(46,52,60,.7)", lineHeight: 0,
+            filter: "drop-shadow(0 1px 0 rgba(255,255,255,.65))",
+            pointerEvents: "none", userSelect: "none",
           }}
         >
-          KOLEEX
+          <KoleexLogo className="w-full h-auto" />
         </div>
 
         {/* dark glossy lens */}
@@ -420,12 +427,21 @@ export default function KoleexRobot({
             overflow: "hidden",
           }}
         >
-          {/* top-light reflection */}
+          {/* broad top-light reflection */}
           <div
             style={{
-              position: "absolute", top: "-18%", left: "8%", right: "8%", height: "55%",
+              position: "absolute", top: "-22%", left: "6%", right: "6%", height: "62%",
               borderRadius: "50%",
-              background: "radial-gradient(closest-side, rgba(255,255,255,.16), rgba(255,255,255,0) 72%)",
+              background: "radial-gradient(closest-side, rgba(255,255,255,.20), rgba(255,255,255,0) 72%)",
+              pointerEvents: "none",
+            }}
+          />
+          {/* diagonal glossy streak (top-left sweep, like the Figma lens) */}
+          <div
+            style={{
+              position: "absolute", top: "-30%", left: "-10%", width: "85%", height: "75%",
+              transform: "rotate(-18deg)",
+              background: "radial-gradient(closest-side, rgba(255,255,255,.16), rgba(255,255,255,0) 70%)",
               pointerEvents: "none",
             }}
           />
@@ -434,6 +450,14 @@ export default function KoleexRobot({
             viewBox="0 0 220 140"
             style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
           >
+            <defs>
+              <radialGradient id="kxr-eye" cx="50%" cy="35%" r="72%">
+                <stop offset="0%" stopColor="#ffffff" />
+                <stop offset="52%" stopColor="#fbfdff" />
+                <stop offset="82%" stopColor="#e2e8f2" />
+                <stop offset="100%" stopColor="#a8b4c6" />
+              </radialGradient>
+            </defs>
             <g
               className={blinkOn ? "kxr-anim" : undefined}
               style={{
