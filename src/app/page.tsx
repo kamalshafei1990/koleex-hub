@@ -308,9 +308,11 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
         </span>
       )}
 
-      {/* LED 7-segment time — frameless */}
-      <div className="flex items-center gap-[5px] md:gap-[7px]">
-        <SevenSeg value={h1} h={78} />
+      {/* LED 7-segment time — frameless. The leading hour digit is omitted
+          (not blanked) when the hour is single-digit, so the time stays clean
+          and centred instead of showing a ghost digit. */}
+      <div className="flex items-center justify-center gap-[5px] md:gap-[7px]">
+        {h1 && <SevenSeg value={h1} h={78} />}
         <SevenSeg value={h2} h={78} />
         {/* colon — flashes once per second */}
         <div
