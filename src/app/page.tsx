@@ -178,70 +178,10 @@ const DAILY_QUOTES: Record<string, string[]> = {
   ],
 };
 
-/* ── 7-segment LED digit (hand-drawn SVG, no font dependency) ──
-   Segment layout:    a
-                    f   b
-                      g
-                    e   c
-                      d
-   `value` is "0".."9" or "" (blank → all segments off, like a real
-   LED clock blanking the leading hour digit). */
-const SEG_ON: Record<string, string> = {
-  "0": "abcdef",
-  "1": "bc",
-  "2": "abdeg",
-  "3": "abcdg",
-  "4": "bcfg",
-  "5": "acdfg",
-  "6": "acdefg",
-  "7": "abc",
-  "8": "abcdefg",
-  "9": "abcdfg",
-};
-const SEG_POLY: Record<string, string> = {
-  // horizontals (a/g/d) and verticals (f/b/e/c) in a 100×180 cell, T≈18
-  a: "14,14 23,5 77,5 86,14 77,23 23,23",
-  g: "14,90 23,81 77,81 86,90 77,99 23,99",
-  d: "14,166 23,157 77,157 86,166 77,175 23,175",
-  f: "14,22 23,31 23,73 14,82 5,73 5,31",
-  b: "86,22 95,31 95,73 86,82 77,73 77,31",
-  e: "14,98 23,107 23,149 14,158 5,149 5,107",
-  c: "86,98 95,107 95,149 86,158 77,149 77,107",
-};
-function SevenSeg({ value, h = 52 }: { value: string; h?: number }) {
-  const on = SEG_ON[value] ?? "";
-  const w = (h * 100) / 180;
-  return (
-    <svg
-      width={w}
-      height={h}
-      viewBox="0 0 100 180"
-      style={{ display: "block", overflow: "visible" }}
-      aria-hidden
-    >
-      {(["a", "b", "c", "d", "e", "f", "g"] as const).map((s) => {
-        const lit = on.includes(s);
-        return (
-          <polygon
-            key={s}
-            points={SEG_POLY[s]}
-            fill={lit ? "#ffffff" : "rgba(255,255,255,0.045)"}
-            style={
-              lit
-                ? { filter: "drop-shadow(0 0 4px rgba(255,255,255,.55))" }
-                : undefined
-            }
-          />
-        );
-      })}
-    </svg>
-  );
-}
-
-/* ── Clock Widget: LED alarm-clock style (Westclox-inspired) ──
-   A black device face with white 7-segment digits, an AM/PM indicator,
-   alarm-bell dots and a KOLEEX label. Always dark (an LED clock reads best
-   on black) with the date above and timezone below. */
+/* ── Clock Widget: clean SF-style numeric clock ──
+   Apple-flavoured: light-weight tabular numerals, monochrome, a softly
+   blinking colon and quiet meta. Date above, timezone below. No skeuomorphism
+   so it sits in the same material language as the rest of the launcher. */
 function ClockWidget({ dk = true }: { dk?: boolean }) {
   const [t, setT] = useState<{ h12: string; mm: string; pm: boolean; blink: boolean }>({
     h12: "",
@@ -294,42 +234,38 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
     return () => clearInterval(id);
   }, []);
 
-  /* 4-digit display: leading hour digit blanks when hour < 10 (real LED look). */
-  const h1 = t.h12.length === 2 ? t.h12[0] : "";
-  const h2 = t.h12.length === 2 ? t.h12[1] : t.h12;
-  const DOT = "rgba(255,255,255,0.9)";
-
   return (
     <div className="shrink-0 hidden sm:flex flex-col items-center justify-center">
-      {/* date sits above the device */}
+      {/* date sits above the time */}
       {dateLabel && (
-        <span className={`mb-2 text-[12px] font-medium ${dk ? "text-white/45" : "text-black/45"}`}>
+        <span className={`mb-1.5 text-[12px] font-medium ${dk ? "text-white/45" : "text-black/45"}`}>
           {dateLabel}
         </span>
       )}
 
-      {/* LED 7-segment time — frameless. The leading hour digit is omitted
-          (not blanked) when the hour is single-digit, so the time stays clean
-          and centred instead of showing a ghost digit. */}
-      <div className="flex items-center justify-center gap-[5px] md:gap-[7px]">
-        {h1 && <SevenSeg value={h1} h={78} />}
-        <SevenSeg value={h2} h={78} />
-        {/* colon — flashes once per second */}
-        <div
-          className="flex flex-col justify-center gap-5 px-[4px] transition-opacity duration-200"
-          style={{ opacity: t.blink ? 1 : 0.12 }}
+      {/* SF-style numerals: light weight, tabular, monochrome, softly blinking colon */}
+      <div className="flex items-baseline gap-2">
+        <span
+          className={`text-[58px] md:text-[68px] font-light leading-none tracking-tight tabular-nums ${
+            dk ? "text-white/90" : "text-black/90"
+          }`}
         >
+          {t.h12}
           <span
-            className="h-3 w-3 rounded-full"
-            style={{ background: DOT, boxShadow: "0 0 4px rgba(255,255,255,.5)" }}
-          />
-          <span
-            className="h-3 w-3 rounded-full"
-            style={{ background: DOT, boxShadow: "0 0 4px rgba(255,255,255,.5)" }}
-          />
-        </div>
-        <SevenSeg value={t.mm[0]} h={78} />
-        <SevenSeg value={t.mm[1]} h={78} />
+            className="mx-0.5 transition-opacity duration-300"
+            style={{ opacity: t.blink ? 1 : 0.25 }}
+          >
+            :
+          </span>
+          {t.mm}
+        </span>
+        <span
+          className={`mb-1.5 text-[14px] font-medium tracking-wide ${
+            dk ? "text-white/40" : "text-black/40"
+          }`}
+        >
+          {t.pm ? "PM" : "AM"}
+        </span>
       </div>
 
       {tzLabel && (
@@ -981,17 +917,20 @@ export default function HomePage() {
               <div
                 className="relative min-w-0 w-full rounded-2xl px-4 py-3 md:px-5 md:py-3.5"
                 style={{
-                  /* Dark glassy core (like the orb's face) inside a thin
-                     rainbow gradient ring (like the orb's ring), with a
-                     soft iridescent glow — so the bubble is clearly the
-                     same "material" as the AI face. */
-                  border: "1px solid transparent",
+                  /* Monochrome glass — one material language with the rest of
+                     the launcher. The rainbow lives only on the orb; here we
+                     use a quiet dark/light glass fill, a hairline border and a
+                     very faint single-hue glow so it still reads as the AI's
+                     surface without competing for attention. */
                   background: dk
-                    ? "linear-gradient(180deg,#15151c,#0c0c11) padding-box, conic-gradient(from 140deg,#3b82f6,#8b5cf6,#ec4899,#f59e0b,#22d3ee,#3b82f6) border-box"
-                    : "linear-gradient(180deg,#ffffff,#f4f5f7) padding-box, conic-gradient(from 140deg,#3b82f6,#8b5cf6,#ec4899,#f59e0b,#22d3ee,#3b82f6) border-box",
+                    ? "linear-gradient(180deg,#15151c,#0c0c11)"
+                    : "linear-gradient(180deg,#ffffff,#f4f5f7)",
+                  border: dk
+                    ? "1px solid rgba(255,255,255,0.08)"
+                    : "1px solid rgba(0,0,0,0.08)",
                   boxShadow: dk
-                    ? "0 0 26px -8px rgba(139,92,246,.30)"
-                    : "0 0 26px -10px rgba(139,92,246,.22)",
+                    ? "0 1px 0 rgba(255,255,255,0.04) inset, 0 0 30px -14px rgba(139,92,246,.30)"
+                    : "0 1px 0 rgba(255,255,255,0.6) inset, 0 8px 24px -16px rgba(0,0,0,.25)",
                 }}
               >
                 <h1
