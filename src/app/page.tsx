@@ -756,19 +756,19 @@ export default function HomePage() {
           </span>
         )}
 
-        {badge && (
+        {/* Only the auto-expiring NEW / UPDATED change markers — the static
+            "Ready to use" billboard was removed to keep the launcher calm. */}
+        {(badge === "new" || badge === "updated") && (
           <span
             className={`absolute top-2 start-2 px-1.5 py-0.5 rounded-md text-[9px] font-extrabold tracking-wider uppercase pointer-events-none select-none whitespace-nowrap ${
               badge === "new"
                 ? "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-400/40"
-                : badge === "updated"
-                  ? "bg-sky-500/20 text-sky-300 ring-1 ring-sky-400/40"
-                  : "bg-[#0066FF]/20 text-[#3385FF] ring-1 ring-[#0066FF]/40"
+                : "bg-sky-500/20 text-sky-300 ring-1 ring-sky-400/40"
             }`}
-            aria-label={badge === "new" ? "New app" : badge === "updated" ? "Updated app" : "Ready to use"}
-            title={badge === "new" ? "New app" : badge === "updated" ? "Recently updated" : "Ready to use"}
+            aria-label={badge === "new" ? "New app" : "Updated app"}
+            title={badge === "new" ? "New app" : "Recently updated"}
           >
-            {badge === "new" ? "NEW" : badge === "updated" ? "UPDATED" : "Ready to use"}
+            {badge === "new" ? "NEW" : "UPDATED"}
           </span>
         )}
         <span className={`transition-all duration-200 ${
@@ -831,13 +831,6 @@ export default function HomePage() {
         }`}>
           {label}
         </span>
-        {!app.active && (
-          <span className={`text-[8px] font-semibold tracking-[0.5px] uppercase ${
-            dk ? "text-white/10" : "text-black/10"
-          }`}>
-            {t("comingSoon")}
-          </span>
-        )}
       </div>
     );
   };
@@ -1068,9 +1061,6 @@ export default function HomePage() {
                     {t(group.tKey, group.label)}
                   </span>
                   <div className={`flex-1 h-px ${dk ? "bg-white/[0.04]" : "bg-black/[0.04]"}`} />
-                  <span className={`text-[10px] font-medium ${dk ? "text-white/15" : "text-black/15"}`}>
-                    {group.apps.filter((a) => a.active).length}/{group.apps.length}
-                  </span>
                 </div>
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3">
                   {group.apps.map((app) => (
