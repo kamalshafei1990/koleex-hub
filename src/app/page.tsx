@@ -719,7 +719,9 @@ export default function HomePage() {
         onPointerEnter={() => prefetchApp(app)}
         onTouchStart={() => prefetchApp(app)}
         onFocus={() => prefetchApp(app)}
-        className={`relative flex flex-col items-center justify-center gap-2.5 p-3 aspect-square rounded-2xl transition-all duration-200 select-none ${
+        className={`relative flex flex-col items-center justify-center gap-2.5 p-3 aspect-square rounded-2xl transition-all duration-200 select-none outline-none focus-visible:ring-2 ${
+          dk ? "focus-visible:ring-white/35" : "focus-visible:ring-black/25"
+        } ${
           isAi
             ? "ai-card-neon cursor-default"
             : app.active
@@ -898,6 +900,21 @@ export default function HomePage() {
 
   return (
     <div className={`${dk ? "bg-[#0A0A0A]" : "bg-white"} min-h-screen transition-colors duration-300`}>
+      {/* Subtle staggered tile entrance — pure CSS, disabled for reduced-motion. */}
+      <style>{`
+        @keyframes kx-tile-in { from { opacity: 0; transform: translateY(10px) scale(.985); } to { opacity: 1; transform: none; } }
+        .kx-grid > * { animation: kx-tile-in .5s cubic-bezier(.22,.61,.36,1) both; }
+        .kx-grid > *:nth-child(1){animation-delay:0s}
+        .kx-grid > *:nth-child(2){animation-delay:.025s}
+        .kx-grid > *:nth-child(3){animation-delay:.05s}
+        .kx-grid > *:nth-child(4){animation-delay:.075s}
+        .kx-grid > *:nth-child(5){animation-delay:.1s}
+        .kx-grid > *:nth-child(6){animation-delay:.125s}
+        .kx-grid > *:nth-child(7){animation-delay:.15s}
+        .kx-grid > *:nth-child(8){animation-delay:.175s}
+        .kx-grid > *:nth-child(n+9){animation-delay:.2s}
+        @media (prefers-reduced-motion: reduce) { .kx-grid > * { animation: none; } }
+      `}</style>
       <div className="px-4 md:px-10 py-5 md:py-6 pb-20 max-w-[1400px] mx-auto">
 
         {/* ── Header: Greeting + Clock + Date ── */}
@@ -957,22 +974,22 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* ── Zone A: Search ── */}
-        <div className="mb-6">
-          <div className={`relative flex items-center w-full h-11 border rounded-xl px-4 gap-3 transition-all duration-200 ${
+        {/* ── Zone A: Search (primary action — elevated) ── */}
+        <div className="mb-7">
+          <div className={`relative flex items-center w-full h-14 border rounded-2xl px-5 gap-3.5 transition-all duration-200 focus-within:shadow-[0_0_0_4px_rgba(139,92,246,0.12)] ${
             dk
-              ? "bg-white/[0.03] border-white/[0.06] focus-within:border-white/[0.20] focus-within:bg-white/[0.05]"
-              : "bg-black/[0.02] border-black/[0.06] focus-within:border-black/[0.20] focus-within:bg-black/[0.04]"
+              ? "bg-white/[0.04] border-white/[0.07] focus-within:border-white/[0.22] focus-within:bg-white/[0.06]"
+              : "bg-black/[0.02] border-black/[0.07] focus-within:border-black/[0.22] focus-within:bg-black/[0.04]"
           }`}>
-            <SearchIcon size={16} className={dk ? "text-white/20" : "text-black/20"} />
+            <SearchIcon size={19} className={dk ? "text-white/30" : "text-black/30"} />
             <input
               id="hub-search"
               type="text"
               placeholder={t("searchDesktop")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className={`flex-1 bg-transparent text-[13px] outline-none ${
-                dk ? "text-white placeholder:text-white/25" : "text-black placeholder:text-black/25"
+              className={`flex-1 bg-transparent text-[15px] outline-none ${
+                dk ? "text-white placeholder:text-white/30" : "text-black placeholder:text-black/30"
               }`}
             />
             {search && (
@@ -991,8 +1008,8 @@ export default function HomePage() {
               onClick={() => document.getElementById("hub-search")?.focus()}
               title={shortcut.hint}
               aria-label={shortcut.hint}
-              className={`hidden md:inline cursor-pointer text-[10px] font-medium px-1.5 py-0.5 rounded transition-colors ${
-                dk ? "bg-white/[0.06] text-white/40 hover:text-white/70" : "bg-black/[0.06] text-black/40 hover:text-black/70"
+              className={`hidden md:inline cursor-pointer text-[11px] font-semibold px-2 py-1 rounded-md transition-colors ${
+                dk ? "bg-white/[0.07] text-white/45 hover:text-white/80" : "bg-black/[0.06] text-black/45 hover:text-black/80"
               }`}
             >
               <kbd>{shortcut.label}</kbd>
@@ -1016,7 +1033,7 @@ export default function HomePage() {
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+              <div className="kx-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
                 {favoriteApps.map((app) => (
                   <CompactCard key={app.id} app={app} showStar />
                 ))}
@@ -1046,7 +1063,7 @@ export default function HomePage() {
           />
         ) : isSearchOrFilter ? (
           /* Flat grid when searching or filtering by category */
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3">
+          <div className="kx-grid grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3">
             {filteredApps.map((app) => (
               <AppCard key={app.id} app={app} showStar />
             ))}
@@ -1062,7 +1079,7 @@ export default function HomePage() {
                   </span>
                   <div className={`flex-1 h-px ${dk ? "bg-white/[0.04]" : "bg-black/[0.04]"}`} />
                 </div>
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3">
+                <div className="kx-grid grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3">
                   {group.apps.map((app) => (
                     <AppCard key={app.id} app={app} showStar />
                   ))}
@@ -1128,7 +1145,7 @@ function AppGridSkeleton({ dk }: { dk: boolean }) {
         <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400/70" />
         Loading your apps…
       </div>
-      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3">
+      <div className="kx-grid grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3">
         {Array.from({ length: 14 }).map((_, i) => (
           <div
             key={i}
