@@ -588,7 +588,7 @@ export default function FloatingPanel() {
                   }`}
                 >
                   <KoleexOrb state="idle" size={22} className={tab === "ai" ? "" : "opacity-40"} />
-                  <span>Copilot</span>
+                  <span>Koleex AI</span>
                 </button>
                 <button
                   onClick={() => { setTab("discuss"); setActiveChannel(null); }}
