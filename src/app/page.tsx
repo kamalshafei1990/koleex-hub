@@ -178,21 +178,106 @@ const DAILY_QUOTES: Record<string, string[]> = {
   ],
 };
 
-/* ── Clock Widget: Analog + Digital ── */
+/* ── 7-segment LED digit (hand-drawn SVG, no font dependency) ──
+   Segment layout:    a
+                    f   b
+                      g
+                    e   c
+                      d
+   `value` is "0".."9" or "" (blank → all segments off, like a real
+   LED clock blanking the leading hour digit). */
+const SEG_ON: Record<string, string> = {
+  "0": "abcdef",
+  "1": "bc",
+  "2": "abdeg",
+  "3": "abcdg",
+  "4": "bcfg",
+  "5": "acdfg",
+  "6": "acdefg",
+  "7": "abc",
+  "8": "abcdefg",
+  "9": "abcdfg",
+};
+const SEG_POLY: Record<string, string> = {
+  // horizontals (a/g/d) and verticals (f/b/e/c) in a 100×180 cell, T≈18
+  a: "14,14 23,5 77,5 86,14 77,23 23,23",
+  g: "14,90 23,81 77,81 86,90 77,99 23,99",
+  d: "14,166 23,157 77,157 86,166 77,175 23,175",
+  f: "14,22 23,31 23,73 14,82 5,73 5,31",
+  b: "86,22 95,31 95,73 86,82 77,73 77,31",
+  e: "14,98 23,107 23,149 14,158 5,149 5,107",
+  c: "86,98 95,107 95,149 86,158 77,149 77,107",
+};
+function SevenSeg({ value, h = 52 }: { value: string; h?: number }) {
+  const on = SEG_ON[value] ?? "";
+  const w = (h * 100) / 180;
+  return (
+    <svg
+      width={w}
+      height={h}
+      viewBox="0 0 100 180"
+      style={{ display: "block", overflow: "visible" }}
+      aria-hidden
+    >
+      {(["a", "b", "c", "d", "e", "f", "g"] as const).map((s) => {
+        const lit = on.includes(s);
+        return (
+          <polygon
+            key={s}
+            points={SEG_POLY[s]}
+            fill={lit ? "#ffffff" : "rgba(255,255,255,0.045)"}
+            style={
+              lit
+                ? { filter: "drop-shadow(0 0 4px rgba(255,255,255,.55))" }
+                : undefined
+            }
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
+/* Small bell glyph for the alarm indicators (decorative, matches the
+   reference clock face). */
+function BellGlyph({ size = 13, dim = true }: { size?: number; dim?: boolean }) {
+  const c = dim ? "rgba(255,255,255,0.4)" : "#ffffff";
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
+      <path
+        d="M12 2.2a1.4 1.4 0 0 1 1.4 1.4v.7a6 6 0 0 1 4.6 5.8v3.4l1.4 2.3a.8.8 0 0 1-.7 1.2H5.3a.8.8 0 0 1-.7-1.2L6 13.5V10.1a6 6 0 0 1 4.6-5.8v-.7A1.4 1.4 0 0 1 12 2.2Z"
+        fill={c}
+      />
+      <path d="M9.7 19.4h4.6a2.3 2.3 0 0 1-4.6 0Z" fill={c} />
+    </svg>
+  );
+}
+
+/* ── Clock Widget: LED alarm-clock style (Westclox-inspired) ──
+   A black device face with white 7-segment digits, an AM/PM indicator,
+   alarm-bell dots and a KOLEEX label. Always dark (an LED clock reads best
+   on black) with the date above and timezone below. */
 function ClockWidget({ dk = true }: { dk?: boolean }) {
-  const [t, setT] = useState<{ hh: string; mm: string; ss: string }>({
-    hh: "--",
-    mm: "--",
-    ss: "--",
+  const [t, setT] = useState<{ h12: string; mm: string; pm: boolean }>({
+    h12: "",
+    mm: "",
+    pm: false,
   });
   const [tzLabel, setTzLabel] = useState("");
   const [dateLabel, setDateLabel] = useState("");
 
   useEffect(() => {
-    const pad = (n: number) => n.toString().padStart(2, "0");
     const tick = () => {
       const now = new Date();
-      setT({ hh: pad(now.getHours()), mm: pad(now.getMinutes()), ss: pad(now.getSeconds()) });
+      const h24 = now.getHours();
+      const pm = h24 >= 12;
+      let h = h24 % 12;
+      if (h === 0) h = 12; // 12-hour clock
+      setT({
+        h12: h.toString(),
+        mm: now.getMinutes().toString().padStart(2, "0"),
+        pm,
+      });
       setDateLabel(
         now.toLocaleDateString(undefined, {
           weekday: "long",
@@ -222,27 +307,81 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
     return () => clearInterval(id);
   }, []);
 
-  /* Digital clock — monochrome, monospace, right-aligned. Matches the Hub's
-     card/typography grammar: dimmed colon + seconds, quiet timezone meta. */
+  /* 4-digit display: leading hour digit blanks when hour < 10 (real LED look). */
+  const h1 = t.h12.length === 2 ? t.h12[0] : "";
+  const h2 = t.h12.length === 2 ? t.h12[1] : t.h12;
+  const DOT = "rgba(255,255,255,0.9)";
+
   return (
     <div className="shrink-0 hidden sm:flex flex-col items-center justify-center">
-      {/* date sits above the time */}
+      {/* date sits above the device */}
       {dateLabel && (
         <span className={`mb-2 text-[12px] font-medium ${dk ? "text-white/45" : "text-black/45"}`}>
           {dateLabel}
         </span>
       )}
+
+      {/* LED alarm-clock device face */}
       <div
-        className={`flex items-start font-mono tabular-nums leading-none ${
-          dk ? "text-white/90" : "text-black/90"
-        }`}
+        className="relative rounded-[26px] px-5 py-4 md:px-7 md:py-5"
+        style={{
+          background:
+            "radial-gradient(120% 140% at 50% 0%, #1c1c1f 0%, #0c0c0e 55%, #050506 100%)",
+          border: "1px solid rgba(255,255,255,0.07)",
+          boxShadow:
+            "inset 0 1px 0 rgba(255,255,255,0.10), inset 0 -10px 24px rgba(0,0,0,0.6), 0 14px 30px -12px rgba(0,0,0,0.8)",
+        }}
       >
-        <span className="text-[34px] md:text-[42px] font-semibold tracking-tight">
-          {t.hh}
-          <span className={`mx-1 ${dk ? "text-white" : "text-black"}`}>:</span>
-          {t.mm}
-        </span>
+        <div className="flex items-center gap-3 md:gap-4">
+          {/* Left indicator stack: PM/AM + alarm bell */}
+          <div className="flex flex-col items-center gap-2 pe-1">
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] font-bold tracking-wide text-white/85 leading-none">
+                {t.pm ? "PM" : "AM"}
+              </span>
+              <span
+                className="inline-block h-1.5 w-1.5 rounded-full"
+                style={{ background: DOT, boxShadow: "0 0 4px rgba(255,255,255,.5)" }}
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <BellGlyph size={12} dim />
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-white/20" />
+            </div>
+          </div>
+
+          {/* HH : MM in 7-segment digits */}
+          <div className="flex items-center gap-[5px] md:gap-[7px]">
+            <SevenSeg value={h1} h={50} />
+            <SevenSeg value={h2} h={50} />
+            {/* colon */}
+            <div className="flex flex-col justify-center gap-3 px-[3px]">
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ background: DOT, boxShadow: "0 0 4px rgba(255,255,255,.5)" }}
+              />
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ background: DOT, boxShadow: "0 0 4px rgba(255,255,255,.5)" }}
+              />
+            </div>
+            <SevenSeg value={t.mm[0]} h={50} />
+            <SevenSeg value={t.mm[1]} h={50} />
+          </div>
+
+          {/* Right indicator: alarm 2 bell */}
+          <div className="flex items-center gap-1 ps-1">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-white/20" />
+            <BellGlyph size={12} dim />
+          </div>
+        </div>
+
+        {/* brand label, like the printed logo on the reference clock */}
+        <div className="mt-1 text-center text-[10px] font-bold tracking-[0.35em] text-white/30 select-none">
+          KOLEEX
+        </div>
       </div>
+
       {tzLabel && (
         <span className={`mt-2 text-[11px] font-medium tracking-wide ${dk ? "text-white/30" : "text-black/35"}`}>
           {tzLabel}
