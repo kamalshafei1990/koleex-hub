@@ -60,3 +60,6 @@ next-env.d.ts
 
 # Vendored UI/UX Pro Max skill source (installed into ~/.claude/skills; not app code)
 ui-ux-pro-max-skill-main/
+
+# OCR language packs — fetched at build time, not committed
+tessdata/
