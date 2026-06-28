@@ -238,21 +238,6 @@ function SevenSeg({ value, h = 52 }: { value: string; h?: number }) {
   );
 }
 
-/* Small bell glyph for the alarm indicators (decorative, matches the
-   reference clock face). */
-function BellGlyph({ size = 13, dim = true }: { size?: number; dim?: boolean }) {
-  const c = dim ? "rgba(255,255,255,0.4)" : "#ffffff";
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
-      <path
-        d="M12 2.2a1.4 1.4 0 0 1 1.4 1.4v.7a6 6 0 0 1 4.6 5.8v3.4l1.4 2.3a.8.8 0 0 1-.7 1.2H5.3a.8.8 0 0 1-.7-1.2L6 13.5V10.1a6 6 0 0 1 4.6-5.8v-.7A1.4 1.4 0 0 1 12 2.2Z"
-        fill={c}
-      />
-      <path d="M9.7 19.4h4.6a2.3 2.3 0 0 1-4.6 0Z" fill={c} />
-    </svg>
-  );
-}
-
 /* ── Clock Widget: LED alarm-clock style (Westclox-inspired) ──
    A black device face with white 7-segment digits, an AM/PM indicator,
    alarm-bell dots and a KOLEEX label. Always dark (an LED clock reads best
@@ -321,65 +306,23 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
         </span>
       )}
 
-      {/* LED alarm-clock device face */}
-      <div
-        className="relative rounded-[26px] px-5 py-4 md:px-7 md:py-5"
-        style={{
-          background:
-            "radial-gradient(120% 140% at 50% 0%, #1c1c1f 0%, #0c0c0e 55%, #050506 100%)",
-          border: "1px solid rgba(255,255,255,0.07)",
-          boxShadow:
-            "inset 0 1px 0 rgba(255,255,255,0.10), inset 0 -10px 24px rgba(0,0,0,0.6), 0 14px 30px -12px rgba(0,0,0,0.8)",
-        }}
-      >
-        <div className="flex items-center gap-3 md:gap-4">
-          {/* Left indicator stack: PM/AM + alarm bell */}
-          <div className="flex flex-col items-center gap-2 pe-1">
-            <div className="flex items-center gap-1">
-              <span className="text-[11px] font-bold tracking-wide text-white/85 leading-none">
-                {t.pm ? "PM" : "AM"}
-              </span>
-              <span
-                className="inline-block h-1.5 w-1.5 rounded-full"
-                style={{ background: DOT, boxShadow: "0 0 4px rgba(255,255,255,.5)" }}
-              />
-            </div>
-            <div className="flex items-center gap-1">
-              <BellGlyph size={12} dim />
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-white/20" />
-            </div>
-          </div>
-
-          {/* HH : MM in 7-segment digits */}
-          <div className="flex items-center gap-[5px] md:gap-[7px]">
-            <SevenSeg value={h1} h={50} />
-            <SevenSeg value={h2} h={50} />
-            {/* colon */}
-            <div className="flex flex-col justify-center gap-3 px-[3px]">
-              <span
-                className="h-2 w-2 rounded-full"
-                style={{ background: DOT, boxShadow: "0 0 4px rgba(255,255,255,.5)" }}
-              />
-              <span
-                className="h-2 w-2 rounded-full"
-                style={{ background: DOT, boxShadow: "0 0 4px rgba(255,255,255,.5)" }}
-              />
-            </div>
-            <SevenSeg value={t.mm[0]} h={50} />
-            <SevenSeg value={t.mm[1]} h={50} />
-          </div>
-
-          {/* Right indicator: alarm 2 bell */}
-          <div className="flex items-center gap-1 ps-1">
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-white/20" />
-            <BellGlyph size={12} dim />
-          </div>
+      {/* LED 7-segment time — frameless */}
+      <div className="flex items-center gap-[5px] md:gap-[7px]">
+        <SevenSeg value={h1} h={50} />
+        <SevenSeg value={h2} h={50} />
+        {/* colon */}
+        <div className="flex flex-col justify-center gap-3 px-[3px]">
+          <span
+            className="h-2 w-2 rounded-full"
+            style={{ background: DOT, boxShadow: "0 0 4px rgba(255,255,255,.5)" }}
+          />
+          <span
+            className="h-2 w-2 rounded-full"
+            style={{ background: DOT, boxShadow: "0 0 4px rgba(255,255,255,.5)" }}
+          />
         </div>
-
-        {/* brand label, like the printed logo on the reference clock */}
-        <div className="mt-1 text-center text-[10px] font-bold tracking-[0.35em] text-white/30 select-none">
-          KOLEEX
-        </div>
+        <SevenSeg value={t.mm[0]} h={50} />
+        <SevenSeg value={t.mm[1]} h={50} />
       </div>
 
       {tzLabel && (
