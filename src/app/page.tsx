@@ -308,21 +308,21 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
 
       {/* LED 7-segment time — frameless */}
       <div className="flex items-center gap-[5px] md:gap-[7px]">
-        <SevenSeg value={h1} h={50} />
-        <SevenSeg value={h2} h={50} />
+        <SevenSeg value={h1} h={78} />
+        <SevenSeg value={h2} h={78} />
         {/* colon */}
-        <div className="flex flex-col justify-center gap-3 px-[3px]">
+        <div className="flex flex-col justify-center gap-5 px-[4px]">
           <span
-            className="h-2 w-2 rounded-full"
+            className="h-3 w-3 rounded-full"
             style={{ background: DOT, boxShadow: "0 0 4px rgba(255,255,255,.5)" }}
           />
           <span
-            className="h-2 w-2 rounded-full"
+            className="h-3 w-3 rounded-full"
             style={{ background: DOT, boxShadow: "0 0 4px rgba(255,255,255,.5)" }}
           />
         </div>
-        <SevenSeg value={t.mm[0]} h={50} />
-        <SevenSeg value={t.mm[1]} h={50} />
+        <SevenSeg value={t.mm[0]} h={78} />
+        <SevenSeg value={t.mm[1]} h={78} />
       </div>
 
       {tzLabel && (
