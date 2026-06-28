@@ -106,9 +106,12 @@ export default function ReportIssueButton() {
         title={t("qa.report.fabTitle", "Report an issue or suggestion")}
         aria-label={t("qa.report.title", "Report an issue")}
         data-qa-capture-skip=""
-        className="fixed end-6 bottom-[5.25rem] z-[80] flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--bg-secondary)]/95 text-[var(--text-secondary)] shadow-lg backdrop-blur-md transition-colors hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]"
+        /* Sits as a clean stacked dock above the AI/Discuss FAB — same end-6
+           rail, matched size + shadow material so the two read as a family. */
+        className="fixed end-6 bottom-[5.75rem] z-[80] flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--bg-secondary)]/95 text-[var(--text-secondary)] backdrop-blur-md transition-colors hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]"
+        style={{ boxShadow: "0 4px 14px rgba(0,0,0,0.30), 0 0 0 1px rgba(255,255,255,0.04)" }}
       >
-        <MessageSquarePlusIcon size={17} />
+        <MessageSquarePlusIcon size={16} />
       </button>
     );
   }
