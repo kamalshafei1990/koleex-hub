@@ -277,12 +277,31 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
   );
 }
 
+/* Module-scope guard so the tile entrance animation plays once per full page
+   load, then is permanently disabled — not every time the grid re-renders or
+   remounts (which was making it loop). The flag is flipped when the intro
+   ENDS, so re-mounts during the brief intro window don't trap it on. */
+let kxIntroDone = false;
+
 export default function HomePage() {
   const router = useRouter();
   const pathname = usePathname();
   const { t, lang } = useTranslation(hubT);
   const currentAppId = getActiveAppId(pathname);
   const { account } = useCurrentAccount();
+
+  /* One-shot intro motion: on for the first load only (initializer reads the
+     module guard so any later mount starts already-off), then switched off
+     after the animation window and the guard latched so it never replays. */
+  const [introMotion, setIntroMotion] = useState(() => !kxIntroDone);
+  useEffect(() => {
+    if (!introMotion) return;
+    const off = setTimeout(() => {
+      kxIntroDone = true;
+      setIntroMotion(false);
+    }, 1000);
+    return () => clearTimeout(off);
+  }, [introMotion]);
 
   /* ── Derive user's first name for greeting ── */
   const firstName = useMemo(() => {
@@ -1063,7 +1082,7 @@ export default function HomePage() {
           />
         ) : isSearchOrFilter ? (
           /* Flat grid when searching or filtering by category */
-          <div className="kx-grid grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3">
+          <div className={`${introMotion ? "kx-grid " : ""}grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3`}>
             {filteredApps.map((app) => (
               <AppCard key={app.id} app={app} showStar />
             ))}
@@ -1079,7 +1098,7 @@ export default function HomePage() {
                   </span>
                   <div className={`flex-1 h-px ${dk ? "bg-white/[0.04]" : "bg-black/[0.04]"}`} />
                 </div>
-                <div className="kx-grid grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3">
+                <div className={`${introMotion ? "kx-grid " : ""}grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3`}>
                   {group.apps.map((app) => (
                     <AppCard key={app.id} app={app} showStar />
                   ))}
@@ -1145,7 +1164,7 @@ function AppGridSkeleton({ dk }: { dk: boolean }) {
         <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400/70" />
         Loading your apps…
       </div>
-      <div className="kx-grid grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3">
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3">
         {Array.from({ length: 14 }).map((_, i) => (
           <div
             key={i}
