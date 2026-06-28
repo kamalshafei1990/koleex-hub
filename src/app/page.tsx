@@ -243,10 +243,11 @@ function SevenSeg({ value, h = 52 }: { value: string; h?: number }) {
    alarm-bell dots and a KOLEEX label. Always dark (an LED clock reads best
    on black) with the date above and timezone below. */
 function ClockWidget({ dk = true }: { dk?: boolean }) {
-  const [t, setT] = useState<{ h12: string; mm: string; pm: boolean }>({
+  const [t, setT] = useState<{ h12: string; mm: string; pm: boolean; blink: boolean }>({
     h12: "",
     mm: "",
     pm: false,
+    blink: true,
   });
   const [tzLabel, setTzLabel] = useState("");
   const [dateLabel, setDateLabel] = useState("");
@@ -262,6 +263,7 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
         h12: h.toString(),
         mm: now.getMinutes().toString().padStart(2, "0"),
         pm,
+        blink: now.getSeconds() % 2 === 0, // colon flashes each second
       });
       setDateLabel(
         now.toLocaleDateString(undefined, {
@@ -310,8 +312,11 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
       <div className="flex items-center gap-[5px] md:gap-[7px]">
         <SevenSeg value={h1} h={78} />
         <SevenSeg value={h2} h={78} />
-        {/* colon */}
-        <div className="flex flex-col justify-center gap-5 px-[4px]">
+        {/* colon — flashes once per second */}
+        <div
+          className="flex flex-col justify-center gap-5 px-[4px] transition-opacity duration-200"
+          style={{ opacity: t.blink ? 1 : 0.12 }}
+        >
           <span
             className="h-3 w-3 rounded-full"
             style={{ background: DOT, boxShadow: "0 0 4px rgba(255,255,255,.5)" }}
