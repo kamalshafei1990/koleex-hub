@@ -1,9 +1,13 @@
 import "server-only";
 
-/* Catalogs belonging to a supplier. The Catalogs app links each catalog to a
-   contact via catalogs.contact_id; a supplier row references that same contact
-   via suppliers.contact_id. So a supplier's catalogs = catalogs where
-   contact_id == supplier.contact_id. Tenant-scoped, read-only. */
+/* Catalogs belonging to a supplier.
+
+   In this app a SUPPLIER *is* a row in `contacts` (contact_type='supplier') and
+   the Catalogs app links each catalog straight to that contact via
+   `catalogs.contact_id`. So the supplier id passed in IS the contact id, and a
+   supplier's catalogs = catalogs where contact_id == id. Tenant-scoped,
+   read-only. (Earlier this indirected through a non-existent `suppliers` table,
+   which 404'd and showed "no catalogs" even when catalogs were linked.) */
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
@@ -14,9 +18,10 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   if (auth instanceof NextResponse) return auth;
   const { id } = await ctx.params;
 
+  // The supplier is a contacts row; load it for the name fallback + existence.
   const { data: sup, error: sErr } = await supabaseServer
-    .from("suppliers")
-    .select("id, contact_id, company_name, company_name_en, name")
+    .from("contacts")
+    .select("id, display_name, company, company_name_en, company_name_cn")
     .eq("tenant_id", auth.tenant_id)
     .eq("id", id)
     .maybeSingle();
@@ -26,32 +31,45 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   }
   if (!sup) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-  const cols = "id, title, title_cn, description, cover_url, file_url, file_path, file_type, year, valid_until, page_count, category_name, category_names, created_at";
-  let rows: unknown[] = [];
+  const cols = "id, title, title_cn, description, cover_url, file_url, file_path, file_type, year, valid_until, page_count, category_name, category_names, contact_id, company_name_en, company_name_cn, created_at";
 
-  if (sup.contact_id) {
-    const { data, error } = await supabaseServer
-      .from("catalogs")
-      .select(cols)
-      .eq("tenant_id", auth.tenant_id)
-      .eq("contact_id", sup.contact_id)
-      .order("created_at", { ascending: false });
-    if (error) {
-      console.error("[api/suppliers/[id]/catalogs by-contact]", error.message);
-      return NextResponse.json({ error: "Lookup failed." }, { status: 500 });
+  // Primary link: catalogs filed directly against this supplier's contact id.
+  const { data: linked, error: lErr } = await supabaseServer
+    .from("catalogs")
+    .select(cols)
+    .eq("tenant_id", auth.tenant_id)
+    .eq("contact_id", id)
+    .order("created_at", { ascending: false });
+  if (lErr) {
+    console.error("[api/suppliers/[id]/catalogs by-contact]", lErr.message);
+    return NextResponse.json({ error: "Lookup failed." }, { status: 500 });
+  }
+
+  const rows: Record<string, unknown>[] = [...(linked ?? [])];
+
+  // Best-effort fallback: catalogs that name this company but were never linked
+  // to the contact (e.g. uploaded before the supplier existed). Merge by id.
+  const names = [sup.company_name_en, sup.company_name_cn, sup.display_name, sup.company]
+    .map((s) => (s || "").trim())
+    .filter((s) => s.length >= 3);
+  if (names.length) {
+    const ors: string[] = [];
+    for (const nm of names) {
+      const safe = nm.replace(/[%,()]/g, " ").trim();
+      if (!safe) continue;
+      ors.push(`company_name_en.ilike.%${safe}%`, `company_name_cn.ilike.%${safe}%`, `title.ilike.%${safe}%`);
     }
-    rows = data ?? [];
-  } else {
-    // Fallback: no linked contact — match by company name (best-effort).
-    const nm = (sup.company_name_en || sup.company_name || sup.name || "").trim();
-    if (nm) {
-      const { data } = await supabaseServer
+    if (ors.length) {
+      const { data: byName } = await supabaseServer
         .from("catalogs")
         .select(cols)
         .eq("tenant_id", auth.tenant_id)
-        .or(`company_name_en.ilike.%${nm}%,company_name_cn.ilike.%${nm}%`)
+        .or(ors.join(","))
         .order("created_at", { ascending: false });
-      rows = data ?? [];
+      const seen = new Set(rows.map((r) => String(r.id)));
+      for (const r of byName ?? []) {
+        if (!seen.has(String(r.id))) { seen.add(String(r.id)); rows.push(r as Record<string, unknown>); }
+      }
     }
   }
 
