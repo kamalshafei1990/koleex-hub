@@ -4037,6 +4037,25 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     reader.onload = () => { const u = String(reader.result || ""); if (u) setLogoCropSrc(u); };
     reader.readAsDataURL(file);
   }, []);
+  /* Paste a screenshot directly while the supplier form is open: take a
+     clipboard screenshot (⌃⌘⇧4 on macOS) then ⌘V here → the square cropper
+     opens. Only acts on image clipboard data, so text paste is untouched. */
+  useEffect(() => {
+    if (view !== "form") return;
+    const onPaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const it of items) {
+        if (it.type.startsWith("image/")) {
+          const file = it.getAsFile();
+          if (file) { e.preventDefault(); openLogoCrop(file); }
+          return;
+        }
+      }
+    };
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, [view, openLogoCrop]);
   const importIntoForm = useCallback((prefill: Partial<ContactForm>, catalogFile: File | null) => {
     pendingCatalogFileRef.current = catalogFile;
     setForm({ ...EMPTY_FORM, contact_type: "supplier", entity_type: "company", division: "Garment Machinery", currency: "CNY", ...prefill });
@@ -7045,7 +7064,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   e.target.value = "";
                 }} />
               </label>
-              <p className="mt-2 text-[11px] text-[var(--text-muted)]">{t("photo.hint", "Upload an image or screenshot — then crop it to a square.")}</p>
+              <p className="mt-2 text-[11px] text-[var(--text-muted)]">{t("photo.hint", "Upload an image, or paste a screenshot (⌘V) — then crop it to a square.")}</p>
             </>
           )}
 
