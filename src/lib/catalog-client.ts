@@ -20,6 +20,80 @@ function pickPages<T>(pages: T[]): number[] {
   return [...idx].sort((a, b) => a - b);
 }
 
+export interface CoverImage {
+  dataUrl: string;
+  width: number;
+  height: number;
+}
+
+/** Convert unpdf's raw pixel buffer (1/3/4 channels) to a PNG data URL. */
+function rawToDataUrl(img: { data: Uint8ClampedArray; width: number; height: number; channels: 1 | 3 | 4 }): string | null {
+  const { data, width, height, channels } = img;
+  if (!width || !height) return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  const rgba = new Uint8ClampedArray(width * height * 4);
+  if (channels === 4) {
+    rgba.set(data.subarray(0, rgba.length));
+  } else if (channels === 3) {
+    for (let i = 0, j = 0; i < width * height; i++) {
+      rgba[j++] = data[i * 3];
+      rgba[j++] = data[i * 3 + 1];
+      rgba[j++] = data[i * 3 + 2];
+      rgba[j++] = 255;
+    }
+  } else {
+    for (let i = 0; i < width * height; i++) {
+      const v = data[i];
+      rgba[i * 4] = v; rgba[i * 4 + 1] = v; rgba[i * 4 + 2] = v; rgba[i * 4 + 3] = 255;
+    }
+  }
+  ctx.putImageData(new ImageData(rgba, width, height), 0, 0);
+  return canvas.toDataURL("image/png");
+}
+
+/**
+ * Pull the embedded images from the first couple of pages so the user can pick
+ * the supplier logo. Tiny icons and enormous full-page photos are filtered out
+ * — logos are typically small-to-medium. Returns biggest-first, capped.
+ */
+export async function extractCoverImages(file: File): Promise<CoverImage[]> {
+  try {
+    const { getDocumentProxy, extractImages } = await import("unpdf");
+    const master = new Uint8Array(await file.arrayBuffer());
+    const pdf = await getDocumentProxy(master.slice());
+    const pages = Math.min(2, pdf.numPages || 1);
+    const out: CoverImage[] = [];
+    const seen = new Set<string>();
+    for (let p = 1; p <= pages; p++) {
+      let imgs: Awaited<ReturnType<typeof extractImages>> = [];
+      try {
+        imgs = await extractImages(pdf, p);
+      } catch {
+        continue;
+      }
+      for (const img of imgs) {
+        const { width, height } = img;
+        if (width < 40 || height < 40) continue; // icon noise
+        if (width > 1600 || height > 1600) continue; // full-page artwork
+        const dataUrl = rawToDataUrl(img);
+        if (!dataUrl || seen.has(dataUrl)) continue;
+        seen.add(dataUrl);
+        out.push({ dataUrl, width, height });
+        if (out.length >= 12) break;
+      }
+      if (out.length >= 12) break;
+    }
+    // Largest first — the logo is usually one of the more prominent marks.
+    return out.sort((a, b) => b.width * b.height - a.width * a.height);
+  } catch {
+    return [];
+  }
+}
+
 export interface CatalogReadResult {
   text: string;
   usedOcr: boolean;
