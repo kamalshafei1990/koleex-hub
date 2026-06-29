@@ -64,15 +64,19 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated }: 
   const [manualLogos, setManualLogos] = useState<string[]>([]);
   /** Rendered cover pages, for cropping a logo out of vector/scanned covers. */
   const [coverPages, setCoverPages] = useState<string[]>([]);
-  const [cropOpen, setCropOpen] = useState(false);
+  /** Images currently open in the square cropper (cover pages OR an upload). */
+  const [cropImages, setCropImages] = useState<string[]>([]);
+  const cropOpen = cropImages.length > 0;
 
+  // Uploading a screenshot/logo opens the SAME square cropper so the result is
+  // always a clean square logo.
   const onPickLogo = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f || !f.type.startsWith("image/")) return;
     const reader = new FileReader();
     reader.onload = () => {
       const url = String(reader.result || "");
-      if (url) { setManualLogos((m) => [url, ...m]); setLogo(url); }
+      if (url) setCropImages([url]);
     };
     reader.readAsDataURL(f);
     e.target.value = "";
@@ -80,7 +84,7 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated }: 
 
   const reset = useCallback(() => {
     setPhase("pick"); setFile(null); setProgress(""); setUsedOcr(false);
-    setDraft(EMPTY); setLogos([]); setLogo(null); setManualLogos([]); setCoverPages([]); setCropOpen(false); setError(null); setCreatedId(null);
+    setDraft(EMPTY); setLogos([]); setLogo(null); setManualLogos([]); setCoverPages([]); setCropImages([]); setError(null); setCreatedId(null);
   }, []);
 
   const close = useCallback(() => { reset(); onClose(); }, [reset, onClose]);
@@ -303,7 +307,7 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated }: 
                     <span className="text-[16px] leading-none">+</span>Upload
                   </button>
                   {coverPages.length > 0 && (
-                    <button onClick={() => setCropOpen(true)}
+                    <button onClick={() => setCropImages(coverPages)}
                       className="h-16 w-16 rounded-lg text-[10px] leading-tight px-1 flex flex-col items-center justify-center gap-0.5"
                       style={{ border: "2px dashed var(--border-subtle, #ccc)", color: "var(--text-dim, #888)" }}>
                       <span className="text-[15px] leading-none">✂</span>Crop from cover
@@ -399,76 +403,108 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated }: 
         </div>
       </div>
 
-      {cropOpen && coverPages.length > 0 && (
+      {cropOpen && (
         <CropOverlay
-          pages={coverPages}
-          onCancel={() => setCropOpen(false)}
-          onCrop={(dataUrl) => { setManualLogos((m) => [dataUrl, ...m]); setLogo(dataUrl); setCropOpen(false); }}
+          images={cropImages}
+          onCancel={() => setCropImages([])}
+          onCrop={(dataUrl) => { setManualLogos((m) => [dataUrl, ...m]); setLogo(dataUrl); setCropImages([]); }}
         />
       )}
     </div>
   );
 }
 
-/* ── crop-from-cover overlay ── */
-function CropOverlay({ pages, onCancel, onCrop }: { pages: string[]; onCancel: () => void; onCrop: (dataUrl: string) => void }) {
+/* ── square logo cropper (cover page OR uploaded screenshot) ──
+   The selection is LOCKED to a square — you can move it and resize it (drag the
+   corner handle) but it always stays 1:1, so the saved logo is always square. */
+function CropOverlay({ images, onCancel, onCrop }: { images: string[]; onCancel: () => void; onCrop: (dataUrl: string) => void }) {
   const [page, setPage] = useState(0);
   const imgRef = useRef<HTMLImageElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const [sel, setSel] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
-  const drag = useRef<{ x: number; y: number } | null>(null);
+  const [disp, setDisp] = useState<{ w: number; h: number } | null>(null);
+  const [sel, setSel] = useState<{ x: number; y: number; size: number } | null>(null);
+  const mode = useRef<null | { type: "move" | "resize"; px: number; py: number; ox: number; oy: number; os: number }>(null);
 
-  const rel = (e: React.PointerEvent) => {
-    const r = wrapRef.current!.getBoundingClientRect();
-    return { x: Math.max(0, Math.min(e.clientX - r.left, r.width)), y: Math.max(0, Math.min(e.clientY - r.top, r.height)) };
+  // Center a square (~70% of the shorter side) once the image lays out.
+  const initSquare = (w: number, h: number) => {
+    const size = Math.round(Math.min(w, h) * 0.7);
+    setDisp({ w, h });
+    setSel({ x: Math.round((w - size) / 2), y: Math.round((h - size) / 2), size });
   };
-  const onDown = (e: React.PointerEvent) => { const p = rel(e); drag.current = p; setSel({ x: p.x, y: p.y, w: 0, h: 0 }); (e.target as Element).setPointerCapture?.(e.pointerId); };
+  const onImgLoad = () => {
+    const img = imgRef.current;
+    if (img) initSquare(img.clientWidth, img.clientHeight);
+  };
+
+  const startMove = (e: React.PointerEvent) => {
+    if (!sel) return;
+    e.stopPropagation();
+    mode.current = { type: "move", px: e.clientX, py: e.clientY, ox: sel.x, oy: sel.y, os: sel.size };
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+  };
+  const startResize = (e: React.PointerEvent) => {
+    if (!sel) return;
+    e.stopPropagation();
+    mode.current = { type: "resize", px: e.clientX, py: e.clientY, ox: sel.x, oy: sel.y, os: sel.size };
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+  };
   const onMove = (e: React.PointerEvent) => {
-    if (!drag.current) return;
-    const p = rel(e); const s = drag.current;
-    setSel({ x: Math.min(s.x, p.x), y: Math.min(s.y, p.y), w: Math.abs(p.x - s.x), h: Math.abs(p.y - s.y) });
+    const m = mode.current;
+    if (!m || !sel || !disp) return;
+    const dx = e.clientX - m.px, dy = e.clientY - m.py;
+    if (m.type === "move") {
+      setSel({ size: m.os, x: clamp(m.ox + dx, 0, disp.w - m.os), y: clamp(m.oy + dy, 0, disp.h - m.os) });
+    } else {
+      const maxS = Math.min(disp.w - m.ox, disp.h - m.oy);
+      const size = clamp(m.os + Math.max(dx, dy), 40, maxS);
+      setSel({ x: m.ox, y: m.oy, size });
+    }
   };
-  const onUp = () => { drag.current = null; };
+  const onUp = () => { mode.current = null; };
 
   const doCrop = () => {
     const img = imgRef.current;
-    if (!img) return;
-    const dispW = img.clientWidth, dispH = img.clientHeight;
-    const region = sel && sel.w > 8 && sel.h > 8 ? sel : { x: 0, y: 0, w: dispW, h: dispH };
-    const sx = img.naturalWidth / dispW, sy = img.naturalHeight / dispH;
+    if (!img || !sel) return;
+    const s = img.naturalWidth / img.clientWidth; // square pixels → sx == sy
+    const side = Math.round(sel.size * s);
     const canvas = document.createElement("canvas");
-    canvas.width = Math.round(region.w * sx);
-    canvas.height = Math.round(region.h * sy);
+    canvas.width = side; canvas.height = side;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    ctx.drawImage(img, region.x * sx, region.y * sy, region.w * sx, region.h * sy, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, sel.x * s, sel.y * s, sel.size * s, sel.size * s, 0, 0, side, side);
     onCrop(canvas.toDataURL("image/png"));
   };
 
   return (
-    <div className="fixed inset-0 z-[210] flex flex-col items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.75)" }}>
-      <div className="mb-3 text-[13px] text-white/90">Drag a box around the logo, then crop. (No selection = whole page.)</div>
-      <div ref={wrapRef} className="relative inline-block touch-none select-none" style={{ maxHeight: "70vh", overflow: "hidden" }}
-        onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}>
+    <div className="fixed inset-0 z-[210] flex flex-col items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.8)" }}>
+      <div className="mb-3 text-[13px] text-white/90">Move the square over the logo · drag the corner to resize · it stays square.</div>
+      <div ref={wrapRef} className="relative inline-block touch-none select-none" style={{ maxHeight: "68vh" }} onPointerMove={onMove} onPointerUp={onUp}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img ref={imgRef} src={pages[page]} alt="cover" draggable={false} style={{ maxHeight: "70vh", display: "block" }} />
+        <img ref={imgRef} src={images[page]} alt="source" draggable={false} onLoad={onImgLoad} style={{ maxHeight: "68vh", maxWidth: "86vw", display: "block" }} />
         {sel && (
-          <div className="absolute pointer-events-none" style={{ left: sel.x, top: sel.y, width: sel.w, height: sel.h, border: `2px solid ${ACCENT}`, background: "rgba(0,102,255,0.12)" }} />
+          <div className="absolute" onPointerDown={startMove}
+            style={{ left: sel.x, top: sel.y, width: sel.size, height: sel.size, border: `2px solid ${ACCENT}`, boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)", cursor: "move" }}>
+            <div onPointerDown={startResize}
+              className="absolute -right-2 -bottom-2 h-5 w-5 rounded-full"
+              style={{ background: ACCENT, border: "2px solid #fff", cursor: "nwse-resize" }} />
+          </div>
         )}
       </div>
       <div className="mt-3 flex items-center gap-2">
-        {pages.length > 1 && pages.map((_, i) => (
-          <button key={i} onClick={() => { setPage(i); setSel(null); }}
+        {images.length > 1 && images.map((_, i) => (
+          <button key={i} onClick={() => { setPage(i); setSel(null); setDisp(null); }}
             className="px-3 py-1.5 text-[12px] rounded-lg"
             style={{ background: i === page ? ACCENT : "rgba(255,255,255,0.12)", color: "#fff" }}>Page {i + 1}</button>
         ))}
         <div className="w-3" />
         <button onClick={onCancel} className="px-3 py-1.5 text-[13px] rounded-lg text-white/80 hover:text-white">Cancel</button>
-        <button onClick={doCrop} className="px-4 py-1.5 text-[13px] font-semibold rounded-lg" style={{ background: "#fff", color: "#111" }}>Use crop</button>
+        <button onClick={doCrop} className="px-4 py-1.5 text-[13px] font-semibold rounded-lg" style={{ background: "#fff", color: "#111" }}>Use square</button>
       </div>
     </div>
   );
 }
+
+function clamp(v: number, min: number, max: number) { return Math.max(min, Math.min(v, max)); }
 
 /* ── helpers ── */
 function updatePerson(
