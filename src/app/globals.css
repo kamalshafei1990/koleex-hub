@@ -678,3 +678,12 @@ input[type="number"]:not(.kx-spinner) {
   .kx-tab-in { animation: none; }
 }
 
+
+/* Catalog import → New Supplier form: green border on auto-filled (non-empty)
+   inputs so the operator sees what was pre-filled vs still empty. Only active
+   inside the import form-modal; after Save the supplier renders without this
+   wrapper, so borders return to normal. */
+.kx-import-fill input:not(:placeholder-shown):not([type="file"]),
+.kx-import-fill textarea:not(:placeholder-shown) {
+  border-color: rgba(10, 138, 74, 0.75) !important;
+}
