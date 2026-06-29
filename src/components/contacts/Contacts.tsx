@@ -4004,34 +4004,6 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     setExpandedFamily(null);
   }, []);
 
-  /* Catalog import → open the REAL New Supplier form pre-filled with the
-     extracted data, so the operator reviews/edits in the exact same form (and
-     completes required Division/Category). The PDF is filed against the new
-     supplier after Save (see handleSave create-success). */
-  const pendingCatalogFileRef = useRef<File | null>(null);
-  const importIntoForm = useCallback((prefill: Partial<ContactForm>, catalogFile: File | null) => {
-    pendingCatalogFileRef.current = catalogFile;
-    setForm({
-      ...EMPTY_FORM,
-      contact_type: "supplier",
-      entity_type: "company",
-      division: "Garment Machinery",
-      currency: "CNY",
-      ...prefill,
-    });
-    setTriedSave(false);
-    setSaveError(null);
-    setSIntel(EMPTY_SINTEL);
-    setRiskScoreManual(false);
-    setNegScoreManual(false);
-    setSupplierDept(null);
-    setSupplierSectionAudit({});
-    setEditingId(null);
-    setView("form");
-    setMobileShowDetail(true);
-    setExpandedFamily(null);
-  }, []);
-
   /* Open the edit form for a specific contact. Used by the in-detail Edit
      button (via handleEdit) and the side-list row Edit button — both must
      map the row through contactToForm (NOT a raw spread) so every field
@@ -4163,30 +4135,6 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       } else {
         const { data: created, error } = await createContact(row);
         if (created) {
-          /* If this supplier came from a catalog import, file the PDF against
-             the new supplier (Suppliers + Catalogs apps), then forget it. */
-          if (pendingCatalogFileRef.current) {
-            const pdf = pendingCatalogFileRef.current;
-            pendingCatalogFileRef.current = null;
-            try {
-              const { uploadCatalogFile, createCatalog } = await import("@/lib/catalogs-admin");
-              const up = await uploadCatalogFile(pdf);
-              if (up) {
-                const dn = (created.display_name || created.company_name_en || created.company_name_cn || pdf.name) as string;
-                await createCatalog({
-                  title: dn, title_cn: (created.company_name_cn as string) || null, description: null,
-                  contact_id: created.id, contact_name: dn,
-                  company_name_en: (created.company_name_en as string) || null,
-                  company_name_cn: (created.company_name_cn as string) || null,
-                  contact_type: "supplier", contact_photo_url: (created.photo_url as string) || null,
-                  division_slug: null, division_name: null, category_slug: null, category_name: null,
-                  file_name: pdf.name, file_path: up.path, file_url: up.url,
-                  file_type: pdf.type || "application/pdf", file_size: pdf.size,
-                  cover_url: null, cover_path: null, tags: ["supplier-catalog"],
-                });
-              }
-            } catch { /* non-fatal — supplier exists regardless */ }
-          }
           /* New suppliers open straight into the Supplier 360 intelligence
              page so the operator immediately sees Factory / Contacts / Media /
              Risk / Negotiation / Sourcing rather than the legacy panel. */
@@ -9554,9 +9502,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       <ImportSupplierFromCatalog
         open={showCatalogImport}
         onClose={() => setShowCatalogImport(false)}
-        onPrefill={(prefill, catalogFile) => {
+        onCreated={(supplierId) => {
           setShowCatalogImport(false);
-          importIntoForm(prefill, catalogFile);
+          void loadContacts();
+          setSelectedId(supplierId);
+          setView("detail");
+          setMobileShowDetail(true);
+          setEditingId(null);
+          void hydrateContact(supplierId);
         }}
       />
 
