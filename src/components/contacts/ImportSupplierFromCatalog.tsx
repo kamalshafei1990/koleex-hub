@@ -222,7 +222,7 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated }: 
       <div
         className="w-full max-w-xl max-h-[88vh] overflow-y-auto rounded-2xl shadow-2xl"
         style={{
-          background: "var(--bg-surface, #fff)",
+          background: "var(--bg-card, #fff)",
           border: "1px solid var(--border-subtle, #e0e0e0)",
           color: "var(--text-primary, #111)",
         }}
@@ -230,7 +230,7 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated }: 
         {/* Header */}
         <div
           className="flex items-center justify-between px-5 py-4 sticky top-0"
-          style={{ background: "var(--bg-surface, #fff)", borderBottom: "1px solid var(--border-subtle, #e0e0e0)" }}
+          style={{ background: "var(--bg-card, #fff)", borderBottom: "1px solid var(--border-subtle, #e0e0e0)" }}
         >
           <div>
             <h2 className="text-[15px] font-semibold">Import supplier from catalog</h2>
