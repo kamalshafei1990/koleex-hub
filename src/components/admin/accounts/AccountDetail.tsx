@@ -421,8 +421,8 @@ export default function AccountDetail({ accountId }: Props) {
                 <button
                   onClick={() => setShowSetPw((s) => !s)}
                   disabled={working}
-                  className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-60"
-                  title="Set a password you choose"
+                  className="h-10 px-4 rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/40 text-[var(--accent)] text-[13px] font-semibold flex items-center gap-2 hover:bg-[var(--accent)]/15 transition-all disabled:opacity-60"
+                  title="Set a password you choose (super admin)"
                 >
                   <KeyIcon className="h-4 w-4" /> Set password
                 </button>

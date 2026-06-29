@@ -433,6 +433,16 @@ export default function AccessRightsTab({ account, onChanged }: Props) {
     setPerms(reset);
   }
 
+  /* Clear ALL per-account overrides → fall back to the account's role defaults.
+     Sets every module to the role baseline; once saved, no module differs from
+     the role so all override rows are removed. Review, then Save to apply. */
+  function resetToRoleDefaults() {
+    if (typeof window !== "undefined" && !window.confirm(t("acc.access.confirmResetDefaults", "Clear all custom permissions for this account and use its role's defaults? Review the grid, then Save to apply."))) return;
+    const reset: Record<string, ModulePerms> = {};
+    ALL_MODULES.forEach((m) => { reset[m] = { ...(rolePerms[m] || EMPTY_PERMS) }; });
+    setPerms(reset);
+  }
+
   function toggleGroupCollapse(label: string) {
     setCollapsedGroups((prev) => {
       const next = new Set(prev);
@@ -655,6 +665,15 @@ export default function AccessRightsTab({ account, onChanged }: Props) {
               title="Save the current access-rights grid as a new role template. Other admins can pick it from this dropdown. Renaming happens in Roles & Permissions."
             >
               + Save as new template
+            </button>
+            <button
+              type="button"
+              onClick={resetToRoleDefaults}
+              disabled={applyingTemplate}
+              className="h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-50 flex items-center gap-1.5"
+              title="Clear every per-module override and fall back to this account's role defaults."
+            >
+              {t("acc.access.resetToRoleDefaults", "Reset to role defaults")}
             </button>
             {applyingTemplate && <SpinnerIcon size={14} className="animate-spin text-[var(--text-dim)]" />}
           </div>
