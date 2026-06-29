@@ -59,10 +59,25 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated }: 
   const [error, setError] = useState<string | null>(null);
   const [createdId, setCreatedId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  /** Manually-uploaded logo data URLs (added to the picker alongside detected). */
+  const [manualLogos, setManualLogos] = useState<string[]>([]);
+
+  const onPickLogo = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f || !f.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const url = String(reader.result || "");
+      if (url) { setManualLogos((m) => [url, ...m]); setLogo(url); }
+    };
+    reader.readAsDataURL(f);
+    e.target.value = "";
+  }, []);
 
   const reset = useCallback(() => {
     setPhase("pick"); setFile(null); setProgress(""); setUsedOcr(false);
-    setDraft(EMPTY); setLogos([]); setLogo(null); setError(null); setCreatedId(null);
+    setDraft(EMPTY); setLogos([]); setLogo(null); setManualLogos([]); setError(null); setCreatedId(null);
   }, []);
 
   const close = useCallback(() => { reset(); onClose(); }, [reset, onClose]);
@@ -264,25 +279,27 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated }: 
               {/* Logo picker */}
               <div>
                 <label className="block text-[11px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: "var(--text-dim, #888)" }}>
-                  Logo {logos.length > 0 && <span className="font-normal lowercase">— pick one from the cover</span>}
+                  Logo <span className="font-normal lowercase">— {logos.length > 0 ? "pick one from the cover, or upload" : "none auto-detected — upload one"}</span>
                 </label>
-                {logos.length === 0 ? (
-                  <div className="text-[12px]" style={{ color: "var(--text-dim, #999)" }}>No images found on the cover.</div>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    <button onClick={() => setLogo(null)}
-                      className="h-16 w-16 rounded-lg text-[11px] flex items-center justify-center"
-                      style={{ border: `2px solid ${logo === null ? ACCENT : "var(--border-subtle, #e0e0e0)"}`, color: "var(--text-dim, #888)" }}>
-                      None
-                    </button>
-                    {logos.map((c, i) => (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img key={i} src={c.dataUrl} alt={`logo ${i + 1}`} onClick={() => setLogo(c.dataUrl)}
-                        className="h-16 w-16 rounded-lg object-contain cursor-pointer bg-white p-1"
-                        style={{ border: `2px solid ${logo === c.dataUrl ? ACCENT : "var(--border-subtle, #e0e0e0)"}` }} />
-                    ))}
-                  </div>
-                )}
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => setLogo(null)}
+                    className="h-16 w-16 rounded-lg text-[11px] flex items-center justify-center"
+                    style={{ border: `2px solid ${logo === null ? ACCENT : "var(--border-subtle, #e0e0e0)"}`, color: "var(--text-dim, #888)" }}>
+                    None
+                  </button>
+                  {[...manualLogos, ...logos.map((c) => c.dataUrl)].map((src, i) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img key={i} src={src} alt={`logo ${i + 1}`} onClick={() => setLogo(src)}
+                      className="h-16 w-16 rounded-lg object-contain cursor-pointer bg-white p-1"
+                      style={{ border: `2px solid ${logo === src ? ACCENT : "var(--border-subtle, #e0e0e0)"}` }} />
+                  ))}
+                  <button onClick={() => logoInputRef.current?.click()}
+                    className="h-16 w-16 rounded-lg text-[11px] flex flex-col items-center justify-center gap-0.5"
+                    style={{ border: "2px dashed var(--border-subtle, #ccc)", color: "var(--text-dim, #888)" }}>
+                    <span className="text-[16px] leading-none">+</span>Upload
+                  </button>
+                  <input ref={logoInputRef} type="file" accept="image/*" hidden onChange={onPickLogo} />
+                </div>
               </div>
 
               {/* Identity */}

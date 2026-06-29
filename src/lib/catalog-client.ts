@@ -65,7 +65,7 @@ export async function extractCoverImages(file: File): Promise<CoverImage[]> {
     const { getDocumentProxy, extractImages } = await import("unpdf");
     const master = new Uint8Array(await file.arrayBuffer());
     const pdf = await getDocumentProxy(master.slice());
-    const pages = Math.min(2, pdf.numPages || 1);
+    const pages = Math.min(3, pdf.numPages || 1);
     const out: CoverImage[] = [];
     const seen = new Set<string>();
     for (let p = 1; p <= pages; p++) {
@@ -77,8 +77,7 @@ export async function extractCoverImages(file: File): Promise<CoverImage[]> {
       }
       for (const img of imgs) {
         const { width, height } = img;
-        if (width < 40 || height < 40) continue; // icon noise
-        if (width > 1600 || height > 1600) continue; // full-page artwork
+        if (width < 24 || height < 24) continue; // icon noise only — keep big images (logos can be large)
         const dataUrl = rawToDataUrl(img);
         if (!dataUrl || seen.has(dataUrl)) continue;
         seen.add(dataUrl);
