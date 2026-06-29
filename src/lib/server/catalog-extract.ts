@@ -1,13 +1,12 @@
 /* ---------------------------------------------------------------------------
-   catalog-extract — analyze a supplier PDF catalog and pull the supplier's
-   identity + contact info, ready to pre-fill a new supplier.
+   catalog-extract (server) — turn catalog TEXT into a reviewable SupplierDraft.
 
-   Pipeline: PDF → text (unpdf, serverless-friendly) → AI structuring (DeepSeek
-   via ai-provider) → validated SupplierDraft. No DB writes here; the caller
-   reviews/confirms before anything is created.
+   The heavy lifting (PDF text + OCR of scanned pages) happens in the browser
+   (see src/lib/catalog-client.ts) so we don't ship native canvas / OCR into
+   the serverless runtime. The server only does the AI structuring + validation
+   on the extracted text, via the existing DeepSeek-backed ai-provider.
    --------------------------------------------------------------------------- */
 
-import { extractText, getDocumentProxy } from "unpdf";
 import { aiChat } from "./ai-provider";
 
 export interface SupplierContactDraft {
@@ -30,31 +29,7 @@ export interface SupplierDraft {
   notes: string | null;
 }
 
-/** Extract per-page plain text from a PDF (server-side). */
-export async function pdfToText(
-  data: Uint8Array,
-): Promise<{ pages: string[]; totalPages: number }> {
-  const pdf = await getDocumentProxy(data);
-  const { totalPages, text } = await extractText(pdf, { mergePages: false });
-  const pages = Array.isArray(text) ? text.map((t) => t ?? "") : [String(text ?? "")];
-  return { pages, totalPages };
-}
-
-/** Company identity usually lives on the cover + first few pages and the back
-   cover. Take those, label them, and cap the size so the AI prompt stays lean. */
-function pickRelevantText(pages: string[]): string {
-  const idx = new Set<number>();
-  for (let i = 0; i < Math.min(4, pages.length); i++) idx.add(i);
-  for (let i = Math.max(0, pages.length - 2); i < pages.length; i++) idx.add(i);
-  const ordered = [...idx].sort((a, b) => a - b);
-  const joined = ordered
-    .map((i) => `[page ${i + 1}]\n${(pages[i] || "").trim()}`)
-    .join("\n\n");
-  return joined.slice(0, 9000);
-}
-
 function parseDraft(reply: string): SupplierDraft | null {
-  // Strip code fences / surrounding prose and grab the JSON object.
   const cleaned = reply.replace(/```json|```/gi, "").trim();
   const start = cleaned.indexOf("{");
   const end = cleaned.lastIndexOf("}");
@@ -68,15 +43,18 @@ function parseDraft(reply: string): SupplierDraft | null {
   const str = (v: unknown): string | null => {
     if (typeof v !== "string") return null;
     const s = v.trim();
-    return s && s.toLowerCase() !== "null" && s !== "n/a" ? s : null;
+    return s && s.toLowerCase() !== "null" && s.toLowerCase() !== "n/a" ? s : null;
   };
   const contacts = Array.isArray(obj.contact_persons)
-    ? (obj.contact_persons as Record<string, unknown>[]).slice(0, 8).map((c) => ({
-        full_name: str(c?.full_name),
-        role: str(c?.role),
-        email: str(c?.email),
-        mobile: str(c?.mobile),
-      })).filter((c) => c.full_name || c.email || c.mobile)
+    ? (obj.contact_persons as Record<string, unknown>[])
+        .slice(0, 8)
+        .map((c) => ({
+          full_name: str(c?.full_name),
+          role: str(c?.role),
+          email: str(c?.email),
+          mobile: str(c?.mobile),
+        }))
+        .filter((c) => c.full_name || c.email || c.mobile)
     : [];
   const conf = String(obj.confidence ?? "").toLowerCase();
   return {
@@ -93,59 +71,51 @@ function parseDraft(reply: string): SupplierDraft | null {
   };
 }
 
-/** Analyze a catalog PDF buffer → a reviewable SupplierDraft (or null if the
-   PDF has no extractable text / the AI is unavailable). */
-export async function extractSupplierFromCatalog(
-  data: Uint8Array,
+/** Structure already-extracted catalog text into a SupplierDraft via the AI. */
+export async function structureSupplierFromText(
+  text: string,
   filename: string,
-): Promise<{ draft: SupplierDraft | null; textFound: boolean; error?: string }> {
-  let pages: string[] = [];
-  try {
-    ({ pages } = await pdfToText(data));
-  } catch (e) {
-    return { draft: null, textFound: false, error: `Could not read PDF: ${(e as Error).message}` };
-  }
-  const text = pickRelevantText(pages);
-  if (text.replace(/\[page \d+\]/g, "").trim().length < 40) {
-    // Almost no selectable text → likely a scanned/image-only catalog.
-    return { draft: null, textFound: false, error: "scanned-or-empty" };
+): Promise<{ draft: SupplierDraft | null; error?: string }> {
+  const clean = (text || "").trim();
+  if (clean.length < 30) {
+    return { draft: null, error: "Not enough text was extracted from the catalog." };
   }
 
   const system =
     "You are a precise data-extraction engine for industrial supplier catalogs, " +
     "which are frequently bilingual (English + Chinese). You extract the identity " +
     "and contact details of the COMPANY THAT PUBLISHED the catalog (the supplier / " +
-    "manufacturer) — never their customers or partners. Respond with ONLY a JSON " +
-    "object, no commentary.";
+    "manufacturer) — never their customers or partners. The text may be noisy OCR " +
+    "output; infer carefully but never invent. Respond with ONLY a JSON object.";
 
   const user = [
     "Extract these fields from the catalog text below and return JSON exactly in this shape:",
-    `{`,
-    `  "company_name_en": string|null,   // English company name`,
-    `  "company_name_cn": string|null,   // Chinese company name (中文) if present`,
-    `  "brand": string|null,             // brand / trademark if different from company`,
-    `  "website": string|null,           // no trailing slash`,
-    `  "email": string|null,             // primary email`,
-    `  "phone": string|null,             // primary phone, as printed`,
-    `  "address": string|null,           // full address`,
-    `  "contact_persons": [{ "full_name": string|null, "role": string|null, "email": string|null, "mobile": string|null }],`,
-    `  "confidence": "high"|"medium"|"low",`,
-    `  "notes": string|null              // anything notable / ambiguous`,
-    `}`,
-    "Rules: use null for anything not clearly present. Do not invent values. Keep emails/phones/URLs exactly as written.",
+    "{",
+    '  "company_name_en": string|null,',
+    '  "company_name_cn": string|null,',
+    '  "brand": string|null,',
+    '  "website": string|null,',
+    '  "email": string|null,',
+    '  "phone": string|null,',
+    '  "address": string|null,',
+    '  "contact_persons": [{ "full_name": string|null, "role": string|null, "email": string|null, "mobile": string|null }],',
+    '  "confidence": "high"|"medium"|"low",',
+    '  "notes": string|null',
+    "}",
+    "Rules: null for anything not clearly present; do not invent; keep emails/phones/URLs exactly as written.",
     `Filename hint: "${filename}".`,
     "",
     "CATALOG TEXT:",
-    text,
+    clean.slice(0, 12000),
   ].join("\n");
 
   const res = await aiChat([
     { role: "system", content: system },
     { role: "user", content: user },
   ]);
-  if (!res) return { draft: null, textFound: true, error: "AI unavailable" };
+  if (!res) return { draft: null, error: "AI is currently unavailable." };
 
   const draft = parseDraft(res.reply);
-  if (!draft) return { draft: null, textFound: true, error: "Could not parse extraction" };
-  return { draft, textFound: true };
+  if (!draft) return { draft: null, error: "Could not parse the extraction result." };
+  return { draft };
 }

@@ -53,6 +53,7 @@ import {
   trackCatalog,
 } from "@/lib/catalogs-admin";
 import { createContact } from "@/lib/contacts-admin";
+import ImportSupplierFromCatalog from "@/components/contacts/ImportSupplierFromCatalog";
 import CatalogsIcon from "@/components/icons/CatalogsIcon";
 import { getDivisionIcon } from "@/components/icons/divisions";
 import type { CatalogEntry } from "@/lib/catalogs-admin";
@@ -2608,6 +2609,7 @@ function PreviewModal({ catalog, onClose, onDownload }: { catalog: CatalogEntry 
    ═══════════════════════════════ */
 export default function CatalogsPage() {
   const [catalogs, setCatalogs] = useState<CatalogEntry[]>([]);
+  const [showSupplierImport, setShowSupplierImport] = useState(false);
   const [contacts, setContacts] = useState<ContactOption[]>([]);
   const [divisions, setDivisions] = useState<DivisionRow[]>([]);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
@@ -3209,8 +3211,14 @@ export default function CatalogsPage() {
             <span className="hidden sm:inline">{t("cat.groupBySupplier", "Group by supplier")}</span>
           </button>
 
+          <button onClick={() => setShowSupplierImport(true)}
+            title={t("cat.importSupplier", "Read a PDF catalog → auto-create the supplier")}
+            className="h-9 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)] text-[12px] font-medium inline-flex items-center gap-1.5 transition-colors shrink-0 ml-auto">
+            <ScanLineIcon className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">{t("cat.importSupplierShort", "Import supplier")}</span>
+          </button>
           <button onClick={() => setUploadModal({ open: true, editEntry: null })}
-            className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-colors shrink-0 ml-auto">
+            className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-colors shrink-0">
             <PlusIcon className="h-3.5 w-3.5" /> {t("cat.upload")}
           </button>
         </div>
@@ -3417,6 +3425,16 @@ export default function CatalogsPage() {
       />
 
       <PreviewModal catalog={previewCatalog} onClose={() => setPreviewCatalog(null)} onDownload={(id) => bumpMetric(id, "download")} />
+
+      {/* Auto-import a supplier from a PDF catalog (also files the catalog here). */}
+      <ImportSupplierFromCatalog
+        open={showSupplierImport}
+        onClose={() => setShowSupplierImport(false)}
+        onCreated={() => {
+          setShowSupplierImport(false);
+          void loadAll();
+        }}
+      />
     </div>
   );
 }
