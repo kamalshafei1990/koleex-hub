@@ -99,6 +99,7 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 import { STRATEGIC_STATUS_LABELS, CLASSIFICATION_LABELS, FACTORY_TYPE_LABELS, strategicStatusTone } from "@/lib/suppliers/intelligence";
 import { findSupplierDuplicates, type DupMatch } from "@/lib/contacts/duplicate-match";
 import { countryNameLocalized, provinceNameLocalized, cityNameLocalized, chinaCitiesForState } from "@/lib/geo/localize";
+import { divisionNameLocalized, categoryNameLocalized } from "@/lib/geo/taxonomy-cn";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { useScopeContext } from "@/lib/use-scope";
 import type { CrmOpportunityWithRelations } from "@/types/supabase";
@@ -2217,7 +2218,7 @@ const TaxonomySelect = React.memo(function TaxonomySelect({ value, onChange, opt
           // eslint-disable-next-line @next/next/no-img-element
           <img src={selected.iconUrl} alt="" className="h-4 w-4 shrink-0 object-contain" onError={(e) => { e.currentTarget.style.display = "none"; }} />
         ) : null}
-        <span className={`flex-1 text-start truncate ${value ? "text-[var(--text-primary)]" : "text-[var(--text-ghost)]"}`}>{value || placeholder}</span>
+        <span className={`flex-1 text-start truncate ${value ? "text-[var(--text-primary)]" : "text-[var(--text-ghost)]"}`}>{selected?.label || value || placeholder}</span>
         <AngleDownIcon size={12} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
@@ -3768,8 +3769,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   }, []);
 
   const divisionOptions: TaxoOption[] = useMemo(
-    () => DIVISIONS.map((d) => ({ value: d.name, label: d.name, iconUrl: divisionLogos[d.id] ?? taxonomyLogoUrl("divisions", d.id) })),
-    [divisionLogos],
+    () => DIVISIONS.map((d) => ({ value: d.name, label: divisionNameLocalized(d.name, lang), iconUrl: divisionLogos[d.id] ?? taxonomyLogoUrl("divisions", d.id) })),
+    [divisionLogos, lang],
   );
   /* Category list is scoped to the chosen division (falls back to all when none picked). */
   const categoryOptions: TaxoOption[] = useMemo(() => {
@@ -3777,8 +3778,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     if (!div) return []; // category depends on the chosen division
     return CATEGORIES
       .filter((c) => divisionOfCategory(c.code)?.id === div.id)
-      .map((c) => ({ value: c.label, label: c.label, iconUrl: categoryLogos[c.slug] ?? taxonomyLogoUrl("categories", c.slug) }));
-  }, [categoryLogos, form.division]);
+      .map((c) => ({ value: c.label, label: categoryNameLocalized(c.label, lang), iconUrl: categoryLogos[c.slug] ?? taxonomyLogoUrl("categories", c.slug) }));
+  }, [categoryLogos, form.division, lang]);
   const [expandedResumeLine, setExpandedResumeLine] = useState<number | null>(null);
   const [mobileShowDetail, setMobileShowDetail] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -4048,6 +4049,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const dupBypassRef = useRef(false);
   /* Square-crop a chosen logo / screenshot before it becomes the photo. */
   const [logoCropSrc, setLogoCropSrc] = useState<string | null>(null);
+  const [logoDrag, setLogoDrag] = useState(false);
   const openLogoCrop = useCallback((file: File) => {
     if (!file.type.startsWith("image/")) return;
     const reader = new FileReader();
@@ -7045,8 +7047,17 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </div>
         )}
 
-        {/* Photo / Logo + Type */}
-        <div className="px-4 md:px-6 py-5 md:py-6 text-center border-b border-[var(--border-color)]">
+        {/* Photo / Logo + Type — supports click, paste (⌘V) and drag-and-drop */}
+        <div
+          className={`px-4 md:px-6 py-5 md:py-6 text-center border-b border-[var(--border-color)] rounded-xl transition-colors ${logoDrag ? "ring-2 ring-[var(--accent)] bg-[var(--accent)]/5" : ""}`}
+          onDragOver={(e) => { e.preventDefault(); if (!logoDrag) setLogoDrag(true); }}
+          onDragLeave={(e) => { e.preventDefault(); setLogoDrag(false); }}
+          onDrop={(e) => {
+            e.preventDefault(); setLogoDrag(false);
+            const file = Array.from(e.dataTransfer.files).find((f) => f.type.startsWith("image/"));
+            if (file) openLogoCrop(file);
+          }}
+        >
           <div className={`w-24 h-24 md:w-28 md:h-28 ${form.contact_type === "supplier" || isCompanyCustomer || isCompanyType ? "rounded-2xl" : "rounded-full"} bg-gradient-to-b from-white/15 to-white/5 flex items-center justify-center mx-auto mb-3 relative overflow-hidden`}>
             {form.photo_url ? (
               <img src={form.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
@@ -7081,7 +7092,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   e.target.value = "";
                 }} />
               </label>
-              <p className="mt-2 text-[11px] text-[var(--text-muted)]">{t("photo.hint", "Upload an image, or paste a screenshot (⌘V) — then crop it to a square.")}</p>
+              <p className="mt-2 text-[11px] text-[var(--text-muted)]">{t("photo.hint", "Upload, drag & drop, or paste a screenshot (⌘V) — then crop to a square.")}</p>
             </>
           )}
 
@@ -8284,10 +8295,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 {form.emails.map((em, i) => (
                   <div key={i} className="flex items-center gap-2">
                     <input type="email" inputMode="email" value={em.email} onChange={e => updateEmail(i, "email", e.target.value)} placeholder={t("field.additionalEmail", "Additional email")} aria-invalid={!!(em.email && !RE_EMAIL.test(em.email)) || undefined} className={`w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none ${em.email && !RE_EMAIL.test(em.email) ? "border-rose-500 ring-1 ring-rose-500/30" : "border-[var(--border-color)] focus:border-[var(--border-focus)]"}`} />
-                    <button type="button" onClick={() => removeEmail(i)} aria-label={t("btn.remove", "Remove")} className="shrink-0 h-9 w-9 rounded-lg border border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">×</button>
+                    <RemoveBtn onClick={() => removeEmail(i)} />
                   </div>
                 ))}
-                <button type="button" onClick={addEmail} className="inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent)] hover:underline">+ {t("field.addEmail", "Add another email")}</button>
+                <AddButton label={t("field.addEmail", "Add another email")} onClick={addEmail} />
                 {/* Website + optional QR (some suppliers share their site as a QR code) */}
                 <MessagingIdField
                   label={t("field.website")}
@@ -8302,10 +8313,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 {form.websites.map((w, i) => (
                   <div key={i} className="flex items-center gap-2">
                     <input type="text" value={w.url} onChange={e => updateWebsite(i, "url", e.target.value)} placeholder={t("field.additionalWebsite", "Additional website")} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
-                    <button type="button" onClick={() => removeWebsite(i)} aria-label={t("btn.remove", "Remove")} className="shrink-0 h-9 w-9 rounded-lg border border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">×</button>
+                    <RemoveBtn onClick={() => removeWebsite(i)} />
                   </div>
                 ))}
-                <button type="button" onClick={addWebsite} className="inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent)] hover:underline">+ {t("field.addWebsite", "Add another website")}</button>
+                <AddButton label={t("field.addWebsite", "Add another website")} onClick={addWebsite} />
                 {/* E-catalog link + optional QR */}
                 <MessagingIdField
                   label={t("field.ecatalog", "E-catalog")}
