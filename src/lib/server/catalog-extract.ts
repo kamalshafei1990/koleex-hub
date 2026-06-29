@@ -42,8 +42,17 @@ function parseDraft(reply: string): SupplierDraft | null {
   }
   const str = (v: unknown): string | null => {
     if (typeof v !== "string") return null;
-    const s = v.trim();
+    // Strip U+FFFD replacement chars (unmappable glyphs from subsetted PDF
+    // fonts) and collapse the whitespace they leave behind.
+    const s = v.replace(/�/g, "").replace(/[ \t]{2,}/g, " ").trim();
     return s && s.toLowerCase() !== "null" && s.toLowerCase() !== "n/a" ? s : null;
+  };
+  // URLs sometimes come out of the PDF text layer with stray spaces
+  // ("http:// www.x.top"); normalise to a clean URL.
+  const url = (v: unknown): string | null => {
+    const s = str(v);
+    if (!s) return null;
+    return s.replace(/^(https?:\/\/)\s+/i, "$1").replace(/\s+/g, "").replace(/\/+$/, "") || null;
   };
   const contacts = Array.isArray(obj.contact_persons)
     ? (obj.contact_persons as Record<string, unknown>[])
@@ -61,7 +70,7 @@ function parseDraft(reply: string): SupplierDraft | null {
     company_name_en: str(obj.company_name_en),
     company_name_cn: str(obj.company_name_cn),
     brand: str(obj.brand),
-    website: str(obj.website)?.replace(/\/+$/, "") ?? null,
+    website: url(obj.website),
     email: str(obj.email),
     phone: str(obj.phone),
     address: str(obj.address),
