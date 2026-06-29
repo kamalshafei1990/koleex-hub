@@ -6950,14 +6950,17 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               <button onClick={() => setField("photo_url", "")} className="text-sm text-red-400 hover:text-red-300 font-medium">{t("btn.remove")}</button>
             </div>
           ) : (
-            <label className="inline-block px-5 py-2 rounded-full bg-[var(--bg-surface-hover)] hover:bg-[var(--bg-surface-active)] text-sm text-[var(--text-secondary)] font-medium cursor-pointer transition-colors">
-              {form.contact_type === "supplier" || isCompanyCustomer || isCompanyType ? t("photo.addLogo") : t("photo.addPhoto")}
-              <input type="file" accept="image/*" className="hidden" onChange={e => {
-                const file = e.target.files?.[0];
-                if (file) openLogoCrop(file);
-                e.target.value = "";
-              }} />
-            </label>
+            <>
+              <label className="inline-block px-5 py-2 rounded-full bg-[var(--bg-surface-hover)] hover:bg-[var(--bg-surface-active)] text-sm text-[var(--text-secondary)] font-medium cursor-pointer transition-colors">
+                {form.contact_type === "supplier" || isCompanyCustomer || isCompanyType ? t("photo.addLogo") : t("photo.addPhoto")}
+                <input type="file" accept="image/*" className="hidden" onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (file) openLogoCrop(file);
+                  e.target.value = "";
+                }} />
+              </label>
+              <p className="mt-2 text-[11px] text-[var(--text-muted)]">{t("photo.hint", "Upload an image or screenshot — then crop it to a square.")}</p>
+            </>
           )}
 
           {/* Contact Type selector — only in the generic Contacts app.
