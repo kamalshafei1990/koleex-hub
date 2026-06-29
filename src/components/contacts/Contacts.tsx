@@ -2297,10 +2297,10 @@ const FormSection = React.memo(function FormSection({ title, icon, children, own
      so the add/edit form and the detail page look like one system. */
   return (
     <div
-      className="mx-4 md:mx-6 my-3 overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]"
+      className="mx-4 md:mx-6 my-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]"
       {...(kxComponent ? kxInspectAttrs({ component: kxComponent, module: kxModule || "Suppliers", section: kxSection }) : {})}
     >
-      <div className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/30 px-4 md:px-5 py-3">
+      <div className="flex items-center justify-between gap-3 rounded-t-2xl border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/30 px-4 md:px-5 py-3">
         <div className="flex items-center gap-2.5 min-w-0">
           {icon && <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]">{icon}</span>}
           <h3 className="truncate text-[13px] font-semibold tracking-tight text-[var(--text-primary)]">{title}</h3>
