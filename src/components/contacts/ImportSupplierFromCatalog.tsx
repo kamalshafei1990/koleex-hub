@@ -19,7 +19,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useRef, useState } from "react";
-import { extractCatalogText, extractCoverImages, type CoverImage } from "@/lib/catalog-client";
+import { extractCatalogText, extractCoverImages, renderCoverPages, type CoverImage } from "@/lib/catalog-client";
 import { createContact } from "@/lib/contacts-admin";
 import { uploadCatalogFile, createCatalog } from "@/lib/catalogs-admin";
 import { uploadToStorage } from "@/lib/storage-client";
@@ -62,6 +62,9 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated }: 
   const logoInputRef = useRef<HTMLInputElement>(null);
   /** Manually-uploaded logo data URLs (added to the picker alongside detected). */
   const [manualLogos, setManualLogos] = useState<string[]>([]);
+  /** Rendered cover pages, for cropping a logo out of vector/scanned covers. */
+  const [coverPages, setCoverPages] = useState<string[]>([]);
+  const [cropOpen, setCropOpen] = useState(false);
 
   const onPickLogo = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -77,15 +80,16 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated }: 
 
   const reset = useCallback(() => {
     setPhase("pick"); setFile(null); setProgress(""); setUsedOcr(false);
-    setDraft(EMPTY); setLogos([]); setLogo(null); setManualLogos([]); setError(null); setCreatedId(null);
+    setDraft(EMPTY); setLogos([]); setLogo(null); setManualLogos([]); setCoverPages([]); setCropOpen(false); setError(null); setCreatedId(null);
   }, []);
 
   const close = useCallback(() => { reset(); onClose(); }, [reset, onClose]);
 
   const analyze = useCallback(async (f: File) => {
     setFile(f); setError(null); setPhase("reading"); setProgress("Reading PDF…");
-    // Cover images load in parallel with the text extraction.
+    // Cover images + rendered cover pages load in parallel with the text.
     extractCoverImages(f).then(setLogos).catch(() => setLogos([]));
+    renderCoverPages(f, 2).then(setCoverPages).catch(() => setCoverPages([]));
     try {
       const { text, usedOcr: ocr } = await extractCatalogText(f, setProgress);
       setUsedOcr(ocr);
@@ -298,6 +302,13 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated }: 
                     style={{ border: "2px dashed var(--border-subtle, #ccc)", color: "var(--text-dim, #888)" }}>
                     <span className="text-[16px] leading-none">+</span>Upload
                   </button>
+                  {coverPages.length > 0 && (
+                    <button onClick={() => setCropOpen(true)}
+                      className="h-16 w-16 rounded-lg text-[10px] leading-tight px-1 flex flex-col items-center justify-center gap-0.5"
+                      style={{ border: "2px dashed var(--border-subtle, #ccc)", color: "var(--text-dim, #888)" }}>
+                      <span className="text-[15px] leading-none">✂</span>Crop from cover
+                    </button>
+                  )}
                   <input ref={logoInputRef} type="file" accept="image/*" hidden onChange={onPickLogo} />
                 </div>
               </div>
@@ -386,6 +397,74 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated }: 
             </div>
           )}
         </div>
+      </div>
+
+      {cropOpen && coverPages.length > 0 && (
+        <CropOverlay
+          pages={coverPages}
+          onCancel={() => setCropOpen(false)}
+          onCrop={(dataUrl) => { setManualLogos((m) => [dataUrl, ...m]); setLogo(dataUrl); setCropOpen(false); }}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ── crop-from-cover overlay ── */
+function CropOverlay({ pages, onCancel, onCrop }: { pages: string[]; onCancel: () => void; onCrop: (dataUrl: string) => void }) {
+  const [page, setPage] = useState(0);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [sel, setSel] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const drag = useRef<{ x: number; y: number } | null>(null);
+
+  const rel = (e: React.PointerEvent) => {
+    const r = wrapRef.current!.getBoundingClientRect();
+    return { x: Math.max(0, Math.min(e.clientX - r.left, r.width)), y: Math.max(0, Math.min(e.clientY - r.top, r.height)) };
+  };
+  const onDown = (e: React.PointerEvent) => { const p = rel(e); drag.current = p; setSel({ x: p.x, y: p.y, w: 0, h: 0 }); (e.target as Element).setPointerCapture?.(e.pointerId); };
+  const onMove = (e: React.PointerEvent) => {
+    if (!drag.current) return;
+    const p = rel(e); const s = drag.current;
+    setSel({ x: Math.min(s.x, p.x), y: Math.min(s.y, p.y), w: Math.abs(p.x - s.x), h: Math.abs(p.y - s.y) });
+  };
+  const onUp = () => { drag.current = null; };
+
+  const doCrop = () => {
+    const img = imgRef.current;
+    if (!img) return;
+    const dispW = img.clientWidth, dispH = img.clientHeight;
+    const region = sel && sel.w > 8 && sel.h > 8 ? sel : { x: 0, y: 0, w: dispW, h: dispH };
+    const sx = img.naturalWidth / dispW, sy = img.naturalHeight / dispH;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(region.w * sx);
+    canvas.height = Math.round(region.h * sy);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(img, region.x * sx, region.y * sy, region.w * sx, region.h * sy, 0, 0, canvas.width, canvas.height);
+    onCrop(canvas.toDataURL("image/png"));
+  };
+
+  return (
+    <div className="fixed inset-0 z-[210] flex flex-col items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.75)" }}>
+      <div className="mb-3 text-[13px] text-white/90">Drag a box around the logo, then crop. (No selection = whole page.)</div>
+      <div ref={wrapRef} className="relative inline-block touch-none select-none" style={{ maxHeight: "70vh", overflow: "hidden" }}
+        onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img ref={imgRef} src={pages[page]} alt="cover" draggable={false} style={{ maxHeight: "70vh", display: "block" }} />
+        {sel && (
+          <div className="absolute pointer-events-none" style={{ left: sel.x, top: sel.y, width: sel.w, height: sel.h, border: `2px solid ${ACCENT}`, background: "rgba(0,102,255,0.12)" }} />
+        )}
+      </div>
+      <div className="mt-3 flex items-center gap-2">
+        {pages.length > 1 && pages.map((_, i) => (
+          <button key={i} onClick={() => { setPage(i); setSel(null); }}
+            className="px-3 py-1.5 text-[12px] rounded-lg"
+            style={{ background: i === page ? ACCENT : "rgba(255,255,255,0.12)", color: "#fff" }}>Page {i + 1}</button>
+        ))}
+        <div className="w-3" />
+        <button onClick={onCancel} className="px-3 py-1.5 text-[13px] rounded-lg text-white/80 hover:text-white">Cancel</button>
+        <button onClick={doCrop} className="px-4 py-1.5 text-[13px] font-semibold rounded-lg" style={{ background: "#fff", color: "#111" }}>Use crop</button>
       </div>
     </div>
   );

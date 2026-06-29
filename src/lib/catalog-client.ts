@@ -93,6 +93,35 @@ export async function extractCoverImages(file: File): Promise<CoverImage[]> {
   }
 }
 
+/**
+ * Render the first few pages to PNG data URLs so the user can crop the logo
+ * out of the cover — works even when the logo is vector art or a scanned page
+ * (which embedded-image extraction can't recover).
+ */
+export async function renderCoverPages(file: File, count = 2): Promise<string[]> {
+  try {
+    const { getDocumentProxy, renderPageAsImage } = await import("unpdf");
+    const master = new Uint8Array(await file.arrayBuffer());
+    const pdf = await getDocumentProxy(master.slice());
+    const pages = Math.min(count, pdf.numPages || 1);
+    const out: string[] = [];
+    for (let p = 1; p <= pages; p++) {
+      try {
+        const png = await renderPageAsImage(master.slice(), p, { scale: 1.5 });
+        const blob = new Blob([png as BlobPart], { type: "image/png" });
+        out.push(await new Promise<string>((resolve) => {
+          const r = new FileReader();
+          r.onload = () => resolve(String(r.result || ""));
+          r.readAsDataURL(blob);
+        }));
+      } catch { /* skip page */ }
+    }
+    return out.filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 export interface CatalogReadResult {
   text: string;
   usedOcr: boolean;
