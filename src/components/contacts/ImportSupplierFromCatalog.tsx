@@ -41,6 +41,9 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onCreated?: (supplierId: string) => void;
+  /** Suppliers app: hand the extracted data to the REAL New Supplier form
+      (pre-filled) instead of the in-modal review/create. */
+  onPrefill?: (form: Partial<ContactForm>, catalogFile: File | null) => void;
 }
 
 const EMPTY: SupplierDraft = {
@@ -56,7 +59,7 @@ const EMPTY: SupplierDraft = {
   confidence: "low", notes: null,
 };
 
-export default function ImportSupplierFromCatalog({ open, onClose, onCreated }: Props) {
+export default function ImportSupplierFromCatalog({ open, onClose, onCreated, onPrefill }: Props) {
   const [phase, setPhase] = useState<Phase>("pick");
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState("");
@@ -103,30 +106,43 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated }: 
   const analyze = useCallback(async (f: File) => {
     setFile(f); setError(null); setPhase("reading"); setProgress("Reading PDF…");
     // Cover images + rendered cover pages load in parallel with the text.
-    extractCoverImages(f).then(setLogos).catch(() => setLogos([]));
+    const coversP = extractCoverImages(f).catch(() => [] as CoverImage[]);
+    coversP.then(setLogos);
     renderCoverPages(f, 2).then(setCoverPages).catch(() => setCoverPages([]));
+
+    let draft: SupplierDraft = EMPTY;
+    let ocr = false;
+    let err: string | null = null;
     try {
-      const { text, usedOcr: ocr } = await extractCatalogText(f, setProgress);
-      setUsedOcr(ocr);
+      const r = await extractCatalogText(f, setProgress);
+      ocr = r.usedOcr;
       setProgress("Extracting supplier details…");
       const res = await fetch("/api/suppliers/import-catalog", {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, filename: f.name }),
+        body: JSON.stringify({ text: r.text, filename: f.name }),
       });
       const j = (await res.json().catch(() => ({}))) as { draft?: SupplierDraft; error?: string };
-      if (!res.ok || !j.draft) {
-        setError(j.error || "Couldn't auto-read this catalog. Fill the details in manually.");
-        setDraft(EMPTY);
-      } else {
-        setDraft({ ...EMPTY, ...j.draft });
-      }
+      if (res.ok && j.draft) draft = { ...EMPTY, ...j.draft };
+      else err = j.error || "Couldn't auto-read this catalog — fill the rest in the form.";
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to read the PDF. Fill the details in manually.");
-      setDraft(EMPTY);
+      err = e instanceof Error ? e.message : "Couldn't read the PDF — fill the details in the form.";
     }
+
+    // Suppliers app: hand the data to the REAL New Supplier form (pre-filled).
+    if (onPrefill) {
+      const imgs = await coversP;
+      onPrefill(draftToOverrides(draft, imgs[0]?.dataUrl || ""), f);
+      close();
+      return;
+    }
+
+    // Catalogs app: in-modal review → direct create.
+    setUsedOcr(ocr);
+    setDraft(draft);
+    if (err) setError(err);
     setPhase("review");
-  }, []);
+  }, [onPrefill, close]);
 
   const onPick = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -541,6 +557,36 @@ function updatePerson(
   patch: Partial<SupplierDraft["contact_persons"][number]>,
 ) {
   setDraft((d) => ({ ...d, contact_persons: d.contact_persons.map((p, j) => (j === i ? { ...p, ...patch } : p)) }));
+}
+
+/* Map an extracted draft → New-Supplier-form overrides (merged onto EMPTY_FORM
+   in Contacts) so the pre-filled real form matches a manual add exactly. */
+function draftToOverrides(draft: SupplierDraft, logo: string): Partial<ContactForm> {
+  const brands = [draft.brand_cn, draft.brand_en].map((b) => (b || "").trim()).filter(Boolean);
+  const persons = draft.contact_persons.map((p, i) => ({
+    name: (p.full_name || "").trim(), name_cn: "", position: (p.role || "").trim(), department: "",
+    phone: "", mobile: (p.mobile || "").trim(), email: (p.email || "").trim(), notes: "",
+    wechat_id: (p.wechat || "").trim(), is_primary: i === 0,
+  }));
+  return {
+    company_name_en: (draft.company_name_en || "").trim(),
+    company_name_cn: (draft.company_name_cn || "").trim(),
+    brand_names: brands,
+    supplier_type: draft.business_type || "",
+    year_established: draft.year_established || "",
+    product_categories: draft.main_products,
+    supplier_email: draft.email || "",
+    supplier_tel: draft.tel || "",
+    supplier_mobile: draft.mobile || "",
+    supplier_website: draft.website || "",
+    supplier_address: draft.address || "",
+    supplier_postal_code: draft.postal_code || "",
+    wechat_id: draft.wechat || "",
+    messaging_channels: (draft.qq ? [{ platform: "QQ", value: draft.qq }] : []) as ContactForm["messaging_channels"],
+    contact_persons: persons as ContactForm["contact_persons"],
+    photo_url: logo || "",
+    notes: draft.fax ? `Fax: ${draft.fax}` : "",
+  };
 }
 
 /* A titled section card matching the New Supplier form (icon chip + title +
