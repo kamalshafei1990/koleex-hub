@@ -8,6 +8,7 @@ import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import ImportSupplierFromCatalog from "@/components/contacts/ImportSupplierFromCatalog";
+import SquareLogoCropper from "@/components/contacts/SquareLogoCropper";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import Edit3Icon from "@/components/icons/ui/Edit3Icon";
@@ -4009,6 +4010,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
      PDF is filed against the new supplier after Save (handleSave success). */
   const [formModalOpen, setFormModalOpen] = useState(false);
   const pendingCatalogFileRef = useRef<File | null>(null);
+  /* Square-crop a chosen logo / screenshot before it becomes the photo. */
+  const [logoCropSrc, setLogoCropSrc] = useState<string | null>(null);
+  const openLogoCrop = useCallback((file: File) => {
+    if (!file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = () => { const u = String(reader.result || ""); if (u) setLogoCropSrc(u); };
+    reader.readAsDataURL(file);
+  }, []);
   const importIntoForm = useCallback((prefill: Partial<ContactForm>, catalogFile: File | null) => {
     pendingCatalogFileRef.current = catalogFile;
     setForm({ ...EMPTY_FORM, contact_type: "supplier", entity_type: "company", division: "Garment Machinery", currency: "CNY", ...prefill });
@@ -6934,7 +6943,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 {form.contact_type === "supplier" || isCompanyCustomer || isCompanyType ? t("photo.changeLogo") : t("photo.changePhoto")}
                 <input type="file" accept="image/*" className="hidden" onChange={e => {
                   const file = e.target.files?.[0];
-                  if (file) compressImage(file).then(url => setField("photo_url", url));
+                  if (file) openLogoCrop(file);
+                  e.target.value = "";
                 }} />
               </label>
               <button onClick={() => setField("photo_url", "")} className="text-sm text-red-400 hover:text-red-300 font-medium">{t("btn.remove")}</button>
@@ -6944,7 +6954,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               {form.contact_type === "supplier" || isCompanyCustomer || isCompanyType ? t("photo.addLogo") : t("photo.addPhoto")}
               <input type="file" accept="image/*" className="hidden" onChange={e => {
                 const file = e.target.files?.[0];
-                if (file) compressImage(file).then(url => setField("photo_url", url));
+                if (file) openLogoCrop(file);
+                e.target.value = "";
               }} />
             </label>
           )}
@@ -9566,9 +9577,20 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <span className="text-[18px] leading-none">×</span>
               </button>
             </div>
-            <div className="max-h-[80vh] overflow-y-auto">{renderFormPanel()}</div>
+            {/* kx-import-fill: highlight auto-filled (non-empty) inputs with a
+                green border while reviewing the import; reverts after save. */}
+            <div className="max-h-[80vh] overflow-y-auto kx-import-fill">{renderFormPanel()}</div>
           </div>
         </div>
+      )}
+
+      {/* Square-crop the chosen logo / screenshot before it becomes the photo. */}
+      {logoCropSrc && (
+        <SquareLogoCropper
+          src={logoCropSrc}
+          onCancel={() => setLogoCropSrc(null)}
+          onCrop={(url) => { setField("photo_url", url); setLogoCropSrc(null); }}
+        />
       )}
 
       {/* Import supplier from PDF catalog */}
