@@ -327,17 +327,17 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated }: 
                 </div>
               </div>
 
-              {/* Identity */}
+              {/* Company Name — mirrors the New Supplier form's first section */}
+              <SectionHead title="Company Name" />
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Company (English)" value={draft.company_name_en} onChange={(v) => set({ company_name_en: v })} />
                 <Field label="Company (中文)" value={draft.company_name_cn} onChange={(v) => set({ company_name_cn: v })} />
                 <Field label="Brand (Latin)" value={draft.brand_en} onChange={(v) => set({ brand_en: v })} />
                 <Field label="Brand (中文)" value={draft.brand_cn} onChange={(v) => set({ brand_cn: v })} />
-                <Field label="Business type" value={draft.business_type} onChange={(v) => set({ business_type: v })} />
-                <Field label="Year established" value={draft.year_established} onChange={(v) => set({ year_established: v })} />
               </div>
 
-              {/* Contact */}
+              {/* Contact Details */}
+              <SectionHead title="Contact Details" />
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Website" value={draft.website} onChange={(v) => set({ website: v })} />
                 <Field label="Email" value={draft.email} onChange={(v) => set({ email: v })} />
@@ -350,33 +350,36 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated }: 
                 <div className="col-span-2">
                   <Field label="Address" value={draft.address} onChange={(v) => set({ address: v })} />
                 </div>
+              </div>
+
+              {/* Contact Persons */}
+              <SectionHead title="Contact Persons"
+                action={<button onClick={() => set({ contact_persons: [...draft.contact_persons, { full_name: "", role: "", email: "", mobile: "", wechat: "" }] })}
+                  className="text-[12px] font-medium" style={{ color: ACCENT }}>+ Add</button>} />
+              <div className="space-y-2">
+                {draft.contact_persons.length === 0 && <div className="text-[12px]" style={{ color: "var(--text-dim, #999)" }}>None detected.</div>}
+                {draft.contact_persons.map((p, i) => (
+                  <div key={i} className="grid grid-cols-2 gap-2 rounded-lg p-2" style={{ border: "1px solid var(--border-subtle, #eee)" }}>
+                    <MiniInput placeholder="Name" value={p.full_name} onChange={(v) => updatePerson(setDraft, i, { full_name: v })} />
+                    <MiniInput placeholder="Position" value={p.role} onChange={(v) => updatePerson(setDraft, i, { role: v })} />
+                    <MiniInput placeholder="Email" value={p.email} onChange={(v) => updatePerson(setDraft, i, { email: v })} />
+                    <MiniInput placeholder="Mobile" value={p.mobile} onChange={(v) => updatePerson(setDraft, i, { mobile: v })} />
+                    <MiniInput placeholder="WeChat" value={p.wechat} onChange={(v) => updatePerson(setDraft, i, { wechat: v })} />
+                    <button onClick={() => set({ contact_persons: draft.contact_persons.filter((_, j) => j !== i) })}
+                      className="text-left text-[11px] hover:opacity-70 self-center" style={{ color: "var(--text-dim, #999)" }}>Remove</button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Company Profile */}
+              <SectionHead title="Company Profile" />
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Business type" value={draft.business_type} onChange={(v) => set({ business_type: v })} />
+                <Field label="Year established" value={draft.year_established} onChange={(v) => set({ year_established: v })} />
                 <div className="col-span-2">
                   <Field label="Main products (comma-separated)"
                     value={draft.main_products.join(", ")}
                     onChange={(v) => set({ main_products: (v || "").split(",").map((s) => s.trim()).filter(Boolean) })} />
-                </div>
-              </div>
-
-              {/* Contacts */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-dim, #888)" }}>Contact persons</label>
-                  <button onClick={() => set({ contact_persons: [...draft.contact_persons, { full_name: "", role: "", email: "", mobile: "", wechat: "" }] })}
-                    className="text-[12px] font-medium" style={{ color: ACCENT }}>+ Add</button>
-                </div>
-                <div className="space-y-2">
-                  {draft.contact_persons.length === 0 && <div className="text-[12px]" style={{ color: "var(--text-dim, #999)" }}>None detected.</div>}
-                  {draft.contact_persons.map((p, i) => (
-                    <div key={i} className="grid grid-cols-2 gap-2 rounded-lg p-2" style={{ border: "1px solid var(--border-subtle, #eee)" }}>
-                      <MiniInput placeholder="Name" value={p.full_name} onChange={(v) => updatePerson(setDraft, i, { full_name: v })} />
-                      <MiniInput placeholder="Role" value={p.role} onChange={(v) => updatePerson(setDraft, i, { role: v })} />
-                      <MiniInput placeholder="Email" value={p.email} onChange={(v) => updatePerson(setDraft, i, { email: v })} />
-                      <MiniInput placeholder="Mobile" value={p.mobile} onChange={(v) => updatePerson(setDraft, i, { mobile: v })} />
-                      <MiniInput placeholder="WeChat" value={p.wechat} onChange={(v) => updatePerson(setDraft, i, { wechat: v })} />
-                      <button onClick={() => set({ contact_persons: draft.contact_persons.filter((_, j) => j !== i) })}
-                        className="text-left text-[11px] hover:opacity-70 self-center" style={{ color: "var(--text-dim, #999)" }}>Remove</button>
-                    </div>
-                  ))}
                 </div>
               </div>
 
@@ -523,6 +526,15 @@ function updatePerson(
   patch: Partial<SupplierDraft["contact_persons"][number]>,
 ) {
   setDraft((d) => ({ ...d, contact_persons: d.contact_persons.map((p, j) => (j === i ? { ...p, ...patch } : p)) }));
+}
+
+function SectionHead({ title, action }: { title: string; action?: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between pt-2 mt-1" style={{ borderTop: "1px solid var(--border-subtle, #ececec)" }}>
+      <h3 className="text-[12px] font-semibold tracking-wide pt-2" style={{ color: "var(--text-primary, #111)" }}>{title}</h3>
+      {action ? <div className="pt-2">{action}</div> : null}
+    </div>
+  );
 }
 
 function Field({ label, value, onChange }: { label: string; value: string | null; onChange: (v: string | null) => void }) {
