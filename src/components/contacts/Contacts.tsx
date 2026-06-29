@@ -4004,6 +4004,29 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     setExpandedFamily(null);
   }, []);
 
+  /* Catalog import → open the REAL New Supplier form (the exact same
+     renderFormPanel) inside a modal, pre-filled with the extracted data. The
+     PDF is filed against the new supplier after Save (handleSave success). */
+  const [formModalOpen, setFormModalOpen] = useState(false);
+  const pendingCatalogFileRef = useRef<File | null>(null);
+  const importIntoForm = useCallback((prefill: Partial<ContactForm>, catalogFile: File | null) => {
+    pendingCatalogFileRef.current = catalogFile;
+    setForm({ ...EMPTY_FORM, contact_type: "supplier", entity_type: "company", division: "Garment Machinery", currency: "CNY", ...prefill });
+    setTriedSave(false);
+    setSaveError(null);
+    setSIntel(EMPTY_SINTEL);
+    setRiskScoreManual(false);
+    setNegScoreManual(false);
+    setSupplierDept(null);
+    setSupplierSectionAudit({});
+    setEditingId(null);
+    setView("form");
+    setExpandedFamily(null);
+    setFormModalOpen(true);
+  }, []);
+  // Close the import form-modal whenever the form navigates away (cancel/save).
+  useEffect(() => { if (formModalOpen && view !== "form") setFormModalOpen(false); }, [formModalOpen, view]);
+
   /* Open the edit form for a specific contact. Used by the in-detail Edit
      button (via handleEdit) and the side-list row Edit button — both must
      map the row through contactToForm (NOT a raw spread) so every field
@@ -4135,6 +4158,31 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       } else {
         const { data: created, error } = await createContact(row);
         if (created) {
+          /* Catalog import: file the PDF against the new supplier (Suppliers +
+             Catalogs apps), then clear the pending file. */
+          if (pendingCatalogFileRef.current) {
+            const pdf = pendingCatalogFileRef.current;
+            pendingCatalogFileRef.current = null;
+            try {
+              const { uploadCatalogFile, createCatalog } = await import("@/lib/catalogs-admin");
+              const up = await uploadCatalogFile(pdf);
+              if (up) {
+                const c = created as unknown as Record<string, unknown>;
+                const dn = (c.display_name || c.company_name_en || c.company_name_cn || pdf.name) as string;
+                await createCatalog({
+                  title: dn, title_cn: (c.company_name_cn as string) || null, description: null,
+                  contact_id: created.id, contact_name: dn,
+                  company_name_en: (c.company_name_en as string) || null,
+                  company_name_cn: (c.company_name_cn as string) || null,
+                  contact_type: "supplier", contact_photo_url: (c.photo_url as string) || null,
+                  division_slug: null, division_name: null, category_slug: null, category_name: null,
+                  file_name: pdf.name, file_path: up.path, file_url: up.url,
+                  file_type: pdf.type || "application/pdf", file_size: pdf.size,
+                  cover_url: null, cover_path: null, tags: ["supplier-catalog"],
+                });
+              }
+            } catch { /* non-fatal — supplier exists regardless */ }
+          }
           /* New suppliers open straight into the Supplier 360 intelligence
              page so the operator immediately sees Factory / Contacts / Media /
              Risk / Negotiation / Sourcing rather than the legacy panel. */
@@ -9492,24 +9540,44 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
       {/* Right panel -- detail / form */}
       <div className={`${mobileShowDetail ? "flex" : "hidden md:flex"} flex-col flex-1 min-w-0 h-full bg-[var(--bg-primary)]`}>
-        {view === "form" ? renderFormPanel() : renderDetailPanel()}
+        {view === "form" && !formModalOpen ? renderFormPanel() : renderDetailPanel()}
       </div>
 
       {/* Type chooser modal */}
       {showTypeChooser && renderTypeChooser()}
 
+      {/* Catalog import → the REAL New Supplier form (renderFormPanel) inside a
+          modal, pre-filled. Identical to a manual add because it IS the form. */}
+      {formModalOpen && view === "form" && (
+        <div className="fixed inset-0 z-[200] flex items-start justify-center p-4 overflow-y-auto"
+          style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(2px)" }}
+          onMouseDown={(e) => { if (e.target === e.currentTarget) { setFormModalOpen(false); pendingCatalogFileRef.current = null; setView("list"); } }}>
+          <div className="w-full max-w-4xl my-6 rounded-2xl shadow-2xl overflow-hidden"
+            style={{ background: "var(--bg-card, #fff)", border: "1px solid var(--border-subtle, #e0e0e0)" }}>
+            <div className="flex items-center justify-between px-5 py-4 sticky top-0 z-10"
+              style={{ background: "var(--bg-card, #fff)", borderBottom: "1px solid var(--border-subtle, #e0e0e0)" }}>
+              <div>
+                <h2 className="text-[15px] font-semibold">New supplier from catalog</h2>
+                <p className="text-[12px]" style={{ color: "var(--text-dim, #888)" }}>Review the imported details, set Division &amp; Category, then Save.</p>
+              </div>
+              <button onClick={() => { setFormModalOpen(false); pendingCatalogFileRef.current = null; setView("list"); }}
+                className="h-8 w-8 rounded-lg flex items-center justify-center hover:opacity-70"
+                style={{ border: "1px solid var(--border-subtle, #e0e0e0)" }} aria-label="Close">
+                <span className="text-[18px] leading-none">×</span>
+              </button>
+            </div>
+            <div className="max-h-[80vh] overflow-y-auto">{renderFormPanel()}</div>
+          </div>
+        </div>
+      )}
+
       {/* Import supplier from PDF catalog */}
       <ImportSupplierFromCatalog
         open={showCatalogImport}
         onClose={() => setShowCatalogImport(false)}
-        onCreated={(supplierId) => {
+        onPrefill={(prefill, catalogFile) => {
           setShowCatalogImport(false);
-          void loadContacts();
-          setSelectedId(supplierId);
-          setView("detail");
-          setMobileShowDetail(true);
-          setEditingId(null);
-          void hydrateContact(supplierId);
+          importIntoForm(prefill, catalogFile);
         }}
       />
 
