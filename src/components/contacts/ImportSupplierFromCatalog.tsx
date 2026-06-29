@@ -25,8 +25,15 @@ import { uploadCatalogFile, createCatalog } from "@/lib/catalogs-admin";
 import { uploadToStorage } from "@/lib/storage-client";
 import type { SupplierDraft } from "@/lib/server/catalog-extract";
 import type { ContactForm } from "@/components/contacts/Contacts";
+import Building2Icon from "@/components/icons/ui/Building2Icon";
+import PhoneIcon from "@/components/icons/ui/PhoneIcon";
+import UsersIcon from "@/components/icons/ui/UsersIcon";
+import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
+import GlobeIcon from "@/components/icons/ui/GlobeIcon";
+import AtSignIcon from "@/components/icons/ui/AtSignIcon";
 
 const ACCENT = "#0066FF";
+const FILLED = "rgba(10,138,74,0.75)"; // green border for auto-filled / completed fields
 
 type Phase = "pick" | "reading" | "review" | "creating" | "done";
 
@@ -59,6 +66,9 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated }: 
   const [logo, setLogo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [createdId, setCreatedId] = useState<string | null>(null);
+  // Country dial codes for the Tel / Mobile fields (mirrors the supplier form).
+  const [telCode, setTelCode] = useState("+86");
+  const [mobileCode, setMobileCode] = useState("+86");
   const inputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   /** Manually-uploaded logo data URLs (added to the picker alongside detected). */
@@ -158,6 +168,12 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated }: 
     // Persons all land in the exact same fields/format.
     const { EMPTY_FORM, formToRow } = await import("@/components/contacts/Contacts");
     const brands = [draft.brand_cn, draft.brand_en].map((b) => (b || "").trim()).filter(Boolean);
+    // Prefix the dial code onto phone numbers that don't already carry one.
+    const withCode = (code: string, num: string | null) => {
+      const n = (num || "").trim();
+      if (!n) return "";
+      return n.startsWith("+") ? n : `${code} ${n}`;
+    };
     const persons = draft.contact_persons.map((p, i) => ({
       name: (p.full_name || "").trim(),
       name_cn: "",
@@ -181,8 +197,8 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated }: 
       year_established: draft.year_established || "",
       product_categories: draft.main_products,
       supplier_email: draft.email || "",
-      supplier_tel: draft.tel || "",
-      supplier_mobile: draft.mobile || "",
+      supplier_tel: withCode(telCode, draft.tel),
+      supplier_mobile: withCode(mobileCode, draft.mobile),
       supplier_website: draft.website || "",
       supplier_address: draft.address || "",
       supplier_postal_code: draft.postal_code || "",
@@ -287,24 +303,20 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated }: 
                 <div className="rounded-lg px-3 py-2 text-[12px]"
                   style={{ background: "rgba(255,51,51,0.10)", color: "#cc2b2b", border: "1px solid rgba(255,51,51,0.25)" }}>{error}</div>
               )}
-              {!error && (
-                <div className="flex items-center gap-2 text-[12px]" style={{ color: "var(--text-dim, #888)" }}>
-                  <ConfidenceDot level={draft.confidence} />
-                  {usedOcr ? "Read via OCR" : "Read from text"} · confidence {draft.confidence}. Review before creating.
-                </div>
-              )}
+              <div className="flex items-center gap-2 text-[12px]" style={{ color: "var(--text-dim, #888)" }}>
+                <ConfidenceDot level={draft.confidence} />
+                {usedOcr ? "Read via OCR" : "Read from text"} · confidence {draft.confidence}.
+                <span className="inline-flex items-center gap-1 ml-1">
+                  <span className="inline-block h-2 w-2 rounded-sm" style={{ background: FILLED }} /> = auto-filled
+                </span>
+              </div>
 
-              {/* Logo picker */}
-              <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: "var(--text-dim, #888)" }}>
-                  Logo <span className="font-normal lowercase">— {logos.length > 0 ? "pick one from the cover, or upload" : "none auto-detected — upload one"}</span>
-                </label>
+              {/* Logo */}
+              <SectionCard icon={<Building2Icon size={16} />} title="Logo">
                 <div className="flex flex-wrap gap-2">
                   <button onClick={() => setLogo(null)}
                     className="h-16 w-16 rounded-lg text-[11px] flex items-center justify-center"
-                    style={{ border: `2px solid ${logo === null ? ACCENT : "var(--border-subtle, #e0e0e0)"}`, color: "var(--text-dim, #888)" }}>
-                    None
-                  </button>
+                    style={{ border: `2px solid ${logo === null ? ACCENT : "var(--border-subtle, #e0e0e0)"}`, color: "var(--text-dim, #888)" }}>None</button>
                   {[...manualLogos, ...logos.map((c) => c.dataUrl)].map((src, i) => (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img key={i} src={src} alt={`logo ${i + 1}`} onClick={() => setLogo(src)}
@@ -314,74 +326,77 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated }: 
                   <button onClick={() => logoInputRef.current?.click()}
                     className="h-16 w-16 rounded-lg text-[11px] flex flex-col items-center justify-center gap-0.5"
                     style={{ border: "2px dashed var(--border-subtle, #ccc)", color: "var(--text-dim, #888)" }}>
-                    <span className="text-[16px] leading-none">+</span>Upload
-                  </button>
+                    <span className="text-[16px] leading-none">+</span>Upload</button>
                   {coverPages.length > 0 && (
                     <button onClick={() => setCropImages(coverPages)}
                       className="h-16 w-16 rounded-lg text-[10px] leading-tight px-1 flex flex-col items-center justify-center gap-0.5"
                       style={{ border: "2px dashed var(--border-subtle, #ccc)", color: "var(--text-dim, #888)" }}>
-                      <span className="text-[15px] leading-none">✂</span>Crop from cover
-                    </button>
+                      <span className="text-[15px] leading-none">✂</span>Crop from cover</button>
                   )}
                   <input ref={logoInputRef} type="file" accept="image/*" hidden onChange={onPickLogo} />
                 </div>
-              </div>
+              </SectionCard>
 
-              {/* Company Name — mirrors the New Supplier form's first section */}
-              <SectionHead title="Company Name" />
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Company (English)" value={draft.company_name_en} onChange={(v) => set({ company_name_en: v })} />
-                <Field label="Company (中文)" value={draft.company_name_cn} onChange={(v) => set({ company_name_cn: v })} />
-                <Field label="Brand (Latin)" value={draft.brand_en} onChange={(v) => set({ brand_en: v })} />
-                <Field label="Brand (中文)" value={draft.brand_cn} onChange={(v) => set({ brand_cn: v })} />
-              </div>
+              {/* Company Name */}
+              <SectionCard icon={<Building2Icon size={16} />} title="Company Name">
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Company Name in English" required value={draft.company_name_en} onChange={(v) => set({ company_name_en: v })} icon={<Building2Icon size={15} />} placeholder="e.g. Shenzhen ABC Trading Co., Ltd." />
+                  <Field label="Company Name in Chinese" optional value={draft.company_name_cn} onChange={(v) => set({ company_name_cn: v })} placeholder="e.g. 深圳ABC贸易有限公司" />
+                  <Field label="Brand (Latin)" optional value={draft.brand_en} onChange={(v) => set({ brand_en: v })} />
+                  <Field label="Brand (中文)" optional value={draft.brand_cn} onChange={(v) => set({ brand_cn: v })} />
+                </div>
+              </SectionCard>
 
               {/* Contact Details */}
-              <SectionHead title="Contact Details" />
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Website" value={draft.website} onChange={(v) => set({ website: v })} />
-                <Field label="Email" value={draft.email} onChange={(v) => set({ email: v })} />
-                <Field label="Mobile" value={draft.mobile} onChange={(v) => set({ mobile: v })} />
-                <Field label="Landline (Tel)" value={draft.tel} onChange={(v) => set({ tel: v })} />
-                <Field label="Fax" value={draft.fax} onChange={(v) => set({ fax: v })} />
-                <Field label="WeChat" value={draft.wechat} onChange={(v) => set({ wechat: v })} />
-                <Field label="QQ" value={draft.qq} onChange={(v) => set({ qq: v })} />
-                <Field label="Postal code" value={draft.postal_code} onChange={(v) => set({ postal_code: v })} />
-                <div className="col-span-2">
-                  <Field label="Address" value={draft.address} onChange={(v) => set({ address: v })} />
+              <SectionCard icon={<PhoneIcon size={16} />} title="Contact Details">
+                <p className="text-[12px] mb-3" style={{ color: "var(--text-dim, #888)" }}>At least one of phone / mobile / email is required <span style={{ color: "#ff3b3b" }}>*</span></p>
+                <div className="grid grid-cols-2 gap-3">
+                  <PhoneField label="Tel" value={draft.tel} onChange={(v) => set({ tel: v })} code={telCode} onCode={setTelCode} />
+                  <PhoneField label="Mobile" value={draft.mobile} onChange={(v) => set({ mobile: v })} code={mobileCode} onCode={setMobileCode} />
+                  <Field label="Email" optional value={draft.email} onChange={(v) => set({ email: v })} icon={<AtSignIcon size={15} />} placeholder="company@example.com" />
+                  <Field label="Website" optional value={draft.website} onChange={(v) => set({ website: v })} icon={<GlobeIcon size={15} />} placeholder="https://www.example.com" />
+                  <Field label="WeChat" optional value={draft.wechat} onChange={(v) => set({ wechat: v })} />
+                  <Field label="QQ" optional value={draft.qq} onChange={(v) => set({ qq: v })} />
+                  <Field label="Fax" optional value={draft.fax} onChange={(v) => set({ fax: v })} />
+                  <Field label="Postal code" optional value={draft.postal_code} onChange={(v) => set({ postal_code: v })} />
+                  <div className="col-span-2">
+                    <Field label="Address" optional value={draft.address} onChange={(v) => set({ address: v })} icon={<Building2Icon size={15} />} />
+                  </div>
                 </div>
-              </div>
+              </SectionCard>
 
               {/* Contact Persons */}
-              <SectionHead title="Contact Persons"
+              <SectionCard icon={<UsersIcon size={16} />} title="Contact Persons"
                 action={<button onClick={() => set({ contact_persons: [...draft.contact_persons, { full_name: "", role: "", email: "", mobile: "", wechat: "" }] })}
-                  className="text-[12px] font-medium" style={{ color: ACCENT }}>+ Add</button>} />
-              <div className="space-y-2">
-                {draft.contact_persons.length === 0 && <div className="text-[12px]" style={{ color: "var(--text-dim, #999)" }}>None detected.</div>}
-                {draft.contact_persons.map((p, i) => (
-                  <div key={i} className="grid grid-cols-2 gap-2 rounded-lg p-2" style={{ border: "1px solid var(--border-subtle, #eee)" }}>
-                    <MiniInput placeholder="Name" value={p.full_name} onChange={(v) => updatePerson(setDraft, i, { full_name: v })} />
-                    <MiniInput placeholder="Position" value={p.role} onChange={(v) => updatePerson(setDraft, i, { role: v })} />
-                    <MiniInput placeholder="Email" value={p.email} onChange={(v) => updatePerson(setDraft, i, { email: v })} />
-                    <MiniInput placeholder="Mobile" value={p.mobile} onChange={(v) => updatePerson(setDraft, i, { mobile: v })} />
-                    <MiniInput placeholder="WeChat" value={p.wechat} onChange={(v) => updatePerson(setDraft, i, { wechat: v })} />
-                    <button onClick={() => set({ contact_persons: draft.contact_persons.filter((_, j) => j !== i) })}
-                      className="text-left text-[11px] hover:opacity-70 self-center" style={{ color: "var(--text-dim, #999)" }}>Remove</button>
-                  </div>
-                ))}
-              </div>
+                  className="text-[12px] font-medium" style={{ color: ACCENT }}>+ Add</button>}>
+                <div className="space-y-2">
+                  {draft.contact_persons.length === 0 && <div className="text-[12px]" style={{ color: "var(--text-dim, #999)" }}>None detected.</div>}
+                  {draft.contact_persons.map((p, i) => (
+                    <div key={i} className="grid grid-cols-2 gap-2 rounded-lg p-2" style={{ border: "1px solid var(--border-subtle, #eee)" }}>
+                      <MiniInput placeholder="Name" value={p.full_name} onChange={(v) => updatePerson(setDraft, i, { full_name: v })} />
+                      <MiniInput placeholder="Position" value={p.role} onChange={(v) => updatePerson(setDraft, i, { role: v })} />
+                      <MiniInput placeholder="Email" value={p.email} onChange={(v) => updatePerson(setDraft, i, { email: v })} />
+                      <MiniInput placeholder="Mobile" value={p.mobile} onChange={(v) => updatePerson(setDraft, i, { mobile: v })} />
+                      <MiniInput placeholder="WeChat" value={p.wechat} onChange={(v) => updatePerson(setDraft, i, { wechat: v })} />
+                      <button onClick={() => set({ contact_persons: draft.contact_persons.filter((_, j) => j !== i) })}
+                        className="text-left text-[11px] hover:opacity-70 self-center" style={{ color: "var(--text-dim, #999)" }}>Remove</button>
+                    </div>
+                  ))}
+                </div>
+              </SectionCard>
 
               {/* Company Profile */}
-              <SectionHead title="Company Profile" />
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Business type" value={draft.business_type} onChange={(v) => set({ business_type: v })} />
-                <Field label="Year established" value={draft.year_established} onChange={(v) => set({ year_established: v })} />
-                <div className="col-span-2">
-                  <Field label="Main products (comma-separated)"
-                    value={draft.main_products.join(", ")}
-                    onChange={(v) => set({ main_products: (v || "").split(",").map((s) => s.trim()).filter(Boolean) })} />
+              <SectionCard icon={<BriefcaseIcon size={16} />} title="Company Profile">
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Business type" optional value={draft.business_type} onChange={(v) => set({ business_type: v })} />
+                  <Field label="Year established" optional value={draft.year_established} onChange={(v) => set({ year_established: v })} />
+                  <div className="col-span-2">
+                    <Field label="Main products" optional value={draft.main_products.join(", ")}
+                      onChange={(v) => set({ main_products: (v || "").split(",").map((s) => s.trim()).filter(Boolean) })}
+                      placeholder="comma-separated" />
+                  </div>
                 </div>
-              </div>
+              </SectionCard>
 
               <div className="flex items-center justify-end gap-2 pt-1">
                 <button onClick={close} className="px-3 py-2 text-[13px] rounded-lg hover:opacity-70" style={{ color: "var(--text-dim, #888)" }}>Cancel</button>
@@ -528,22 +543,74 @@ function updatePerson(
   setDraft((d) => ({ ...d, contact_persons: d.contact_persons.map((p, j) => (j === i ? { ...p, ...patch } : p)) }));
 }
 
-function SectionHead({ title, action }: { title: string; action?: React.ReactNode }) {
+/* A titled section card matching the New Supplier form (icon chip + title +
+   PROCUREMENT pill + divider). */
+function SectionCard({ icon, title, action, children }: { icon: React.ReactNode; title: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between pt-2 mt-1" style={{ borderTop: "1px solid var(--border-subtle, #ececec)" }}>
-      <h3 className="text-[12px] font-semibold tracking-wide pt-2" style={{ color: "var(--text-primary, #111)" }}>{title}</h3>
-      {action ? <div className="pt-2">{action}</div> : null}
+    <div className="rounded-2xl p-4" style={{ border: "1px solid var(--border-subtle, #e0e0e0)", background: "var(--bg-surface, rgba(255,255,255,0.03))" }}>
+      <div className="flex items-center justify-between pb-3 mb-3" style={{ borderBottom: "1px solid var(--border-subtle, #e0e0e0)" }}>
+        <div className="flex items-center gap-2.5">
+          <div className="h-9 w-9 rounded-lg flex items-center justify-center" style={{ border: "1px solid var(--border-subtle, #e0e0e0)", color: "var(--text-dim, #888)" }}>{icon}</div>
+          <h3 className="text-[15px] font-semibold">{title}</h3>
+        </div>
+        <div className="flex items-center gap-2">
+          {action}
+          <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-semibold tracking-wide px-2 py-0.5 rounded-full"
+            style={{ color: ACCENT, border: `1px solid ${ACCENT}55` }}>
+            <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: ACCENT }} />PROCUREMENT
+          </span>
+        </div>
+      </div>
+      {children}
     </div>
   );
 }
 
-function Field({ label, value, onChange }: { label: string; value: string | null; onChange: (v: string | null) => void }) {
+function Field({ label, value, onChange, required, optional, icon, placeholder }: {
+  label: string; value: string | null; onChange: (v: string | null) => void;
+  required?: boolean; optional?: boolean; icon?: React.ReactNode; placeholder?: string;
+}) {
+  const filled = !!(value && value.trim());
   return (
     <div>
-      <label className="block text-[11px] font-semibold uppercase tracking-wide mb-1" style={{ color: "var(--text-dim, #888)" }}>{label}</label>
-      <input value={value ?? ""} onChange={(e) => onChange(e.target.value || null)}
-        className="w-full rounded-lg px-3 py-2 text-[13px] bg-transparent outline-none focus:ring-2"
-        style={{ border: "1px solid var(--border-subtle, #e0e0e0)", ["--tw-ring-color" as string]: "rgba(0,102,255,0.25)" }} />
+      <label className="flex items-center gap-1.5 mb-1">
+        <span className="text-[12px]" style={{ color: "var(--text-secondary, #aaa)" }}>{label}</span>
+        {required && <span style={{ color: "#ff3b3b" }}>*</span>}
+        {optional && <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--text-dim, #888)" }}>optional</span>}
+      </label>
+      <div className="relative">
+        {icon && <span className="absolute start-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-dim, #888)" }}>{icon}</span>}
+        <input value={value ?? ""} onChange={(e) => onChange(e.target.value || null)} placeholder={placeholder}
+          className={`w-full rounded-lg py-2.5 text-[13px] bg-transparent outline-none focus:ring-2 ${icon ? "ps-9 pe-3" : "px-3"}`}
+          style={{ border: `1.5px solid ${filled ? FILLED : "var(--border-subtle, #e0e0e0)"}`, ["--tw-ring-color" as string]: "rgba(0,102,255,0.25)" }} />
+      </div>
+    </div>
+  );
+}
+
+/* Phone field with a dial-code selector, mirroring the supplier form's Tel/Mobile. */
+const DIAL_CODES = ["+86", "+1", "+44", "+91", "+49", "+33", "+39", "+34", "+81", "+82", "+852", "+886", "+971", "+966", "+90", "+7", "+55", "+61"];
+function PhoneField({ label, value, onChange, code, onCode }: {
+  label: string; value: string | null; onChange: (v: string | null) => void; code: string; onCode: (c: string) => void;
+}) {
+  const filled = !!(value && value.trim());
+  const border = `1.5px solid ${filled ? FILLED : "var(--border-subtle, #e0e0e0)"}`;
+  return (
+    <div>
+      <label className="flex items-center gap-1.5 mb-1">
+        <span className="text-[12px]" style={{ color: "var(--text-secondary, #aaa)" }}>{label}</span>
+        <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--text-dim, #888)" }}>optional</span>
+      </label>
+      <div className="flex gap-2">
+        <select value={code} onChange={(e) => onCode(e.target.value)}
+          className="rounded-lg px-2 py-2.5 text-[13px] bg-transparent outline-none shrink-0"
+          style={{ border: "1.5px solid var(--border-subtle, #e0e0e0)", color: "var(--text-primary, #111)" }}>
+          {DIAL_CODES.map((c) => <option key={c} value={c} style={{ color: "#111" }}>{c}</option>)}
+        </select>
+        <input value={value ?? ""} onChange={(e) => onChange(e.target.value || null)} placeholder={label}
+          className="w-full rounded-lg px-3 py-2.5 text-[13px] bg-transparent outline-none focus:ring-2"
+          style={{ border, ["--tw-ring-color" as string]: "rgba(0,102,255,0.25)" }} />
+      </div>
     </div>
   );
 }
