@@ -98,6 +98,7 @@ import { fetchOpportunities } from "@/lib/crm";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { STRATEGIC_STATUS_LABELS, CLASSIFICATION_LABELS, FACTORY_TYPE_LABELS, strategicStatusTone } from "@/lib/suppliers/intelligence";
 import { findSupplierDuplicates, type DupMatch } from "@/lib/contacts/duplicate-match";
+import { countryNameLocalized, provinceNameLocalized, cityNameLocalized } from "@/lib/geo/localize";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { useScopeContext } from "@/lib/use-scope";
 import type { CrmOpportunityWithRelations } from "@/types/supabase";
@@ -349,6 +350,7 @@ export interface ContactForm {
   business_hours_start: string;
   business_hours_end: string;
   wechat_official_account: string;
+  wechat_official_account_qr: string;
   wechat_sales_group_available: boolean;
   wechat_group_name: string;
   wechat_group_members: string;
@@ -851,6 +853,7 @@ export const EMPTY_FORM: ContactForm = {
   business_hours_start: "",
   business_hours_end: "",
   wechat_official_account: "",
+  wechat_official_account_qr: "",
   wechat_sales_group_available: false,
   wechat_group_name: "",
   wechat_group_members: "",
@@ -1501,6 +1504,7 @@ function contactToForm(c: ContactRow): ContactForm {
     business_hours_start: (c as unknown as Record<string, unknown>).business_hours_start as string || "",
     business_hours_end: (c as unknown as Record<string, unknown>).business_hours_end as string || "",
     wechat_official_account: c.wechat_official_account || "",
+    wechat_official_account_qr: c.wechat_official_account_qr || "",
     wechat_sales_group_available: !!c.wechat_sales_group_available,
     wechat_group_name: (c as unknown as Record<string, unknown>).wechat_group_name as string || "",
     wechat_group_members: (c as unknown as Record<string, unknown>).wechat_group_members as string || "",
@@ -1574,7 +1578,7 @@ export function formToRow(f: ContactForm): Record<string, unknown> {
     display_name: displayName,
     company: f.company || f.company_name_en || null,
     position: f.position || null,
-    email: f.emails[0]?.email || f.supplier_email || null,
+    email: f.supplier_email || f.emails[0]?.email || null,
     phone: f.phones[0]?.number || f.supplier_tel || f.supplier_mobile || null,
     country: f.country || null,
     country_code: f.country_code || null,
@@ -1583,7 +1587,7 @@ export function formToRow(f: ContactForm): Record<string, unknown> {
     city: f.city || null,
     birthday: f.birthday || null,
     notes: f.notes || null,
-    website: f.websites[0]?.url || f.supplier_website || null,
+    website: f.supplier_website || f.websites[0]?.url || null,
     is_active: f.is_active,
     /* Keep the tier even when the customer is deactivated — we used
        to null it out on is_active=false, which silently deleted the
@@ -1760,6 +1764,7 @@ export function formToRow(f: ContactForm): Record<string, unknown> {
     business_hours_start: f.business_hours_start || null,
     business_hours_end: f.business_hours_end || null,
     wechat_official_account: f.wechat_official_account || null,
+    wechat_official_account_qr: f.wechat_official_account_qr || null,
     wechat_sales_group_available: !!f.wechat_sales_group_available,
     wechat_group_name: f.wechat_group_name || null,
     wechat_group_members: f.wechat_group_members || null,
@@ -3333,6 +3338,7 @@ function CountryDropdown({ value, displayValue, onChange, label, placeholder, no
   onChange: (name: string, isoCode: string) => void;
   label?: string; placeholder?: string; noResults?: string;
 }) {
+  const { lang } = useTranslation(contactsT);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -3353,8 +3359,8 @@ function CountryDropdown({ value, displayValue, onChange, label, placeholder, no
   const filtered = useMemo(() => {
     if (!query.trim()) return ALL_COUNTRIES;
     const q = query.toLowerCase();
-    return ALL_COUNTRIES.filter(c => c.name.toLowerCase().includes(q) || c.isoCode.toLowerCase().includes(q));
-  }, [query]);
+    return ALL_COUNTRIES.filter(c => c.name.toLowerCase().includes(q) || c.isoCode.toLowerCase().includes(q) || countryNameLocalized(c.isoCode, lang, c.name).toLowerCase().includes(q));
+  }, [query, lang]);
 
   const handleSelect = (c: CountryOption) => {
     onChange(c.name, c.isoCode);
@@ -3375,7 +3381,7 @@ function CountryDropdown({ value, displayValue, onChange, label, placeholder, no
         <input
           ref={inputRef}
           type="text"
-          value={open ? query : displayValue}
+          value={open ? query : (value ? countryNameLocalized(value, lang, displayValue) : displayValue)}
           onChange={e => { setQuery(e.target.value); if (!open) setOpen(true); }}
           onFocus={() => setOpen(true)}
           placeholder={placeholder ?? "Search country..."}
@@ -3397,7 +3403,7 @@ function CountryDropdown({ value, displayValue, onChange, label, placeholder, no
                 }`}
               >
                 <span className="text-base">{c.flag}</span>
-                <span className="truncate">{c.name}</span>
+                <span className="truncate">{countryNameLocalized(c.isoCode, lang, c.name)}</span>
                 <span className="text-[10px] text-[var(--text-ghost)] ml-auto">{c.isoCode}</span>
               </button>
             ))
@@ -3416,6 +3422,7 @@ function ProvinceDropdown({ countryCode, value, displayValue, onChange, label, p
   onChange: (name: string, isoCode: string) => void;
   label?: string; placeholder?: string; noResults?: string;
 }) {
+  const { lang } = useTranslation(contactsT);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -3440,8 +3447,8 @@ function ProvinceDropdown({ countryCode, value, displayValue, onChange, label, p
   const filtered = useMemo(() => {
     if (!query.trim()) return states;
     const q = query.toLowerCase();
-    return states.filter(s => s.name.toLowerCase().includes(q) || s.isoCode.toLowerCase().includes(q));
-  }, [query, states]);
+    return states.filter(s => s.name.toLowerCase().includes(q) || s.isoCode.toLowerCase().includes(q) || provinceNameLocalized(countryCode, s.isoCode, lang, s.name).toLowerCase().includes(q));
+  }, [query, states, countryCode, lang]);
 
   if (states.length === 0) return null;
 
@@ -3455,7 +3462,7 @@ function ProvinceDropdown({ countryCode, value, displayValue, onChange, label, p
         <input
           ref={inputRef}
           type="text"
-          value={open ? query : displayValue}
+          value={open ? query : (value ? provinceNameLocalized(countryCode, value, lang, displayValue) : displayValue)}
           onChange={e => { setQuery(e.target.value); if (!open) setOpen(true); }}
           onFocus={() => setOpen(true)}
           placeholder={placeholder ?? "Search province..."}
@@ -3476,7 +3483,7 @@ function ProvinceDropdown({ countryCode, value, displayValue, onChange, label, p
                   s.isoCode === value ? "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]" : "text-[var(--text-secondary)]"
                 }`}
               >
-                <span className="truncate">{s.name}</span>
+                <span className="truncate">{provinceNameLocalized(countryCode, s.isoCode, lang, s.name)}</span>
                 <span className="text-[10px] text-[var(--text-ghost)] ml-auto">{s.isoCode}</span>
               </button>
             ))
@@ -3495,6 +3502,7 @@ function CityDropdown({ countryCode, stateCode, value, onChange, label, placehol
   onChange: (name: string) => void;
   label?: string; placeholder?: string; noResults?: string;
 }) {
+  const { lang } = useTranslation(contactsT);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -3520,8 +3528,8 @@ function CityDropdown({ countryCode, stateCode, value, onChange, label, placehol
   const filtered = useMemo(() => {
     if (!query.trim()) return cities;
     const q = query.toLowerCase();
-    return cities.filter(c => c.name.toLowerCase().includes(q));
-  }, [query, cities]);
+    return cities.filter(c => c.name.toLowerCase().includes(q) || cityNameLocalized(countryCode, c.name, lang).toLowerCase().includes(q));
+  }, [query, cities, countryCode, lang]);
 
   // Fallback to plain text input if no city data available
   if (cities.length === 0) {
@@ -3540,7 +3548,7 @@ function CityDropdown({ countryCode, stateCode, value, onChange, label, placehol
         <input
           ref={inputRef}
           type="text"
-          value={open ? query : value}
+          value={open ? query : cityNameLocalized(countryCode, value, lang)}
           onChange={e => { setQuery(e.target.value); if (!open) setOpen(true); }}
           onFocus={() => setOpen(true)}
           placeholder={placeholder ?? "Search city..."}
@@ -3561,7 +3569,7 @@ function CityDropdown({ countryCode, stateCode, value, onChange, label, placehol
                   c.name === value ? "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]" : "text-[var(--text-secondary)]"
                 }`}
               >
-                <span className="truncate">{c.name}</span>
+                <span className="truncate">{cityNameLocalized(countryCode, c.name, lang)}</span>
               </button>
             ))
           )}
@@ -8263,6 +8271,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <PhoneField label={t("field.contactMobile")} value={form.supplier_mobile} onChange={v => setField("supplier_mobile", v)} placeholder={t("field.contactMobile")} defaultIso={form.country_code || "CN"} />
                 </div>
                 <Input label={t("field.contactEmail")} type="email" value={form.supplier_email} onChange={v => setField("supplier_email", v)} placeholder="company@example.com" icon={<EnvelopeIcon size={14} />} invalid={!!form.supplier_email.trim() && !RE_EMAIL.test(form.supplier_email.trim())} />
+                {/* Additional emails — some companies have more than one */}
+                {form.emails.map((em, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input type="email" inputMode="email" value={em.email} onChange={e => updateEmail(i, "email", e.target.value)} placeholder={t("field.additionalEmail", "Additional email")} aria-invalid={!!(em.email && !RE_EMAIL.test(em.email)) || undefined} className={`w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none ${em.email && !RE_EMAIL.test(em.email) ? "border-rose-500 ring-1 ring-rose-500/30" : "border-[var(--border-color)] focus:border-[var(--border-focus)]"}`} />
+                    <button type="button" onClick={() => removeEmail(i)} aria-label={t("btn.remove", "Remove")} className="shrink-0 h-9 w-9 rounded-lg border border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">×</button>
+                  </div>
+                ))}
+                <button type="button" onClick={addEmail} className="inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent)] hover:underline">+ {t("field.addEmail", "Add another email")}</button>
                 {/* Website + optional QR (some suppliers share their site as a QR code) */}
                 <MessagingIdField
                   label={t("field.website")}
@@ -8273,6 +8289,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   qrValue={form.supplier_website_qr}
                   onQrChange={v => setField("supplier_website_qr", v)}
                 />
+                {/* Additional websites — companies sometimes run more than one site */}
+                {form.websites.map((w, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input type="text" value={w.url} onChange={e => updateWebsite(i, "url", e.target.value)} placeholder={t("field.additionalWebsite", "Additional website")} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
+                    <button type="button" onClick={() => removeWebsite(i)} aria-label={t("btn.remove", "Remove")} className="shrink-0 h-9 w-9 rounded-lg border border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">×</button>
+                  </div>
+                ))}
+                <button type="button" onClick={addWebsite} className="inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent)] hover:underline">+ {t("field.addWebsite", "Add another website")}</button>
                 {/* E-catalog link + optional QR */}
                 <MessagingIdField
                   label={t("field.ecatalog", "E-catalog")}
@@ -8462,7 +8486,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     they're different concepts, so they stay in their own sections.) */}
                 <div className="space-y-2.5 border-t border-[var(--border-color)] pt-3">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("subsection.wechatPresence", "WeChat presence")}</p>
-                  <Input label={t("field.wechatOfficialAccount", "WeChat Official Account")} value={form.wechat_official_account} onChange={v => setField("wechat_official_account", v)} placeholder={t("placeholder.wechatOfficial", "Official Account name / ID")} icon={<BrandGlyph name="WeChat" size={14} />} />
+                  <MessagingIdField
+                    label={t("field.wechatOfficialAccount", "WeChat Official Account")}
+                    icon={<BrandGlyph name="WeChat" size={16} />}
+                    idValue={form.wechat_official_account}
+                    onIdChange={v => setField("wechat_official_account", v)}
+                    placeholder={t("placeholder.wechatOfficial", "Official Account name / ID")}
+                    qrValue={form.wechat_official_account_qr}
+                    onQrChange={v => setField("wechat_official_account_qr", v)}
+                  />
                   <div className="flex flex-wrap gap-4 text-sm text-[var(--text-muted)] pt-0.5">
                     <label className="inline-flex items-center gap-2"><input type="checkbox" checked={!!form.wechat_sales_group_available} onChange={e => setField("wechat_sales_group_available", e.target.checked)} className="accent-[var(--bg-inverted)]" />{t("field.wechatGroupAvailable", "WeChat group available")}</label>
                     {form.wechat_sales_group_available && (

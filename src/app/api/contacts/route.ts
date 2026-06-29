@@ -72,7 +72,7 @@ export async function GET(req: Request) {
     "business_card_front", "business_card_back", "business_license_image",
     "documents", "catalogues", "attachments", "visa_documents",
     "contact_persons", "bank_accounts", "resume_lines", "emergency_contacts", "family_members",
-    "wechat_qr", "whatsapp_qr", "telegram_qr", "line_qr", "skype_qr", "qq_qr",
+    "wechat_qr", "wechat_official_account_qr", "whatsapp_qr", "telegram_qr", "line_qr", "skype_qr", "qq_qr",
     "dingtalk_qr", "messenger_qr", "wechat_pay_qr", "alipay_qr", "website_qr", "ecatalog_qr",
     "quality_issues",
   ];

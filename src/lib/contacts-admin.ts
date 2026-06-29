@@ -195,6 +195,7 @@ export interface ContactRow {
   supplier_email: string | null;
   supplier_website: string | null;
   wechat_official_account: string | null;
+  wechat_official_account_qr: string | null;
   wechat_sales_group_available: boolean | null;
   wecom_support_available: boolean | null;
   supplier_address: string | null;
