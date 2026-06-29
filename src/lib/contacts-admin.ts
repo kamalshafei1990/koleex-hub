@@ -304,6 +304,29 @@ export async function fetchContacts(
   return (data as ContactRow[]) || [];
 }
 
+/**
+ * Lazy-load the avatar images (logo_url / photo_url) the directory list drops to
+ * stay under the response-size limit. Fetched in small batches and returned as a
+ * map keyed by contact id, so the caller can merge them into the rendered rows.
+ */
+export async function fetchContactAvatars(
+  ids: string[],
+): Promise<Record<string, { logo_url: string | null; photo_url: string | null }>> {
+  const out: Record<string, { logo_url: string | null; photo_url: string | null }> = {};
+  const unique = [...new Set(ids.filter(Boolean))];
+  const CHUNK = 30;
+  for (let i = 0; i < unique.length; i += CHUNK) {
+    const batch = unique.slice(i, i + CHUNK);
+    try {
+      const res = await fetch(`/api/contacts/avatars?ids=${encodeURIComponent(batch.join(","))}`, { credentials: "include" });
+      if (!res.ok) continue;
+      const json = (await res.json()) as { avatars: { id: string; logo_url: string | null; photo_url: string | null }[] };
+      for (const a of json.avatars || []) out[a.id] = { logo_url: a.logo_url ?? null, photo_url: a.photo_url ?? null };
+    } catch { /* a failed batch just leaves those avatars as placeholders */ }
+  }
+  return out;
+}
+
 export async function fetchContactsByType(
   type: string,
   ctx?: ScopeContext | null,

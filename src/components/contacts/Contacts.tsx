@@ -91,7 +91,7 @@ import CustomersIcon from "@/components/icons/CustomersIcon";
 import SuppliersIcon from "@/components/icons/SuppliersIcon";
 
 import {
-  checkContactsSetup, fetchContacts, fetchContactsByType, createContact, updateContact, deleteContact,
+  checkContactsSetup, fetchContacts, fetchContactsByType, fetchContactAvatars, createContact, updateContact, deleteContact,
   type ContactRow,
 } from "@/lib/contacts-admin";
 import { fetchOpportunities } from "@/lib/crm";
@@ -3804,8 +3804,21 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       ? await fetchContactsByType(filterType, scopeCtx)
       : await fetchContacts(scopeCtx);
     // Exclude employees — they are managed via the Employees app now
-    setContacts(data.filter(c => c.contact_type !== "employee"));
+    const slim = data.filter(c => c.contact_type !== "employee");
+    setContacts(slim);
     setLoading(false);
+    /* The list endpoint drops heavy base64 avatars so the response stays under
+       the function size limit. Lazy-load the real logos in small batches and
+       merge them in, so the directory paints instantly and logos stream in. */
+    const missing = slim.filter(c => !c.logo_url && !c.photo_url).map(c => c.id);
+    if (missing.length) {
+      fetchContactAvatars(missing).then((map) => {
+        if (!map || Object.keys(map).length === 0) return;
+        setContacts(prev => prev.map(c => map[c.id]
+          ? { ...c, logo_url: map[c.id].logo_url ?? c.logo_url, photo_url: map[c.id].photo_url ?? c.photo_url }
+          : c));
+      }).catch(() => {});
+    }
   }, [scopeCtx, filterType]);
 
   useEffect(() => { loadContacts(); }, [loadContacts]);

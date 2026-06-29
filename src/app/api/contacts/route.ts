@@ -76,9 +76,19 @@ export async function GET(req: Request) {
     "dingtalk_qr", "messenger_qr", "wechat_pay_qr", "alipay_qr", "website_qr", "ecatalog_qr",
     "quality_issues",
   ];
+  /* logo_url / photo_url frequently hold a base64 data: URL (a cropped logo is
+     ~80 KB each). With ~100 rows that alone is several MB and pushes the list
+     response past Vercel's 4.5 MB function limit → the whole fetch fails and the
+     directory shows nothing. Drop ONLY the heavy base64 avatars here; short
+     (storage-URL) logos stay inline. The client lazy-loads the dropped ones in
+     small batches via GET /api/contacts/avatars. */
+  const isHeavyDataUrl = (v: unknown) =>
+    typeof v === "string" && v.startsWith("data:") && v.length > 4000;
   const slim = (data ?? []).map((row) => {
     const r = row as Record<string, unknown>;
     for (const k of HEAVY_FIELDS) if (k in r) r[k] = null;
+    if (isHeavyDataUrl(r.logo_url)) r.logo_url = null;
+    if (isHeavyDataUrl(r.photo_url)) r.photo_url = null;
     return r;
   });
 
