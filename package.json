@@ -54,6 +54,7 @@
     "validate:finance-ux-maturity": "NODE_OPTIONS=--conditions=react-server tsx scripts/finance-ux-maturity.ts"
   },
   "dependencies": {
+    "@napi-rs/canvas": "^0.1.100",
     "@node-rs/argon2": "^2.0.2",
     "@rive-app/react-canvas": "^4.29.3",
     "@sparticuz/chromium-min": "^148.0.0",
@@ -92,7 +93,10 @@
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "simple-icons": "^16.22.0",
+    "tesseract.js": "^7.0.0",
+    "tesseract.js-core": "^7.0.0",
     "tus-js-client": "^4.3.1",
+    "unpdf": "^1.6.2",
     "web-push": "^3.6.7",
     "xlsx": "^0.18.5"
   },

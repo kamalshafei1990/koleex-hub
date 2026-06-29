@@ -7,6 +7,7 @@ import { ScrollLockOverlay } from "@/hooks/useScrollLock";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
+import ImportSupplierFromCatalog from "@/components/contacts/ImportSupplierFromCatalog";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import Edit3Icon from "@/components/icons/ui/Edit3Icon";
@@ -3732,6 +3733,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const [setupNeeded, setSetupNeeded] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showTypeChooser, setShowTypeChooser] = useState(false);
+  const [showCatalogImport, setShowCatalogImport] = useState(false);
   const [typeChooserStep, setTypeChooserStep] = useState<1 | 2>(1);
   const [expandedFamily, setExpandedFamily] = useState<number | null>(null);
 
@@ -4436,6 +4438,17 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               title="Export CSV"
             >
               <DownloadIcon size={14} />
+            </button>
+          )}
+          {filterType === "supplier" && (
+            <button
+              onClick={() => setShowCatalogImport(true)}
+              className="h-8 px-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center gap-1.5 text-[12px] font-medium transition-colors shrink-0"
+              aria-label={t("importFromCatalog", "Import from catalog")}
+              title={t("importFromCatalog", "Import supplier from a PDF catalog")}
+            >
+              <PlusIcon size={13} />
+              {t("importCatalog", "Import catalog")}
             </button>
           )}
           <button
@@ -9484,6 +9497,21 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
       {/* Type chooser modal */}
       {showTypeChooser && renderTypeChooser()}
+
+      {/* Import supplier from PDF catalog */}
+      <ImportSupplierFromCatalog
+        open={showCatalogImport}
+        onClose={() => setShowCatalogImport(false)}
+        onCreated={(supplierId) => {
+          setShowCatalogImport(false);
+          void loadContacts();
+          setSelectedId(supplierId);
+          setView("detail");
+          setMobileShowDetail(true);
+          setEditingId(null);
+          void hydrateContact(supplierId);
+        }}
+      />
 
       {/* Delete confirmation — isolated host (window-event driven) so opening
           it never re-renders this giant component. */}
