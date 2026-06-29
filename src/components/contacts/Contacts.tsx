@@ -98,7 +98,7 @@ import { fetchOpportunities } from "@/lib/crm";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { STRATEGIC_STATUS_LABELS, CLASSIFICATION_LABELS, FACTORY_TYPE_LABELS, strategicStatusTone } from "@/lib/suppliers/intelligence";
 import { findSupplierDuplicates, type DupMatch } from "@/lib/contacts/duplicate-match";
-import { countryNameLocalized, provinceNameLocalized, cityNameLocalized } from "@/lib/geo/localize";
+import { countryNameLocalized, provinceNameLocalized, cityNameLocalized, chinaCitiesForState } from "@/lib/geo/localize";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { useScopeContext } from "@/lib/use-scope";
 import type { CrmOpportunityWithRelations } from "@/types/supabase";
@@ -3510,6 +3510,12 @@ function CityDropdown({ countryCode, stateCode, value, onChange, label, placehol
 
   const cities = useMemo(() => {
     if (!countryCode) return [];
+    // China: use our clean, complete prefecture-level list (the geo library's
+    // China cities are English-only and noisy). Elsewhere use the library.
+    if (countryCode === "CN") {
+      const list = chinaCitiesForState(stateCode);
+      if (list.length) return list.map((c) => ({ name: c.en }));
+    }
     if (stateCode) return City.getCitiesOfState(countryCode, stateCode);
     return City.getCitiesOfCountry(countryCode) || [];
   }, [countryCode, stateCode]);
@@ -3570,6 +3576,9 @@ function CityDropdown({ countryCode, stateCode, value, onChange, label, placehol
                 }`}
               >
                 <span className="truncate">{cityNameLocalized(countryCode, c.name, lang)}</span>
+                {cityNameLocalized(countryCode, c.name, lang) !== c.name && (
+                  <span className="text-[10px] text-[var(--text-ghost)] ml-auto">{c.name}</span>
+                )}
               </button>
             ))
           )}
