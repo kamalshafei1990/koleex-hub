@@ -31,10 +31,13 @@ export async function extractCatalogText(
   onProgress?: (msg: string) => void,
 ): Promise<CatalogReadResult> {
   const { extractText, getDocumentProxy, renderPageAsImage } = await import("unpdf");
-  const data = new Uint8Array(await file.arrayBuffer());
+  // pdf.js transfers (and DETACHES) the buffer it's handed, so we keep one
+  // pristine master copy and pass a fresh .slice() to every call below —
+  // otherwise the second call throws "ArrayBuffer ... is already detached".
+  const master = new Uint8Array(await file.arrayBuffer());
 
   onProgress?.("Reading PDF…");
-  const pdf = await getDocumentProxy(data);
+  const pdf = await getDocumentProxy(master.slice());
   const { totalPages, text } = await extractText(pdf, { mergePages: false });
   const pages: string[] = Array.isArray(text) ? text.map((t) => t ?? "") : [String(text ?? "")];
 
@@ -59,7 +62,7 @@ export async function extractCatalogText(
     let ocr = "";
     for (const i of ocrPages) {
       onProgress?.(`OCR page ${i + 1} of ${totalPages}…`);
-      const png = await renderPageAsImage(data, i + 1, { scale: 2 });
+      const png = await renderPageAsImage(master.slice(), i + 1, { scale: 2 });
       const blob = new Blob([png as BlobPart], { type: "image/png" });
       const { data: r } = await worker.recognize(blob);
       ocr += `\n[page ${i + 1}]\n${r.text || ""}`;
