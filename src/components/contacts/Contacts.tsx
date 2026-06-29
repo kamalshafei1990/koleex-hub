@@ -1137,8 +1137,8 @@ function supplierFormErrors(f: ContactForm): string[] {
   if (!v(f.division)) e.push("Division is required.");
   if (!v(f.category)) e.push("Category is required.");
   if (![f.supplier_tel, f.supplier_mobile, f.supplier_email].some((x) => v(x))) e.push("Add at least one company contact (tel, mobile, or email).");
-  if (!v(f.wechat_id) && !f.messaging_channels.some((m) => v(m.value))) e.push("Add at least one messaging channel (WeChat or another app).");
-  if (!f.contact_persons.some((p) => v(p.name))) e.push("Add at least one contact person.");
+  // Messaging channel (WeChat etc.) and contact person are no longer required —
+  // the supplier can be saved without them.
 
   // C — email / phone format
   if (v(f.supplier_email) && !RE_EMAIL.test(v(f.supplier_email))) e.push("Company email isn't a valid email address.");
@@ -8365,7 +8365,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             {/* 3. Contact Persons — Key people to communicate with */}
             <FormSection title={t("section.contactPersons")} kxComponent="ContactPersonsFormSection" kxModule={filterType === "supplier" ? "Suppliers" : filterType === "customer" ? "Customers" : "Contacts"} kxSection="Contacts & communication" icon={<UsersIcon size={14} />} owner={t("owner.procurement")} ownerLabel={t("owner.label")} dept="procurement" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
               <div className="space-y-3">
-                <p className="text-[11px] text-[var(--text-dim)]">{t("hint.atLeastOnePerson", "At least one contact person is required")} <span className="text-rose-400">*</span></p>
+                <p className="text-[11px] text-[var(--text-dim)]">{t("hint.atLeastOnePerson", "Contact persons (optional)")}</p>
                 {form.contact_persons.map((cp, i) => (
                   <div key={i} className="rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] overflow-hidden">
                     <div className="flex items-center gap-2 p-3">
@@ -8479,7 +8479,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 PNG/JPG). WeChat is the primary channel for China sourcing. */}
             <FormSection title={t("section.messagingIds", "Messaging IDs")} icon={<MessageSquareIcon size={14} />} owner={t("owner.procurement")} ownerLabel={t("owner.label")} dept="procurement" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
               <div className="space-y-3">
-                <p className="text-[11px] text-[var(--text-dim)]">{t("hint.atLeastOneMessaging", "At least one messaging channel is required")} <span className="text-rose-400">*</span></p>
+                <p className="text-[11px] text-[var(--text-dim)]">{t("hint.atLeastOneMessaging", "Messaging channel (optional)")}</p>
                 <MessagingIdField
                   hero
                   label={t("field.wechat", "WeChat")}

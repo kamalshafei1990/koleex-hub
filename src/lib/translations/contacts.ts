@@ -1032,8 +1032,8 @@ export const contactsT: Translations = {
   "field.businessLicense":      { en: "Business License",          zh: "营业执照",              ar: "السجل التجاري" },
 
   "hint.atLeastOneContact":     { en: "At least one of phone / mobile / email is required", zh: "电话 / 手机 / 邮箱 至少填写一项", ar: "مطلوب واحد على الأقل من الهاتف / الجوال / البريد" },
-  "hint.atLeastOneMessaging":   { en: "At least one messaging channel is required", zh: "至少需要一个即时通讯渠道", ar: "مطلوب قناة مراسلة واحدة على الأقل" },
-  "hint.atLeastOnePerson":      { en: "At least one contact person is required", zh: "至少需要一位联系人", ar: "مطلوب جهة اتصال واحدة على الأقل" },
+  "hint.atLeastOneMessaging":   { en: "Messaging channel (optional)", zh: "即时通讯渠道（可选）", ar: "قناة مراسلة (اختياري)" },
+  "hint.atLeastOnePerson":      { en: "Contact persons (optional)", zh: "联系人（可选）", ar: "جهات الاتصال (اختياري)" },
   "hint.bankInfoPhoto":         { en: "Company sent bank details as an image? Drop it here — PNG / JPG", zh: "公司以图片形式发送了银行信息?拖放到此处 — PNG / JPG", ar: "أرسلت الشركة بيانات البنك كصورة؟ أفلتها هنا — PNG / JPG" },
   "hint.businessLicense":       { en: "Drop the company license photo — PNG / JPG", zh: "拖放公司营业执照照片 — PNG / JPG", ar: "أفلت صورة رخصة الشركة — PNG / JPG" },
   "hint.socialMedia":           { en: "Add the factory's social pages — paste a link, page, or @account.", zh: "添加工厂的社交主页 — 粘贴链接、主页或 @账号。", ar: "أضف صفحات المصنع الاجتماعية — الصق رابطًا أو صفحة أو @حساب." },
