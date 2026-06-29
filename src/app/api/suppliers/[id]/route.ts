@@ -101,7 +101,7 @@ export async function GET(
     safe(() =>
       supabaseServer
         .from("supplier_product_links")
-        .select("product_id, products(id, product_name, slug, category_slug)")
+        .select("product_id, is_primary, supplier_product_photo, supplier_product_code, supplier_product_name, products(id, product_name, slug, category_slug, primary_model)")
         .eq("tenant_id", tid)
         .eq("supplier_id", id)
         .limit(200),
@@ -251,7 +251,19 @@ export async function GET(
   for (const r of productLinkRows) {
     const p = (r.products as Row | null) ?? null;
     const pid = p && typeof p.id === "string" ? p.id : null;
-    if (p && pid && !seenProducts.has(pid)) { seenProducts.add(pid); products.push(p); }
+    if (!p || !pid || seenProducts.has(pid)) continue;
+    seenProducts.add(pid);
+    const s = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+    // The supplier's own photo / model / name for this product (from the link)
+    // take precedence so the card shows what this supplier actually offers,
+    // falling back to the product master.
+    products.push({
+      ...p,
+      photo: s(r.supplier_product_photo) ?? null,
+      model: s(r.supplier_product_code) ?? s(p.primary_model) ?? null,
+      product_name: s(r.supplier_product_name) ?? s(p.product_name) ?? null,
+      is_primary: r.is_primary === true,
+    });
   }
 
   const factory = factoryRows[0] ?? null;

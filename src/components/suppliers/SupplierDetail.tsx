@@ -1540,12 +1540,20 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
               <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-3 @4xl:grid-cols-4">
                 {data.products.map((p, i) => {
                   const pid = str(p, "slug", "id");
+                  const photo = str(p, "photo");
+                  const model = str(p, "model");
                   const card = (
                     <div className="rounded-2xl bg-[var(--bg-surface-subtle)] p-3 transition-colors hover:bg-[var(--bg-surface-hover)]">
                       <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl bg-[var(--bg-surface)] text-[var(--text-faint)]">
-                        <PackageIcon className="h-7 w-7" />
+                        {photo ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={photo} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <PackageIcon className="h-7 w-7" />
+                        )}
                       </div>
-                      <div className="mt-2 truncate text-sm font-medium text-[var(--text-primary)]">{str(p, "product_name") || t("sd.untitled", "Untitled")}</div>
+                      {model ? <div className="mt-2 truncate text-[11px] font-semibold uppercase tracking-wide text-[var(--accent)]">{model}</div> : null}
+                      <div className={`${model ? "mt-0.5" : "mt-2"} truncate text-sm font-medium text-[var(--text-primary)]`}>{str(p, "product_name") || t("sd.untitled", "Untitled")}</div>
                       {str(p, "category_slug") ? <div className="truncate text-[11px] text-[var(--text-faint)]">{str(p, "category_slug")}</div> : null}
                     </div>
                   );
