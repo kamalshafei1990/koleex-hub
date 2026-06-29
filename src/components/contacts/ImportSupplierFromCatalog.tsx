@@ -34,6 +34,9 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onCreated?: (supplierId: string) => void;
+  /** When provided (Suppliers app), hand the extracted data to the REAL New
+      Supplier form pre-filled, instead of creating directly. */
+  onPrefill?: (form: Partial<ContactForm>, catalogFile: File | null) => void;
 }
 
 const EMPTY: SupplierDraft = {
@@ -49,7 +52,7 @@ const EMPTY: SupplierDraft = {
   confidence: "low", notes: null,
 };
 
-export default function ImportSupplierFromCatalog({ open, onClose, onCreated }: Props) {
+export default function ImportSupplierFromCatalog({ open, onClose, onCreated, onPrefill }: Props) {
   const [phase, setPhase] = useState<Phase>("pick");
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState("");
@@ -227,6 +230,41 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated }: 
     setProgress(""); setPhase("done"); onCreated?.(supplierId);
   }, [file, draft, logo, uploadLogo, onCreated]);
 
+  // Hand the extracted data to the REAL New Supplier form, pre-filled.
+  const handoff = useCallback(() => {
+    if (!file || !onPrefill) return;
+    const nameEn = (draft.company_name_en || "").trim();
+    const nameCn = (draft.company_name_cn || "").trim();
+    if (!nameEn && !nameCn) { setError("Add at least the English or Chinese company name first."); return; }
+    const brands = [draft.brand_cn, draft.brand_en].map((b) => (b || "").trim()).filter(Boolean);
+    const persons = draft.contact_persons.map((p, i) => ({
+      name: (p.full_name || "").trim(), name_cn: "", position: (p.role || "").trim(), department: "",
+      phone: "", mobile: (p.mobile || "").trim(), email: (p.email || "").trim(), notes: "",
+      wechat_id: (p.wechat || "").trim(), is_primary: i === 0,
+    }));
+    const overrides: Partial<ContactForm> = {
+      company_name_en: nameEn,
+      company_name_cn: nameCn,
+      brand_names: brands,
+      supplier_type: draft.business_type || "",
+      year_established: draft.year_established || "",
+      product_categories: draft.main_products,
+      supplier_email: draft.email || "",
+      supplier_tel: draft.tel || "",
+      supplier_mobile: draft.mobile || "",
+      supplier_website: draft.website || "",
+      supplier_address: draft.address || "",
+      supplier_postal_code: draft.postal_code || "",
+      wechat_id: draft.wechat || "",
+      messaging_channels: (draft.qq ? [{ platform: "QQ", value: draft.qq }] : []) as ContactForm["messaging_channels"],
+      contact_persons: persons as ContactForm["contact_persons"],
+      photo_url: logo || "",
+      notes: draft.fax ? `Fax: ${draft.fax}` : "",
+    };
+    onPrefill(overrides, file);
+    close();
+  }, [file, draft, logo, onPrefill, close]);
+
   if (!open) return null;
   const set = (patch: Partial<SupplierDraft>) => setDraft((d) => ({ ...d, ...patch }));
 
@@ -385,8 +423,13 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated }: 
 
               <div className="flex items-center justify-end gap-2 pt-1">
                 <button onClick={close} className="px-3 py-2 text-[13px] rounded-lg hover:opacity-70" style={{ color: "var(--text-dim, #888)" }}>Cancel</button>
-                <button onClick={() => void create()} className="px-4 py-2 text-[13px] font-semibold rounded-lg"
-                  style={{ background: "var(--bg-inverted, #111)", color: "var(--text-inverted, #fff)" }}>Create supplier</button>
+                {onPrefill ? (
+                  <button onClick={handoff} className="px-4 py-2 text-[13px] font-semibold rounded-lg"
+                    style={{ background: "var(--bg-inverted, #111)", color: "var(--text-inverted, #fff)" }}>Continue in supplier form →</button>
+                ) : (
+                  <button onClick={() => void create()} className="px-4 py-2 text-[13px] font-semibold rounded-lg"
+                    style={{ background: "var(--bg-inverted, #111)", color: "var(--text-inverted, #fff)" }}>Create supplier</button>
+                )}
               </div>
             </div>
           )}
