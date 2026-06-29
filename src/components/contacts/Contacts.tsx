@@ -157,7 +157,7 @@ interface VisaDocEntry {
   uploaded_at: string;
 }
 
-interface ContactForm {
+export interface ContactForm {
   contact_type: ContactType;
   entity_type: "person" | "company" | "";
   photo_url: string;
@@ -660,7 +660,7 @@ const INCOTERMS = [
   "CIF — Cost, Insurance & Freight",
 ];
 
-const EMPTY_FORM: ContactForm = {
+export const EMPTY_FORM: ContactForm = {
   contact_type: "customer",
   entity_type: "",
   photo_url: "",
@@ -1554,7 +1554,7 @@ function contactToForm(c: ContactRow): ContactForm {
   };
 }
 
-function formToRow(f: ContactForm): Record<string, unknown> {
+export function formToRow(f: ContactForm): Record<string, unknown> {
   const fullName = buildFullName(f);
   const displayName = buildDisplayName(f);
   return {

@@ -24,6 +24,7 @@ import { createContact } from "@/lib/contacts-admin";
 import { uploadCatalogFile, createCatalog } from "@/lib/catalogs-admin";
 import { uploadToStorage } from "@/lib/storage-client";
 import type { SupplierDraft } from "@/lib/server/catalog-extract";
+import type { ContactForm } from "@/components/contacts/Contacts";
 
 const ACCENT = "#0066FF";
 
@@ -151,45 +152,54 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated }: 
     if (logo) { setProgress("Uploading logo…"); logoUrl = await uploadLogo(logo); }
 
     setProgress("Creating supplier…");
+    // Build the supplier with the SAME mapper the manual "New Supplier" form
+    // uses (formToRow over EMPTY_FORM), so an imported supplier is identical in
+    // shape to a hand-entered one — Company Profile, Contact Data and Contact
+    // Persons all land in the exact same fields/format.
+    const { EMPTY_FORM, formToRow } = await import("@/components/contacts/Contacts");
     const brands = [draft.brand_cn, draft.brand_en].map((b) => (b || "").trim()).filter(Boolean);
     const persons = draft.contact_persons.map((p, i) => ({
-      name: p.full_name || null, full_name: p.full_name || null, name_cn: null,
-      position: p.role || null, role: p.role || null, department: null,
-      phone: p.mobile || null, mobile: p.mobile || null, email: p.email || null,
-      wechat_id: p.wechat || null, is_primary: i === 0,
+      name: (p.full_name || "").trim(),
+      name_cn: "",
+      position: (p.role || "").trim(),
+      department: "",
+      phone: "",
+      mobile: (p.mobile || "").trim(),
+      email: (p.email || "").trim(),
+      notes: "",
+      wechat_id: (p.wechat || "").trim(),
+      is_primary: i === 0,
     }));
-    const noteBits = [
-      draft.notes,
-      draft.fax ? `Fax: ${draft.fax}` : null,
-    ].filter(Boolean);
-
-    // Only columns proven to exist on `contacts` (verified against formToRow).
-    const core: Record<string, unknown> = {
-      contact_type: "supplier", entity_type: "company",
-      company_name_en: nameEn || null, company_name_cn: nameCn || null,
-      display_name: displayName,
-      supplier_email: draft.email || null, email: draft.email || null,
-      supplier_website: draft.website || null, website: draft.website || null,
-      supplier_mobile: draft.mobile || null, phone: draft.mobile || draft.tel || null,
-      supplier_tel: draft.tel || null,
-      supplier_address: draft.address || null, supplier_postal_code: draft.postal_code || null,
-      wechat_id: draft.wechat || null, qq_id: draft.qq || null,
-      year_established: draft.year_established || null,
-      brand_names: brands.length ? brands : null,
-      product_categories: draft.main_products.length ? draft.main_products : null,
-      contact_persons: persons,
-      photo_url: logoUrl, logo_url: logoUrl,
-      notes: noteBits.length ? noteBits.join("\n") : null,
+    const form: ContactForm = {
+      ...EMPTY_FORM,
+      contact_type: "supplier",
+      entity_type: "company",
+      company_name_en: nameEn,
+      company_name_cn: nameCn,
+      brand_names: brands,
+      supplier_type: draft.business_type || "",
+      year_established: draft.year_established || "",
+      product_categories: draft.main_products,
+      supplier_email: draft.email || "",
+      supplier_tel: draft.tel || "",
+      supplier_mobile: draft.mobile || "",
+      supplier_website: draft.website || "",
+      supplier_address: draft.address || "",
+      supplier_postal_code: draft.postal_code || "",
+      wechat_id: draft.wechat || "",
+      messaging_channels: draft.qq
+        ? [...EMPTY_FORM.messaging_channels, { platform: "QQ", value: draft.qq }]
+        : EMPTY_FORM.messaging_channels,
+      contact_persons: persons as ContactForm["contact_persons"],
+      photo_url: logoUrl || "",
+      notes: draft.fax ? `Fax: ${draft.fax}` : EMPTY_FORM.notes,
     };
-    // supplier_type may carry a CHECK/enum constraint — keep it OUT of core so a
-    // bad value can't block creation; it's added to the first (rich) attempt only.
-    const rich: Record<string, unknown> = { ...core, supplier_type: draft.business_type || null };
 
-    let { data, error: cErr } = await createContact(rich);
+    let { data, error: cErr } = await createContact(formToRow(form));
     if (!data?.id) {
-      // Retry without the optional/risky field so a constraint mismatch never
-      // costs the user the whole import.
-      ({ data, error: cErr } = await createContact(core));
+      // supplier_type may carry a CHECK/enum constraint; retry once without it
+      // so a bad value never costs the whole import.
+      ({ data, error: cErr } = await createContact(formToRow({ ...form, supplier_type: "" })));
     }
     if (!data?.id) { setError(cErr || "Failed to create the supplier."); setPhase("review"); return; }
 
