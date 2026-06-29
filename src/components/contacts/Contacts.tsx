@@ -97,6 +97,7 @@ import {
 import { fetchOpportunities } from "@/lib/crm";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { STRATEGIC_STATUS_LABELS, CLASSIFICATION_LABELS, FACTORY_TYPE_LABELS, strategicStatusTone } from "@/lib/suppliers/intelligence";
+import { findSupplierDuplicates, type DupMatch } from "@/lib/contacts/duplicate-match";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { useScopeContext } from "@/lib/use-scope";
 import type { CrmOpportunityWithRelations } from "@/types/supabase";
@@ -4010,6 +4011,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
      PDF is filed against the new supplier after Save (handleSave success). */
   const [formModalOpen, setFormModalOpen] = useState(false);
   const pendingCatalogFileRef = useRef<File | null>(null);
+  /* Duplicate-supplier guard: likely matches found at save time + a one-shot
+     bypass when the operator confirms "create anyway". */
+  const [dupMatches, setDupMatches] = useState<DupMatch[]>([]);
+  const [dupMerging, setDupMerging] = useState<string | null>(null);
+  const dupBypassRef = useRef(false);
   /* Square-crop a chosen logo / screenshot before it becomes the photo. */
   const [logoCropSrc, setLogoCropSrc] = useState<string | null>(null);
   const openLogoCrop = useCallback((file: File) => {
@@ -4165,6 +4171,21 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           setSaveError(error || t("error.updateFailed"));
         }
       } else {
+        /* Duplicate guard (suppliers only): before creating, look for an
+           existing supplier this is likely a duplicate of. If found and the
+           operator hasn't chosen "create anyway", surface the matches and stop. */
+        if (!dupBypassRef.current && (filterType === "supplier" || row.contact_type === "supplier")) {
+          const matches = findSupplierDuplicates(
+            row as Record<string, unknown>,
+            contacts as unknown as Record<string, unknown>[],
+          );
+          if (matches.length) {
+            setDupMatches(matches);
+            setSaving(false);
+            return;
+          }
+        }
+        dupBypassRef.current = false;
         const { data: created, error } = await createContact(row);
         if (created) {
           /* Catalog import: file the PDF against the new supplier (Suppliers +
@@ -4211,6 +4232,58 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       setSaveError(err instanceof Error ? err.message : t("error.unexpected"));
     }
     setSaving(false);
+  };
+
+  /* File the pending catalog PDF against a supplier id (shared by create + merge). */
+  const fileCatalogAgainst = async (id: string, idy: Record<string, unknown>) => {
+    if (!pendingCatalogFileRef.current) return;
+    const pdf = pendingCatalogFileRef.current;
+    pendingCatalogFileRef.current = null;
+    try {
+      const { uploadCatalogFile, createCatalog } = await import("@/lib/catalogs-admin");
+      const up = await uploadCatalogFile(pdf);
+      if (!up) return;
+      const dn = (idy.display_name || idy.company_name_en || idy.company_name_cn || pdf.name) as string;
+      await createCatalog({
+        title: dn, title_cn: (idy.company_name_cn as string) || null, description: null,
+        contact_id: id, contact_name: dn,
+        company_name_en: (idy.company_name_en as string) || null,
+        company_name_cn: (idy.company_name_cn as string) || null,
+        contact_type: "supplier", contact_photo_url: (idy.photo_url as string) || null,
+        division_slug: null, division_name: null, category_slug: null, category_name: null,
+        file_name: pdf.name, file_path: up.path, file_url: up.url,
+        file_type: pdf.type || "application/pdf", file_size: pdf.size,
+        cover_url: null, cover_path: null, tags: ["supplier-catalog"],
+      });
+    } catch { /* non-fatal */ }
+  };
+
+  /* Duplicate resolution actions. */
+  const openExistingDup = (id: string) => { setDupMatches([]); setFormModalOpen(false); router.push(`/suppliers/${id}`); };
+  const createAnywayDup = () => { dupBypassRef.current = true; setDupMatches([]); void handleSave(); };
+  /* "Merge into existing": fill ONLY the empty fields of the existing supplier
+     from the new data (never overwrite), attach the catalog, then open it. */
+  const mergeIntoExisting = async (existingId: string) => {
+    setDupMerging(existingId);
+    const existing = contacts.find((c) => c.id === existingId) as unknown as Record<string, unknown> | undefined;
+    const row = formToRow(form) as unknown as Record<string, unknown>;
+    const isEmpty = (v: unknown) => v == null || v === "" || (Array.isArray(v) && v.length === 0);
+    const patch: Record<string, unknown> = {};
+    if (existing) {
+      for (const k of Object.keys(row)) {
+        if (k === "id" || k === "contact_type") continue;
+        if (!isEmpty(row[k]) && isEmpty(existing[k])) patch[k] = row[k];
+      }
+    }
+    try {
+      if (Object.keys(patch).length) await updateContact(existingId, patch);
+      await fileCatalogAgainst(existingId, { ...(existing || {}), ...patch });
+    } catch { /* non-fatal */ }
+    setDupMerging(null);
+    setDupMatches([]);
+    setFormModalOpen(false);
+    await enrichSupplier(existingId).catch(() => {});
+    router.push(`/suppliers/${existingId}`);
   };
 
   const handleDelete = async (id: string): Promise<DeleteResult> => {
@@ -9594,6 +9667,64 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           onCancel={() => setLogoCropSrc(null)}
           onCrop={(url) => { setField("photo_url", url); setLogoCropSrc(null); }}
         />
+      )}
+
+      {/* Possible-duplicate guard — shown before a new supplier is created when
+          it looks like one we already have. Operator decides: open / merge / create. */}
+      {dupMatches.length > 0 && (
+        <div className="fixed inset-0 z-[320] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)" }}
+          onMouseDown={(e) => { if (e.target === e.currentTarget && !dupMerging) setDupMatches([]); }}>
+          <div className="w-full max-w-lg rounded-2xl overflow-hidden flex flex-col max-h-[85vh]"
+            style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <div className="px-5 py-4 border-b" style={{ borderColor: "var(--border-color)" }}>
+              <div className="text-[15px] font-semibold text-[var(--text-primary)]">{t("dup.title", "Possible duplicate supplier")}</div>
+              <div className="text-[12px] text-[var(--text-muted)] mt-0.5">
+                {t("dup.subtitle", "This looks like a supplier you already have. Open it, merge the new info into it, or create a separate record.")}
+              </div>
+            </div>
+            <div className="px-5 py-4 space-y-3 overflow-y-auto">
+              {dupMatches.map((m) => (
+                <div key={m.id} className="rounded-xl p-3.5" style={{ background: "var(--bg-surface)", border: "1px solid var(--border-color)" }}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-[14px] font-medium text-[var(--text-primary)] truncate">{m.name}</div>
+                      <div className="text-[11px] text-[var(--text-muted)] mt-0.5">{m.reasons.join(" · ")}</div>
+                    </div>
+                    <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded-full"
+                      style={m.level === "high"
+                        ? { background: "rgba(255,51,51,0.12)", color: "#ff6b6b" }
+                        : { background: "rgba(255,204,0,0.12)", color: "#e0a800" }}>
+                      {m.level === "high" ? t("dup.likely", "Likely match") : t("dup.possible", "Possible")}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-3">
+                    <button disabled={!!dupMerging} onClick={() => openExistingDup(m.id)}
+                      className="px-3 py-1.5 text-[12px] font-medium rounded-lg disabled:opacity-50"
+                      style={{ background: "var(--bg-surface-hover)", color: "var(--text-secondary)" }}>
+                      {t("dup.open", "Open this supplier")}
+                    </button>
+                    <button disabled={!!dupMerging} onClick={() => mergeIntoExisting(m.id)}
+                      className="px-3 py-1.5 text-[12px] font-semibold rounded-lg disabled:opacity-50"
+                      style={{ background: "#0066FF", color: "#fff" }}>
+                      {dupMerging === m.id ? t("dup.merging", "Merging…") : t("dup.merge", "Merge new info into it")}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="px-5 py-3 border-t flex items-center justify-between gap-2" style={{ borderColor: "var(--border-color)" }}>
+              <button disabled={!!dupMerging} onClick={() => setDupMatches([])}
+                className="px-3 py-1.5 text-[12px] rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] disabled:opacity-50">
+                {t("btn.cancel", "Cancel")}
+              </button>
+              <button disabled={!!dupMerging} onClick={createAnywayDup}
+                className="px-3 py-1.5 text-[12px] font-medium rounded-lg disabled:opacity-50"
+                style={{ border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}>
+                {t("dup.createAnyway", "Not a duplicate — create anyway")}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Import supplier from PDF catalog */}
