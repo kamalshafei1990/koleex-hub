@@ -9,7 +9,7 @@
    Zone D: All Apps (category chips + flat grid)
    --------------------------------------------------------------------------- */
 
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import StarIcon from "@/components/icons/ui/StarIcon";
@@ -276,6 +276,224 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
     </div>
   );
 }
+
+/* ── Full App Card (for grid) ── */
+const AppCard = memo(function AppCard({
+  app,
+  showStar = false,
+  t,
+  isFav,
+  isCurrentApp,
+  appUnread,
+  appUnreadNoun,
+  dk,
+  onAppClick,
+  onPrefetch,
+  onToggleFavorite,
+}: {
+  app: AppDef;
+  showStar?: boolean;
+  t: (key: string, fb: string) => string;
+  isFav: boolean;
+  isCurrentApp: boolean;
+  appUnread: number;
+  appUnreadNoun: string;
+  dk: boolean;
+  onAppClick: (app: AppDef) => void;
+  onPrefetch: (app: AppDef) => void;
+  onToggleFavorite: (appId: string, isFav: boolean) => void;
+}) {
+  const Icon = app.icon;
+  const label = t(app.tKey, app.name);
+  const isAi = app.id === "ai";
+  const badge = getAppBadge(app);
+
+  return (
+    <div
+      role="button"
+      tabIndex={app.active ? 0 : -1}
+      onClick={() => onAppClick(app)}
+      onKeyDown={(e) => { if (e.key === "Enter") onAppClick(app); }}
+      onPointerEnter={() => onPrefetch(app)}
+      onTouchStart={() => onPrefetch(app)}
+      onFocus={() => onPrefetch(app)}
+      className={`relative flex flex-col items-center justify-center gap-2.5 p-3 aspect-square rounded-2xl transition-all duration-200 select-none outline-none focus-visible:ring-2 ${
+        dk ? "focus-visible:ring-white/35" : "focus-visible:ring-black/25"
+      } ${
+        isAi
+          ? "ai-card-neon cursor-default"
+          : app.active
+            ? isCurrentApp
+              ? `cursor-pointer group border ${
+                  dk
+                    ? "bg-white/[0.08] border-white/[0.18] hover:scale-[1.02] ring-1 ring-white/[0.08] active:scale-[0.97]"
+                    : "bg-black/[0.05] border-black/[0.15] hover:scale-[1.02] ring-1 ring-black/[0.05] active:scale-[0.97]"
+                }`
+              : `cursor-pointer group border ${
+                  dk
+                    ? "bg-[#111] border-white/[0.06] hover:border-white/[0.18] hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(0,0,0,0.6)] active:scale-[0.97]"
+                    : "bg-white border-black/[0.06] hover:border-black/[0.14] hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] active:scale-[0.97]"
+                }`
+            : `cursor-default border ${dk ? "bg-[#0c0c0c] border-white/[0.03]" : "bg-[#f8f8f8] border-black/[0.03]"}`
+      }`}
+    >
+      {showStar && app.active && (
+        <span
+          role="button"
+          tabIndex={0}
+          onClick={(e) => { e.stopPropagation(); onToggleFavorite(app.id, isFav); }}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onToggleFavorite(app.id, isFav); } }}
+          className={`absolute top-2 end-2 p-1.5 rounded-lg transition-all duration-200 ${
+            isFav
+              ? "text-amber-400 hover:text-amber-300 hover:scale-110"
+              : dk
+                ? "text-white/0 group-hover:text-white/20 hover:!text-amber-400 hover:!scale-110"
+                : "text-black/0 group-hover:text-black/15 hover:!text-amber-400 hover:!scale-110"
+          }`}
+          aria-label={isFav ? "Remove from favorites" : "Add to favorites"}
+        >
+          <StarIcon size={12} style={{ fill: isFav ? "currentColor" : "none" }} />
+        </span>
+      )}
+
+      {(badge === "new" || badge === "updated") && (
+        <span
+          className={`absolute top-2 start-2 px-1.5 py-0.5 rounded-md text-[9px] font-extrabold tracking-wider uppercase pointer-events-none select-none whitespace-nowrap ${
+            badge === "new"
+              ? "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-400/40"
+              : "bg-sky-500/20 text-sky-300 ring-1 ring-sky-400/40"
+          }`}
+          aria-label={badge === "new" ? "New app" : "Updated app"}
+          title={badge === "new" ? "New app" : "Recently updated"}
+        >
+          {badge === "new" ? "NEW" : "UPDATED"}
+        </span>
+      )}
+      <span className={`transition-all duration-200 ${
+        isAi
+          ? "opacity-100"
+          : app.active
+            ? dk ? "text-white opacity-100" : "text-black opacity-100"
+            : dk ? "text-white opacity-[0.15]" : "text-black opacity-[0.15]"
+      }`}
+        style={isAi ? {
+          filter:
+            "drop-shadow(0 0 10px rgba(0,212,255,0.4)) drop-shadow(0 0 20px rgba(123,97,255,0.25))",
+        } : undefined}
+      >
+        <span className="relative inline-flex">
+          {appUnread > 0 && (
+            <span
+              className={`absolute -top-2 -end-2.5 z-10 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full bg-[#FF3333] text-white text-[10px] font-bold leading-none ring-2 ${dk ? "ring-[#111]" : "ring-white"} pointer-events-none select-none`}
+              aria-label={`${appUnread} unread`}
+              title={`${appUnread} unread ${appUnreadNoun}${appUnread === 1 ? "" : "s"}`}
+            >
+              {appUnread > 99 ? "99+" : appUnread}
+            </span>
+          )}
+          {(() => {
+            if (isAi) {
+              const AnimatedIcon = Icon as React.ComponentType<{
+                size?: number;
+                animated?: boolean;
+                scaleClass?: string;
+              }>;
+              return <AnimatedIcon size={34} animated scaleClass="scale-100" />;
+            }
+            return <Icon size={34} />;
+          })()}
+        </span>
+      </span>
+      <span className={`text-[12px] font-medium text-center leading-tight transition-all duration-200 ${
+        app.active
+          ? isCurrentApp
+            ? dk ? "text-white font-semibold" : "text-black font-semibold"
+            : dk ? "text-white/90" : "text-black/90"
+          : dk ? "text-white/15" : "text-black/15"
+      }`}>
+        {label}
+      </span>
+    </div>
+  );
+});
+
+/* ── Compact horizontal card (for favorites row / recent strip) ── */
+const CompactCard = memo(function CompactCard({
+  app,
+  showStar = false,
+  t,
+  isFav,
+  dk,
+  onAppClick,
+  onPrefetch,
+  onToggleFavorite,
+}: {
+  app: AppDef;
+  showStar?: boolean;
+  t: (key: string, fb: string) => string;
+  isFav: boolean;
+  dk: boolean;
+  onAppClick: (app: AppDef) => void;
+  onPrefetch: (app: AppDef) => void;
+  onToggleFavorite: (appId: string, isFav: boolean) => void;
+}) {
+  const Icon = app.icon;
+  const label = t(app.tKey, app.name);
+
+  return (
+    <div
+      role="button"
+      tabIndex={app.active ? 0 : -1}
+      onClick={() => onAppClick(app)}
+      onKeyDown={(e) => { if (e.key === "Enter") onAppClick(app); }}
+      onPointerEnter={() => onPrefetch(app)}
+      onTouchStart={() => onPrefetch(app)}
+      onFocus={() => onPrefetch(app)}
+      className={`relative flex items-center gap-2.5 px-3.5 py-2.5 border rounded-xl transition-all duration-200 shrink-0 select-none ${
+        app.active
+          ? `cursor-pointer group ${
+              dk
+                ? "bg-[#111] border-white/[0.06] hover:border-white/[0.18] hover:scale-[1.02] hover:shadow-[0_6px_20px_rgba(0,0,0,0.4)] active:scale-[0.98]"
+                : "bg-white border-black/[0.06] hover:border-black/[0.14] hover:scale-[1.02] hover:shadow-[0_6px_20px_rgba(0,0,0,0.08)] active:scale-[0.98]"
+            }`
+          : `cursor-default opacity-20 ${dk ? "bg-[#0e0e0e] border-white/[0.02]" : "bg-[#f5f5f5] border-black/[0.02]"}`
+      }`}
+    >
+      <span className={`transition-all duration-200 ${
+        app.active
+          ? dk ? "text-white opacity-100" : "text-black opacity-100"
+          : dk ? "text-white opacity-25" : "text-black opacity-25"
+      }`}>
+        <Icon size={17} />
+      </span>
+      <span className={`text-[12px] font-medium whitespace-nowrap transition-colors duration-200 ${
+        app.active
+          ? dk ? "text-white/90" : "text-black/90"
+          : dk ? "text-white/25" : "text-black/25"
+      }`}>
+        {label}
+      </span>
+      {showStar && app.active && (
+        <span
+          role="button"
+          tabIndex={0}
+          onClick={(e) => { e.stopPropagation(); onToggleFavorite(app.id, isFav); }}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onToggleFavorite(app.id, isFav); } }}
+          className={`p-0.5 rounded transition-all duration-200 ${
+            isFav
+              ? "text-amber-400 hover:text-amber-300"
+              : dk
+                ? "text-white/0 group-hover:text-white/15 hover:!text-amber-400"
+                : "text-black/0 group-hover:text-black/10 hover:!text-amber-400"
+          }`}
+          aria-label={isFav ? "Remove from favorites" : "Add to favorites"}
+        >
+          <StarIcon size={11} style={{ fill: isFav ? "currentColor" : "none" }} />
+        </span>
+      )}
+    </div>
+  );
+});
 
 /* Module-scope guard so the tile entrance animation plays once per full page
    load, then is permanently disabled — not every time the grid re-renders or
@@ -581,10 +799,9 @@ export default function HomePage() {
   );
 
   const toggleFavorite = useCallback(
-    async (appId: string) => {
+    async (appId: string, isFav: boolean) => {
       const id = accountIdRef.current;
       if (!id) return;
-      const isFav = favoriteIds.includes(appId);
       if (isFav) {
         setFavoriteIds((prev) => prev.filter((a) => a !== appId));
         await removeFavorite(id, appId);
@@ -593,7 +810,7 @@ export default function HomePage() {
         await addFavorite(id, appId);
       }
     },
-    [favoriteIds],
+    [],
   );
 
   /* ⌘K */
@@ -712,210 +929,7 @@ export default function HomePage() {
   const totalCount = filteredApps.length;
 
 
-  /* ── Full App Card (for grid) ── */
-  const AppCard = ({ app, showStar = false }: { app: AppDef; showStar?: boolean }) => {
-    const Icon = app.icon;
-    const label = t(app.tKey, app.name);
-    const isFav = favoriteIds.includes(app.id);
-    const isCurrentApp = currentAppId === app.id;
-    const isAi = app.id === "ai";
-    /* NEW / UPDATED badge — rendered as a small pill at the top-left
-       of the tile. getAppBadge auto-expires after APP_BADGE_TTL_MS
-       (3 days) so dev sets newSince / updatedSince once and forgets. */
-    const badge = getAppBadge(app);
-    /* Per-app live notification count. Discuss = unread messages,
-       To-do = unread task assignments; other apps fall through to 0. */
-    const appUnread =
-      app.id === "discuss" ? discussUnread : app.id === "todo" ? todoUnread : 0;
-    const appUnreadNoun = app.id === "todo" ? "task" : "message";
 
-    return (
-      <div
-        role="button"
-        tabIndex={app.active ? 0 : -1}
-        onClick={() => handleAppClick(app)}
-        onKeyDown={(e) => { if (e.key === "Enter") handleAppClick(app); }}
-        onPointerEnter={() => prefetchApp(app)}
-        onTouchStart={() => prefetchApp(app)}
-        onFocus={() => prefetchApp(app)}
-        className={`relative flex flex-col items-center justify-center gap-2.5 p-3 aspect-square rounded-2xl transition-all duration-200 select-none outline-none focus-visible:ring-2 ${
-          dk ? "focus-visible:ring-white/35" : "focus-visible:ring-black/25"
-        } ${
-          isAi
-            ? "ai-card-neon cursor-default"
-            : app.active
-              ? isCurrentApp
-                ? `cursor-pointer group border ${
-                    dk
-                      ? "bg-white/[0.08] border-white/[0.18] hover:scale-[1.02] ring-1 ring-white/[0.08] active:scale-[0.97]"
-                      : "bg-black/[0.05] border-black/[0.15] hover:scale-[1.02] ring-1 ring-black/[0.05] active:scale-[0.97]"
-                  }`
-                : `cursor-pointer group border ${
-                    dk
-                      ? "bg-[#111] border-white/[0.06] hover:border-white/[0.18] hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(0,0,0,0.6)] active:scale-[0.97]"
-                      : "bg-white border-black/[0.06] hover:border-black/[0.14] hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] active:scale-[0.97]"
-                  }`
-              : `cursor-default border ${dk ? "bg-[#0c0c0c] border-white/[0.03]" : "bg-[#f8f8f8] border-black/[0.03]"}`
-        }`}
-      >
-        {showStar && app.active && (
-          <span
-            role="button"
-            tabIndex={0}
-            onClick={(e) => { e.stopPropagation(); toggleFavorite(app.id); }}
-            onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); toggleFavorite(app.id); } }}
-            className={`absolute top-2 end-2 p-1.5 rounded-lg transition-all duration-200 ${
-              isFav
-                ? "text-amber-400 hover:text-amber-300 hover:scale-110"
-                : dk
-                  ? "text-white/0 group-hover:text-white/20 hover:!text-amber-400 hover:!scale-110"
-                  : "text-black/0 group-hover:text-black/15 hover:!text-amber-400 hover:!scale-110"
-            }`}
-            aria-label={isFav ? "Remove from favorites" : "Add to favorites"}
-          >
-            <StarIcon size={12} style={{ fill: isFav ? "currentColor" : "none" }} />
-          </span>
-        )}
-
-        {/* Only the auto-expiring NEW / UPDATED change markers — the static
-            "Ready to use" billboard was removed to keep the launcher calm. */}
-        {(badge === "new" || badge === "updated") && (
-          <span
-            className={`absolute top-2 start-2 px-1.5 py-0.5 rounded-md text-[9px] font-extrabold tracking-wider uppercase pointer-events-none select-none whitespace-nowrap ${
-              badge === "new"
-                ? "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-400/40"
-                : "bg-sky-500/20 text-sky-300 ring-1 ring-sky-400/40"
-            }`}
-            aria-label={badge === "new" ? "New app" : "Updated app"}
-            title={badge === "new" ? "New app" : "Recently updated"}
-          >
-            {badge === "new" ? "NEW" : "UPDATED"}
-          </span>
-        )}
-        <span className={`transition-all duration-200 ${
-          isAi
-            ? "opacity-100"
-            : app.active
-              /* Active app icons are now full-opacity by default
-                 (user: "apps color white not gray"). AI keeps its
-                 custom neon/drop-shadow treatment above — untouched.
-                 Coming-soon (inactive) apps stay faded. */
-              ? dk ? "text-white opacity-100" : "text-black opacity-100"
-              : dk ? "text-white opacity-[0.15]" : "text-black opacity-[0.15]"
-        }`}
-          style={isAi ? {
-            filter:
-              "drop-shadow(0 0 10px rgba(0,212,255,0.4)) drop-shadow(0 0 20px rgba(123,97,255,0.25))",
-          } : undefined}
-        >
-          {/* The shared AppIcon type only declares size + className, but
-              AiFaceIcon also accepts `animated`. Render through a widened
-              component reference when isAi so we can pass the animation
-              flag without mutating the shared type.
-              The icon is wrapped in a relative span so the Discuss unread
-              badge can pin to the icon's top-right corner (an app-style
-              notification badge that never collides with the hover star). */}
-          <span className="relative inline-flex">
-            {appUnread > 0 && (
-              <span
-                className={`absolute -top-2 -end-2.5 z-10 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full bg-[#FF3333] text-white text-[10px] font-bold leading-none ring-2 ${dk ? "ring-[#111]" : "ring-white"} pointer-events-none select-none`}
-                aria-label={`${appUnread} unread`}
-                title={`${appUnread} unread ${appUnreadNoun}${appUnread === 1 ? "" : "s"}`}
-              >
-                {appUnread > 99 ? "99+" : appUnread}
-              </span>
-            )}
-            {(() => {
-              if (isAi) {
-                const AnimatedIcon = Icon as React.ComponentType<{
-                  size?: number;
-                  animated?: boolean;
-                  scaleClass?: string;
-                }>;
-                /* The custom orb fills its box, so size it like every other app
-                   icon (34) — no scale needed. */
-                return <AnimatedIcon size={34} animated scaleClass="scale-100" />;
-              }
-              return <Icon size={34} />;
-            })()}
-          </span>
-        </span>
-        <span className={`text-[12px] font-medium text-center leading-tight transition-all duration-200 ${
-          app.active
-            /* Labels track the icon: full colour for active apps,
-               bold for the currently-open app (keeps the "you are
-               here" signal), faded for coming-soon apps. */
-            ? isCurrentApp
-              ? dk ? "text-white font-semibold" : "text-black font-semibold"
-              : dk ? "text-white/90" : "text-black/90"
-            : dk ? "text-white/15" : "text-black/15"
-        }`}>
-          {label}
-        </span>
-      </div>
-    );
-  };
-
-  /* ── Compact horizontal card (for favorites row / recent strip) ── */
-  const CompactCard = ({ app, showStar = false }: { app: AppDef; showStar?: boolean }) => {
-    const Icon = app.icon;
-    const label = t(app.tKey, app.name);
-    const isFav = favoriteIds.includes(app.id);
-
-    return (
-      <div
-        role="button"
-        tabIndex={app.active ? 0 : -1}
-        onClick={() => handleAppClick(app)}
-        onKeyDown={(e) => { if (e.key === "Enter") handleAppClick(app); }}
-        onPointerEnter={() => prefetchApp(app)}
-        onTouchStart={() => prefetchApp(app)}
-        onFocus={() => prefetchApp(app)}
-        className={`relative flex items-center gap-2.5 px-3.5 py-2.5 border rounded-xl transition-all duration-200 shrink-0 select-none ${
-          app.active
-            ? `cursor-pointer group ${
-                dk
-                  ? "bg-[#111] border-white/[0.06] hover:border-white/[0.18] hover:scale-[1.02] hover:shadow-[0_6px_20px_rgba(0,0,0,0.4)] active:scale-[0.98]"
-                  : "bg-white border-black/[0.06] hover:border-black/[0.14] hover:scale-[1.02] hover:shadow-[0_6px_20px_rgba(0,0,0,0.08)] active:scale-[0.98]"
-              }`
-            : `cursor-default opacity-20 ${dk ? "bg-[#0e0e0e] border-white/[0.02]" : "bg-[#f5f5f5] border-black/[0.02]"}`
-        }`}
-      >
-        <span className={`transition-all duration-200 ${
-          app.active
-            ? dk ? "text-white opacity-100" : "text-black opacity-100"
-            : dk ? "text-white opacity-25" : "text-black opacity-25"
-        }`}>
-          <Icon size={17} />
-        </span>
-        <span className={`text-[12px] font-medium whitespace-nowrap transition-colors duration-200 ${
-          app.active
-            ? dk ? "text-white/90" : "text-black/90"
-            : dk ? "text-white/25" : "text-black/25"
-        }`}>
-          {label}
-        </span>
-        {showStar && app.active && (
-          <span
-            role="button"
-            tabIndex={0}
-            onClick={(e) => { e.stopPropagation(); toggleFavorite(app.id); }}
-            onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); toggleFavorite(app.id); } }}
-            className={`p-0.5 rounded transition-all duration-200 ${
-              isFav
-                ? "text-amber-400 hover:text-amber-300"
-                : dk
-                  ? "text-white/0 group-hover:text-white/15 hover:!text-amber-400"
-                  : "text-black/0 group-hover:text-black/10 hover:!text-amber-400"
-            }`}
-            aria-label={isFav ? "Remove from favorites" : "Add to favorites"}
-          >
-            <StarIcon size={11} style={{ fill: isFav ? "currentColor" : "none" }} />
-          </span>
-        )}
-      </div>
-    );
-  };
 
   return (
     <div className={`${dk ? "bg-[#0A0A0A]" : "bg-white"} min-h-screen transition-colors duration-300`}>
@@ -1048,13 +1062,33 @@ export default function HomePage() {
             {favoriteApps.length < 3 ? (
               <div className="flex gap-2.5 overflow-x-auto scrollbar-none py-2 -my-1 px-1 -mx-1">
                 {favoriteApps.map((app) => (
-                  <CompactCard key={app.id} app={app} showStar />
+                  <CompactCard
+                    key={app.id}
+                    app={app}
+                    showStar
+                    t={t}
+                    isFav={favoriteIds.includes(app.id)}
+                    dk={dk}
+                    onAppClick={handleAppClick}
+                    onPrefetch={prefetchApp}
+                    onToggleFavorite={toggleFavorite}
+                  />
                 ))}
               </div>
             ) : (
               <div className="kx-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
                 {favoriteApps.map((app) => (
-                  <CompactCard key={app.id} app={app} showStar />
+                  <CompactCard
+                    key={app.id}
+                    app={app}
+                    showStar
+                    t={t}
+                    isFav={favoriteIds.includes(app.id)}
+                    dk={dk}
+                    onAppClick={handleAppClick}
+                    onPrefetch={prefetchApp}
+                    onToggleFavorite={toggleFavorite}
+                  />
                 ))}
               </div>
             )}
@@ -1084,7 +1118,20 @@ export default function HomePage() {
           /* Flat grid when searching or filtering by category */
           <div className={`${introMotion ? "kx-grid " : ""}grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3`}>
             {filteredApps.map((app) => (
-              <AppCard key={app.id} app={app} showStar />
+              <AppCard
+                key={app.id}
+                app={app}
+                showStar
+                t={t}
+                isFav={favoriteIds.includes(app.id)}
+                isCurrentApp={currentAppId === app.id}
+                appUnread={app.id === "discuss" ? discussUnread : app.id === "todo" ? todoUnread : 0}
+                appUnreadNoun={app.id === "todo" ? "task" : "message"}
+                dk={dk}
+                onAppClick={handleAppClick}
+                onPrefetch={prefetchApp}
+                onToggleFavorite={toggleFavorite}
+              />
             ))}
           </div>
         ) : (
@@ -1100,7 +1147,20 @@ export default function HomePage() {
                 </div>
                 <div className={`${introMotion ? "kx-grid " : ""}grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3`}>
                   {group.apps.map((app) => (
-                    <AppCard key={app.id} app={app} showStar />
+                    <AppCard
+                      key={app.id}
+                      app={app}
+                      showStar
+                      t={t}
+                      isFav={favoriteIds.includes(app.id)}
+                      isCurrentApp={currentAppId === app.id}
+                      appUnread={app.id === "discuss" ? discussUnread : app.id === "todo" ? todoUnread : 0}
+                      appUnreadNoun={app.id === "todo" ? "task" : "message"}
+                      dk={dk}
+                      onAppClick={handleAppClick}
+                      onPrefetch={prefetchApp}
+                      onToggleFavorite={toggleFavorite}
+                    />
                   ))}
                 </div>
               </div>
