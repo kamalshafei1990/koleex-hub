@@ -30,56 +30,41 @@ import { useMeBootstrap } from "@/lib/me-bootstrap";
 
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
-/** 
- * Resets the scroll position on every route navigation.
- * Uses a multi-layered approach to beat Next.js scroll restoration and focus handlers.
- */
 function ScrollToTopOnRouteChange() {
   const pathname = usePathname();
   const prevPathRef = useRef(pathname);
 
-  // Disable browser's native scroll restoration if supported
+  // Re‑apply manual scroll restoration on every pathname change
   useEffect(() => {
     if ("scrollRestoration" in window.history) {
       window.history.scrollRestoration = "manual";
     }
-  }, []);
+  }, [pathname]);
 
+  // Multi‑layered reset to outrun Next.js router restoration
   useIsomorphicLayoutEffect(() => {
-    if (prevPathRef.current !== pathname) {
-      prevPathRef.current = pathname;
-      
-      const resetScroll = () => {
-        // Reset the custom scroll container
+    if (pathname !== prevPathRef.current) {
+      const reset = () => {
         const el = document.getElementById("main-scroll-container");
-        if (el) {
-          el.scrollTo({ top: 0, left: 0, behavior: "instant" });
-        }
-        // Fallback safety for document/window
-        window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+        if (el) el.scrollTo(0, 0);
+        window.scrollTo(0, 0);
         document.documentElement.scrollTop = 0;
         document.body.scrollTop = 0;
       };
-
-      // 1. Synchronous execution
-      resetScroll();
-      
-      // 2. Next frame execution (React commits)
+      // 1️⃣ Synchronous reset
+      reset();
+      // 2️⃣ Next frame + delayed resets
       requestAnimationFrame(() => {
-        resetScroll();
-        
-        // 3. Deferred execution (Beat Next.js router async focus)
-        setTimeout(() => {
-          resetScroll();
-        }, 50);
+        reset();
+        setTimeout(reset, 50);
+        setTimeout(reset, 150);
       });
+      prevPathRef.current = pathname;
     }
   }, [pathname]);
 
   return null;
 }
-
-const BYPASS_PREFIXES = ["/login", "/auth"];
 
 /* Paths that need chrome-less rendering — same treatment as the
    /login + /auth flows but matched anywhere in the URL. Right now
@@ -88,6 +73,7 @@ const BYPASS_PREFIXES = ["/login", "/auth"];
    pages and the Hub chrome (header, sidebar, panels) must NOT be
    present in the captured output. */
 const BYPASS_SUFFIXES = ["/print"];
+const BYPASS_PREFIXES = ["/login", "/auth"];
 
 function isBypassed(pathname: string | null): boolean {
   if (!pathname) return false;
@@ -172,7 +158,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
             .shell-content-offset { padding-inline-start: ${desktopPad}px !important; }
           }
         `}</style>
-        <div className="shell-content-offset flex-1 flex flex-col min-h-0 overflow-auto transition-all duration-300 ease-in-out">
+        <div id="main-scroll-container" className="shell-content-offset flex-1 flex flex-col min-h-0 overflow-auto transition-all duration-300 ease-in-out">
+          <ScrollToTopOnRouteChange />
           {children}
         </div>
       </div>
