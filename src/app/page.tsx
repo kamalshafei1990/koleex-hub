@@ -313,13 +313,13 @@ const AppCard = memo(function AppCard({
             ? isCurrentApp
               ? `cursor-pointer group border ${
                   dk
-                    ? "bg-white/[0.08] border-white/[0.18] hover:scale-[1.02] ring-1 ring-white/[0.08] active:scale-[0.97]"
-                    : "bg-black/[0.05] border-black/[0.15] hover:scale-[1.02] ring-1 ring-black/[0.05] active:scale-[0.97]"
+                    ? "bg-white/[0.08] border-white/[0.18] hover:bg-white/[0.12] ring-1 ring-white/[0.08]"
+                    : "bg-black/[0.05] border-black/[0.15] hover:bg-black/[0.08] ring-1 ring-black/[0.05]"
                 }`
               : `cursor-pointer group border ${
                   dk
-                    ? "bg-[#111] border-white/[0.06] hover:border-white/[0.18] hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(0,0,0,0.6)] active:scale-[0.97]"
-                    : "bg-white border-black/[0.06] hover:border-black/[0.14] hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] active:scale-[0.97]"
+                    ? "bg-[#111] border-white/[0.06] hover:border-white/[0.18] hover:bg-[#1a1a1a] hover:shadow-[0_8px_30px_rgba(0,0,0,0.6)]"
+                    : "bg-white border-black/[0.06] hover:border-black/[0.14] hover:bg-[#fafafa] hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)]"
                 }`
             : `cursor-default border ${dk ? "bg-[#0c0c0c] border-white/[0.03]" : "bg-[#f8f8f8] border-black/[0.03]"}`
       }`}
@@ -416,8 +416,8 @@ const CompactCard = memo(function CompactCard({
         app.active
           ? `cursor-pointer group ${
               dk
-                ? "bg-[#111] border-white/[0.06] hover:border-white/[0.18] hover:scale-[1.02] hover:shadow-[0_6px_20px_rgba(0,0,0,0.4)] active:scale-[0.98]"
-                : "bg-white border-black/[0.06] hover:border-black/[0.14] hover:scale-[1.02] hover:shadow-[0_6px_20px_rgba(0,0,0,0.08)] active:scale-[0.98]"
+                ? "bg-[#111] border-white/[0.06] hover:border-white/[0.18] hover:bg-[#1a1a1a] hover:shadow-[0_6px_20px_rgba(0,0,0,0.4)]"
+                : "bg-white border-black/[0.06] hover:border-black/[0.14] hover:bg-[#fafafa] hover:shadow-[0_6px_20px_rgba(0,0,0,0.08)]"
             }`
           : `cursor-default opacity-20 ${dk ? "bg-[#0e0e0e] border-white/[0.02]" : "bg-[#f5f5f5] border-black/[0.02]"}`
       }`}
