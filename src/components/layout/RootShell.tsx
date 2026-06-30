@@ -31,26 +31,48 @@ import { useMeBootstrap } from "@/lib/me-bootstrap";
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 /** 
- * Resets the custom scroll container to the top on every route navigation. 
+ * Resets the scroll position on every route navigation.
+ * Uses a multi-layered approach to beat Next.js scroll restoration and focus handlers.
  */
 function ScrollToTopOnRouteChange() {
   const pathname = usePathname();
   const prevPathRef = useRef(pathname);
 
-  // Synchronous reset before browser paint to prevent visual jumping
+  // Disable browser's native scroll restoration if supported
+  useEffect(() => {
+    if ("scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
+    }
+  }, []);
+
   useIsomorphicLayoutEffect(() => {
     if (prevPathRef.current !== pathname) {
       prevPathRef.current = pathname;
-      const el = document.getElementById("main-scroll-container");
-      if (el) {
-        el.scrollTo({ top: 0, left: 0, behavior: "instant" });
-        // Fallback for async content mounting
-        requestAnimationFrame(() => {
-          if (el.scrollTop > 0) {
-            el.scrollTo({ top: 0, left: 0, behavior: "instant" });
-          }
-        });
-      }
+      
+      const resetScroll = () => {
+        // Reset the custom scroll container
+        const el = document.getElementById("main-scroll-container");
+        if (el) {
+          el.scrollTo({ top: 0, left: 0, behavior: "instant" });
+        }
+        // Fallback safety for document/window
+        window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      };
+
+      // 1. Synchronous execution
+      resetScroll();
+      
+      // 2. Next frame execution (React commits)
+      requestAnimationFrame(() => {
+        resetScroll();
+        
+        // 3. Deferred execution (Beat Next.js router async focus)
+        setTimeout(() => {
+          resetScroll();
+        }, 50);
+      });
     }
   }, [pathname]);
 
