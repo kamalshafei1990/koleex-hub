@@ -15,7 +15,7 @@ import Sidebar from "./Sidebar";
 import FloatingPanel from "./FloatingPanel";
 import ViewAsBanner from "./ViewAsBanner";
 import ReportIssueButton from "@/components/qa/ReportIssueButton";
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useLayoutEffect, useRef } from "react";
 import QaFocusHighlight from "@/components/qa/QaFocusHighlight";
 import ActivityTracker from "@/components/activity/ActivityTracker";
 import ServiceWorkerRegistrar from "@/components/pwa/ServiceWorkerRegistrar";
@@ -27,6 +27,35 @@ import {
   SIDEBAR_COLLAPSED_W,
 } from "./SidebarContext";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
+
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+/** 
+ * Resets the custom scroll container to the top on every route navigation. 
+ */
+function ScrollToTopOnRouteChange() {
+  const pathname = usePathname();
+  const prevPathRef = useRef(pathname);
+
+  // Synchronous reset before browser paint to prevent visual jumping
+  useIsomorphicLayoutEffect(() => {
+    if (prevPathRef.current !== pathname) {
+      prevPathRef.current = pathname;
+      const el = document.getElementById("main-scroll-container");
+      if (el) {
+        el.scrollTo({ top: 0, left: 0, behavior: "instant" });
+        // Fallback for async content mounting
+        requestAnimationFrame(() => {
+          if (el.scrollTop > 0) {
+            el.scrollTo({ top: 0, left: 0, behavior: "instant" });
+          }
+        });
+      }
+    }
+  }, [pathname]);
+
+  return null;
+}
 
 const BYPASS_PREFIXES = ["/login", "/auth"];
 
