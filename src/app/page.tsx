@@ -12,7 +12,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
-import StarIcon from "@/components/icons/ui/StarIcon";
 import KoleexOrb, { type OrbState } from "@/components/ai/KoleexOrb";
 import { useTranslation } from "@/lib/i18n";
 import { hubT } from "@/lib/translations/hub";
@@ -25,13 +24,7 @@ import {
   type AppDef,
 } from "@/lib/navigation";
 import { getCurrentAccountIdSync, useCurrentAccount } from "@/lib/identity";
-import {
-  fetchFavorites,
-  addFavorite,
-  removeFavorite,
-  fetchRecent,
-  trackAppOpen,
-} from "@/lib/app-launcher";
+import { trackAppOpen } from "@/lib/app-launcher";
 import { usePermittedModules } from "@/lib/use-scope";
 import { getMeBootstrapLastError, retryMeBootstrap, useMeBootstrap } from "@/lib/me-bootstrap";
 import { useShortcutHint } from "@/lib/ui/use-shortcut-hint";
@@ -280,28 +273,22 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
 /* ── Full App Card (for grid) ── */
 const AppCard = memo(function AppCard({
   app,
-  showStar = false,
   t,
-  isFav,
   isCurrentApp,
   appUnread,
   appUnreadNoun,
   dk,
   onAppClick,
   onPrefetch,
-  onToggleFavorite,
 }: {
   app: AppDef;
-  showStar?: boolean;
   t: (key: string, fb: string) => string;
-  isFav: boolean;
   isCurrentApp: boolean;
   appUnread: number;
   appUnreadNoun: string;
   dk: boolean;
   onAppClick: (app: AppDef) => void;
   onPrefetch: (app: AppDef) => void;
-  onToggleFavorite: (appId: string, isFav: boolean) => void;
 }) {
   const Icon = app.icon;
   const label = t(app.tKey, app.name);
@@ -337,24 +324,6 @@ const AppCard = memo(function AppCard({
             : `cursor-default border ${dk ? "bg-[#0c0c0c] border-white/[0.03]" : "bg-[#f8f8f8] border-black/[0.03]"}`
       }`}
     >
-      {showStar && app.active && (
-        <span
-          role="button"
-          tabIndex={0}
-          onClick={(e) => { e.stopPropagation(); onToggleFavorite(app.id, isFav); }}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onToggleFavorite(app.id, isFav); } }}
-          className={`absolute top-2 end-2 p-1.5 rounded-lg transition-all duration-200 ${
-            isFav
-              ? "text-amber-400 hover:text-amber-300 hover:scale-110"
-              : dk
-                ? "text-white/0 group-hover:text-white/20 hover:!text-amber-400 hover:!scale-110"
-                : "text-black/0 group-hover:text-black/15 hover:!text-amber-400 hover:!scale-110"
-          }`}
-          aria-label={isFav ? "Remove from favorites" : "Add to favorites"}
-        >
-          <StarIcon size={12} style={{ fill: isFav ? "currentColor" : "none" }} />
-        </span>
-      )}
 
       {(badge === "new" || badge === "updated") && (
         <span
@@ -420,22 +389,16 @@ const AppCard = memo(function AppCard({
 /* ── Compact horizontal card (for favorites row / recent strip) ── */
 const CompactCard = memo(function CompactCard({
   app,
-  showStar = false,
   t,
-  isFav,
   dk,
   onAppClick,
   onPrefetch,
-  onToggleFavorite,
 }: {
   app: AppDef;
-  showStar?: boolean;
   t: (key: string, fb: string) => string;
-  isFav: boolean;
   dk: boolean;
   onAppClick: (app: AppDef) => void;
   onPrefetch: (app: AppDef) => void;
-  onToggleFavorite: (appId: string, isFav: boolean) => void;
 }) {
   const Icon = app.icon;
   const label = t(app.tKey, app.name);
@@ -473,24 +436,6 @@ const CompactCard = memo(function CompactCard({
       }`}>
         {label}
       </span>
-      {showStar && app.active && (
-        <span
-          role="button"
-          tabIndex={0}
-          onClick={(e) => { e.stopPropagation(); onToggleFavorite(app.id, isFav); }}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onToggleFavorite(app.id, isFav); } }}
-          className={`p-0.5 rounded transition-all duration-200 ${
-            isFav
-              ? "text-amber-400 hover:text-amber-300"
-              : dk
-                ? "text-white/0 group-hover:text-white/15 hover:!text-amber-400"
-                : "text-black/0 group-hover:text-black/10 hover:!text-amber-400"
-          }`}
-          aria-label={isFav ? "Remove from favorites" : "Add to favorites"}
-        >
-          <StarIcon size={11} style={{ fill: isFav ? "currentColor" : "none" }} />
-        </span>
-      )}
     </div>
   );
 });
@@ -656,8 +601,6 @@ export default function HomePage() {
       : spark ?? "idle";
 
   /* ── Per-user data ── */
-  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
-  const [recentIds, setRecentIds] = useState<string[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
   const accountIdRef = useRef<string | null>(null);
   /* Unread Discuss messages → notification badge on the Discuss app tile.
@@ -675,12 +618,7 @@ export default function HomePage() {
   useEffect(() => {
     const id = getCurrentAccountIdSync();
     accountIdRef.current = id;
-    if (!id) { setDataLoaded(true); return; }
-    Promise.all([fetchFavorites(id), fetchRecent(id)]).then(([favs, recs]) => {
-      setFavoriteIds(favs);
-      setRecentIds(recs);
-      setDataLoaded(true);
-    });
+    setDataLoaded(true);
   }, []);
 
   /* ── Discuss unread badge ──
@@ -798,21 +736,6 @@ export default function HomePage() {
     [router],
   );
 
-  const toggleFavorite = useCallback(
-    async (appId: string, isFav: boolean) => {
-      const id = accountIdRef.current;
-      if (!id) return;
-      if (isFav) {
-        setFavoriteIds((prev) => prev.filter((a) => a !== appId));
-        await removeFavorite(id, appId);
-      } else {
-        setFavoriteIds((prev) => [...prev, appId]);
-        await addFavorite(id, appId);
-      }
-    },
-    [],
-  );
-
   /* ⌘K */
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -871,40 +794,6 @@ export default function HomePage() {
     }
     return result;
   }, [search, activeCategory, t, visibleRegistry]);
-
-  const favoriteApps = useMemo(
-    () => favoriteIds.map((id) => visibleRegistry.find((a) => a.id === id)).filter((a): a is AppDef => !!a),
-    [favoriteIds, visibleRegistry],
-  );
-  const recentApps = useMemo(
-    () =>
-      recentIds
-        .filter((id) => !favoriteIds.includes(id))
-        .map((id) => visibleRegistry.find((a) => a.id === id))
-        .filter((a): a is AppDef => !!a)
-        .slice(0, 6),
-    [recentIds, favoriteIds, visibleRegistry],
-  );
-
-  /* When the dashboard goes idle, warm the most-likely destinations (favorites
-     + recent) so the very first tap on mobile is instant too — hover/touch
-     prefetch can't help on a cold first interaction. */
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const targets = [...favoriteApps, ...recentApps];
-    if (targets.length === 0) return;
-    const warm = () => targets.forEach((a) => prefetchApp(a));
-    const w = window as unknown as {
-      requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number;
-      cancelIdleCallback?: (id: number) => void;
-    };
-    if (w.requestIdleCallback) {
-      const id = w.requestIdleCallback(warm, { timeout: 2500 });
-      return () => w.cancelIdleCallback?.(id);
-    }
-    const id = window.setTimeout(warm, 1000);
-    return () => window.clearTimeout(id);
-  }, [favoriteApps, recentApps, prefetchApp]);
 
   const isSearching = search.trim() !== "";
   const isFiltered = activeCategory !== "all";
@@ -1050,55 +939,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* ── Zone B: Favorites ── */}
-        {!isSearchOrFilter && favoriteApps.length > 0 && (
-          <div className="mb-5">
-            <div className="flex items-center gap-2 mb-2.5">
-              <StarIcon size={11} className={dk ? "text-amber-400/50" : "text-amber-500/50"} />
-              <span className={`text-[10px] font-semibold tracking-[1.5px] uppercase ${dk ? "text-white/25" : "text-black/25"}`}>
-                {t("favorites")}
-              </span>
-            </div>
-            {favoriteApps.length < 3 ? (
-              <div className="flex gap-2.5 overflow-x-auto scrollbar-none py-2 -my-1 px-1 -mx-1">
-                {favoriteApps.map((app) => (
-                  <CompactCard
-                    key={app.id}
-                    app={app}
-                    showStar
-                    t={t}
-                    isFav={favoriteIds.includes(app.id)}
-                    dk={dk}
-                    onAppClick={handleAppClick}
-                    onPrefetch={prefetchApp}
-                    onToggleFavorite={toggleFavorite}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="kx-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
-                {favoriteApps.map((app) => (
-                  <CompactCard
-                    key={app.id}
-                    app={app}
-                    showStar
-                    t={t}
-                    isFav={favoriteIds.includes(app.id)}
-                    dk={dk}
-                    onAppClick={handleAppClick}
-                    onPrefetch={prefetchApp}
-                    onToggleFavorite={toggleFavorite}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Divider (after favorites) ── */}
-        {!isSearchOrFilter && favoriteApps.length > 0 && (
-          <div className={`border-b mb-5 ${dk ? "border-white/[0.04]" : "border-black/[0.04]"}`} />
-        )}
 
         {/* Mobile-resilience: while the permission bootstrap is in
             flight or has failed (timeout / 5xx / lost mobile signal),
@@ -1121,16 +961,13 @@ export default function HomePage() {
               <AppCard
                 key={app.id}
                 app={app}
-                showStar
                 t={t}
-                isFav={favoriteIds.includes(app.id)}
                 isCurrentApp={currentAppId === app.id}
                 appUnread={app.id === "discuss" ? discussUnread : app.id === "todo" ? todoUnread : 0}
                 appUnreadNoun={app.id === "todo" ? "task" : "message"}
                 dk={dk}
                 onAppClick={handleAppClick}
                 onPrefetch={prefetchApp}
-                onToggleFavorite={toggleFavorite}
               />
             ))}
           </div>
@@ -1150,16 +987,13 @@ export default function HomePage() {
                     <AppCard
                       key={app.id}
                       app={app}
-                      showStar
                       t={t}
-                      isFav={favoriteIds.includes(app.id)}
                       isCurrentApp={currentAppId === app.id}
                       appUnread={app.id === "discuss" ? discussUnread : app.id === "todo" ? todoUnread : 0}
                       appUnreadNoun={app.id === "todo" ? "task" : "message"}
                       dk={dk}
                       onAppClick={handleAppClick}
                       onPrefetch={prefetchApp}
-                      onToggleFavorite={toggleFavorite}
                     />
                   ))}
                 </div>
