@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { getServerAuth } from "@/lib/server/auth";
+import { getSessionAccountId, getViewAsAccountId, getViewAsRoleId } from "@/lib/server/session";
 
 /* GET /api/me/bootstrap
    Consolidates the three hot per-page /api/me/* lookups (context,
@@ -22,20 +23,23 @@ import { getServerAuth } from "@/lib/server/auth";
 const TYPE_C_MODULES = ["Calendar", "To-do", "Koleex Mail", "Inbox", "Notes"];
 
 export async function GET() {
-  const auth = await getServerAuth();
-  if (!auth) {
+  const realAccountId = await getSessionAccountId();
+  if (!realAccountId) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
-  /* In role-mode the SA is still themselves — but we want the HEADER
-     row to reflect the target role too, so the picker / banner can
-     show "Viewing as <role name>". Fetch the target role's display
-     row in parallel. */
-  const roleMode = auth.view_as_kind === "role";
+  // Determine view-as targets synchronously from session cookies
+  const overrideTargetAccountId = await getViewAsAccountId(realAccountId);
+  const overrideTargetRoleId = overrideTargetAccountId ? null : await getViewAsRoleId(realAccountId);
+  
+  const accountIdToLoad = overrideTargetAccountId ?? realAccountId;
+  const roleMode = !!(overrideTargetRoleId && !overrideTargetAccountId);
 
-  // Run the DB queries in parallel — same work as separate routes
-  // would do, but in one serverless invocation.
-  const [headerRes, rolePermsRes, overridesRes, targetRoleLabelRes] = await Promise.all([
+  // Run ALL database queries strictly in parallel. 
+  // By querying accounts + embedded roles/permissions alongside getServerAuth, 
+  // we eliminate the sequential waterfall entirely (2 round trips -> 1 round trip).
+  const [auth, headerRes, overridesRes, targetRoleLabelRes] = await Promise.all([
+    getServerAuth(),
     supabaseServer
       .from("accounts")
       .select(
@@ -44,49 +48,68 @@ export async function GET() {
          two_factor_enabled, last_login_at, created_at, updated_at,
          is_super_admin, preferences,
          person:people(id, full_name, email, avatar_url, first_name, last_name, phone, job_title, country, city, language),
-         role:roles(id, name, is_super_admin, can_view_private, description, display_order)`,
+         role:roles(id, name, is_super_admin, can_view_private, description, display_order, koleex_permissions(module_name, can_view))`
       )
-      .eq("id", auth.account_id)
+      .eq("id", accountIdToLoad)
       .maybeSingle(),
-    auth.is_super_admin
-      ? supabaseServer.from("koleex_permissions").select("module_name")
-      : auth.role_id
-        ? supabaseServer
-            .from("koleex_permissions")
-            .select("module_name")
-            .eq("role_id", auth.role_id)
-            .eq("can_view", true)
-        : Promise.resolve({ data: [] as Array<{ module_name: string }> }),
-    /* Skip account-level overrides in role-mode — by definition there's
-       no specific target account, so any overrides on the SA's own
-       account would taint the role preview. */
-    auth.is_super_admin || roleMode
+    /* Fetch overrides for everyone (since we don't know SA status until auth resolves).
+       We will filter them out in JS if the user is a super admin. */
+    roleMode
       ? Promise.resolve({ data: [] as Array<{ module_key: string; can_view: boolean }> })
       : supabaseServer
           .from("account_permission_overrides")
           .select("module_key, can_view")
-          .eq("account_id", auth.account_id),
-    auth.view_as_role_id
+          .eq("account_id", accountIdToLoad),
+    overrideTargetRoleId
       ? supabaseServer
           .from("roles")
-          .select("id, name")
-          .eq("id", auth.view_as_role_id)
+          .select("id, name, koleex_permissions(module_name, can_view)")
+          .eq("id", overrideTargetRoleId)
           .maybeSingle()
       : Promise.resolve(null),
   ]);
 
+  if (!auth) {
+    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  }
+
   // Build permitted modules set.
-  const allowed = new Set<string>(
-    (rolePermsRes.data ?? []).map((r) =>
-      (r as { module_name: string }).module_name,
-    ),
-  );
+  const allowed = new Set<string>();
+  
+  // Helper to extract permissions from embedded role relation
+  const extractPerms = (r: unknown) => {
+    if (!r || typeof r !== 'object') return;
+    const rd = r as { koleex_permissions?: Array<{ module_name: string; can_view: boolean }> | { module_name: string; can_view: boolean } | null };
+    if (!rd.koleex_permissions) return;
+    const perms = Array.isArray(rd.koleex_permissions) ? rd.koleex_permissions : [rd.koleex_permissions];
+    for (const p of perms) {
+      if (p.can_view) allowed.add(p.module_name);
+    }
+  };
+
+  // If super admin, they get all modules from the koleex_permissions table (exactly like old behavior).
+  if (auth.is_super_admin) {
+    const allPermsRes = await supabaseServer.from("koleex_permissions").select("module_name");
+    for (const r of allPermsRes.data ?? []) {
+      allowed.add((r as { module_name: string }).module_name);
+    }
+  } else if (roleMode && targetRoleLabelRes?.data) {
+    // If role-mode view-as, use the target role's permissions.
+    extractPerms(targetRoleLabelRes.data);
+  } else if (headerRes?.data?.role) {
+    // Otherwise use the account's role permissions.
+    extractPerms(headerRes.data.role);
+  }
+
   for (const m of TYPE_C_MODULES) allowed.add(m);
   allowed.add("Dashboard");
-  for (const o of overridesRes.data ?? []) {
-    const row = o as { module_key: string; can_view: boolean };
-    if (row.can_view) allowed.add(row.module_key);
-    else allowed.delete(row.module_key);
+
+  if (!auth.is_super_admin) {
+    for (const o of overridesRes.data ?? []) {
+      const row = o as { module_key: string; can_view: boolean };
+      if (row.can_view) allowed.add(row.module_key);
+      else allowed.delete(row.module_key);
+    }
   }
 
   /* When the auth context is a view-as override, expose a `viewingAs`
