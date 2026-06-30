@@ -446,6 +446,157 @@ const CompactCard = memo(function CompactCard({
    ENDS, so re-mounts during the brief intro window don't trap it on. */
 let kxIntroDone = false;
 
+/* ── AI Greeter (Isolated to prevent typing from re-rendering the whole page) ── */
+const AIGreeter = memo(function AIGreeter({
+  dk,
+  firstName,
+  t,
+  lang,
+}: {
+  dk: boolean;
+  firstName: string | null;
+  t: (key: string, fb: string) => string;
+  lang: string;
+}) {
+  const greetingText = `${t(getGreetingKey(), "")}${firstName ? `, ${firstName}` : ""}`;
+  const [greet, setGreet] = useState(0);
+  const [typed, setTyped] = useState("");
+  const [introDone, setIntroDone] = useState(false);
+  const [celebrating, setCelebrating] = useState(false);
+  const [quote, setQuote] = useState("");
+  const [quoteTyped, setQuoteTyped] = useState("");
+
+  useEffect(() => {
+    const pool = DAILY_QUOTES[lang] ?? DAILY_QUOTES.en;
+    let i = Math.floor(Date.now() / 45_000) % pool.length;
+    setQuote(pool[i]);
+    const id = setInterval(() => {
+      i = (i + 1) % pool.length;
+      setQuote(pool[i]);
+    }, 45_000);
+    return () => clearInterval(id);
+  }, [lang]);
+
+  const quoteTyping = quoteTyped.length < quote.length;
+  useEffect(() => {
+    if (!introDone || !quote) return;
+    setQuoteTyped("");
+    let i = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const step = () => {
+      i += 1;
+      setQuoteTyped(quote.slice(0, i));
+      if (i < quote.length) timer = setTimeout(step, 26 + Math.random() * 42);
+    };
+    timer = setTimeout(step, 220);
+    return () => clearTimeout(timer);
+  }, [quote, introDone]);
+
+  useEffect(() => {
+    if (!greetingText) return;
+    setTyped("");
+    setIntroDone(false);
+    let i = 0;
+    let stepTimer: ReturnType<typeof setTimeout>;
+    const step = () => {
+      i += 1;
+      setTyped(greetingText.slice(0, i));
+      if (i < greetingText.length) {
+        stepTimer = setTimeout(step, 45 + Math.random() * 50);
+      } else {
+        setIntroDone(true);
+        setGreet((g) => g + 1);
+        setCelebrating(true);
+        stepTimer = setTimeout(() => setCelebrating(false), 1100);
+      }
+    };
+    const startTimer = setTimeout(step, 550);
+    return () => {
+      clearTimeout(startTimer);
+      clearTimeout(stepTimer);
+    };
+  }, [greetingText]);
+
+  const [spark, setSpark] = useState<OrbState | null>(null);
+  useEffect(() => {
+    if (!introDone) return;
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const pool: OrbState[] = ["wink", "surprised", "celebrate", "success", "wink"];
+    const schedule = () => {
+      timer = setTimeout(
+        () => {
+          if (!alive) return;
+          setSpark(pool[Math.floor(Math.random() * pool.length)]);
+          timer = setTimeout(() => {
+            if (!alive) return;
+            setSpark(null);
+            schedule();
+          }, 1100);
+        },
+        6000 + Math.random() * 7000,
+      );
+    };
+    schedule();
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [introDone]);
+
+  const orbState: OrbState = !introDone
+    ? typed.length === 0
+      ? "surprised"
+      : "typing"
+    : celebrating
+      ? "celebrate"
+      : spark ?? "idle";
+
+  return (
+    <>
+      <KoleexOrb state={orbState} greetKey={greet} size={72} className="shrink-0 hidden sm:block" />
+      <div
+        className="relative min-w-0 w-full rounded-2xl px-4 py-3 md:px-5 md:py-3.5"
+        style={{
+          background: dk
+            ? "linear-gradient(180deg,#15151c,#0c0c11)"
+            : "linear-gradient(180deg,#ffffff,#f4f5f7)",
+          border: dk
+            ? "1px solid rgba(255,255,255,0.08)"
+            : "1px solid rgba(0,0,0,0.08)",
+          boxShadow: dk
+            ? "0 1px 0 rgba(255,255,255,0.04) inset, 0 0 30px -14px rgba(139,92,246,.30)"
+            : "0 1px 0 rgba(255,255,255,0.6) inset, 0 8px 24px -16px rgba(0,0,0,.25)",
+        }}
+      >
+        <h1
+          aria-label={greetingText}
+          className={`text-[22px] md:text-[30px] font-bold tracking-tight ${dk ? "text-white" : "text-black"}`}
+        >
+          <span aria-hidden>{typed || " "}</span>
+          {!introDone && (
+            <span
+              aria-hidden
+              className={`inline-block w-[2px] -mb-[2px] ms-[2px] h-[0.95em] align-middle animate-pulse ${dk ? "bg-white/70" : "bg-black/70"}`}
+            />
+          )}
+        </h1>
+        <div className={`transition-opacity duration-500 ${introDone ? "opacity-100" : "opacity-0"}`}>
+          <p className={`text-[13px] md:text-[15px] mt-2 font-medium leading-snug min-h-[2.8em] ${dk ? "text-white/45" : "text-black/50"}`}>
+            <span aria-hidden>{quoteTyped || " "}</span>
+            {quoteTyping && (
+              <span
+                aria-hidden
+                className={`inline-block w-[2px] -mb-[1px] ms-[2px] h-[0.9em] align-middle animate-pulse ${dk ? "bg-white/50" : "bg-black/50"}`}
+              />
+            )}
+          </p>
+        </div>
+      </div>
+    </>
+  );
+});
+
 export default function HomePage() {
   const router = useRouter();
   const pathname = usePathname();
@@ -494,111 +645,6 @@ export default function HomePage() {
   const shortcut = useShortcutHint(); // platform-aware ⌘K / Ctrl K label + tooltip
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
-
-  /* ── Koleex AI greeter — the orb "speaks" the greeting as it types ──
-     On mount the orb wakes (surprised), the greeting types out character by
-     character while the orb is in its "typing"/talking state, then it
-     celebrates with a one-shot jump and settles into the alive idle loop. */
-  const greetingText = `${t(getGreetingKey())}${firstName ? `, ${firstName}` : ""}`;
-  const [greet, setGreet] = useState(0);
-  const [typed, setTyped] = useState("");
-  const [introDone, setIntroDone] = useState(false);
-  const [celebrating, setCelebrating] = useState(false);
-  /* Motivational quote — cycles through the 40-quote pool while the page is
-     open (changes during the day). `quote` is the full current target; it gets
-     typed out char-by-char (typewriter) like the greeting. Client-only so
-     there's no hydration mismatch. */
-  const [quote, setQuote] = useState("");
-  const [quoteTyped, setQuoteTyped] = useState("");
-  useEffect(() => {
-    const pool = DAILY_QUOTES[lang] ?? DAILY_QUOTES.en;
-    let i = Math.floor(Date.now() / 45_000) % pool.length;
-    setQuote(pool[i]);
-    const id = setInterval(() => {
-      i = (i + 1) % pool.length;
-      setQuote(pool[i]); // typewriter effect (below) retypes it
-    }, 45_000); // new quote every 45s
-    return () => clearInterval(id);
-  }, [lang]); // re-pick from the active language's pool when language changes
-
-  /* Type the current quote out once the greeting has finished typing. */
-  const quoteTyping = quoteTyped.length < quote.length;
-  useEffect(() => {
-    if (!introDone || !quote) return;
-    setQuoteTyped("");
-    let i = 0;
-    let timer: ReturnType<typeof setTimeout>;
-    const step = () => {
-      i += 1;
-      setQuoteTyped(quote.slice(0, i));
-      if (i < quote.length) timer = setTimeout(step, 26 + Math.random() * 42);
-    };
-    timer = setTimeout(step, 220); // small beat before it starts "speaking"
-    return () => clearTimeout(timer);
-  }, [quote, introDone]);
-
-  useEffect(() => {
-    if (!greetingText) return;
-    setTyped("");
-    setIntroDone(false);
-    let i = 0;
-    let stepTimer: ReturnType<typeof setTimeout>;
-    const step = () => {
-      i += 1;
-      setTyped(greetingText.slice(0, i));
-      if (i < greetingText.length) {
-        stepTimer = setTimeout(step, 45 + Math.random() * 50);
-      } else {
-        setIntroDone(true);
-        setGreet((g) => g + 1);        // fire the orb's celebrate jump
-        setCelebrating(true);
-        stepTimer = setTimeout(() => setCelebrating(false), 1100);
-      }
-    };
-    const startTimer = setTimeout(step, 550); // brief "wake up" beat
-    return () => {
-      clearTimeout(startTimer);
-      clearTimeout(stepTimer);
-    };
-  }, [greetingText]);
-
-  /* After the intro, the orb periodically performs a spontaneous reaction
-     (wink / surprised / celebrate / success) every few seconds so the face
-     stays lively beyond the idle micro-expressions. */
-  const [spark, setSpark] = useState<OrbState | null>(null);
-  useEffect(() => {
-    if (!introDone) return;
-    let alive = true;
-    let timer: ReturnType<typeof setTimeout>;
-    const pool: OrbState[] = ["wink", "surprised", "celebrate", "success", "wink"];
-    const schedule = () => {
-      timer = setTimeout(
-        () => {
-          if (!alive) return;
-          setSpark(pool[Math.floor(Math.random() * pool.length)]);
-          timer = setTimeout(() => {
-            if (!alive) return;
-            setSpark(null);
-            schedule();
-          }, 1100);
-        },
-        6000 + Math.random() * 7000,
-      );
-    };
-    schedule();
-    return () => {
-      alive = false;
-      clearTimeout(timer);
-    };
-  }, [introDone]);
-
-  const orbState: OrbState = !introDone
-    ? typed.length === 0
-      ? "surprised"
-      : "typing"
-    : celebrating
-      ? "celebrate"
-      : spark ?? "idle";
 
   /* ── Per-user data ── */
   const [dataLoaded, setDataLoaded] = useState(false);
@@ -843,54 +889,7 @@ export default function HomePage() {
         <div className="mb-5 md:mb-6 min-h-[160px] md:min-h-[180px] flex items-center">
           <div className="flex items-center justify-between gap-5 md:gap-8 w-full">
             <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1">
-              {/* Koleex AI greeter — the orb "speaks" the greeting through a
-                  chat bubble with a tail pointing back at the face. */}
-              <KoleexOrb state={orbState} greetKey={greet} size={72} className="shrink-0 hidden sm:block" />
-              <div
-                className="relative min-w-0 w-full rounded-2xl px-4 py-3 md:px-5 md:py-3.5"
-                style={{
-                  /* Monochrome glass — one material language with the rest of
-                     the launcher. The rainbow lives only on the orb; here we
-                     use a quiet dark/light glass fill, a hairline border and a
-                     very faint single-hue glow so it still reads as the AI's
-                     surface without competing for attention. */
-                  background: dk
-                    ? "linear-gradient(180deg,#15151c,#0c0c11)"
-                    : "linear-gradient(180deg,#ffffff,#f4f5f7)",
-                  border: dk
-                    ? "1px solid rgba(255,255,255,0.08)"
-                    : "1px solid rgba(0,0,0,0.08)",
-                  boxShadow: dk
-                    ? "0 1px 0 rgba(255,255,255,0.04) inset, 0 0 30px -14px rgba(139,92,246,.30)"
-                    : "0 1px 0 rgba(255,255,255,0.6) inset, 0 8px 24px -16px rgba(0,0,0,.25)",
-                }}
-              >
-                <h1
-                  aria-label={greetingText}
-                  className={`text-[22px] md:text-[30px] font-bold tracking-tight ${dk ? "text-white" : "text-black"}`}
-                >
-                  <span aria-hidden>{typed || " "}</span>
-                  {/* blinking caret while the orb is "speaking" */}
-                  {!introDone && (
-                    <span
-                      aria-hidden
-                      className={`inline-block w-[2px] -mb-[2px] ms-[2px] h-[0.95em] align-middle animate-pulse ${dk ? "bg-white/70" : "bg-black/70"}`}
-                    />
-                  )}
-                </h1>
-                {/* daily motivational quote — types out like the greeting */}
-                <div className={`transition-opacity duration-500 ${introDone ? "opacity-100" : "opacity-0"}`}>
-                  <p className={`text-[13px] md:text-[15px] mt-2 font-medium leading-snug ${dk ? "text-white/45" : "text-black/50"}`}>
-                    <span aria-hidden>{quoteTyped || " "}</span>
-                    {quoteTyping && (
-                      <span
-                        aria-hidden
-                        className={`inline-block w-[2px] -mb-[1px] ms-[2px] h-[0.9em] align-middle animate-pulse ${dk ? "bg-white/50" : "bg-black/50"}`}
-                      />
-                    )}
-                  </p>
-                </div>
-              </div>
+              <AIGreeter dk={dk} firstName={firstName} t={t} lang={lang} />
             </div>
             <ClockWidget dk={dk} />
           </div>
