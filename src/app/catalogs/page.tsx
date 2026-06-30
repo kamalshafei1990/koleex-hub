@@ -28,6 +28,15 @@ import AtSignIcon from "@/components/icons/ui/AtSignIcon";
 import GlobeIcon from "@/components/icons/ui/GlobeIcon";
 import MapPinIcon from "@/components/icons/ui/MapPinIcon";
 import MapPinnedIcon from "@/components/icons/ui/MapPinnedIcon";
+
+const CatalogSkeleton = () => (
+  <div className="flex flex-col gap-2 p-4 animate-pulse">
+    <div className="h-40 bg-gray-200 rounded" />
+    <div className="h-4 bg-gray-200 rounded w-3/4" />
+    <div className="h-4 bg-gray-200 rounded w-1/2" />
+  </div>
+);
+
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import UserIcon from "@/components/icons/ui/UserIcon";
 import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
@@ -2615,7 +2624,9 @@ export default function CatalogsPage() {
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [divLogos, setDivLogos] = useState<Record<string, string>>({});
   const [catLogos, setCatLogos] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
+  // Split loading: critical catalogs data first, then ancillary data
+  const [catalogsLoading, setCatalogsLoading] = useState(true);
+
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   // Group-by-supplier (Option A): collapse the flat grid into per-supplier
   // sections so "this supplier has N catalogs" is obvious. Composes with the
@@ -2653,30 +2664,29 @@ export default function CatalogsPage() {
   const clearSelection = useCallback(() => setSelected(new Set()), []);
 
   const loadAll = useCallback(async () => {
-    setLoading(true);
-    /* Each source is independently guarded: the catalogs come from a working
-       API, but the taxonomy/logo helpers can throw under RLS — a bare
-       Promise.all would reject and leave the page stuck on "Loading…" forever.
-       Guard every fetch + finally so the page always renders what loaded. */
-    try {
-      const [cats, conts, divs, catgs, dLogos, cLogos] = await Promise.all([
-        fetchCatalogs().catch(() => [] as CatalogEntry[]),
-        fetchCatalogContacts().catch(() => [] as ContactOption[]),
-        fetchDivisions().catch(() => [] as DivisionRow[]),
-        fetchCategories().catch(() => [] as CategoryRow[]),
-        fetchDivisionLogos().catch(() => ({}) as Record<string, string>),
-        fetchCategoryLogos().catch(() => ({}) as Record<string, string>),
-      ]);
-      setCatalogs(cats);
-      setContacts(conts);
-      setDivisions(divs);
-      setCategories(catgs);
-      setDivLogos(dLogos);
-      setCatLogos(cLogos);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+     // 1️⃣ Load catalogs (critical)
+     if (process.env.NODE_ENV === "development") console.time("fetchCatalogs");
+     const cats = await fetchCatalogs().catch(() => [] as CatalogEntry[]);
+     if (process.env.NODE_ENV === "development") console.timeEnd("fetchCatalogs");
+     setCatalogs(cats);
+     setCatalogsLoading(false);
+
+     // 2️⃣ Load ancillary data (non‑critical)
+     if (process.env.NODE_ENV === "development") console.time("fetchOtherData");
+     const [conts, divs, catgs, dLogos, cLogos] = await Promise.all([
+       fetchCatalogContacts().catch(() => [] as ContactOption[]),
+       fetchDivisions().catch(() => [] as DivisionRow[]),
+       fetchCategories().catch(() => [] as CategoryRow[]),
+       fetchDivisionLogos().catch(() => ({}) as Record<string, string>),
+       fetchCategoryLogos().catch(() => ({}) as Record<string, string>),
+     ]);
+     if (process.env.NODE_ENV === "development") console.timeEnd("fetchOtherData");
+     setContacts(conts);
+     setDivisions(divs);
+     setCategories(catgs);
+     setDivLogos(dLogos);
+     setCatLogos(cLogos);
+   }, []);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
@@ -3246,8 +3256,10 @@ export default function CatalogsPage() {
         )}
 
         {/* Content */}
-        {loading ? (
-          <div className="flex items-center justify-center py-20"><SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" /></div>
+        {catalogsLoading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
+            {Array.from({ length: 10 }).map((_, i) => <CatalogSkeleton key={i} />)}
+          </div>
         ) : catalogs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-[var(--border-subtle)] rounded-2xl">
             <div className="w-16 h-16 rounded-2xl bg-[var(--bg-surface)] flex items-center justify-center mb-4">
@@ -3387,7 +3399,7 @@ export default function CatalogsPage() {
         )}
 
         {/* Infinite scroll — auto-loads the next batch as the sentinel nears view */}
-        {!loading && filtered.length > visibleCount && (
+        {!catalogsLoading && filtered.length > visibleCount && (
           <div ref={loadMoreRef} className="mt-6 flex items-center justify-center gap-2 py-2 text-[12px] text-[var(--text-dim)]">
             <SpinnerIcon className="h-4 w-4 animate-spin" />
             {t("cat.loading", "Loading…")}
