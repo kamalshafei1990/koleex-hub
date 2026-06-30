@@ -747,13 +747,13 @@ export default function HomePage() {
               ? isCurrentApp
                 ? `cursor-pointer group border ${
                     dk
-                      ? "bg-white/[0.08] border-white/[0.18] ring-1 ring-white/[0.08]"
-                      : "bg-black/[0.05] border-black/[0.15] ring-1 ring-black/[0.05]"
+                      ? "bg-white/[0.08] border-white/[0.18] hover:scale-[1.02] ring-1 ring-white/[0.08] active:scale-[0.97]"
+                      : "bg-black/[0.05] border-black/[0.15] hover:scale-[1.02] ring-1 ring-black/[0.05] active:scale-[0.97]"
                   }`
                 : `cursor-pointer group border ${
                     dk
-                      ? "bg-[#111] border-white/[0.06] hover:border-white/[0.18] hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.6)] active:translate-y-0 active:scale-[0.97]"
-                      : "bg-white border-black/[0.06] hover:border-black/[0.14] hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] active:translate-y-0 active:scale-[0.97]"
+                      ? "bg-[#111] border-white/[0.06] hover:border-white/[0.18] hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(0,0,0,0.6)] active:scale-[0.97]"
+                      : "bg-white border-black/[0.06] hover:border-black/[0.14] hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] active:scale-[0.97]"
                   }`
               : `cursor-default border ${dk ? "bg-[#0c0c0c] border-white/[0.03]" : "bg-[#f8f8f8] border-black/[0.03]"}`
         }`}
@@ -875,8 +875,8 @@ export default function HomePage() {
           app.active
             ? `cursor-pointer group ${
                 dk
-                  ? "bg-[#111] border-white/[0.06] hover:border-white/[0.18] hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(0,0,0,0.4)] active:translate-y-0 active:scale-[0.98]"
-                  : "bg-white border-black/[0.06] hover:border-black/[0.14] hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(0,0,0,0.08)] active:translate-y-0 active:scale-[0.98]"
+                  ? "bg-[#111] border-white/[0.06] hover:border-white/[0.18] hover:scale-[1.02] hover:shadow-[0_6px_20px_rgba(0,0,0,0.4)] active:scale-[0.98]"
+                  : "bg-white border-black/[0.06] hover:border-black/[0.14] hover:scale-[1.02] hover:shadow-[0_6px_20px_rgba(0,0,0,0.08)] active:scale-[0.98]"
               }`
             : `cursor-default opacity-20 ${dk ? "bg-[#0e0e0e] border-white/[0.02]" : "bg-[#f5f5f5] border-black/[0.02]"}`
         }`}
@@ -1144,7 +1144,7 @@ export default function HomePage() {
           box-shadow:
             0 0 16px rgba(123,97,255,0.25),
             0 0 32px rgba(0,212,255,0.15);
-          transform: translateY(-2px);
+          transform: scale(1.02);
         }
       `}</style>
     </div>
