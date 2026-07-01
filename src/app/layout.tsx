@@ -4,6 +4,7 @@ import "./globals.css";
 import RootShell from "@/components/layout/RootShell";
 import DialogHost from "@/lib/ui-dialog";
 import SmartCreateDrawer from "@/components/ui/create/SmartCreateDrawer";
+import Providers from "./providers";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -56,14 +57,16 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
       <body className="h-full overflow-hidden flex flex-col bg-[#0A0A0A] text-white font-sans">
-        <RootShell>{children}</RootShell>
-        {/* Global themed replacement for window.confirm/alert/prompt.
-            Mounted once so any component can call dialog.confirm()
-            without each page wiring its own state. */}
-        <DialogHost />
-        {/* Global "+ Create" launcher — callable from header chips,
-            mobile action bar, and openSmartCreate() helper. */}
-        <SmartCreateDrawer />
+        <Providers>
+          <RootShell>{children}</RootShell>
+          {/* Global themed replacement for window.confirm/alert/prompt.
+              Mounted once so any component can call dialog.confirm()
+              without each page wiring its own state. */}
+          <DialogHost />
+          {/* Global "+ Create" launcher — callable from header chips,
+              mobile action bar, and openSmartCreate() helper. */}
+          <SmartCreateDrawer />
+        </Providers>
       </body>
     </html>
   );
