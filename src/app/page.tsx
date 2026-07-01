@@ -813,8 +813,12 @@ export default function HomePage() {
   const isSuperAdmin = !!meBoot?.isSuperAdmin;
 
   const visibleRegistry = useMemo(() => {
-    // Fail-closed: while perms load, show no apps at all.
-    if (permLoading) return [];
+    // Fail-closed ONLY while we truly know nothing yet. Once the permitted
+    // module set is known — including instantly from the warm-started
+    // bootstrap cache — render the apps even if a background revalidation is
+    // still in flight. Otherwise a plain refresh shows "Loading your apps…"
+    // for seconds despite the app list already being known.
+    if (permLoading && permittedModules.size === 0) return [];
     return APP_REGISTRY.filter((a) => {
       if (a.hideFromLauncher) return false;
       // Super-Admin-only apps (e.g. Activity Monitor) gate on the bootstrap flag,
@@ -943,7 +947,7 @@ export default function HomePage() {
             flight or has failed (timeout / 5xx / lost mobile signal),
             render a calm loading skeleton or a Retry banner instead
             of a silent empty grid. */}
-        {permLoading ? (
+        {permLoading && permittedModules.size === 0 ? (
           <AppGridSkeleton dk={dk} />
         ) : visibleRegistry.length === 0 ? (
           <BootstrapErrorBanner
