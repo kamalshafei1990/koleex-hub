@@ -236,21 +236,21 @@ export const landedCostT: Translations = {
   /* ═══════════════════════════════════════════════════════════════════════════
      SECTION: FINANCIAL & COMMERCIAL
      ═══════════════════════════════════════════════════════════════════════════ */
-  "sec.financial":          { en: "Financial & Commercial",       zh: "财务与商业",                   ar: "المالية والتجارية" },
-  "sec.financialDesc":      { en: "Exchange rates, financing, margins, and adjustments", zh: "汇率、融资、利润和调整", ar: "أسعار الصرف والتمويل والهوامش والتعديلات" },
+  "sec.financial":          { en: "Finance, Risk & Commercial",   zh: "财务、风险与商业",             ar: "المالية والمخاطر والتجارة" },
+  "sec.financialDesc":      { en: "Real finance & risk costs (part of landed cost) + commercial pricing (margin, discount, commission)", zh: "真实财务与风险成本（计入到岸成本）+ 商业定价（利润、折扣、佣金）", ar: "تكاليف التمويل والمخاطر الحقيقية (جزء من تكلفة الوصول) + التسعير التجاري (الهامش، الخصم، العمولة)" },
   "exchangeRate":           { en: "Exchange Rate (to local)",     zh: "汇率（转本地货币）",            ar: "سعر الصرف (إلى المحلي)" },
   "exchangeRateHint":       { en: "Multiply total by this rate to get local currency value", zh: "总额乘以此汇率得到本地货币值", ar: "اضرب الإجمالي في هذا السعر للحصول على القيمة بالعملة المحلية" },
   "paymentTerm":            { en: "Payment Term",                 zh: "付款条件",                     ar: "شروط الدفع" },
   "paymentTermHint":        { en: "TT = Wire Transfer, LC = Letter of Credit, DP = Documents against Payment, OA = Open Account", zh: "TT=电汇, LC=信用证, DP=付款交单, OA=赊账", ar: "TT = تحويل بنكي، LC = اعتماد مستندي، DP = مستندات مقابل الدفع، OA = حساب مفتوح" },
 
-  "sub.bankingFinance":     { en: "Banking & Finance",            zh: "银行与融资",                   ar: "البنوك والتمويل" },
+  "sub.bankingFinance":     { en: "Finance & Risk Costs · Section A (real cost)", zh: "财务与风险成本 · A部分（真实成本）", ar: "تكاليف التمويل والمخاطر · القسم أ (تكلفة حقيقية)" },
   "bankTransferCost":       { en: "Bank Transfer Cost",           zh: "银行转账费",                   ar: "تكلفة التحويل البنكي" },
   "financingCost":          { en: "Financing Cost",               zh: "融资成本",                     ar: "تكلفة التمويل" },
   "creditInsurance":        { en: "Credit Insurance",             zh: "信用保险",                     ar: "تأمين الائتمان" },
   "unexpectedReserve":      { en: "Unexpected Reserve",           zh: "意外准备金",                   ar: "احتياطي غير متوقع" },
   "unexpectedReserveHint":  { en: "Buffer for unforeseen costs",  zh: "用于不可预见费用的缓冲",       ar: "احتياطي للتكاليف غير المتوقعة" },
 
-  "sub.commissionAdj":      { en: "Commission & Adjustments",     zh: "佣金与调整",                   ar: "العمولات والتعديلات" },
+  "sub.commissionAdj":      { en: "Commercial Pricing · Section B (margin, discount, commission)", zh: "商业定价 · B部分（利润、折扣、佣金）", ar: "التسعير التجاري · القسم ب (الهامش، الخصم، العمولة)" },
   "agentCommission":        { en: "Agent Commission",             zh: "代理佣金",                     ar: "عمولة الوكيل" },
   "salesCommission":        { en: "Sales Commission",             zh: "销售佣金",                     ar: "عمولة المبيعات" },
   "discountPct":            { en: "Discount (%)",                 zh: "折扣 (%)",                     ar: "الخصم (%)" },
@@ -357,4 +357,39 @@ export const landedCostT: Translations = {
   "list.duplicate":         { en: "Duplicate",                    zh: "复制",                         ar: "تكرار" },
   "list.delete":            { en: "Delete",                       zh: "删除",                         ar: "حذف" },
   "list.deleteConfirm":     { en: "Delete this simulation?",      zh: "删除此模拟？",                  ar: "حذف هذه المحاكاة؟" },
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+     PLATFORM v2 — TRUE LANDED COST vs COMMERCIAL PRICING SEPARATION
+     ═══════════════════════════════════════════════════════════════════════════ */
+  /* Section A — True Landed Cost */
+  "trueLandedCost":         { en: "True Landed Cost",             zh: "真实到岸成本",                 ar: "التكلفة الحقيقية للوصول" },
+  "trueLandedCostSub":      { en: "Real cost to warehouse — no margin or commission", zh: "到仓库的真实成本 — 不含利润或佣金", ar: "التكلفة الحقيقية إلى المستودع — بدون هامش أو عمولة" },
+  "sectionA":               { en: "Section A · Cost",             zh: "A 部分 · 成本",                ar: "القسم أ · التكلفة" },
+  "sectionB":               { en: "Section B · Pricing",          zh: "B 部分 · 定价",                ar: "القسم ب · التسعير" },
+
+  /* Section B — Commercial Pricing */
+  "commercialPricing":      { en: "Commercial Pricing",           zh: "商业定价",                     ar: "التسعير التجاري" },
+  "commercialPricingSub":   { en: "Selling price & profit — starts from landed cost", zh: "销售价格与利润 — 从到岸成本开始", ar: "سعر البيع والربح — يبدأ من تكلفة الوصول" },
+  "basePriceLabel":         { en: "Base Price (cost + margin)",   zh: "基础价格（成本+利润）",        ar: "السعر الأساسي (التكلفة + الهامش)" },
+  "discountLabel":          { en: "Discount",                     zh: "折扣",                         ar: "الخصم" },
+  "sellingPrice":           { en: "Selling Price",                zh: "销售价格",                     ar: "سعر البيع" },
+  "sellingPricePerUnit":    { en: "Selling / unit",               zh: "单价 / 件",                    ar: "سعر البيع / وحدة" },
+  "commissionsLabel":       { en: "Commissions",                  zh: "佣金",                         ar: "العمولات" },
+  "grossProfit":            { en: "Gross Profit",                 zh: "毛利润",                       ar: "إجمالي الربح" },
+  "realizedMargin":         { en: "Margin",                       zh: "利润率",                       ar: "الهامش" },
+  "markup":                 { en: "Markup on cost",               zh: "成本加成",                     ar: "الترميز على التكلفة" },
+  "noCommercialYet":        { en: "Set a margin in Finance & Commercial to see pricing.", zh: "在财务与商务中设置利润率以查看定价。", ar: "حدد هامشًا في المالية والتجارة لعرض التسعير." },
+
+  /* §2 Incoterm responsibility summary */
+  "incotermSummary":        { en: "Incoterm Coverage",            zh: "贸易术语覆盖范围",             ar: "تغطية شروط التجارة" },
+  "incotermSummarySub":     { en: "Who covers what under",        zh: "覆盖范围依据",                 ar: "من يغطي ماذا وفق" },
+  "includedBySupplier":     { en: "Included by supplier",         zh: "供应商已包含",                 ar: "مشمول من المورد" },
+  "stillExcluded":          { en: "Still to add (origin side)",   zh: "仍需添加（原产地方）",         ar: "لا يزال يُضاف (جهة المنشأ)" },
+  "customerResponsibility": { en: "Customer always pays (destination)", zh: "客户始终支付（目的地）",   ar: "العميل يدفع دائمًا (الوجهة)" },
+  "destinationNeverVanish": { en: "Destination charges never disappear automatically.", zh: "目的地费用不会自动消失。", ar: "رسوم الوجهة لا تختفي تلقائيًا." },
+
+  /* §9 Finance & Risk grouping (breakdown relabel) */
+  "financeRisk":            { en: "Finance & Risk",               zh: "财务与风险",                   ar: "التمويل والمخاطر" },
+  "cost.financeRisk":       { en: "Finance & Risk",               zh: "财务与风险",                   ar: "التمويل والمخاطر" },
+  "landedCostLabel":        { en: "Landed cost",                  zh: "到岸成本",                     ar: "تكلفة الوصول" },
 };

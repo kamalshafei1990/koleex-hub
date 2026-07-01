@@ -38,6 +38,10 @@ import {
   fetchProductsForLookup, fetchModelsForProduct,
 } from "@/lib/landed-cost-admin";
 import { calculate, calculateDutyBreakdown, type DutyBreakdown } from "@/lib/landed-cost-calc";
+import {
+  calculateLandedCost, calculateCommercialPricing,
+  commercialInputsFromFinancial, incotermSummary,
+} from "@/lib/landed-cost/engine";
 import { findCountryDefaults, calcVolumetricWeight, calcChargeableWeight } from "@/lib/landed-cost-defaults";
 import { useTranslation, type Lang } from "@/lib/i18n";
 import { landedCostT } from "@/lib/translations/landed-cost";
@@ -469,6 +473,20 @@ export default function SimulationForm({ id }: { id?: string }) {
   const results: SimulationResults = useMemo(() => {
     return calculate(unitPrice, quantity, priceBasis, productInfo, exportCosts, shippingCosts, importCosts, inlandDelivery, financial);
   }, [unitPrice, quantity, priceBasis, productInfo, exportCosts, shippingCosts, importCosts, inlandDelivery, financial]);
+
+  // ── Platform v2: TRUE landed cost (Section A) vs COMMERCIAL pricing (Section B) ──
+  // Additive — the legacy `results` above is still computed and saved for full
+  // backward compatibility. These drive the redesigned summary that cleanly
+  // separates real cost (no margin/commission) from selling price / profit.
+  const landed = useMemo(() => {
+    return calculateLandedCost(unitPrice, quantity, priceBasis, productInfo, exportCosts, shippingCosts, importCosts, inlandDelivery, financial);
+  }, [unitPrice, quantity, priceBasis, productInfo, exportCosts, shippingCosts, importCosts, inlandDelivery, financial]);
+
+  const commercial = useMemo(() => {
+    return calculateCommercialPricing(landed.totalLandedCost, commercialInputsFromFinancial(financial), quantity);
+  }, [landed.totalLandedCost, financial, quantity]);
+
+  const incoterm = useMemo(() => incotermSummary(priceBasis), [priceBasis]);
 
   // ── Intelligence: duty/tax breakdown for transparency ──
   const dutyBreakdown = useMemo(() => {
@@ -978,23 +996,27 @@ export default function SimulationForm({ id }: { id?: string }) {
           {/* ═══════ RIGHT: Sticky Summary ═══════ */}
           <div className="lg:sticky lg:top-28 flex flex-col max-h-[calc(100vh-8rem)]">
 
-            {/* ── Final Warehouse Cost — Pinned Hero Card ── */}
+            {/* ── SECTION A: True Landed Cost — Pinned Hero Card ── */}
             <div className="shrink-0 relative bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
-              <div className="h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-emerald-500" />
+              <div className="h-1 bg-[var(--bg-inverted)]/70" />
               <div className="px-5 py-5 text-center">
-                <p className="text-[10px] uppercase tracking-[0.1em] text-[var(--text-ghost)] mb-2 font-medium">{t("finalWarehouseCost")}</p>
-                <p className="text-[34px] font-extrabold font-mono tracking-tight leading-none">
+                <div className="flex items-center justify-center gap-1.5 mb-2">
+                  <span className="px-1.5 py-px rounded bg-[var(--bg-inverted)]/[0.06] text-[8px] font-bold uppercase tracking-[0.08em] text-[var(--text-ghost)]">{t("sectionA")}</span>
+                  <p className="text-[10px] uppercase tracking-[0.1em] text-[var(--text-ghost)] font-medium">{t("trueLandedCost")}</p>
+                </div>
+                <p className="text-[34px] font-extrabold font-mono tracking-tight leading-none text-[var(--text-primary)]">
                   <span className="text-[16px] font-semibold text-[var(--text-dim)] mr-1 align-top">{currency}</span>
-                  {fmt(results.totalLandedCost)}
+                  {fmt(landed.totalLandedCost)}
                 </p>
                 {financial.exchangeRate > 1 && (
-                  <p className="text-[13px] text-[var(--text-dim)] mt-2 font-mono">{t("localCurrency")}: {fmt(results.finalWarehouseCostLocal)}</p>
+                  <p className="text-[13px] text-[var(--text-dim)] mt-2 font-mono">{t("localCurrency")}: {fmt(landed.totalLandedCost * financial.exchangeRate)}</p>
                 )}
-                {results.totalLandedCost > 0 && unitPrice > 0 && (
+                <p className="text-[10px] text-[var(--text-ghost)] mt-2 leading-snug px-2">{t("trueLandedCostSub")}</p>
+                {landed.totalLandedCost > 0 && unitPrice > 0 && (
                   <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)]">
                     <TrendingUpIcon className="h-3 w-3 text-[var(--text-ghost)]" />
                     <span className="text-[10px] font-medium text-[var(--text-dim)]">
-                      {((results.totalLandedCost / productTotal - 1) * 100).toFixed(1)}% {t("overProductCost")}
+                      {((landed.totalLandedCost / productTotal - 1) * 100).toFixed(1)}% {t("overProductCost")}
                     </span>
                   </div>
                 )}
@@ -1022,7 +1044,108 @@ export default function SimulationForm({ id }: { id?: string }) {
               </div>
             )}
 
-            {/* ── Unit Economics ── */}
+            {/* ── SECTION B: Commercial Pricing (starts FROM landed cost) ── */}
+            <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+              <div className="px-5 py-3 border-b border-[var(--border-subtle)] flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("commercialPricing")}</p>
+                  <p className="text-[9px] text-[var(--text-ghost)] mt-0.5 truncate">{t("commercialPricingSub")}</p>
+                </div>
+                <span className="shrink-0 px-1.5 py-px rounded bg-[var(--bg-inverted)]/[0.06] text-[8px] font-bold uppercase tracking-[0.08em] text-[var(--text-ghost)]">{t("sectionB")}</span>
+              </div>
+              {financial.margin > 0 || commercial.sellingPrice > 0 ? (
+                <>
+                  <div className="px-5 py-4 space-y-2">
+                    {[
+                      { l: t("landedCostLabel"), v: landed.totalLandedCost, sub: true },
+                      { l: `${t("basePriceLabel")} +${fmt(financial.margin, 1)}%`, v: commercial.basePrice, sub: true },
+                      ...(commercial.discountAmount > 0 ? [{ l: t("discountLabel"), v: -commercial.discountAmount, sub: true, neg: true }] : []),
+                      ...(commercial.totalCommission > 0 ? [{ l: t("commissionsLabel"), v: -commercial.totalCommission, sub: true, neg: true }] : []),
+                    ].map((r, i) => (
+                      <div key={i} className="flex items-center justify-between text-[11px]">
+                        <span className="text-[var(--text-dim)]">{r.l}</span>
+                        <span className={`font-mono tabular-nums ${(r as { neg?: boolean }).neg ? "text-[var(--text-ghost)]" : "text-[var(--text-primary)]"}`}>
+                          {(r as { neg?: boolean }).neg ? "−" : ""}{currency} {fmt(Math.abs(r.v))}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Selling price headline */}
+                  <div className="mx-5 mb-3 px-4 py-3 rounded-xl bg-[var(--bg-inverted)]/[0.04] border border-[var(--border-subtle)]">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-[11px] font-semibold text-[var(--text-dim)]">{t("sellingPrice")}</span>
+                      <span className="text-[18px] font-extrabold font-mono tabular-nums text-[var(--text-primary)]">{currency} {fmt(commercial.sellingPrice)}</span>
+                    </div>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-[9px] text-[var(--text-ghost)]">{t("sellingPricePerUnit")}</span>
+                      <span className="text-[10px] font-mono text-[var(--text-dim)] tabular-nums">{currency} {fmt(commercial.sellingPricePerUnit)}</span>
+                    </div>
+                  </div>
+                  {/* Profit + margin */}
+                  <div className="grid grid-cols-2 divide-x divide-[var(--border-subtle)] border-t border-[var(--border-subtle)]">
+                    <div className="px-4 py-3 text-center">
+                      <p className="text-[9px] uppercase tracking-wider text-[var(--text-ghost)] mb-1">{t("grossProfit")}</p>
+                      <p className={`text-[15px] font-bold font-mono tabular-nums ${commercial.grossProfit < 0 ? "text-[var(--danger,#FF3333)]" : "text-[var(--text-primary)]"}`}>{currency} {fmt(commercial.grossProfit)}</p>
+                    </div>
+                    <div className="px-4 py-3 text-center">
+                      <p className="text-[9px] uppercase tracking-wider text-[var(--text-ghost)] mb-1">{t("realizedMargin")}</p>
+                      <p className={`text-[15px] font-bold font-mono tabular-nums ${commercial.marginPct < 0 ? "text-[var(--danger,#FF3333)]" : "text-[var(--text-primary)]"}`}>{commercial.marginPct.toFixed(1)}%</p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="px-5 py-5 text-center">
+                  <p className="text-[11px] text-[var(--text-ghost)] leading-relaxed">{t("noCommercialYet")}</p>
+                </div>
+              )}
+            </div>
+
+            {/* ── §2 Incoterm Coverage — who covers what, destination never vanishes ── */}
+            <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+              <div className="px-5 py-3 border-b border-[var(--border-subtle)] flex items-center justify-between gap-2">
+                <p className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("incotermSummary")}</p>
+                <span className="shrink-0 px-2 py-0.5 rounded-md bg-[var(--bg-inverted)]/[0.06] text-[10px] font-bold font-mono text-[var(--text-primary)]">{incoterm.basis}</span>
+              </div>
+              <div className="px-5 py-4 space-y-3">
+                {incoterm.includedBySupplier.length > 0 && (
+                  <div>
+                    <p className="text-[9px] uppercase tracking-wider text-[var(--text-ghost)] mb-1.5 flex items-center gap-1">
+                      <CheckCircleIcon className="h-3 w-3 text-[var(--success,#00CC66)]" /> {t("includedBySupplier")}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {incoterm.includedBySupplier.map(c => (
+                        <span key={c} className="px-2 py-0.5 rounded-md bg-[var(--bg-inverted)]/[0.04] border border-[var(--border-subtle)] text-[10px] text-[var(--text-dim)]">{c}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {incoterm.excluded.length > 0 && (
+                  <div>
+                    <p className="text-[9px] uppercase tracking-wider text-[var(--text-ghost)] mb-1.5 flex items-center gap-1">
+                      <InfoIcon className="h-3 w-3" /> {t("stillExcluded")}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {incoterm.excluded.map(c => (
+                        <span key={c} className="px-2 py-0.5 rounded-md bg-[var(--bg-inverted)]/[0.04] border border-[var(--border-subtle)] text-[10px] text-[var(--text-dim)]">{c}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div>
+                  <p className="text-[9px] uppercase tracking-wider text-[var(--text-ghost)] mb-1.5 flex items-center gap-1">
+                    <UsersIcon className="h-3 w-3" /> {t("customerResponsibility")}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {incoterm.customerResponsibility.map(c => (
+                      <span key={c} className="px-2 py-0.5 rounded-md bg-[var(--bg-inverted)]/[0.04] border border-[var(--border-subtle)] text-[10px] text-[var(--text-dim)]">{c}</span>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-[9px] text-[var(--text-ghost)] leading-snug pt-1 border-t border-[var(--border-subtle)]/50">{t("destinationNeverVanish")}</p>
+              </div>
+            </div>
+
+            {/* ── Unit Economics (true landed cost basis) ── */}
             <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
               <div className="px-5 py-3 border-b border-[var(--border-subtle)]">
                 <p className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("unitEconomics")}</p>
@@ -1030,21 +1153,21 @@ export default function SimulationForm({ id }: { id?: string }) {
               <div className="grid grid-cols-2 divide-x divide-[var(--border-subtle)] border-b border-[var(--border-subtle)]">
                 <div className="px-4 py-3.5 text-center">
                   <p className="text-[9px] uppercase tracking-wider text-[var(--text-ghost)] mb-1">{t("perUnit")}</p>
-                  <p className="text-[16px] font-bold font-mono tabular-nums">{fmt(results.landedCostPerUnit)}</p>
+                  <p className="text-[16px] font-bold font-mono tabular-nums">{fmt(landed.landedCostPerUnit)}</p>
                 </div>
                 <div className="px-4 py-3.5 text-center">
                   <p className="text-[9px] uppercase tracking-wider text-[var(--text-ghost)] mb-1">{t("perCarton")}</p>
-                  <p className="text-[16px] font-bold font-mono tabular-nums">{fmt(results.landedCostPerCarton)}</p>
+                  <p className="text-[16px] font-bold font-mono tabular-nums">{fmt(landed.landedCostPerCarton)}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 divide-x divide-[var(--border-subtle)]">
                 <div className="px-4 py-3.5 text-center">
                   <p className="text-[9px] uppercase tracking-wider text-[var(--text-ghost)] mb-1">{t("perCBM")}</p>
-                  <p className="text-[16px] font-bold font-mono tabular-nums">{fmt(results.landedCostPerCbm)}</p>
+                  <p className="text-[16px] font-bold font-mono tabular-nums">{fmt(landed.landedCostPerCbm)}</p>
                 </div>
                 <div className="px-4 py-3.5 text-center">
                   <p className="text-[9px] uppercase tracking-wider text-[var(--text-ghost)] mb-1">{t("perKG")}</p>
-                  <p className="text-[16px] font-bold font-mono tabular-nums">{fmt(results.landedCostPerKg)}</p>
+                  <p className="text-[16px] font-bold font-mono tabular-nums">{fmt(landed.landedCostPerKg)}</p>
                 </div>
               </div>
             </div>
@@ -1056,17 +1179,17 @@ export default function SimulationForm({ id }: { id?: string }) {
               </div>
               <div className="px-5 py-4 space-y-3">
                 {[
-                  { label: t("cost.product"), val: results.productTotal, pct: results.pctProduct, color: "bg-blue-500", dot: "bg-blue-400" },
-                  { label: t("cost.export"), val: results.exportTotal, pct: results.pctExport, color: "bg-amber-500", dot: "bg-amber-400" },
-                  { label: t("cost.shipping"), val: results.shippingTotal, pct: results.pctShipping, color: "bg-cyan-500", dot: "bg-cyan-400" },
-                  { label: t("cost.import"), val: results.importTotal, pct: results.pctImport, color: "bg-purple-500", dot: "bg-purple-400" },
-                  { label: t("cost.inland"), val: results.inlandTotal, pct: results.pctInland, color: "bg-emerald-500", dot: "bg-emerald-400" },
-                  { label: t("cost.financial"), val: results.financialTotal, pct: results.pctFinancial, color: "bg-pink-500", dot: "bg-pink-400" },
-                ].map(row => (
+                  { label: t("cost.product"), val: landed.productTotal, pct: landed.pct.product },
+                  { label: t("cost.export"), val: landed.exportTotal, pct: landed.pct.export },
+                  { label: t("cost.shipping"), val: landed.shippingTotal, pct: landed.pct.shipping },
+                  { label: t("cost.import"), val: landed.importTotal, pct: landed.pct.import },
+                  { label: t("cost.inland"), val: landed.inlandTotal, pct: landed.pct.inland },
+                  { label: t("cost.financeRisk"), val: landed.financeRiskTotal, pct: landed.pct.financeRisk },
+                ].filter(row => row.val > 0).map(row => (
                   <div key={row.label}>
                     <div className="flex items-center justify-between text-[11px] mb-1.5">
                       <span className="flex items-center gap-1.5 text-[var(--text-dim)]">
-                        <span className={`w-2 h-2 rounded-full ${row.dot}`} />
+                        <span className="w-2 h-2 rounded-full bg-[var(--text-dim)]" />
                         {row.label}
                       </span>
                       <span className="font-mono text-[var(--text-primary)] tabular-nums">
@@ -1074,14 +1197,14 @@ export default function SimulationForm({ id }: { id?: string }) {
                       </span>
                     </div>
                     <div className="h-1.5 rounded-full bg-[var(--bg-inverted)]/[0.06] overflow-hidden">
-                      <div className={`h-full rounded-full ${row.color} transition-all duration-500`} style={{ width: `${Math.min(row.pct, 100)}%` }} />
+                      <div className="h-full rounded-full bg-[var(--bg-inverted)]/60 transition-all duration-500" style={{ width: `${Math.min(row.pct, 100)}%` }} />
                     </div>
                   </div>
                 ))}
               </div>
               <div className="mx-5 mb-4 pt-3 border-t border-dashed border-[var(--border-subtle)]/60 flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-[var(--text-dim)]">{t("total")}</span>
-                <span className="text-[13px] font-bold font-mono text-[var(--text-primary)] tabular-nums">{currency} {fmt(results.totalLandedCost)}</span>
+                <span className="text-[11px] font-semibold text-[var(--text-dim)]">{t("trueLandedCost")}</span>
+                <span className="text-[13px] font-bold font-mono text-[var(--text-primary)] tabular-nums">{currency} {fmt(landed.totalLandedCost)}</span>
               </div>
             </div>
 
