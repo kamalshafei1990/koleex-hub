@@ -84,6 +84,70 @@ let cache: CacheEntry | null = null;
 let inflight: Promise<MeBootstrapPayload | null> | null = null;
 const listeners = new Set<(p: MeBootstrapPayload | null) => void>();
 
+/* ---------------------------------------------------------------------------
+   Persistence warm-start (stale-while-revalidate across full page reloads).
+
+   The in-memory `cache` above dies on a hard reload / new tab, so after a
+   browser refresh the very first paint used to block on the network again.
+   We mirror the last successful payload into localStorage so a fresh load can
+   paint the shell instantly from the last-known identity + permitted modules,
+   then revalidate in the background.
+
+   This is a PAINT HINT only — it never changes enforcement. Every API call is
+   still authorized server-side, and the persisted TTL matches the in-memory
+   one so anything older than 60s is shown-then-immediately-revalidated. On any
+   permission change (invalidateMeBootstrap) or 401 the mirror is cleared, so
+   stale rights can't linger. Persisted data is only ever this user's own
+   already-client-visible module list — no secrets.
+   --------------------------------------------------------------------------- */
+const PERSIST_KEY = "koleex.me-bootstrap.v1";
+/* Never warm-start from a mirror older than this (defensive against a very
+   stale tab restored days later); background revalidation still runs. */
+const PERSIST_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+function persistCache(payload: MeBootstrapPayload): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      PERSIST_KEY,
+      JSON.stringify({ payload, savedAt: Date.now() }),
+    );
+  } catch {
+    /* private mode / quota — persistence is best-effort */
+  }
+}
+
+function clearPersisted(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(PERSIST_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+function readPersisted(): CacheEntry | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(PERSIST_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { payload: MeBootstrapPayload; savedAt: number };
+    if (!parsed || typeof parsed.savedAt !== "number") return null;
+    if (Date.now() - parsed.savedAt > PERSIST_MAX_AGE_MS) return null;
+    /* Honest expiry: if the mirror is younger than the in-memory TTL treat it
+       as fresh (instant, no refetch); otherwise it paints then revalidates. */
+    return { payload: parsed.payload, expiresAt: parsed.savedAt + CACHE_TTL_MS };
+  } catch {
+    return null;
+  }
+}
+
+/* Warm the in-memory cache from the persisted mirror on first client load. */
+if (typeof window !== "undefined" && !cache) {
+  const warm = readPersisted();
+  if (warm) cache = warm;
+}
+
 /**
  * Force the next caller to re-fetch. Call this after actions that change
  * the user's permissions or profile (e.g. saving a role override).
@@ -91,6 +155,7 @@ const listeners = new Set<(p: MeBootstrapPayload | null) => void>();
 export function invalidateMeBootstrap(): void {
   cache = null;
   inflight = null;
+  clearPersisted();
 }
 
 /**
@@ -99,6 +164,7 @@ export function invalidateMeBootstrap(): void {
  */
 export function seedMeBootstrap(payload: MeBootstrapPayload): void {
   cache = { payload, expiresAt: Date.now() + CACHE_TTL_MS };
+  persistCache(payload);
   for (const cb of listeners) cb(payload);
 }
 
@@ -190,6 +256,7 @@ export async function getMeBootstrap(opts?: {
             };
             if (res.status === 401) {
               cache = null;
+              clearPersisted();
               for (const cb of listeners) cb(null);
               return null;   // No point retrying 401
             }
@@ -197,6 +264,7 @@ export async function getMeBootstrap(opts?: {
           }
           const payload = (await res.json()) as MeBootstrapPayload;
           cache = { payload, expiresAt: Date.now() + CACHE_TTL_MS };
+          persistCache(payload);
           _lastError = null;
           for (const cb of listeners) cb(payload);
           return payload;
