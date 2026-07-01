@@ -27,6 +27,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { persistContactImages } from "@/lib/server/persist-contact-images";
 
 /* Map contact_type → ERP module name. Unknown / missing types fall
    back to "Customers" which is the broadest directory view. */
@@ -130,6 +131,10 @@ export async function POST(req: Request) {
   const row: Record<string, unknown> = { ...body, tenant_id: auth.tenant_id };
   if (displayName) row.display_name = displayName;
   if (companyName && !pick(body.company_name)) row.company_name = companyName;
+
+  /* Root-cause guard: move any inline base64 avatar into Storage so the row
+     stores a short URL, never multi-KB base64 (keeps the directory list lean). */
+  await persistContactImages(auth.tenant_id, row);
 
   const { data, error } = await supabaseServer
     .from("contacts")

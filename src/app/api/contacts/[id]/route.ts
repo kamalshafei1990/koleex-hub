@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { deptsFromFields, recordSectionEdits } from "@/lib/suppliers/section-audit";
+import { persistContactImages } from "@/lib/server/persist-contact-images";
 
 /* PATCH /api/contacts/[id] — update a contact. Tenant-enforced.
    DELETE /api/contacts/[id] — remove a contact. Tenant-enforced.
@@ -69,6 +70,10 @@ export async function PATCH(
   delete patch.id;
   delete patch.tenant_id;
   delete patch.created_at;
+
+  /* Root-cause guard: move any inline base64 avatar into Storage so an edit
+     saves a short URL, never re-introducing multi-KB base64 into the row. */
+  await persistContactImages(auth.tenant_id, patch);
 
   /* If the caller is trying to convert a record from one type to
      another (supplier → customer, say), they also need view+edit on
