@@ -23,6 +23,8 @@
 
 import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useTranslation } from "@/lib/i18n";
+import { customerProfileT } from "@/lib/translations/customer-profile";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -105,7 +107,7 @@ function formatDate(iso: string | null | undefined) {
 /** Customer display title:
  *   · B2B (entity_type=company) → company_name first, else display_name
  *   · B2C (entity_type=person)  → display_name / first last */
-function customerTitle(c: CustomerContactRow): string {
+function customerTitle(c: CustomerContactRow, unnamed: string): string {
   const entity = (c.entity_type as string) || "";
   const displayName = c.display_name as string | null;
   const companyName = c.company_name as string | null;
@@ -115,7 +117,7 @@ function customerTitle(c: CustomerContactRow): string {
   const first = c.first_name as string | null;
   const last = c.last_name as string | null;
   if (first || last) return [first, last].filter(Boolean).join(" ");
-  return "Unnamed customer";
+  return unnamed;
 }
 
 /* ═══════════════════════════════════════════════════
@@ -189,6 +191,7 @@ function ActivityCard({
   appHref: string;
   emptyHint: string;
 }) {
+  const { t } = useTranslation(customerProfileT);
   return (
     <div className={panelCls}>
       <div className="flex items-start justify-between gap-3 mb-3">
@@ -199,7 +202,7 @@ function ActivityCard({
           <div className="min-w-0">
             <h3 className="text-[13px] font-semibold text-[var(--text-primary)] leading-tight truncate">{title}</h3>
             <p className="text-[11px] text-[var(--text-dim)] mt-0.5">
-              {bucket.count === 0 ? emptyHint : `${bucket.count} total`}
+              {bucket.count === 0 ? emptyHint : `${bucket.count} ${t("activity.total")}`}
             </p>
           </div>
         </div>
@@ -208,13 +211,13 @@ function ActivityCard({
             href={appHref}
             className="text-[10px] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors flex items-center gap-1"
           >
-            Open <ArrowRightIcon size={10} />
+            {t("activity.open")} <ArrowRightIcon size={10} />
           </Link>
         )}
       </div>
 
       {bucket.recent.length === 0 ? (
-        <div className="text-[12px] text-[var(--text-faint)] py-3">Nothing yet.</div>
+        <div className="text-[12px] text-[var(--text-faint)] py-3">{t("activity.nothing")}</div>
       ) : (
         <ul className="divide-y divide-[var(--border-faint)]">
           {bucket.recent.map((r) => <ActivityRow key={r.id} item={r} />)}
@@ -265,6 +268,7 @@ export default function CustomerProfilePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const { t } = useTranslation(customerProfileT);
   const [contact, setContact] = useState<CustomerContactRow | null>(null);
   const [linked, setLinked] = useState<LinkedCommercialCustomer | null>(null);
   const [activity, setActivity] = useState<CustomerActivity | null>(null);
@@ -312,9 +316,9 @@ export default function CustomerProfilePage({
       <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
         <div className="text-center">
           <CustomersIcon size={32} className="mx-auto text-[var(--text-faint)] mb-3" />
-          <p className="text-sm text-[var(--text-primary)] font-medium mb-1">Customer not found</p>
+          <p className="text-sm text-[var(--text-primary)] font-medium mb-1">{t("notFound.title")}</p>
           <Link href="/customers" className="text-xs text-[var(--text-dim)] hover:text-[var(--text-primary)] underline underline-offset-2">
-            Back to customers
+            {t("notFound.back")}
           </Link>
         </div>
       </div>
@@ -329,7 +333,7 @@ export default function CustomerProfilePage({
     );
   }
 
-  const title = customerTitle(contact);
+  const title = customerTitle(contact, t("title.unnamed"));
   const tier = normalizeTier(contact.customer_type);
   const isActive = contact.is_active !== false;
   const entity = (contact.entity_type as string) || "person";
@@ -344,18 +348,18 @@ export default function CustomerProfilePage({
             <Link
               href="/customers"
               className="flex items-center justify-center h-8 w-8 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
-              aria-label="Back to customers"
+              aria-label={t("notFound.back")}
             >
               <ArrowLeftIcon size={16} />
             </Link>
-            <h1 className="text-lg font-semibold text-[var(--text-primary)]">Customer Profile</h1>
+            <h1 className="text-lg font-semibold text-[var(--text-primary)]">{t("header.title")}</h1>
           </div>
           {/* The existing Contacts component handles edit — link back into it */}
           <Link
             href={`/customers?selected=${contact.id}`}
             className="h-9 px-4 rounded-xl text-[12px] font-medium bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] inline-flex items-center gap-2 transition-colors"
           >
-            <PencilIcon size={12} /> Edit in list
+            <PencilIcon size={12} /> {t("header.editInList")}
           </Link>
         </div>
 
@@ -368,7 +372,7 @@ export default function CustomerProfilePage({
                 <h2 className="text-xl font-bold text-[var(--text-primary)] truncate">{title}</h2>
                 {tier && (
                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border flex items-center gap-1 ${TIER_STYLES[tier]}`}>
-                    <CrownIcon size={10} /> {TIER_LABELS[tier]}
+                    <CrownIcon size={10} /> {t(`tier.${tier}`, TIER_LABELS[tier])}
                   </span>
                 )}
                 <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${
@@ -376,10 +380,10 @@ export default function CustomerProfilePage({
                     ? "text-emerald-400 bg-emerald-400/10 border-emerald-400/20"
                     : "text-slate-400 bg-slate-400/10 border-slate-400/20"
                 }`}>
-                  {isActive ? "Active" : "Inactive"}
+                  {isActive ? t("status.active") : t("status.inactive")}
                 </span>
                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md border border-[var(--border-faint)] bg-[var(--bg-surface)] text-[var(--text-dim)] capitalize">
-                  {entity}
+                  {t(`entity.${entity}`, entity)}
                 </span>
               </div>
 
@@ -405,9 +409,7 @@ export default function CustomerProfilePage({
             <div className="mt-5 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3">
               <CircleDollarSignIcon size={16} className="text-amber-400 mt-0.5 shrink-0" />
               <div className="flex-1 min-w-0 text-[12px] text-amber-300">
-                No matching row in the commercial <code className="bg-amber-500/10 px-1 rounded">customers</code> table.
-                Pricing, invoicing, and AI agent lookups may fall back to defaults. A match can be created by adding
-                a row with the same email or company name.
+                {t("nudge.noCommercial")}
               </div>
             </div>
           )}
@@ -415,20 +417,20 @@ export default function CustomerProfilePage({
 
         {/* ── Tabs ── */}
         <div className="flex items-center gap-1 mb-4 overflow-x-auto">
-          {TABS.map((t) => {
-            const label = t === "activity" ? `Activity${activity ? ` · ${activityTotal}` : ""}`
-              : t === "commercial" ? "Commercial"
-              : "Details";
+          {TABS.map((tabKey) => {
+            const label = tabKey === "activity" ? `${t("tab.activity")}${activity ? ` · ${activityTotal}` : ""}`
+              : tabKey === "commercial" ? t("tab.commercial")
+              : t("tab.details");
             return (
               <button
-                key={t}
-                onClick={() => setTab(t)}
+                key={tabKey}
+                onClick={() => setTab(tabKey)}
                 className={`h-9 px-4 rounded-lg text-[12px] font-medium transition-colors ${
-                  tab === t
+                  tab === tabKey
                     ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
                     : "bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
                 }`}
-                aria-current={tab === t ? "page" : undefined}
+                aria-current={tab === tabKey ? "page" : undefined}
               >
                 {label}
               </button>
@@ -446,47 +448,47 @@ export default function CustomerProfilePage({
             ) : activityTotal === 0 ? (
               <div className={`${panelCls} text-center py-10`}>
                 <ClockIcon size={24} className="mx-auto text-[var(--text-faint)] mb-2" />
-                <p className="text-[13px] text-[var(--text-primary)] font-medium mb-1">No activity yet</p>
+                <p className="text-[13px] text-[var(--text-primary)] font-medium mb-1">{t("activity.emptyTitle")}</p>
                 <p className="text-[12px] text-[var(--text-dim)]">
-                  Create a quotation, invoice, or opportunity for this customer and it will show here.
+                  {t("activity.emptyHint")}
                 </p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 <ActivityCard
-                  title="Opportunities"
+                  title={t("card.opportunities")}
                   icon={BriefcaseIcon}
                   bucket={activity.opportunities}
                   appHref="/crm"
-                  emptyHint="No open opportunities"
+                  emptyHint={t("card.empty.opportunities")}
                 />
                 <ActivityCard
-                  title="Quotations"
+                  title={t("card.quotations")}
                   icon={DocumentIcon}
                   bucket={activity.quotations}
                   appHref="/quotations"
-                  emptyHint="No quotations issued"
+                  emptyHint={t("card.empty.quotations")}
                 />
                 <ActivityCard
-                  title="Invoices"
+                  title={t("card.invoices")}
                   icon={CreditCardIcon}
                   bucket={activity.invoices}
                   appHref="/invoices"
-                  emptyHint="No invoices issued"
+                  emptyHint={t("card.empty.invoices")}
                 />
                 <ActivityCard
-                  title="Projects"
+                  title={t("card.projects")}
                   icon={BriefcaseIcon}
                   bucket={activity.projects}
                   appHref="/projects"
-                  emptyHint="No projects linked"
+                  emptyHint={t("card.empty.projects")}
                 />
                 <ActivityCard
-                  title="Open Tasks"
+                  title={t("card.tasks")}
                   icon={CheckIcon}
                   bucket={activity.tasks}
                   appHref="/projects"
-                  emptyHint="No open tasks"
+                  emptyHint={t("card.empty.tasks")}
                 />
               </div>
             )}
@@ -497,53 +499,52 @@ export default function CustomerProfilePage({
         {tab === "commercial" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <section className={panelCls}>
-              <SectionHeader icon={CircleDollarSignIcon} title="Sales & Credit" description="From the Customers directory." />
+              <SectionHeader icon={CircleDollarSignIcon} title={t("sec.salesCredit")} description={t("sec.salesCredit.desc")} />
               <div>
-                <InfoRow label="Tier" value={tier ? TIER_LABELS[tier] : null} />
-                <InfoRow label="Entity type" value={entity} />
-                <InfoRow label="Sales rep" value={contact.sales_rep as string | null} />
-                <InfoRow label="Payment terms" value={contact.payment_terms as string | null} />
-                <InfoRow label="Credit limit" value={contact.credit_limit as string | null} />
-                <InfoRow label="Credit currency" value={contact.currency as string | null} />
-                <InfoRow label="Approved by" value={contact.credit_limit_approved_by as string | null} />
-                <InfoRow label="Approved on" value={formatDate(contact.credit_limit_approved_date as string | null)} />
+                <InfoRow label={t("f.tier")} value={tier ? t(`tier.${tier}`, TIER_LABELS[tier]) : null} />
+                <InfoRow label={t("f.entityType")} value={t(`entity.${entity}`, entity)} />
+                <InfoRow label={t("f.salesRep")} value={contact.sales_rep as string | null} />
+                <InfoRow label={t("f.paymentTerms")} value={contact.payment_terms as string | null} />
+                <InfoRow label={t("f.creditLimit")} value={contact.credit_limit as string | null} />
+                <InfoRow label={t("f.creditCurrency")} value={contact.currency as string | null} />
+                <InfoRow label={t("f.approvedBy")} value={contact.credit_limit_approved_by as string | null} />
+                <InfoRow label={t("f.approvedOn")} value={formatDate(contact.credit_limit_approved_date as string | null)} />
               </div>
             </section>
 
             <section className={panelCls}>
               <SectionHeader
                 icon={BriefcaseIcon}
-                title="Linked Commercial Record"
-                description="From the pricing-engine customers table."
+                title={t("sec.linked")}
+                description={t("sec.linked.desc")}
               />
               {linked ? (
                 <div>
-                  <InfoRow label="Customer code" value={linked.customer_code} />
-                  <InfoRow label="Name" value={linked.name} />
-                  <InfoRow label="Pricing tier" value={linked.preferred_pricing_tier} />
-                  <InfoRow label="Salesperson" value={linked.assigned_salesperson} />
-                  <InfoRow label="Currency" value={linked.currency_code} />
-                  <InfoRow label="Payment terms" value={linked.payment_terms} />
-                  <InfoRow label="Last contact" value={formatDate(linked.last_contact_date)} />
-                  <InfoRow label="Next follow-up" value={formatDate(linked.next_followup_date)} />
-                  <InfoRow label="Status" value={linked.status} />
+                  <InfoRow label={t("f.customerCode")} value={linked.customer_code} />
+                  <InfoRow label={t("f.name")} value={linked.name} />
+                  <InfoRow label={t("f.pricingTier")} value={linked.preferred_pricing_tier} />
+                  <InfoRow label={t("f.salesperson")} value={linked.assigned_salesperson} />
+                  <InfoRow label={t("f.currency")} value={linked.currency_code} />
+                  <InfoRow label={t("f.paymentTerms")} value={linked.payment_terms} />
+                  <InfoRow label={t("f.lastContact")} value={formatDate(linked.last_contact_date)} />
+                  <InfoRow label={t("f.nextFollowup")} value={formatDate(linked.next_followup_date)} />
+                  <InfoRow label={t("f.status")} value={linked.status} />
                 </div>
               ) : (
                 <div className="text-[12px] text-[var(--text-dim)] py-3">
-                  No linked row found (matched by email / company name). The pricing engine will fall back to
-                  default tier rules for this customer.
+                  {t("sec.linked.none")}
                 </div>
               )}
             </section>
 
             <section className={panelCls}>
-              <SectionHeader icon={ClockIcon} title="Touchpoints" description="Recent and upcoming contact dates." />
+              <SectionHeader icon={ClockIcon} title={t("sec.touchpoints")} description={t("sec.touchpoints.desc")} />
               <div>
-                <InfoRow label="First contact" value={formatDate(contact.first_contact_date as string | null)} />
-                <InfoRow label="Last contact" value={formatDate(contact.last_contacted as string | null)} />
-                <InfoRow label="Follow-up" value={formatDate(contact.follow_up_date as string | null)} />
-                <InfoRow label="Preferred channel" value={contact.communication_preference as string | null} />
-                <InfoRow label="Language" value={contact.language as string | null} />
+                <InfoRow label={t("f.firstContact")} value={formatDate(contact.first_contact_date as string | null)} />
+                <InfoRow label={t("f.lastContact")} value={formatDate(contact.last_contacted as string | null)} />
+                <InfoRow label={t("f.followUp")} value={formatDate(contact.follow_up_date as string | null)} />
+                <InfoRow label={t("f.preferredChannel")} value={contact.communication_preference as string | null} />
+                <InfoRow label={t("f.language")} value={contact.language as string | null} />
               </div>
             </section>
           </div>
@@ -553,43 +554,43 @@ export default function CustomerProfilePage({
         {tab === "details" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <section className={panelCls}>
-              <SectionHeader icon={MapPinIcon} title="Address" />
+              <SectionHeader icon={MapPinIcon} title={t("sec.address")} />
               <div>
-                <InfoRow label="Line 1" value={contact.address_line1 as string | null} />
-                <InfoRow label="Line 2" value={contact.address_line2 as string | null} />
-                <InfoRow label="City" value={contact.city as string | null} />
-                <InfoRow label="State" value={contact.state as string | null} />
-                <InfoRow label="Postal" value={contact.postal_code as string | null} />
-                <InfoRow label="Country" value={contact.country as string | null} />
+                <InfoRow label={t("f.line1")} value={contact.address_line1 as string | null} />
+                <InfoRow label={t("f.line2")} value={contact.address_line2 as string | null} />
+                <InfoRow label={t("f.city")} value={contact.city as string | null} />
+                <InfoRow label={t("f.state")} value={contact.state as string | null} />
+                <InfoRow label={t("f.postal")} value={contact.postal_code as string | null} />
+                <InfoRow label={t("f.country")} value={contact.country as string | null} />
               </div>
             </section>
 
             <section className={panelCls}>
-              <SectionHeader icon={PhoneIcon} title="Contact Channels" />
+              <SectionHeader icon={PhoneIcon} title={t("sec.channels")} />
               <div>
-                <InfoRow label="Email" value={contact.email as string | null} />
-                <InfoRow label="Phone" value={contact.phone as string | null} />
-                <InfoRow label="WhatsApp" value={contact.whatsapp as string | null} />
-                <InfoRow label="WhatsApp Business" value={contact.whatsapp_business as string | null} />
-                <InfoRow label="WeChat" value={contact.wechat_id as string | null} />
-                <InfoRow label="Telegram" value={contact.telegram_id as string | null} />
-                <InfoRow label="LINE" value={contact.line_id as string | null} />
-                <InfoRow label="Skype" value={contact.skype_id as string | null} />
+                <InfoRow label={t("f.email")} value={contact.email as string | null} />
+                <InfoRow label={t("f.phone")} value={contact.phone as string | null} />
+                <InfoRow label={t("f.whatsapp")} value={contact.whatsapp as string | null} />
+                <InfoRow label={t("f.whatsappBiz")} value={contact.whatsapp_business as string | null} />
+                <InfoRow label={t("f.wechat")} value={contact.wechat_id as string | null} />
+                <InfoRow label={t("f.telegram")} value={contact.telegram_id as string | null} />
+                <InfoRow label={t("f.line")} value={contact.line_id as string | null} />
+                <InfoRow label={t("f.skype")} value={contact.skype_id as string | null} />
               </div>
             </section>
 
             {(contact.notes || contact.internal_notes) ? (
               <section className={`${panelCls} lg:col-span-2`}>
-                <SectionHeader icon={DocumentIcon} title="Notes" />
+                <SectionHeader icon={DocumentIcon} title={t("sec.notes")} />
                 {contact.notes ? (
                   <div className="mb-3">
-                    <p className="text-[10px] text-[var(--text-faint)] uppercase tracking-wide mb-1">Public</p>
+                    <p className="text-[10px] text-[var(--text-faint)] uppercase tracking-wide mb-1">{t("notes.public")}</p>
                     <p className="text-[13px] text-[var(--text-primary)] whitespace-pre-wrap">{contact.notes as string}</p>
                   </div>
                 ) : null}
                 {contact.internal_notes ? (
                   <div>
-                    <p className="text-[10px] text-[var(--text-faint)] uppercase tracking-wide mb-1">Internal</p>
+                    <p className="text-[10px] text-[var(--text-faint)] uppercase tracking-wide mb-1">{t("notes.internal")}</p>
                     <p className="text-[13px] text-amber-300/90 whitespace-pre-wrap">{contact.internal_notes as string}</p>
                   </div>
                 ) : null}
