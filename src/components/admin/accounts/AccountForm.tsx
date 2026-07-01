@@ -171,6 +171,10 @@ export default function AccountForm({ mode, account }: Props) {
   const [showPw, setShowPw] = useState(false);
   const [showCompanyPanel, setShowCompanyPanel] = useState(false);
   const [showPersonPanel, setShowPersonPanel] = useState(false);
+  /* After a successful CREATE we show the password one last time (it becomes a
+     one-way hash immediately, so this is the only moment to capture it). */
+  const [createdInfo, setCreatedInfo] = useState<{ id: string; username: string; password: string } | null>(null);
+  const [copiedPw, setCopiedPw] = useState(false);
 
   /* Standalone "Reset password" panel in edit mode (separate from the
      regular Save button so the admin can change a password without
@@ -402,7 +406,13 @@ export default function AccountForm({ mode, account }: Props) {
       if (hiddenModules.size > 0) {
         await saveHiddenModulesForAccount(created.id, Array.from(hiddenModules));
       }
-      router.push(`/accounts/${created.id}`);
+      /* Don't navigate yet — surface the password one last time so the admin
+         who created the account can copy/record it (it's hashed from here on). */
+      setCreatedInfo({
+        id: created.id,
+        username: form.username.trim() || form.login_email.trim(),
+        password: form.temporary_password.trim(),
+      });
     } else if (account) {
       const ok = await updateAccount(account.id, {
         ...base,
@@ -1170,6 +1180,48 @@ export default function AccountForm({ mode, account }: Props) {
           </div>
         </form>
       </div>
+
+      {/* Post-create: show the password ONCE so the creator can capture it.
+          After this it only exists as a one-way hash and can never be shown. */}
+      {createdInfo && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)" }}>
+          <div className="w-full max-w-md rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6 shadow-2xl">
+            <div className="flex items-center gap-2 mb-1">
+              <CheckCircleIcon className="h-5 w-5 text-emerald-400" />
+              <h3 className="text-[16px] font-bold text-[var(--text-primary)]">{t("acc.created.title", "Account created")}</h3>
+            </div>
+            <p className="text-[12px] text-[var(--text-dim)] mb-4">
+              {t("acc.created.warn", "Save this password now — for security it can never be shown again. You can always set a new one later.")}
+            </p>
+            <div className="space-y-2 mb-4">
+              <div className="flex items-center justify-between gap-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] px-3 py-2">
+                <span className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">{t("acc.field.username", "Username")}</span>
+                <span className="text-[13px] font-medium text-[var(--text-primary)] font-mono truncate">{createdInfo.username}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--accent)]/40 px-3 py-2">
+                <span className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">{t("acc.field.password", "Password")}</span>
+                <span className="text-[15px] font-semibold text-[var(--text-primary)] font-mono truncate select-all">{createdInfo.password}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => { navigator.clipboard?.writeText(createdInfo.password).catch(() => {}); setCopiedPw(true); setTimeout(() => setCopiedPw(false), 2000); }}
+                className="h-10 flex-1 rounded-xl bg-[var(--accent)] text-white text-[13px] font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
+              >
+                <CopyIcon className="h-4 w-4" /> {copiedPw ? t("acc.created.copied", "Copied!") : t("acc.created.copy", "Copy password")}
+              </button>
+              <button
+                type="button"
+                onClick={() => { const id = createdInfo.id; setCreatedInfo(null); router.push(`/accounts/${id}`); }}
+                className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+              >
+                {t("acc.created.done", "Done")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
