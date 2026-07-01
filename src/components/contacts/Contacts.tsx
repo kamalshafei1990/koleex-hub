@@ -2765,6 +2765,7 @@ function splitPhone(value: string): { code: string; number: string } {
 const PhoneField = React.memo(function PhoneField({ label, value, onChange, placeholder, defaultIso }: {
   label?: string; value: string; onChange: (v: string) => void; placeholder?: string; defaultIso?: string;
 }) {
+  const { lang } = useTranslation(contactsT);
   const parsed = splitPhone(value);
   const defaultCode = defaultIso ? (DIAL_CODES.find(d => d.iso === defaultIso)?.code ?? "") : "";
   const [selCode, setSelCode] = useState<string>(() => parsed.code || defaultCode);
@@ -2794,8 +2795,8 @@ const PhoneField = React.memo(function PhoneField({ label, value, onChange, plac
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase().replace(/^\+/, "");
     if (!q) return DIAL_CODES;
-    return DIAL_CODES.filter(d => d.name.toLowerCase().includes(q) || d.code.startsWith(q) || d.iso.toLowerCase().includes(q));
-  }, [query]);
+    return DIAL_CODES.filter(d => d.name.toLowerCase().includes(q) || countryNameLocalized(d.iso, lang, d.name).toLowerCase().includes(q) || d.code.startsWith(q) || d.iso.toLowerCase().includes(q));
+  }, [query, lang]);
 
   const sel = DIAL_CODES.find(d => d.code === selCode);
 
@@ -2845,7 +2846,7 @@ const PhoneField = React.memo(function PhoneField({ label, value, onChange, plac
                   className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-start hover:bg-[var(--bg-surface)] transition-colors ${d.code === selCode ? "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}
                 >
                   <span className="text-base">{d.flag}</span>
-                  <span className="truncate flex-1">{d.name}</span>
+                  <span className="truncate flex-1">{countryNameLocalized(d.iso, lang, d.name)}</span>
                   <span className="text-[11px] text-[var(--text-ghost)] tabular-nums">+{d.code}</span>
                 </button>
               ))}
