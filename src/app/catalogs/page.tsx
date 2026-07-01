@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { currentScopeKey } from "@/lib/me-bootstrap";
 import Link from "next/link";
 import FileIcon from "@/components/icons/ui/FileIcon";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
@@ -2617,13 +2618,13 @@ function PreviewModal({ catalog, onClose, onDownload }: { catalog: CatalogEntry 
 /* ═══════════════════════════════
    ── MAIN PAGE ──
    ═══════════════════════════════ */
-/* Shared cache key for the tenant's catalog list. Reading the cache on mount
-   lets a revisit paint the grid instantly (no skeleton) while loadAll
-   revalidates in the background — see the TanStack layer in providers.tsx. */
-const CATALOGS_QK = ["catalogs", "list"] as const;
-
 export default function CatalogsPage() {
   const queryClient = useQueryClient();
+  /* Shared cache key for THIS tenant/scope's catalog list. Reading the cache on
+     mount lets a revisit paint the grid instantly (no skeleton) while loadAll
+     revalidates in the background. The scope key (tenant + view-as) guarantees a
+     cached list never bleeds across tenants. */
+  const CATALOGS_QK = ["catalogs", "list", currentScopeKey()] as const;
   /* Seed from cache so returning to Catalogs shows the last-known list
      immediately instead of a skeleton. */
   const [catalogs, setCatalogs] = useState<CatalogEntry[]>(

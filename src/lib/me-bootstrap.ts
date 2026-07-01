@@ -149,6 +149,23 @@ if (typeof window !== "undefined" && !cache) {
 }
 
 /**
+ * Synchronous best-effort scope key for the current caller — tenant id plus a
+ * view-as discriminator. Client data caches (TanStack Query keys, etc.) MUST
+ * include this so a cached list can never bleed across tenants or into a
+ * super-admin "view-as" session. Reads the warm-started bootstrap cache; falls
+ * back to "anon" before the first bootstrap resolves (a fresh fetch follows).
+ */
+export function currentScopeKey(): string {
+  const a = cache?.payload?.auth as Record<string, unknown> | null | undefined;
+  if (!a) return "anon";
+  const tid = typeof a.tenant_id === "string" ? a.tenant_id : "t";
+  const va = a.viewing_as
+    ? String(a.view_as_role_id ?? a.real_account_id ?? "va")
+    : "self";
+  return `${tid}:${va}`;
+}
+
+/**
  * Force the next caller to re-fetch. Call this after actions that change
  * the user's permissions or profile (e.g. saving a role override).
  */

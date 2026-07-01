@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef, useDeferredValue } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
+import { currentScopeKey } from "@/lib/me-bootstrap";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
@@ -93,7 +95,16 @@ export default function ProductList() {
   const isInternal = (pathname || "").startsWith("/product-data");
   const baseRoute = isInternal ? "/product-data" : "/products";
 
-  const [products, setProducts] = useState<ProductRow[]>([]);
+  /* Cache the product list per-scope (tenant + view-as) so returning to the
+     catalogue paints instantly from cache instead of re-showing skeletons,
+     while the effect below still refetches fresh in the background. The scope
+     key guarantees a cached list never bleeds across tenants / view-as. */
+  const queryClient = useQueryClient();
+  const productsQK = ["products", "list", currentScopeKey()] as const;
+
+  const [products, setProducts] = useState<ProductRow[]>(
+    () => queryClient.getQueryData<ProductRow[]>(productsQK) ?? [],
+  );
   const [divisions, setDivisions] = useState<DivisionRow[]>([]);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [subcategories, setSubcategories] = useState<SubcategoryRow[]>([]);
@@ -106,7 +117,10 @@ export default function ProductList() {
   const [allSuppliers, setAllSuppliers] = useState<string[]>([]);
   const [primaryModelNames, setPrimaryModelNames] = useState<Record<string, string>>({});
   const [mainImages, setMainImages] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
+  // Skip the skeleton on revisit when the list is already cached for this scope.
+  const [loading, setLoading] = useState(
+    () => queryClient.getQueryData<ProductRow[]>(productsQK) == null,
+  );
   /* Load-failure state — products are the critical fetch. On failure we
      show a real error + Retry instead of the misleading "No products yet"
      empty state. retryKey re-runs the load effect. */
@@ -190,6 +204,7 @@ export default function ProductList() {
           fetchSubcategories(), fetchModelSummaries(), fetchProductMainImages(),
         ]);
         if (cancelled) return;
+        queryClient.setQueryData(productsQK, p); // warm the cache for instant revisit
         setProducts(p); setDivisions(d); setCategories(c);
         setSubcategories(s);
         setModelCounts(ms.counts);
