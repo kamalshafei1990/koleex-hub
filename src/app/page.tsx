@@ -171,6 +171,23 @@ const DAILY_QUOTES: Record<string, string[]> = {
   ],
 };
 
+/* Warm each app's primary list GET on hover (alongside the route prefetch) so
+   the app's own fetch on mount hits the browser HTTP cache instead of a cold
+   round-trip — the app opens with its data already there. Only mapped here for
+   apps whose list endpoint sends max-age/stale-while-revalidate AND whose
+   client fetches in the default (cacheable) mode, so the warm entry is actually
+   reused. Fire-and-forget; a miss is harmless. */
+const APP_DATA_PREFETCH: Record<string, string> = {
+  products: "/api/products",
+  "product-data": "/api/products",
+  projects: "/api/projects",
+  todo: "/api/todos",
+  accounts: "/api/accounts",
+  customers: "/api/contacts?type=customer",
+  suppliers: "/api/contacts?type=supplier",
+  contacts: "/api/contacts",
+};
+
 /* ── Clock Widget: clean SF-style numeric clock ──
    Apple-flavoured: light-weight tabular numerals, monochrome, a softly
    blinking colon and quiet meta. Date above, timezone below. No skeuomorphism
@@ -778,6 +795,12 @@ export default function HomePage() {
       if (!app.active || prefetchedRef.current.has(app.route)) return;
       prefetchedRef.current.add(app.route);
       try { router.prefetch(app.route); } catch { /* ignore */ }
+      /* Warm the app's data too (default cache mode → populates the browser
+         HTTP cache), so the app's own fetch on mount is served from cache. */
+      const dataUrl = APP_DATA_PREFETCH[app.id];
+      if (dataUrl) {
+        try { void fetch(dataUrl, { credentials: "include" }).catch(() => {}); } catch { /* ignore */ }
+      }
     },
     [router],
   );
