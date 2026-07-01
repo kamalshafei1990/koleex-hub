@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import FileIcon from "@/components/icons/ui/FileIcon";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
@@ -2616,16 +2617,29 @@ function PreviewModal({ catalog, onClose, onDownload }: { catalog: CatalogEntry 
 /* ═══════════════════════════════
    ── MAIN PAGE ──
    ═══════════════════════════════ */
+/* Shared cache key for the tenant's catalog list. Reading the cache on mount
+   lets a revisit paint the grid instantly (no skeleton) while loadAll
+   revalidates in the background — see the TanStack layer in providers.tsx. */
+const CATALOGS_QK = ["catalogs", "list"] as const;
+
 export default function CatalogsPage() {
-  const [catalogs, setCatalogs] = useState<CatalogEntry[]>([]);
+  const queryClient = useQueryClient();
+  /* Seed from cache so returning to Catalogs shows the last-known list
+     immediately instead of a skeleton. */
+  const [catalogs, setCatalogs] = useState<CatalogEntry[]>(
+    () => queryClient.getQueryData<CatalogEntry[]>(CATALOGS_QK) ?? [],
+  );
   const [showSupplierImport, setShowSupplierImport] = useState(false);
   const [contacts, setContacts] = useState<ContactOption[]>([]);
   const [divisions, setDivisions] = useState<DivisionRow[]>([]);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [divLogos, setDivLogos] = useState<Record<string, string>>({});
   const [catLogos, setCatLogos] = useState<Record<string, string>>({});
-  // Split loading: critical catalogs data first, then ancillary data
-  const [catalogsLoading, setCatalogsLoading] = useState(true);
+  // Split loading: critical catalogs data first, then ancillary data.
+  // Skip the skeleton on revisit when the list is already cached.
+  const [catalogsLoading, setCatalogsLoading] = useState(
+    () => queryClient.getQueryData<CatalogEntry[]>(CATALOGS_QK) == null,
+  );
 
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   // Group-by-supplier (Option A): collapse the flat grid into per-supplier
@@ -2664,9 +2678,13 @@ export default function CatalogsPage() {
   const clearSelection = useCallback(() => setSelected(new Set()), []);
 
   const loadAll = useCallback(async () => {
-     // 1️⃣ Load catalogs (critical)
+     // 1️⃣ Load catalogs (critical). Fetch fresh every time (staleTime 0 so a
+     //    create/edit/delete → loadAll always reflects the change) but write
+     //    through the shared cache so the NEXT visit paints instantly.
      if (process.env.NODE_ENV === "development") console.time("fetchCatalogs");
-     const cats = await fetchCatalogs().catch(() => [] as CatalogEntry[]);
+     const cats = await queryClient
+       .fetchQuery({ queryKey: CATALOGS_QK, queryFn: fetchCatalogs, staleTime: 0 })
+       .catch(() => queryClient.getQueryData<CatalogEntry[]>(CATALOGS_QK) ?? ([] as CatalogEntry[]));
      if (process.env.NODE_ENV === "development") console.timeEnd("fetchCatalogs");
      setCatalogs(cats);
      setCatalogsLoading(false);
@@ -2686,7 +2704,7 @@ export default function CatalogsPage() {
      setCategories(catgs);
      setDivLogos(dLogos);
      setCatLogos(cLogos);
-   }, []);
+   }, [queryClient]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
