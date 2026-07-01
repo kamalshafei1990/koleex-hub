@@ -38,6 +38,18 @@ export interface SaveNotice {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/* True when two peer lists describe the same people in the same state — used
+   to skip redundant re-renders on presence heartbeats. Compares who's present
+   (id) + display name + status; deliberately ignores the `at` timestamp, which
+   changes every heartbeat and would otherwise force a constant re-render. */
+function peersMeaningfullyEqual(a: CollabPeer[], b: CollabPeer[]): boolean {
+  if (a.length !== b.length) return false;
+  const sig = (p: CollabPeer) => `${p.id}|${p.status}|${p.name}`;
+  const seen = new Set(a.map(sig));
+  for (const p of b) if (!seen.has(sig(p))) return false;
+  return true;
+}
+
 export function useQuotationCollab(opts: {
   quotationId: string | null | undefined;
   me: { id: string; name: string } | null;
@@ -82,7 +94,14 @@ export function useQuotationCollab(opts: {
           at: typeof m.at === "string" ? m.at : new Date().toISOString(),
         });
       }
-      setPeers(out);
+      /* Presence "sync" fires on every heartbeat, and each peer's `at` bumps
+         each time — so a naive setPeers(out) would hand back a new array on
+         every tick and re-render the (very heavy) quotation editor + A4 preview
+         constantly, which starves route transitions (Back / the Koleex logo
+         feel unresponsive). Only update when the meaningful peer set actually
+         changes (who's present + their status). The `at` timestamp is presence
+         noise and intentionally excluded from the comparison. */
+      setPeers((prev) => (peersMeaningfullyEqual(prev, out) ? prev : out));
     };
 
     channel
