@@ -39,7 +39,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const { data, error } = await supabaseServer.from("visual_assets").select("*").eq("id", id).eq("tenant_id", auth.tenant_id).maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: "Asset not found" }, { status: 404 });
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const base = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
   const bucket = (data.storage_bucket as string) || "media";
   const path = data.svg_path as string | null;
   const asset = { ...data, public_url: path ? `${base}/storage/v1/object/public/${bucket}/${path}` : null };

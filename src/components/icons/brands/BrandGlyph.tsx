@@ -29,7 +29,7 @@ type SI = { path: string; hex: string };
    for the platforms already covered by accurate Simple Icons). Add a slug here
    when you upload a new override. */
 const STORAGE_BASE =
-  (process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "") ?? "") + "/storage/v1/object/public/media/brand-icons/";
+  (process.env.NEXT_PUBLIC_SUPABASE_URL?.trim().replace(/\/$/, "") ?? "") + "/storage/v1/object/public/media/brand-icons/";
 const STORAGE_SLUGS = new Set([
   "qq", "bilibili", "dingtalk", "douyin", "1688", "made-in-china", "global-sources",
 ]);

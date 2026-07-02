@@ -122,6 +122,6 @@ export async function getSignedUrl(
 /** Synchronously compute the public URL for a bucket object. Works for
  *  public buckets only; private buckets need getSignedUrl() instead. */
 export function publicUrl(bucket: string, path: string): string {
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const base = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
   return `${base}/storage/v1/object/public/${bucket}/${path}`;
 }

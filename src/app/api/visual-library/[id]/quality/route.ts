@@ -17,7 +17,7 @@ import { QUALITY_STATUSES } from "@/lib/visual-library/types";
 const STATUS = new Set<string>(QUALITY_STATUSES);
 function publicUrl(bucket: string | null, path: string | null): string | null {
   if (!path) return null;
-  return `${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""}/storage/v1/object/public/${bucket || "media"}/${path}`;
+  return `${(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim()}/storage/v1/object/public/${bucket || "media"}/${path}`;
 }
 const baseStem = (s: string) => (s || "").toLowerCase().replace(/-(alt|[0-9]+)$/g, "").trim();
 

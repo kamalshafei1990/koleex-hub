@@ -83,13 +83,16 @@ function getStep(
    surrounding text colour (white on dark, black on light) exactly like the
    built-in code icons. */
 function MonoIcon({ src, className }: { src: string; className?: string }) {
+  // Whitespace (e.g. a stray newline in a stored URL) invalidates the CSS
+  // mask value and the element paints as a solid square — strip it.
+  const url = src.replace(/\s+/g, "");
   return (
     <span
       aria-hidden
       className={`inline-block bg-current ${className ?? ""}`}
       style={{
-        WebkitMaskImage: `url("${src}")`,
-        maskImage: `url("${src}")`,
+        WebkitMaskImage: `url("${url}")`,
+        maskImage: `url("${url}")`,
         WebkitMaskRepeat: "no-repeat",
         maskRepeat: "no-repeat",
         WebkitMaskPosition: "center",

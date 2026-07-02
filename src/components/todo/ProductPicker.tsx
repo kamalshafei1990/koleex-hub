@@ -20,7 +20,7 @@ import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 
 /* Storage base for taxonomy icons (divisions/categories live as SVGs under
    media/<level>/<slug>.svg; the classification-icon hub overrides win). */
-const STORAGE_BASE = `${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""}/storage/v1/object/public/media`;
+const STORAGE_BASE = `${(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim()}/storage/v1/object/public/media`;
 const taxoStorageIcon = (level: "divisions" | "categories", slug: string) =>
   `${STORAGE_BASE}/${level}/${slug}.svg`;
 

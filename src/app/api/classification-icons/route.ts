@@ -39,7 +39,10 @@ export async function GET() {
   for (const row of data ?? []) {
     const lvl = row.level as Level;
     if (LEVELS.includes(lvl) && row.slug && row.icon_url) {
-      icons[lvl][row.slug as string] = row.icon_url as string;
+      /* Strip any whitespace on the way out too — a corrupted URL (e.g. a
+         newline from a bad env value at write time) breaks CSS mask-image
+         and every consumer renders a solid square instead of the icon. */
+      icons[lvl][row.slug as string] = (row.icon_url as string).replace(/\s+/g, "");
     }
   }
   return NextResponse.json(
@@ -71,7 +74,10 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: "level (division|category|subcategory|kind) and slug are required" }, { status: 400 });
   }
   const icon_asset_id = body.icon_asset_id ?? null;
-  const icon_url = body.icon_url ?? null;
+  /* URLs must never contain whitespace — a newline (seen when the
+     NEXT_PUBLIC_SUPABASE_URL env value had a trailing \n) makes the CSS
+     mask-image invalid and every icon renders as a solid square. */
+  const icon_url = body.icon_url ? body.icon_url.replace(/\s+/g, "") : null;
 
   // Both empty → clear the override.
   if (!icon_asset_id && !icon_url) {

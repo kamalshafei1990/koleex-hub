@@ -9,7 +9,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 
-const SUPA = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+const SUPA = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
 const publicUrl = (fp: string | null | undefined) =>
   fp ? `${SUPA}/storage/v1/object/public/media/${fp.replace(/^\/+/, "")}` : null;
 const mediaUrl = (m: { url?: string | null; file_path?: string | null }) =>

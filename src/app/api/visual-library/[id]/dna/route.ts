@@ -18,7 +18,7 @@ import type { DnaRule, DnaPattern } from "@/lib/visual-library/types";
 
 function publicUrl(bucket: string | null, path: string | null): string | null {
   if (!path) return null;
-  return `${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""}/storage/v1/object/public/${bucket || "media"}/${path}`;
+  return `${(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim()}/storage/v1/object/public/${bucket || "media"}/${path}`;
 }
 
 async function coreProfile(tid: string) {

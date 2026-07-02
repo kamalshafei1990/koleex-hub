@@ -24,7 +24,7 @@ import { logVisualAssetEvent } from "@/lib/visual-library/events";
 
 function publicUrl(bucket: string | null, path: string | null): string | null {
   if (!path) return null;
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const base = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
   return `${base}/storage/v1/object/public/${bucket || "media"}/${path}`;
 }
 

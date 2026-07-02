@@ -92,12 +92,15 @@ const stColors: Record<string, string> = {
    null when there's no icon for that slug. */
 function ClassMonoIcon({ src, className }: { src?: string; className?: string }) {
   if (!src) return null;
+  // Whitespace (e.g. a stray newline in a stored URL) invalidates the CSS
+  // mask value and the pill paints as a solid square — strip it.
+  const url = src.replace(/\s+/g, "");
   return (
     <span
       aria-hidden
       className={`inline-block shrink-0 bg-current ${className ?? "h-5 w-5"}`}
       style={{
-        WebkitMaskImage: `url("${src}")`, maskImage: `url("${src}")`,
+        WebkitMaskImage: `url("${url}")`, maskImage: `url("${url}")`,
         WebkitMaskRepeat: "no-repeat", maskRepeat: "no-repeat",
         WebkitMaskPosition: "center", maskPosition: "center",
         WebkitMaskSize: "contain", maskSize: "contain",

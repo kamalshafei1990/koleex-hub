@@ -19,7 +19,7 @@ import { buildAssetPatch, validateAssetPatch, codeNameToken, CATEGORY_CODE } fro
 import type { VisualAsset } from "@/lib/visual-library/types";
 
 function withPublicUrl(row: VisualAsset): VisualAsset {
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const base = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
   const bucket = row.storage_bucket || "media";
   const path = row.svg_path || row.preview_path || null;
   return { ...row, public_url: path ? `${base}/storage/v1/object/public/${bucket}/${path}` : null };

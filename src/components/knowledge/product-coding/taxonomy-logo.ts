@@ -14,7 +14,7 @@
    --------------------------------------------------------------------------- */
 
 const SUPABASE_URL =
-  process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "") ?? "";
+  process.env.NEXT_PUBLIC_SUPABASE_URL?.trim().replace(/\/$/, "") ?? "";
 
 export type TaxonomyFolder =
   | "divisions"

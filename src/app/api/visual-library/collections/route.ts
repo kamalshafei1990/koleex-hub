@@ -14,7 +14,7 @@ import { buildCollectionPatch, validateCollectionPatch, slugify } from "@/lib/vi
 
 function publicUrl(bucket: string | null, path: string | null): string | null {
   if (!path) return null;
-  return `${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""}/storage/v1/object/public/${bucket || "media"}/${path}`;
+  return `${(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim()}/storage/v1/object/public/${bucket || "media"}/${path}`;
 }
 
 export async function GET(req: Request) {

@@ -16,7 +16,7 @@ import { validRole } from "@/lib/visual-library/collection-fields";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function publicUrl(bucket: string | null, path: string | null): string | null {
   if (!path) return null;
-  return `${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""}/storage/v1/object/public/${bucket || "media"}/${path}`;
+  return `${(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim()}/storage/v1/object/public/${bucket || "media"}/${path}`;
 }
 async function resolveId(cid: string, tid: string): Promise<string | null> {
   if (UUID.test(cid)) return cid;
