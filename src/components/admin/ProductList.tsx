@@ -1130,10 +1130,11 @@ export default function ProductList() {
           <>
             {/* ── Category jump-nav ── */}
             {categoryTree.length > 1 && (
-              <nav className="sticky top-[68px] z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 py-2 mb-8 bg-[var(--bg-primary)]/95 backdrop-blur-xl" aria-label="Categories">
-                {/* Same sliding-pill shell as the Divisions nav: one bordered
-                    rounded-xl container with compact pills inside. */}
-                <div className="relative inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <nav className="sticky top-[68px] z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 py-2.5 mb-8 bg-[var(--bg-primary)]/95 backdrop-blur-xl border-b border-[var(--border-subtle)]/60 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Categories">
+                {/* Light secondary jump-nav — quieter than the Divisions filter
+                    above: borderless ghost links with plain muted counts, so the
+                    two rows read as a clear primary/secondary hierarchy. */}
+                <div className="flex items-center gap-0.5">
                   {categoryTree.map((cat) => (
                     <a
                       key={cat.slug}
@@ -1143,10 +1144,10 @@ export default function ProductList() {
                         const el = document.getElementById(`cat-${cat.slug}`);
                         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
                       }}
-                      className="relative z-10 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[12.5px] font-medium text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors"
+                      className="group inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
                     >
                       <span>{cat.name}</span>
-                      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--bg-inverted)]/[0.06] text-[10px] tabular-nums font-semibold text-[var(--text-dim)]">{cat.total}</span>
+                      <span className="text-[10px] tabular-nums text-[var(--text-ghost)] group-hover:text-[var(--text-dim)]">{cat.total}</span>
                     </a>
                   ))}
                 </div>
