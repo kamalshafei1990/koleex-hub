@@ -3734,18 +3734,14 @@ export default function ProductForm({ productId }: Props) {
            by the template the kind chose.
            ═══════════════════════════════════════════════════════════ */}
         {onePage && isSewing && <div id="sec-sewing" className="scroll-mt-28" aria-hidden />}
-        {steps[currentStep]?.id === "specs" && isSewing && (() => {
-          /* Schema-driven specs — the canonical structured editor that
-             writes product.schema_specs (the data that lights up the
-             public product page, quotes, brochures, AI). Resolved from
-             the current Division → Category → Subcategory classification.
-             The legacy free-form SewingMachineSection stays below as a
-             fallback for classifications without a published schema. */
-          const specsSchema = resolveSchema({
-            divisionCode: product.division_slug || "",
-            categoryCode: product.category_slug || "",
-            subcategoryCode: selectedSubcategory?.code || "",
-          }).schema;
+        {/* Schema-driven specs — the canonical structured editor that writes
+            product.schema_specs (the data that lights up the public product
+            page, quotes, brochures, AI). Renders for ANY classification with a
+            published schema (e.g. Spreading Machines), not just sewing — each
+            subcategory gets its own data template. The free-form
+            SewingMachineSection stays below ONLY for sewing machines. */}
+        {steps[currentStep]?.id === "specs" && (isSewing || activeSpecsSchema) && (() => {
+          const specsSchema = activeSpecsSchema;
           return (
             <div className="space-y-5 animate-in fade-in duration-300">
               {specsSchema ? (
@@ -3763,20 +3759,22 @@ export default function ProductForm({ productId }: Props) {
                 </Section>
               ) : null}
 
-              <Section
-                id="sewing"
-                icon={<Settings2Icon className="h-4 w-4" />}
-                title={specsSchema ? t("specs.additionalLegacy", "Additional / Legacy Specs") : t("specs.machineSpecs", "Machine Specs")}
-                badge={sewingSpecs.template_slug ? sewingSpecs.template_slug.replace(/-/g, " ") : undefined}
-                defaultOpen={!specsSchema}
-              >
-                <SewingMachineSection
-                  data={sewingSpecs}
-                  onChange={setSewingSpecs}
-                  subcategorySlug={product.subcategory_slug}
-                  mode="specs"
-                />
-              </Section>
+              {isSewing ? (
+                <Section
+                  id="sewing"
+                  icon={<Settings2Icon className="h-4 w-4" />}
+                  title={specsSchema ? t("specs.additionalLegacy", "Additional / Legacy Specs") : t("specs.machineSpecs", "Machine Specs")}
+                  badge={sewingSpecs.template_slug ? sewingSpecs.template_slug.replace(/-/g, " ") : undefined}
+                  defaultOpen={!specsSchema}
+                >
+                  <SewingMachineSection
+                    data={sewingSpecs}
+                    onChange={setSewingSpecs}
+                    subcategorySlug={product.subcategory_slug}
+                    mode="specs"
+                  />
+                </Section>
+              ) : null}
             </div>
           );
         })()}

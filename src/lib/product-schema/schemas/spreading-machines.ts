@@ -516,8 +516,8 @@ export const SPREADING_MACHINES_SCHEMA: ProductSchemaDefinition = {
       order: 40,
       fields: [
         {
-          id: "power_phase",
-          key: "power_phase",
+          id: "phase",
+          key: "phase",
           label: "Power Phase",
           order: 10,
           fieldType: "select",
@@ -532,8 +532,8 @@ export const SPREADING_MACHINES_SCHEMA: ProductSchemaDefinition = {
           visualRenderType: "technical_badge",
         },
         {
-          id: "voltage",
-          key: "voltage",
+          id: "voltage_options",
+          key: "voltage_options",
           label: "Voltage",
           order: 20,
           fieldType: "select",
@@ -550,8 +550,8 @@ export const SPREADING_MACHINES_SCHEMA: ProductSchemaDefinition = {
           visualRenderType: "technical_badge",
         },
         {
-          id: "frequency",
-          key: "frequency",
+          id: "frequency_hz",
+          key: "frequency_hz",
           label: "Frequency",
           order: 30,
           fieldType: "unit_number",
@@ -563,8 +563,8 @@ export const SPREADING_MACHINES_SCHEMA: ProductSchemaDefinition = {
           visualRenderType: "spec_card",
         },
         {
-          id: "power",
-          key: "power",
+          id: "power_consumption_w",
+          key: "power_consumption_w",
           label: "Power",
           order: 40,
           fieldType: "unit_number",
@@ -646,8 +646,8 @@ export const SPREADING_MACHINES_SCHEMA: ProductSchemaDefinition = {
       order: 60,
       fields: [
         {
-          id: "machine_weight",
-          key: "machine_weight",
+          id: "machine_weight_kg",
+          key: "machine_weight_kg",
           label: "Machine Weight",
           order: 10,
           fieldType: "unit_number",
