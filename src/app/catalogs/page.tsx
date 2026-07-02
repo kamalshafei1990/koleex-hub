@@ -336,6 +336,73 @@ function ensurePdfJs(): Promise<void> {
   });
 }
 
+/* ── On-demand PDF opening (range requests) ──
+   Catalog PDFs average ~32MB (max 187MB); downloading them in full just to
+   show the first pages is what made Preview feel dead slow. pdf.js CAN load
+   on demand via HTTP Range, but its automatic detection reads the
+   `Accept-Ranges` response header — which Supabase does NOT expose to
+   cross-origin JS (no Access-Control-Expose-Headers), so detection always
+   fails and pdf.js silently falls back to a full download.
+
+   Workaround: skip detection. We already know the exact byte size from the
+   DB (`catalogs.file_size`, verified identical to storage), and 206 response
+   BODIES are readable cross-origin — only the headers are hidden. So we hand
+   pdf.js a manual PDFDataRangeTransport: fetch the first chunk ourselves
+   (also proves the host honours Range via the 206 status), then serve every
+   further byte-range pdf.js asks for. Pages/thumbnails are already lazy, so
+   a preview now costs ~1–2MB instead of the whole file.
+
+   Safety: any failure (no 206, wrong size, network error) falls back to the
+   plain full-file path — exactly the previous behaviour. */
+const PDF_RANGE_CHUNK = 524288; // 512KB
+const PDF_RANGE_MIN_SIZE = 4 * 1024 * 1024; // small files: plain load is fine
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function openPdfDocument(url: string, fileSize?: number | null): Promise<any> {
+  await ensurePdfJs();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lib = (window as any).pdfjsLib;
+
+  if (fileSize && fileSize > PDF_RANGE_MIN_SIZE && typeof lib.PDFDataRangeTransport === "function") {
+    try {
+      const firstEnd = Math.min(PDF_RANGE_CHUNK, fileSize) - 1;
+      const probe = await fetch(url, { headers: { Range: `bytes=0-${firstEnd}` } });
+      if (probe.status === 206) {
+        const initial = new Uint8Array(await probe.arrayBuffer());
+        if (initial.byteLength === firstEnd + 1) {
+          const transport = new lib.PDFDataRangeTransport(fileSize, initial);
+          let aborted = false;
+          transport.requestDataRange = (begin: number, end: number) => {
+            const get = (attempt: number) => {
+              fetch(url, { headers: { Range: `bytes=${begin}-${end - 1}` } })
+                .then((r) => { if (r.status !== 206) throw new Error(`range ${r.status}`); return r.arrayBuffer(); })
+                .then((buf) => { if (!aborted) transport.onDataRange(begin, new Uint8Array(buf)); })
+                .catch((e) => {
+                  if (aborted) return;
+                  if (attempt < 2) get(attempt + 1);
+                  else console.error("[pdf-range]", e);
+                });
+            };
+            get(0);
+          };
+          const baseAbort = transport.abort.bind(transport);
+          transport.abort = () => { aborted = true; baseAbort(); };
+          return await lib.getDocument({
+            range: transport,
+            rangeChunkSize: PDF_RANGE_CHUNK,
+            disableAutoFetch: true, // fetch only what's actually viewed
+            disableStream: true,
+          }).promise;
+        }
+      }
+    } catch (e) {
+      console.warn("[pdf-range] falling back to full fetch:", e);
+    }
+  }
+  // Plain full-file load — identical to the original behaviour.
+  return await lib.getDocument({ url }).promise;
+}
+
 async function generatePdfThumbnail(file: File): Promise<Blob | null> {
   const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 30000));
   const generate = async (): Promise<Blob | null> => {
@@ -369,12 +436,12 @@ async function generatePdfThumbnail(file: File): Promise<Blob | null> {
    backfill a cover for catalogs that were created without one (e.g. synced
    from a supplier before covers existed). pdf.js fetches the URL itself
    (Supabase public bucket allows CORS). */
-async function pdfUrlFirstPageBlob(url: string): Promise<Blob | null> {
+async function pdfUrlFirstPageBlob(url: string, fileSize?: number | null): Promise<Blob | null> {
   try {
-    await ensurePdfJs();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const pdfjsLib = (window as any).pdfjsLib;
-    const pdf = await pdfjsLib.getDocument({ url }).promise;
+    /* Only page 1 is rendered — with the range transport this fetches ~the
+       first chunks instead of downloading a ~32MB average catalog in full
+       ON THE LIST PAGE for every card missing a cover. */
+    const pdf = await openPdfDocument(url, fileSize);
     const page = await pdf.getPage(1);
     const viewport = page.getViewport({ scale: 0.75 });
     const canvas = document.createElement("canvas");
@@ -1830,7 +1897,7 @@ function CatalogCard({ catalog, divLogos, catLogos, selected, onToggleSelect, on
     let objUrl: string | null = null;
     (async () => {
       try {
-        const blob = await pdfUrlFirstPageBlob(catalog.file_url);
+        const blob = await pdfUrlFirstPageBlob(catalog.file_url, catalog.file_size);
         if (!blob) { coverBackfillTried.delete(catalog.id); return; } // allow a later retry
         if (!alive) return;
         objUrl = URL.createObjectURL(blob);
@@ -2061,7 +2128,7 @@ function CatalogRow({ catalog, divLogos, catLogos, selected, onToggleSelect, onP
     let objUrl: string | null = null;
     (async () => {
       try {
-        const blob = await pdfUrlFirstPageBlob(catalog.file_url);
+        const blob = await pdfUrlFirstPageBlob(catalog.file_url, catalog.file_size);
         if (!blob) { coverBackfillTried.delete(catalog.id); return; } // allow a later retry
         if (!alive) return;
         objUrl = URL.createObjectURL(blob);
@@ -2289,7 +2356,7 @@ function PdfThumb({ pdf, pageNumber, active, onClick }: { pdf: PdfDoc; pageNumbe
   );
 }
 
-function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void }) {
+function PdfViewer({ url, fileSize, onDownload }: { url: string; fileSize?: number | null; onDownload: () => void }) {
   const { t } = useTranslation(T);
   const [pdf, setPdf] = useState<PdfDoc>(null);
   const [numPages, setNumPages] = useState(0);
@@ -2315,17 +2382,18 @@ function PdfViewer({ url, onDownload }: { url: string; onDownload: () => void })
     setStatus("loading"); setPdf(null); setNumPages(0); setActivePage(1); setRotation(0);
     (async () => {
       try {
-        await ensurePdfJs();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const lib = (window as any).pdfjsLib;
-        doc = await lib.getDocument({ url }).promise;
+        /* On-demand loading via the manual range transport (see
+           openPdfDocument): first pages appear after ~1–2MB instead of the
+           whole 32–187MB file; further pages fetch their chunks as you
+           scroll/navigate. Falls back to the original full-file load. */
+        doc = await openPdfDocument(url, fileSize);
         if (!alive) { try { doc.destroy?.(); } catch { /* noop */ } return; }
         try { const p1 = await doc.getPage(1); baseWidthRef.current = p1.getViewport({ scale: 1 }).width; } catch { /* noop */ }
         setPdf(doc); setNumPages(doc.numPages); setStatus("ready");
       } catch (e) { console.error("[PdfViewer load]", e); if (alive) setStatus("error"); }
     })();
     return () => { alive = false; try { doc?.destroy?.(); } catch { /* noop */ } };
-  }, [url]);
+  }, [url, fileSize]);
 
   useEffect(() => { setPageInput(String(activePage)); }, [activePage]);
   useEffect(() => {
@@ -2598,7 +2666,7 @@ function PreviewModal({ catalog, onClose, onDownload }: { catalog: CatalogEntry 
       </div>
       <div className="flex-1 overflow-auto flex items-center justify-center p-2 md:p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
         {isPdf ? (
-          <PdfViewer url={catalog.file_url} onDownload={download} />
+          <PdfViewer url={catalog.file_url} fileSize={catalog.file_size} onDownload={download} />
         ) : isImg ? (
           <img src={catalog.file_url} alt={catalog.title} style={{ transform: `scale(${zoom})` }} className="max-w-full max-h-full object-contain transition-transform duration-150 origin-center" />
         ) : (
