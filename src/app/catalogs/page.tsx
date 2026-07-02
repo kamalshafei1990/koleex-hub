@@ -2422,9 +2422,12 @@ function PdfViewer({ url, fileSize, onDownload }: { url: string; fileSize?: numb
 
   // Re-rasterize pages sharper a beat after the user settles on a zoom (so the
   // live zoom stays fluid — it's just a CSS transform — yet ends up crisp).
+  // Capped at 3× render scale: 4× meant ~8-megapixel canvases per page whose
+  // rasterization froze the viewer after each zoom, for sharpness beyond what
+  // the screen can show at typical zoom levels.
   useEffect(() => {
     const dpr = typeof window !== "undefined" ? Math.min(window.devicePixelRatio || 1, 2) : 1;
-    const target = Math.min(4, +(scale * dpr).toFixed(2));
+    const target = Math.min(3, +(scale * dpr).toFixed(2));
     const id = setTimeout(() => setQuality(q => (Math.abs(target - q) > 0.15 ? target : q)), 200);
     return () => clearTimeout(id);
   }, [scale]);
@@ -2615,7 +2618,11 @@ function PdfViewer({ url, fileSize, onDownload }: { url: string; fileSize?: numb
               size and scaled with one GPU transform (instant zoom, no per-page work). */}
           <div style={(stageSize.w && Number.isFinite(stageSize.w * scale)) ? { width: stageSize.w * scale, height: stageSize.h * scale } : undefined} className="relative mx-auto">
             <div ref={stageRef}
-              style={{ transform: `scale(${scale})`, transformOrigin: "0 0", ...(stageSize.w ? { position: "absolute", top: 0, left: 0 } : {}) }}
+              /* willChange promotes the stage to its own compositor layer, so
+                 changing scale() is a pure GPU transform — without it the
+                 browser repaints the multi-megapixel page bitmaps on every
+                 zoom step, which is what made zooming feel slow. */
+              style={{ transform: `scale(${scale})`, transformOrigin: "0 0", willChange: "transform", ...(stageSize.w ? { position: "absolute", top: 0, left: 0 } : {}) }}
               className="w-max flex flex-col items-center gap-4 py-1 px-2">
               {pdf && Array.from({ length: numPages }, (_, i) => (
                 <PdfPageCanvas key={i} pdf={pdf} pageNumber={i + 1} quality={quality} rotation={rotation} onActive={setActivePage} />
