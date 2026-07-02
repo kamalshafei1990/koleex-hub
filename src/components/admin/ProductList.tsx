@@ -1162,25 +1162,27 @@ export default function ProductList() {
               style={{ contentVisibility: "auto", containIntrinsicSize: "1px 800px" }}
               className="scroll-mt-32"
             >
-              {/* ── CATEGORY headline — calm, editorial. An accent
-                  bar on the left replaces the heavier gradient
-                  background; the title sits big with the count
-                  rendered as a small uppercase caption above. */}
-              <div className="mb-7 flex items-end justify-between gap-3 pl-4 border-l-[3px] border-[var(--border-focus)]">
-                <div className="flex min-w-0 items-center gap-3">
-                  <ClassMonoIcon src={classIcons.category?.[cat.slug]} className="h-7 w-7 text-[var(--text-secondary)]" />
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-ghost)] mb-1">
-                      Category
-                    </p>
-                    <h2 className="text-[20px] md:text-[26px] font-bold tracking-tight text-[var(--text-primary)] truncate leading-tight">
+              {/* ── CATEGORY headline — minimal & monochrome: icon in a clean
+                  bordered tile, title, count on the right, then a hairline that
+                  separates the header from the grid so each category reads as a
+                  tidy, self-contained block. */}
+              <div className="mb-7">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    {classIcons.category?.[cat.slug] && (
+                      <span className="h-9 w-9 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0">
+                        <ClassMonoIcon src={classIcons.category?.[cat.slug]} className="h-[18px] w-[18px] text-[var(--text-secondary)]" />
+                      </span>
+                    )}
+                    <h2 className="text-[18px] md:text-[22px] font-bold tracking-tight text-[var(--text-primary)] truncate leading-tight">
                       {cat.name}
                     </h2>
                   </div>
+                  <span className="shrink-0 text-[11px] font-medium text-[var(--text-ghost)] tabular-nums whitespace-nowrap">
+                    {cat.total} {cat.total === 1 ? "product" : "products"}
+                  </span>
                 </div>
-                <span className="shrink-0 text-[12px] font-semibold text-[var(--text-muted)] tabular-nums whitespace-nowrap">
-                  {cat.total} {cat.total === 1 ? "product" : "products"}
-                </span>
+                <div className="mt-3 h-px bg-[var(--border-subtle)]" />
               </div>
 
               {/* Sub-sections within the category */}
