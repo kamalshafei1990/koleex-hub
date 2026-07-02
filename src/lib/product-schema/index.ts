@@ -1,7 +1,9 @@
 import { LOCKSTITCH_SCHEMA } from "./schemas/lockstitch";
+import { SPREADING_MACHINES_SCHEMA } from "./schemas/spreading-machines";
 import { registerSchema } from "./registry";
 
 registerSchema(LOCKSTITCH_SCHEMA);
+registerSchema(SPREADING_MACHINES_SCHEMA);
 
 export {
   registerSchema,
