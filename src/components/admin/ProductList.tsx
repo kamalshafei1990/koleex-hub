@@ -14,8 +14,6 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
-import EyeIcon from "@/components/icons/ui/EyeIcon";
-import EyeOffIcon from "@/components/icons/ui/EyeOffIcon";
 import FilterIcon from "@/components/icons/ui/FilterIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import StarIcon from "@/components/icons/ui/StarIcon";
@@ -1223,19 +1221,6 @@ export default function ProductList() {
                       )}
                     </div>
 
-                    {/* Visibility indicator */}
-                    <div className="absolute top-2.5 right-2.5 z-[1] flex items-center gap-1.5">
-                      {p.visible ? (
-                        <span className="h-6 w-6 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center backdrop-blur-sm">
-                          <EyeIcon className="h-3 w-3 text-[var(--text-secondary)]" />
-                        </span>
-                      ) : (
-                        <span className="h-6 w-6 rounded-full bg-[var(--bg-overlay)] border border-[var(--border-subtle)] flex items-center justify-center backdrop-blur-sm">
-                          <EyeOffIcon className="h-3 w-3 text-[var(--text-dim)]" />
-                        </span>
-                      )}
-                    </div>
-
                     {/* Actions (show on hover) — internal only.
                         Edit is a real <Link> (with prefetch), wrapped
                         in stopPropagation so the click doesn't also
@@ -1518,14 +1503,6 @@ export default function ProductList() {
 
                     {/* Actions */}
                     <div className="relative z-10 flex items-center gap-1.5 shrink-0">
-                      {/* Mobile visibility indicator */}
-                      <div className="md:hidden">
-                        {p.visible ? (
-                          <EyeIcon className="h-3.5 w-3.5 text-emerald-400" />
-                        ) : (
-                          <EyeOffIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" />
-                        )}
-                      </div>
                       {isInternal && (
                         <>
                           <Link
