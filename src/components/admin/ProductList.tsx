@@ -1012,6 +1012,10 @@ export default function ProductList() {
 
               {orderedDivisions.map((d) => {
                 const isActive = filterDiv === d.slug;
+                /* Prefer the icon saved for this division in the Classification
+                   Icon Hub (classIcons.division[slug]); fall back to a built-in
+                   keyword icon when none is assigned yet. */
+                const savedIcon = classIcons.division?.[d.slug];
                 const DivIcon = divisionIcon(d.name);
                 return (
                   <button
@@ -1026,7 +1030,9 @@ export default function ProductList() {
                         : "text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
                     }`}
                   >
-                    <DivIcon className="h-3.5 w-3.5 opacity-80 shrink-0" />
+                    {savedIcon
+                      ? <ClassMonoIcon src={savedIcon} className="h-4 w-4 shrink-0" />
+                      : <DivIcon className="h-3.5 w-3.5 opacity-80 shrink-0" />}
                     {d.name}
                   </button>
                 );
