@@ -669,8 +669,8 @@ export default function ProductList() {
             the user can refine the query without scrolling back up.
             z-30 sits above the category jump-nav (z-20) so the
             search row always wins when both stack. */}
-        <div className="mb-4">
-        <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] p-3.5">
+        <div className="sticky top-0 z-30 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-3 pb-2 mb-4 bg-[var(--bg-primary)]/95 backdrop-blur-xl">
+        <div className="bg-[var(--bg-secondary)]/80 backdrop-blur-sm rounded-xl border border-[var(--border-subtle)] p-3.5 shadow-sm">
           <div className="flex gap-3">
             <div className="relative flex-1" ref={searchBoxRef}>
               <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-dim)] z-10" />
