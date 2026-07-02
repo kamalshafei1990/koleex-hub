@@ -959,18 +959,26 @@ export default function ProductList() {
             are outlined secondary pills. Horizontally scrollable on
             mobile so long division names don't wrap awkwardly. */}
         {orderedDivisions.length > 0 && (
-          <div className="mb-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-ghost)] mb-2.5">{t("list.divisions")}</p>
-            <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <div className="flex items-center gap-2 min-w-max">
+          <div className="mb-6">
+            {/* Sliding-pill nav shell — matches the Database/app tab nav:
+                one bordered rounded-xl container, compact pills inside, the
+                active one filled. Divisions are client filters (buttons), so
+                this mirrors SlidingPillNav's look without its href routing. */}
+            <div
+              role="tablist"
+              aria-label={t("list.divisions")}
+              className="relative inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
               {/* "All" — clears the division filter. */}
               <button
                 type="button"
+                role="tab"
+                aria-selected={filterDiv === ""}
                 onClick={() => { setFilterDiv(""); setFilterCat(""); setFilterSub(""); }}
-                className={`h-8 px-3.5 rounded-full text-[12px] font-medium border transition-all shrink-0 ${
+                className={`relative z-10 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[12.5px] font-medium transition-colors ${
                   filterDiv === ""
-                    ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-[var(--bg-inverted)]"
-                    : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)] border-[var(--border-subtle)] hover:text-[var(--text-primary)]"
+                    ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                    : "text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
                 }`}
               >
                 All divisions
@@ -979,39 +987,26 @@ export default function ProductList() {
               {orderedDivisions.map((d) => {
                 const isFlagship = d.slug === FLAGSHIP_DIVISION_SLUG;
                 const isActive = filterDiv === d.slug;
-
-                /* Flagship styling: always filled/accent so customers
-                   see it as the primary tile even when a different
-                   division is active. Other divisions use the hub's
-                   standard ghost-pill treatment and fill up only when
-                   selected. */
-                const cls = isFlagship
-                  ? isActive
-                    ? "bg-[var(--text-primary)] text-[var(--bg-primary)] border-[var(--text-primary)] ring-2 ring-[var(--text-primary)]/30"
-                    : "bg-[var(--text-primary)]/10 text-[var(--text-primary)] border-[var(--text-primary)]/25 hover:bg-[var(--text-primary)]/15"
-                  : isActive
-                    ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-[var(--bg-inverted)]"
-                    : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)] border-[var(--border-subtle)] hover:text-[var(--text-primary)]";
-
                 return (
                   <button
                     key={d.slug}
                     type="button"
+                    role="tab"
+                    aria-selected={isActive}
                     onClick={() => { setFilterDiv(d.slug); setFilterCat(""); setFilterSub(""); }}
-                    className={`h-8 px-3.5 rounded-full text-[12px] font-medium border transition-all shrink-0 ${cls} ${isFlagship ? "font-semibold" : ""}`}
-                    aria-pressed={isActive}
+                    className={`relative z-10 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[12.5px] font-medium transition-colors ${
+                      isActive
+                        ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                        : "text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
+                    }`}
                   >
                     {isFlagship && (
-                      <span
-                        aria-hidden
-                        className="inline-block h-1.5 w-1.5 rounded-full bg-current mr-1.5 -translate-y-[1px]"
-                      />
+                      <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full bg-current opacity-80" />
                     )}
                     {d.name}
                   </button>
                 );
               })}
-            </div>
             </div>
           </div>
         )}
