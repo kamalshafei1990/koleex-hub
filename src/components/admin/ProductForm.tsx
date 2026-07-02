@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import WizardKnowledgePanel, { type WizardKnowledge } from "@/components/admin/WizardKnowledgePanel";
 import { useRouter, usePathname } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
@@ -1652,44 +1651,6 @@ export default function ProductForm({ productId }: Props) {
     return set;
   }, [steps, classificationComplete]);
 
-  /* ── Live Product Knowledge — the persistent "Raise Product Maturity"
-        signal shown above every step. Recomputed each render from the
-        working form state, so completeness/maturity move on every edit.
-        Same data-presence groups as the Product Detail Knowledge Object,
-        so the number the operator builds here matches what they'll see
-        on the product page. No new data. */
-  const wizardKnowledge: WizardKnowledge = (() => {
-    const cs = (sewingSpecs.common_specs || {}) as Record<string, unknown>;
-    const ts = (sewingSpecs.template_specs || {}) as Record<string, unknown>;
-    const gs = ((product as unknown as { specs?: Record<string, unknown> }).specs || {}) as Record<string, unknown>;
-    const nonEmpty = (o: Record<string, unknown>) =>
-      Object.values(o).filter((v) => v !== null && v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0)).length;
-    const specsCount = nonEmpty(cs) + nonEmpty(ts) + nonEmpty(gs);
-    const imgVid = media.filter((m) => ["main_image", "gallery", "video"].includes(m.type)).length;
-    const docs = media.filter((m) => !["main_image", "gallery", "video"].includes(m.type)).length;
-    const productTags = (product.tags || []) as string[];
-    const apps = productTags.length;
-    const fabricRe = /denim|jean|leather|canvas|tarp|knit|jersey|silk|satin|chiffon|cotton|polyester|nylon|wool|fleece|vinyl|pvc|mesh|spandex|elastane|twill|terry|velvet|corduroy|fabric|material/i;
-    const fabrics = productTags.filter((t) => fabricRe.test(t)).length;
-    const rel = related.length;
-    const defs = [
-      { key: "specifications", label: "Specs", present: specsCount > 0, w: 20 },
-      { key: "media", label: "Media", present: imgVid > 0, w: 20 },
-      { key: "applications", label: "Applications", present: apps > 0, w: 15 },
-      { key: "documents", label: "Documents", present: docs > 0, w: 10 },
-      { key: "fabrics", label: "Fabrics", present: fabrics > 0, w: 10 },
-      { key: "operations", label: "Operations", present: false, w: 10 },
-      { key: "relationships", label: "Relationships", present: rel > 0, w: 15 },
-    ];
-    const pct = defs.reduce((a, s) => a + (s.present ? s.w : 0), 0);
-    let level: 1 | 2 | 3 | 4 | 5 = pct < 25 ? 1 : pct < 50 ? 2 : pct < 75 ? 3 : 4;
-    if (level >= 4 && rel === 0) level = 3;
-    if (pct >= 85 && rel > 0) level = 5;
-    const levelLabel = ["", "Record", "Structured", "Knowledge", "Connected", "Complete"][level];
-    const tone: WizardKnowledge["tone"] = pct < 35 ? "low" : pct < 70 ? "mid" : "high";
-    return { pct, level, levelLabel, tone, connected: rel > 0, missing: defs.filter((s) => !s.present).map((s) => s.label), sections: defs.map(({ w: _w, ...s }) => s) };
-  })();
-
   /* ── Editor mode ──
      `tabbed`: each section is its OWN screen, navigated freely via a clean
      tab bar (only the active section renders) — no step numbers, no locks,
@@ -2447,14 +2408,6 @@ export default function ProductForm({ productId }: Props) {
             issueCounts={stepIssueCount}
             t={t}
           />
-        )}
-
-        {/* "Raise Product Maturity" is a read-only meter, not an input. In the
-            tabbed editor it appears only on the Review tab (so it never crowds
-            the editing tabs); legacy step mode keeps it on top. */}
-        {!onePage && !tabbed && <WizardKnowledgePanel knowledge={wizardKnowledge} />}
-        {tabbed && steps[currentStep]?.id === "finalize" && (
-          <WizardKnowledgePanel knowledge={wizardKnowledge} />
         )}
 
         {/* ═══ GLOBAL CLASSIFICATION BREADCRUMB (shown once classification is set, across all steps) ═══ */}
@@ -4926,9 +4879,6 @@ export default function ProductForm({ productId }: Props) {
           );
         })()}
         </div>
-
-        {/* Maturity meter lives at the bottom on the single page (read-only). */}
-        {onePage && <div className="mt-2"><WizardKnowledgePanel knowledge={wizardKnowledge} /></div>}
 
         {/* ═══ STEP NAVIGATION BUTTONS ═══ */}
         {!onePage && !tabbed && (

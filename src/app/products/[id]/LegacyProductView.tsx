@@ -92,7 +92,6 @@ import { FIELD_GLYPHS } from "@/lib/machine-specs/icons";
 import { getKindBySlug } from "@/lib/machine-kinds";
 import { IMG } from "@/lib/cdn";
 import KoleexLogo from "@/components/layout/KoleexLogo";
-import ProductKnowledgePanel, { type ProductKnowledge } from "./ProductKnowledgePanel";
 
 /* ---------------- helpers ---------------- */
 
@@ -1089,40 +1088,6 @@ export default function LegacyProductView() {
   const priceFrom = primaryModel?.global_price ?? primaryModel?.head_only_price ?? primaryModel?.complete_set_price ?? null;
   const tags = product.tags || [];
 
-  /* ── Product Knowledge — turns this detail page from a record into a
-        Knowledge Object. Computed PURELY from data already loaded above
-        (specs / media / docs / tags / relationships). No new fetch. */
-  const fabricRe = /denim|jean|leather|canvas|tarp|knit|jersey|silk|satin|chiffon|cotton|polyester|nylon|wool|fleece|vinyl|pvc|mesh|spandex|elastane|twill|terry|velvet|corduroy|fabric|material/i;
-  const k_specs = specCategories.reduce((a, c) => a + c.rows.length, 0) + genericSpecsRendered.length + (technicalRendered?.filled || 0);
-  const k_media = galleryImages.length + videos.length;
-  const k_docs = manuals.length + otherDocs.length;
-  const k_apps = tags.length;
-  const k_fabrics = tags.filter((t) => fabricRe.test(t)).length;
-  const k_related = related.length;
-  const k_defs = [
-    { key: "specifications", label: "Specifications", present: k_specs > 0, summary: `${k_specs} specifications`, task: "Add specifications", w: 20 },
-    { key: "media", label: "Media", present: k_media > 0, summary: `${k_media} ${k_media === 1 ? "image / video" : "images & videos"}`, task: "Add images & video", w: 20 },
-    { key: "applications", label: "Applications", present: k_apps > 0, summary: `${k_apps} ${k_apps === 1 ? "application" : "applications"}`, task: "Add applications", w: 15 },
-    { key: "documents", label: "Documents", present: k_docs > 0, summary: `${k_docs} ${k_docs === 1 ? "document" : "documents"}`, task: "Add manuals & documents", w: 10 },
-    { key: "fabrics", label: "Fabrics & Materials", present: k_fabrics > 0, summary: `${k_fabrics} fabric ${k_fabrics === 1 ? "type" : "types"}`, task: "Add fabrics & materials", w: 10 },
-    { key: "operations", label: "Operations", present: false, summary: "", task: "Add operations", w: 10 },
-    /* Relationships — the Connect layer. Existing related_products data
-       contributes to maturity and is the gate to L4 Connected. */
-    { key: "relationships", label: "Relationships", present: k_related > 0, summary: `${k_related} linked ${k_related === 1 ? "product" : "products"}`, task: "Connect related products", w: 15 },
-  ];
-  const k_pct = k_defs.reduce((a, s) => a + (s.present ? s.w : 0), 0);
-  let k_level: 1 | 2 | 3 | 4 | 5 = k_pct < 25 ? 1 : k_pct < 50 ? 2 : k_pct < 75 ? 3 : 4;
-  if (k_level >= 4 && k_related === 0) k_level = 3;            // no relationships → can't be "Connected"
-  if (k_pct >= 85 && k_related > 0) k_level = 5;
-  const k_levelLabel = ["", "Record", "Structured", "Knowledge", "Connected", "Complete"][k_level];
-  const k_tone: "low" | "mid" | "high" = k_pct < 35 ? "low" : k_pct < 70 ? "mid" : "high";
-  const k_health = k_pct < 35 ? "Needs work" : k_pct < 70 ? "Developing" : "Strong";
-  const knowledge: ProductKnowledge = {
-    pct: k_pct, level: k_level, levelLabel: k_levelLabel, tone: k_tone, health: k_health,
-    missing: k_defs.filter((s) => !s.present).map((s) => s.label),
-    sections: k_defs.map(({ w: _w, ...s }) => s),
-  };
-
   /* ════════════════════════════════════════════ */
   return (
     <div
@@ -1192,16 +1157,6 @@ export default function LegacyProductView() {
           )}
         </div>
       </div>
-
-      {/* ── Product Knowledge panel — makes completeness, maturity, and
-              every knowledge section (present OR missing-as-a-task) visible.
-              The first thing on the page, so a record reads as a Knowledge
-              Object. */}
-      <ProductKnowledgePanel
-        knowledge={knowledge}
-        internal={isInternal}
-        editHref={`/product-data/${product.id}/edit`}
-      />
 
       {/* ── Certifications (Phase 4) — buyer-relevant, shown when present. */}
       {certifications.length > 0 && (
@@ -1342,9 +1297,8 @@ export default function LegacyProductView() {
       })()}
 
       {/* ── Relationships ("Connect") — turns the catalog from islands into
-              a graph. Renders the existing related_products links as cards;
-              an empty state becomes a task that explains how connecting
-              raises maturity (Connected → L4). Public hides the empty state. */}
+              a graph. Renders the existing related_products links as cards.
+              Public hides the empty state. */}
       {(related.length > 0 || isInternal) && (
         <section className="mx-auto w-full max-w-[1200px] px-4 md:px-6 lg:px-10 xl:px-16 pt-4">
           <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">
@@ -1406,7 +1360,7 @@ export default function LegacyProductView() {
               <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/50 p-5 text-center">
                 <p className="text-[13px] font-medium text-[var(--text-primary)]">This product is isolated</p>
                 <p className="text-[12px] text-[var(--text-muted)] mt-1 max-w-[460px] mx-auto leading-relaxed">
-                  Connect related, alternative, or upgrade products to turn this record into a <span className="text-[var(--text-primary)] font-medium">Connected Knowledge Object (L4)</span>. Relationships add 15% to product knowledge and let buyers navigate the catalog as a graph.
+                  Connect related, alternative, or upgrade products so buyers can navigate the catalog as a graph.
                 </p>
                 <Link
                   href={`/product-data/${product.id}/edit`}
