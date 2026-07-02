@@ -17,6 +17,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 import { loadPublicSchemaProduct } from "@/lib/server/product-detail";
+import { getSessionAccountId } from "@/lib/server/session";
 import { ProductPreview } from "@/components/product-preview/ProductPreview";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import LegacyProductView from "./LegacyProductView";
@@ -41,7 +42,12 @@ export default async function ProductDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const loaded = await loadPublicSchemaProduct(id);
+  // Logged-in hub users may preview draft/hidden schema products before they
+  // are published; anonymous visitors still only see public ones.
+  const accountId = await getSessionAccountId();
+  const loaded = await loadPublicSchemaProduct(id, {
+    allowUnpublished: Boolean(accountId),
+  });
 
   // No resolved schema (or non-public / not found) → original renderer.
   if (!loaded) {

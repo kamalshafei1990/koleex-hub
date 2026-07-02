@@ -128,12 +128,19 @@ async function fetchProduct(idOrSlug: string): Promise<PublicProductRow | null> 
 /**
  * Load ready-to-render <ProductPreview> props for a public, schema-backed
  * product. Returns null when not found, not public, or no schema resolves.
+ *
+ * `opts.allowUnpublished` bypasses the public (visible + active) gate so an
+ * authenticated internal viewer can preview a draft/hidden product's schema
+ * view before publishing. Callers MUST only pass this after verifying the
+ * requester is a logged-in hub user — never on a truly public surface.
  */
 export async function loadPublicSchemaProduct(
   idOrSlug: string,
+  opts?: { allowUnpublished?: boolean },
 ): Promise<LoadedSchemaProduct | null> {
   const product = await fetchProduct(idOrSlug);
-  if (!product || !isPublic(product)) return null;
+  if (!product) return null;
+  if (!opts?.allowUnpublished && !isPublic(product)) return null;
 
   const supabase = getSupabaseServer();
 
