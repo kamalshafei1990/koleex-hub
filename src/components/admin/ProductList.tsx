@@ -959,8 +959,10 @@ export default function ProductList() {
             are outlined secondary pills. Horizontally scrollable on
             mobile so long division names don't wrap awkwardly. */}
         {orderedDivisions.length > 0 && (
-          <div className="mb-6 -mx-1 px-1 overflow-x-auto">
-            <div className="flex items-center gap-2 min-w-max pb-1">
+          <div className="mb-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-ghost)] mb-2.5">{t("list.divisions")}</p>
+            <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex items-center gap-2 min-w-max">
               {/* "All" — clears the division filter. */}
               <button
                 type="button"
@@ -1009,6 +1011,7 @@ export default function ProductList() {
                   </button>
                 );
               })}
+            </div>
             </div>
           </div>
         )}

@@ -143,6 +143,7 @@ export const PRODUCTS_UI_I18N: Translations = {
   "list.searchAria": { en: "Search products", zh: "搜索产品", ar: "ابحث عن المنتجات" },
   "list.clearSearch": { en: "Clear search", zh: "清除搜索", ar: "مسح البحث" },
   "list.allOption": { en: "All", zh: "全部", ar: "الكل" },
+  "list.divisions": { en: "Divisions", zh: "部门", ar: "الأقسام" },
   "list.activeFilters": { en: "Active:", zh: "已筛选：", ar: "مفعّلة:" },
   "list.removeFilter": { en: "Remove filter {label}", zh: "移除筛选 {label}", ar: "إزالة عامل التصفية {label}" },
   "list.noMatchesFor": { en: "No matches for", zh: "未找到匹配项：", ar: "لا توجد نتائج مطابقة لـ" },
