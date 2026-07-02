@@ -69,6 +69,30 @@ export const PUBLIC_PRODUCT_COLUMNS = [
   "updated_at",
 ].join(", ");
 
+/** Columns the catalogue LIST views (/products + /product-data grids)
+ *  actually render/search — a strict subset of PUBLIC_PRODUCT_COLUMNS,
+ *  so it is safe for every caller regardless of access level. Requested
+ *  via GET /api/products?view=list. The full-row shape stays the default
+ *  for pickers/detail flows that need more fields; the products table has
+ *  ~80 columns, and serialising all of them for 700 rows made the list
+ *  response megabytes instead of the ~200 KB this projection yields. */
+export const LIST_PRODUCT_COLUMNS = [
+  "id",
+  "product_name",
+  "slug",
+  "division_slug",
+  "category_slug",
+  "subcategory_slug",
+  "brand",
+  "level",
+  "tags",
+  "excerpt",
+  "description",      // part of the client-side search haystack
+  "status",
+  "visible",
+  "featured",
+].join(", ");
+
 /** Fields on the products table that are internal-only. Used for
  *  stripping when a row was fetched with `*` (e.g. joined query) and
  *  needs to be sanitised after the fact. Keep in sync with

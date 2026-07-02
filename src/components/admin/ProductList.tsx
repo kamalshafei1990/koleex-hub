@@ -211,19 +211,26 @@ export default function ProductList() {
            block the catalogue from rendering). */
         const ctrl = new AbortController();
         const timeoutId = setTimeout(() => ctrl.abort(), 12_000);
+        /* The meta fetches don't depend on the products response — start
+           them immediately so they load alongside it instead of queueing
+           behind the largest request on the page. */
+        const metaPromise = Promise.all([
+          fetchDivisions(), fetchCategories(),
+          fetchSubcategories(), fetchModelSummaries(), fetchProductMainImages(),
+        ]);
         let p: ProductRow[];
         try {
-          const res = await fetch("/api/products", { credentials: "include", signal: ctrl.signal });
+          /* ?view=list keeps the response to the ~15 columns this grid
+             actually uses — the full 80-column rows made this the page's
+             megabyte-scale blocking fetch. */
+          const res = await fetch("/api/products?view=list", { credentials: "include", signal: ctrl.signal });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const json = (await res.json()) as { products?: ProductRow[] };
           p = json.products ?? [];
         } finally {
           clearTimeout(timeoutId);
         }
-        const [d, c, s, ms, imgs] = await Promise.all([
-          fetchDivisions(), fetchCategories(),
-          fetchSubcategories(), fetchModelSummaries(), fetchProductMainImages(),
-        ]);
+        const [d, c, s, ms, imgs] = await metaPromise;
         if (cancelled) return;
         queryClient.setQueryData(productsQK, p); // warm the cache for instant revisit
         setProducts(p); setDivisions(d); setCategories(c);

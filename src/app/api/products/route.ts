@@ -24,14 +24,24 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { hasProductDataAccess, PUBLIC_PRODUCT_COLUMNS, requireProductDataAction } from "@/lib/server/product-access";
+import { hasProductDataAccess, LIST_PRODUCT_COLUMNS, PUBLIC_PRODUCT_COLUMNS, requireProductDataAction } from "@/lib/server/product-access";
 
-export async function GET() {
+export async function GET(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
 
-  const canSeeSecrets = await hasProductDataAccess(auth);
-  const cols = canSeeSecrets ? "*" : PUBLIC_PRODUCT_COLUMNS;
+  /* ?view=list → slim projection with only the columns the catalogue
+     grids render/search. LIST_PRODUCT_COLUMNS is a subset of the public
+     set, so no access check is needed for it; the full shape keeps the
+     public/admin split. */
+  const listView = new URL(req.url).searchParams.get("view") === "list";
+  let cols: string;
+  if (listView) {
+    cols = LIST_PRODUCT_COLUMNS;
+  } else {
+    const canSeeSecrets = await hasProductDataAccess(auth);
+    cols = canSeeSecrets ? "*" : PUBLIC_PRODUCT_COLUMNS;
+  }
 
   const { data, error } = await supabaseServer
     .from("products")

@@ -42,7 +42,13 @@ export async function GET() {
       icons[lvl][row.slug as string] = row.icon_url as string;
     }
   }
-  return NextResponse.json({ icons });
+  return NextResponse.json(
+    { icons },
+    /* Icon overrides change rarely (Database-app edits) — let the browser
+       reuse them briefly instead of re-downloading ~56 KB on every
+       catalogue mount. Same policy as /api/taxonomy. */
+    { headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=600" } },
+  );
 }
 
 /* PUT — set (upsert) or clear a classification icon override, keyed by
