@@ -301,7 +301,6 @@ function getSteps(isSewing: boolean): WizardStep[] {
     { id: "knowledge", label: "Knowledge & Relationships", shortLabel: "Knowledge", icon: <BookOpenIcon className="h-4 w-4" /> },
     { id: "finalize", label: "Review & Publish", shortLabel: "Review", icon: <CheckIcon className="h-4 w-4" /> },
   ];
-  void ZapIcon; // retained import; the standalone Technical tab merged into Specs
   return steps;
 }
 

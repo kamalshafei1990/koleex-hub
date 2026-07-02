@@ -3,7 +3,7 @@ export interface UiModule { key: string; fileCount: number; components: string[]
 export const UI_COMPONENT_MODULES: UiModule[] = [
   {
     "key": "admin",
-    "fileCount": 48,
+    "fileCount": 43,
     "components": [
       "AccessRightsTab",
       "AccountDetail",
@@ -14,7 +14,6 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
       "ApiKeyRevealModal",
       "AuthGate",
       "BarcodeQRDisplay",
-      "BasicInfoSection",
       "CalendarApp",
       "CalendarTab",
       "CheckCell",
@@ -22,7 +21,6 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
       "CityPicker",
       "ClassificationSection",
       "ColorChipInput",
-      "ConfigSection",
       "ConfirmDialog",
       "CountryPicker",
       "CreateBrandModal",
@@ -54,7 +52,6 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
       "JoinSuccessPanel",
       "LegendDot",
       "MachineKindPicker",
-      "MarketPricesSection",
       "MediaSection",
       "MediaSlot",
       "MenuItem",
@@ -93,7 +90,6 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
       "SpecRowControl",
       "SpecRowGroup",
       "SpecsProgressBar",
-      "SpecsSection",
       "StatButtons",
       "StatusBadge",
       "StatusRibbon",
@@ -108,7 +104,6 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
       "TechnicalSection",
       "Toggle",
       "ToggleRow",
-      "TranslationsSection",
       "VisBadge",
       "WattInput",
       "WeekView"
