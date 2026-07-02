@@ -22,6 +22,15 @@ import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import TagsIcon from "@/components/icons/ui/TagsIcon";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
 import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
+import ScissorsIcon from "@/components/icons/ui/ScissorsIcon";
+import CpuIcon from "@/components/icons/ui/CpuIcon";
+import HomeIcon from "@/components/icons/ui/HomeIcon";
+import SparklesIcon from "@/components/icons/ui/SparklesIcon";
+import TruckIcon from "@/components/icons/ui/TruckIcon";
+import FactoryIcon from "@/components/icons/ui/FactoryIcon";
+import ZapIcon from "@/components/icons/ui/ZapIcon";
+import StethoscopeIcon from "@/components/icons/ui/StethoscopeIcon";
+import PackageIcon from "@/components/icons/ui/PackageIcon";
 import ListIcon from "@/components/icons/ui/ListIcon";
 import SettingsIcon2 from "@/components/icons/ui/SettingsIcon2";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
@@ -43,6 +52,22 @@ import ConfirmDialog from "./form-sections/ConfirmDialog";
    in one place so a future rename (e.g. "koleex-machinery") is a
    single-file change. */
 const FLAGSHIP_DIVISION_SLUG = "garment-machinery";
+
+/* Division → icon. Divisions are DB-driven with no icon column, so we map by
+   name keyword (robust to slug variants) and fall back to a neutral box. */
+function divisionIcon(name: string): React.ElementType {
+  const n = (name || "").toLowerCase();
+  if (/garment|sewing|machin/.test(n)) return ScissorsIcon;
+  if (/digital|device|electron|tech/.test(n)) return CpuIcon;
+  if (/smart|living|home/.test(n)) return HomeIcon;
+  if (/life ?style|lifestyle|beauty|leisure/.test(n)) return SparklesIcon;
+  if (/mobil|vehicle|auto|transport/.test(n)) return TruckIcon;
+  if (/industr|factory|solution/.test(n)) return FactoryIcon;
+  if (/fabric|textile|material/.test(n)) return LayersIcon;
+  if (/energy|power|solar|battery/.test(n)) return ZapIcon;
+  if (/medic|health|care|pharma/.test(n)) return StethoscopeIcon;
+  return PackageIcon;
+}
 
 /* Static tonal maps — hoisted to module scope so they aren't
    re-allocated on every render (levelColors) or, worse, once per
@@ -981,12 +1006,13 @@ export default function ProductList() {
                     : "text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
                 }`}
               >
+                <LayoutGridIcon className="h-3.5 w-3.5 opacity-80 shrink-0" />
                 All divisions
               </button>
 
               {orderedDivisions.map((d) => {
-                const isFlagship = d.slug === FLAGSHIP_DIVISION_SLUG;
                 const isActive = filterDiv === d.slug;
+                const DivIcon = divisionIcon(d.name);
                 return (
                   <button
                     key={d.slug}
@@ -1000,9 +1026,7 @@ export default function ProductList() {
                         : "text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
                     }`}
                   >
-                    {isFlagship && (
-                      <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full bg-current opacity-80" />
-                    )}
+                    <DivIcon className="h-3.5 w-3.5 opacity-80 shrink-0" />
                     {d.name}
                   </button>
                 );
