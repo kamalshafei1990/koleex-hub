@@ -2269,12 +2269,20 @@ const PdfPageCanvas = React.memo(function PdfPageCanvas({ pdf, pageNumber, quali
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const taskRef = useRef<any>(null);
   const [visible, setVisible] = useState(pageNumber <= 2);
+  /* `visible` latches once (the canvas stays mounted with its last bitmap);
+     `inView` tracks the CURRENT intersection. Rasterization only runs while
+     in view — otherwise a zoom-settle quality bump would re-render every page
+     ever scrolled past (dozens of huge canvases in a big catalog), which is
+     exactly what made zooming feel slow. Off-screen pages keep their old
+     bitmap and re-render at the latest quality when they come back. */
+  const [inView, setInView] = useState(pageNumber <= 2);
   const [base, setBase] = useState<{ w: number; h: number } | null>(null);
 
   useEffect(() => {
     const el = wrapRef.current; if (!el) return;
     const io = new IntersectionObserver((entries) => {
       for (const e of entries) {
+        setInView(e.isIntersecting);
         if (e.isIntersecting) setVisible(true);
         if (e.isIntersecting && e.intersectionRatio >= 0.5) onActive(pageNumber);
       }
@@ -2288,7 +2296,7 @@ const PdfPageCanvas = React.memo(function PdfPageCanvas({ pdf, pageNumber, quali
      the page's natural points — the parent applies the live zoom via a single
      GPU transform, so this component does NOT re-render while zooming. */
   useEffect(() => {
-    if (!visible || !pdf) return;
+    if (!visible || !inView || !pdf) return;
     let alive = true;
     (async () => {
       try { taskRef.current?.cancel?.(); } catch { /* noop */ }
@@ -2307,7 +2315,7 @@ const PdfPageCanvas = React.memo(function PdfPageCanvas({ pdf, pageNumber, quali
       } catch (e) { const n = (e as { name?: string } | null)?.name; if (n !== "RenderingCancelledException") console.error("[PdfPage]", e); }
     })();
     return () => { alive = false; };
-  }, [visible, pdf, pageNumber, rotation, quality]);
+  }, [visible, inView, pdf, pageNumber, rotation, quality]);
 
   useEffect(() => () => { try { taskRef.current?.cancel?.(); } catch { /* noop */ } }, []);
 
