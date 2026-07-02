@@ -274,7 +274,7 @@ function ReplacementPicker({ excludeId, onClose, onPick }: { excludeId: string; 
     if (q.trim().length < 2) { setResults([]); return; }
     let alive = true; setLoading(true);
     const t = setTimeout(() => {
-      fetch(`/api/visual-library?q=${encodeURIComponent(q.trim())}&approval_status=approved&pageSize=10`, { credentials: "include", cache: "no-store" })
+      fetch(`/api/visual-library?view=list&q=${encodeURIComponent(q.trim())}&approval_status=approved&pageSize=10`, { credentials: "include", cache: "no-store" })
         .then((r) => r.ok ? r.json() : { assets: [] })
         .then((j) => { if (alive) setResults((j.assets ?? []).filter((a: SearchAsset) => a.id !== excludeId)); })
         .catch(() => {}).finally(() => { if (alive) setLoading(false); });

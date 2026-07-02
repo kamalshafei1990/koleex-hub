@@ -42,7 +42,7 @@ export default function VisualRelationshipModal({
     debRef.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await fetch(`/api/visual-library?q=${encodeURIComponent(q.trim())}&pageSize=24&sort=name`, { credentials: "include", cache: "no-store" });
+        const res = await fetch(`/api/visual-library?view=list&q=${encodeURIComponent(q.trim())}&pageSize=24&sort=name`, { credentials: "include", cache: "no-store" });
         const json = res.ok ? await res.json() : { assets: [] };
         const pickedIds = new Set(picked.map((p) => p.id));
         setResults((json.assets ?? [])

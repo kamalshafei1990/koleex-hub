@@ -235,7 +235,7 @@ function AddAssets({ cid, existing, onAdded }: { cid: string; existing: Set<stri
     if (!q.trim()) { setResults([]); return; }
     deb.current = setTimeout(async () => {
       setSearching(true);
-      const res = await fetch(`/api/visual-library?q=${encodeURIComponent(q.trim())}&pageSize=24&sort=name`, { credentials: "include", cache: "no-store" });
+      const res = await fetch(`/api/visual-library?view=list&q=${encodeURIComponent(q.trim())}&pageSize=24&sort=name`, { credentials: "include", cache: "no-store" });
       const j = res.ok ? await res.json() : { assets: [] };
       setResults((j.assets ?? []).filter((a: VisualAsset) => !existing.has(a.id)));
       setSearching(false);

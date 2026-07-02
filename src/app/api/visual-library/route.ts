@@ -25,6 +25,18 @@ function withPublicUrl(row: VisualAsset): VisualAsset {
   return { ...row, public_url: path ? `${base}/storage/v1/object/public/${bucket}/${path}` : null };
 }
 
+/* ?view=list — only the columns the Library browser/pickers render, filter
+   on, or search. The table has 68 columns and 5,000+ rows; serialising full
+   rows made the browser's warm-up load ~10 MB of JSON. Detail views fetch
+   the full row via /api/visual-library/[id] instead. */
+const LIST_COLUMNS = [
+  "id", "title", "slug", "visual_asset_code", "source_name", "description",
+  "keywords", "synonyms", "search_aliases", "tags",
+  "category", "subcategory", "asset_type", "style",
+  "approval_status", "status", "svg_path", "preview_path", "storage_bucket",
+  "is_multipath", "usage_count", "file_type", "created_at", "updated_at",
+].join(", ");
+
 export async function GET(req: Request) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
@@ -50,9 +62,11 @@ export async function GET(req: Request) {
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
+  const listView = (url.searchParams.get("view") ?? "").trim() === "list";
+
   let query = supabaseServer
     .from("visual_assets")
-    .select("*", { count: "exact" })
+    .select(listView ? LIST_COLUMNS : "*", { count: "exact" })
     .eq("tenant_id", auth.tenant_id);
 
   query = sort === "used"
@@ -97,7 +111,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   return NextResponse.json({
-    assets: (data ?? []).map((r) => withPublicUrl(r as VisualAsset)),
+    assets: (data ?? []).map((r) => withPublicUrl(r as unknown as VisualAsset)),
     total: count ?? 0,
     page,
     pageSize,

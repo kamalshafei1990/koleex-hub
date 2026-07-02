@@ -456,7 +456,7 @@ function IconPicker({ onClose, onPick }: { onClose: () => void; onPick: (icon: V
   const fetchPage = useCallback(async (pg: number, term: string, col: string | null, cat: string) => {
     const url = col
       ? `/api/visual-library/collections/${col}/assets?page=${pg}&pageSize=${PAGE}`
-      : `/api/visual-library?asset_type=icon&sort=usage&pageSize=${PAGE}&page=${pg}${term.trim().length >= 2 ? `&q=${encodeURIComponent(term.trim())}` : ""}${cat ? `&category=${encodeURIComponent(cat)}` : ""}`;
+      : `/api/visual-library?view=list&asset_type=icon&sort=usage&pageSize=${PAGE}&page=${pg}${term.trim().length >= 2 ? `&q=${encodeURIComponent(term.trim())}` : ""}${cat ? `&category=${encodeURIComponent(cat)}` : ""}`;
     const r = await fetch(url, { credentials: "include", cache: "no-store" });
     const j = r.ok ? await r.json() : {};
     const assets: VlIcon[] = col

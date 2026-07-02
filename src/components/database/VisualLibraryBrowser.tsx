@@ -77,16 +77,29 @@ export default function VisualLibraryBrowser() {
     const myReq = ++reqRef.current;
     setLoading(true);
     try {
-      // Supabase caps each response at 1000 rows — page through until exhausted
-      // so the in-memory set (used for counts + instant search) is complete.
-      const acc: VisualAsset[] = [];
-      for (let page = 1; page <= 40; page++) {
-        const res = await fetch(`/api/visual-library?pageSize=1000&page=${page}&sort=name`, { credentials: "include", cache: "no-store" });
-        if (!res.ok) break;
-        const json = await res.json();
-        const batch: VisualAsset[] = json.assets ?? [];
-        acc.push(...batch);
-        if (batch.length < 1000) break;
+      /* Supabase caps each response at 1000 rows — the in-memory set (used
+         for counts + instant search) needs them all. ?view=list keeps rows to
+         the ~24 columns this browser renders/searches (full 68-column rows
+         made this warm-up a ~10 MB download), and after page 1 reports the
+         total, the remaining pages download in PARALLEL instead of one after
+         another. The detail drawer hydrates the full row by id separately. */
+      const pageUrl = (page: number) =>
+        `/api/visual-library?view=list&pageSize=1000&page=${page}&sort=name`;
+      const first = await fetch(pageUrl(1), { credentials: "include", cache: "no-store" });
+      if (!first.ok) throw new Error(`HTTP ${first.status}`);
+      const j1 = await first.json();
+      const acc: VisualAsset[] = [...(j1.assets ?? [])];
+      const total: number = j1.total ?? acc.length;
+      const pages = Math.min(40, Math.ceil(total / 1000));
+      if (pages > 1) {
+        const rest = await Promise.all(
+          Array.from({ length: pages - 1 }, (_, i) =>
+            fetch(pageUrl(i + 2), { credentials: "include", cache: "no-store" })
+              .then((r) => (r.ok ? r.json() : { assets: [] }))
+              .catch(() => ({ assets: [] })),
+          ),
+        );
+        for (const j of rest) acc.push(...(j.assets ?? []));
       }
       if (myReq === reqRef.current) setAll(acc);
     } catch {
@@ -106,19 +119,27 @@ export default function VisualLibraryBrowser() {
   useEffect(() => {
     if (!contextSlug) { setContextIds(null); return; }
     let alive = true;
-    fetch(`/api/visual-library?context=${encodeURIComponent(contextSlug)}&rule=allowed&pageSize=1000&sort=name`, { credentials: "include", cache: "no-store" })
+    fetch(`/api/visual-library?view=list&context=${encodeURIComponent(contextSlug)}&rule=allowed&pageSize=1000&sort=name`, { credentials: "include", cache: "no-store" })
       .then((r) => r.ok ? r.json() : { assets: [] })
       .then((j) => { if (alive) setContextIds(new Set((j.assets ?? []).map((a: VisualAsset) => a.id))); })
       .catch(() => { if (alive) setContextIds(new Set()); });
     return () => { alive = false; };
   }, [contextSlug]);
 
-  // keep the open drawer's data fresh after edits
+  /* The list holds slim rows (?view=list) — the drawer needs the full asset.
+     Hydrate it by id when it opens, and re-hydrate after edits (`all` is
+     replaced by load(), signalling data changed). The drawer opens instantly
+     with the slim row and fills in the remaining fields when this lands. */
+  const openId = openAsset?.id ?? null;
   useEffect(() => {
-    if (!openAsset) return;
-    const fresh = all.find((a) => a.id === openAsset.id);
-    if (fresh && fresh !== openAsset) setOpenAsset(fresh);
-  }, [all]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!openId) return;
+    let alive = true;
+    fetch(`/api/visual-library/${openId}`, { credentials: "include", cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (alive && j?.asset) setOpenAsset(j.asset); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [openId, all]);
 
   const categoryCounts = useMemo(() => {
     const m: Record<string, number> = {};
