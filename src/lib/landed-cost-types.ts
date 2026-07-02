@@ -165,8 +165,29 @@ export interface SimulationRow {
   financial: FinancialSettings;
   results: SimulationResults;
   notes: string | null;
+  /* ── Platform v2 (additive, nullable jsonb columns — see engine.ts types) ── */
+  commercial?: CommercialSnapshot | null;
+  confidence?: string | null;
+  responsibility?: Record<string, string> | null;
+  currencies?: Record<string, unknown> | null;
+  actuals?: Record<string, unknown> | null;
+  customs_profile?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
+}
+
+/* Commercial pricing snapshot persisted at save time (Section B). Mirrors the
+   engine's CommercialPricing so a saved row can render pricing without recompute. */
+export interface CommercialSnapshot {
+  landedCost: number;
+  basePrice: number;
+  discountAmount: number;
+  sellingPrice: number;
+  totalCommission: number;
+  grossProfit: number;
+  marginPct: number;
+  markupPct: number;
+  sellingPricePerUnit: number;
 }
 
 /* ── Defaults ── */

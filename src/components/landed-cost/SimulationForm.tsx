@@ -41,6 +41,8 @@ import { calculate, calculateDutyBreakdown, type DutyBreakdown } from "@/lib/lan
 import {
   calculateLandedCost, calculateCommercialPricing,
   commercialInputsFromFinancial, incotermSummary,
+  validateSimulation, CONFIDENCE_META, DEFAULT_CONFIDENCE, DEFAULT_CUSTOMS_PROFILE,
+  type ConfidenceLevel, type CustomsProfile,
 } from "@/lib/landed-cost/engine";
 import { findCountryDefaults, calcVolumetricWeight, calcChargeableWeight } from "@/lib/landed-cost-defaults";
 import { useTranslation, type Lang } from "@/lib/i18n";
@@ -296,6 +298,12 @@ export default function SimulationForm({ id }: { id?: string }) {
   const [inlandDelivery, setInlandDelivery] = useState<InlandDelivery>({ ...DEFAULT_INLAND });
   const [financial, setFinancial] = useState<FinancialSettings>({ ...DEFAULT_FINANCIAL });
 
+  // ── Platform v2 persisted state (additive nullable columns) ──
+  const [confidence, setConfidence] = useState<ConfidenceLevel>(DEFAULT_CONFIDENCE);
+  const [customsProfile, setCustomsProfile] = useState<CustomsProfile>({ ...DEFAULT_CUSTOMS_PROFILE });
+  const [actualLanded, setActualLanded] = useState(0);       // §8 actual-vs-estimated
+  const [actualReason, setActualReason] = useState("");
+
   // Product lookup
   const [products, setProducts] = useState<{ id: string; product_name: string; brand: string | null; hs_code: string | null }[]>([]);
   const [models, setModels] = useState<{ id: string; model_name: string; sku: string; cost_price: number | null; weight: number | null; cbm: number | null; packing_type: string | null; global_price: number | null }[]>([]);
@@ -361,6 +369,14 @@ export default function SimulationForm({ id }: { id?: string }) {
         if (sim.import_costs) setImportCosts({ ...DEFAULT_IMPORT_COSTS, ...sim.import_costs });
         if (sim.inland_delivery) setInlandDelivery({ ...DEFAULT_INLAND, ...sim.inland_delivery });
         if (sim.financial) setFinancial({ ...DEFAULT_FINANCIAL, ...sim.financial });
+        // v2 additive fields
+        if (sim.confidence) setConfidence(sim.confidence as ConfidenceLevel);
+        if (sim.customs_profile) setCustomsProfile({ ...DEFAULT_CUSTOMS_PROFILE, ...(sim.customs_profile as Partial<CustomsProfile>) });
+        if (sim.actuals) {
+          const a = sim.actuals as { actualLandedCost?: number; reason?: string };
+          if (typeof a.actualLandedCost === "number") setActualLanded(a.actualLandedCost);
+          if (typeof a.reason === "string") setActualReason(a.reason);
+        }
         if (sim.product_id) fetchModelsForProduct(sim.product_id).then(setModels);
         setLoading(false);
       });
@@ -488,6 +504,18 @@ export default function SimulationForm({ id }: { id?: string }) {
 
   const incoterm = useMemo(() => incotermSummary(priceBasis), [priceBasis]);
 
+  // §10 — engine validation issues (non-blocking, smarter than the required-field list)
+  const engineIssues = useMemo(() => validateSimulation({
+    quantity, unitPrice, priceBasis, shipping: shippingCosts, importCosts, financial,
+  }), [quantity, unitPrice, priceBasis, shippingCosts, importCosts, financial]);
+
+  // §13 — smart field visibility: Air/Courier hides sea-only surcharges
+  const isAirMode = shippingCosts.shippingMode === "Air" || shippingCosts.shippingMode === "Courier";
+
+  // §6 — customs value warning: declared/custom value below the goods value
+  const declaredValue = importCosts.calculationBasis === "custom_value" ? importCosts.customValue : 0;
+  const customsValueBelow = importCosts.calculationBasis === "custom_value" && declaredValue > 0 && declaredValue < unitPrice * (quantity || 1);
+
   // ── Intelligence: duty/tax breakdown for transparency ──
   const dutyBreakdown = useMemo(() => {
     return calculateDutyBreakdown(results.productTotal, results.exportTotal, results.shippingTotal, priceBasis, importCosts);
@@ -535,6 +563,40 @@ export default function SimulationForm({ id }: { id?: string }) {
       financial: financial as unknown as FinancialSettings,
       results: results as unknown as SimulationResults,
       notes,
+      // ── Platform v2 (additive) ──
+      commercial: {
+        landedCost: commercial.landedCost, basePrice: commercial.basePrice,
+        discountAmount: commercial.discountAmount, sellingPrice: commercial.sellingPrice,
+        totalCommission: commercial.totalCommission, grossProfit: commercial.grossProfit,
+        marginPct: commercial.marginPct, markupPct: commercial.markupPct,
+        sellingPricePerUnit: commercial.sellingPricePerUnit,
+      },
+      confidence,
+      responsibility: {
+        product: "supplier", export: priceBasis === "EXW" ? "koleex" : "supplier",
+        freight: priceBasis === "CFR" || priceBasis === "CIF" ? "supplier" : "koleex",
+        insurance: priceBasis === "CIF" ? "supplier" : "koleex",
+        import: "customer", inland: "customer",
+      },
+      currencies: {
+        productCurrency: currency, freightCurrency: shippingCosts.freightCurrency,
+        customsCurrency: currency, localCurrency: currency, reportCurrency: currency,
+        rates: { [shippingCosts.freightCurrency]: shippingCosts.freightExchangeRate || 1 },
+      },
+      actuals: actualLanded > 0 ? {
+        stage: "actual", actualLandedCost: actualLanded,
+        variance: actualLanded - landed.totalLandedCost,
+        variancePct: landed.totalLandedCost > 0 ? ((actualLanded - landed.totalLandedCost) / landed.totalLandedCost) * 100 : 0,
+        reason: actualReason,
+      } : null,
+      customs_profile: {
+        ...customsProfile,
+        destinationCountry: customsProfile.destinationCountry || customerCountry,
+        countryOfOrigin: customsProfile.countryOfOrigin || originCountry,
+        hsCode: customsProfile.hsCode || hsCode,
+        dutyPct: importCosts.customsDutyPct, vatPct: importCosts.importVatPct,
+        additionalTaxPct: importCosts.additionalTaxPct,
+      },
     };
     if (newStatus) setStatus(newStatus);
     if (isNew) {
@@ -544,7 +606,7 @@ export default function SimulationForm({ id }: { id?: string }) {
       await updateSimulation(id!, payload);
     }
     setSaving(false);
-  }, [name, status, customerName, customerCompany, customerCountry, customerCity, warehouseDest, productId, productName, modelId, modelName, skuVal, hsCode, brandVal, originCountry, quantity, unitPrice, currency, priceBasis, productInfo, exportCosts, shippingCosts, importCosts, inlandDelivery, financial, results, notes, isNew, id, router, t]);
+  }, [name, status, customerName, customerCompany, customerCountry, customerCity, warehouseDest, productId, productName, modelId, modelName, skuVal, hsCode, brandVal, originCountry, quantity, unitPrice, currency, priceBasis, productInfo, exportCosts, shippingCosts, importCosts, inlandDelivery, financial, results, notes, commercial, confidence, customsProfile, actualLanded, actualReason, landed.totalLandedCost, isNew, id, router, t]);
 
   // Updaters
   const ux = (fn: React.Dispatch<React.SetStateAction<ExportCosts>>) => (key: keyof ExportCosts, v: number) => fn(prev => ({ ...prev, [key]: v }));
@@ -591,6 +653,19 @@ export default function SimulationForm({ id }: { id?: string }) {
             <input type="text" value={name} onChange={e => setName(e.target.value)} className="text-xl md:text-[22px] font-bold tracking-tight bg-transparent outline-none flex-1 min-w-0 placeholder:text-[var(--text-ghost)]" placeholder={t("untitledSimulation")} />
           </div>
           <div className="flex items-center gap-2 shrink-0 w-full md:w-auto justify-end">
+            {/* §4 Confidence level selector */}
+            <div className="relative group" title={t("confidenceHint")}>
+              <select
+                value={confidence}
+                onChange={e => setConfidence(e.target.value as ConfidenceLevel)}
+                className="h-8 pl-2.5 pr-7 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] appearance-none cursor-pointer"
+              >
+                {(Object.keys(CONFIDENCE_META) as ConfidenceLevel[]).map(k => (
+                  <option key={k} value={k}>{t(`conf.${k}`)}</option>
+                ))}
+              </select>
+              <AngleDownIcon className="h-3 w-3 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--text-ghost)]" />
+            </div>
             <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider ${status === "completed" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-amber-500/10 text-amber-400 border border-amber-500/20"}`}>{t(status)}</span>
             <button onClick={() => handleSave()} disabled={saving} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-50 shadow-lg">
               {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <DiskIcon className="h-4 w-4" />}
@@ -823,14 +898,20 @@ export default function SimulationForm({ id }: { id?: string }) {
                 </div>
               </SubGroup>
               <SubGroup label={t("sub.surcharges")}>
+                {isAirMode && (
+                  <p className="text-[10px] text-[var(--text-ghost)] mb-3 flex items-center gap-1.5">
+                    <InfoIcon className="h-3 w-3" /> {t("airModeNote")}
+                  </p>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <NumField label={t("baf")} value={shippingCosts.baf} onChange={v => updateShipping("baf", v)} suffix={shippingCosts.freightCurrency} hint={t("bafHint")} />
-                  <NumField label={t("caf")} value={shippingCosts.caf} onChange={v => updateShipping("caf", v)} suffix={shippingCosts.freightCurrency} />
+                  {/* Sea-only surcharges — hidden in Air/Courier mode (§13) */}
+                  {!isAirMode && <NumField label={t("baf")} value={shippingCosts.baf} onChange={v => updateShipping("baf", v)} suffix={shippingCosts.freightCurrency} hint={t("bafHint")} />}
+                  {!isAirMode && <NumField label={t("caf")} value={shippingCosts.caf} onChange={v => updateShipping("caf", v)} suffix={shippingCosts.freightCurrency} />}
                   <NumField label={t("gri")} value={shippingCosts.gri} onChange={v => updateShipping("gri", v)} suffix={shippingCosts.freightCurrency} />
                   <NumField label={t("peakSeasonSurcharge")} value={shippingCosts.peakSeasonSurcharge} onChange={v => updateShipping("peakSeasonSurcharge", v)} suffix={shippingCosts.freightCurrency} />
                   <NumField label={t("amsEnsIsf")} value={shippingCosts.amsEnsIsf} onChange={v => updateShipping("amsEnsIsf", v)} suffix={shippingCosts.freightCurrency} hint={t("amsHint")} />
                   <NumField label={t("blAwbFee")} value={shippingCosts.blAwbFee} onChange={v => updateShipping("blAwbFee", v)} suffix={shippingCosts.freightCurrency} hint={t("blHint")} />
-                  <NumField label={t("telexReleaseFee")} value={shippingCosts.telexReleaseFee} onChange={v => updateShipping("telexReleaseFee", v)} suffix={shippingCosts.freightCurrency} />
+                  {!isAirMode && <NumField label={t("telexReleaseFee")} value={shippingCosts.telexReleaseFee} onChange={v => updateShipping("telexReleaseFee", v)} suffix={shippingCosts.freightCurrency} />}
                 </div>
               </SubGroup>
               <SubGroup label={t("sub.weightCurrency")}>
@@ -858,6 +939,31 @@ export default function SimulationForm({ id }: { id?: string }) {
               defaultOpen={false}
               forceOpen={openedSections.has("import")}
             >
+              {/* §5 Country Customs Profile — DB-ready context, no hardcoded rates */}
+              <div className="mb-5 rounded-xl bg-[var(--bg-inverted)]/[0.03] border border-[var(--border-subtle)]/60 p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-ghost)] mb-1 flex items-center gap-1.5">
+                  <GlobeIcon className="h-3 w-3" /> {t("customsProfile")}
+                </p>
+                <p className="text-[10px] text-[var(--text-ghost)] mb-3">{t("customsProfileDesc")}</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Field label={t("destinationCountry")}><input type="text" value={customsProfile.destinationCountry} onChange={e => setCustomsProfile(p => ({ ...p, destinationCountry: e.target.value }))} className={inputCls} placeholder={customerCountry || t("ph.egypt")} /></Field>
+                  <Field label={t("countryOfOriginLbl")}><input type="text" value={customsProfile.countryOfOrigin} onChange={e => setCustomsProfile(p => ({ ...p, countryOfOrigin: e.target.value }))} className={inputCls} placeholder={originCountry || t("ph.countryOfOrigin")} /></Field>
+                  <Field label={t("hsCode")}><input type="text" value={customsProfile.hsCode} onChange={e => setCustomsProfile(p => ({ ...p, hsCode: e.target.value }))} className={inputCls} placeholder={hsCode || "8516.31.00"} /></Field>
+                  <Field label={t("tradeAgreement")} hint={t("tradeAgreementHint")}>
+                    <select value={customsProfile.tradeAgreement} onChange={e => setCustomsProfile(p => ({ ...p, tradeAgreement: e.target.value }))} className={selectCls}>
+                      {["None","GAFTA","GCC","FTA","COMESA","AfCFTA","EU","Other"].map(a => <option key={a} value={a}>{a}</option>)}
+                    </select>
+                  </Field>
+                  <Field label={t("valuationMethod")}>
+                    <select value={customsProfile.valuationMethod} onChange={e => setCustomsProfile(p => ({ ...p, valuationMethod: e.target.value }))} className={selectCls}>
+                      {(["transaction_value","cif","fob","custom"] as const).map(v => <option key={v} value={v}>{t(`val.${v}`)}</option>)}
+                    </select>
+                  </Field>
+                </div>
+              </div>
+              {customsValueBelow && (
+                <Callout type="warning">{t("customsValueBelowGoods")}</Callout>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <NumField label={t("customsDutyPct")} value={importCosts.customsDutyPct} onChange={v => { updateImport("customsDutyPct", v); markManual("dutyPct"); }} suffix="%" hint={t("dutyHint")} fieldState={fs("dutyPct")} badgeLabels={bl} />
                 <NumField label={t("importVatPct")} value={importCosts.importVatPct} onChange={v => { updateImport("importVatPct", v); markManual("vatPct"); }} suffix="%" hint={t("vatHint")} fieldState={fs("vatPct")} badgeLabels={bl} />
@@ -985,6 +1091,29 @@ export default function SimulationForm({ id }: { id?: string }) {
               </SubGroup>
               <div className="mt-4"><Field label={t("financialNotes")}><textarea value={financial.notes} onChange={e => updateFinancial("notes", e.target.value)} className={`${inputCls} h-20 py-2 resize-none`} placeholder={t("ph.additionalNotes")} /></Field></div>
               <SectionFooter label={t("financialTotal")} value={results.financialTotal} currency={currency} />
+            </Section>
+
+            {/* ──────── §8 Actual vs Estimated ──────── */}
+            <Section icon={TrendingUpIcon} title={t("sec.actuals")} description={t("sec.actualsDesc")} defaultOpen={false}>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Field label={t("estimatedLanded")}>
+                  <div className="h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.03] border border-[var(--border-subtle)] flex items-center text-[14px] font-mono tabular-nums text-[var(--text-dim)]">{currency} {fmt(landed.totalLandedCost)}</div>
+                </Field>
+                <NumField label={t("actualLanded")} value={actualLanded} onChange={setActualLanded} suffix={currency} />
+                <Field label={t("variance")}>
+                  <div className={`h-10 px-4 rounded-lg border flex items-center justify-between text-[14px] font-mono tabular-nums ${actualLanded > 0 ? (actualLanded > landed.totalLandedCost ? "border-[var(--danger,#FF3333)]/30 text-[var(--danger,#FF3333)]" : "border-[var(--success,#00CC66)]/30 text-[var(--success,#00CC66)]") : "border-[var(--border-subtle)] text-[var(--text-ghost)]"}`}>
+                    {actualLanded > 0 ? (
+                      <>
+                        <span>{actualLanded > landed.totalLandedCost ? "+" : ""}{fmt(actualLanded - landed.totalLandedCost)}</span>
+                        <span className="text-[11px]">{landed.totalLandedCost > 0 ? `${(((actualLanded - landed.totalLandedCost) / landed.totalLandedCost) * 100).toFixed(1)}%` : "—"}</span>
+                      </>
+                    ) : <span>—</span>}
+                  </div>
+                </Field>
+              </div>
+              {actualLanded > 0 && (
+                <div className="mt-4"><Field label={t("varianceReason")}><input type="text" value={actualReason} onChange={e => setActualReason(e.target.value)} className={inputCls} placeholder={t("ph.varianceReason")} /></Field></div>
+              )}
             </Section>
 
             {/* ──────── General Notes ──────── */}
@@ -1207,6 +1336,76 @@ export default function SimulationForm({ id }: { id?: string }) {
                 <span className="text-[13px] font-bold font-mono text-[var(--text-primary)] tabular-nums">{currency} {fmt(landed.totalLandedCost)}</span>
               </div>
             </div>
+
+            {/* ── §16 Cost Journey — cumulative build-up to landed, then selling ── */}
+            {landed.totalLandedCost > 0 && (() => {
+              const steps = [
+                { label: t("jStart"), val: landed.productTotal },
+                { label: t("cost.export"), val: landed.exportTotal },
+                { label: t("cost.shipping"), val: landed.shippingTotal },
+                { label: t("cost.import"), val: landed.importTotal },
+                { label: t("cost.inland"), val: landed.inlandTotal },
+                { label: t("cost.financeRisk"), val: landed.financeRiskTotal },
+              ].filter(s => s.val > 0);
+              const denom = commercial.sellingPrice > landed.totalLandedCost ? commercial.sellingPrice : landed.totalLandedCost;
+              let cum = 0;
+              return (
+                <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+                  <div className="px-5 py-3 border-b border-[var(--border-subtle)]">
+                    <p className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("costJourney")}</p>
+                    <p className="text-[9px] text-[var(--text-ghost)] mt-0.5">{t("costJourneySub")}</p>
+                  </div>
+                  <div className="px-5 py-4 space-y-2">
+                    {steps.map((s, i) => {
+                      const start = cum; cum += s.val;
+                      const leftPct = (start / denom) * 100;
+                      const widthPct = (s.val / denom) * 100;
+                      const opacity = 0.35 + (i / Math.max(steps.length - 1, 1)) * 0.5;
+                      return (
+                        <div key={s.label} className="flex items-center gap-2">
+                          <span className="w-14 shrink-0 text-[9px] text-[var(--text-ghost)] truncate text-right">{s.label}</span>
+                          <div className="flex-1 h-3 rounded bg-[var(--bg-inverted)]/[0.04] relative overflow-hidden">
+                            <div className="absolute top-0 h-full rounded bg-[var(--bg-inverted)]" style={{ left: `${leftPct}%`, width: `${Math.max(widthPct, 1)}%`, opacity }} />
+                          </div>
+                          <span className="w-16 shrink-0 text-[9px] font-mono tabular-nums text-[var(--text-dim)] text-right">{fmt(s.val, 0)}</span>
+                        </div>
+                      );
+                    })}
+                    {/* Landed marker */}
+                    <div className="flex items-center gap-2 pt-1 border-t border-dashed border-[var(--border-subtle)]/50">
+                      <span className="w-14 shrink-0 text-[9px] font-semibold text-[var(--text-dim)] text-right">{t("landedCostLabel")}</span>
+                      <div className="flex-1 h-1.5 rounded bg-[var(--bg-inverted)]/60" style={{ width: `${(landed.totalLandedCost / denom) * 100}%` }} />
+                      <span className="w-16 shrink-0 text-[9px] font-mono font-bold tabular-nums text-[var(--text-primary)] text-right">{fmt(landed.totalLandedCost, 0)}</span>
+                    </div>
+                    {commercial.sellingPrice > 0 && financial.margin > 0 && (
+                      <div className="flex items-center gap-2">
+                        <span className="w-14 shrink-0 text-[9px] font-semibold text-[var(--text-dim)] text-right">{t("sellingPrice")}</span>
+                        <div className="flex-1 h-1.5 rounded bg-[var(--bg-inverted)]" style={{ width: `${(commercial.sellingPrice / denom) * 100}%` }} />
+                        <span className="w-16 shrink-0 text-[9px] font-mono font-bold tabular-nums text-[var(--text-primary)] text-right">{fmt(commercial.sellingPrice, 0)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ── §10 Automatic checks (engine validation, non-blocking) ── */}
+            {engineIssues.length > 0 && (
+              <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+                <div className="px-5 py-3 border-b border-[var(--border-subtle)] flex items-center gap-2">
+                  <InfoIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" />
+                  <span className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("customsValueWarn").split(" ")[0]} · {engineIssues.length}</span>
+                </div>
+                <div className="px-5 py-3 space-y-1.5">
+                  {engineIssues.map((iss, i) => (
+                    <p key={i} className="text-[10px] text-[var(--text-dim)] flex items-start gap-1.5">
+                      <span className="w-1 h-1 rounded-full bg-[var(--text-ghost)] shrink-0 mt-1.5" />
+                      {iss.message}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* ── Simulation Details ── */}
             <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">

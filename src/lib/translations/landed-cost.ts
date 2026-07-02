@@ -392,4 +392,49 @@ export const landedCostT: Translations = {
   "financeRisk":            { en: "Finance & Risk",               zh: "财务与风险",                   ar: "التمويل والمخاطر" },
   "cost.financeRisk":       { en: "Finance & Risk",               zh: "财务与风险",                   ar: "التمويل والمخاطر" },
   "landedCostLabel":        { en: "Landed cost",                  zh: "到岸成本",                     ar: "تكلفة الوصول" },
+
+  /* §4 Confidence level */
+  "confidence":             { en: "Confidence",                   zh: "可信度",                       ar: "مستوى الثقة" },
+  "confidenceHint":         { en: "How firm are these numbers? Estimate → Final Actual as costs get confirmed.", zh: "这些数字有多确定？从估算到最终实际。", ar: "ما مدى دقة هذه الأرقام؟ من التقدير إلى الفعلي النهائي." },
+  "conf.estimate":            { en: "Estimate",             zh: "估算",           ar: "تقدير" },
+  "conf.supplier_confirmed":  { en: "Supplier Confirmed",   zh: "供应商已确认",   ar: "مؤكد من المورد" },
+  "conf.forwarder_confirmed": { en: "Forwarder Confirmed",  zh: "货代已确认",     ar: "مؤكد من الشاحن" },
+  "conf.broker_confirmed":    { en: "Broker Confirmed",     zh: "报关行已确认",   ar: "مؤكد من المخلص" },
+  "conf.final_actual":        { en: "Final Actual Cost",    zh: "最终实际成本",   ar: "التكلفة الفعلية النهائية" },
+
+  /* §5 Customs profile */
+  "customsProfile":         { en: "Country Customs Profile",      zh: "国家海关档案",                 ar: "ملف الجمارك القطري" },
+  "customsProfileDesc":     { en: "Country-specific duty context — no hardcoded rates.", zh: "特定国家的关税背景 — 无硬编码税率。", ar: "سياق الرسوم الخاص بالبلد — بدون معدلات ثابتة." },
+  "destinationCountry":     { en: "Destination Country",          zh: "目的地国家",                   ar: "دولة الوجهة" },
+  "countryOfOriginLbl":     { en: "Country of Origin",            zh: "原产国",                       ar: "بلد المنشأ" },
+  "tradeAgreement":         { en: "Trade Agreement",              zh: "贸易协定",                     ar: "اتفاقية تجارية" },
+  "tradeAgreementHint":     { en: "A preferential agreement (GAFTA, GCC, FTA…) can lower or zero the duty.", zh: "优惠协定（GAFTA、GCC、FTA…）可降低或免除关税。", ar: "اتفاقية تفضيلية (جافتا، الخليج، منطقة تجارة حرة…) قد تخفض الرسوم أو تلغيها." },
+  "valuationMethod":        { en: "Valuation Method",             zh: "估价方法",                     ar: "طريقة التقييم" },
+  "val.transaction_value":  { en: "Transaction Value",            zh: "成交价格",                     ar: "قيمة المعاملة" },
+  "val.cif":                { en: "CIF Value",                    zh: "CIF价值",                      ar: "قيمة CIF" },
+  "val.fob":                { en: "FOB Value",                    zh: "FOB价值",                      ar: "قيمة FOB" },
+  "val.custom":             { en: "Custom Declared",              zh: "自定义申报",                   ar: "قيمة مصرح بها" },
+
+  /* §6 Customs value warning */
+  "customsValueWarn":       { en: "Customs Value Check",          zh: "海关价值检查",                 ar: "فحص القيمة الجمركية" },
+  "customsValueBelowGoods": { en: "Declared customs value is below the goods value — customs may reassess and raise duty/VAT.", zh: "申报海关价值低于货物价值 — 海关可能重新评估并提高关税/增值税。", ar: "القيمة الجمركية المصرح بها أقل من قيمة البضائع — قد تعيد الجمارك التقييم وترفع الرسوم." },
+  "customsValueOk":         { en: "Declared value looks consistent with the goods value.", zh: "申报价值与货物价值一致。", ar: "القيمة المصرح بها متسقة مع قيمة البضائع." },
+
+  /* §8 Actual vs Estimated */
+  "sec.actuals":            { en: "Actual vs Estimated",          zh: "实际与估算对比",               ar: "الفعلي مقابل التقديري" },
+  "sec.actualsDesc":        { en: "Post-shipment: record the real landed cost and see the variance.", zh: "装运后：记录真实到岸成本并查看差异。", ar: "بعد الشحن: سجّل التكلفة الفعلية وشاهد الفرق." },
+  "recordActuals":          { en: "Record actual cost",           zh: "记录实际成本",                 ar: "تسجيل التكلفة الفعلية" },
+  "estimatedLanded":        { en: "Estimated landed cost",        zh: "估算到岸成本",                 ar: "التكلفة التقديرية" },
+  "actualLanded":           { en: "Actual landed cost",           zh: "实际到岸成本",                 ar: "التكلفة الفعلية" },
+  "variance":               { en: "Variance",                     zh: "差异",                         ar: "الفرق" },
+  "varianceReason":         { en: "Reason for variance",          zh: "差异原因",                     ar: "سبب الفرق" },
+  "ph.varianceReason":      { en: "e.g. Freight increased, customs reassessment…", zh: "例如 运费上涨、海关重新评估…", ar: "مثال: ارتفاع الشحن، إعادة تقييم جمركي…" },
+
+  /* §13 smart visibility */
+  "airModeNote":            { en: "Air / Courier mode — sea-only surcharges hidden.", zh: "空运/快递模式 — 已隐藏仅海运的附加费。", ar: "وضع الجو/البريد السريع — تم إخفاء رسوم البحر فقط." },
+
+  /* §16 Cost Journey */
+  "costJourney":            { en: "Cost Journey",                 zh: "成本旅程",                     ar: "رحلة التكلفة" },
+  "costJourneySub":         { en: "How product cost builds up to landed cost, then to selling price", zh: "产品成本如何累积到到岸成本，再到销售价格", ar: "كيف تتراكم تكلفة المنتج إلى تكلفة الوصول ثم سعر البيع" },
+  "jStart":                 { en: "Product",                      zh: "产品",                         ar: "المنتج" },
 };
