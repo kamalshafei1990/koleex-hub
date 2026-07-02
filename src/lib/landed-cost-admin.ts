@@ -2,53 +2,64 @@
    Landed Cost Simulator — Supabase CRUD operations
    --------------------------------------------------------------------------- */
 
-import { supabaseAdmin as supabase } from "./supabase-admin";
 import type { SimulationRow } from "./landed-cost-types";
 
-const TABLE = "landed_cost_simulations";
+/* landed_cost_simulations has RLS enabled with a service-role-only policy, so
+   the browser anon client can neither read nor write it. All CRUD therefore
+   goes through the authenticated server routes at /api/landed-cost*, which use
+   the service-role client behind a session check. */
+
+const BASE = "/api/landed-cost";
 
 export async function fetchSimulations(): Promise<SimulationRow[]> {
-  const { data, error } = await supabase
-    .from(TABLE)
-    .select("*")
-    .order("updated_at", { ascending: false });
-  if (error) { console.error("[LCS] Fetch:", error.message); return []; }
-  return (data as SimulationRow[]) || [];
+  try {
+    const res = await fetch(BASE, { credentials: "include" });
+    if (!res.ok) { console.error("[LCS] Fetch:", res.status); return []; }
+    const json = (await res.json()) as { simulations?: SimulationRow[] };
+    return json.simulations ?? [];
+  } catch (e) { console.error("[LCS] Fetch:", e); return []; }
 }
 
 export async function fetchSimulation(id: string): Promise<SimulationRow | null> {
-  const { data, error } = await supabase
-    .from(TABLE)
-    .select("*")
-    .eq("id", id)
-    .single();
-  if (error) { console.error("[LCS] FetchOne:", error.message); return null; }
-  return data as SimulationRow;
+  try {
+    const res = await fetch(`${BASE}/${encodeURIComponent(id)}`, { credentials: "include" });
+    if (!res.ok) { console.error("[LCS] FetchOne:", res.status); return null; }
+    const json = (await res.json()) as { simulation?: SimulationRow };
+    return json.simulation ?? null;
+  } catch (e) { console.error("[LCS] FetchOne:", e); return null; }
 }
 
 export async function createSimulation(sim: Partial<SimulationRow>): Promise<string | null> {
-  const { data, error } = await supabase
-    .from(TABLE)
-    .insert(sim)
-    .select("id")
-    .single();
-  if (error) { console.error("[LCS] Create:", error.message); return null; }
-  return (data as { id: string }).id;
+  try {
+    const res = await fetch(BASE, {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(sim),
+    });
+    if (!res.ok) { console.error("[LCS] Create:", res.status); return null; }
+    const json = (await res.json()) as { id?: string };
+    return json.id ?? null;
+  } catch (e) { console.error("[LCS] Create:", e); return null; }
 }
 
 export async function updateSimulation(id: string, sim: Partial<SimulationRow>): Promise<boolean> {
-  const { error } = await supabase
-    .from(TABLE)
-    .update({ ...sim, updated_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) { console.error("[LCS] Update:", error.message); return false; }
-  return true;
+  try {
+    const res = await fetch(`${BASE}/${encodeURIComponent(id)}`, {
+      method: "PATCH", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(sim),
+    });
+    if (!res.ok) { console.error("[LCS] Update:", res.status); return false; }
+    return true;
+  } catch (e) { console.error("[LCS] Update:", e); return false; }
 }
 
 export async function deleteSimulation(id: string): Promise<boolean> {
-  const { error } = await supabase.from(TABLE).delete().eq("id", id);
-  if (error) { console.error("[LCS] Delete:", error.message); return false; }
-  return true;
+  try {
+    const res = await fetch(`${BASE}/${encodeURIComponent(id)}`, { method: "DELETE", credentials: "include" });
+    if (!res.ok) { console.error("[LCS] Delete:", res.status); return false; }
+    return true;
+  } catch (e) { console.error("[LCS] Delete:", e); return false; }
 }
 
 export async function duplicateSimulation(id: string): Promise<string | null> {
