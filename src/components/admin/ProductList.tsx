@@ -1130,8 +1130,10 @@ export default function ProductList() {
           <>
             {/* ── Category jump-nav ── */}
             {categoryTree.length > 1 && (
-              <nav className="sticky top-[68px] z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 py-3 mb-8 bg-[var(--bg-primary)]/90 backdrop-blur-xl border-b border-[var(--border-subtle)] overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                <div className="flex items-center gap-1.5">
+              <nav className="sticky top-[68px] z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 py-2 mb-8 bg-[var(--bg-primary)]/95 backdrop-blur-xl" aria-label="Categories">
+                {/* Same sliding-pill shell as the Divisions nav: one bordered
+                    rounded-xl container with compact pills inside. */}
+                <div className="relative inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {categoryTree.map((cat) => (
                     <a
                       key={cat.slug}
@@ -1141,10 +1143,10 @@ export default function ProductList() {
                         const el = document.getElementById(`cat-${cat.slug}`);
                         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
                       }}
-                      className="inline-flex items-center gap-2 h-8 px-3.5 rounded-full text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors whitespace-nowrap shrink-0"
+                      className="relative z-10 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[12.5px] font-medium text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors"
                     >
                       <span>{cat.name}</span>
-                      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--bg-surface)] text-[10px] tabular-nums font-semibold text-[var(--text-dim)]">{cat.total}</span>
+                      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--bg-inverted)]/[0.06] text-[10px] tabular-nums font-semibold text-[var(--text-dim)]">{cat.total}</span>
                     </a>
                   ))}
                 </div>
