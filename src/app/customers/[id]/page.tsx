@@ -46,6 +46,7 @@ import {
   fetchCustomerContact,
   fetchCustomerActivity,
   findLinkedCommercialCustomer,
+  createLinkedCommercialCustomer,
   normalizeTier,
   type CustomerContactRow,
   type CustomerActivity,
@@ -275,6 +276,18 @@ export default function CustomerProfilePage({
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("activity");
+  const [creatingCommercial, setCreatingCommercial] = useState(false);
+  const [createError, setCreateError] = useState(false);
+
+  const handleCreateCommercial = async () => {
+    if (!contact || creatingCommercial) return;
+    setCreatingCommercial(true);
+    setCreateError(false);
+    const created = await createLinkedCommercialCustomer(contact);
+    if (created) setLinked(created);
+    else setCreateError(true);
+    setCreatingCommercial(false);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -408,8 +421,22 @@ export default function CustomerProfilePage({
           {!linked && (
             <div className="mt-5 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3">
               <CircleDollarSignIcon size={16} className="text-amber-400 mt-0.5 shrink-0" />
-              <div className="flex-1 min-w-0 text-[12px] text-amber-300">
-                {t("nudge.noCommercial")}
+              <div className="flex-1 min-w-0">
+                <div className="text-[12px] text-amber-300">{t("nudge.noCommercial")}</div>
+                <div className="mt-2.5 flex items-center gap-3 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleCreateCommercial}
+                    disabled={creatingCommercial}
+                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-amber-500/15 border border-amber-500/40 text-[12px] font-semibold text-amber-200 hover:bg-amber-500/25 transition-colors disabled:opacity-60 cursor-pointer"
+                  >
+                    <CircleDollarSignIcon size={13} />
+                    {creatingCommercial ? t("nudge.creating") : t("nudge.createBtn")}
+                  </button>
+                  {createError && (
+                    <span className="text-[11px] text-red-400">{t("nudge.createFailed")}</span>
+                  )}
+                </div>
               </div>
             </div>
           )}

@@ -24,6 +24,9 @@ export const customerProfileT: Translations = {
     zh: "商务客户表中没有匹配记录。定价、开票和 AI 查询可能会回退到默认值。可通过添加相同邮箱或公司名称的记录来建立匹配。",
     ar: "لا يوجد سجل مطابق في جدول العملاء التجاري. قد تعتمد التسعير والفوترة واستعلامات الوكيل الذكي على القيم الافتراضية. يمكن إنشاء تطابق بإضافة سجل بنفس البريد الإلكتروني أو اسم الشركة.",
   },
+  "nudge.createBtn": { en: "Create commercial profile", zh: "创建商务档案", ar: "إنشاء ملف تجاري" },
+  "nudge.creating": { en: "Creating…", zh: "创建中…", ar: "جارٍ الإنشاء…" },
+  "nudge.createFailed": { en: "Couldn't create it — please try again.", zh: "创建失败，请重试。", ar: "تعذّر الإنشاء — يرجى المحاولة مرة أخرى." },
 
   // Tabs
   "tab.activity": { en: "Activity", zh: "动态", ar: "النشاط" },

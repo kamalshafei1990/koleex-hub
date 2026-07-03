@@ -173,6 +173,45 @@ export async function findLinkedCommercialCustomer(
   return null;
 }
 
+/**
+ * Create a commercial `customers` row seeded from this contact, so pricing,
+ * invoicing, and AI lookups stop falling back to defaults. Writes go through
+ * the tenant-scoped, permission-gated POST /api/customers (the `customers`
+ * table is not client-writable). Returns the freshly-linked commercial row
+ * (re-resolved by email/company/name), or null on failure.
+ */
+export async function createLinkedCommercialCustomer(
+  contact: CustomerContactRow,
+): Promise<LinkedCommercialCustomer | null> {
+  const name =
+    (contact.display_name as string | null) ||
+    (contact.company_name as string | null) ||
+    [contact.first_name, contact.last_name].filter(Boolean).join(" ").trim() ||
+    "";
+  if (!name) return null;
+  try {
+    const res = await fetch("/api/customers", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name,
+        company_name: (contact.company_name as string | null) ?? null,
+        email: (contact.email as string | null) ?? null,
+        phone: (contact.phone as string | null) ?? null,
+        country: (contact.country as string | null) ?? null,
+        city: (contact.city as string | null) ?? null,
+      }),
+    });
+    if (!res.ok) return null;
+    // Re-resolve so we return the full projection the profile UI renders.
+    return await findLinkedCommercialCustomer(contact);
+  } catch (e) {
+    console.error("[customers-admin] createLinkedCommercialCustomer:", e);
+    return null;
+  }
+}
+
 /* ═══════════════════════════════════════════════════
    ACTIVITY AGGREGATOR
    ═══════════════════════════════════════════════════ */
