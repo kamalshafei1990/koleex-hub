@@ -5166,6 +5166,22 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           end_user: contacts.filter(c => c.contact_type === filterType && c.customer_type === "end_user").length,
           none: contacts.filter(c => c.contact_type === filterType && !c.customer_type).length,
         };
+        /* Customers grouped by country (for the flagged breakdown card).
+           Keyed by ISO code when present (gives a flag), else by name. */
+        const countryMap = new Map<string, { code: string; name: string; count: number }>();
+        for (const c of contacts) {
+          if (c.contact_type !== filterType) continue;
+          const code = String(c.country_code || "").trim().toUpperCase();
+          const name = String(c.country || "").trim();
+          if (!code && !name) continue;
+          const key = code || name.toLowerCase();
+          const cur = countryMap.get(key);
+          if (cur) cur.count += 1;
+          else countryMap.set(key, { code, name: name || code, count: 1 });
+        }
+        const countryStats = Array.from(countryMap.values()).sort((a, b) => b.count - a.count);
+        const countryMax = countryStats.reduce((m, x) => Math.max(m, x.count), 0);
+        const topCountries = countryStats.slice(0, 8);
         const inactive = moduleKpis.total - moduleKpis.active;
         return (
           <div className="h-full overflow-y-auto">
@@ -5251,6 +5267,28 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   ))}
                 </div>
               </div>
+
+              {/* Customers by Country (flagged) */}
+              {topCountries.length > 0 && (
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
+                  <h3 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-4">{t("kpi.customersByCountry")}</h3>
+                  <div className="space-y-3">
+                    {topCountries.map((cty) => (
+                      <div key={cty.code || cty.name} className="flex items-center gap-3">
+                        <span className="text-base w-6 text-center shrink-0" aria-hidden>{cty.code ? countryCodeToFlag(cty.code) : "🏳️"}</span>
+                        <span className="text-xs font-medium w-24 truncate text-[var(--text-secondary)]" title={cty.name}>{cty.name}</span>
+                        <div className="flex-1 h-2 bg-[var(--bg-surface)] rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                            style={{ width: countryMax > 0 ? `${(cty.count / countryMax) * 100}%` : "0%" }}
+                          />
+                        </div>
+                        <span className="text-xs font-semibold text-[var(--text-muted)] w-8 text-end">{cty.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Status Breakdown */}
               <div className="grid grid-cols-2 gap-3 md:gap-4">

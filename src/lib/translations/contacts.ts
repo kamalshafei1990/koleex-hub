@@ -633,6 +633,7 @@ export const contactsT: Translations = {
   "kpi.divisions":         { en: "Divisions",             zh: "事业部",               ar: "الأقسام" },
   "kpi.categories":        { en: "Categories",            zh: "类别",                 ar: "الفئات" },
   "kpi.customerTiers":     { en: "Customer Tiers",        zh: "客户等级",              ar: "مستويات العملاء" },
+  "kpi.customersByCountry": { en: "Customers by Country",  zh: "按国家/地区分布",        ar: "العملاء حسب الدولة" },
   "kpi.overview":          { en: "Overview",              zh: "概览",                 ar: "نظرة عامة" },
   "kpi.keyMetrics":        { en: "Key metrics and insights", zh: "关键指标和洞察",      ar: "المقاييس والرؤى الرئيسية" },
   "kpi.ofTotal":           { en: "of total",              zh: "占总数",               ar: "من الإجمالي" },
