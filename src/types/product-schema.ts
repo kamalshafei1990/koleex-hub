@@ -150,6 +150,14 @@ export interface SpecGroup {
   order: number;
   visibility?: Partial<VisibilityFlags>;
   requiredCompletionMode?: 'all' | 'any';
+  /**
+   * Which tab of the product-data form edits this group. Defaults to "specs".
+   * "logistics" routes the group to the Logistics & Customs step instead — used
+   * for shipping-unit data (packing dimensions, CBM, net/gross weight) that
+   * belongs with freight/customs rather than machine specs. Storage is
+   * unchanged either way: values still live in products.schema_specs.
+   */
+  formTab?: 'specs' | 'logistics';
   fields: SpecField[];
 }
 

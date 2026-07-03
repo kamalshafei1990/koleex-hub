@@ -1197,6 +1197,20 @@ export default function ProductForm({ productId }: Props) {
     categoryCode: product.category_slug || "",
     subcategoryCode: selectedSubcategory?.code || "",
   }).schema;
+  /* A schema group can be routed to the Logistics tab (formTab:"logistics") —
+     shipping-unit data (packing dims, CBM, net/gross weight) lives with
+     freight/customs, not machine specs. Split the resolved schema so the Specs
+     editor shows everything EXCEPT those groups, and the Logistics tab renders
+     ONLY those groups. Both write to the same product.schema_specs. */
+  const specsTabSchema = activeSpecsSchema
+    ? { ...activeSpecsSchema, groups: activeSpecsSchema.groups.filter((g) => g.formTab !== "logistics") }
+    : null;
+  const logisticsSchemaGroups = activeSpecsSchema
+    ? activeSpecsSchema.groups.filter((g) => g.formTab === "logistics")
+    : [];
+  const logisticsTabSchema = activeSpecsSchema && logisticsSchemaGroups.length
+    ? { ...activeSpecsSchema, groups: logisticsSchemaGroups }
+    : null;
   const schemaCoveredCols = computeSchemaCoveredColumns(activeSpecsSchema);
   /* The legacy Technical block, Purchase Options + Fulfillment sub-sections are
      hidden when the active schema already covers their fields (no double entry).
@@ -3741,7 +3755,7 @@ export default function ProductForm({ productId }: Props) {
             subcategory gets its own data template. The free-form
             SewingMachineSection stays below ONLY for sewing machines. */}
         {steps[currentStep]?.id === "specs" && (isSewing || activeSpecsSchema) && (() => {
-          const specsSchema = activeSpecsSchema;
+          const specsSchema = specsTabSchema;
           return (
             <div className="space-y-5 animate-in fade-in duration-300">
               {specsSchema ? (
@@ -4141,20 +4155,33 @@ export default function ProductForm({ productId }: Props) {
               </div>
             </Section>
 
-            <div className="flex items-start gap-3 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
-              <BoxIcon className="mt-0.5 h-4 w-4 shrink-0 text-[var(--text-ghost)]" />
-              <div className="flex-1 min-w-0">
-                <p className="text-[12px] font-medium text-[var(--text-primary)]">{t("logistics.packingTitle", "Packing & shipment are per-variant")}</p>
-                <p className="text-[10px] text-[var(--text-ghost)] mt-0.5 leading-relaxed">{t("logistics.packingBody", "Packing type, carton dimensions, CBM, net/gross weight and 20ft/40ft container quantities are entered per variant on the Variants tab.")}</p>
-                <button
-                  type="button"
-                  onClick={() => { const i = steps.findIndex((s) => s.id === "commercial"); if (i >= 0) goToStep(i); }}
-                  className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-semibold text-[var(--text-primary)] bg-[var(--bg-base)] hover:bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] transition-colors mt-2"
-                >
-                  <ArrowUpRightIcon className="h-3 w-3" /> {t("logistics.jumpCommercial", "Open Variants")}
-                </button>
+            {/* Schema-driven Packing & Shipping group (formTab:"logistics").
+                Product-level packing/CBM/weights entered here, stored in
+                schema_specs — the single source of truth for schema products. */}
+            {logisticsTabSchema ? (
+              <Section id="logistics-packing" icon={<BoxIcon className="h-4 w-4" />} title={t("logistics.packingSpecsTitle", "Packing & Shipping")} badge={t("logistics.packingSpecsBadge", "Freight · Customs")}>
+                <SchemaSpecsSection
+                  schema={logisticsTabSchema}
+                  values={product.schema_specs || {}}
+                  onChange={(next) => updateProduct_({ schema_specs: next })}
+                />
+              </Section>
+            ) : (
+              <div className="flex items-start gap-3 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
+                <BoxIcon className="mt-0.5 h-4 w-4 shrink-0 text-[var(--text-ghost)]" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[12px] font-medium text-[var(--text-primary)]">{t("logistics.packingTitle", "Packing & shipment are per-variant")}</p>
+                  <p className="text-[10px] text-[var(--text-ghost)] mt-0.5 leading-relaxed">{t("logistics.packingBody", "Packing type, carton dimensions, CBM, net/gross weight and 20ft/40ft container quantities are entered per variant on the Variants tab.")}</p>
+                  <button
+                    type="button"
+                    onClick={() => { const i = steps.findIndex((s) => s.id === "commercial"); if (i >= 0) goToStep(i); }}
+                    className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-semibold text-[var(--text-primary)] bg-[var(--bg-base)] hover:bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] transition-colors mt-2"
+                  >
+                    <ArrowUpRightIcon className="h-3 w-3" /> {t("logistics.jumpCommercial", "Open Variants")}
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 

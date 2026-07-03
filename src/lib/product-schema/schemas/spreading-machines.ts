@@ -641,8 +641,8 @@ export const SPREADING_MACHINES_SCHEMA: ProductSchemaDefinition = {
     // Group 6 — Physical & Packing
     // ------------------------------------------------------------------
     {
-      id: "physical-packing",
-      title: "Physical & Packing",
+      id: "physical",
+      title: "Physical",
       order: 60,
       fields: [
         {
@@ -670,11 +670,26 @@ export const SPREADING_MACHINES_SCHEMA: ProductSchemaDefinition = {
           ...pub,
           visualRenderType: "packing_block",
         },
+      ],
+    },
+
+    // ------------------------------------------------------------------
+    // Group 6b — Packing & Shipping (edited on the Logistics tab, not Specs)
+    // Shipping-unit data (crate size / volume / shipping weight) for freight,
+    // container loading, and customs. formTab:"logistics" routes this group to
+    // the Logistics step in the product form; still stored in schema_specs.
+    // ------------------------------------------------------------------
+    {
+      id: "packing-shipping",
+      title: "Packing & Shipping",
+      order: 65,
+      formTab: "logistics",
+      fields: [
         {
           id: "packing_dimensions",
           key: "packing_dimensions",
           label: "Packing Dimensions (L×W×H)",
-          order: 30,
+          order: 10,
           fieldType: "text",
           dataType: "string",
           required: false,
@@ -686,7 +701,7 @@ export const SPREADING_MACHINES_SCHEMA: ProductSchemaDefinition = {
           id: "cbm",
           key: "cbm",
           label: "CBM",
-          order: 40,
+          order: 20,
           fieldType: "unit_number",
           dataType: "number",
           unit: "m³",
@@ -699,7 +714,7 @@ export const SPREADING_MACHINES_SCHEMA: ProductSchemaDefinition = {
           id: "net_weight",
           key: "net_weight",
           label: "Net Weight",
-          order: 50,
+          order: 30,
           fieldType: "unit_number",
           dataType: "number",
           unit: "kg",
@@ -712,7 +727,7 @@ export const SPREADING_MACHINES_SCHEMA: ProductSchemaDefinition = {
           id: "gross_weight",
           key: "gross_weight",
           label: "Gross Weight",
-          order: 60,
+          order: 40,
           fieldType: "unit_number",
           dataType: "number",
           unit: "kg",
