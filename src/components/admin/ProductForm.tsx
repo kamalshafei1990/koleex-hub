@@ -1224,6 +1224,13 @@ export default function ProductForm({ productId }: Props) {
   const technicalHasVisibleField = TECH_BLOCK_COLS.some((c) => !schemaCoveredCols.has(c));
   const purchaseCoveredBySchema = schemaCoveredCols.has("supports_head_only") && schemaCoveredCols.has("supports_complete_set");
   const fulfillmentCoveredBySchema = schemaCoveredCols.has("moq") && schemaCoveredCols.has("lead_time");
+  /* When the active schema carries a `certifications` field (a public-facing
+     CE/ISO badge on the Specs tab), that is the single input for certifications
+     — so the Compliance tab hides its redundant CE toggle (keeping RoHS + the
+     detailed certificate records). Avoids entering CE in two tabs. */
+  const certsCoveredBySchema = !!activeSpecsSchema?.groups?.some(
+    (g) => g.fields?.some((f) => f.key === "certifications"),
+  );
 
   /* ── Primary model helpers (shown in Hero) ── */
   const primaryModel = models[0];
@@ -4197,9 +4204,12 @@ export default function ProductForm({ productId }: Props) {
         {(onePage || steps[currentStep]?.id === "compliance") && (
           <div id="sec-compliance" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
             <Section id="compliance-certs" icon={<ShieldCheckIcon className="h-4 w-4" />} title={t("compliance.title", "Compliance")} badge={t("compliance.badge", "Certifications")}>
+              {certsCoveredBySchema && (
+                <p className="mb-3 text-[11px] leading-relaxed text-[var(--text-ghost)]">{t("compliance.ceInSpecs", "CE and other certifications for this category are set on the Specifications tab (Safety & Compliance → Certifications). Add certificate records with issuer, number and expiry below.")}</p>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {([
-                  { key: "ce_certified" as const, label: t("compliance.ce", "CE Certified"), help: t("compliance.ceHelp", "Required for sale in the European Economic Area.") },
+                  ...(certsCoveredBySchema ? [] : [{ key: "ce_certified" as const, label: t("compliance.ce", "CE Certified"), help: t("compliance.ceHelp", "Required for sale in the European Economic Area.") }]),
                   { key: "rohs_compliant" as const, label: t("compliance.rohs", "RoHS Compliant"), help: t("compliance.rohsHelp", "EU restriction on hazardous substances in electronics.") },
                 ]).map((c) => {
                   const on = !!product[c.key];
