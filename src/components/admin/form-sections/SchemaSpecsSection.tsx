@@ -359,36 +359,17 @@ function GroupCard({
                 </label>
                 <FieldBadges f={f} />
               </div>
+              <FieldInput
+                field={f}
+                value={values[f.key]}
+                onSet={(v) => setField(f.key, v)}
+              />
               {f.computed ? (
-                <>
-                  <div className="relative">
-                    <div className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)]/40 border border-dashed border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] flex items-center pe-14">
-                      {isFilled(values[f.key]) ? (
-                        String(values[f.key])
-                      ) : (
-                        <span className="text-[var(--text-ghost)]">
-                          Enter {group.fields.find((x) => x.key === f.computed!.from)?.label ?? "the source"} to calculate
-                        </span>
-                      )}
-                    </div>
-                    {f.unit ? (
-                      <span className="absolute end-3 top-1/2 -translate-y-1/2 text-[11px] font-medium text-[var(--text-ghost)] pointer-events-none">
-                        {f.unit}
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="text-[10px] text-[var(--text-secondary)] leading-relaxed inline-flex items-center gap-1">
-                    <span aria-hidden>↻</span> Auto-calculated from{" "}
-                    {group.fields.find((x) => x.key === f.computed!.from)?.label ?? "the linked field"}.
-                  </p>
-                </>
-              ) : (
-                <FieldInput
-                  field={f}
-                  value={values[f.key]}
-                  onSet={(v) => setField(f.key, v)}
-                />
-              )}
+                <p className="text-[10px] text-[var(--text-secondary)] leading-relaxed inline-flex items-center gap-1">
+                  <span aria-hidden>↻</span> Auto-fills from{" "}
+                  {group.fields.find((x) => x.key === f.computed!.from)?.label ?? "the linked field"} — you can also type it manually.
+                </p>
+              ) : null}
               {f.description ? (
                 <p className="text-[10px] text-[var(--text-ghost)] leading-relaxed">
                   {f.description}
