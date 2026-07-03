@@ -322,7 +322,7 @@ function GroupCard({
       </button>
 
       {open ? (
-        <div className="px-4 pb-4 pt-1 space-y-4 border-t border-[var(--border-subtle)]">
+        <div className="px-4 pb-4 pt-4 space-y-5 border-t border-[var(--border-subtle)]">
           {fields.map((f) => (
             <div key={f.key} className="space-y-1.5">
               <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -395,7 +395,7 @@ export default function SchemaSpecsSection({ schema, values, onChange, hideHeade
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {/* Header — what this is + required progress */}
       {!hideHeader ? (
         <div className="flex items-start justify-between gap-3 flex-wrap rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/50 px-4 py-3">
