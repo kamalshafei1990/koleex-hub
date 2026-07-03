@@ -623,6 +623,28 @@ export default function CustomerProfilePage({
                 ) : null}
               </section>
             ) : null}
+
+            {(contact.business_card_front || contact.business_card_back) ? (
+              <section className={`${panelCls} lg:col-span-2`}>
+                <SectionHeader icon={CreditCardIcon} title={t("sec.businessCard")} />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {contact.business_card_front ? (
+                    <div>
+                      <p className="text-[10px] text-[var(--text-faint)] uppercase tracking-wide mb-1.5">{t("f.front")}</p>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={contact.business_card_front as string} alt={t("f.front")} className="w-full rounded-lg border border-[var(--border-subtle)]" loading="lazy" decoding="async" />
+                    </div>
+                  ) : null}
+                  {contact.business_card_back ? (
+                    <div>
+                      <p className="text-[10px] text-[var(--text-faint)] uppercase tracking-wide mb-1.5">{t("f.back")}</p>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={contact.business_card_back as string} alt={t("f.back")} className="w-full rounded-lg border border-[var(--border-subtle)]" loading="lazy" decoding="async" />
+                    </div>
+                  ) : null}
+                </div>
+              </section>
+            ) : null}
           </div>
         )}
       </div>

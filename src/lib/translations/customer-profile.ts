@@ -69,6 +69,9 @@ export const customerProfileT: Translations = {
   "sec.address": { en: "Address", zh: "地址", ar: "العنوان" },
   "sec.channels": { en: "Contact Channels", zh: "联系方式", ar: "قنوات الاتصال" },
   "sec.notes": { en: "Notes", zh: "备注", ar: "ملاحظات" },
+  "sec.businessCard": { en: "Business Card", zh: "名片", ar: "بطاقة العمل" },
+  "f.front": { en: "Front", zh: "正面", ar: "الأمام" },
+  "f.back": { en: "Back", zh: "背面", ar: "الخلف" },
   "notes.public": { en: "Public", zh: "公开", ar: "عام" },
   "notes.internal": { en: "Internal", zh: "内部", ar: "داخلي" },
 
