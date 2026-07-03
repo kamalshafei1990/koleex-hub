@@ -115,6 +115,73 @@ const FieldBadges = ({ f }: { f: SpecField }) => (
 const inputCls =
   "w-full h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors";
 
+/* Numeric field with a suggested-value dropdown that shows the unit inside each
+   row (e.g. "1900 mm"). Free-type is always allowed — the dropdown only offers
+   common values and filters as you type; picking one fills the field. */
+function SuggestNumberInput({
+  field,
+  value,
+  onSet,
+}: {
+  field: SpecField;
+  value: unknown;
+  onSet: (v: unknown) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const strVal = value === null || value === undefined ? "" : String(value);
+  const all = field.suggestions ?? [];
+  const q = strVal.trim();
+  const filtered = q === "" ? all : all.filter((s) => String(s).startsWith(q));
+  const show = filtered.length ? filtered : all;
+  return (
+    <div className="relative">
+      <input
+        type="number"
+        value={strVal}
+        onChange={(e) => onSet(e.target.value === "" ? undefined : Number(e.target.value))}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 120)}
+        placeholder="0"
+        className={`${inputCls} pe-[4.75rem]`}
+      />
+      {field.unit ? (
+        <span className="absolute end-9 top-1/2 -translate-y-1/2 text-[11px] font-medium text-[var(--text-ghost)] pointer-events-none">
+          {field.unit}
+        </span>
+      ) : null}
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label="Show suggestions"
+        onMouseDown={(e) => { e.preventDefault(); setOpen((o) => !o); }}
+        className="absolute end-1.5 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-md text-[var(--text-ghost)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)] transition-colors"
+      >
+        <AngleDownIcon className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && show.length ? (
+        <div className="absolute z-30 mt-1 left-0 right-0 max-h-52 overflow-y-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] py-1 shadow-[0_10px_30px_-12px_rgba(0,0,0,0.6)]">
+          {show.map((s) => {
+            const active = String(s) === strVal;
+            return (
+              <button
+                key={String(s)}
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); onSet(Number(s)); setOpen(false); }}
+                className={`flex w-full items-center justify-between px-3 py-1.5 text-start text-[13px] transition-colors hover:bg-[var(--bg-surface-hover)] ${
+                  active ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-secondary)]"
+                }`}
+              >
+                <span>{String(s)}</span>
+                {field.unit ? <span className="text-[11px] text-[var(--text-ghost)]">{field.unit}</span> : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function FieldInput({
   field,
   value,
@@ -210,15 +277,16 @@ function FieldInput({
     );
   }
 
-  /* number / unit_number — numeric with unit suffix. Optional `suggestions`
-     render as a datalist dropdown while still allowing any typed value. */
+  /* number / unit_number — numeric with unit suffix. When `suggestions` are
+     present, render the combobox (dropdown of common values, still free-type). */
   if (ft === "number" || ft === "unit_number") {
-    const dlId = field.suggestions?.length ? `dl-${field.key}` : undefined;
+    if (field.suggestions?.length) {
+      return <SuggestNumberInput field={field} value={value} onSet={onSet} />;
+    }
     return (
       <div className="relative">
         <input
           type="number"
-          list={dlId}
           value={value === null || value === undefined ? "" : String(value)}
           onChange={(e) => {
             const raw = e.target.value;
@@ -227,11 +295,6 @@ function FieldInput({
           placeholder="0"
           className={`${inputCls} ${field.unit ? "pe-14" : ""}`}
         />
-        {dlId ? (
-          <datalist id={dlId}>
-            {field.suggestions!.map((s) => <option key={String(s)} value={String(s)} />)}
-          </datalist>
-        ) : null}
         {field.unit ? (
           <span className="absolute end-3 top-1/2 -translate-y-1/2 text-[11px] font-medium text-[var(--text-ghost)] pointer-events-none">
             {field.unit}
