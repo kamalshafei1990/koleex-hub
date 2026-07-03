@@ -14,7 +14,8 @@
    owns the values object and persistence.
    --------------------------------------------------------------------------- */
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import type {
   ProductSchemaDefinition,
   SpecField,
@@ -22,6 +23,76 @@ import type {
 } from "@/types/product-schema";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+
+/* ── Anchored dropdown menu (portal) ───────────────────────────────
+   The specs cards use overflow-hidden, which clips any in-card absolute
+   dropdown, and the native <select>/<datalist> menus render inconsistently.
+   This renders the menu in a body portal, positioned under the trigger and
+   kept in sync on scroll/resize, so every dropdown looks identical, is never
+   clipped, and closes on outside-click / Escape. */
+function useAnchoredMenu() {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [rect, setRect] = useState<DOMRect | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const update = () => {
+      if (triggerRef.current) setRect(triggerRef.current.getBoundingClientRect());
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (triggerRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return { open, setOpen, triggerRef, menuRef, rect };
+}
+
+function DropdownPortal({
+  rect,
+  menuRef,
+  children,
+}: {
+  rect: DOMRect | null;
+  menuRef: React.RefObject<HTMLDivElement | null>;
+  children: React.ReactNode;
+}) {
+  if (!rect || typeof document === "undefined") return null;
+  return createPortal(
+    <div
+      ref={menuRef}
+      style={{ position: "fixed", top: rect.bottom + 4, left: rect.left, width: rect.width, zIndex: 60 }}
+      className="max-h-60 overflow-y-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] py-1 shadow-[0_12px_34px_-10px_rgba(0,0,0,0.7)]"
+    >
+      {children}
+    </div>,
+    document.body,
+  );
+}
+
+const menuItemCls =
+  "flex w-full items-center justify-between gap-2 px-3 py-2 text-start text-[13px] transition-colors hover:bg-[var(--bg-surface-hover)] cursor-pointer";
 
 interface Props {
   schema: ProductSchemaDefinition | null;
@@ -115,6 +186,123 @@ const FieldBadges = ({ f }: { f: SpecField }) => (
 const inputCls =
   "w-full h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors";
 
+/* Single-choice dropdown (closed set) — brand-styled trigger + portal menu. */
+function SelectField({
+  field,
+  value,
+  onSet,
+}: {
+  field: SpecField;
+  value: unknown;
+  onSet: (v: unknown) => void;
+}) {
+  const { open, setOpen, triggerRef, menuRef, rect } = useAnchoredMenu();
+  const opts = field.options ?? [];
+  const selected = opts.find((o) => o.value === value);
+  return (
+    <div ref={triggerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`${inputCls} flex items-center justify-between gap-2 text-start`}
+      >
+        <span className={`truncate ${selected ? "" : "text-[var(--text-ghost)]"}`}>
+          {selected ? selected.label : "— Select —"}
+        </span>
+        <AngleDownIcon className={`h-3.5 w-3.5 shrink-0 text-[var(--text-ghost)] transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open ? (
+        <DropdownPortal rect={rect} menuRef={menuRef}>
+          <button
+            type="button"
+            onMouseDown={(e) => { e.preventDefault(); onSet(undefined); setOpen(false); }}
+            className={`${menuItemCls} text-[var(--text-ghost)]`}
+          >
+            — Select —
+          </button>
+          {opts.map((o) => {
+            const active = o.value === value;
+            return (
+              <button
+                key={o.value}
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); onSet(o.value); setOpen(false); }}
+                className={`${menuItemCls} ${active ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}
+              >
+                <span className="truncate">{o.label}</span>
+                {active ? <CheckIcon className="h-3.5 w-3.5 shrink-0" /> : null}
+              </button>
+            );
+          })}
+        </DropdownPortal>
+      ) : null}
+    </div>
+  );
+}
+
+/* Numeric field with a suggestions dropdown — same menu as SelectField, but the
+   trigger is an editable input so any value can still be typed. */
+function NumberSuggestField({
+  field,
+  value,
+  onSet,
+}: {
+  field: SpecField;
+  value: unknown;
+  onSet: (v: unknown) => void;
+}) {
+  const { open, setOpen, triggerRef, menuRef, rect } = useAnchoredMenu();
+  const strVal = value === null || value === undefined ? "" : String(value);
+  const all = field.suggestions ?? [];
+  const q = strVal.trim();
+  const filtered = q === "" ? all : all.filter((s) => String(s).startsWith(q));
+  const show = filtered.length ? filtered : all;
+  return (
+    <div ref={triggerRef} className="relative">
+      <input
+        type="number"
+        value={strVal}
+        onChange={(e) => { onSet(e.target.value === "" ? undefined : Number(e.target.value)); if (!open) setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        placeholder="0"
+        className={`${inputCls} ${field.unit ? "pe-[3.75rem]" : "pe-9"}`}
+      />
+      {field.unit ? (
+        <span className="absolute end-8 top-1/2 -translate-y-1/2 text-[11px] font-medium text-[var(--text-ghost)] pointer-events-none">
+          {field.unit}
+        </span>
+      ) : null}
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label="Toggle suggestions"
+        onMouseDown={(e) => { e.preventDefault(); setOpen((o) => !o); }}
+        className="absolute end-2.5 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] hover:text-[var(--text-secondary)] transition-colors"
+      >
+        <AngleDownIcon className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && show.length ? (
+        <DropdownPortal rect={rect} menuRef={menuRef}>
+          {show.map((s) => {
+            const active = String(s) === strVal;
+            return (
+              <button
+                key={String(s)}
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); onSet(Number(s)); setOpen(false); }}
+                className={`${menuItemCls} ${active ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}
+              >
+                <span>{String(s)}</span>
+                {field.unit ? <span className="text-[11px] text-[var(--text-ghost)]">{field.unit}</span> : null}
+              </button>
+            );
+          })}
+        </DropdownPortal>
+      ) : null}
+    </div>
+  );
+}
+
 function FieldInput({
   field,
   value,
@@ -156,23 +344,9 @@ function FieldInput({
     );
   }
 
-  /* select — single choice dropdown (native <select>, the Koleex Hub standard
-     styled globally in globals.css). */
+  /* select — single choice dropdown (portal menu, brand-styled). */
   if (ft === "select") {
-    return (
-      <select
-        value={typeof value === "string" ? value : ""}
-        onChange={(e) => onSet(e.target.value || undefined)}
-        className={inputCls}
-      >
-        <option value="">— Select —</option>
-        {(field.options ?? []).map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    );
+    return <SelectField field={field} value={value} onSet={onSet} />;
   }
 
   /* multi-choice — chips toggled on/off */
@@ -211,37 +385,28 @@ function FieldInput({
     );
   }
 
-  /* number / unit_number — numeric with unit suffix. When `suggestions` are
-     present it's a native datalist (still free-type) shown with a dropdown
-     chevron so it reads like the Hub <select> fields (e.g. Spreader Type). */
+  /* number / unit_number — with suggestions → dropdown combobox (portal menu),
+     otherwise a plain numeric input with unit suffix. */
   if (ft === "number" || ft === "unit_number") {
-    const dlId = field.suggestions?.length ? `dl-${field.key}` : undefined;
-    const pad = dlId ? (field.unit ? "pe-[3.75rem]" : "pe-9") : (field.unit ? "pe-14" : "");
+    if (field.suggestions?.length) {
+      return <NumberSuggestField field={field} value={value} onSet={onSet} />;
+    }
     return (
       <div className="relative">
         <input
           type="number"
-          list={dlId}
           value={value === null || value === undefined ? "" : String(value)}
           onChange={(e) => {
             const raw = e.target.value;
             onSet(raw === "" ? undefined : Number(raw));
           }}
           placeholder="0"
-          className={`${inputCls} ${pad}`}
+          className={`${inputCls} ${field.unit ? "pe-14" : ""}`}
         />
-        {dlId ? (
-          <datalist id={dlId}>
-            {field.suggestions!.map((s) => <option key={String(s)} value={String(s)} />)}
-          </datalist>
-        ) : null}
         {field.unit ? (
-          <span className={`absolute ${dlId ? "end-8" : "end-3"} top-1/2 -translate-y-1/2 text-[11px] font-medium text-[var(--text-ghost)] pointer-events-none`}>
+          <span className="absolute end-3 top-1/2 -translate-y-1/2 text-[11px] font-medium text-[var(--text-ghost)] pointer-events-none">
             {field.unit}
           </span>
-        ) : null}
-        {dlId ? (
-          <AngleDownIcon className="absolute end-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-ghost)] pointer-events-none" />
         ) : null}
       </div>
     );
