@@ -708,6 +708,7 @@ export const SPREADING_MACHINES_SCHEMA: ProductSchemaDefinition = {
           required: false,
           description: "Packed volume in cubic metres.",
           ...pub,
+          computed: { from: "packing_dimensions", formula: "cbm_m3_from_mm_dimensions" },
           visualRenderType: "spec_card",
         },
         {

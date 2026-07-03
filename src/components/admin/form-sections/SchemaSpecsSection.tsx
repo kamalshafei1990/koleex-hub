@@ -47,6 +47,33 @@ const isFilled = (v: unknown): boolean => {
 const asStringArray = (raw: unknown): string[] =>
   Array.isArray(raw) ? raw.map((x) => String(x)) : [];
 
+/* ── computed fields ───────────────────────────────────────────────
+   Derive one field's value from another (e.g. CBM from packing L×W×H). */
+
+/* Parse an "L×W×H" string in mm (any separator: × x * , space) → m³, or null
+   when fewer than three positive numbers are present. Rounded to 3 dp. */
+const cbmFromMmDimensions = (raw: unknown): number | null => {
+  if (typeof raw !== "string") return null;
+  const nums = (raw.match(/\d+(?:\.\d+)?/g) ?? []).map(Number).filter((n) => n > 0);
+  if (nums.length < 3) return null;
+  const [l, w, h] = nums;
+  const cbm = (l * w * h) / 1_000_000_000;
+  if (!Number.isFinite(cbm) || cbm <= 0) return null;
+  return Math.round(cbm * 1000) / 1000;
+};
+
+const computeDerivedValue = (
+  formula: NonNullable<SpecField["computed"]>["formula"],
+  sourceRaw: unknown,
+): number | null => {
+  switch (formula) {
+    case "cbm_m3_from_mm_dimensions":
+      return cbmFromMmDimensions(sourceRaw);
+    default:
+      return null;
+  }
+};
+
 /* Required-completeness counts a required boolean as "answered" only when the
    operator has explicitly toggled it (true OR false), never when undefined. */
 const requiredFilled = (f: SpecField, v: unknown): boolean => {
@@ -332,11 +359,36 @@ function GroupCard({
                 </label>
                 <FieldBadges f={f} />
               </div>
-              <FieldInput
-                field={f}
-                value={values[f.key]}
-                onSet={(v) => setField(f.key, v)}
-              />
+              {f.computed ? (
+                <>
+                  <div className="relative">
+                    <div className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)]/40 border border-dashed border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] flex items-center pe-14">
+                      {isFilled(values[f.key]) ? (
+                        String(values[f.key])
+                      ) : (
+                        <span className="text-[var(--text-ghost)]">
+                          Enter {group.fields.find((x) => x.key === f.computed!.from)?.label ?? "the source"} to calculate
+                        </span>
+                      )}
+                    </div>
+                    {f.unit ? (
+                      <span className="absolute end-3 top-1/2 -translate-y-1/2 text-[11px] font-medium text-[var(--text-ghost)] pointer-events-none">
+                        {f.unit}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="text-[10px] text-[var(--text-secondary)] leading-relaxed inline-flex items-center gap-1">
+                    <span aria-hidden>↻</span> Auto-calculated from{" "}
+                    {group.fields.find((x) => x.key === f.computed!.from)?.label ?? "the linked field"}.
+                  </p>
+                </>
+              ) : (
+                <FieldInput
+                  field={f}
+                  value={values[f.key]}
+                  onSet={(v) => setField(f.key, v)}
+                />
+              )}
               {f.description ? (
                 <p className="text-[10px] text-[var(--text-ghost)] leading-relaxed">
                   {f.description}
@@ -353,12 +405,31 @@ function GroupCard({
 /* ── main editor ───────────────────────────────────────────────── */
 
 export default function SchemaSpecsSection({ schema, values, onChange, hideHeader }: Props) {
+  /* source field key → the computed fields that derive from it. Lets a single
+     edit (e.g. Packing Dimensions) recompute its dependants (e.g. CBM). */
+  const derivedBySource = useMemo(() => {
+    const map: Record<string, { target: string; formula: NonNullable<SpecField["computed"]>["formula"] }[]> = {};
+    for (const g of schema?.groups ?? []) {
+      for (const f of g.fields) {
+        if (f.computed) (map[f.computed.from] ??= []).push({ target: f.key, formula: f.computed.formula });
+      }
+    }
+    return map;
+  }, [schema]);
+
   const setField = (key: string, v: unknown) => {
     const next = { ...values };
-    if (v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0)) {
-      delete next[key];
-    } else {
-      next[key] = v;
+    const setOne = (k: string, val: unknown) => {
+      if (val === undefined || val === null || val === "" || (Array.isArray(val) && val.length === 0)) {
+        delete next[k];
+      } else {
+        next[k] = val;
+      }
+    };
+    setOne(key, v);
+    // Recompute any fields derived from the one just edited.
+    for (const d of derivedBySource[key] ?? []) {
+      setOne(d.target, computeDerivedValue(d.formula, next[key]));
     }
     onChange(next);
   };

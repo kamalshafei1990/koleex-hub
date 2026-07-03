@@ -140,6 +140,12 @@ export interface SpecField extends VisibilityFlags {
      the Layer-2 Product Intelligence band. Schema-driven + generic: any
      field can carry one; absent → the field simply isn't summarized. */
   insight?: string;
+  /* Auto-derive this field's value from another field. When the source field
+     changes, this field is recomputed and filled in — but it stays editable so
+     an operator can override. Currently supported formula:
+       'cbm_m3_from_mm_dimensions' — parses the source (an "L×W×H" string in mm,
+        any separator) and returns cubic metres = L·W·H / 1e9. */
+  computed?: { from: string; formula: 'cbm_m3_from_mm_dimensions' };
 }
 
 export interface SpecGroup {
