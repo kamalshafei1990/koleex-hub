@@ -182,6 +182,65 @@ function SuggestNumberInput({
   );
 }
 
+/* Custom single-choice dropdown — same styling grammar as SuggestNumberInput
+   (styled trigger + panel) so every dropdown in the specs editor looks the
+   same, instead of the browser's native <select>. Closed set: no free typing. */
+function SelectDropdown({
+  field,
+  value,
+  onSet,
+}: {
+  field: SpecField;
+  value: unknown;
+  onSet: (v: unknown) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const opts = field.options ?? [];
+  const selected = opts.find((o) => o.value === value);
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        onBlur={() => setTimeout(() => setOpen(false), 120)}
+        className={`${inputCls} flex items-center justify-between gap-2 text-start`}
+      >
+        <span className={`truncate ${selected ? "" : "text-[var(--text-ghost)]"}`}>
+          {selected ? selected.label : "— Select —"}
+        </span>
+        <AngleDownIcon className={`h-3.5 w-3.5 shrink-0 text-[var(--text-ghost)] transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open ? (
+        <div className="absolute z-30 mt-1 left-0 right-0 max-h-60 overflow-y-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] py-1 shadow-[0_10px_30px_-12px_rgba(0,0,0,0.6)]">
+          <button
+            type="button"
+            onMouseDown={(e) => { e.preventDefault(); onSet(undefined); setOpen(false); }}
+            className="flex w-full items-center px-3 py-1.5 text-start text-[13px] text-[var(--text-ghost)] transition-colors hover:bg-[var(--bg-surface-hover)]"
+          >
+            — Select —
+          </button>
+          {opts.map((o) => {
+            const active = o.value === value;
+            return (
+              <button
+                key={o.value}
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); onSet(o.value); setOpen(false); }}
+                className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-start text-[13px] transition-colors hover:bg-[var(--bg-surface-hover)] ${
+                  active ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-secondary)]"
+                }`}
+              >
+                <span className="truncate">{o.label}</span>
+                {active ? <CheckIcon className="h-3.5 w-3.5 shrink-0" /> : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function FieldInput({
   field,
   value,
@@ -223,22 +282,9 @@ function FieldInput({
     );
   }
 
-  /* select — single choice dropdown */
+  /* select — single choice dropdown (custom, styled to match the editor) */
   if (ft === "select") {
-    return (
-      <select
-        value={typeof value === "string" ? value : ""}
-        onChange={(e) => onSet(e.target.value || undefined)}
-        className={inputCls}
-      >
-        <option value="">— Select —</option>
-        {(field.options ?? []).map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    );
+    return <SelectDropdown field={field} value={value} onSet={onSet} />;
   }
 
   /* multi-choice — chips toggled on/off */
