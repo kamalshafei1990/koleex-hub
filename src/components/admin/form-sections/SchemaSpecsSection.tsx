@@ -266,6 +266,46 @@ function FieldInput({
     );
   }
 
+  /* dimension — three numbers (L × W × H) composed into an "L×W×H" string
+     (+ unit). Any separator is accepted on read so legacy free-text values
+     still populate the three boxes. */
+  if (ft === "dimension") {
+    const parts = typeof value === "string" ? value.split(/[×xX*,]/).map((s) => s.trim()) : [];
+    const [l, w, h] = [parts[0] ?? "", parts[1] ?? "", parts[2] ?? ""];
+    const compose = (a: string, b: string, c: string) =>
+      !a && !b && !c ? undefined : `${a}×${b}×${c}`;
+    return (
+      <div className="flex items-center gap-2">
+        <input
+          type="number"
+          value={l}
+          onChange={(e) => onSet(compose(e.target.value, w, h))}
+          placeholder="L"
+          className={`${inputCls} min-w-0 flex-1`}
+        />
+        <span className="text-[var(--text-ghost)] shrink-0">×</span>
+        <input
+          type="number"
+          value={w}
+          onChange={(e) => onSet(compose(l, e.target.value, h))}
+          placeholder="W"
+          className={`${inputCls} min-w-0 flex-1`}
+        />
+        <span className="text-[var(--text-ghost)] shrink-0">×</span>
+        <input
+          type="number"
+          value={h}
+          onChange={(e) => onSet(compose(l, w, e.target.value))}
+          placeholder="H"
+          className={`${inputCls} min-w-0 flex-1`}
+        />
+        {field.unit ? (
+          <span className="text-[11px] font-medium text-[var(--text-ghost)] shrink-0">{field.unit}</span>
+        ) : null}
+      </div>
+    );
+  }
+
   /* long_text — textarea */
   if (ft === "long_text" || ft === "rich_text") {
     return (
@@ -278,19 +318,17 @@ function FieldInput({
     );
   }
 
-  /* text / dimension / url / fallback — single line */
+  /* text / url / fallback — single line */
   return (
     <div className="relative">
       <input
         type="text"
         value={typeof value === "string" ? value : ""}
         onChange={(e) => onSet(e.target.value || undefined)}
-        placeholder={
-          ft === "dimension" ? "L × W × H" : field.unit ? `value (${field.unit})` : ""
-        }
-        className={`${inputCls} ${field.unit && ft !== "dimension" ? "pe-14" : ""}`}
+        placeholder={field.unit ? `value (${field.unit})` : ""}
+        className={`${inputCls} ${field.unit ? "pe-14" : ""}`}
       />
-      {field.unit && ft !== "dimension" ? (
+      {field.unit ? (
         <span className="absolute end-3 top-1/2 -translate-y-1/2 text-[11px] font-medium text-[var(--text-ghost)] pointer-events-none">
           {field.unit}
         </span>
