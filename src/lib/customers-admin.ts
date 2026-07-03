@@ -82,16 +82,23 @@ export type CustomerContactRow = Record<string, unknown> & {
 
 export async function fetchCustomerContact(contactId: string): Promise<CustomerContactRow | null> {
   if (!contactId) return null;
-  const { data, error } = await supabase
-    .from("contacts")
-    .select("*")
-    .eq("id", contactId)
-    .maybeSingle();
-  if (error) {
-    console.error("[customers-admin] fetchCustomerContact:", error.message);
+  /* `contacts` is RLS-locked to the service role, so the browser client (this
+     module uses the ANON key — supabaseAdmin is a misnomer) can't read it: a
+     direct query returns null and the profile page shows "Customer not found".
+     Read through the tenant-scoped server route instead — the same endpoint the
+     Contacts list uses to hydrate a row. */
+  try {
+    const res = await fetch(`/api/contacts/${contactId}`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const j = (await res.json()) as { contact?: CustomerContactRow | null };
+    return (j.contact as CustomerContactRow | null) ?? null;
+  } catch (e) {
+    console.error("[customers-admin] fetchCustomerContact:", e);
     return null;
   }
-  return data as CustomerContactRow | null;
 }
 
 /* ═══════════════════════════════════════════════════
