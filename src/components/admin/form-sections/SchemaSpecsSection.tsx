@@ -210,12 +210,15 @@ function FieldInput({
     );
   }
 
-  /* number / unit_number — numeric with unit suffix */
+  /* number / unit_number — numeric with unit suffix. Optional `suggestions`
+     render as a datalist dropdown while still allowing any typed value. */
   if (ft === "number" || ft === "unit_number") {
+    const dlId = field.suggestions?.length ? `dl-${field.key}` : undefined;
     return (
       <div className="relative">
         <input
           type="number"
+          list={dlId}
           value={value === null || value === undefined ? "" : String(value)}
           onChange={(e) => {
             const raw = e.target.value;
@@ -224,6 +227,11 @@ function FieldInput({
           placeholder="0"
           className={`${inputCls} ${field.unit ? "pe-14" : ""}`}
         />
+        {dlId ? (
+          <datalist id={dlId}>
+            {field.suggestions!.map((s) => <option key={String(s)} value={String(s)} />)}
+          </datalist>
+        ) : null}
         {field.unit ? (
           <span className="absolute end-3 top-1/2 -translate-y-1/2 text-[11px] font-medium text-[var(--text-ghost)] pointer-events-none">
             {field.unit}
@@ -318,16 +326,23 @@ function FieldInput({
     );
   }
 
-  /* text / url / fallback — single line */
+  /* text / url / fallback — single line (+ optional suggestions datalist) */
+  const textDlId = field.suggestions?.length ? `dl-${field.key}` : undefined;
   return (
     <div className="relative">
       <input
         type="text"
+        list={textDlId}
         value={typeof value === "string" ? value : ""}
         onChange={(e) => onSet(e.target.value || undefined)}
         placeholder={field.unit ? `value (${field.unit})` : ""}
         className={`${inputCls} ${field.unit ? "pe-14" : ""}`}
       />
+      {textDlId ? (
+        <datalist id={textDlId}>
+          {field.suggestions!.map((s) => <option key={String(s)} value={String(s)} />)}
+        </datalist>
+      ) : null}
       {field.unit ? (
         <span className="absolute end-3 top-1/2 -translate-y-1/2 text-[11px] font-medium text-[var(--text-ghost)] pointer-events-none">
           {field.unit}

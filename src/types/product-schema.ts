@@ -146,6 +146,11 @@ export interface SpecField extends VisibilityFlags {
        'cbm_m3_from_mm_dimensions' — parses the source (an "L×W×H" string in mm,
         any separator) and returns cubic metres = L·W·H / 1e9. */
   computed?: { from: string; formula: 'cbm_m3_from_mm_dimensions' };
+  /** Suggested values offered as a dropdown (datalist) on a free-entry
+   *  number/text field. The operator can pick one OR type any other value —
+   *  it never restricts input. Use for common-but-not-fixed specs (e.g. cloth
+   *  widths, travel speeds) where a select would be too rigid. */
+  suggestions?: (string | number)[];
 }
 
 export interface SpecGroup {
