@@ -658,6 +658,7 @@ export const SPREADING_MACHINES_SCHEMA: ProductSchemaDefinition = {
       id: "physical",
       title: "Physical",
       order: 60,
+      formTab: "logistics",
       fields: [
         {
           id: "machine_weight_kg",
