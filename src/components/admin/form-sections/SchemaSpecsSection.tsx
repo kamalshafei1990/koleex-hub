@@ -27,6 +27,11 @@ interface Props {
   schema: ProductSchemaDefinition | null;
   values: Record<string, unknown>;
   onChange: (next: Record<string, unknown>) => void;
+  /** Hide the "{name} — structured specs" intro + required-progress header.
+   *  Used when a single schema group is rendered under another tab (e.g. the
+   *  Packing & Shipping group on the Logistics tab) where that intro — which
+   *  talks about the public product page — is out of context. */
+  hideHeader?: boolean;
 }
 
 /* ── value helpers ─────────────────────────────────────────────── */
@@ -347,7 +352,7 @@ function GroupCard({
 
 /* ── main editor ───────────────────────────────────────────────── */
 
-export default function SchemaSpecsSection({ schema, values, onChange }: Props) {
+export default function SchemaSpecsSection({ schema, values, onChange, hideHeader }: Props) {
   const setField = (key: string, v: unknown) => {
     const next = { ...values };
     if (v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0)) {
@@ -392,28 +397,30 @@ export default function SchemaSpecsSection({ schema, values, onChange }: Props) 
   return (
     <div className="space-y-3">
       {/* Header — what this is + required progress */}
-      <div className="flex items-start justify-between gap-3 flex-wrap rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/50 px-4 py-3">
-        <div className="min-w-0">
-          <p className="text-[12px] font-semibold text-[var(--text-primary)]">
-            {schema.name} — structured specs
-          </p>
-          <p className="text-[10px] text-[var(--text-ghost)] mt-0.5 leading-relaxed max-w-xl">
-            These power the public product page, quotations, brochures, and the AI
-            layer. Each field shows where it appears (Public / Internal / AI).
-            Choices over free text wherever possible.
-          </p>
-        </div>
-        {reqTotal > 0 ? (
-          <div className="text-right shrink-0">
-            <div className="text-[18px] font-bold font-mono text-[var(--text-primary)]">
-              {reqFilled}/{reqTotal}
-            </div>
-            <div className="text-[9px] uppercase tracking-wider text-[var(--text-ghost)]">
-              Required
-            </div>
+      {!hideHeader ? (
+        <div className="flex items-start justify-between gap-3 flex-wrap rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/50 px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-[12px] font-semibold text-[var(--text-primary)]">
+              {schema.name} — structured specs
+            </p>
+            <p className="text-[10px] text-[var(--text-ghost)] mt-0.5 leading-relaxed max-w-xl">
+              These power the public product page, quotations, brochures, and the AI
+              layer. Each field shows where it appears (Public / Internal / AI).
+              Choices over free text wherever possible.
+            </p>
           </div>
-        ) : null}
-      </div>
+          {reqTotal > 0 ? (
+            <div className="text-right shrink-0">
+              <div className="text-[18px] font-bold font-mono text-[var(--text-primary)]">
+                {reqFilled}/{reqTotal}
+              </div>
+              <div className="text-[9px] uppercase tracking-wider text-[var(--text-ghost)]">
+                Required
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {groups.map((g) => (
         <GroupCard key={g.id} group={g} values={values} setField={setField} />

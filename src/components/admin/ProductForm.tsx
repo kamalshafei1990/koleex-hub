@@ -4157,15 +4157,18 @@ export default function ProductForm({ productId }: Props) {
 
             {/* Schema-driven Packing & Shipping group (formTab:"logistics").
                 Product-level packing/CBM/weights entered here, stored in
-                schema_specs — the single source of truth for schema products. */}
+                schema_specs — the single source of truth for schema products.
+                Rendered header-less (the group card carries its own title) so
+                it doesn't duplicate the title or show the Specs-tab intro. */}
             {logisticsTabSchema ? (
-              <Section id="logistics-packing" icon={<BoxIcon className="h-4 w-4" />} title={t("logistics.packingSpecsTitle", "Packing & Shipping")} badge={t("logistics.packingSpecsBadge", "Freight · Customs")}>
+              <div id="logistics-packing" className="scroll-mt-28">
                 <SchemaSpecsSection
                   schema={logisticsTabSchema}
                   values={product.schema_specs || {}}
                   onChange={(next) => updateProduct_({ schema_specs: next })}
+                  hideHeader
                 />
-              </Section>
+              </div>
             ) : (
               <div className="flex items-start gap-3 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
                 <BoxIcon className="mt-0.5 h-4 w-4 shrink-0 text-[var(--text-ghost)]" />
