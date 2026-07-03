@@ -128,15 +128,15 @@ function customerTitle(c: CustomerContactRow, unnamed: string): string {
 const panelCls =
   "bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6";
 
-function Avatar({ name, size = 80 }: { name: string; size?: number }) {
+function Avatar({ name, size = 96 }: { name: string; size?: number }) {
   const initials = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
   return (
     <div
-      className="rounded-2xl bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center shrink-0 text-[var(--text-dim)]"
+      className="rounded-2xl bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)] shadow-[0_8px_30px_-12px_rgba(0,0,0,0.5)] flex items-center justify-center shrink-0 overflow-hidden text-[var(--text-secondary)]"
       style={{ width: size, height: size }}
     >
       {initials
-        ? <span className="font-semibold" style={{ fontSize: size * 0.36 }}>{initials}</span>
+        ? <span className="font-mono font-bold" style={{ fontSize: size * 0.3 }}>{initials}</span>
         : <CustomersIcon size={size * 0.5} />}
     </div>
   );
@@ -378,11 +378,16 @@ export default function CustomerProfilePage({
 
         {/* ── Header card ── */}
         <section className={`${panelCls} mb-4`}>
+          <nav className="mb-3 flex items-center gap-1.5 text-[12px] text-[var(--text-dim)]">
+            <Link href="/customers" className="hover:text-[var(--text-primary)] transition-colors">{t("type.customer", "Customers")}</Link>
+            <span className="text-[var(--text-ghost)]">/</span>
+            <span className="text-[var(--text-secondary)] truncate">{title}</span>
+          </nav>
           <div className="flex items-start gap-5">
-            <Avatar name={title} size={80} />
+            <Avatar name={title} size={96} />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-xl font-bold text-[var(--text-primary)] truncate">{title}</h2>
+                <h2 className="text-2xl font-bold text-[var(--text-primary)] truncate tracking-tight">{title}</h2>
                 {tier && (
                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border flex items-center gap-1 ${TIER_STYLES[tier]}`}>
                     <CrownIcon size={10} /> {t(`tier.${tier}`, TIER_LABELS[tier])}
@@ -442,8 +447,8 @@ export default function CustomerProfilePage({
           )}
         </section>
 
-        {/* ── Tabs ── */}
-        <div className="flex items-center gap-1 mb-4 overflow-x-auto">
+        {/* ── Tabs (sticky pill nav — matches Supplier 360) ── */}
+        <nav className="sticky top-[56px] md:top-[64px] z-20 mb-4 flex gap-1 overflow-x-auto rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)]/95 px-1.5 py-1.5 backdrop-blur scrollbar-none">
           {TABS.map((tabKey) => {
             const label = tabKey === "activity" ? `${t("tab.activity")}${activity ? ` · ${activityTotal}` : ""}`
               : tabKey === "commercial" ? t("tab.commercial")
@@ -452,10 +457,10 @@ export default function CustomerProfilePage({
               <button
                 key={tabKey}
                 onClick={() => setTab(tabKey)}
-                className={`h-9 px-4 rounded-lg text-[12px] font-medium transition-colors ${
+                className={`h-8 shrink-0 whitespace-nowrap rounded-full px-4 text-[12px] font-medium transition-colors ${
                   tab === tabKey
                     ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
-                    : "bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                    : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
                 }`}
                 aria-current={tab === tabKey ? "page" : undefined}
               >
@@ -463,7 +468,7 @@ export default function CustomerProfilePage({
               </button>
             );
           })}
-        </div>
+        </nav>
 
         {/* ── Activity ── */}
         {tab === "activity" && (
