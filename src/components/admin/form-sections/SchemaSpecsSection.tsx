@@ -211,10 +211,12 @@ function FieldInput({
     );
   }
 
-  /* number / unit_number — numeric with unit suffix. Optional `suggestions`
-     render as a native datalist (Hub-standard) while still allowing any value. */
+  /* number / unit_number — numeric with unit suffix. When `suggestions` are
+     present it's a native datalist (still free-type) shown with a dropdown
+     chevron so it reads like the Hub <select> fields (e.g. Spreader Type). */
   if (ft === "number" || ft === "unit_number") {
     const dlId = field.suggestions?.length ? `dl-${field.key}` : undefined;
+    const pad = dlId ? (field.unit ? "pe-[3.75rem]" : "pe-9") : (field.unit ? "pe-14" : "");
     return (
       <div className="relative">
         <input
@@ -226,7 +228,7 @@ function FieldInput({
             onSet(raw === "" ? undefined : Number(raw));
           }}
           placeholder="0"
-          className={`${inputCls} ${field.unit ? "pe-14" : ""}`}
+          className={`${inputCls} ${pad}`}
         />
         {dlId ? (
           <datalist id={dlId}>
@@ -234,9 +236,12 @@ function FieldInput({
           </datalist>
         ) : null}
         {field.unit ? (
-          <span className="absolute end-3 top-1/2 -translate-y-1/2 text-[11px] font-medium text-[var(--text-ghost)] pointer-events-none">
+          <span className={`absolute ${dlId ? "end-8" : "end-3"} top-1/2 -translate-y-1/2 text-[11px] font-medium text-[var(--text-ghost)] pointer-events-none`}>
             {field.unit}
           </span>
+        ) : null}
+        {dlId ? (
+          <AngleDownIcon className="absolute end-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-ghost)] pointer-events-none" />
         ) : null}
       </div>
     );
