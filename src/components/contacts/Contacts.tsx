@@ -3999,7 +3999,22 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     if (!filterType) return null;
     const all = contacts.filter(c => c.contact_type === filterType);
     const active = all.filter(c => c.is_active);
-    const countries = new Set(all.map(c => c.country_code).filter(Boolean));
+    /* Count countries with the SAME code-or-name resolution the
+       "Customers by Country" card uses — counting only country_code
+       undercounted (KPI said 13 while the card listed 17) because many
+       records store the country by name only. */
+    const countries = new Set(
+      all
+        .map(c => {
+          const code = String(c.country_code || "").trim().toUpperCase();
+          if (code) return code;
+          const raw = String(c.country || "").trim();
+          if (!raw) return "";
+          return COUNTRY_NAME_TO_CODE.get(raw.toLowerCase())
+            || (COUNTRY_CODE_TO_NAME.has(raw.toUpperCase()) ? raw.toUpperCase() : raw.toLowerCase());
+        })
+        .filter(Boolean),
+    );
     const vip = all.filter(c => c.customer_type === "diamond" || c.customer_type === "platinum");
     const now = new Date();
     const thisMonth = all.filter(c => {
@@ -5331,11 +5346,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <h3 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-4">{t("kpi.customerTiers")}</h3>
                 <div className="space-y-3">
                   {[
-                    { key: "diamond", label: t("tier.diamond"), count: tierCounts.diamond, color: "bg-violet-500", textColor: "text-violet-300" },
-                    { key: "platinum", label: t("tier.platinum"), count: tierCounts.platinum, color: "bg-cyan-500", textColor: "text-cyan-300" },
-                    { key: "gold", label: t("tier.gold"), count: tierCounts.gold, color: "bg-amber-500", textColor: "text-amber-300" },
-                    { key: "silver", label: t("tier.silver"), count: tierCounts.silver, color: "bg-slate-400", textColor: "text-slate-300" },
-                    { key: "end_user", label: t("tier.end_user"), count: tierCounts.end_user, color: "bg-zinc-500", textColor: "text-zinc-300" },
+                    /* Label colors carry light-mode variants — the old -300-only
+                       shades were unreadable on a white card. */
+                    { key: "diamond", label: t("tier.diamond"), count: tierCounts.diamond, color: "bg-violet-500", textColor: "text-violet-600 dark:text-violet-300" },
+                    { key: "platinum", label: t("tier.platinum"), count: tierCounts.platinum, color: "bg-cyan-500", textColor: "text-cyan-600 dark:text-cyan-300" },
+                    { key: "gold", label: t("tier.gold"), count: tierCounts.gold, color: "bg-amber-500", textColor: "text-amber-600 dark:text-amber-300" },
+                    { key: "silver", label: t("tier.silver"), count: tierCounts.silver, color: "bg-slate-400", textColor: "text-slate-600 dark:text-slate-300" },
+                    { key: "end_user", label: t("tier.end_user"), count: tierCounts.end_user, color: "bg-zinc-500", textColor: "text-zinc-600 dark:text-zinc-300" },
                   ].map(tier => (
                     <div key={tier.key} className="flex items-center gap-3">
                       <span className={`text-xs font-medium w-20 ${tier.textColor}`}>{tier.label}</span>

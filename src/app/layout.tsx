@@ -55,7 +55,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} h-full antialiased`}>
+    /* data-scroll-behavior: our smooth scrolling (globals.css) is intentional —
+       this silences Next.js's route-transition advisory warning hub-wide. */
+    <html lang="en" data-scroll-behavior="smooth" className={`${inter.variable} h-full antialiased`}>
       <body className="h-full overflow-hidden flex flex-col bg-[#0A0A0A] text-white font-sans">
         <Providers>
           <RootShell>{children}</RootShell>
