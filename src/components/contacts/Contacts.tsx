@@ -2738,6 +2738,18 @@ const COUNTRY_CODE_TO_NAME: Map<string, string> = new Map(
 const COUNTRY_NAME_TO_CODE: Map<string, string> = new Map(
   ALL_COUNTRIES.map(c => [c.name.trim().toLowerCase(), c.isoCode.toUpperCase()]),
 );
+/** Resolve a contact's flag emoji from its country_code, or from the free-text
+ *  country name (which sometimes holds a full name OR a 2-letter ISO code).
+ *  Returns "" when nothing resolves, so callers can omit the flag entirely. */
+function contactFlag(country_code?: string | null, country?: string | null): string {
+  let code = String(country_code || "").trim().toUpperCase();
+  if (!code && country) {
+    const raw = String(country).trim();
+    code = COUNTRY_NAME_TO_CODE.get(raw.toLowerCase())
+      || (COUNTRY_CODE_TO_NAME.has(raw.toUpperCase()) ? raw.toUpperCase() : "");
+  }
+  return countryCodeToFlag(code);
+}
 /* Year options for "Year Established" — current year back to 1950. */
 const ESTABLISHED_YEARS: string[] = (() => {
   const now = new Date().getFullYear();
@@ -4902,6 +4914,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
+                        {(() => { const fl = contactFlag(c.country_code, c.country); return fl ? <span className="text-base shrink-0" title={c.country || c.country_code || ""} aria-hidden>{fl}</span> : null; })()}
                         <span className="text-sm font-medium text-[var(--text-primary)] truncate">
                           {contactDisplayName(c)}
                         </span>
