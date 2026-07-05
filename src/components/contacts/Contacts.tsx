@@ -4914,7 +4914,6 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        {(() => { const fl = contactFlag(c.country_code, c.country); return fl ? <span className="text-base shrink-0" title={c.country || c.country_code || ""} aria-hidden>{fl}</span> : null; })()}
                         <span className="text-sm font-medium text-[var(--text-primary)] truncate">
                           {contactDisplayName(c)}
                         </span>
@@ -4930,6 +4929,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                         </div>
                       )}
                       <div className="flex items-center gap-1.5 mt-0.5">
+                        {(() => { const fl = contactFlag(c.country_code, c.country); return fl ? <span className="text-[11px] leading-none shrink-0" title={c.country || c.country_code || ""} aria-hidden>{fl}</span> : null; })()}
                         <span className={`text-[10px] font-medium ${getTypeColor(c.contact_type)}`}>
                           {t("type." + c.contact_type, c.contact_type?.charAt(0).toUpperCase() + c.contact_type?.slice(1))}
                         </span>
