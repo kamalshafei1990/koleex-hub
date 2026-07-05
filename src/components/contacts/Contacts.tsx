@@ -5379,7 +5379,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     { key: "platinum", label: t("tier.platinum"), count: tierCounts.platinum, color: "bg-cyan-500", textColor: "text-cyan-600 dark:text-cyan-300" },
                     { key: "gold", label: t("tier.gold"), count: tierCounts.gold, color: "bg-amber-500", textColor: "text-amber-600 dark:text-amber-300" },
                     { key: "silver", label: t("tier.silver"), count: tierCounts.silver, color: "bg-slate-400", textColor: "text-slate-600 dark:text-slate-300" },
-                    { key: "end_user", label: t("tier.end_user"), count: tierCounts.end_user, color: "bg-zinc-500", textColor: "text-zinc-600 dark:text-zinc-300" },
+                    { key: "end_user", label: t("tier.end_user"), count: tierCounts.end_user, color: "bg-emerald-500", textColor: "text-emerald-600 dark:text-emerald-300" },
                   ].map(tier => (
                     <div key={tier.key} className="flex items-center gap-3">
                       <span className={`text-xs font-medium w-20 ${tier.textColor}`}>{tier.label}</span>
