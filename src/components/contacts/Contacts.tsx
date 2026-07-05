@@ -5184,9 +5184,17 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           if (!code && !rawName) continue;
           /* Resolve BOTH fields from the country dataset: a record with only a
              code gets its full name; a record with only a name gets its ISO code
-             (so the flag renders instead of a blank white flag). */
-          if (!code && rawName) code = COUNTRY_NAME_TO_CODE.get(rawName.toLowerCase()) || "";
+             (so the flag renders instead of a blank white flag). The name field
+             sometimes literally holds a 2-letter ISO code (e.g. "EG") — treat
+             that as a code too, so it merges with the proper country entry
+             instead of forming a second row that collides on the render key. */
+          if (!code && rawName) {
+            code = COUNTRY_NAME_TO_CODE.get(rawName.toLowerCase())
+              || (COUNTRY_CODE_TO_NAME.has(rawName.toUpperCase()) ? rawName.toUpperCase() : "");
+          }
           const name = COUNTRY_CODE_TO_NAME.get(code) || rawName || code;
+          /* One stable identity per country used for BOTH dedup and the React
+             key, so the two can never diverge and produce duplicate keys. */
           const key = code || name.toLowerCase();
           const cur = countryMap.get(key);
           if (cur) cur.count += 1;
@@ -5293,7 +5301,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   </div>
                   <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
                     {topCountries.map((cty) => (
-                      <div key={cty.code || cty.name} className="flex items-center gap-3">
+                      <div key={cty.code || cty.name.toLowerCase()} className="flex items-center gap-3">
                         <span className="text-base w-6 text-center shrink-0" aria-hidden>{countryCodeToFlag(cty.code) || "🏳️"}</span>
                         <span className="text-xs font-medium w-32 shrink-0 truncate text-[var(--text-secondary)]" title={cty.name}>{cty.name}</span>
                         <div className="flex-1 h-2 bg-[var(--bg-surface)] rounded-full overflow-hidden">
