@@ -376,50 +376,68 @@ export default function CustomerProfilePage({
           </Link>
         </div>
 
-        {/* ── Header card ── */}
+        {/* ── Hero (centered — same layout grammar as Supplier 360) ── */}
         <section className={`${panelCls} mb-4`}>
-          <nav className="mb-3 flex items-center gap-1.5 text-[12px] text-[var(--text-dim)]">
+          <nav className="mb-4 flex items-center gap-1.5 text-[12px] text-[var(--text-dim)]">
             <Link href="/customers" className="hover:text-[var(--text-primary)] transition-colors">{t("type.customer", "Customers")}</Link>
             <span className="text-[var(--text-ghost)]">/</span>
             <span className="text-[var(--text-secondary)] truncate">{title}</span>
           </nav>
-          <div className="flex items-start gap-5">
-            <Avatar name={title} size={96} />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-2xl font-bold text-[var(--text-primary)] truncate tracking-tight">{title}</h2>
-                {tier && (
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border flex items-center gap-1 ${TIER_STYLES[tier]}`}>
-                    <CrownIcon size={10} /> {t(`tier.${tier}`, TIER_LABELS[tier])}
-                  </span>
-                )}
-                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${
-                  isActive
-                    ? "text-emerald-400 bg-emerald-400/10 border-emerald-400/20"
-                    : "text-slate-400 bg-slate-400/10 border-slate-400/20"
-                }`}>
-                  {isActive ? t("status.active") : t("status.inactive")}
-                </span>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md border border-[var(--border-faint)] bg-[var(--bg-surface)] text-[var(--text-dim)] capitalize">
-                  {t(`entity.${entity}`, entity)}
-                </span>
-              </div>
 
-              <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-[12px] text-[var(--text-dim)]">
-                {contact.email ? (
-                  <span className="flex items-center gap-1.5"><EnvelopeIcon size={12} /> {String(contact.email)}</span>
-                ) : null}
-                {contact.phone ? (
-                  <span className="flex items-center gap-1.5"><PhoneIcon size={12} /> {String(contact.phone)}</span>
-                ) : null}
-                {contact.country ? (
-                  <span className="flex items-center gap-1.5"><GlobeIcon size={12} /> {String(contact.country)}</span>
-                ) : null}
-                {contact.city ? (
-                  <span className="flex items-center gap-1.5"><MapPinIcon size={12} /> {String(contact.city)}</span>
-                ) : null}
-              </div>
+          <div className="flex flex-col items-center text-center px-2 pt-2 pb-1">
+            <Avatar name={title} size={112} />
+            <h2 className="mt-5 text-2xl md:text-3xl font-bold text-[var(--text-primary)] tracking-tight max-w-3xl">{title}</h2>
+
+            {/* Badge row — entity · status · tier (mirrors Manufacturer · Active) */}
+            <div className="mt-3 flex items-center gap-2 flex-wrap justify-center">
+              <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-[var(--border-faint)] bg-[var(--bg-surface)] text-[var(--text-secondary)] capitalize">
+                {t(`entity.${entity}`, entity)}
+              </span>
+              <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border ${
+                isActive
+                  ? "text-emerald-400 bg-emerald-400/10 border-emerald-400/20"
+                  : "text-slate-400 bg-slate-400/10 border-slate-400/20"
+              }`}>
+                {isActive ? t("status.active") : t("status.inactive")}
+              </span>
+              {tier && (
+                <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border flex items-center gap-1 ${TIER_STYLES[tier]}`}>
+                  <CrownIcon size={11} /> {t(`tier.${tier}`, TIER_LABELS[tier])}
+                </span>
+              )}
             </div>
+
+            {/* Contact chips row (mirrors the supplier category chip row) */}
+            <div className="mt-3 flex flex-wrap gap-2 justify-center text-[12px] text-[var(--text-dim)]">
+              {contact.email ? (
+                <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)]"><EnvelopeIcon size={12} /> {String(contact.email)}</span>
+              ) : null}
+              {contact.phone ? (
+                <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)]"><PhoneIcon size={12} /> {String(contact.phone)}</span>
+              ) : null}
+              {contact.country ? (
+                <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)]"><GlobeIcon size={12} /> {String(contact.country)}</span>
+              ) : null}
+              {contact.city ? (
+                <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)]"><MapPinIcon size={12} /> {String(contact.city)}</span>
+              ) : null}
+            </div>
+          </div>
+
+          {/* Metric strip — customer counterpart of the supplier score band */}
+          <div className="mt-5 pt-4 border-t border-[var(--border-faint)] flex flex-wrap justify-center gap-2">
+            {([
+              { label: t("card.opportunities"), value: activity?.opportunities.count },
+              { label: t("card.quotations"), value: activity?.quotations.count },
+              { label: t("card.invoices"), value: activity?.invoices.count },
+              { label: t("card.projects"), value: activity?.projects.count },
+              { label: t("card.tasks"), value: activity?.tasks.count },
+            ]).map((m) => (
+              <span key={m.label} className="inline-flex items-baseline gap-2 rounded-lg border border-[var(--border-faint)] bg-[var(--bg-surface)] px-4 py-2">
+                <span className="text-[15px] font-bold text-[var(--text-primary)] tabular-nums">{m.value ?? "—"}</span>
+                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-dim)]">{m.label}</span>
+              </span>
+            ))}
           </div>
 
           {/* Missing commercial record nudge */}
@@ -529,6 +547,8 @@ export default function CustomerProfilePage({
 
         {/* ── Commercial ── */}
         {tab === "commercial" && (
+          <div>
+          <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--text-faint)]">{t("group.commercial", "Commercial & Credit")}</p>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <section className={panelCls}>
               <SectionHeader icon={CircleDollarSignIcon} title={t("sec.salesCredit")} description={t("sec.salesCredit.desc")} />
@@ -580,10 +600,13 @@ export default function CustomerProfilePage({
               </div>
             </section>
           </div>
+          </div>
         )}
 
         {/* ── Details ── */}
         {tab === "details" && (
+          <div>
+          <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--text-faint)]">{t("group.details", "Contacts & Communication")}</p>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <section className={panelCls}>
               <SectionHeader icon={MapPinIcon} title={t("sec.address")} />
@@ -650,6 +673,7 @@ export default function CustomerProfilePage({
                 </div>
               </section>
             ) : null}
+          </div>
           </div>
         )}
       </div>
