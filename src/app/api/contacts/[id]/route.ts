@@ -143,6 +143,27 @@ export async function DELETE(
   const deny = await requireModuleAction(auth, moduleForType(existing.contact_type), "delete");
   if (deny) return deny;
 
+  /* A customer contact can have a linked portal/login account
+     (accounts.contact_id → contacts, ON DELETE SET NULL). The
+     accounts_identity_per_type CHECK requires a customer account to KEEP a
+     contact_id, so the FK's SET NULL would fire and abort the whole delete
+     with "violates check constraint". Remove the linked customer account(s)
+     first — a customer login is meaningless once its contact is gone. Only
+     customer accounts carry contact_id (internal accounts use person_id), so
+     this never touches internal staff logins. Scoped by contact_id ONLY (not
+     tenant): contact_id is a globally-unique FK pointing at exactly this
+     contact, so it targets only accounts tied to the contact being deleted —
+     and some legacy/seed accounts are linked cross-tenant, which a tenant
+     filter would miss, leaving the delete blocked. */
+  const { error: acctErr } = await supabaseServer
+    .from("accounts")
+    .delete()
+    .eq("contact_id", id);
+  if (acctErr) {
+    console.error("[api/contacts/[id] DELETE] account cleanup", acctErr.message);
+    return NextResponse.json({ error: acctErr.message }, { status: 500 });
+  }
+
   const { error } = await supabaseServer
     .from("contacts")
     .delete()
