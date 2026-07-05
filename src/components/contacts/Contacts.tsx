@@ -5636,6 +5636,42 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               <TrashIcon size={14} /> {t("btn.delete")}
             </button>
           </div>
+
+          {/* Key facts — quick identity at a glance (country / city / industry
+              / currency / sales rep / primary contact). Only fields that have
+              a value are shown; the full customer data stays in the sections
+              below, unchanged. */}
+          {(() => {
+            const countryName = c.country
+              ? (COUNTRY_CODE_TO_NAME.get(String(c.country).trim().toUpperCase()) || c.country)
+              : "";
+            const flag = contactFlag(c.country_code, c.country);
+            const primaryPhone = phones.find((p) => p.number)?.number || c.phone || "";
+            const primaryEmail = emails.find((e) => e.email)?.email || c.email || "";
+            const facts: { key: string; icon: React.ReactNode; value: string }[] = [];
+            if (countryName) facts.push({ key: "country", icon: <span className="text-sm leading-none">{flag || "🌐"}</span>, value: countryName });
+            if (c.city) facts.push({ key: "city", icon: <MapPinIcon size={13} />, value: c.city });
+            if (c.industry) facts.push({ key: "industry", icon: <Building2Icon size={13} />, value: c.industry });
+            if (c.currency) facts.push({ key: "currency", icon: <DollarSignIcon size={13} />, value: c.currency });
+            if (c.sales_rep) facts.push({ key: "rep", icon: <UserIcon size={13} />, value: c.sales_rep });
+            if (primaryPhone) facts.push({ key: "phone", icon: <PhoneIcon size={13} />, value: primaryPhone });
+            if (primaryEmail) facts.push({ key: "email", icon: <EnvelopeIcon size={13} />, value: primaryEmail });
+            if (!facts.length) return null;
+            return (
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+                {facts.map((f) => (
+                  <span
+                    key={f.key}
+                    className="inline-flex items-center gap-1.5 max-w-full px-2.5 py-1 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]"
+                    title={f.value}
+                  >
+                    <span className="text-[var(--text-dim)] shrink-0">{f.icon}</span>
+                    <span className="truncate">{f.value}</span>
+                  </span>
+                ))}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Premium tabs (Customer only) */}
