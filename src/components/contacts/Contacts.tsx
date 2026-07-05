@@ -3779,15 +3779,21 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const [expandedFamily, setExpandedFamily] = useState<number | null>(null);
 
   /* Division / category icons — loaded live from the same storage the Product
-     Data app manages, so an icon swapped there shows here too. */
+     Data app manages, so an icon swapped there shows here too.
+     PERF: these two /api/storage/list calls are ONLY consumed by the create/
+     edit form's taxonomy selects — fetching them on mount slowed the initial
+     directory load for every visitor. Deferred until the form actually opens. */
   const [divisionLogos, setDivisionLogos] = useState<Record<string, string>>({});
   const [categoryLogos, setCategoryLogos] = useState<Record<string, string>>({});
+  const taxonomyLogosRequested = useRef(false);
   useEffect(() => {
-    let alive = true;
-    fetchDivisionLogos().then((m) => { if (alive) setDivisionLogos(m); }).catch(() => {});
-    fetchCategoryLogos().then((m) => { if (alive) setCategoryLogos(m); }).catch(() => {});
-    return () => { alive = false; };
-  }, []);
+    if (view !== "form" || taxonomyLogosRequested.current) return;
+    taxonomyLogosRequested.current = true;
+    /* One-shot load; no cancellation — closing the form mid-flight should
+       still cache the result for the next open (fallback icons cover the gap). */
+    fetchDivisionLogos().then(setDivisionLogos).catch(() => {});
+    fetchCategoryLogos().then(setCategoryLogos).catch(() => {});
+  }, [view]);
 
   const divisionOptions: TaxoOption[] = useMemo(
     () => DIVISIONS.map((d) => ({ value: d.name, label: divisionNameLocalized(d.name, lang), iconUrl: divisionLogos[d.id] ?? taxonomyLogoUrl("divisions", d.id) })),
@@ -3831,9 +3837,37 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const scopeCtx = useScopeContext();
 
   const loadContacts = useCallback(async () => {
-    setLoading(true);
-    const ok = await checkContactsSetup();
-    if (!ok) { setSetupNeeded(true); setLoading(false); return; }
+    /* PERF — wait for the resolved scope before fetching. scopeCtx starts null
+       for one render tick and then resolves from the (already-loaded) bootstrap
+       cache; fetching on the null tick caused EVERY visit to download the
+       directory twice (an "anon" fetch immediately superseded by the real one).
+       PermissionGate only renders this page after bootstrap loads, so waiting
+       here costs nothing and halves the network work. */
+    if (!scopeCtx) return;
+    /* PERF — warm start: paint the last-known directory instantly from
+       sessionStorage (same pattern as the hub bootstrap warm-start), then
+       refresh from the network in the background and silently replace it.
+       Keyed by tenant + contact type so no cross-tenant/cross-app bleed. */
+    const cacheKey = `kx_contacts_v1:${scopeCtx?.tenant_id || "anon"}:${filterType || "all"}`;
+    let paintedFromCache = false;
+    try {
+      const raw = sessionStorage.getItem(cacheKey);
+      if (raw) {
+        const cached = JSON.parse(raw) as ContactRow[];
+        if (Array.isArray(cached) && cached.length) {
+          setContacts(cached);
+          setLoading(false);
+          paintedFromCache = true;
+        }
+      }
+    } catch { /* corrupt/absent cache → normal load path */ }
+    if (!paintedFromCache) setLoading(true);
+    /* PERF: the old code AWAITED a checkContactsSetup() round-trip to Supabase
+       BEFORE starting the real fetch — a pure serial waterfall that delayed
+       every load by a network round-trip. Start the contacts fetch immediately;
+       the setup probe runs in parallel and is only consulted when the directory
+       comes back empty (the only case where "table not set up" matters). */
+    const setupProbe = checkContactsSetup().catch(() => false);
     /* Scope the fetch to the app's contact type when we have one
        (Suppliers / Customers / …). Without this the Suppliers app
        downloaded EVERY contact in the tenant (~789 KB of customers,
@@ -3842,10 +3876,22 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     const data = filterType
       ? await fetchContactsByType(filterType, scopeCtx)
       : await fetchContacts(scopeCtx);
+    if (data.length === 0 && !(await setupProbe)) {
+      setSetupNeeded(true); setLoading(false); return;
+    }
+    /* An empty result while the cache already painted rows is almost always a
+       transient failure (expired session mid-flight, network blip) — keep the
+       cached view instead of blanking a directory the user is looking at. */
+    if (data.length === 0 && paintedFromCache) return;
     // Exclude employees — they are managed via the Employees app now
     const slim = data.filter(c => c.contact_type !== "employee");
     setContacts(slim);
     setLoading(false);
+    /* Refresh the warm-start cache (skip oversized payloads — quota safety). */
+    try {
+      const json = JSON.stringify(slim);
+      if (json.length < 2_500_000) sessionStorage.setItem(cacheKey, json);
+    } catch { /* quota exceeded → next visit just cold-loads */ }
     /* The list endpoint drops heavy base64 avatars so the response stays under
        the function size limit. Lazy-load the real logos in small batches and
        merge them in, so the directory paints instantly and logos stream in. */
