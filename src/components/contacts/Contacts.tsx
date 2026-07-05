@@ -4880,9 +4880,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* Customer tier filter — All + Diamond/Platinum/Gold/Silver/End User,
-            painted with the canonical material tier colors. */}
+            painted with the canonical material tier colors. Wraps so every
+            tier (incl. End User) is always visible, not hidden off-screen. */}
         {filterType === "customer" && (
-          <div className="flex gap-1 mt-2 overflow-x-auto no-scrollbar">
+          <div className="flex flex-wrap gap-1 mt-2">
             <button
               onClick={() => setTierFilter("all")}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
