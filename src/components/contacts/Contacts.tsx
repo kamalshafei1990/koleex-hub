@@ -4880,10 +4880,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* Customer tier filter — All + Diamond/Platinum/Gold/Silver/End User,
-            painted with the canonical material tier colors. Wraps so every
-            tier (incl. End User) is always visible, not hidden off-screen. */}
+            painted with the canonical material tier colors. Kept on one line;
+            the wider list panel fits all six. Falls back to horizontal scroll
+            only on unusually narrow viewports. */}
         {filterType === "customer" && (
-          <div className="flex flex-wrap gap-1 mt-2">
+          <div className="flex gap-1 mt-2 overflow-x-auto no-scrollbar">
             <button
               onClick={() => setTierFilter("all")}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
@@ -10057,7 +10058,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   return (
     <div className="h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)] text-[var(--text-primary)] flex overflow-hidden max-w-[100vw]">
       {/* Left panel -- contact list */}
-      <div className={`${mobileShowDetail ? "hidden md:flex" : "flex"} flex-col w-full md:w-[340px] lg:w-[380px] md:border-e border-[var(--border-color)] shrink-0 h-full bg-[var(--bg-secondary)] min-w-0`}>
+      <div className={`${mobileShowDetail ? "hidden md:flex" : "flex"} flex-col w-full md:w-[400px] lg:w-[480px] md:border-e border-[var(--border-color)] shrink-0 h-full bg-[var(--bg-secondary)] min-w-0`}>
         {renderListPanel()}
       </div>
 
