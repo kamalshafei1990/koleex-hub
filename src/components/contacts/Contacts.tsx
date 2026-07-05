@@ -4082,12 +4082,19 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   }, []);
 
   const handleSelectContact = useCallback((c: ContactRow) => {
-    /* On the Customers app, route to the dedicated /customers/[id]
-       profile page. /suppliers, /companies, /people, /contacts keep
-       the legacy in-app side-panel detail view — that flow is
-       unchanged. */
+    /* Customers use a two-step open (like Suppliers): the FIRST click on a row
+       shows the profile inline in the right pane; clicking the SAME already-open
+       customer again navigates to the dedicated full /customers/[id] page. */
     if (filterType === "customer" && c.contact_type === "customer") {
-      router.push(`/customers/${c.id}`);
+      if (selectedId === c.id && view === "detail") {
+        router.push(`/customers/${c.id}`);
+        return;
+      }
+      setSelectedId(c.id);
+      setView("detail");
+      setMobileShowDetail(true);
+      setEditingId(null);
+      void hydrateContact(c.id);
       return;
     }
     /* On the Suppliers app, show the full Supplier 360 (Factory, Contacts,
@@ -4098,7 +4105,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     setMobileShowDetail(true);
     setEditingId(null);
     void hydrateContact(c.id); // pull full record (images/docs) for the detail view
-  }, [filterType, router, hydrateContact]);
+  }, [filterType, router, hydrateContact, selectedId, view]);
 
   const handleAdd = useCallback((type: ContactType, entityType?: "person" | "company") => {
     // New suppliers default to the Garment Machinery division so the
