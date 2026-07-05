@@ -9999,7 +9999,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
      ═════════════════════════════════════════════════════════════════════════ */
 
   const renderTypeChooser = () => (
-    <ScrollLockOverlay className="fixed inset-0 z-50 bg-[var(--bg-overlay)] flex items-center justify-center p-4" onClick={() => { setShowTypeChooser(false); setTypeChooserStep(1); }}>
+    <ScrollLockOverlay className="fixed inset-0 z-50 bg-[var(--bg-overlay)] backdrop-blur-md flex items-center justify-center p-4" onClick={() => { setShowTypeChooser(false); setTypeChooserStep(1); }}>
       <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
         {typeChooserStep === 1 ? (
           <>
