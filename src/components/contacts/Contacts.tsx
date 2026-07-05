@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
 import { getTierColor, tierTextStyle, TIER_COLOR_META, TIER_ORDER } from "@/lib/customer-tiers";
+import { getCountryByCode } from "@/lib/commercial-policy/countries";
 import { ImageLightbox } from "@/components/quotations/ImageLightbox";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -4898,14 +4899,23 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
   /* ── Location cascade handlers ── */
   const handleCountryChange = useCallback((name: string, isoCode: string) => {
-    setForm(prev => ({
-      ...prev,
-      country: name,
-      country_code: isoCode,
-      province: "",
-      province_code: "",
-      city: "",
-    }));
+    setForm(prev => {
+      // Territory auto-fill (editable): pre-fill from the country's region when
+      // Territory is still empty. Never clobber a value the user already typed.
+      const region = getCountryByCode((isoCode || "").toUpperCase())?.region;
+      const territory = (prev.territory && prev.territory.trim())
+        ? prev.territory
+        : (region || prev.territory);
+      return {
+        ...prev,
+        country: name,
+        country_code: isoCode,
+        territory,
+        province: "",
+        province_code: "",
+        city: "",
+      };
+    });
   }, []);
 
   const handleProvinceChange = useCallback((name: string, isoCode: string) => {
