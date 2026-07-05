@@ -5373,20 +5373,42 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <h3 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-4">{t("kpi.customerTiers")}</h3>
                 <div className="space-y-3">
                   {[
-                    /* Label colors carry light-mode variants — the old -300-only
-                       shades were unreadable on a white card. */
-                    { key: "diamond", label: t("tier.diamond"), count: tierCounts.diamond, color: "bg-violet-500", textColor: "text-violet-600 dark:text-violet-300" },
-                    { key: "platinum", label: t("tier.platinum"), count: tierCounts.platinum, color: "bg-cyan-500", textColor: "text-cyan-600 dark:text-cyan-300" },
-                    { key: "gold", label: t("tier.gold"), count: tierCounts.gold, color: "bg-amber-500", textColor: "text-amber-600 dark:text-amber-300" },
-                    { key: "silver", label: t("tier.silver"), count: tierCounts.silver, color: "bg-slate-400", textColor: "text-slate-600 dark:text-slate-300" },
-                    { key: "end_user", label: t("tier.end_user"), count: tierCounts.end_user, color: "bg-emerald-500", textColor: "text-emerald-600 dark:text-emerald-300" },
+                    /* Diamond / Platinum / Gold / Silver get a shiny material
+                       gradient (via the .kx-tier-metal utility + --kx-tier-grad)
+                       so each label reads like the precious material it's named
+                       after. The same gradient fills the progress bar. End User
+                       keeps a flat emerald (not a precious material). */
+                    { key: "diamond", label: t("tier.diamond"), count: tierCounts.diamond, grad: "linear-gradient(100deg, #7fd7ff 0%, #e8faff 20%, #ffffff 38%, #d9c7ff 55%, #9be8ff 72%, #ffffff 88%, #7fd7ff 100%)" },
+                    { key: "platinum", label: t("tier.platinum"), count: tierCounts.platinum, grad: "linear-gradient(100deg, #a7adb5 0%, #ffffff 22%, #dfe3e8 42%, #9aa0a8 60%, #ffffff 80%, #c3c8ce 100%)" },
+                    { key: "gold", label: t("tier.gold"), count: tierCounts.gold, grad: "linear-gradient(100deg, #b8860b 0%, #f7c948 22%, #fff3b0 42%, #e6a817 60%, #fff6c2 80%, #d4930a 100%)" },
+                    { key: "silver", label: t("tier.silver"), count: tierCounts.silver, grad: "linear-gradient(100deg, #8a9299 0%, #ffffff 24%, #c8ced4 44%, #7f878e 62%, #ffffff 82%, #b0b6bd 100%)" },
+                    { key: "end_user", label: t("tier.end_user"), count: tierCounts.end_user, textColor: "text-emerald-600 dark:text-emerald-300", barColor: "bg-emerald-500" },
                   ].map(tier => (
                     <div key={tier.key} className="flex items-center gap-3">
-                      <span className={`text-xs font-medium w-20 ${tier.textColor}`}>{tier.label}</span>
+                      <span
+                        className={`text-xs font-semibold w-20 ${tier.grad ? "kx-tier-metal" : tier.textColor}`}
+                        style={tier.grad ? ({
+                          /* Static gradient-text is inlined so it renders even
+                             if the .kx-tier-metal rule (which adds the animated
+                             shine) hasn't loaded. */
+                          backgroundImage: tier.grad,
+                          backgroundSize: "200% auto",
+                          WebkitBackgroundClip: "text",
+                          backgroundClip: "text",
+                          color: "transparent",
+                          WebkitTextFillColor: "transparent",
+                          ["--kx-tier-grad" as string]: tier.grad,
+                        } as React.CSSProperties) : undefined}
+                      >
+                        {tier.label}
+                      </span>
                       <div className="flex-1 h-2 bg-[var(--bg-surface)] rounded-full overflow-hidden">
                         <div
-                          className={`h-full ${tier.color} rounded-full transition-all duration-500`}
-                          style={{ width: moduleKpis.total > 0 ? `${(tier.count / moduleKpis.total) * 100}%` : "0%" }}
+                          className={`h-full rounded-full transition-all duration-500 ${tier.barColor ?? ""}`}
+                          style={{
+                            width: moduleKpis.total > 0 ? `${(tier.count / moduleKpis.total) * 100}%` : "0%",
+                            ...(tier.grad ? { backgroundImage: tier.grad, backgroundSize: "200% auto" } : {}),
+                          }}
                         />
                       </div>
                       <span className="text-xs font-semibold text-[var(--text-muted)] w-8 text-end">{tier.count}</span>
