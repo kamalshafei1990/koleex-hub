@@ -5181,7 +5181,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         }
         const countryStats = Array.from(countryMap.values()).sort((a, b) => b.count - a.count);
         const countryMax = countryStats.reduce((m, x) => Math.max(m, x.count), 0);
-        const topCountries = countryStats.slice(0, 8);
+        /* Show EVERY country we have a customer from — the map is rebuilt from
+           live contacts, so a customer added from a new country appears here
+           automatically. Not capped; the list scrolls inside the card. */
+        const topCountries = countryStats;
         const inactive = moduleKpis.total - moduleKpis.active;
         return (
           <div className="h-full overflow-y-auto">
@@ -5271,8 +5274,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               {/* Customers by Country (flagged) */}
               {topCountries.length > 0 && (
                 <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
-                  <h3 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-4">{t("kpi.customersByCountry")}</h3>
-                  <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-2 mb-4">
+                    <h3 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider">{t("kpi.customersByCountry")}</h3>
+                    <span className="text-xs font-semibold text-[var(--text-faint)] shrink-0">{topCountries.length}</span>
+                  </div>
+                  <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
                     {topCountries.map((cty) => (
                       <div key={cty.code || cty.name} className="flex items-center gap-3">
                         <span className="text-base w-6 text-center shrink-0" aria-hidden>{cty.code ? countryCodeToFlag(cty.code) : "🏳️"}</span>
