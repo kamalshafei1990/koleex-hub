@@ -5378,10 +5378,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                        so each label reads like the precious material it's named
                        after. The same gradient fills the progress bar. End User
                        keeps a flat emerald (not a precious material). */
-                    { key: "diamond", label: t("tier.diamond"), count: tierCounts.diamond, grad: "linear-gradient(100deg, #7fd7ff 0%, #e8faff 20%, #ffffff 38%, #d9c7ff 55%, #9be8ff 72%, #ffffff 88%, #7fd7ff 100%)" },
-                    { key: "platinum", label: t("tier.platinum"), count: tierCounts.platinum, grad: "linear-gradient(100deg, #a7adb5 0%, #ffffff 22%, #dfe3e8 42%, #9aa0a8 60%, #ffffff 80%, #c3c8ce 100%)" },
+                    /* Kept visually distinct: Diamond = icy blue/cyan (prismatic),
+                       Platinum = bright warm champagne-white, Gold = gold,
+                       Silver = darker cool steel-gray. */
+                    { key: "diamond", label: t("tier.diamond"), count: tierCounts.diamond, grad: "linear-gradient(100deg, #22b8e6 0%, #9becff 18%, #ffffff 34%, #b39dff 52%, #38d6f5 70%, #d6f6ff 86%, #22b8e6 100%)" },
+                    { key: "platinum", label: t("tier.platinum"), count: tierCounts.platinum, grad: "linear-gradient(100deg, #cdc7b4 0%, #fdfbf3 24%, #ece6d5 44%, #c7c0aa 62%, #fffdf6 82%, #ddd6c3 100%)" },
                     { key: "gold", label: t("tier.gold"), count: tierCounts.gold, grad: "linear-gradient(100deg, #b8860b 0%, #f7c948 22%, #fff3b0 42%, #e6a817 60%, #fff6c2 80%, #d4930a 100%)" },
-                    { key: "silver", label: t("tier.silver"), count: tierCounts.silver, grad: "linear-gradient(100deg, #8a9299 0%, #ffffff 24%, #c8ced4 44%, #7f878e 62%, #ffffff 82%, #b0b6bd 100%)" },
+                    { key: "silver", label: t("tier.silver"), count: tierCounts.silver, grad: "linear-gradient(100deg, #6b7480 0%, #cdd3da 24%, #9aa2ab 44%, #626a75 62%, #dde2e8 82%, #98a0a9 100%)" },
                     { key: "end_user", label: t("tier.end_user"), count: tierCounts.end_user, textColor: "text-emerald-600 dark:text-emerald-300", barColor: "bg-emerald-500" },
                   ].map(tier => (
                     <div key={tier.key} className="flex items-center gap-3">
