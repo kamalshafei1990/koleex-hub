@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
+import { getTierColor, tierTextStyle, TIER_COLOR_META } from "@/lib/customer-tiers";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
@@ -4982,8 +4983,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                           {contactDisplayName(c)}
                         </span>
                         {tierInfo && (
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${tierInfo.bg} ${tierInfo.color} font-medium`}>
-                            {tierInfo.label}
+                          <span
+                            className="text-[10px] px-1.5 py-0.5 rounded font-semibold"
+                            style={{ backgroundColor: TIER_COLOR_META[tierInfo.value].tintBg }}
+                          >
+                            <span className="kx-tier-metal" style={tierTextStyle(TIER_COLOR_META[tierInfo.value])}>
+                              {tierInfo.label}
+                            </span>
                           </span>
                         )}
                       </div>
@@ -5378,13 +5384,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                        so each label reads like the precious material it's named
                        after. The same gradient fills the progress bar. End User
                        keeps a flat emerald (not a precious material). */
-                    /* Kept visually distinct: Diamond = icy blue/cyan (prismatic),
-                       Platinum = bright warm champagne-white, Gold = gold,
-                       Silver = darker cool steel-gray. */
-                    { key: "diamond", label: t("tier.diamond"), count: tierCounts.diamond, grad: "linear-gradient(100deg, #22b8e6 0%, #9becff 18%, #ffffff 34%, #b39dff 52%, #38d6f5 70%, #d6f6ff 86%, #22b8e6 100%)" },
-                    { key: "platinum", label: t("tier.platinum"), count: tierCounts.platinum, grad: "linear-gradient(100deg, #cdc7b4 0%, #fdfbf3 24%, #ece6d5 44%, #c7c0aa 62%, #fffdf6 82%, #ddd6c3 100%)" },
-                    { key: "gold", label: t("tier.gold"), count: tierCounts.gold, grad: "linear-gradient(100deg, #b8860b 0%, #f7c948 22%, #fff3b0 42%, #e6a817 60%, #fff6c2 80%, #d4930a 100%)" },
-                    { key: "silver", label: t("tier.silver"), count: tierCounts.silver, grad: "linear-gradient(100deg, #6b7480 0%, #cdd3da 24%, #9aa2ab 44%, #626a75 62%, #dde2e8 82%, #98a0a9 100%)" },
+                    /* Gradients come from the canonical tier-color source
+                       (src/lib/customer-tiers.ts) so this chart, the row/detail
+                       badges, and every other app stay in sync. Diamond = icy
+                       blue/cyan, Platinum = warm champagne, Gold = gold,
+                       Silver = steel-gray, End User = flat green. */
+                    { key: "diamond", label: t("tier.diamond"), count: tierCounts.diamond, grad: TIER_COLOR_META.diamond.gradient },
+                    { key: "platinum", label: t("tier.platinum"), count: tierCounts.platinum, grad: TIER_COLOR_META.platinum.gradient },
+                    { key: "gold", label: t("tier.gold"), count: tierCounts.gold, grad: TIER_COLOR_META.gold.gradient },
+                    { key: "silver", label: t("tier.silver"), count: tierCounts.silver, grad: TIER_COLOR_META.silver.gradient },
                     { key: "end_user", label: t("tier.end_user"), count: tierCounts.end_user, textColor: "text-emerald-600 dark:text-emerald-300", barColor: "bg-emerald-500" },
                   ].map(tier => (
                     <div key={tier.key} className="flex items-center gap-3">
@@ -5600,8 +5608,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               {t("type." + c.contact_type, c.contact_type?.charAt(0).toUpperCase() + c.contact_type?.slice(1))}{c.contact_type === "customer" && c.entity_type === "company" ? " · " + t("entity.business") : c.contact_type === "customer" && c.entity_type === "person" ? " · " + t("entity.individual") : ""}
             </span>
             {tierInfo && (
-              <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${tierInfo.bg} ${tierInfo.color}`}>
-                {tierInfo.label}
+              <span
+                className="text-xs font-semibold px-2.5 py-1 rounded-full border border-[var(--border-subtle)]"
+                style={{ backgroundColor: TIER_COLOR_META[tierInfo.value].tintBg }}
+              >
+                <span className="kx-tier-metal" style={tierTextStyle(TIER_COLOR_META[tierInfo.value])}>
+                  {tierInfo.label}
+                </span>
               </span>
             )}
             {!c.is_active && (

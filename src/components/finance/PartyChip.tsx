@@ -9,17 +9,10 @@
 
 import type { FinancePartyRow } from "@/components/finance/PartyPickerModal";
 import { COUNTRIES } from "@/lib/commercial-policy/countries";
+import { getTierColor, tierTextStyle } from "@/lib/customer-tiers";
 import RrIcon from "@/components/ui/RrIcon";
 import { useTranslation } from "@/lib/i18n";
 import { financeT } from "@/lib/translations/finance";
-
-const TIER_COLORS: Record<NonNullable<FinancePartyRow["customer_tier"]>, string> = {
-  end_user: "bg-gray-500/15 text-[var(--text-highlight)]",
-  silver:   "bg-zinc-400/15 text-zinc-200",
-  gold:     "bg-amber-500/15 text-amber-600 dark:text-amber-300",
-  platinum: "bg-sky-500/15 text-sky-600 dark:text-sky-300",
-  diamond:  "bg-violet-500/15 text-violet-600 dark:text-violet-300",
-};
 
 export interface PartyChipData {
   id?: string | null;
@@ -84,11 +77,20 @@ export default function PartyChip({
         <div className="flex items-center gap-1.5 truncate">
           <span className="truncate text-sm font-medium text-[var(--text-primary)]">{party.name}</span>
           {flag && <span className="text-xs">{flag}</span>}
-          {party.customer_tier && party.customer_tier !== "end_user" && (
-            <span className={`rounded-full px-1 py-0.5 text-[8px] font-semibold uppercase ${TIER_COLORS[party.customer_tier]}`}>
-              {party.customer_tier}
-            </span>
-          )}
+          {(() => {
+            const tm = getTierColor(party.customer_tier);
+            if (!tm || tm.value === "end_user") return null;
+            return (
+              <span
+                className="rounded-full px-1 py-0.5 text-[8px] font-semibold uppercase"
+                style={{ backgroundColor: tm.tintBg }}
+              >
+                <span className="kx-tier-metal" style={tierTextStyle(tm)}>
+                  {party.customer_tier}
+                </span>
+              </span>
+            );
+          })()}
         </div>
         {!compact && (party.company || party.payment_terms) && (
           <div className="mt-0.5 truncate text-[10px] text-[var(--text-dim)]">
