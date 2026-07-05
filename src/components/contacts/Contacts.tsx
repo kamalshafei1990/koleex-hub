@@ -8359,24 +8359,33 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               />
               {form.is_active && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {CUSTOMER_TIERS.map(tier => (
-                    <button
-                      key={tier.value}
-                      onClick={() => setField("customer_type", form.customer_type === tier.value ? "" : tier.value)}
-                      className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
-                        form.customer_type === tier.value
-                          ? `${tier.bg} ${tier.color} border-[var(--border-focus)] ring-1 ring-white/10`
-                          : "border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-subtle)] hover:border-[var(--border-strong)]"
-                      }`}
-                    >
-                      {tier.value === "end_user" && <UserIcon size={14} />}
-                      {tier.value === "silver" && <ShieldIcon size={14} />}
-                      {tier.value === "gold" && <StarIcon size={14} />}
-                      {tier.value === "platinum" && <AwardIcon size={14} />}
-                      {tier.value === "diamond" && <GemIcon size={14} />}
-                      {tier.label}
-                    </button>
-                  ))}
+                  {CUSTOMER_TIERS.map(tier => {
+                    const meta = TIER_COLOR_META[tier.value];
+                    const selected = form.customer_type === tier.value;
+                    return (
+                      <button
+                        key={tier.value}
+                        onClick={() => setField("customer_type", selected ? "" : tier.value)}
+                        className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                          selected
+                            ? "border-[var(--border-focus)] ring-1 ring-white/10"
+                            : "border-[var(--border-color)] hover:border-[var(--border-strong)]"
+                        }`}
+                        style={{ backgroundColor: selected ? meta.tintBg : "transparent" }}
+                      >
+                        {/* icon painted in the tier's material solid colour */}
+                        <span className="shrink-0" style={{ color: meta.solid }}>
+                          {tier.value === "end_user" && <UserIcon size={14} />}
+                          {tier.value === "silver" && <ShieldIcon size={14} />}
+                          {tier.value === "gold" && <StarIcon size={14} />}
+                          {tier.value === "platinum" && <AwardIcon size={14} />}
+                          {tier.value === "diamond" && <GemIcon size={14} />}
+                        </span>
+                        {/* label with the shiny material-gradient text */}
+                        <span className="kx-tier-metal" style={tierTextStyle(meta)}>{tier.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
