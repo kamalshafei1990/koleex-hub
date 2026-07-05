@@ -5079,6 +5079,12 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                           </span>
                         )}
                       </div>
+                      {/* Company name — its own line directly under the customer name. */}
+                      {showCo && (
+                        <div className="text-xs text-[var(--text-secondary)] truncate mt-0.5">
+                          {c.company}
+                        </div>
+                      )}
                       {showCn && (
                         <div lang="zh" className="text-xs text-[var(--text-secondary)] truncate mt-0.5">
                           {c.company_name_cn}
@@ -5095,9 +5101,6 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                               <StarIcon key={i} size={9} className={i <= rating ? "text-amber-400" : "text-[var(--text-faint)] opacity-40"} />
                             ))}
                           </span>
-                        )}
-                        {showCo && (
-                          <span className="text-xs text-[var(--text-dim)] truncate">&middot; {c.company}</span>
                         )}
                       </div>
                       {/* ── Supplier mini-intelligence — readiness · strategic · type.
