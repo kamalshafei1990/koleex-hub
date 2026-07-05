@@ -485,7 +485,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
               supporting underneath, and a soft-pill metric rail fused to the bottom
               edge. Not a dashboard table. ─── */}
         <div className="mx-4 md:mx-6 mt-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
-          <div className="px-4 sm:px-8 md:px-10 pt-4">
+          <div className="px-5 sm:px-8 md:px-10 pt-5 md:pt-6">
             {/* Standalone breadcrumb — clear orientation + a real Back.
                 Back returns to wherever you came from (e.g. Catalogs); the
                 crumbs jump straight to Home or the Suppliers app. */}

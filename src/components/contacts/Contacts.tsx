@@ -5597,7 +5597,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           const primaryEmail = emails.find((e) => e.email)?.email || c.email || "";
           return (
         <div className="mx-4 md:mx-6 mt-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
-          <div className="px-4 sm:px-8 md:px-10 pt-4">
+          <div className="px-5 sm:px-8 md:px-10 pt-5 md:pt-6">
             {/* Top bar — back (start) · Edit / Delete (end) */}
             <div className="flex items-center justify-between gap-3">
               <button onClick={handleBack} className="flex items-center gap-1.5 min-w-0 shrink rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]">
