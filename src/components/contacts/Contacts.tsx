@@ -5095,6 +5095,16 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                         <span className={`text-[10px] font-medium ${getTypeColor(c.contact_type)}`}>
                           {t("type." + c.contact_type, c.contact_type?.charAt(0).toUpperCase() + c.contact_type?.slice(1))}
                         </span>
+                        {/* Active / Inactive status pill — small dot + label. */}
+                        {(() => {
+                          const active = (c.is_active ?? true) !== false;
+                          return (
+                            <span className={`inline-flex items-center gap-1 shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${active ? "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/12 text-rose-600 dark:text-rose-400"}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-emerald-500" : "bg-rose-500"}`} />
+                              {active ? t("kpi.active", "Active") : t("filter.notActive", "Inactive")}
+                            </span>
+                          );
+                        })()}
                         {rating > 0 && (
                           <span className="flex items-center gap-0.5" aria-label={`${rating} of 5 stars`}>
                             {[1, 2, 3, 4, 5].map((i) => (
