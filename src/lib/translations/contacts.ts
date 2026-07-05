@@ -497,6 +497,7 @@ export const contactsT: Translations = {
   "field.productCategories":    { en: "Product Categories",        zh: "产品类别",              ar: "فئات المنتجات" },
   "field.brandNames":           { en: "Brand Names",               zh: "品牌名称",              ar: "أسماء العلامات التجارية" },
   "field.brand":                { en: "Brand",                     zh: "品牌",                 ar: "العلامة التجارية" },
+  "field.brands":               { en: "Brands",                    zh: "品牌",                 ar: "العلامات التجارية" },
   "field.moq":                  { en: "MOQ (Minimum Order Quantity)", zh: "最低起订量 (MOQ)",    ar: "الحد الأدنى للطلب (MOQ)" },
   "field.leadTime":             { en: "Lead Time",                 zh: "交货期",               ar: "وقت التسليم" },
   "field.totalPurchases":       { en: "Total Purchases",           zh: "总采购额",              ar: "إجمالي المشتريات" },

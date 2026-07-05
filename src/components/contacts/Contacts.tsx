@@ -6444,7 +6444,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* ── Classification & Segmentation (customer only — Commercial tab) ── */}
-        {c.contact_type === "customer" && detailTab("commercial") && (c.industry || c.source || (Array.isArray(c.tags) && c.tags.length > 0) || c.account_manager) && (
+        {c.contact_type === "customer" && detailTab("commercial") && (c.industry || c.source || (Array.isArray(c.tags) && c.tags.length > 0) || (Array.isArray(c.brand_names) && c.brand_names.length > 0) || c.account_manager) && (
           <Section title={t("section.classification")} icon={<TagsIcon size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.industry && (
@@ -6466,6 +6466,16 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
               )}
             </div>
+            {Array.isArray(c.brand_names) && c.brand_names.length > 0 && (
+              <div className="mt-3">
+                <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider block mb-1.5">{t("field.brands", "Brands")}</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {c.brand_names.map((b: string, i: number) => (
+                    <span key={i} className="px-2 py-0.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-secondary)]">{b}</span>
+                  ))}
+                </div>
+              </div>
+            )}
             {Array.isArray(c.tags) && c.tags.length > 0 && (
               <div className="mt-3">
                 <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider block mb-1.5">{t("field.tags")}</span>
@@ -8271,6 +8281,18 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <SelectInput label={t("field.source")} value={form.source} onChange={v => setField("source", v)} options={LEAD_SOURCES} icon={<TargetIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
               </div>
               <EmployeeSelect label={t("field.accountManager")} value={form.account_manager} onChange={v => setField("account_manager", v)} placeholder={t("field.selectEmployee", "Select an employee…")} />
+              {/* Brands — free-text, add as many as needed (Enter or the Add button) */}
+              <div>
+                <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.brands", "Brands")}</label>
+                <TagInput
+                  values={form.brand_names}
+                  onChange={(next) => setField("brand_names", next)}
+                  placeholder={t("add.brand", "Type a brand and press Enter")}
+                  icon={<TagsIcon size={13} />}
+                  addLabel={t("btn.add")}
+                  duplicateLabel={t("hint.brandAlreadyAdded", "Already added — pick a different name")}
+                />
+              </div>
               <div>
                 <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.tags")}</label>
                 <div className="flex flex-wrap gap-1.5 mb-2">
