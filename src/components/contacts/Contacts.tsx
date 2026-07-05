@@ -4835,7 +4835,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {/* Status filter (All / Active / Not Active) — suppliers + customers.
             Customers say "Not Active"; suppliers keep "Archived". */}
         {(filterType === "supplier" || filterType === "customer") && (
-          <div className="flex gap-1 mt-3 overflow-x-auto no-scrollbar">
+          <div className="flex w-fit max-w-full gap-1 mt-3 p-1 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] overflow-x-auto no-scrollbar">
             {([
               { k: "all", label: t("sd.statusAll", "All") },
               { k: "active", label: t("sd.active", "Active") },
@@ -4858,7 +4858,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Individual vs Company filter — customer/company/people views. */}
         {(filterType === "customer" || filterType === "company" || filterType === "people") && (
-          <div className="flex gap-1 mt-2 overflow-x-auto no-scrollbar">
+          <div className="flex w-fit max-w-full gap-1 mt-2 p-1 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] overflow-x-auto no-scrollbar">
             {([
               { k: "all", label: t("filter.everyone", "Everyone"), icon: null },
               { k: "person", label: t("filter.individuals", "Individuals"), icon: <UserIcon size={13} /> },
@@ -4884,7 +4884,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             the wider list panel fits all six. Falls back to horizontal scroll
             only on unusually narrow viewports. */}
         {filterType === "customer" && (
-          <div className="flex gap-1 mt-2 overflow-x-auto no-scrollbar">
+          <div className="flex w-fit max-w-full gap-1 mt-2 p-1 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] overflow-x-auto no-scrollbar">
             <button
               onClick={() => setTierFilter("all")}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
