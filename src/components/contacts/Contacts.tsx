@@ -5604,33 +5604,6 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </div>
         </div>
 
-        {/* Planning + Project-tasks strips — upcoming Planning items
-            and open Project tasks that reference this contact. Renders
-            for every contact type (customer / supplier / other). */}
-        <div className="px-4 md:px-6 py-3 border-b border-[var(--border-color)] space-y-3">
-          <EntityPlanningStrip
-            entityType={
-              c.contact_type === "customer"
-                ? "customer"
-                : c.contact_type === "supplier"
-                  ? "supplier"
-                  : "contact"
-            }
-            entityId={c.id}
-          />
-          <EntityTasksStrip
-            entityType={
-              c.contact_type === "customer"
-                ? "customer"
-                : c.contact_type === "supplier"
-                  ? "supplier"
-                  : "contact"
-            }
-            entityId={c.id}
-          />
-          {c.contact_type === "customer" && <EntityInvoicesStrip customerId={c.id} />}
-        </div>
-
         {/* Premium tabs (Customer only) */}
         {isCustomerDetail && (
           <CustomerTabBar activeTab={customerTab} onChange={setCustomerTab} translate={(k, f) => t(k, f)} />
@@ -6924,6 +6897,34 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">{c.notes}</p>
           </Section>
         )}
+
+        {/* Planning + Project-tasks + Invoices strips — linked records that
+            reference this contact. Rendered at the BOTTOM of the detail (was at
+            the top) so the record's own profile reads first. Shown on every
+            contact type / tab, unchanged from before — only its position moved. */}
+        <div className="px-4 md:px-6 py-3 space-y-3">
+          <EntityPlanningStrip
+            entityType={
+              c.contact_type === "customer"
+                ? "customer"
+                : c.contact_type === "supplier"
+                  ? "supplier"
+                  : "contact"
+            }
+            entityId={c.id}
+          />
+          <EntityTasksStrip
+            entityType={
+              c.contact_type === "customer"
+                ? "customer"
+                : c.contact_type === "supplier"
+                  ? "supplier"
+                  : "contact"
+            }
+            entityId={c.id}
+          />
+          {c.contact_type === "customer" && <EntityInvoicesStrip customerId={c.id} />}
+        </div>
 
         {/* Delete confirmation is rendered once at the top level (see main
             return) so it works from every entry point, including supplier
