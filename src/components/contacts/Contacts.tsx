@@ -2730,6 +2730,14 @@ const ALL_COUNTRIES: CountryOption[] = Country.getAllCountries().map(c => ({
 
 /* All country names — for the Registration Country dropdown. */
 const COUNTRY_NAMES: string[] = ALL_COUNTRIES.map(c => c.name);
+/* Bidirectional lookups so a country stored as only a code (→ full name) or
+   only a name (→ ISO code for the flag) can always be resolved to both. */
+const COUNTRY_CODE_TO_NAME: Map<string, string> = new Map(
+  ALL_COUNTRIES.map(c => [c.isoCode.toUpperCase(), c.name]),
+);
+const COUNTRY_NAME_TO_CODE: Map<string, string> = new Map(
+  ALL_COUNTRIES.map(c => [c.name.trim().toLowerCase(), c.isoCode.toUpperCase()]),
+);
 /* Year options for "Year Established" — current year back to 1950. */
 const ESTABLISHED_YEARS: string[] = (() => {
   const now = new Date().getFullYear();
@@ -5171,13 +5179,18 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         const countryMap = new Map<string, { code: string; name: string; count: number }>();
         for (const c of contacts) {
           if (c.contact_type !== filterType) continue;
-          const code = String(c.country_code || "").trim().toUpperCase();
-          const name = String(c.country || "").trim();
-          if (!code && !name) continue;
+          let code = String(c.country_code || "").trim().toUpperCase();
+          const rawName = String(c.country || "").trim();
+          if (!code && !rawName) continue;
+          /* Resolve BOTH fields from the country dataset: a record with only a
+             code gets its full name; a record with only a name gets its ISO code
+             (so the flag renders instead of a blank white flag). */
+          if (!code && rawName) code = COUNTRY_NAME_TO_CODE.get(rawName.toLowerCase()) || "";
+          const name = COUNTRY_CODE_TO_NAME.get(code) || rawName || code;
           const key = code || name.toLowerCase();
           const cur = countryMap.get(key);
           if (cur) cur.count += 1;
-          else countryMap.set(key, { code, name: name || code, count: 1 });
+          else countryMap.set(key, { code, name, count: 1 });
         }
         const countryStats = Array.from(countryMap.values()).sort((a, b) => b.count - a.count);
         const countryMax = countryStats.reduce((m, x) => Math.max(m, x.count), 0);
@@ -5281,8 +5294,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
                     {topCountries.map((cty) => (
                       <div key={cty.code || cty.name} className="flex items-center gap-3">
-                        <span className="text-base w-6 text-center shrink-0" aria-hidden>{cty.code ? countryCodeToFlag(cty.code) : "🏳️"}</span>
-                        <span className="text-xs font-medium w-24 truncate text-[var(--text-secondary)]" title={cty.name}>{cty.name}</span>
+                        <span className="text-base w-6 text-center shrink-0" aria-hidden>{countryCodeToFlag(cty.code) || "🏳️"}</span>
+                        <span className="text-xs font-medium w-32 shrink-0 truncate text-[var(--text-secondary)]" title={cty.name}>{cty.name}</span>
                         <div className="flex-1 h-2 bg-[var(--bg-surface)] rounded-full overflow-hidden">
                           <div
                             className="h-full bg-blue-500 rounded-full transition-all duration-500"
