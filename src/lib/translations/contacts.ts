@@ -679,6 +679,7 @@ export const contactsT: Translations = {
   "detail.present":         { en: "Present",              zh: "至今",                 ar: "حتى الآن" },
   "detail.type":            { en: "Type",                 zh: "类型",                 ar: "النوع" },
   "detail.activeCustomer":  { en: "Active Customer",      zh: "活跃客户",              ar: "عميل نشط" },
+  "detail.activeCustomerHint": { en: "When off, the customer shows as Inactive and its tier is dimmed in the list", zh: "关闭后，客户显示为停用，其等级在列表中变暗", ar: "عند الإيقاف، يظهر العميل كغير نشط ويتم تعتيم فئته في القائمة" },
   "detail.outstanding":     { en: "Outstanding",          zh: "未结",                 ar: "مستحق" },
   "detail.creditLimit":     { en: "Credit Limit",         zh: "信用额度",              ar: "الحد الائتماني" },
   "detail.lastOrder":       { en: "Last Order",           zh: "最后订单",              ar: "آخر طلب" },

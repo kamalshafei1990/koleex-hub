@@ -5368,16 +5368,24 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                         <span className="text-sm font-medium text-[var(--text-primary)] truncate">
                           {contactDisplayName(c)}
                         </span>
-                        {tierInfo && (
-                          <span
-                            className="text-[10px] px-1.5 py-0.5 rounded font-semibold"
-                            style={{ backgroundColor: TIER_COLOR_META[tierInfo.value].tintBg }}
-                          >
-                            <span className="kx-tier-metal" style={tierTextStyle(TIER_COLOR_META[tierInfo.value])}>
+                        {tierInfo && (() => {
+                          const active = (c.is_active ?? true) !== false;
+                          // Active → shiny material tier color; inactive → dimmed neutral badge.
+                          return active ? (
+                            <span
+                              className="text-[10px] px-1.5 py-0.5 rounded font-semibold"
+                              style={{ backgroundColor: TIER_COLOR_META[tierInfo.value].tintBg }}
+                            >
+                              <span className="kx-tier-metal" style={tierTextStyle(TIER_COLOR_META[tierInfo.value])}>
+                                {tierInfo.label}
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-[var(--bg-surface)] text-[var(--text-dim)] opacity-70">
                               {tierInfo.label}
                             </span>
-                          </span>
-                        )}
+                          );
+                        })()}
                       </div>
                       {/* Company name — its own line directly under the customer name. */}
                       {showCo && (
@@ -8339,6 +8347,42 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </FormSection>
         )}
 
+        {/* Customer Type — first section on the Commercial tab: active status + tier */}
+        {isCustomer && showTab("commercial") && (
+          <FormSection title={t("section.customerType")} icon={<CrownIcon size={14} />}>
+            <div className="space-y-3">
+              <ToggleSwitch
+                label={t("detail.activeCustomer")}
+                hint={t("detail.activeCustomerHint", "When off, the customer shows as Inactive and its tier is dimmed in the list")}
+                checked={form.is_active}
+                onChange={v => setField("is_active", v)}
+              />
+              {form.is_active && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {CUSTOMER_TIERS.map(tier => (
+                    <button
+                      key={tier.value}
+                      onClick={() => setField("customer_type", form.customer_type === tier.value ? "" : tier.value)}
+                      className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                        form.customer_type === tier.value
+                          ? `${tier.bg} ${tier.color} border-[var(--border-focus)] ring-1 ring-white/10`
+                          : "border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-subtle)] hover:border-[var(--border-strong)]"
+                      }`}
+                    >
+                      {tier.value === "end_user" && <UserIcon size={14} />}
+                      {tier.value === "silver" && <ShieldIcon size={14} />}
+                      {tier.value === "gold" && <StarIcon size={14} />}
+                      {tier.value === "platinum" && <AwardIcon size={14} />}
+                      {tier.value === "diamond" && <GemIcon size={14} />}
+                      {tier.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </FormSection>
+        )}
+
         {/* ── Classification & Segmentation (customer only — Commercial tab) ── */}
         {isCustomer && showTab("commercial") && (
           <FormSection title={t("section.classification")} kxComponent="ClassificationFormSection" kxModule={filterType === "supplier" ? "Suppliers" : filterType === "customer" ? "Customers" : "Contacts"} kxSection="Intelligence" icon={<TagsIcon size={14} />}>
@@ -10268,46 +10312,6 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </div>
         </FormSection>
         </>
-        )}
-
-        {/* Customer Type (only for customer contacts — Commercial tab) */}
-        {isCustomer && showTab("commercial") && (
-          <FormSection title={t("section.customerType")} icon={<CrownIcon size={14} />}>
-            <div className="space-y-3">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.is_active}
-                  onChange={e => setField("is_active", e.target.checked)}
-                  className="w-4 h-4 rounded border-[var(--border-focus)] bg-[var(--bg-surface)] accent-blue-500"
-                />
-                <span className="text-sm text-[var(--text-primary)]">{t("detail.activeCustomer")}</span>
-              </label>
-
-              {form.is_active && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {CUSTOMER_TIERS.map(tier => (
-                    <button
-                      key={tier.value}
-                      onClick={() => setField("customer_type", form.customer_type === tier.value ? "" : tier.value)}
-                      className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
-                        form.customer_type === tier.value
-                          ? `${tier.bg} ${tier.color} border-[var(--border-focus)] ring-1 ring-white/10`
-                          : "border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-subtle)] hover:border-[var(--border-strong)]"
-                      }`}
-                    >
-                      {tier.value === "end_user" && <UserIcon size={14} />}
-                      {tier.value === "silver" && <ShieldIcon size={14} />}
-                      {tier.value === "gold" && <StarIcon size={14} />}
-                      {tier.value === "platinum" && <AwardIcon size={14} />}
-                      {tier.value === "diamond" && <GemIcon size={14} />}
-                      {tier.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </FormSection>
         )}
 
         {/* Spacer at bottom */}
