@@ -1828,8 +1828,11 @@ export function formToRow(f: ContactForm): Record<string, unknown> {
 
 /* ── Detail view section wrapper ── */
 const Section = React.memo(function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+  /* Separated rounded shell — matches the Supplier 360 section cards
+     (mx-4/6, rounded-2xl, bordered --bg-secondary surface) instead of the
+     old flat full-width border-b rows. */
   return (
-    <div className="border-b border-[var(--border-color)] px-4 md:px-6 py-4">
+    <div className="mx-4 md:mx-6 my-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 md:px-5 py-4">
       <div className="flex items-center gap-2 mb-3">
         <span className="text-[var(--text-dim)]">{icon}</span>
         <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{title}</h3>
