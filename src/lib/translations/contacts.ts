@@ -556,6 +556,7 @@ export const contactsT: Translations = {
 
   /* ── Related Person Fields ── */
   "field.name":                 { en: "Name",                      zh: "姓名",                 ar: "الاسم" },
+  "field.selectEmployee":       { en: "Select an employee…",       zh: "选择员工…",             ar: "اختر موظفًا…" },
   "field.relationship":         { en: "Relationship",              zh: "关系",                 ar: "العلاقة" },
   "field.notes":                { en: "Notes",                     zh: "备注",                 ar: "ملاحظات" },
   "field.email":                { en: "Email",                     zh: "邮箱",                 ar: "البريد الإلكتروني" },

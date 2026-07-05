@@ -1955,6 +1955,214 @@ const Input = React.memo(function Input({ label, value, onChange, type = "text",
   );
 });
 
+/* ── Team-member picker (Account Manager / Backup) ───────────────────────────
+   A searchable dropdown of Koleex Hub users that have an account, each shown
+   with their avatar, name, and department/position. Selecting one stores the
+   person's display name into the text column (schema unchanged), so the detail
+   view keeps rendering the plain name. The trigger re-derives the avatar by
+   matching the stored name back to a team member. */
+interface TeamMember {
+  account_id: string;
+  username: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  department: string | null;
+  position: string | null;
+}
+
+// One fetch shared by every EmployeeSelect on the page (both AM + Backup).
+let _teamCache: TeamMember[] | null = null;
+let _teamPromise: Promise<TeamMember[]> | null = null;
+function loadTeamMembers(): Promise<TeamMember[]> {
+  if (_teamCache) return Promise.resolve(_teamCache);
+  if (!_teamPromise) {
+    _teamPromise = fetch("/api/contacts/team-members", { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : { members: [] }))
+      .then((d) => {
+        _teamCache = (d.members ?? []) as TeamMember[];
+        return _teamCache;
+      })
+      .catch(() => {
+        _teamPromise = null; // allow retry on next mount
+        return [] as TeamMember[];
+      });
+  }
+  return _teamPromise;
+}
+
+function memberLabel(m: TeamMember): string {
+  return (m.full_name || m.username || "").trim();
+}
+function memberInitials(m: TeamMember): string {
+  const src = memberLabel(m);
+  const parts = src.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+const TeamAvatar = React.memo(function TeamAvatar({ m, size = 24 }: { m: TeamMember; size?: number }) {
+  if (m.avatar_url) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return (
+      <img
+        src={m.avatar_url}
+        alt=""
+        width={size}
+        height={size}
+        className="rounded-full object-cover shrink-0 border border-[var(--border-subtle)]"
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+  return (
+    <span
+      className="rounded-full shrink-0 flex items-center justify-center bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] text-[var(--text-secondary)] font-semibold"
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.4) }}
+    >
+      {memberInitials(m)}
+    </span>
+  );
+});
+
+const EmployeeSelect = React.memo(function EmployeeSelect({ label, value, onChange, placeholder, tier, help }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; tier?: FieldTier; help?: string;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [members, setMembers] = React.useState<TeamMember[]>(_teamCache ?? []);
+  const [loading, setLoading] = React.useState(!_teamCache);
+  const [q, setQ] = React.useState("");
+  const ref = React.useRef<HTMLDivElement>(null);
+  const searchRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    let alive = true;
+    if (_teamCache) { setMembers(_teamCache); setLoading(false); return; }
+    setLoading(true);
+    loadTeamMembers().then((list) => { if (alive) { setMembers(list); setLoading(false); } });
+    return () => { alive = false; };
+  }, []);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("keydown", onKey);
+    // focus the search box when the menu opens
+    const tmr = setTimeout(() => searchRef.current?.focus(), 30);
+    return () => { document.removeEventListener("mousedown", h); document.removeEventListener("keydown", onKey); clearTimeout(tmr); };
+  }, [open]);
+
+  const selected = React.useMemo(
+    () => members.find((m) => memberLabel(m).toLowerCase() === (value || "").trim().toLowerCase()) || null,
+    [members, value],
+  );
+  const filtered = React.useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return members;
+    return members.filter((m) =>
+      `${m.full_name || ""} ${m.username} ${m.department || ""} ${m.position || ""}`.toLowerCase().includes(term),
+    );
+  }, [members, q]);
+
+  const pick = (m: TeamMember) => { onChange(memberLabel(m)); setOpen(false); setQ(""); };
+
+  return (
+    <div ref={ref} className="relative">
+      <label className="text-xs text-[var(--text-faint)] mb-1 flex items-center gap-1">{label}<FieldMark tier={tier} />{help && <GuidanceTip guidanceId={help} size="xs" />}</label>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full h-10 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] hover:border-[var(--border-focus)] focus:border-[var(--border-focus)] outline-none transition-colors flex items-center gap-2 ps-2 pe-2 text-start"
+      >
+        {selected ? (
+          <>
+            <TeamAvatar m={selected} size={26} />
+            <span className="flex-1 min-w-0 truncate text-sm text-[var(--text-primary)]">{memberLabel(selected)}</span>
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => { e.stopPropagation(); onChange(""); }}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); onChange(""); } }}
+              className="shrink-0 p-1 rounded-md text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]"
+              aria-label="Clear"
+            >
+              <CrossIcon size={13} />
+            </span>
+          </>
+        ) : value ? (
+          // stored name that no longer matches an active account — still show it
+          <>
+            <span className="w-[26px] h-[26px] rounded-full shrink-0 flex items-center justify-center bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] text-[var(--text-secondary)]"><UserCogIcon size={14} /></span>
+            <span className="flex-1 min-w-0 truncate text-sm text-[var(--text-primary)]">{value}</span>
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => { e.stopPropagation(); onChange(""); }}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); onChange(""); } }}
+              className="shrink-0 p-1 rounded-md text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]"
+              aria-label="Clear"
+            >
+              <CrossIcon size={13} />
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="w-[26px] h-[26px] rounded-full shrink-0 flex items-center justify-center text-[var(--text-ghost)]"><UserCogIcon size={15} /></span>
+            <span className="flex-1 min-w-0 truncate text-sm text-[var(--text-ghost)]">{placeholder || label}</span>
+            <AngleDownIcon size={14} className="shrink-0 text-[var(--text-ghost)]" />
+          </>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute z-30 mt-1 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl overflow-hidden">
+          <div className="p-2 border-b border-[var(--border-subtle)]">
+            <div className="relative">
+              <span className="absolute start-2.5 top-1/2 -translate-y-1/2 text-[var(--text-ghost)]"><SearchIcon size={13} /></span>
+              <input
+                ref={searchRef}
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search team…"
+                className="w-full h-9 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] focus:border-[var(--border-focus)] outline-none text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] ps-8 pe-3"
+              />
+            </div>
+          </div>
+          <div className="max-h-64 overflow-y-auto py-1">
+            {loading ? (
+              <div className="px-3 py-6 text-center text-xs text-[var(--text-ghost)]">Loading…</div>
+            ) : filtered.length === 0 ? (
+              <div className="px-3 py-6 text-center text-xs text-[var(--text-ghost)]">No team members found</div>
+            ) : (
+              filtered.map((m) => {
+                const isSel = selected?.account_id === m.account_id;
+                const sub = [m.position, m.department].filter(Boolean).join(" · ");
+                return (
+                  <button
+                    key={m.account_id}
+                    type="button"
+                    onClick={() => pick(m)}
+                    className={`w-full flex items-center gap-2.5 px-2.5 py-2 text-start transition-colors ${isSel ? "bg-[var(--bg-surface-hover)]" : "hover:bg-[var(--bg-surface-hover)]"}`}
+                  >
+                    <TeamAvatar m={m} size={30} />
+                    <span className="flex-1 min-w-0">
+                      <span className="block truncate text-sm text-[var(--text-primary)]">{memberLabel(m)}</span>
+                      {sub && <span className="block truncate text-[11px] text-[var(--text-dim)]">{sub}</span>}
+                    </span>
+                    {isSel && <CheckIcon size={14} className="shrink-0 text-[var(--text-secondary)]" />}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
+
 /* ── Clock time picker (brand-styled, replaces the native <input type=time>) ──
    Stores "HH:MM" (24h) so the saved value format is unchanged. Opens a compact
    monochrome popover with hour + minute columns. */
@@ -8037,7 +8245,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <SelectInput label={t("field.industry")} value={form.industry} onChange={v => setField("industry", v)} options={INDUSTRIES} icon={<FactoryIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
                 <SelectInput label={t("field.source")} value={form.source} onChange={v => setField("source", v)} options={LEAD_SOURCES} icon={<TargetIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
               </div>
-              <Input label={t("field.accountManager")} value={form.account_manager} onChange={v => setField("account_manager", v)} placeholder={t("field.name")} icon={<UserCogIcon size={14} />} />
+              <EmployeeSelect label={t("field.accountManager")} value={form.account_manager} onChange={v => setField("account_manager", v)} placeholder={t("field.selectEmployee", "Select an employee…")} />
               <div>
                 <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.tags")}</label>
                 <div className="flex flex-wrap gap-1.5 mb-2">
@@ -8207,7 +8415,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Input label={t("field.salesRep", "Sales Rep")} value={form.sales_rep} onChange={v => setField("sales_rep", v)} placeholder={t("field.name")} icon={<UserIcon size={14} />} />
-                <Input label={t("field.backupAM", "Backup Account Manager")} value={form.backup_account_manager} onChange={v => setField("backup_account_manager", v)} placeholder={t("field.name")} icon={<UserCogIcon size={14} />} />
+                <EmployeeSelect label={t("field.backupAM", "Backup Account Manager")} value={form.backup_account_manager} onChange={v => setField("backup_account_manager", v)} placeholder={t("field.selectEmployee", "Select an employee…")} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Input label={t("field.sourceDetails", "Source Details")} value={form.source_details} onChange={v => setField("source_details", v)} placeholder={t("placeholder.sourceCampaign", "Campaign / event")} icon={<TargetIcon size={14} />} />
