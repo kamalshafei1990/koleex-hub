@@ -5280,7 +5280,6 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
            live contacts, so a customer added from a new country appears here
            automatically. Not capped; the list scrolls inside the card. */
         const topCountries = countryStats;
-        const inactive = moduleKpis.total - moduleKpis.active;
         return (
           <div className="h-full overflow-y-auto">
             <div className="w-full px-4 md:px-6 py-6 md:py-8 space-y-4 md:space-y-6">
@@ -5290,13 +5289,38 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <p className="text-sm text-[var(--text-faint)] mt-1">{t("kpi.keyMetrics")}</p>
               </div>
 
-              {/* Main KPI Row */}
+              {/* Explore — two compact entry points to the deeper customer
+                  surfaces, mirroring the Supplier Overview's feature cards
+                  (Main Suppliers / Sourcing Command Center). */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {[
+                  { href: "/crm", icon: <TargetIcon size={18} />, title: t("customer.crmPipeline", "CRM Pipeline"), desc: t("customer.crmPipelineDesc", "Opportunities, deals & follow-ups across your customer book") },
+                  { href: "/commercial-policy", icon: <DollarSignIcon size={18} />, title: t("customer.commercialPolicy", "Commercial Policy & Pricing"), desc: t("customer.commercialPolicyDesc", "Customer tiers, price levels, discounts & credit rules") },
+                ].map((c) => (
+                  <Link
+                    key={c.href}
+                    href={c.href}
+                    className="group flex items-center gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-3.5 transition-colors hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)]"
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)]">
+                      {c.icon}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13.5px] font-semibold text-[var(--text-primary)] truncate">{c.title}</p>
+                      <p className="text-[11px] text-[var(--text-faint)] mt-0.5 line-clamp-2">{c.desc}</p>
+                    </div>
+                    <AngleRightIcon size={14} className="shrink-0 text-[var(--text-ghost)] group-hover:text-[var(--text-secondary)] rtl:rotate-180" />
+                  </Link>
+                ))}
+              </div>
+
+              {/* Main KPI Row — neutral chip styling, same as Supplier Overview */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                 {/* Total */}
                 <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
                   <div className="flex items-center gap-2 mb-3">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/10">
-                      <CrownIcon size={16} className="text-amber-400" />
+                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+                      <CrownIcon size={16} className="text-[var(--text-secondary)]" />
                     </div>
                     <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-faint)]">{t("kpi.total")}</span>
                   </div>
@@ -5305,38 +5329,38 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
 
                 {/* Active */}
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-emerald-500/20">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
                   <div className="flex items-center gap-2 mb-3">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/10">
-                      <UserCheckIcon size={16} className="text-emerald-400" />
+                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+                      <UserCheckIcon size={16} className="text-[var(--text-secondary)]" />
                     </div>
-                    <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-400/60">{t("kpi.active")}</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-faint)]">{t("kpi.active")}</span>
                   </div>
-                  <p className="text-2xl md:text-3xl font-bold text-emerald-400">{moduleKpis.active}</p>
+                  <p className="text-2xl md:text-3xl font-bold text-[var(--text-primary)]">{moduleKpis.active}</p>
                   <p className="text-xs text-[var(--text-dim)] mt-1">{moduleKpis.total > 0 ? Math.round((moduleKpis.active / moduleKpis.total) * 100) : 0}% {t("kpi.ofTotal")}</p>
                 </div>
 
                 {/* VIP */}
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-violet-500/20">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
                   <div className="flex items-center gap-2 mb-3">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-violet-500/10">
-                      <GemIcon size={16} className="text-violet-400" />
+                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+                      <GemIcon size={16} className="text-[var(--text-secondary)]" />
                     </div>
-                    <span className="text-[10px] font-semibold uppercase tracking-widest text-violet-400/60">{t("kpi.vip")}</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-faint)]">{t("kpi.vip")}</span>
                   </div>
-                  <p className="text-2xl md:text-3xl font-bold text-violet-400">{moduleKpis.vip}</p>
+                  <p className="text-2xl md:text-3xl font-bold text-[var(--text-primary)]">{moduleKpis.vip}</p>
                   <p className="text-xs text-[var(--text-dim)] mt-1">{t("kpi.diamondPlatinum")}</p>
                 </div>
 
                 {/* Countries */}
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-blue-500/20">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
                   <div className="flex items-center gap-2 mb-3">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/10">
-                      <MapPinnedIcon size={16} className="text-blue-400" />
+                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+                      <MapPinnedIcon size={16} className="text-[var(--text-secondary)]" />
                     </div>
-                    <span className="text-[10px] font-semibold uppercase tracking-widest text-blue-400/60">{t("kpi.countries")}</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-faint)]">{t("kpi.countries")}</span>
                   </div>
-                  <p className="text-2xl md:text-3xl font-bold text-blue-400">{moduleKpis.countries}</p>
+                  <p className="text-2xl md:text-3xl font-bold text-[var(--text-primary)]">{moduleKpis.countries}</p>
                   <p className="text-xs text-[var(--text-dim)] mt-1">{t("kpi.globalReach")}</p>
                 </div>
               </div>
@@ -5393,32 +5417,16 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
               )}
 
-              {/* Status Breakdown */}
-              <div className="grid grid-cols-2 gap-3 md:gap-4">
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                    <span className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{t("kpi.active")}</span>
-                  </div>
-                  <p className="text-3xl font-bold text-emerald-400">{moduleKpis.active}</p>
-                </div>
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-2 h-2 rounded-full bg-red-400" />
-                    <span className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{t("kpi.inactive")}</span>
-                  </div>
-                  <p className="text-3xl font-bold text-red-400">{inactive}</p>
-                </div>
-              </div>
-
-              {/* New This Month */}
+              {/* New This Month — neutral trend card, same as Supplier Overview.
+                  (The old Active/Inactive 2-col block was removed: it repeated
+                  the Active KPI above; the supplier layout has no such block.) */}
               {moduleKpis.newThisMonth > 0 && (
                 <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 flex items-center gap-4">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-green-500/10">
-                    <TrendingUpIcon size={20} className="text-green-400" />
+                  <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+                    <TrendingUpIcon size={20} className="text-[var(--text-secondary)]" />
                   </div>
                   <div>
-                    <p className="text-xl font-bold text-green-400">+{moduleKpis.newThisMonth}</p>
+                    <p className="text-xl font-bold text-[var(--text-primary)]">+{moduleKpis.newThisMonth}</p>
                     <p className="text-xs text-[var(--text-faint)]">{t("kpi.newCustomersMonth")}</p>
                   </div>
                 </div>
