@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
 import { getTierColor, tierTextStyle, TIER_COLOR_META } from "@/lib/customer-tiers";
+import { ImageLightbox } from "@/components/quotations/ImageLightbox";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
@@ -3830,6 +3831,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const [rlsCopied, setRlsCopied] = useState(false);
   /* Customer premium tab — used by both form and detail views for customers */
   const [customerTab, setCustomerTab] = useState<CustomerTab>("overview");
+  /* Business-card / photo lightbox — click any card image to expand it in a
+     framed viewer with a Download button (same UX as the Quotations app). */
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   /* Reset to overview whenever the form/detail opens for a different customer */
   useEffect(() => {
     if (view === "form" || view === "detail") setCustomerTab("overview");
@@ -5585,6 +5589,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
     return (
       <div className="h-full overflow-y-auto">
+        {/* Framed photo viewer for business-card / image clicks (Quotations UX). */}
+        <ImageLightbox src={lightboxSrc || ""} open={!!lightboxSrc} onClose={() => setLightboxSrc(null)} />
         {/* ─── Suppliers-style identity hero ───
              Bordered identity card → back + Edit/Delete top bar → big logo
              tile → name → chip row (type · location · tier · status) → key
@@ -5909,13 +5915,17 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               {c.business_card_front && (
                 <div>
                   <span className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("detail.front")}</span>
-                  <img src={c.business_card_front!} alt="Business Card Front" className="w-full rounded-lg border border-[var(--border-color)]" loading="lazy" decoding="async" />
+                  <button type="button" onClick={() => setLightboxSrc(c.business_card_front!)} className="block w-full cursor-zoom-in rounded-lg overflow-hidden border border-[var(--border-color)] transition-colors hover:border-[var(--border-focus)]" title={t("detail.front")}>
+                    <img src={c.business_card_front!} alt="Business Card Front" className="w-full block" loading="lazy" decoding="async" />
+                  </button>
                 </div>
               )}
               {c.business_card_back && (
                 <div>
                   <span className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("detail.back")}</span>
-                  <img src={c.business_card_back!} alt="Business Card Back" className="w-full rounded-lg border border-[var(--border-color)]" loading="lazy" decoding="async" />
+                  <button type="button" onClick={() => setLightboxSrc(c.business_card_back!)} className="block w-full cursor-zoom-in rounded-lg overflow-hidden border border-[var(--border-color)] transition-colors hover:border-[var(--border-focus)]" title={t("detail.back")}>
+                    <img src={c.business_card_back!} alt="Business Card Back" className="w-full block" loading="lazy" decoding="async" />
+                  </button>
                 </div>
               )}
             </div>
