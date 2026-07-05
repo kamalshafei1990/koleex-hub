@@ -3717,8 +3717,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       .catch(() => {});
     return () => { alive = false; };
   }, []);
-  /* Active/Archived status filter — surfaced only in the supplier view. */
+  /* Active/Archived status filter — surfaced in the supplier + customer views. */
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "archived">("all");
+  /* Individual vs Company filter — customer/company/people views. */
+  const [entityFilter, setEntityFilter] = useState<"all" | "person" | "company">("all");
   const [form, setForm] = useState<ContactForm>({ ...EMPTY_FORM });
   /* Department filter for the supplier form — null = show all sections.
      Lets a Finance/Legal/QC owner collapse the form to just their fields. */
@@ -3957,6 +3959,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       const wantActive = statusFilter === "active";
       list = list.filter(c => ((c.is_active ?? true) !== false) === wantActive);
     }
+    if (entityFilter !== "all") {
+      list = list.filter(c => c.entity_type === entityFilter);
+    }
     if (debouncedSearch.trim()) {
       /* Smart search: builds one haystack per contact from every supplier-related
          field (incl. the Chinese company name and messaging-app IDs), then
@@ -3974,8 +3979,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           contactDisplayName(c), s("first_name"), s("last_name"), s("company"),
           s("company_name_en"), s("company_name_cn"), s("trading_name"), s("supplier_code"),
           s("email"), s("supplier_email"), s("phone"), s("supplier_tel"), s("supplier_mobile"),
-          s("whatsapp_business"), s("wechat_id"), s("website"),
-          s("country"), s("province"), s("city"), s("division"), s("category"),
+          s("whatsapp"), s("whatsapp_business"), s("wechat_id"), s("website"), s("supplier_website"),
+          s("country"), s("country_code"), s("province"), s("state"), s("city"), s("address"),
+          s("division"), s("category"), s("sub_industry"), s("industry"),
+          /* customer-specific identifiers so the customer directory search
+             covers "anything", not just the name. */
+          s("customer_code"), s("customer_type"), s("price_list_tier"), s("sales_rep"),
+          s("tax_id"), s("vat_number"), s("position"), s("nationality"), s("primary_model"),
+          s("notes"), s("preferred_pricing_tier"),
         ];
         if (Array.isArray(c.brand_names)) parts.push(...c.brand_names);
         if (Array.isArray(c.tags)) parts.push(...c.tags);
@@ -3990,7 +4001,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       });
     }
     return list.sort((a, b) => contactSortKey(a).localeCompare(contactSortKey(b)));
-  }, [contacts, typeTab, filterType, debouncedSearch, statusFilter]);
+  }, [contacts, typeTab, filterType, debouncedSearch, statusFilter, entityFilter]);
 
   /* Typeahead suggestions — the top matches with a "why it matched" hint. */
   const searchTerms = useMemo(() => debouncedSearch.trim().toLowerCase().split(/\s+/).filter(Boolean), [debouncedSearch]);
@@ -4768,7 +4779,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           <SearchIcon size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
           <input
             type="text"
-            placeholder={filterType === "supplier" ? t("searchSuppliers", "Search suppliers — name, 中文名, country, app ID…") : filterType === "customer" ? t("searchCustomers", "Search customers…") : t("searchPlaceholder")}
+            placeholder={filterType === "supplier" ? t("searchSuppliers", "Search suppliers — name, 中文名, country, app ID…") : filterType === "customer" ? t("searchCustomers", "Search — name, company, email, phone, country, tier…") : t("searchPlaceholder")}
             value={search}
             onChange={e => setSearch(e.target.value)}
             onFocus={() => setSearchFocused(true)}
@@ -4816,24 +4827,48 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           )}
         </div>
 
-        {/* Active / Archived filter — suppliers only */}
-        {filterType === "supplier" && (
-          <div className="flex gap-1 mt-3">
+        {/* Status filter (All / Active / Not Active) — suppliers + customers.
+            Customers say "Not Active"; suppliers keep "Archived". */}
+        {(filterType === "supplier" || filterType === "customer") && (
+          <div className="flex gap-1 mt-3 overflow-x-auto no-scrollbar">
             {([
               { k: "all", label: t("sd.statusAll", "All") },
               { k: "active", label: t("sd.active", "Active") },
-              { k: "archived", label: t("sd.archived", "Archived") },
+              { k: "archived", label: filterType === "customer" ? t("filter.notActive", "Not Active") : t("sd.archived", "Archived") },
             ] as const).map(opt => (
               <button
                 key={opt.k}
                 onClick={() => setStatusFilter(opt.k)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
                   statusFilter === opt.k
                     ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]"
                     : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
                 }`}
               >
                 {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Individual vs Company filter — customer/company/people views. */}
+        {(filterType === "customer" || filterType === "company" || filterType === "people") && (
+          <div className="flex gap-1 mt-2 overflow-x-auto no-scrollbar">
+            {([
+              { k: "all", label: t("filter.everyone", "Everyone"), icon: null },
+              { k: "person", label: t("filter.individuals", "Individuals"), icon: <UserIcon size={13} /> },
+              { k: "company", label: t("filter.companies", "Companies"), icon: <Building2Icon size={13} /> },
+            ] as const).map(opt => (
+              <button
+                key={opt.k}
+                onClick={() => setEntityFilter(opt.k)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors inline-flex items-center gap-1.5 ${
+                  entityFilter === opt.k
+                    ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]"
+                    : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
+                }`}
+              >
+                {opt.icon}{opt.label}
               </button>
             ))}
           </div>
