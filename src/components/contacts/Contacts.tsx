@@ -544,8 +544,6 @@ const CUSTOMER_TABS: { id: CustomerTab; label: string; icon: React.ReactNode }[]
   { id: "trade",      label: "Trade",      icon: <ShipIcon size={14} /> },
   { id: "activity",   label: "Activity",   icon: <ClockIcon size={14} /> },
 ];
-
-const MARKET_BANDS = ["A", "B", "C", "D"];
 const COMMERCIAL_ROLES = ["Importer", "Distributor", "Wholesaler", "Retailer", "End User", "Agent", "Reseller"];
 const EXCLUSIVITY_LEVELS = ["None", "Non-Exclusive", "Exclusive"];
 const EXCLUSIVITY_SCOPES = ["Country", "Region", "Product Line", "Full Territory"];
@@ -2184,6 +2182,75 @@ const EmployeeSelect = React.memo(function EmployeeSelect({ label, value, onChan
           </div>
         </div>
       )}
+    </div>
+  );
+});
+
+/* ── Market Band field (customer) ────────────────────────────────────────────
+   The customer's Band is NOT a free A/B/C/D pick — it is governed by Commercial
+   Setup: every country is assigned to a market band there. This field resolves
+   the band from the customer's selected country (country → band map) and keeps
+   the stored value in sync, showing the band read-only with its label. */
+interface BandInfo { code: string; name: string; label: string | null }
+interface BandData { bands: BandInfo[]; countryBands: Record<string, string> }
+let _bandsCache: BandData | null = null;
+let _bandsPromise: Promise<BandData> | null = null;
+function loadBands(): Promise<BandData> {
+  if (_bandsCache) return Promise.resolve(_bandsCache);
+  if (!_bandsPromise) {
+    _bandsPromise = fetch("/api/commercial-policy/bands", { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : { bands: [], countryBands: {} }))
+      .then((d): BandData => {
+        _bandsCache = { bands: d.bands ?? [], countryBands: d.countryBands ?? {} };
+        return _bandsCache;
+      })
+      .catch((): BandData => {
+        _bandsPromise = null;
+        return { bands: [], countryBands: {} };
+      });
+  }
+  return _bandsPromise;
+}
+
+const MarketBandField = React.memo(function MarketBandField({ label, countryCode, countryName, value, onChange }: {
+  label: string; countryCode: string; countryName: string; value: string; onChange: (v: string) => void;
+}) {
+  const [data, setData] = React.useState(_bandsCache);
+  React.useEffect(() => {
+    let alive = true;
+    if (_bandsCache) { setData(_bandsCache); return; }
+    loadBands().then((d) => { if (alive) setData(d); });
+    return () => { alive = false; };
+  }, []);
+
+  const derived = countryCode ? (data?.countryBands?.[countryCode.toUpperCase()] ?? "") : "";
+  // Keep the stored band in sync with the country's band from Commercial Setup.
+  React.useEffect(() => {
+    if (derived && derived !== value) onChange(derived);
+  }, [derived]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const effective = value || derived;
+  const band = (data?.bands ?? []).find((b) => b.code === effective) || null;
+
+  return (
+    <div>
+      <label className="text-xs text-[var(--text-faint)] mb-1 flex items-center gap-1">{label}</label>
+      <div className="w-full min-h-10 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] px-3 py-2 flex items-center gap-2.5">
+        <span className="shrink-0 text-[var(--text-ghost)]"><TargetIcon size={14} /></span>
+        {band ? (
+          <span className="flex items-center gap-2 min-w-0">
+            <span className="shrink-0 inline-flex items-center justify-center h-6 min-w-6 px-1.5 rounded-md bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-xs font-bold">{band.code}</span>
+            <span className="flex flex-col min-w-0 leading-tight">
+              <span className="text-sm text-[var(--text-primary)] truncate">{band.name}{band.label ? ` · ${band.label}` : ""}</span>
+              {countryName && <span className="text-[11px] text-[var(--text-dim)] truncate">From {countryName} · Commercial Setup</span>}
+            </span>
+          </span>
+        ) : countryCode && data && !derived ? (
+          <span className="text-sm text-[var(--text-dim)]">No band assigned for {countryName || countryCode} in Commercial Setup</span>
+        ) : (
+          <span className="text-sm text-[var(--text-ghost)]">Set the customer&apos;s country to assign the band</span>
+        )}
+      </div>
     </div>
   );
 });
@@ -8445,7 +8512,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           <FormSection title={t("section.commercialProfile", "Commercial Profile")} kxComponent="CommercialFormSection" kxModule={filterType === "supplier" ? "Suppliers" : filterType === "customer" ? "Customers" : "Contacts"} kxSection="Commercial & logistics" icon={<BriefcaseIcon size={14} />}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <SelectInput label={t("field.marketBand", "Market Band")} value={form.market_band} onChange={v => setField("market_band", v)} options={MARKET_BANDS} icon={<TargetIcon size={14} />} selectLabel={t("detail.select")} />
+                <MarketBandField label={t("field.marketBand", "Market Band")} countryCode={form.country_code} countryName={form.country} value={form.market_band} onChange={v => setField("market_band", v)} />
                 <SelectInput label={t("field.commercialRole", "Commercial Role")} value={form.commercial_role} onChange={v => setField("commercial_role", v)} options={COMMERCIAL_ROLES} icon={<HandCoinsIcon size={14} />} selectLabel={t("detail.select")} />
               </div>
               <div className="grid grid-cols-2 gap-3">
