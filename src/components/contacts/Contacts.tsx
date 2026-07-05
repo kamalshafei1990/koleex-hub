@@ -10055,9 +10055,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <span className="text-[11px] text-[var(--text-dim)] text-center leading-tight">{t("typeChooser.businessDesc")}</span>
               </button>
             </div>
-            <button onClick={() => setTypeChooserStep(1)} className="w-full mt-4 py-2.5 rounded-lg text-sm text-[var(--text-subtle)] hover:text-[var(--text-primary)] border border-[var(--border-color)] hover:bg-[var(--bg-surface)] transition-colors flex items-center justify-center gap-2">
-              <ArrowLeftIcon size={14} className="rtl:rotate-180" /> {t("back")}
-            </button>
+            {filterType === "customer" ? (
+              <button onClick={() => { setShowTypeChooser(false); setTypeChooserStep(1); }} className="w-full mt-4 py-2.5 rounded-lg text-sm text-[var(--text-subtle)] hover:text-[var(--text-primary)] border border-[var(--border-color)] hover:bg-[var(--bg-surface)] transition-colors">
+                {t("cancel", "Cancel")}
+              </button>
+            ) : (
+              <button onClick={() => setTypeChooserStep(1)} className="w-full mt-4 py-2.5 rounded-lg text-sm text-[var(--text-subtle)] hover:text-[var(--text-primary)] border border-[var(--border-color)] hover:bg-[var(--bg-surface)] transition-colors flex items-center justify-center gap-2">
+                <ArrowLeftIcon size={14} className="rtl:rotate-180" /> {t("back")}
+              </button>
+            )}
           </>
         )}
       </div>
