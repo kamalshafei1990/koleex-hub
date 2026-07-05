@@ -4662,18 +4662,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
             <ArrowLeftIcon size={16} className="rtl:rotate-180" />
           </Link>
-          {/* Phase 20: tint the icon tile per filterType so /customers,
-              /suppliers, /contacts each get a visually distinct header.
-              Previously all three looked identical — same neutral tile,
-              same icon style — which made /customers feel like a
-              filtered Contacts view instead of its own app. */}
+          {/* Neutral surface tile — matches the shared PageHeader and every
+              other app's header icon. (Was amber-tinted for /customers only,
+              which made it the odd one out.) */}
           <div
             className={`h-8 w-8 rounded-xl border flex items-center justify-center shrink-0 ${
-              filterType === "customer"
-                ? "bg-amber-500/10 border-amber-500/25 text-amber-400"
-                : filterType === "supplier"
-                  ? "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-primary)]"
-                  : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)]"
+              filterType === "company" || filterType === "people"
+                ? "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)]"
+                : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-primary)]"
             }`}
           >
             {filterType === "supplier" ? <SuppliersIcon size={16} /> : filterType === "customer" ? <CustomersIcon size={16} /> : <ContactsIcon size={16} />}
