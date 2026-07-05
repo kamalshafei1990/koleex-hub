@@ -14,7 +14,7 @@ export const contactsT: Translations = {
   "searchPlaceholder":    { en: "Search contacts...",    zh: "搜索联系人...",          ar: "بحث جهات الاتصال..." },
   "searchSuppliers":      { en: "Search suppliers — name, 中文名, country, app ID…", zh: "搜索供应商 — 名称、中文名、国家、App ID…", ar: "ابحث عن الموردين — الاسم، الاسم الصيني، الدولة، معرّف التطبيق…" },
   "searchCustomers":      { en: "Search — name, company, email, phone, country, tier…", zh: "搜索 — 名称、公司、邮箱、电话、国家、级别…", ar: "ابحث — الاسم، الشركة، البريد، الهاتف، الدولة، الفئة…" },
-  "filter.notActive":     { en: "Not Active",            zh: "未激活",                 ar: "غير نشط" },
+  "filter.notActive":     { en: "Inactive",              zh: "停用",                   ar: "غير نشط" },
   "filter.everyone":      { en: "Everyone",              zh: "全部",                   ar: "الجميع" },
   "filter.individuals":   { en: "Individuals",           zh: "个人",                   ar: "أفراد" },
   "filter.companies":     { en: "Companies",             zh: "公司",                   ar: "شركات" },

@@ -4834,7 +4834,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             {([
               { k: "all", label: t("sd.statusAll", "All") },
               { k: "active", label: t("sd.active", "Active") },
-              { k: "archived", label: filterType === "customer" ? t("filter.notActive", "Not Active") : t("sd.archived", "Archived") },
+              { k: "archived", label: filterType === "customer" ? t("filter.notActive", "Inactive") : t("sd.archived", "Archived") },
             ] as const).map(opt => (
               <button
                 key={opt.k}
