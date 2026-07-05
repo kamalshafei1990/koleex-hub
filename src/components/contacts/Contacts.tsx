@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
-import { getTierColor, tierTextStyle, TIER_COLOR_META } from "@/lib/customer-tiers";
+import { getTierColor, tierTextStyle, TIER_COLOR_META, TIER_ORDER } from "@/lib/customer-tiers";
 import { ImageLightbox } from "@/components/quotations/ImageLightbox";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -3721,6 +3721,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "archived">("all");
   /* Individual vs Company filter — customer/company/people views. */
   const [entityFilter, setEntityFilter] = useState<"all" | "person" | "company">("all");
+  /* Customer tier filter — Diamond / Platinum / Gold / Silver / End User. */
+  const [tierFilter, setTierFilter] = useState<"all" | CustomerTier>("all");
   const [form, setForm] = useState<ContactForm>({ ...EMPTY_FORM });
   /* Department filter for the supplier form — null = show all sections.
      Lets a Finance/Legal/QC owner collapse the form to just their fields. */
@@ -3962,6 +3964,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     if (entityFilter !== "all") {
       list = list.filter(c => c.entity_type === entityFilter);
     }
+    if (tierFilter !== "all") {
+      list = list.filter(c => c.customer_type === tierFilter);
+    }
     if (debouncedSearch.trim()) {
       /* Smart search: builds one haystack per contact from every supplier-related
          field (incl. the Chinese company name and messaging-app IDs), then
@@ -4001,7 +4006,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       });
     }
     return list.sort((a, b) => contactSortKey(a).localeCompare(contactSortKey(b)));
-  }, [contacts, typeTab, filterType, debouncedSearch, statusFilter, entityFilter]);
+  }, [contacts, typeTab, filterType, debouncedSearch, statusFilter, entityFilter, tierFilter]);
 
   /* Typeahead suggestions — the top matches with a "why it matched" hint. */
   const searchTerms = useMemo(() => debouncedSearch.trim().toLowerCase().split(/\s+/).filter(Boolean), [debouncedSearch]);
@@ -4871,6 +4876,37 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 {opt.icon}{opt.label}
               </button>
             ))}
+          </div>
+        )}
+
+        {/* Customer tier filter — All + Diamond/Platinum/Gold/Silver/End User,
+            painted with the canonical material tier colors. */}
+        {filterType === "customer" && (
+          <div className="flex gap-1 mt-2 overflow-x-auto no-scrollbar">
+            <button
+              onClick={() => setTierFilter("all")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+                tierFilter === "all" ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
+              }`}
+            >
+              {t("filter.allTiers", "All Tiers")}
+            </button>
+            {TIER_ORDER.map((tk) => {
+              const meta = TIER_COLOR_META[tk];
+              const active = tierFilter === tk;
+              return (
+                <button
+                  key={tk}
+                  onClick={() => setTierFilter(tk)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
+                    active ? "bg-[var(--bg-surface-active)]" : "hover:bg-[var(--bg-surface-hover)]"
+                  }`}
+                  style={active ? { backgroundColor: meta.tintBg } : undefined}
+                >
+                  <span className="kx-tier-metal" style={tierTextStyle(meta)}>{meta.label}</span>
+                </button>
+              );
+            })}
           </div>
         )}
 

@@ -18,6 +18,7 @@ export const contactsT: Translations = {
   "filter.everyone":      { en: "Everyone",              zh: "全部",                   ar: "الجميع" },
   "filter.individuals":   { en: "Individuals",           zh: "个人",                   ar: "أفراد" },
   "filter.companies":     { en: "Companies",             zh: "公司",                   ar: "شركات" },
+  "filter.allTiers":      { en: "All Tiers",             zh: "所有级别",               ar: "كل الفئات" },
   "noContactsFound":      { en: "No contacts found",    zh: "未找到联系人",            ar: "لم يتم العثور على جهات اتصال" },
   "selectContact":        { en: "Select a contact to view details", zh: "选择联系人以查看详情", ar: "اختر جهة اتصال لعرض التفاصيل" },
   "unnamedContact":       { en: "Unnamed Contact",       zh: "未命名联系人",           ar: "جهة اتصال بدون اسم" },
