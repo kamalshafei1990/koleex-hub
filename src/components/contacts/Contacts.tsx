@@ -421,7 +421,7 @@ const CONTACT_TYPES: { value: ContactType; label: string; icon: React.ReactNode;
 ];
 
 const CUSTOMER_TIERS: { value: CustomerTier; label: string; color: string; bg: string }[] = [
-  { value: "end_user", label: "End User", color: "text-zinc-300", bg: "bg-zinc-700" },
+  { value: "end_user", label: "Standard", color: "text-zinc-300", bg: "bg-zinc-700" },
   { value: "silver", label: "Silver", color: "text-slate-300", bg: "bg-slate-600" },
   { value: "gold", label: "Gold", color: "text-amber-300", bg: "bg-amber-700/60" },
   { value: "platinum", label: "Platinum", color: "text-cyan-200", bg: "bg-cyan-800/50" },
@@ -556,7 +556,7 @@ const SANCTIONS_STATUSES = ["Clear", "Flagged", "Pending"];
 const CREDIT_RATING_INTERNAL = ["A", "B", "C", "D"];
 
 const PREFERRED_PAYMENT_METHODS = ["Wire Transfer", "LC (Letter of Credit)", "Documentary Collection", "Check", "Credit Card", "Cash", "Cryptocurrency"];
-const PRICE_LIST_TIERS = ["Diamond", "Platinum", "Gold", "Silver", "End User", "Custom"];
+const PRICE_LIST_TIERS = ["Diamond", "Platinum", "Gold", "Silver", "Standard", "Custom"];
 
 const BUYING_BEHAVIORS = ["Frequent", "Seasonal", "Project-based", "One-time"];
 const SENSITIVITY_LEVELS = ["Low", "Medium", "High"];

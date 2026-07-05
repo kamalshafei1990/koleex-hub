@@ -73,7 +73,10 @@ export const TIER_COLOR_META: Record<CanonicalTier, TierColorMeta> = {
   },
   end_user: {
     value: "end_user",
-    label: "End User",
+    // Display label "Standard" — the underlying value stays "end_user" (no data
+    // migration). Renamed from "End User" so the tier name no longer collides
+    // with the "End User" *commercial role*.
+    label: "Standard",
     /* Flat emerald — kept as a gradient string too so the bar fill can use
        one code path, but visually it's a single green. */
     gradient: "linear-gradient(100deg, #10b981 0%, #34d399 100%)",
@@ -113,6 +116,7 @@ export function normalizeTier(
     case "enduser":
     case "retail":
     case "end_customer":
+    case "standard":
       return "end_user";
     default:
       return null;
