@@ -2346,28 +2346,30 @@ const CustomerTabBar = React.memo(function CustomerTabBar({
   translate?: (key: string, fallback: string) => string;
 }) {
   const t = translate ?? ((_k: string, f: string) => f);
+  /* Floating rounded-full pill nav — matches the Supplier 360 in-page nav
+     (bordered --bg-secondary/95 capsule with backdrop blur) so the customer
+     detail reads identically. */
   return (
-    <div className="sticky top-[56px] md:top-[64px] z-20 bg-[var(--bg-secondary)] border-b border-[var(--border-color)]">
-      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar px-3 md:px-6 py-2.5">
-        {CUSTOMER_TABS.map(tab => {
-          const active = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => onChange(tab.id)}
-              className={`flex items-center gap-1.5 px-3 md:px-3.5 py-1.5 rounded-full text-xs md:text-[13px] font-medium transition-all whitespace-nowrap shrink-0 ${
-                active
-                  ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] shadow-sm"
-                  : "text-[var(--text-subtle)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]"
-              }`}
-            >
-              <span className={active ? "text-[var(--text-inverted)]" : "text-[var(--text-faint)]"}>{tab.icon}</span>
-              <span>{t(`customerTab.${tab.id}`, tab.label)}</span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
+    <nav className="sticky top-0 z-20 mx-4 md:mx-6 mt-3 flex gap-1 overflow-x-auto rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)]/95 px-1.5 py-1.5 backdrop-blur scrollbar-none no-scrollbar">
+      {CUSTOMER_TABS.map(tab => {
+        const active = activeTab === tab.id;
+        return (
+          <button
+            key={tab.id}
+            onClick={() => onChange(tab.id)}
+            aria-current={active ? "true" : undefined}
+            className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-medium transition-colors whitespace-nowrap ${
+              active
+                ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]"
+            }`}
+          >
+            <span className={active ? "text-[var(--text-inverted)]" : "text-[var(--text-faint)]"}>{tab.icon}</span>
+            <span>{t(`customerTab.${tab.id}`, tab.label)}</span>
+          </button>
+        );
+      })}
+    </nav>
   );
 });
 
