@@ -5580,97 +5580,132 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
     return (
       <div className="h-full overflow-y-auto">
-        {/* Back button + top-right actions (Edit / Delete) */}
-        <div className="px-4 py-3 border-b border-[var(--border-color)] flex items-center justify-between gap-2">
-          <button onClick={handleBack} className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] text-sm transition-colors min-w-0">
-            <ArrowLeftIcon size={16} className="rtl:rotate-180 shrink-0" /> <span className="truncate">{backLabel}</span>
-          </button>
-          <div className="flex items-center gap-2 shrink-0">
-            <button onClick={handleEdit} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] text-sm transition-colors">
-              <Edit3Icon size={14} /> <span className="hidden sm:inline">{t("btn.edit")}</span>
-            </button>
-            <button
-              onClick={() => requestDelete(c)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-sm transition-colors"
-            >
-              <TrashIcon size={14} /> <span className="hidden sm:inline">{t("btn.delete")}</span>
-            </button>
-          </div>
-        </div>
+        {/* ─── Suppliers-style identity hero ───
+             Bordered identity card → back + Edit/Delete top bar → big logo
+             tile → name → chip row (type · location · tier · status) → key
+             facts → a soft-pill metric rail fused to the bottom. Mirrors the
+             Supplier 360 hero so Customers/Companies/People read the same. */}
+        {(() => {
+          const isCompanyish = c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && c.entity_type === "company");
+          const logo = (c.photo_url || c.logo_url) as string | null;
+          const countryName = c.country ? (COUNTRY_CODE_TO_NAME.get(String(c.country).trim().toUpperCase()) || c.country) : "";
+          const flag = contactFlag(c.country_code, c.country);
+          const locLabel = [c.city, countryName].filter(Boolean).join(", ");
+          const primaryPhone = phones.find((p) => p.number)?.number || c.phone || "";
+          const primaryEmail = emails.find((e) => e.email)?.email || c.email || "";
+          return (
+        <div className="mx-4 md:mx-6 mt-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
+          <div className="px-4 sm:px-8 md:px-10 pt-4">
+            {/* Top bar — back (start) · Edit / Delete (end) */}
+            <div className="flex items-center justify-between gap-3">
+              <button onClick={handleBack} className="flex items-center gap-1.5 min-w-0 shrink rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]">
+                <ArrowLeftIcon size={14} className="rtl:rotate-180 shrink-0" /> <span className="truncate">{backLabel}</span>
+              </button>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button onClick={handleEdit} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:bg-[var(--bg-surface-hover)] text-[12px] font-medium transition-colors text-[var(--text-primary)]">
+                  <Edit3Icon size={14} /> <span className="hidden sm:inline">{t("btn.edit")}</span>
+                </button>
+                <button onClick={() => requestDelete(c)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[12px] font-medium transition-colors">
+                  <TrashIcon size={14} /> <span className="hidden sm:inline">{t("btn.delete")}</span>
+                </button>
+              </div>
+            </div>
 
-        {/* Header card */}
-        <div className="px-4 md:px-6 py-6 md:py-8 text-center border-b border-[var(--border-color)]">
-          <div className={`w-24 h-24 ${c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && c.entity_type === "company") ? "rounded-2xl" : "rounded-full"} bg-[var(--bg-surface-hover)] flex items-center justify-center text-2xl font-bold text-[var(--text-subtle)] mx-auto mb-4 overflow-hidden`}>
-            {(c.photo_url || c.logo_url) ? (
-              <img src={(c.photo_url || c.logo_url) as string} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
-            ) : c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && c.entity_type === "company") ? (
-              <Building2Icon size={32} className="text-[var(--text-ghost)]" />
-            ) : (
-              getInitials(c)
-            )}
-          </div>
-          <h2 className="text-xl font-semibold text-[var(--text-primary)]">{contactDisplayName(c)}</h2>
-          {c.contact_type === "supplier" && c.company_name_cn && <p className="text-sm text-[var(--text-faint)] mt-0.5">{c.company_name_cn}</p>}
-          {c.contact_type !== "supplier" && c.contact_type !== "company" && !(c.contact_type === "customer" && c.entity_type === "company") && c.position && <p className="text-sm text-[var(--text-subtle)] mt-1">{c.position}</p>}
-          {c.contact_type !== "supplier" && c.contact_type !== "company" && !(c.contact_type === "customer" && c.entity_type === "company") && c.company && <p className="text-sm text-[var(--text-faint)]">{c.company}</p>}
+            {/* Centered identity */}
+            <div className="flex flex-col items-center text-center pt-1 pb-7 md:pb-8">
+              <div className={`w-24 h-24 ${isCompanyish ? "rounded-2xl" : "rounded-full"} bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)] shadow-[0_8px_30px_-12px_rgba(0,0,0,0.5)] flex items-center justify-center overflow-hidden`}>
+                {logo ? (
+                  <img src={logo} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                ) : isCompanyish ? (
+                  <Building2Icon size={32} className="text-[var(--text-ghost)]" />
+                ) : (
+                  <span className="font-mono text-2xl font-bold text-[var(--text-secondary)]">{getInitials(c)}</span>
+                )}
+              </div>
 
-          <div className="flex items-center justify-center gap-2 mt-3">
-            <span className={`text-xs font-medium px-2.5 py-1 rounded-full border border-[var(--border-color)] ${getTypeColor(c.contact_type)}`}>
-              {t("type." + c.contact_type, c.contact_type?.charAt(0).toUpperCase() + c.contact_type?.slice(1))}{c.contact_type === "customer" && c.entity_type === "company" ? " · " + t("entity.business") : c.contact_type === "customer" && c.entity_type === "person" ? " · " + t("entity.individual") : ""}
-            </span>
-            {tierInfo && (
-              <span
-                className="text-xs font-semibold px-2.5 py-1 rounded-full border border-[var(--border-subtle)]"
-                style={{ backgroundColor: TIER_COLOR_META[tierInfo.value].tintBg }}
-              >
-                <span className="kx-tier-metal" style={tierTextStyle(TIER_COLOR_META[tierInfo.value])}>
-                  {tierInfo.label}
+              <h2 className="mt-4 text-2xl md:text-[28px] font-semibold leading-tight tracking-tight text-[var(--text-primary)] max-w-2xl">{contactDisplayName(c)}</h2>
+              {c.company_name_cn && c.company_name_cn !== contactDisplayName(c) && <p lang="zh" className="mt-1 text-[14px] text-[var(--text-faint)]">{c.company_name_cn}</p>}
+              {!isCompanyish && c.position && <p className="mt-1 text-sm text-[var(--text-subtle)]">{c.position}</p>}
+              {!isCompanyish && c.company && <p className="text-sm text-[var(--text-faint)]">{c.company}</p>}
+
+              {/* Chip row — type · location · tier · status */}
+              <div className="flex flex-wrap items-center justify-center gap-1.5 mt-4">
+                <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)] inline-flex items-center gap-1">
+                  <Building2Icon size={12} /> {t("type." + c.contact_type, c.contact_type?.charAt(0).toUpperCase() + c.contact_type?.slice(1))}{c.contact_type === "customer" && c.entity_type === "company" ? " · " + t("entity.business") : c.contact_type === "customer" && c.entity_type === "person" ? " · " + t("entity.individual") : ""}
                 </span>
-              </span>
-            )}
-            {!c.is_active && (
-              <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-red-500/20 text-red-400">
-                {t("kpi.inactive")}
-              </span>
-            )}
+                {locLabel && (
+                  <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)] inline-flex items-center gap-1">
+                    {flag ? <span className="text-[13px] leading-none">{flag}</span> : <MapPinIcon size={12} />} {locLabel}
+                  </span>
+                )}
+                {tierInfo && (
+                  <span
+                    className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full border border-[var(--border-subtle)]"
+                    style={{ backgroundColor: TIER_COLOR_META[tierInfo.value].tintBg }}
+                  >
+                    <span className="kx-tier-metal" style={tierTextStyle(TIER_COLOR_META[tierInfo.value])}>{tierInfo.label}</span>
+                  </span>
+                )}
+                <span className={`text-[11px] font-medium px-2.5 py-0.5 rounded-full ${c.is_active ? "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/10 text-rose-500"}`}>
+                  {c.is_active ? t("kpi.active", "Active") : t("kpi.inactive")}
+                </span>
+              </div>
+
+              {/* Key facts — quick identity (industry / currency / rep / primary
+                  contact). Location moved into the chip row above. */}
+              {(() => {
+                const facts: { key: string; icon: React.ReactNode; value: string }[] = [];
+                if (c.industry) facts.push({ key: "industry", icon: <Building2Icon size={13} />, value: c.industry });
+                if (c.currency) facts.push({ key: "currency", icon: <DollarSignIcon size={13} />, value: c.currency });
+                if (c.sales_rep) facts.push({ key: "rep", icon: <UserIcon size={13} />, value: c.sales_rep });
+                if (primaryPhone) facts.push({ key: "phone", icon: <PhoneIcon size={13} />, value: primaryPhone });
+                if (primaryEmail) facts.push({ key: "email", icon: <EnvelopeIcon size={13} />, value: primaryEmail });
+                if (!facts.length) return null;
+                return (
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5 max-w-2xl">
+                    {facts.map((f) => (
+                      <span
+                        key={f.key}
+                        className="inline-flex items-center gap-1.5 max-w-full px-2.5 py-1 rounded-full bg-[var(--bg-surface-subtle)] ring-1 ring-[var(--border-subtle)] text-[11px] text-[var(--text-secondary)]"
+                        title={f.value}
+                      >
+                        <span className="text-[var(--text-dim)] shrink-0">{f.icon}</span>
+                        <span className="truncate">{f.value}</span>
+                      </span>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
           </div>
 
-          {/* Key facts — quick identity at a glance (country / city / industry
-              / currency / sales rep / primary contact). Only fields that have
-              a value are shown; the full customer data stays in the sections
-              below, unchanged. */}
-          {(() => {
-            const countryName = c.country
-              ? (COUNTRY_CODE_TO_NAME.get(String(c.country).trim().toUpperCase()) || c.country)
-              : "";
-            const flag = contactFlag(c.country_code, c.country);
-            const primaryPhone = phones.find((p) => p.number)?.number || c.phone || "";
-            const primaryEmail = emails.find((e) => e.email)?.email || c.email || "";
-            const facts: { key: string; icon: React.ReactNode; value: string }[] = [];
-            if (countryName) facts.push({ key: "country", icon: <span className="text-sm leading-none">{flag || "🌐"}</span>, value: countryName });
-            if (c.city) facts.push({ key: "city", icon: <MapPinIcon size={13} />, value: c.city });
-            if (c.industry) facts.push({ key: "industry", icon: <Building2Icon size={13} />, value: c.industry });
-            if (c.currency) facts.push({ key: "currency", icon: <DollarSignIcon size={13} />, value: c.currency });
-            if (c.sales_rep) facts.push({ key: "rep", icon: <UserIcon size={13} />, value: c.sales_rep });
-            if (primaryPhone) facts.push({ key: "phone", icon: <PhoneIcon size={13} />, value: primaryPhone });
-            if (primaryEmail) facts.push({ key: "email", icon: <EnvelopeIcon size={13} />, value: primaryEmail });
-            if (!facts.length) return null;
+          {/* Metric rail — soft pills fused to the bottom edge (customers only) */}
+          {isCustomerDetail && (() => {
+            const creditVal = c.credit_limit ? `${c.currency ? c.currency + " " : ""}${c.credit_limit}` : "—";
+            const metrics: { label: string; value: string }[] = [
+              { label: t("kpi.tier", "Tier"), value: tierInfo?.label || "—" },
+              { label: t("field.creditLimit", "Credit limit"), value: creditVal },
+              { label: t("field.paymentTerms", "Payment terms"), value: c.payment_terms || "—" },
+              { label: t("field.currency", "Currency"), value: c.currency || "—" },
+              { label: t("field.kyc", "KYC"), value: c.kyc_status || "—" },
+              { label: t("field.vip", "VIP"), value: c.vip_status ? t("common.yes", "Yes") : "—" },
+            ];
             return (
-              <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-                {facts.map((f) => (
-                  <span
-                    key={f.key}
-                    className="inline-flex items-center gap-1.5 max-w-full px-2.5 py-1 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]"
-                    title={f.value}
-                  >
-                    <span className="text-[var(--text-dim)] shrink-0">{f.icon}</span>
-                    <span className="truncate">{f.value}</span>
-                  </span>
-                ))}
+              <div className="border-t border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 px-4 sm:px-6 py-3">
+                <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
+                  {metrics.map((m) => (
+                    <span key={m.label} className="inline-flex items-baseline gap-1.5 rounded-full bg-[var(--bg-surface)] px-3 py-1.5 ring-1 ring-[var(--border-subtle)]/60">
+                      <span className="text-[13px] font-semibold tabular-nums leading-none text-[var(--text-primary)] capitalize">{m.value}</span>
+                      <span className="text-[9.5px] font-medium uppercase tracking-wider text-[var(--text-faint)]">{m.label}</span>
+                    </span>
+                  ))}
+                </div>
               </div>
             );
           })()}
         </div>
+          );
+        })()}
 
         {/* Premium tabs (Customer only) */}
         {isCustomerDetail && (
