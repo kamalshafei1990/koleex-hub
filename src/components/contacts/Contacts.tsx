@@ -5299,7 +5299,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     <h3 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider">{t("kpi.customersByCountry")}</h3>
                     <span className="text-xs font-semibold text-[var(--text-faint)] shrink-0">{topCountries.length}</span>
                   </div>
-                  <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                  <div className="space-y-3">
                     {topCountries.map((cty) => (
                       <div key={cty.code || cty.name.toLowerCase()} className="flex items-center gap-3">
                         <span className="text-base w-6 text-center shrink-0" aria-hidden>{countryCodeToFlag(cty.code) || "🏳️"}</span>
