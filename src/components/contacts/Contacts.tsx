@@ -5580,11 +5580,22 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
     return (
       <div className="h-full overflow-y-auto">
-        {/* Back button */}
-        <div className="px-4 py-3 border-b border-[var(--border-color)]">
-          <button onClick={handleBack} className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] text-sm transition-colors">
-            <ArrowLeftIcon size={16} className="rtl:rotate-180" /> {backLabel}
+        {/* Back button + top-right actions (Edit / Delete) */}
+        <div className="px-4 py-3 border-b border-[var(--border-color)] flex items-center justify-between gap-2">
+          <button onClick={handleBack} className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] text-sm transition-colors min-w-0">
+            <ArrowLeftIcon size={16} className="rtl:rotate-180 shrink-0" /> <span className="truncate">{backLabel}</span>
           </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button onClick={handleEdit} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] text-sm transition-colors">
+              <Edit3Icon size={14} /> <span className="hidden sm:inline">{t("btn.edit")}</span>
+            </button>
+            <button
+              onClick={() => requestDelete(c)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-sm transition-colors"
+            >
+              <TrashIcon size={14} /> <span className="hidden sm:inline">{t("btn.delete")}</span>
+            </button>
+          </div>
         </div>
 
         {/* Header card */}
@@ -5622,19 +5633,6 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 {t("kpi.inactive")}
               </span>
             )}
-          </div>
-
-          {/* Action buttons */}
-          <div className="flex items-center justify-center gap-2 mt-5">
-            <button onClick={handleEdit} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] text-sm transition-colors">
-              <Edit3Icon size={14} /> {t("btn.edit")}
-            </button>
-            <button
-              onClick={() => requestDelete(c)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-sm transition-colors"
-            >
-              <TrashIcon size={14} /> {t("btn.delete")}
-            </button>
           </div>
 
           {/* Key facts — quick identity at a glance (country / city / industry
