@@ -1188,13 +1188,17 @@ function supplierFormErrors(f: ContactForm): string[] {
 }
 
 function contactSortKey(c: ContactRow): string {
+  /* Trim so stray leading/trailing spaces in the source field (e.g. a
+     first_name stored as " Osama") don't sort a record above "A" — a
+     leading space collates before every letter. */
+  const norm = (s: string | null | undefined) => (s || "").trim();
   if (c.contact_type === "supplier") {
-    const en = c.company_name_en || "";
+    const en = norm(c.company_name_en);
     if (en) return en.toLowerCase();
   }
-  if (c.contact_type === "company" && c.company) return c.company.toLowerCase();
-  if (c.entity_type === "company" && c.company) return c.company.toLowerCase();
-  return (c.first_name || c.last_name || c.company || c.display_name || "zzz").toLowerCase();
+  if (c.contact_type === "company" && norm(c.company)) return norm(c.company).toLowerCase();
+  if (c.entity_type === "company" && norm(c.company)) return norm(c.company).toLowerCase();
+  return (norm(c.first_name) || norm(c.last_name) || norm(c.company) || norm(c.display_name) || "zzz").toLowerCase();
 }
 
 function getTypeColor(type: string): string {
