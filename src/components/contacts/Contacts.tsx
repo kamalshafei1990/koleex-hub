@@ -1828,16 +1828,16 @@ export function formToRow(f: ContactForm): Record<string, unknown> {
 
 /* ── Detail view section wrapper ── */
 const Section = React.memo(function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
-  /* Separated rounded shell — matches the Supplier 360 section cards
-     (mx-4/6, rounded-2xl, bordered --bg-secondary surface) instead of the
-     old flat full-width border-b rows. */
+  /* Separated rounded shell — matches the Supplier 360 section cards: a
+     tinted header row (icon tile + title) with its own bottom-border
+     divider, then the content below. */
   return (
-    <div className="mx-4 md:mx-6 my-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 md:px-5 py-4">
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-[var(--text-dim)]">{icon}</span>
-        <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{title}</h3>
+    <div className="mx-4 md:mx-6 my-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
+      <div className="flex w-full items-center gap-2.5 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/30 px-4 md:px-5 py-3">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]">{icon}</span>
+        <h3 className="text-[13px] font-semibold tracking-tight text-[var(--text-primary)] truncate">{title}</h3>
       </div>
-      {children}
+      <div className="px-4 md:px-5 py-4">{children}</div>
     </div>
   );
 });
