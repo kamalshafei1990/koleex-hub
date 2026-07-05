@@ -10036,9 +10036,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => handleAdd("customer", "person")}
-                className="flex flex-col items-center gap-2 p-4 rounded-xl border border-[var(--border-color)] hover:border-amber-500/30 bg-[var(--bg-surface-subtle)] hover:bg-amber-500/[0.05] transition-all text-amber-400"
+                className="flex flex-col items-center gap-2 p-4 rounded-xl border border-[var(--border-color)] hover:border-[var(--border-focus)] bg-[var(--bg-surface-subtle)] hover:bg-[var(--bg-surface-hover)] transition-all text-[var(--text-primary)]"
               >
-                <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-full bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-secondary)]">
                   <UserIcon size={22} />
                 </div>
                 <span className="text-sm font-medium">{t("typeChooser.individual")}</span>
@@ -10046,9 +10046,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </button>
               <button
                 onClick={() => handleAdd("customer", "company")}
-                className="flex flex-col items-center gap-2 p-4 rounded-xl border border-[var(--border-color)] hover:border-amber-500/30 bg-[var(--bg-surface-subtle)] hover:bg-amber-500/[0.05] transition-all text-amber-400"
+                className="flex flex-col items-center gap-2 p-4 rounded-xl border border-[var(--border-color)] hover:border-[var(--border-focus)] bg-[var(--bg-surface-subtle)] hover:bg-[var(--bg-surface-hover)] transition-all text-[var(--text-primary)]"
               >
-                <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-full bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-secondary)]">
                   <Building2Icon size={22} />
                 </div>
                 <span className="text-sm font-medium">{t("typeChooser.business")}</span>
