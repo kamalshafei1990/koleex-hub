@@ -759,8 +759,9 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
 
 
         {/* ── In-page layer navigation (sticky) — 6 operational layers, scan-first.
-             Full-width opaque strip masks scrolling content behind the pill. ── */}
-        <div className="sticky top-0 z-20 bg-[var(--bg-primary)] px-4 md:px-6 pt-3 pb-2">
+             Opaque strip (same tone as the detail header) masks scrolling content
+             behind the pill without boxing it in a darker frame. ── */}
+        <div className="sticky top-0 z-20 bg-[var(--bg-secondary)] px-4 md:px-6 pt-3 pb-2">
         <nav className="flex gap-1 overflow-x-auto rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 scrollbar-none">
           {navItems.map((n) => {
             const active = n.target === activeLayer;
