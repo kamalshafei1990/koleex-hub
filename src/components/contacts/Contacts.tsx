@@ -4542,7 +4542,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const handleAdd = useCallback((type: ContactType, entityType?: "person" | "company") => {
     // New suppliers default to the Garment Machinery division so the
     // category dropdown is populated out of the box.
-    setForm({ ...EMPTY_FORM, contact_type: type, entity_type: entityType || "", division: type === "supplier" ? "Garment Machinery" : "", currency: type === "supplier" ? "CNY" : "" });
+    // New CUSTOMERS start Inactive by default — the operator explicitly
+    // activates them (via the Active Customer toggle) once onboarded. Other
+    // contact types keep the standard active default.
+    setForm({ ...EMPTY_FORM, contact_type: type, entity_type: entityType || "", division: type === "supplier" ? "Garment Machinery" : "", currency: type === "supplier" ? "CNY" : "", is_active: type === "customer" ? false : EMPTY_FORM.is_active });
     setTriedSave(false);
     setSaveError(null);
     setSIntel(EMPTY_SINTEL);
