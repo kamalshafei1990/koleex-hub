@@ -2048,19 +2048,19 @@ const ComboInput = React.memo(function ComboInput({ label, value, onChange, plac
           placeholder={placeholder || label}
           className={`w-full h-10 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] focus:border-[var(--border-focus)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none transition-colors ${icon ? "ps-9 pe-8" : "px-3"}`}
         />
-        <span className="absolute end-2.5 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] pointer-events-none"><AngleDownIcon size={14} /></span>
+        <AngleDownIcon size={14} className={`absolute end-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)] pointer-events-none transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
       {open && filtered.length > 0 && (
-        <div className="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl py-1">
+        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
           {filtered.map((opt, i) => (
             <button
               key={opt}
               type="button"
               onMouseEnter={() => setActive(i)}
               onClick={() => pick(opt)}
-              className={`w-full text-start px-3 py-2 text-sm transition-colors ${
-                i === active ? "bg-[var(--bg-surface-hover)] text-[var(--text-primary)]" : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]"
-              } ${opt === value ? "font-semibold text-[var(--text-primary)]" : ""}`}
+              className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-start hover:bg-[var(--bg-surface)] transition-colors ${
+                opt === value || i === active ? "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]" : "text-[var(--text-secondary)]"
+              }`}
             >
               {opt}
             </button>
