@@ -2741,17 +2741,20 @@ const CustomerTabBar = React.memo(function CustomerTabBar({
   activeTab,
   onChange,
   translate,
+  stickyTop,
 }: {
   activeTab: CustomerTab;
   onChange: (tab: CustomerTab) => void;
   translate?: (key: string, fallback: string) => string;
+  /* Where the pill pins when scrolling. In the edit form there's a sticky
+     Save/Cancel header (~71px) above it, so it must pin BELOW that; in the
+     read-only detail view the top bar scrolls away, so it pins at the top. */
+  stickyTop?: string;
 }) {
   const t = translate ?? ((_k: string, f: string) => f);
-  /* Floating rounded-full pill nav — matches the Supplier 360 in-page nav
-     (bordered --bg-secondary/95 capsule with backdrop blur) so the customer
-     detail reads identically. */
+  /* Full-width opaque strip (panel bg) masks scrolling content behind the pill. */
   return (
-    <div className="sticky top-0 z-20 bg-[var(--bg-primary)] px-4 md:px-6 pt-3 pb-2">
+    <div className={`sticky ${stickyTop ?? "top-0"} z-[15] bg-[var(--bg-primary)] px-4 md:px-6 pt-3 pb-2`}>
     <nav className="flex gap-1 overflow-x-auto rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 scrollbar-none no-scrollbar">
       {CUSTOMER_TABS.map(tab => {
         const active = activeTab === tab.id;
@@ -7931,7 +7934,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Customer Premium Tab Bar ── */}
         {isCustomer && form.entity_type && (
-          <CustomerTabBar activeTab={customerTab} onChange={setCustomerTab} translate={(k, f) => t(k, f)} />
+          <CustomerTabBar activeTab={customerTab} onChange={setCustomerTab} translate={(k, f) => t(k, f)} stickyTop="top-[53px] md:top-[71px]" />
         )}
 
         {/* Company Customer: Company Name section */}
