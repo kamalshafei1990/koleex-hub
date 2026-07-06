@@ -487,6 +487,29 @@ const LEAD_SOURCES = [
   "Print Media", "Radio / TV", "Billboard / Outdoor", "Walk-in", "Government Tender",
   "Public Relations", "Sponsorship", "Import / Export Database", "Other",
 ];
+/* Suggestions for the free-text "Source Details" combobox. Users can pick one
+   or type their own — these just speed up common entries (trade shows the
+   garment-machinery industry attends, campaign types, and channel specifics). */
+const SOURCE_DETAILS = [
+  // Major garment / textile / machinery trade shows
+  "ITMA", "ITMA Asia", "CISMA (Shanghai)", "Texworld", "Intertextile Shanghai",
+  "Heimtextil", "Canton Fair", "Gartex Texprocess India", "Bharat Tex", "IGATEX Pakistan",
+  "Apparel Textile Sourcing", "Colombiatex", "Febratex", "Techtextil", "Domotex",
+  "GTE (Garment Technology Expo)", "Saigontex", "Dhaka Int'l Textile & Garment",
+  "Local Trade Show", "Regional Exhibition",
+  // Campaign types
+  "Email Newsletter", "New Product Launch", "Seasonal Promo", "Year-End Promo",
+  "Ramadan Promo", "New Year Promo", "Clearance Sale", "Webinar / Online Demo",
+  "Product Catalog Mailer",
+  // Digital / channel specifics
+  "Google Ads", "Facebook Ads", "Instagram Ads", "LinkedIn Campaign", "TikTok Ads",
+  "YouTube Video", "WhatsApp Broadcast", "WeChat Campaign", "Website Inquiry Form",
+  "Live Chat", "SEO / Organic",
+  // Referral / relationship specifics
+  "Existing Customer Referral", "Partner Referral", "Agent Introduction",
+  "Word of Mouth", "Industry Association", "Trade Magazine Ad", "Cold Call List",
+  "Import / Export Database",
+];
 const PAYMENT_TERMS_OPTIONS = [
   "Prepaid", "COD", "Net 15", "Net 30", "Net 45", "Net 60", "Net 90",
   "EOM", "2/10 Net 30", "CIA", "CWO", "Upon Receipt",
@@ -8595,7 +8618,12 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <EmployeeSelect label={t("field.backupAM", "Backup Account Manager")} value={form.backup_account_manager} onChange={v => setField("backup_account_manager", v)} placeholder={t("field.selectEmployee", "Select an employee…")} />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <Input label={t("field.sourceDetails", "Source Details")} value={form.source_details} onChange={v => setField("source_details", v)} placeholder={t("placeholder.sourceCampaign", "Campaign / event")} icon={<TargetIcon size={14} />} />
+                <>
+                  <Input label={t("field.sourceDetails", "Source Details")} value={form.source_details} onChange={v => setField("source_details", v)} placeholder={t("placeholder.sourceCampaign", "Campaign / event")} icon={<TargetIcon size={14} />} list="kx-source-details" />
+                  <datalist id="kx-source-details">
+                    {SOURCE_DETAILS.map(s => <option key={s} value={s} />)}
+                  </datalist>
+                </>
                 <Input label={t("field.referredBy", "Referred By")} value={form.referred_by} onChange={v => setField("referred_by", v)} placeholder={t("field.name")} icon={<UsersIcon size={14} />} />
               </div>
               <div className="grid grid-cols-2 gap-3">
