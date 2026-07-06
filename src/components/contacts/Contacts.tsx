@@ -8688,7 +8688,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <DateField value={form.exclusivity_expiry} onChange={v => setField("exclusivity_expiry", v)} />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <Input label={t("field.salesRep", "Sales Rep")} value={form.sales_rep} onChange={v => setField("sales_rep", v)} placeholder={t("field.name")} icon={<UserIcon size={14} />} />
+                <EmployeeSelect label={t("field.salesRep", "Sales Rep")} value={form.sales_rep} onChange={v => setField("sales_rep", v)} placeholder={t("field.selectEmployee", "Select an employee…")} />
                 <EmployeeSelect label={t("field.backupAM", "Backup Account Manager")} value={form.backup_account_manager} onChange={v => setField("backup_account_manager", v)} placeholder={t("field.selectEmployee", "Select an employee…")} />
               </div>
               <div className="grid grid-cols-2 gap-3">
