@@ -804,7 +804,7 @@ export const contactsT: Translations = {
   "field.commissionRate":            { en: "Commission Rate",       zh: "佣金率",           ar: "معدل العمولة" },
   "field.contractPricingExpiry":     { en: "Contract Expires",      zh: "合同到期",         ar: "انتهاء العقد" },
   "field.specialPricingAgreement":   { en: "Special Pricing Agreement", zh: "特殊定价协议", ar: "اتفاقية تسعير خاصة" },
-  "field.specialPricingAgreementHint": { en: "Active custom contract pricing", zh: "有效的定制合同定价", ar: "تسعير تعاقدي مخصص نشط" },
+  "field.specialPricingAgreementHint": { en: "Turn on if this customer has a custom negotiated price contract — it overrides the standard tier price list, sets Price List to Custom, and needs an expiry date.", zh: "如果该客户签有定制议价合同，请开启——它将覆盖标准等级价目表，把价目表设为“定制”，并需填写到期日期。", ar: "فعّله إذا كان لهذا العميل عقد تسعير تفاوضي مخصص — فهو يتجاوز قائمة أسعار الفئة القياسية، ويضبط قائمة الأسعار على «مخصص»، ويتطلب تاريخ انتهاء." },
 
   /* ── Segmentation & Health ── */
   "section.segmentationHealth": { en: "Segmentation & Health", zh: "细分与健康",      ar: "التقسيم والصحة" },
