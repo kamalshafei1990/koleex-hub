@@ -581,6 +581,8 @@ const CREDIT_RATING_INTERNAL = ["A", "B", "C", "D"];
 
 const PREFERRED_PAYMENT_METHODS = ["Wire Transfer", "LC (Letter of Credit)", "Documentary Collection", "Check", "Credit Card", "Cash", "Cryptocurrency"];
 const PRICE_LIST_TIERS = ["Diamond", "Platinum", "Gold", "Silver", "Standard", "Custom"];
+/* Max discount picker: stores the bare number ("1".."30"); shows "1%".."30%". */
+const MAX_DISCOUNT_OPTIONS = Array.from({ length: 30 }, (_, i) => String(i + 1));
 
 const BUYING_BEHAVIORS = ["Frequent", "Seasonal", "Project-based", "One-time"];
 const SENSITIVITY_LEVELS = ["Low", "Medium", "High"];
@@ -8731,7 +8733,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <SelectInput label={t("field.priceListTier", "Price List Tier")} value={form.price_list_tier} onChange={v => setField("price_list_tier", v)} options={PRICE_LIST_TIERS} icon={<TagsIcon size={14} />} selectLabel={t("detail.select")} help={t("help.priceListFollowsTier", "Follows the customer tier — pick Custom to override")} />
-                <Input label={t("field.maxDiscount", "Max Discount (%)")} value={form.max_discount_allowed} onChange={v => setField("max_discount_allowed", v)} placeholder="0.00" inputMode="decimal" icon={<ReceiptIcon size={14} />} />
+                <SelectInput label={t("field.maxDiscount", "Max Discount")} value={form.max_discount_allowed} onChange={v => setField("max_discount_allowed", v)} options={MAX_DISCOUNT_OPTIONS} renderLabel={o => `${o}%`} icon={<ReceiptIcon size={14} />} selectLabel={t("detail.select")} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Input label={t("field.commissionRate", "Commission Rate (%)")} value={form.commission_rate} onChange={v => setField("commission_rate", v)} placeholder="0.00" inputMode="decimal" icon={<DollarSignIcon size={14} />} />
