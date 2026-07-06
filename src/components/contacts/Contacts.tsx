@@ -8693,7 +8693,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <ComboInput label={t("field.sourceDetails", "Source Details")} value={form.source_details} onChange={v => setField("source_details", v)} placeholder={t("placeholder.sourceCampaign", "Campaign / event")} icon={<TargetIcon size={14} />} options={SOURCE_DETAILS} />
-                <Input label={t("field.referredBy", "Referred By")} value={form.referred_by} onChange={v => setField("referred_by", v)} placeholder={t("field.name")} icon={<UsersIcon size={14} />} />
+                <EmployeeSelect label={t("field.referredBy", "Referred By")} value={form.referred_by} onChange={v => setField("referred_by", v)} placeholder={t("field.selectEmployee", "Select an employee…")} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
