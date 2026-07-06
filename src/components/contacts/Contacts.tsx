@@ -2002,6 +2002,75 @@ const Input = React.memo(function Input({ label, value, onChange, type = "text",
   );
 });
 
+/* ── Combo input — free-text field with a themed suggestions dropdown ─────────
+   Like the native <input list> but fully styled to the Hub (the native datalist
+   popup can't be themed and looks wrong in dark mode). Type freely OR pick a
+   suggestion; the list filters as you type. */
+const ComboInput = React.memo(function ComboInput({ label, value, onChange, placeholder, icon, options, tier, help }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; icon?: React.ReactNode;
+  options: string[]; tier?: FieldTier; help?: string;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [active, setActive] = React.useState(-1);
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [open]);
+
+  const filtered = React.useMemo(() => {
+    const q = (value || "").trim().toLowerCase();
+    const list = q ? options.filter(o => o.toLowerCase().includes(q)) : options;
+    return list.slice(0, 60);
+  }, [options, value]);
+
+  const pick = (v: string) => { onChange(v); setOpen(false); setActive(-1); };
+
+  return (
+    <div ref={ref} className="relative">
+      <label className="text-xs text-[var(--text-faint)] mb-1 flex items-center gap-1">{label}<FieldMark tier={tier} />{help && <GuidanceTip guidanceId={help} size="xs" />}</label>
+      <div className="relative">
+        {icon && <span className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] pointer-events-none">{icon}</span>}
+        <input
+          type="text"
+          value={value}
+          onChange={e => { onChange(e.target.value); setOpen(true); setActive(-1); }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={e => {
+            if (e.key === "ArrowDown") { e.preventDefault(); setOpen(true); setActive(a => Math.min(a + 1, filtered.length - 1)); }
+            else if (e.key === "ArrowUp") { e.preventDefault(); setActive(a => Math.max(a - 1, 0)); }
+            else if (e.key === "Enter" && open && active >= 0 && filtered[active]) { e.preventDefault(); pick(filtered[active]); }
+            else if (e.key === "Escape") { setOpen(false); }
+          }}
+          placeholder={placeholder || label}
+          className={`w-full h-10 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] focus:border-[var(--border-focus)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none transition-colors ${icon ? "ps-9 pe-8" : "px-3"}`}
+        />
+        <span className="absolute end-2.5 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] pointer-events-none"><AngleDownIcon size={14} /></span>
+      </div>
+      {open && filtered.length > 0 && (
+        <div className="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl py-1">
+          {filtered.map((opt, i) => (
+            <button
+              key={opt}
+              type="button"
+              onMouseEnter={() => setActive(i)}
+              onClick={() => pick(opt)}
+              className={`w-full text-start px-3 py-2 text-sm transition-colors ${
+                i === active ? "bg-[var(--bg-surface-hover)] text-[var(--text-primary)]" : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]"
+              } ${opt === value ? "font-semibold text-[var(--text-primary)]" : ""}`}
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+});
+
 /* ── Team-member picker (Account Manager / Backup) ───────────────────────────
    A searchable dropdown of Koleex Hub users that have an account, each shown
    with their avatar, name, and department/position. Selecting one stores the
@@ -8618,12 +8687,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <EmployeeSelect label={t("field.backupAM", "Backup Account Manager")} value={form.backup_account_manager} onChange={v => setField("backup_account_manager", v)} placeholder={t("field.selectEmployee", "Select an employee…")} />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <>
-                  <Input label={t("field.sourceDetails", "Source Details")} value={form.source_details} onChange={v => setField("source_details", v)} placeholder={t("placeholder.sourceCampaign", "Campaign / event")} icon={<TargetIcon size={14} />} list="kx-source-details" />
-                  <datalist id="kx-source-details">
-                    {SOURCE_DETAILS.map(s => <option key={s} value={s} />)}
-                  </datalist>
-                </>
+                <ComboInput label={t("field.sourceDetails", "Source Details")} value={form.source_details} onChange={v => setField("source_details", v)} placeholder={t("placeholder.sourceCampaign", "Campaign / event")} icon={<TargetIcon size={14} />} options={SOURCE_DETAILS} />
                 <Input label={t("field.referredBy", "Referred By")} value={form.referred_by} onChange={v => setField("referred_by", v)} placeholder={t("field.name")} icon={<UsersIcon size={14} />} />
               </div>
               <div className="grid grid-cols-2 gap-3">
