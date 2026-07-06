@@ -4712,6 +4712,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         return;
       }
     }
+    // Customer: a Special Pricing Agreement is a bespoke contract, so it must
+    // carry a Contract Expiry date (otherwise it never lapses back to standard).
+    if ((filterType === "customer" || form.contact_type === "customer") && form.special_pricing_agreement && !form.contract_pricing_expiry) {
+      setTriedSave(true);
+      setSaveErrorIsValidation(true);
+      setSaveError(t("error.specialPricingNeedsExpiry", "A Special Pricing Agreement needs a Contract Expiry date."));
+      return;
+    }
     setTriedSave(false);
     setSaveErrorIsValidation(false);
     setSaving(true);
@@ -4922,6 +4930,22 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             ? TIER_COLOR_META[nextTier].label
             : "";
       return { ...prev, customer_type: nextTier, price_list_tier: priceList };
+    });
+  }, []);
+
+  /* Special Pricing Agreement drives the Price List. Turning it ON forces the
+     Price List to "Custom" (this customer is priced by a bespoke contract, not
+     the standard tier list). Turning it OFF reverts the Price List to the
+     tier-derived value. The Contract Expiry date is then required on save. */
+  const handleSpecialPricingToggle = useCallback((on: boolean) => {
+    setForm(prev => {
+      let priceList = prev.price_list_tier;
+      if (on) {
+        priceList = "Custom";
+      } else if (prev.price_list_tier === "Custom") {
+        priceList = prev.customer_type ? TIER_COLOR_META[prev.customer_type].label : "";
+      }
+      return { ...prev, special_pricing_agreement: on, price_list_tier: priceList };
     });
   }, []);
 
@@ -8740,15 +8764,21 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               <div className="grid grid-cols-2 gap-3">
                 <SelectInput label={t("field.commissionRate", "Commission Rate")} value={form.commission_rate} onChange={v => setField("commission_rate", v)} options={COMMISSION_RATE_OPTIONS} renderLabel={o => `${o}%`} icon={<DollarSignIcon size={14} />} selectLabel={t("detail.select")} />
                 <div>
-                  <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.contractPricingExpiry", "Contract Pricing Expiry")}</label>
+                  <label className="text-xs text-[var(--text-faint)] mb-1 block">
+                    {t("field.contractPricingExpiry", "Contract Pricing Expiry")}
+                    {form.special_pricing_agreement && <span className="text-red-400 ms-0.5">*</span>}
+                  </label>
                   <DateField value={form.contract_pricing_expiry} onChange={v => setField("contract_pricing_expiry", v)} />
+                  {form.special_pricing_agreement && triedSave && !form.contract_pricing_expiry && (
+                    <p className="text-[11px] text-red-400 mt-1">{t("error.contractExpiryRequired", "Required when a Special Pricing Agreement is active")}</p>
+                  )}
                 </div>
               </div>
               <ToggleSwitch
                 label={t("field.specialPricingAgreement", "Special Pricing Agreement")}
-                hint={t("field.specialPricingAgreementHint", "Active custom contract pricing")}
+                hint={t("field.specialPricingAgreementHint", "Prices this customer by a bespoke contract — sets Price List to Custom and needs an expiry date")}
                 checked={form.special_pricing_agreement}
-                onChange={v => setField("special_pricing_agreement", v)}
+                onChange={handleSpecialPricingToggle}
               />
             </div>
           </FormSection>
