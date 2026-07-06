@@ -758,8 +758,10 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
             Onboarding / Performance now live inside their groups below. */}
 
 
-        {/* ── In-page layer navigation (sticky) — 6 operational layers, scan-first ── */}
-        <nav className="sticky top-0 z-20 mx-4 md:mx-6 mt-3 flex gap-1 overflow-x-auto rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)]/95 px-1.5 py-1.5 backdrop-blur scrollbar-none">
+        {/* ── In-page layer navigation (sticky) — 6 operational layers, scan-first.
+             Full-width opaque strip masks scrolling content behind the pill. ── */}
+        <div className="sticky top-0 z-20 bg-[var(--bg-primary)] px-4 md:px-6 pt-3 pb-2">
+        <nav className="flex gap-1 overflow-x-auto rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 scrollbar-none">
           {navItems.map((n) => {
             const active = n.target === activeLayer;
             return (
@@ -788,6 +790,7 @@ export default function SupplierDetail({ id, embedded = false, onEdit, onDelete,
             );
           })}
         </nav>
+        </div>
 
         {/* ═══ Everything below is one continuous page — no hidden tabs ═══ */}
 

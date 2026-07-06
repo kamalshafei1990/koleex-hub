@@ -2751,7 +2751,8 @@ const CustomerTabBar = React.memo(function CustomerTabBar({
      (bordered --bg-secondary/95 capsule with backdrop blur) so the customer
      detail reads identically. */
   return (
-    <nav className="sticky top-2 z-20 mx-4 md:mx-6 mt-3 flex gap-1 overflow-x-auto rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)]/95 px-1.5 py-1.5 backdrop-blur scrollbar-none no-scrollbar">
+    <div className="sticky top-0 z-20 bg-[var(--bg-primary)] px-4 md:px-6 pt-3 pb-2">
+    <nav className="flex gap-1 overflow-x-auto rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 scrollbar-none no-scrollbar">
       {CUSTOMER_TABS.map(tab => {
         const active = activeTab === tab.id;
         return (
@@ -2771,6 +2772,7 @@ const CustomerTabBar = React.memo(function CustomerTabBar({
         );
       })}
     </nav>
+    </div>
   );
 });
 
