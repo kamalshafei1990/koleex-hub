@@ -476,6 +476,68 @@ const INDUSTRIES = [
   "Transportation & Rail", "Warehousing & Storage", "Waste Management", "Water & Sanitation",
   "Wholesale & Distribution", "Other",
 ];
+/* Suggestions for the free-text "Sub Industry" combobox — a broad niche list
+   across sectors (heavy on textile/garment, Koleex's domain). Users pick one
+   or type their own. */
+const SUB_INDUSTRIES = [
+  // Apparel / garment / textile (Koleex core)
+  "Woven Garment Manufacturing", "Knitwear Manufacturing", "Denim / Jeans Manufacturing",
+  "Activewear & Sportswear", "Lingerie & Intimate Apparel", "Swimwear",
+  "Outerwear & Jackets", "Workwear & Uniforms", "Kids & Baby Wear", "Bridal & Formal Wear",
+  "Fast Fashion", "Luxury & Couture", "Leather Garments", "Fur & Shearling",
+  "Home Textiles & Linen", "Bedding & Mattress", "Towels & Terry", "Curtains & Drapery",
+  "Carpets & Rugs", "Technical / Industrial Textiles", "Nonwovens", "Geotextiles",
+  "Medical Textiles", "Automotive Textiles", "Embroidery & Lace", "Printing & Dyeing (Textile)",
+  "Spinning Mill", "Weaving Mill", "Knitting Mill", "Garment Trims & Accessories",
+  "Zippers & Fasteners", "Buttons & Labels", "Thread & Yarn", "Fabric Trading",
+  "Cut-Make-Trim (CMT)", "Full-Package (FOB) Manufacturing", "Sampling & Prototyping",
+  "Laundry & Garment Washing", "Screen Printing", "Digital Textile Printing",
+  "Sewing Machine Dealer", "Textile Machinery Dealer", "Garment Factory (OEM)", "Garment Factory (ODM)",
+  // Footwear & leather
+  "Footwear Manufacturing", "Leather Goods & Bags", "Tanning & Leather Processing",
+  // Food & beverage
+  "Bakery & Confectionery", "Dairy Processing", "Meat & Poultry Processing", "Seafood Processing",
+  "Beverages & Bottling", "Coffee & Tea", "Snacks & Packaged Food", "Frozen Foods",
+  "Edible Oils", "Grain Milling", "Spices & Condiments", "Catering & Cloud Kitchen",
+  // Construction & materials
+  "Residential Construction", "Commercial Construction", "Infrastructure & Civil Works",
+  "Cement Manufacturing", "Ready-Mix Concrete", "Steel Fabrication", "Aluminum & Glazing",
+  "Tiles & Sanitaryware", "Paints & Coatings", "Insulation Materials", "Prefab & Modular Building",
+  // Energy
+  "Solar EPC", "Solar Panel Manufacturing", "Wind Energy", "Battery & Energy Storage",
+  "Oil & Gas Upstream", "Oil & Gas Downstream", "Power Generation", "Power Transmission & Distribution",
+  "Electrical Contracting", "Energy Trading",
+  // Industrial / machinery
+  "CNC Machining", "Injection Molding", "Metal Stamping & Pressing", "Tool & Die Making",
+  "Industrial Automation & Robotics", "Packaging Machinery", "Food Processing Machinery",
+  "Printing Machinery", "Pumps & Valves", "Bearings & Power Transmission", "Welding & Fabrication",
+  "3D Printing / Additive", "Heavy Equipment Rental",
+  // Automotive & transport
+  "Auto Parts Manufacturing", "Auto Assembly", "Tyres & Rubber", "EV & Mobility",
+  "Auto Dealership", "Fleet & Logistics", "Freight Forwarding", "Cold Chain Logistics",
+  "Warehousing & 3PL", "Shipping & Maritime", "Rail & Metro",
+  // Chemicals & pharma
+  "Specialty Chemicals", "Agrochemicals & Fertilizers", "Petrochemicals",
+  "Pharmaceutical Manufacturing", "Nutraceuticals & Supplements", "Cosmetics & Personal Care",
+  "Plastics & Polymers", "Rubber Products", "Paints, Inks & Adhesives",
+  // Electronics & tech
+  "Consumer Electronics", "Semiconductors & PCB", "Home Appliances", "Lighting & LED",
+  "Telecom Equipment", "IT Hardware & Peripherals", "SaaS / Software", "IT Services & Consulting",
+  "E-Commerce & Marketplace", "Fintech", "EdTech", "HealthTech",
+  // Agriculture
+  "Crop Farming", "Horticulture & Floriculture", "Poultry & Livestock", "Aquaculture & Fisheries",
+  "Agri-Processing", "Agri Machinery & Equipment", "Seeds & Nursery",
+  // Healthcare
+  "Hospitals & Clinics", "Medical Devices", "Diagnostics & Labs", "Dental",
+  "Pharmacy & Distribution", "Elderly & Home Care",
+  // Services & retail
+  "Retail Chain", "Supermarket & Grocery", "Wholesale & Distribution", "Import / Export Trading",
+  "Hospitality & Hotels", "Restaurants & QSR", "Travel & Tourism", "Real Estate Development",
+  "Property Management", "Facility Management", "Advertising & Marketing", "Media & Publishing",
+  "Events & Exhibitions", "Education & Training", "Consulting & Professional Services",
+  "Banking & Financial Services", "Insurance", "Legal Services", "Government & Public Sector",
+  "Non-Profit / NGO", "Other",
+];
 const LEAD_SOURCES = [
   "Referral", "Existing Customer", "Word of Mouth", "Website", "Website Contact Form",
   "Live Chat", "Blog / Content", "SEO / Organic Search", "Google Ads", "Paid Advertisement",
@@ -8792,7 +8854,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           <FormSection title={t("section.segmentationHealth", "Segmentation & Health")} icon={<StarIcon size={14} />}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <Input label={t("field.subIndustry", "Sub Industry")} value={form.sub_industry} onChange={v => setField("sub_industry", v)} placeholder={t("placeholder.subIndustry", "e.g. Solar EPC")} icon={<FactoryIcon size={14} />} />
+                <ComboInput label={t("field.subIndustry", "Sub Industry")} value={form.sub_industry} onChange={v => setField("sub_industry", v)} placeholder={t("placeholder.subIndustry", "e.g. Solar EPC")} icon={<FactoryIcon size={14} />} options={SUB_INDUSTRIES} />
                 <SelectInput label={t("field.buyingBehavior", "Buying Behavior")} value={form.buying_behavior} onChange={v => setField("buying_behavior", v)} options={BUYING_BEHAVIORS} icon={<PackageIcon size={14} />} selectLabel={t("detail.select")} />
               </div>
               <div className="grid grid-cols-2 gap-3">
