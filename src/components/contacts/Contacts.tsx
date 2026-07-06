@@ -4905,6 +4905,22 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const setField = useCallback(<K extends keyof ContactForm>(key: K, val: ContactForm[K]) =>
     setForm(prev => ({ ...prev, [key]: val })), []);
 
+  /* Selecting a customer tier auto-fills the Price List to the matching tier
+     (Diamond→Diamond, End User→Standard, …). It stays editable: a manual
+     "Custom" override is preserved and never re-synced. */
+  const handleTierSelect = useCallback((tierValue: CustomerTier) => {
+    setForm(prev => {
+      const nextTier = prev.customer_type === tierValue ? "" : tierValue;
+      const priceList =
+        prev.price_list_tier === "Custom"
+          ? prev.price_list_tier
+          : nextTier
+            ? TIER_COLOR_META[nextTier].label
+            : "";
+      return { ...prev, customer_type: nextTier, price_list_tier: priceList };
+    });
+  }, []);
+
   const addPhone = () => setField("phones", [...form.phones, { label: "mobile", number: "" }]);
   const removePhone = (i: number) => setField("phones", form.phones.filter((_, idx) => idx !== i));
   const updatePhone = (i: number, field: keyof PhoneEntry, val: string) => {
@@ -8472,7 +8488,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     return (
                       <button
                         key={tier.value}
-                        onClick={() => setField("customer_type", selected ? "" : tier.value)}
+                        onClick={() => handleTierSelect(tier.value)}
                         className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
                           selected
                             ? "border-[var(--border-focus)] ring-1 ring-white/10"
@@ -8714,7 +8730,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           <FormSection title={t("section.pricingDiscounts", "Pricing & Discounts")} kxComponent="PricingFormSection" kxModule={filterType === "supplier" ? "Suppliers" : filterType === "customer" ? "Customers" : "Contacts"} kxSection="Commercial & logistics" icon={<HandCoinsIcon size={14} />}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <SelectInput label={t("field.priceListTier", "Price List Tier")} value={form.price_list_tier} onChange={v => setField("price_list_tier", v)} options={PRICE_LIST_TIERS} icon={<TagsIcon size={14} />} selectLabel={t("detail.select")} />
+                <SelectInput label={t("field.priceListTier", "Price List Tier")} value={form.price_list_tier} onChange={v => setField("price_list_tier", v)} options={PRICE_LIST_TIERS} icon={<TagsIcon size={14} />} selectLabel={t("detail.select")} help={t("help.priceListFollowsTier", "Follows the customer tier — pick Custom to override")} />
                 <Input label={t("field.maxDiscount", "Max Discount (%)")} value={form.max_discount_allowed} onChange={v => setField("max_discount_allowed", v)} placeholder="0.00" inputMode="decimal" icon={<ReceiptIcon size={14} />} />
               </div>
               <div className="grid grid-cols-2 gap-3">
