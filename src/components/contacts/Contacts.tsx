@@ -480,6 +480,7 @@ const INDUSTRIES = [
    across sectors (heavy on textile/garment, Koleex's domain). Users pick one
    or type their own. */
 const SUB_INDUSTRIES = [
+  "None",
   // Apparel / garment / textile (Koleex core)
   "Woven Garment Manufacturing", "Knitwear Manufacturing", "Denim / Jeans Manufacturing",
   "Activewear & Sportswear", "Lingerie & Intimate Apparel", "Swimwear",
