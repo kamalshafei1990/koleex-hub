@@ -2752,11 +2752,10 @@ const CustomerTabBar = React.memo(function CustomerTabBar({
   stickyTop?: string;
 }) {
   const t = translate ?? ((_k: string, f: string) => f);
-  /* Opaque strip masks scrolling content behind the pill. It uses the same
-     tone as the form header / pill (secondary) so the tabs read as one
-     continuous masthead — no darker frame boxing the pill in. */
+  /* Transparent strip — no backing fill. Only the pill itself carries a
+     background; the surrounding sticky area shows through. */
   return (
-    <div className={`sticky ${stickyTop ?? "top-0"} z-[15] bg-[var(--bg-secondary)] px-4 md:px-6 pt-3 pb-2`}>
+    <div className={`sticky ${stickyTop ?? "top-0"} z-[15] bg-transparent px-4 md:px-6 pt-3 pb-2`}>
     <nav className="flex gap-1 overflow-x-auto rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 scrollbar-none no-scrollbar">
       {CUSTOMER_TABS.map(tab => {
         const active = activeTab === tab.id;
