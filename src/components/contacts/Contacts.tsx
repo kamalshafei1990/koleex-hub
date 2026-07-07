@@ -3029,6 +3029,10 @@ const CustomerAccountPanel = React.memo(function CustomerAccountPanel({ contactI
   // reset password
   const [resetPwd, setResetPwd] = useState("");
   const [resetForce, setResetForce] = useState(true);
+  // create custom role (inline)
+  const [showRoleForm, setShowRoleForm] = useState(false);
+  const [newRoleName, setNewRoleName] = useState("");
+  const [newRoleDesc, setNewRoleDesc] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -3110,6 +3114,29 @@ const CustomerAccountPanel = React.memo(function CustomerAccountPanel({ contactI
     } catch { setErr(t("account.actionFailed", "Action failed.")); } finally { setBusy(false); }
   };
 
+  const createRole = async () => {
+    const name = newRoleName.trim();
+    if (!name) { setErr(t("account.roleNameNeeded", "Enter a role name.")); return; }
+    setBusy(true); setErr(null); setNotice(null);
+    try {
+      const res = await fetch("/api/roles", {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, description: newRoleDesc.trim() || null, scope: "customer" }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { setErr((json as { error?: string }).error || t("account.roleFailed", "Couldn't create the role.")); return; }
+      const created = (json as { role?: { id?: string; name?: string } }).role;
+      if (created?.id) {
+        const nr: PortalRole = { id: created.id, name: created.name || name, scope: "customer" };
+        setRoles((rs) => [...rs, nr].sort((a, b) => a.name.localeCompare(b.name)));
+        if (account) { await changeRole(nr.id); } else { setRoleId(nr.id); }
+        setNotice(t("account.roleCreated", "Custom role created and selected."));
+        setNewRoleName(""); setNewRoleDesc(""); setShowRoleForm(false);
+      }
+    } catch { setErr(t("account.roleFailed", "Couldn't create the role.")); }
+    finally { setBusy(false); }
+  };
+
   if (loading) return <div className="text-sm text-[var(--text-faint)] py-6 text-center">{t("loading", "Loading…")}</div>;
 
   const banner = (err || notice) && (
@@ -3118,6 +3145,25 @@ const CustomerAccountPanel = React.memo(function CustomerAccountPanel({ contactI
   const pwInput = "w-full h-9 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] px-3";
   const genBtn = "shrink-0 px-3 h-9 rounded-lg border border-[var(--border-color)] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors";
   const primaryBtn = "px-3.5 h-9 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-sm font-medium disabled:opacity-40 transition-opacity";
+
+  const roleCreator = (
+    !showRoleForm ? (
+      <button type="button" onClick={() => { setShowRoleForm(true); setErr(null); setNotice(null); }} className="text-xs text-blue-400 hover:text-blue-300 font-medium inline-flex items-center gap-1">
+        <PlusIcon size={12} /> {t("account.createRole", "Create custom role")}
+      </button>
+    ) : (
+      <div className="rounded-lg border border-[var(--border-color)] p-3 space-y-2.5">
+        <div className="text-xs font-semibold text-[var(--text-secondary)]">{t("account.newRole", "New custom role")}</div>
+        <Input label={t("account.roleName", "Role name")} value={newRoleName} onChange={setNewRoleName} placeholder={t("account.roleNamePh", "e.g. Portal Buyer")} icon={<ShieldCheckIcon size={14} />} />
+        <Input label={t("account.roleDesc", "Description (optional)")} value={newRoleDesc} onChange={setNewRoleDesc} placeholder={t("account.roleDescPh", "What this role is for")} />
+        <p className="text-[11px] text-[var(--text-faint)]">{t("account.roleHint", "Creates a customer-scoped role you can assign here. Fine-tune its module permissions later in Roles & Permissions.")}</p>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={createRole} disabled={busy || !newRoleName.trim()} className={primaryBtn}>{t("account.createRoleBtn", "Create role")}</button>
+          <button type="button" onClick={() => { setShowRoleForm(false); setNewRoleName(""); setNewRoleDesc(""); }} className={genBtn}>{t("cancel", "Cancel")}</button>
+        </div>
+      </div>
+    )
+  );
 
   if (account) {
     const active = account.status === "active";
@@ -3139,7 +3185,10 @@ const CustomerAccountPanel = React.memo(function CustomerAccountPanel({ contactI
           <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("account.lastLogin", "Last Login")}</span><p className="text-sm text-[var(--text-primary)]">{account.last_login_at ? fmtAcctDate(account.last_login_at) : t("account.never", "Never")}</p></div>
           <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("account.createdOn", "Created")}</span><p className="text-sm text-[var(--text-primary)]">{fmtAcctDate(account.created_at)}</p></div>
         </div>
-        <SelectInput label={t("account.role", "Role")} value={account.role_id || ""} onChange={changeRole} options={roles.map((r) => r.id)} renderLabel={(id) => roleName(id)} selectLabel={t("account.noRole", "No role")} />
+        <div className="space-y-2">
+          <SelectInput label={t("account.role", "Role")} value={account.role_id || ""} onChange={changeRole} options={roles.map((r) => r.id)} renderLabel={(id) => roleName(id)} selectLabel={t("account.noRole", "No role")} />
+          {roleCreator}
+        </div>
         <div className="flex items-center gap-2 flex-wrap">
           {active
             ? <button type="button" onClick={() => setStatus("suspended")} disabled={busy} className="px-3 h-9 rounded-lg border border-amber-500/40 text-amber-500 text-sm hover:bg-amber-500/10 transition-colors disabled:opacity-40">{t("account.suspend", "Suspend")}</button>
@@ -3168,7 +3217,10 @@ const CustomerAccountPanel = React.memo(function CustomerAccountPanel({ contactI
         <Input label={t("account.username", "Username")} value={username} onChange={setUsername} placeholder="customer.name" icon={<UserIcon size={14} />} />
         <Input label={t("account.loginEmail", "Login Email")} value={email} onChange={setEmail} placeholder="name@company.com" icon={<EnvelopeIcon size={14} />} inputMode="email" />
       </div>
-      <SelectInput label={t("account.role", "Role")} value={roleId} onChange={setRoleId} options={roles.map((r) => r.id)} renderLabel={(id) => roleName(id)} selectLabel={t("account.selectRole", "Select role…")} />
+      <div className="space-y-2">
+        <SelectInput label={t("account.role", "Role")} value={roleId} onChange={setRoleId} options={roles.map((r) => r.id)} renderLabel={(id) => roleName(id)} selectLabel={t("account.selectRole", "Select role…")} />
+        {roleCreator}
+      </div>
       <div>
         <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("account.tempPassword", "Temporary Password")}</label>
         <div className="flex gap-2">
