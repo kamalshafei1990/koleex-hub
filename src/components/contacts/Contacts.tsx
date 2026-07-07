@@ -589,6 +589,25 @@ const CARRIER_DOMAINS: Record<string, string> = {
   "Bolloré Logistics": "bollore-logistics.com", "CEVA Logistics": "cevalogistics.com",
   "Agility": "agility.com", "GEODIS": "geodis.com", "Yusen Logistics": "yusen-logistics.com",
 };
+/* A custom carrier the operator adds can carry its own logo domain, encoded as
+   "Name|domain.com" in the stored value. These helpers read the display name
+   and the logo domain from either an encoded value or a known carrier. */
+const CARRIER_SEP = "|";
+function carrierName(v: string): string {
+  const i = v.indexOf(CARRIER_SEP);
+  return i === -1 ? v : v.slice(0, i);
+}
+function carrierDomain(v: string): string | undefined {
+  const i = v.indexOf(CARRIER_SEP);
+  if (i !== -1) return v.slice(i + 1).trim() || undefined;
+  return CARRIER_DOMAINS[v];
+}
+function normalizeDomain(input: string): string {
+  let s = (input || "").trim().toLowerCase();
+  if (!s) return "";
+  s = s.replace(/^https?:\/\//, "").replace(/^www\./, "");
+  return s.split("/")[0].split("?")[0];
+}
 /* Sea/air ports of entry keyed by ISO-2 country code, with a global fallback.
    The Port of Entry combobox shows the customer's country ports first, and
    users can still type any port. */
@@ -2993,12 +3012,12 @@ const ToggleSwitch = React.memo(function ToggleSwitch({
    letter-monogram fallback when there's no domain or the image fails to load
    (e.g. offline / blocked). Keeps the dropdown readable either way. */
 const CarrierLogo = React.memo(function CarrierLogo({ name }: { name: string }) {
-  const domain = CARRIER_DOMAINS[name];
+  const domain = carrierDomain(name);
   const [failed, setFailed] = React.useState(false);
   if (!domain || failed) {
     return (
       <span className="inline-flex items-center justify-center w-4 h-4 rounded-sm bg-[var(--bg-surface-active)] text-[9px] font-semibold text-[var(--text-dim)] shrink-0">
-        {name.charAt(0)}
+        {carrierName(name).charAt(0)}
       </span>
     );
   }
@@ -3013,6 +3032,99 @@ const CarrierLogo = React.memo(function CarrierLogo({ name }: { name: string }) 
       className="w-4 h-4 rounded-sm object-contain shrink-0"
       onError={() => setFailed(true)}
     />
+  );
+});
+
+/* Preferred-carriers picker: brand-logo suggestions + a built-in "add a carrier
+   with its own logo" form (name + website → logo via favicon). Custom carriers
+   are stored as "Name|domain.com" so the logo persists. */
+const CarrierTagEditor = React.memo(function CarrierTagEditor({
+  label, values, onChange,
+}: { label: string; values: string[]; onChange: (v: string[]) => void }) {
+  const [draft, setDraft] = React.useState("");
+  const [open, setOpen] = React.useState(false);
+  const [addMode, setAddMode] = React.useState(false);
+  const [newName, setNewName] = React.useState("");
+  const [newSite, setNewSite] = React.useState("");
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) { setOpen(false); setAddMode(false); } };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [open]);
+
+  const addValue = (v: string) => {
+    const t = v.trim();
+    if (t && !values.some(x => carrierName(x).toLowerCase() === carrierName(t).toLowerCase())) onChange([...values, t]);
+  };
+  const filtered = React.useMemo(() => {
+    const q = draft.trim().toLowerCase();
+    const chosen = new Set(values.map(v => carrierName(v).toLowerCase()));
+    return CARRIERS.filter(c => !chosen.has(c.toLowerCase()) && (!q || c.toLowerCase().includes(q))).slice(0, 60);
+  }, [draft, values]);
+  const submitCustom = () => {
+    const nm = newName.trim(); if (!nm) return;
+    const dom = normalizeDomain(newSite);
+    addValue(dom ? `${nm}${CARRIER_SEP}${dom}` : nm);
+    setNewName(""); setNewSite(""); setAddMode(false); setDraft(""); setOpen(false);
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <label className="text-xs text-[var(--text-faint)] mb-1 block">{label}</label>
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        {values.map((v, i) => (
+          <span key={i} className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-secondary)]">
+            <CarrierLogo name={v} />
+            {carrierName(v)}
+            <button type="button" onClick={() => onChange(values.filter((_, idx) => idx !== i))} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]"><CrossIcon size={10} /></button>
+          </span>
+        ))}
+      </div>
+      <div className="relative">
+        <span className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] pointer-events-none"><TruckIcon size={14} /></span>
+        <input
+          value={draft}
+          onChange={e => { setDraft(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); if (draft.trim()) { addValue(draft); setDraft(""); } } else if (e.key === "Escape") setOpen(false); }}
+          placeholder="Maersk / DHL / …"
+          className="w-full h-9 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] ps-9 pe-8"
+        />
+        <AngleDownIcon size={14} className={`absolute end-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)] pointer-events-none transition-transform ${open ? "rotate-180" : ""}`} />
+      </div>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+          {filtered.map(opt => (
+            <button key={opt} type="button" onClick={() => { addValue(opt); setDraft(""); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-start text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] transition-colors">
+              <CarrierLogo name={opt} />{opt}
+            </button>
+          ))}
+          {!addMode ? (
+            <button type="button" onClick={() => { setAddMode(true); setNewName(draft.trim()); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-start text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] transition-colors border-t border-[var(--border-subtle)]">
+              <PlusIcon size={14} className="text-[var(--text-muted)]" /> Add a carrier with its logo…
+            </button>
+          ) : (
+            <div className="p-2.5 border-t border-[var(--border-subtle)] space-y-2">
+              <input autoFocus value={newName} onChange={e => setNewName(e.target.value)} placeholder="Carrier name" className="w-full h-9 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] px-3" />
+              <div className="flex items-center gap-2">
+                {normalizeDomain(newSite)
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={`https://www.google.com/s2/favicons?domain=${normalizeDomain(newSite)}&sz=64`} alt="" width={20} height={20} className="w-5 h-5 rounded-sm object-contain shrink-0" />
+                  : <span className="inline-flex items-center justify-center w-5 h-5 rounded-sm bg-[var(--bg-surface-active)] text-[10px] text-[var(--text-dim)] shrink-0">{(newName.trim().charAt(0) || "?")}</span>}
+                <input value={newSite} onChange={e => setNewSite(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); submitCustom(); } }} placeholder="Website for logo (e.g. carrier.com)" className="flex-1 h-9 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] px-3" />
+              </div>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={submitCustom} disabled={!newName.trim()} className="px-3 h-8 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-xs font-medium disabled:opacity-40">Add</button>
+                <button type="button" onClick={() => { setAddMode(false); setNewName(""); setNewSite(""); }} className="px-3 h-8 rounded-lg border border-[var(--border-color)] text-xs text-[var(--text-secondary)]">Cancel</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 });
 
@@ -7759,7 +7871,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider block mb-1.5">{t("field.preferredCarriers", "Preferred Carriers")}</span>
                   <div className="flex flex-wrap gap-1.5">
                     {c.preferred_carriers.map((car: string, i: number) => (
-                      <span key={i} className="px-2 py-0.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-secondary)]">{car}</span>
+                      <span key={i} className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-secondary)]"><CarrierLogo name={car} />{carrierName(car)}</span>
                     ))}
                   </div>
                 </div>
@@ -9289,14 +9401,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 placeholder={t("placeholder.hsCode", "e.g. 8541.40")}
                 icon={<HashtagIcon size={14} />}
               />
-              <TagEditor
+              <CarrierTagEditor
                 label={t("field.preferredCarriers", "Preferred Carriers")}
                 values={form.preferred_carriers}
                 onChange={v => setField("preferred_carriers", v)}
-                placeholder={t("placeholder.carrier", "Maersk / DHL / …")}
-                icon={<TruckIcon size={14} />}
-                suggestions={CARRIERS}
-                iconFor={(c) => <CarrierLogo name={c} />}
               />
               <TagEditor
                 label={t("field.certificationsRequired", "Certifications Required")}
