@@ -3182,6 +3182,151 @@ const CustomerAccountPanel = React.memo(function CustomerAccountPanel({ contactI
   );
 });
 
+/* ── Customer Activity hub (Activity tab) ────────────────────────────────────
+   Interaction timeline + follow-up tasks (persisted in the existing custom_fields
+   jsonb under a reserved "__activity" key — no schema change) plus a read-only
+   list of the customer's linked quotations & invoices. */
+const ACTIVITY_CF_KEY = "__activity";
+const INTERACTION_TYPES = ["Call", "Meeting", "Email", "WhatsApp", "Visit", "Quote Sent", "Order", "Payment", "Complaint", "Note", "Other"];
+type TimelineEntry = { id: string; date: string; type: string; note: string };
+type TaskEntry = { id: string; title: string; due: string; done: boolean };
+function readActivityBlob(cf: CustomField[]): { timeline: TimelineEntry[]; tasks: TaskEntry[] } {
+  const e = cf.find((x) => x.field_name === ACTIVITY_CF_KEY);
+  if (!e) return { timeline: [], tasks: [] };
+  try {
+    const p = JSON.parse(e.field_value || "{}") as { timeline?: TimelineEntry[]; tasks?: TaskEntry[] };
+    return { timeline: Array.isArray(p.timeline) ? p.timeline : [], tasks: Array.isArray(p.tasks) ? p.tasks : [] };
+  } catch { return { timeline: [], tasks: [] }; }
+}
+function writeActivityBlob(cf: CustomField[], blob: { timeline: TimelineEntry[]; tasks: TaskEntry[] }): CustomField[] {
+  const val = JSON.stringify(blob);
+  const idx = cf.findIndex((x) => x.field_name === ACTIVITY_CF_KEY);
+  if (idx === -1) return [...cf, { field_name: ACTIVITY_CF_KEY, field_value: val }];
+  const next = [...cf]; next[idx] = { field_name: ACTIVITY_CF_KEY, field_value: val }; return next;
+}
+function newId(): string { try { return globalThis.crypto?.randomUUID?.() || String(Date.now()) + Math.round(performance.now()); } catch { return String(Date.now()); } }
+
+const CustomerActivityHub = React.memo(function CustomerActivityHub({ contactId, customFields, onCustomFields, t }: {
+  contactId: string | null; customFields: CustomField[]; onCustomFields: (v: CustomField[]) => void; t: (k: string, f?: string) => string;
+}) {
+  const { timeline, tasks } = readActivityBlob(customFields);
+  const commit = (next: { timeline: TimelineEntry[]; tasks: TaskEntry[] }) => onCustomFields(writeActivityBlob(customFields, next));
+  const [tDate, setTDate] = useState(() => { try { return new Date().toISOString().slice(0, 10); } catch { return ""; } });
+  const [tType, setTType] = useState("Call");
+  const [tNote, setTNote] = useState("");
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskDue, setTaskDue] = useState("");
+  const [linked, setLinked] = useState<{ quotes: Record<string, unknown>[]; invoices: Record<string, unknown>[] } | null>(null);
+
+  useEffect(() => {
+    if (!contactId) { setLinked(null); return; }
+    let cancelled = false;
+    (async () => {
+      const [q, i] = await Promise.all([
+        fetch(`/api/quotations?customer_id=${contactId}`, { credentials: "include" }).then((r) => r.ok ? r.json() : {}).catch(() => ({})),
+        fetch(`/api/invoices?customer_id=${contactId}`, { credentials: "include" }).then((r) => r.ok ? r.json() : {}).catch(() => ({})),
+      ]);
+      if (cancelled) return;
+      const pick = (o: Record<string, unknown>, keys: string[]) => { for (const k of keys) if (Array.isArray(o[k])) return o[k] as Record<string, unknown>[]; return []; };
+      setLinked({ quotes: pick(q, ["quotations", "data", "rows"]), invoices: pick(i, ["invoices", "data", "rows"]) });
+    })();
+    return () => { cancelled = true; };
+  }, [contactId]);
+
+  const addInteraction = () => { if (!tNote.trim()) return; commit({ timeline: [{ id: newId(), date: tDate, type: tType, note: tNote.trim() }, ...timeline], tasks }); setTNote(""); };
+  const addTask = () => { if (!taskTitle.trim()) return; commit({ timeline, tasks: [...tasks, { id: newId(), title: taskTitle.trim(), due: taskDue, done: false }] }); setTaskTitle(""); setTaskDue(""); };
+  const sortedTimeline = [...timeline].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const fmtD = (v: string) => { if (!v) return ""; try { return new Date(v).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }); } catch { return v; } };
+  const inputCls = "h-9 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] px-3";
+  const addBtn = "shrink-0 px-3 h-9 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-sm font-medium disabled:opacity-40";
+
+  return (
+    <div className="space-y-6">
+      {/* Interaction Timeline */}
+      <div>
+        <div className="text-xs font-semibold text-[var(--text-secondary)] mb-2">{t("activity.timeline", "Interaction Timeline")}</div>
+        <div className="flex flex-wrap gap-2 mb-3">
+          <input type="date" value={tDate} onChange={(e) => setTDate(e.target.value)} className={`${inputCls} w-[140px]`} />
+          <select value={tType} onChange={(e) => setTType(e.target.value)} className={`${inputCls} cursor-pointer`}>
+            {INTERACTION_TYPES.map((x) => <option key={x} value={x} className="bg-[var(--bg-secondary)]">{x}</option>)}
+          </select>
+          <input value={tNote} onChange={(e) => setTNote(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addInteraction(); } }} placeholder={t("activity.notePlaceholder", "What happened?")} className={`${inputCls} flex-1 min-w-[160px]`} />
+          <button type="button" onClick={addInteraction} disabled={!tNote.trim()} className={addBtn}>{t("add.label", "Add")}</button>
+        </div>
+        {sortedTimeline.length === 0 ? (
+          <p className="text-[12px] text-[var(--text-faint)]">{t("activity.noInteractions", "No interactions logged yet.")}</p>
+        ) : (
+          <div className="relative ps-4 space-y-2.5 before:absolute before:top-1 before:bottom-1 before:start-[3px] before:w-px before:bg-[var(--border-color)]">
+            {sortedTimeline.map((e) => (
+              <div key={e.id} className="relative">
+                <span className="absolute -start-4 top-1.5 w-1.5 h-1.5 rounded-full bg-[var(--text-dim)]" />
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-secondary)]">{e.type}</span>
+                      <span className="text-[11px] text-[var(--text-faint)]">{fmtD(e.date)}</span>
+                    </div>
+                    <p className="text-sm text-[var(--text-primary)] mt-0.5 break-words">{e.note}</p>
+                  </div>
+                  <button type="button" onClick={() => commit({ timeline: timeline.filter((x) => x.id !== e.id), tasks })} className="text-[var(--text-dim)] hover:text-[var(--text-primary)] shrink-0 mt-0.5"><CrossIcon size={12} /></button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Tasks & Follow-ups */}
+      <div>
+        <div className="text-xs font-semibold text-[var(--text-secondary)] mb-2">{t("activity.tasks", "Tasks & Follow-ups")}</div>
+        <div className="flex flex-wrap gap-2 mb-3">
+          <input value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTask(); } }} placeholder={t("activity.taskPlaceholder", "Follow-up task…")} className={`${inputCls} flex-1 min-w-[160px]`} />
+          <input type="date" value={taskDue} onChange={(e) => setTaskDue(e.target.value)} className={`${inputCls} w-[140px]`} />
+          <button type="button" onClick={addTask} disabled={!taskTitle.trim()} className={addBtn}>{t("add.label", "Add")}</button>
+        </div>
+        {tasks.length === 0 ? (
+          <p className="text-[12px] text-[var(--text-faint)]">{t("activity.noTasks", "No open tasks.")}</p>
+        ) : (
+          <div className="space-y-1.5">
+            {tasks.map((tk) => {
+              const overdue = !tk.done && tk.due && (() => { try { return new Date(tk.due) < new Date(new Date().toDateString()); } catch { return false; } })();
+              return (
+                <div key={tk.id} className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)]">
+                  <button type="button" onClick={() => commit({ timeline, tasks: tasks.map((x) => x.id === tk.id ? { ...x, done: !x.done } : x) })} className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center ${tk.done ? "bg-emerald-500 border-emerald-500 text-white" : "border-[var(--border-strong)]"}`}>{tk.done ? <CheckIcon size={10} /> : null}</button>
+                  <span className={`flex-1 text-sm ${tk.done ? "line-through text-[var(--text-faint)]" : "text-[var(--text-primary)]"}`}>{tk.title}</span>
+                  {tk.due && <span className={`text-[11px] ${overdue ? "text-rose-500" : "text-[var(--text-faint)]"}`}>{fmtD(tk.due)}{overdue ? ` · ${t("activity.overdue", "overdue")}` : ""}</span>}
+                  <button type="button" onClick={() => commit({ timeline, tasks: tasks.filter((x) => x.id !== tk.id) })} className="text-[var(--text-dim)] hover:text-[var(--text-primary)] shrink-0"><CrossIcon size={12} /></button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Linked records (read-only) */}
+      <div>
+        <div className="text-xs font-semibold text-[var(--text-secondary)] mb-2">{t("activity.linkedRecords", "Linked Records")}</div>
+        {!contactId ? (
+          <p className="text-[12px] text-[var(--text-faint)]">{t("activity.saveForRecords", "Save the customer to see linked quotations & invoices.")}</p>
+        ) : linked === null ? (
+          <p className="text-[12px] text-[var(--text-faint)]">{t("loading", "Loading…")}</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            <a href={`/quotations?customer=${contactId}`} className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2.5 hover:border-[var(--border-focus)] transition-colors">
+              <div className="text-2xl font-semibold text-[var(--text-primary)]">{linked.quotes.length}</div>
+              <div className="text-[11px] text-[var(--text-faint)]">{t("activity.quotations", "Quotations")}</div>
+            </a>
+            <a href={`/invoices?customer=${contactId}`} className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2.5 hover:border-[var(--border-focus)] transition-colors">
+              <div className="text-2xl font-semibold text-[var(--text-primary)]">{linked.invoices.length}</div>
+              <div className="text-[11px] text-[var(--text-faint)]">{t("activity.invoices", "Invoices")}</div>
+            </a>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
 /* ── Toggle switch — premium on/off switch used across Compliance/KYC booleans ── */
 const ToggleSwitch = React.memo(function ToggleSwitch({
   label,
@@ -8973,7 +9118,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {/* Custom Fields (hidden for suppliers) */}
         {form.contact_type !== "supplier" && showTab("activity") && (
         <FormSection title={t("section.customFields")} icon={<HashtagIcon size={14} />}>
-          {form.custom_fields.map((cf, i) => (
+          {form.custom_fields.map((cf, i) => {
+            if (cf.field_name === ACTIVITY_CF_KEY) return null;
+            return (
             <div key={i} className="flex items-center gap-2 mb-3">
               <RemoveBtn onClick={() => removeCustomField(i)} />
               <input
@@ -8989,7 +9136,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 className="flex-1 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
               />
             </div>
-          ))}
+            );
+          })}
           <AddButton label={t("add.field")} onClick={addCustomField} />
         </FormSection>
         )}
@@ -9631,6 +9779,73 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {/* Messaging IDs removed from the customer form — the same contact
            channels (WhatsApp / WeChat / Telegram / etc.) are captured under
            Social Profiles in the Overview tab, so this section was redundant. */}
+
+        {/* ── Activity & Follow-ups (customer only — Activity tab) ── */}
+        {isCustomer && showTab("activity") && (
+          <FormSection title={t("section.activityHub", "Activity & Follow-ups")} icon={<ClockIcon size={14} />}>
+            <CustomerActivityHub
+              contactId={editingId}
+              customFields={form.custom_fields}
+              onCustomFields={(v) => setField("custom_fields", v)}
+              t={(k, f) => t(k, f)}
+            />
+          </FormSection>
+        )}
+
+        {/* ── Documents & Attachments (customer only — Activity tab) ──
+             Reuses the shared `documents` jsonb column + the same uploader
+             used by suppliers. Upload PDFs/images, preview, download. */}
+        {isCustomer && showTab("activity") && (
+          <FormSection title={t("section.documents", "Documents & Attachments")} icon={<PaperclipIcon size={14} />}>
+            <div className="space-y-2">
+              {form.documents.map((doc, i) => (
+                <div key={i} className="p-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] space-y-2">
+                  <div className="flex items-center gap-2">
+                    <RemoveBtn onClick={() => setField("documents", form.documents.filter((_, idx) => idx !== i))} />
+                    {doc.url ? (
+                      <>
+                        <FileCheckIcon size={14} className="text-blue-400 shrink-0" />
+                        <span className="text-xs text-[var(--text-muted)] font-medium truncate">{doc.doc_name || t("misc.untitled")}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-faint)] font-medium ms-auto">{doc.type}</span>
+                        <button onClick={() => openFilePreview(doc.url)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[10px] text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors">
+                          {doc.type === "PDF" ? <ExternalLinkIcon size={10} /> : <EyeIcon size={10} />} {doc.type === "PDF" ? t("btn.open") : t("btn.preview")}
+                        </button>
+                        <button onClick={() => downloadFile(doc.url, doc.name)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[10px] text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors">
+                          <DownloadIcon size={10} /> {t("btn.download")}
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <input
+                          value={doc.doc_name}
+                          onChange={e => { const arr = [...form.documents]; arr[i] = { ...arr[i], doc_name: e.target.value }; setField("documents", arr); }}
+                          placeholder={t("placeholder.docName")}
+                          className="flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
+                        />
+                        <label className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-subtle)] hover:text-[var(--text-primary)] cursor-pointer transition-colors shrink-0">
+                          <PaperclipIcon size={12} /> {t("btn.upload")}
+                          <input type="file" accept=".pdf,image/*" className="hidden" onChange={e => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const isPdf = file.type === "application/pdf";
+                              const handler = isPdf ? uploadFileToStorage(file) : compressImage(file, 1200, 0.8);
+                              handler.then(url => {
+                                const arr = [...form.documents];
+                                arr[i] = { ...arr[i], name: file.name, url, type: isPdf ? "PDF" : file.type.split("/").pop()?.toUpperCase() || "FILE", uploaded_at: new Date().toISOString() };
+                                setField("documents", arr);
+                              });
+                            }
+                          }} />
+                        </label>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+              <AddButton label={t("add.document")} onClick={() => setField("documents", [...form.documents, { doc_name: "", name: "", url: "", type: "", uploaded_at: "" }])} />
+            </div>
+          </FormSection>
+        )}
 
         {/* ── Account (customer only — super-admin-only Account tab) ──
              Provision + manage a portal login for the customer. Requires a
@@ -10667,7 +10882,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
             {/* 12. Custom Fields */}
             <FormSection title={t("section.customFields")} icon={<HashtagIcon size={14} />} owner={t("owner.anyTeam")} ownerLabel={t("owner.label")} dept="general" activeDept={supplierDept} auditMap={supplierSectionAudit} updatedByLabel={t("owner.updatedBy")}>
-              {form.custom_fields.map((cf, i) => (
+              {form.custom_fields.map((cf, i) => {
+                if (cf.field_name === ACTIVITY_CF_KEY) return null;
+                return (
                 <div key={i} className="flex items-center gap-2 mb-3">
                   <RemoveBtn onClick={() => removeCustomField(i)} />
                   <input
@@ -10683,7 +10900,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     className="flex-1 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
                   />
                 </div>
-              ))}
+                );
+              })}
               <AddButton label={t("add.field")} onClick={addCustomField} />
             </FormSection>
           </>
