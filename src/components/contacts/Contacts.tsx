@@ -6979,7 +6979,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Premium tabs (Customer only) */}
         {isCustomerDetail && (
-          <CustomerTabBar activeTab={customerTab} onChange={setCustomerTab} translate={(k, f) => t(k, f)} />
+          <CustomerTabBar activeTab={customerTab} onChange={setCustomerTab} translate={(k, f) => t(k, f)} extraTabs={isSuperAdmin ? [{ id: "account", label: t("customerTab.account", "Account"), icon: <ShieldCheckIcon size={14} /> }] : undefined} />
         )}
 
         {/* Customer Hero Strip — quick badges for tier, KYC, VIP, Strategic, Flags */}
@@ -8282,6 +8282,19 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {(c.contact_type !== "customer" || detailTab("activity")) && c.notes && (
           <Section title={t("section.notes")} icon={<DocumentIcon size={14} />}>
             <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">{c.notes}</p>
+          </Section>
+        )}
+
+        {/* Account (customer only — super-admin-only Account tab, detail view).
+            Create/manage the customer's portal login straight from the profile. */}
+        {isCustomerDetail && detailTab("account") && isSuperAdmin && (
+          <Section title={t("customerTab.account", "Account")} icon={<ShieldCheckIcon size={14} />}>
+            <CustomerAccountPanel
+              contactId={c.id}
+              contactEmail={(Array.isArray(c.emails) ? c.emails.find((e) => e && e.email && e.email.trim())?.email : "") || ""}
+              contactName={c.company || [c.first_name, c.last_name].filter(Boolean).join(" ") || c.company_name_en || "customer"}
+              t={(k, f) => t(k, f)}
+            />
           </Section>
         )}
 
