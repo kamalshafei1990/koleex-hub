@@ -8543,7 +8543,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Customer Premium Tab Bar ── */}
         {isCustomer && form.entity_type && (
-          <CustomerTabBar activeTab={customerTab} onChange={setCustomerTab} translate={(k, f) => t(k, f)} stickyTop="top-[53px] md:top-[71px]" extraTabs={isCustomer && isSuperAdmin && editingId ? [{ id: "account", label: t("customerTab.account", "Account"), icon: <ShieldCheckIcon size={14} /> }] : undefined} />
+          <CustomerTabBar activeTab={customerTab} onChange={setCustomerTab} translate={(k, f) => t(k, f)} stickyTop="top-[53px] md:top-[71px]" extraTabs={isCustomer && isSuperAdmin ? [{ id: "account", label: t("customerTab.account", "Account"), icon: <ShieldCheckIcon size={14} /> }] : undefined} />
         )}
 
         {/* Company Customer: Company Name section */}
