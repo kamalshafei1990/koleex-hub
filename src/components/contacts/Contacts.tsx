@@ -713,8 +713,17 @@ const INCOTERMS_OPTIONS = ["EXW", "FCA", "FAS", "FOB", "CFR", "CIF", "CPT", "CIP
 const COMM_PREFERENCES = ["Phone", "Email", "WhatsApp", "WeChat", "Telegram", "SMS", "In-Person", "Video Call"];
 const LANGUAGES = [
   "English", "Arabic", "Chinese (Mandarin)", "Chinese (Cantonese)", "Spanish", "French",
-  "German", "Portuguese", "Russian", "Japanese", "Korean", "Hindi", "Turkish",
-  "Italian", "Dutch", "Thai", "Vietnamese", "Indonesian", "Malay", "Tagalog",
+  "German", "Portuguese", "Portuguese (Brazil)", "Russian", "Japanese", "Korean", "Hindi",
+  "Urdu", "Bengali", "Punjabi", "Tamil", "Telugu", "Marathi", "Gujarati",
+  "Turkish", "Italian", "Dutch", "Thai", "Vietnamese", "Indonesian", "Malay", "Tagalog",
+  "Persian (Farsi)", "Hebrew", "Polish", "Ukrainian", "Romanian", "Greek", "Czech",
+  "Hungarian", "Swedish", "Norwegian", "Danish", "Finnish",
+  "Swahili", "Amharic", "Hausa", "Yoruba", "Zulu", "Afrikaans",
+  "Kurdish", "Pashto", "Azerbaijani", "Uzbek", "Kazakh", "Turkmen",
+  "Khmer", "Lao", "Burmese", "Sinhala", "Nepali",
+  "Serbian", "Croatian", "Bulgarian", "Slovak", "Slovenian", "Lithuanian", "Latvian", "Estonian",
+  "Catalan", "Basque", "Icelandic", "Maltese", "Georgian", "Armenian", "Mongolian",
+  "Other",
 ];
 
 /* Supplier "type" is no longer a standalone field — it is the PRIMARY
