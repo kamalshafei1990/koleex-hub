@@ -755,7 +755,7 @@ const COUNTRIES_WITH_STATES = new Set([
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /** Customer tab identifiers for the premium tabbed form/detail layout */
-type CustomerTab = "overview" | "commercial" | "financial" | "compliance" | "trade" | "activity";
+type CustomerTab = "overview" | "commercial" | "financial" | "compliance" | "trade" | "activity" | "account";
 
 const CUSTOMER_TABS: { id: CustomerTab; label: string; icon: React.ReactNode }[] = [
   { id: "overview",   label: "Overview",   icon: <UserIcon size={14} /> },
@@ -2943,6 +2943,7 @@ const CustomerTabBar = React.memo(function CustomerTabBar({
   onChange,
   translate,
   stickyTop,
+  extraTabs,
 }: {
   activeTab: CustomerTab;
   onChange: (tab: CustomerTab) => void;
@@ -2951,13 +2952,17 @@ const CustomerTabBar = React.memo(function CustomerTabBar({
      Save/Cancel header (~71px) above it, so it must pin BELOW that; in the
      read-only detail view the top bar scrolls away, so it pins at the top. */
   stickyTop?: string;
+  /* Conditional extra tabs appended after the standard set (e.g. the
+     super-admin-only Account tab). */
+  extraTabs?: { id: CustomerTab; label: string; icon: React.ReactNode }[];
 }) {
   const t = translate ?? ((_k: string, f: string) => f);
+  const tabs = extraTabs && extraTabs.length ? [...CUSTOMER_TABS, ...extraTabs] : CUSTOMER_TABS;
   /* Full-width opaque strip (panel bg) masks scrolling content behind the pill. */
   return (
     <div className={`sticky ${stickyTop ?? "top-0"} z-[15] bg-[var(--bg-primary)] px-4 md:px-6 pt-3 pb-2`}>
     <nav className="flex gap-1 overflow-x-auto rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 scrollbar-none no-scrollbar">
-      {CUSTOMER_TABS.map(tab => {
+      {tabs.map(tab => {
         const active = activeTab === tab.id;
         return (
           <button
@@ -2976,6 +2981,203 @@ const CustomerTabBar = React.memo(function CustomerTabBar({
         );
       })}
     </nav>
+    </div>
+  );
+});
+
+/* ── Customer portal account (super-admin only) ──────────────────────────────
+   Create + manage a login account for the customer: username / email / role /
+   password (set + reset) / status / 2FA display / force-change / last login.
+   Talks to the existing /api/accounts endpoints (Argon2 hashing server-side). */
+type PortalAccount = {
+  id: string; username: string; login_email: string; status: string; user_type: string;
+  role_id: string | null; is_super_admin: boolean; two_factor_enabled: boolean;
+  force_password_change: boolean; last_login_at: string | null; created_at: string;
+  contact_id: string | null;
+};
+type PortalRole = { id: string; name: string; scope?: string | null };
+
+function genPortalPassword(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789@#$%&*";
+  const rnd = (typeof crypto !== "undefined" && crypto.getRandomValues)
+    ? () => { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] / 4294967296; }
+    : Math.random;
+  let s = "";
+  for (let i = 0; i < 14; i++) s += chars[Math.floor(rnd() * chars.length)];
+  return s;
+}
+function fmtAcctDate(v: string | null): string {
+  if (!v) return "—";
+  try { return new Date(v).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }); } catch { return "—"; }
+}
+
+const CustomerAccountPanel = React.memo(function CustomerAccountPanel({ contactId, contactEmail, contactName, t }: {
+  contactId: string; contactEmail: string; contactName: string; t: (k: string, f?: string) => string;
+}) {
+  const [loading, setLoading] = useState(true);
+  const [account, setAccount] = useState<PortalAccount | null>(null);
+  const [roles, setRoles] = useState<PortalRole[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  // create form
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState(contactEmail || "");
+  const [roleId, setRoleId] = useState("");
+  const [pwd, setPwd] = useState("");
+  const [forceChange, setForceChange] = useState(true);
+  // reset password
+  const [resetPwd, setResetPwd] = useState("");
+  const [resetForce, setResetForce] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true); setErr(null);
+      try {
+        const [aRes, rRes] = await Promise.all([
+          fetch("/api/accounts", { credentials: "include" }),
+          fetch("/api/roles", { credentials: "include" }),
+        ]);
+        const aJson = await aRes.json().catch(() => ({}));
+        const rJson = await rRes.json().catch(() => ({}));
+        if (cancelled) return;
+        const list: PortalAccount[] = Array.isArray(aJson.accounts) ? aJson.accounts : [];
+        const rl: PortalRole[] = Array.isArray(rJson.roles) ? rJson.roles : [];
+        const mine = list.find((a) => a.contact_id === contactId) || null;
+        setAccount(mine);
+        setRoles(rl.filter((r) => !r.scope || r.scope === "customer" || r.scope === "all"));
+        if (!mine) {
+          const seed = (contactEmail?.split("@")[0]) || contactName.toLowerCase().replace(/[^a-z0-9]+/g, ".").replace(/^\.+|\.+$/g, "").slice(0, 24) || "customer";
+          setUsername(seed);
+          setEmail(contactEmail || "");
+        }
+      } catch { if (!cancelled) setErr(t("account.loadError", "Couldn't load account information.")); }
+      finally { if (!cancelled) setLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [contactId, contactEmail, contactName, t]);
+
+  const roleName = (id: string | null) => roles.find((r) => r.id === id)?.name || (id ? "—" : t("account.noRole", "No role"));
+
+  const createAccount = async () => {
+    if (!username.trim() || !email.trim()) { setErr(t("account.needUserEmail", "Username and login email are required.")); return; }
+    setBusy(true); setErr(null); setNotice(null);
+    try {
+      const res = await fetch("/api/accounts", {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contact_id: contactId, username: username.trim(), login_email: email.trim(),
+          user_type: "customer", status: "active", role_id: roleId || null,
+          ...(pwd.trim() ? { temporary_password: pwd.trim(), force_password_change: forceChange } : {}),
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { setErr((json as { error?: string }).error || t("account.createFailed", "Couldn't create the account.")); return; }
+      setAccount((json as { account?: PortalAccount }).account || (json as PortalAccount));
+      setNotice(t("account.created", "Portal account created."));
+      setPwd("");
+    } catch { setErr(t("account.createFailed", "Couldn't create the account.")); }
+    finally { setBusy(false); }
+  };
+
+  const post = async (path: string, body: object): Promise<boolean> => {
+    if (!account) return false;
+    setBusy(true); setErr(null); setNotice(null);
+    try {
+      const res = await fetch(`/api/accounts/${account.id}${path}`, {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); setErr((j as { error?: string }).error || t("account.actionFailed", "Action failed.")); return false; }
+      return true;
+    } catch { setErr(t("account.actionFailed", "Action failed.")); return false; }
+    finally { setBusy(false); }
+  };
+
+  const setStatus = async (status: string) => { if (await post("/status", { status })) { setAccount((a) => a ? { ...a, status } : a); setNotice(t("account.statusUpdated", "Status updated.")); } };
+  const resetPassword = async () => {
+    if (!resetPwd.trim()) { setErr(t("account.needPwd", "Enter a new password.")); return; }
+    if (await post("/password", { password: resetPwd.trim(), forceReset: resetForce })) { setResetPwd(""); setAccount((a) => a ? { ...a, force_password_change: resetForce } : a); setNotice(t("account.pwdReset", "Password updated.")); }
+  };
+  const toggleForce = async (force: boolean) => { if (await post("/force-password-change", { force })) { setAccount((a) => a ? { ...a, force_password_change: force } : a); setNotice(t("account.saved", "Saved.")); } };
+  const changeRole = async (rid: string) => {
+    if (!account) return;
+    setBusy(true); setErr(null); setNotice(null);
+    try {
+      const res = await fetch(`/api/accounts/${account.id}`, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role_id: rid || null }) });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); setErr((j as { error?: string }).error || t("account.actionFailed", "Action failed.")); return; }
+      setAccount((a) => a ? { ...a, role_id: rid || null } : a); setNotice(t("account.saved", "Saved."));
+    } catch { setErr(t("account.actionFailed", "Action failed.")); } finally { setBusy(false); }
+  };
+
+  if (loading) return <div className="text-sm text-[var(--text-faint)] py-6 text-center">{t("loading", "Loading…")}</div>;
+
+  const banner = (err || notice) && (
+    <div className={`text-[12px] rounded-lg px-3 py-2 ${err ? "bg-rose-500/10 text-rose-500 border border-rose-500/20" : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"}`}>{err || notice}</div>
+  );
+  const pwInput = "w-full h-9 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] px-3";
+  const genBtn = "shrink-0 px-3 h-9 rounded-lg border border-[var(--border-color)] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors";
+  const primaryBtn = "px-3.5 h-9 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-sm font-medium disabled:opacity-40 transition-opacity";
+
+  if (account) {
+    const active = account.status === "active";
+    return (
+      <div className="space-y-4">
+        {banner}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-[var(--text-primary)] truncate">{account.username}</div>
+            <div className="text-xs text-[var(--text-faint)] truncate">{account.login_email}</div>
+          </div>
+          <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${active ? "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/12 text-rose-500"}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-emerald-500" : "bg-rose-500"}`} />{account.status}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+          <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("account.userType", "User Type")}</span><p className="text-sm text-[var(--text-primary)] capitalize">{account.user_type}</p></div>
+          <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("account.twoFactor", "Two-Factor")}</span><p className="text-sm text-[var(--text-primary)]">{account.two_factor_enabled ? t("account.on", "On") : t("account.off", "Off")}</p></div>
+          <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("account.lastLogin", "Last Login")}</span><p className="text-sm text-[var(--text-primary)]">{account.last_login_at ? fmtAcctDate(account.last_login_at) : t("account.never", "Never")}</p></div>
+          <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("account.createdOn", "Created")}</span><p className="text-sm text-[var(--text-primary)]">{fmtAcctDate(account.created_at)}</p></div>
+        </div>
+        <SelectInput label={t("account.role", "Role")} value={account.role_id || ""} onChange={changeRole} options={roles.map((r) => r.id)} renderLabel={(id) => roleName(id)} selectLabel={t("account.noRole", "No role")} />
+        <div className="flex items-center gap-2 flex-wrap">
+          {active
+            ? <button type="button" onClick={() => setStatus("suspended")} disabled={busy} className="px-3 h-9 rounded-lg border border-amber-500/40 text-amber-500 text-sm hover:bg-amber-500/10 transition-colors disabled:opacity-40">{t("account.suspend", "Suspend")}</button>
+            : <button type="button" onClick={() => setStatus("active")} disabled={busy} className={primaryBtn}>{t("account.activate", "Activate")}</button>}
+          <button type="button" onClick={() => setStatus("disabled")} disabled={busy} className="px-3 h-9 rounded-lg border border-rose-500/40 text-rose-500 text-sm hover:bg-rose-500/10 transition-colors disabled:opacity-40">{t("account.disable", "Disable")}</button>
+        </div>
+        <div className="rounded-lg border border-[var(--border-color)] p-3 space-y-2.5">
+          <div className="text-xs font-semibold text-[var(--text-secondary)]">{t("account.resetPassword", "Reset password")}</div>
+          <div className="flex gap-2">
+            <input type="text" value={resetPwd} onChange={(e) => setResetPwd(e.target.value)} placeholder={t("account.newPassword", "New password")} className={pwInput} />
+            <button type="button" onClick={() => setResetPwd(genPortalPassword())} className={genBtn}>{t("account.generate", "Generate")}</button>
+          </div>
+          <ToggleSwitch label={t("account.forceChangeNext", "Require change on next login")} checked={resetForce} onChange={setResetForce} />
+          <button type="button" onClick={resetPassword} disabled={busy || !resetPwd.trim()} className={primaryBtn}>{t("account.updatePassword", "Update password")}</button>
+        </div>
+        <ToggleSwitch label={t("account.forceChangeToggle", "Force password change on next login")} checked={account.force_password_change} onChange={toggleForce} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {banner}
+      <p className="text-sm text-[var(--text-secondary)]">{t("account.createIntro", "Create a portal login so this customer can sign in.")}</p>
+      <div className="grid grid-cols-2 gap-3">
+        <Input label={t("account.username", "Username")} value={username} onChange={setUsername} placeholder="customer.name" icon={<UserIcon size={14} />} />
+        <Input label={t("account.loginEmail", "Login Email")} value={email} onChange={setEmail} placeholder="name@company.com" icon={<EnvelopeIcon size={14} />} inputMode="email" />
+      </div>
+      <SelectInput label={t("account.role", "Role")} value={roleId} onChange={setRoleId} options={roles.map((r) => r.id)} renderLabel={(id) => roleName(id)} selectLabel={t("account.selectRole", "Select role…")} />
+      <div>
+        <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("account.tempPassword", "Temporary Password")}</label>
+        <div className="flex gap-2">
+          <input type="text" value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder={t("account.setPassword", "Set a password (optional)")} className={pwInput} />
+          <button type="button" onClick={() => setPwd(genPortalPassword())} className={genBtn}>{t("account.generate", "Generate")}</button>
+        </div>
+      </div>
+      <ToggleSwitch label={t("account.forceChangeFirst", "Require password change on first login")} checked={forceChange} onChange={setForceChange} />
+      <button type="button" onClick={createAccount} disabled={busy || !username.trim() || !email.trim()} className={primaryBtn}>{t("account.createBtn", "Create Account")}</button>
     </div>
   );
 });
@@ -8341,7 +8543,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Customer Premium Tab Bar ── */}
         {isCustomer && form.entity_type && (
-          <CustomerTabBar activeTab={customerTab} onChange={setCustomerTab} translate={(k, f) => t(k, f)} stickyTop="top-[53px] md:top-[71px]" />
+          <CustomerTabBar activeTab={customerTab} onChange={setCustomerTab} translate={(k, f) => t(k, f)} stickyTop="top-[53px] md:top-[71px]" extraTabs={isCustomer && isSuperAdmin && editingId ? [{ id: "account", label: t("customerTab.account", "Account"), icon: <ShieldCheckIcon size={14} /> }] : undefined} />
         )}
 
         {/* Company Customer: Company Name section */}
@@ -9429,6 +9631,25 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {/* Messaging IDs removed from the customer form — the same contact
            channels (WhatsApp / WeChat / Telegram / etc.) are captured under
            Social Profiles in the Overview tab, so this section was redundant. */}
+
+        {/* ── Account (customer only — super-admin-only Account tab) ──
+             Provision + manage a portal login for the customer. Requires a
+             saved customer (contact_id) and super-admin. */}
+        {isCustomer && showTab("account") && isSuperAdmin && editingId && (
+          <FormSection title={t("customerTab.account", "Account")} icon={<ShieldCheckIcon size={14} />}>
+            <CustomerAccountPanel
+              contactId={editingId}
+              contactEmail={form.emails.find((e) => e.email && e.email.trim())?.email || ""}
+              contactName={form.company || [form.first_name, form.last_name].filter(Boolean).join(" ") || form.company_name_en || "customer"}
+              t={(k, f) => t(k, f)}
+            />
+          </FormSection>
+        )}
+        {isCustomer && showTab("account") && isSuperAdmin && !editingId && (
+          <div className="mx-4 md:mx-6 my-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-5 py-6 text-sm text-[var(--text-secondary)]">
+            {t("account.saveFirst", "Save the customer first, then you can create a portal account here.")}
+          </div>
+        )}
 
         {/* ── Internal Notes (customer only — Activity tab) ── */}
         {isCustomer && showTab("activity") && (
