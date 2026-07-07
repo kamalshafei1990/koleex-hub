@@ -6649,7 +6649,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
-                      <CrownIcon size={16} className="text-[var(--text-secondary)]" />
+                      <UsersIcon size={16} className="text-[var(--text-secondary)]" />
                     </div>
                     <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-faint)]">{t("kpi.total")}</span>
                   </div>
