@@ -8353,7 +8353,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {/* Planning + Project-tasks + Invoices strips — linked records that
             reference this contact. Rendered at the BOTTOM of the detail (was at
             the top) so the record's own profile reads first. Shown on every
-            contact type / tab, unchanged from before — only its position moved. */}
+            contact type / tab EXCEPT the Account tab, which is purely account
+            management (these linked records live on the Activity tab). */}
+        {!(isCustomerDetail && detailTab("account")) && (
         <div className="px-4 md:px-6 py-3 space-y-3">
           <EntityPlanningStrip
             entityType={
@@ -8377,6 +8379,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           />
           {c.contact_type === "customer" && <EntityInvoicesStrip customerId={c.id} />}
         </div>
+        )}
 
         {/* Delete confirmation is rendered once at the top level (see main
             return) so it works from every entry point, including supplier
