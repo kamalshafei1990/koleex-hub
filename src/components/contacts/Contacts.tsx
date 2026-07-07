@@ -9426,22 +9426,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </FormSection>
         )}
 
-        {/* ── Messaging IDs (customer only — Activity tab) ── */}
-        {isCustomer && showTab("activity") && (
-          <FormSection title={t("section.messagingIds", "Messaging IDs")} icon={<MessageSquareIcon size={14} />}>
-            <div className="space-y-3">
-              <Input label={t("field.whatsappBusiness", "WhatsApp Business")} value={form.whatsapp_business} onChange={v => setField("whatsapp_business", sanPhone(v))} placeholder="+971 …" icon={<PhoneIcon size={14} />} inputMode="tel" />
-              <div className="grid grid-cols-2 gap-3">
-                <Input label={t("field.wechatId", "WeChat ID")} value={form.wechat_id} onChange={v => setField("wechat_id", v)} placeholder="@handle" icon={<MessageSquareIcon size={14} />} />
-                <Input label={t("field.telegramId", "Telegram ID")} value={form.telegram_id} onChange={v => setField("telegram_id", v)} placeholder="@handle" icon={<MessageSquareIcon size={14} />} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <Input label={t("field.lineId", "Line ID")} value={form.line_id} onChange={v => setField("line_id", v)} placeholder="@handle" icon={<MessageSquareIcon size={14} />} />
-                <Input label={t("field.skypeId", "Skype ID")} value={form.skype_id} onChange={v => setField("skype_id", v)} placeholder="live:…" icon={<MessageSquareIcon size={14} />} />
-              </div>
-            </div>
-          </FormSection>
-        )}
+        {/* Messaging IDs removed from the customer form — the same contact
+           channels (WhatsApp / WeChat / Telegram / etc.) are captured under
+           Social Profiles in the Overview tab, so this section was redundant. */}
 
         {/* ── Internal Notes (customer only — Activity tab) ── */}
         {isCustomer && showTab("activity") && (
