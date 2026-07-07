@@ -566,6 +566,29 @@ const CARRIERS = [
   "Sinotrans", "Nippon Express", "Bolloré Logistics", "CEVA Logistics",
   "Agility", "GEODIS", "Yusen Logistics",
 ];
+/* Carrier → brand domain, used to fetch each company's logo (favicon) for the
+   Preferred Carriers dropdown. Missing/failed logos fall back to a monogram. */
+const CARRIER_DOMAINS: Record<string, string> = {
+  "Maersk": "maersk.com", "MSC": "msc.com", "CMA CGM": "cma-cgm.com",
+  "COSCO": "coscoshipping.com", "Hapag-Lloyd": "hapag-lloyd.com",
+  "ONE (Ocean Network Express)": "one-line.com", "Evergreen": "evergreen-line.com",
+  "HMM": "hmm21.com", "Yang Ming": "yangming.com", "ZIM": "zim.com",
+  "PIL (Pacific Int'l Lines)": "pilship.com", "Wan Hai": "wanhai.com",
+  "OOCL": "oocl.com", "APL": "apl.com", "SITC": "sitc.com", "TS Lines": "tslines.com",
+  "Emirates SkyCargo": "emiratesskycargo.com", "Qatar Airways Cargo": "qrcargo.com",
+  "Etihad Cargo": "etihadcargo.com", "Saudia Cargo": "saudiacargo.com",
+  "EgyptAir Cargo": "egyptair-cargo.com", "Turkish Cargo": "turkishcargo.com",
+  "Cathay Cargo": "cathaycargo.com", "Singapore Airlines Cargo": "siacargo.com",
+  "Korean Air Cargo": "koreanair.com", "China Airlines Cargo": "china-airlines.com",
+  "Lufthansa Cargo": "lufthansa-cargo.com", "China Southern Cargo": "csair.com",
+  "DHL Express": "dhl.com", "FedEx": "fedex.com", "UPS": "ups.com", "TNT": "tnt.com",
+  "Aramex": "aramex.com", "SF Express": "sf-express.com", "China Post / EMS": "ems.com.cn",
+  "DB Schenker": "dbschenker.com", "Kuehne + Nagel": "kuehne-nagel.com", "DSV": "dsv.com",
+  "Expeditors": "expeditors.com", "DHL Global Forwarding": "dhl.com",
+  "Sinotrans": "sinotrans.com", "Nippon Express": "nipponexpress.com",
+  "Bolloré Logistics": "bollore-logistics.com", "CEVA Logistics": "cevalogistics.com",
+  "Agility": "agility.com", "GEODIS": "geodis.com", "Yusen Logistics": "yusen-logistics.com",
+};
 /* Sea/air ports of entry keyed by ISO-2 country code, with a global fallback.
    The Port of Entry combobox shows the customer's country ports first, and
    users can still type any port. */
@@ -2966,6 +2989,33 @@ const ToggleSwitch = React.memo(function ToggleSwitch({
   );
 });
 
+/* Small brand mark for a carrier: its logo (via favicon service) with a
+   letter-monogram fallback when there's no domain or the image fails to load
+   (e.g. offline / blocked). Keeps the dropdown readable either way. */
+const CarrierLogo = React.memo(function CarrierLogo({ name }: { name: string }) {
+  const domain = CARRIER_DOMAINS[name];
+  const [failed, setFailed] = React.useState(false);
+  if (!domain || failed) {
+    return (
+      <span className="inline-flex items-center justify-center w-4 h-4 rounded-sm bg-[var(--bg-surface-active)] text-[9px] font-semibold text-[var(--text-dim)] shrink-0">
+        {name.charAt(0)}
+      </span>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
+      alt=""
+      width={16}
+      height={16}
+      loading="lazy"
+      className="w-4 h-4 rounded-sm object-contain shrink-0"
+      onError={() => setFailed(true)}
+    />
+  );
+});
+
 /* ── Tag Editor — reusable chip input used for hs_codes, preferred_carriers, certifications_required, flags ── */
 const TagEditor = React.memo(function TagEditor({
   label,
@@ -2974,6 +3024,7 @@ const TagEditor = React.memo(function TagEditor({
   placeholder,
   icon,
   suggestions,
+  iconFor,
 }: {
   label: string;
   values: string[];
@@ -2983,6 +3034,8 @@ const TagEditor = React.memo(function TagEditor({
   /* Optional suggestion list — renders a filterable dropdown of options that
      aren't already added. Users can still type any value and press Enter. */
   suggestions?: string[];
+  /* Optional leading icon/logo per option (e.g. carrier brand marks). */
+  iconFor?: (opt: string) => React.ReactNode;
 }) {
   const inputId = React.useId();
   const [draft, setDraft] = React.useState("");
@@ -3013,7 +3066,8 @@ const TagEditor = React.memo(function TagEditor({
       <label className="text-xs text-[var(--text-faint)] mb-1 block">{label}</label>
       <div className="flex flex-wrap gap-1.5 mb-2">
         {values.map((v, i) => (
-          <span key={i} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-secondary)]">
+          <span key={i} className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-secondary)]">
+            {iconFor?.(v)}
             {v}
             <button type="button" onClick={() => onChange(values.filter((_, idx) => idx !== i))} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]">
               <CrossIcon size={10} />
@@ -3046,6 +3100,7 @@ const TagEditor = React.memo(function TagEditor({
               onClick={() => add(opt)}
               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-start text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] transition-colors"
             >
+              {iconFor?.(opt)}
               {opt}
             </button>
           ))}
@@ -9241,6 +9296,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 placeholder={t("placeholder.carrier", "Maersk / DHL / …")}
                 icon={<TruckIcon size={14} />}
                 suggestions={CARRIERS}
+                iconFor={(c) => <CarrierLogo name={c} />}
               />
               <TagEditor
                 label={t("field.certificationsRequired", "Certifications Required")}
