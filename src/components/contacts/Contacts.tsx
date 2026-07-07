@@ -539,6 +539,89 @@ const SUB_INDUSTRIES = [
   "Banking & Financial Services", "Insurance", "Legal Services", "Government & Public Sector",
   "Non-Profit / NGO", "Other",
 ];
+/* External credit-rating suggestions (agencies + grades). Multi-select: a
+   customer can carry ratings from more than one agency. */
+const EXTERNAL_RATINGS = [
+  "D&B (Dun & Bradstreet)", "S&P", "Moody's", "Fitch", "AM Best", "Coface",
+  "Allianz Trade (Euler Hermes)", "Atradius", "CRISIL", "ICRA", "CARE",
+  "Creditreform", "Experian", "Equifax", "TransUnion", "Bureau van Dijk",
+  "Investment Grade", "Non-Investment Grade", "Prime (High Grade)",
+  "AAA", "AA", "A", "BBB", "BB", "B", "CCC", "Not Rated",
+];
+/* Preferred carriers / forwarders — ocean, air, express, and major freight
+   forwarders. Suggestions only; users can add any name. */
+const CARRIERS = [
+  // Ocean lines
+  "Maersk", "MSC", "CMA CGM", "COSCO", "Hapag-Lloyd", "ONE (Ocean Network Express)",
+  "Evergreen", "HMM", "Yang Ming", "ZIM", "PIL (Pacific Int'l Lines)", "Wan Hai",
+  "OOCL", "APL", "SITC", "TS Lines",
+  // Air cargo
+  "Emirates SkyCargo", "Qatar Airways Cargo", "Etihad Cargo", "Saudia Cargo",
+  "EgyptAir Cargo", "Turkish Cargo", "Cathay Cargo", "Singapore Airlines Cargo",
+  "Korean Air Cargo", "China Airlines Cargo", "Lufthansa Cargo", "China Southern Cargo",
+  // Express / parcel
+  "DHL Express", "FedEx", "UPS", "TNT", "Aramex", "SF Express", "China Post / EMS",
+  // Freight forwarders / 3PL
+  "DB Schenker", "Kuehne + Nagel", "DSV", "Expeditors", "DHL Global Forwarding",
+  "Sinotrans", "Nippon Express", "Bolloré Logistics", "CEVA Logistics",
+  "Agility", "GEODIS", "Yusen Logistics",
+];
+/* Sea/air ports of entry keyed by ISO-2 country code, with a global fallback.
+   The Port of Entry combobox shows the customer's country ports first, and
+   users can still type any port. */
+const PORTS_BY_COUNTRY: Record<string, string[]> = {
+  CN: ["Shanghai", "Ningbo-Zhoushan", "Shenzhen", "Guangzhou", "Qingdao", "Tianjin", "Xiamen", "Dalian", "Hong Kong (via HK)", "Yantian", "Nansha", "Shekou"],
+  HK: ["Hong Kong"],
+  AE: ["Jebel Ali (Dubai)", "Port Rashid (Dubai)", "Khalifa Port (Abu Dhabi)", "Sharjah (Khor Fakkan)", "Hamriyah (Sharjah)", "Fujairah"],
+  SA: ["Jeddah Islamic Port", "King Abdulaziz Port (Dammam)", "Jubail", "King Abdullah Port (KAEC)", "Yanbu"],
+  EG: ["Alexandria", "El Dekheila", "Port Said", "Damietta", "Ain Sokhna", "Suez", "Sokhna"],
+  IN: ["Nhava Sheva (JNPT, Mumbai)", "Mundra", "Chennai", "Kolkata", "Cochin", "Visakhapatnam", "Kandla", "Tuticorin", "Pipavav"],
+  PK: ["Karachi Port", "Port Qasim", "Gwadar"],
+  BD: ["Chattogram (Chittagong)", "Mongla", "Payra"],
+  TR: ["Ambarlı (Istanbul)", "Mersin", "İzmir (Aliağa)", "Gebze (Kocaeli)", "Iskenderun", "Haydarpaşa"],
+  US: ["Los Angeles", "Long Beach", "New York / New Jersey", "Savannah", "Houston", "Norfolk", "Seattle-Tacoma", "Oakland", "Charleston", "Miami"],
+  GB: ["Felixstowe", "Southampton", "London Gateway", "Liverpool", "Tilbury"],
+  DE: ["Hamburg", "Bremerhaven", "Wilhelmshaven"],
+  NL: ["Rotterdam", "Amsterdam"],
+  BE: ["Antwerp-Bruges", "Zeebrugge"],
+  FR: ["Le Havre", "Marseille-Fos", "Dunkirk"],
+  IT: ["Genoa", "Gioia Tauro", "La Spezia", "Naples", "Trieste", "Livorno"],
+  ES: ["Valencia", "Algeciras", "Barcelona", "Bilbao"],
+  GR: ["Piraeus", "Thessaloniki"],
+  BR: ["Santos", "Paranaguá", "Itajaí", "Rio de Janeiro", "Suape"],
+  VN: ["Ho Chi Minh (Cat Lai)", "Cai Mep", "Hai Phong", "Da Nang"],
+  ID: ["Jakarta (Tanjung Priok)", "Surabaya (Tanjung Perak)", "Semarang", "Belawan (Medan)"],
+  TH: ["Laem Chabang", "Bangkok"],
+  MY: ["Port Klang", "Tanjung Pelepas", "Penang"],
+  SG: ["Singapore"],
+  KR: ["Busan", "Incheon", "Gwangyang"],
+  JP: ["Tokyo", "Yokohama", "Kobe", "Nagoya", "Osaka"],
+  ZA: ["Durban", "Cape Town", "Port Elizabeth (Gqeberha)", "Ngqura"],
+  NG: ["Lagos (Apapa)", "Tin Can Island (Lagos)", "Onne (Port Harcourt)"],
+  KE: ["Mombasa"],
+  AU: ["Sydney (Port Botany)", "Melbourne", "Brisbane", "Fremantle (Perth)"],
+  CA: ["Vancouver", "Montreal", "Prince Rupert", "Halifax"],
+  MX: ["Manzanillo", "Veracruz", "Lázaro Cárdenas", "Altamira"],
+  MA: ["Tanger Med", "Casablanca"],
+  JO: ["Aqaba"],
+  IQ: ["Umm Qasr", "Basra"],
+  OM: ["Sohar", "Salalah", "Sultan Qaboos (Muscat)"],
+  QA: ["Hamad Port (Doha)"],
+  KW: ["Shuwaikh", "Shuaiba"],
+  BH: ["Khalifa Bin Salman Port"],
+  LK: ["Colombo", "Hambantota"],
+};
+const GLOBAL_PORTS = [
+  "Shanghai", "Singapore", "Ningbo-Zhoushan", "Shenzhen", "Rotterdam", "Jebel Ali (Dubai)",
+  "Busan", "Hamburg", "Antwerp-Bruges", "Los Angeles", "Long Beach", "Port Klang",
+  "New York / New Jersey", "Piraeus", "Colombo", "Jeddah Islamic Port", "Tanger Med",
+  "Valencia", "Felixstowe", "Nhava Sheva (JNPT, Mumbai)", "Mundra", "Karachi Port",
+  "Chattogram (Chittagong)", "Alexandria", "Mersin", "Air Freight", "Land / Road", "Other",
+];
+function portsForCountry(code: string): string[] {
+  const list = PORTS_BY_COUNTRY[(code || "").toUpperCase()];
+  return list && list.length ? [...list, "Air Freight", "Land / Road", "Other"] : GLOBAL_PORTS;
+}
 const LEAD_SOURCES = [
   "Referral", "Existing Customer", "Word of Mouth", "Website", "Website Contact Form",
   "Live Chat", "Blog / Content", "SEO / Organic Search", "Google Ads", "Paid Advertisement",
@@ -2890,22 +2973,49 @@ const TagEditor = React.memo(function TagEditor({
   onChange,
   placeholder,
   icon,
+  suggestions,
 }: {
   label: string;
   values: string[];
   onChange: (values: string[]) => void;
   placeholder?: string;
   icon?: React.ReactNode;
+  /* Optional suggestion list — renders a filterable dropdown of options that
+     aren't already added. Users can still type any value and press Enter. */
+  suggestions?: string[];
 }) {
   const inputId = React.useId();
+  const [draft, setDraft] = React.useState("");
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [open]);
+
+  const add = (val: string) => {
+    const v = val.trim();
+    if (v && !values.includes(v)) onChange([...values, v]);
+    setDraft("");
+  };
+
+  const filtered = React.useMemo(() => {
+    if (!suggestions) return [];
+    const q = draft.trim().toLowerCase();
+    return suggestions.filter(s => !values.includes(s) && (!q || s.toLowerCase().includes(q))).slice(0, 60);
+  }, [suggestions, draft, values]);
+
   return (
-    <div>
+    <div ref={ref} className="relative">
       <label className="text-xs text-[var(--text-faint)] mb-1 block">{label}</label>
       <div className="flex flex-wrap gap-1.5 mb-2">
         {values.map((v, i) => (
           <span key={i} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-secondary)]">
             {v}
-            <button onClick={() => onChange(values.filter((_, idx) => idx !== i))} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]">
+            <button type="button" onClick={() => onChange(values.filter((_, idx) => idx !== i))} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]">
               <CrossIcon size={10} />
             </button>
           </span>
@@ -2915,21 +3025,32 @@ const TagEditor = React.memo(function TagEditor({
         {icon && <span className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] pointer-events-none">{icon}</span>}
         <input
           id={inputId}
+          value={draft}
+          onChange={e => { setDraft(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
           placeholder={placeholder || "Press Enter to add"}
-          className={`w-full h-9 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] ${icon ? "ps-9 pe-3" : "px-3"}`}
+          className={`w-full h-9 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] ${icon ? "ps-9" : "ps-3"} ${suggestions ? "pe-8" : "pe-3"}`}
           onKeyDown={e => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              const el = e.target as HTMLInputElement;
-              const val = el.value.trim();
-              if (val && !values.includes(val)) {
-                onChange([...values, val]);
-                el.value = "";
-              }
-            }
+            if (e.key === "Enter") { e.preventDefault(); add(draft); }
+            else if (e.key === "Escape") { setOpen(false); }
           }}
         />
+        {suggestions && <AngleDownIcon size={14} className={`absolute end-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)] pointer-events-none transition-transform ${open ? "rotate-180" : ""}`} />}
       </div>
+      {suggestions && open && filtered.length > 0 && (
+        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
+          {filtered.map(opt => (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => add(opt)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-start text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] transition-colors"
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 });
@@ -4608,7 +4729,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     // New CUSTOMERS start Inactive by default — the operator explicitly
     // activates them (via the Active Customer toggle) once onboarded. Other
     // contact types keep the standard active default.
-    setForm({ ...EMPTY_FORM, contact_type: type, entity_type: entityType || "", division: type === "supplier" ? "Garment Machinery" : "", currency: type === "supplier" ? "CNY" : "", is_active: type === "customer" ? false : EMPTY_FORM.is_active });
+    setForm({ ...EMPTY_FORM, contact_type: type, entity_type: entityType || "", division: type === "supplier" ? "Garment Machinery" : "", currency: type === "supplier" ? "CNY" : "USD", is_active: type === "customer" ? false : EMPTY_FORM.is_active });
     setTriedSave(false);
     setSaveError(null);
     setSIntel(EMPTY_SINTEL);
@@ -8895,7 +9016,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <SelectInput label={t("field.creditRatingInternal", "Internal Rating")} value={form.credit_rating_internal} onChange={v => setField("credit_rating_internal", v)} options={CREDIT_RATING_INTERNAL} icon={<ShieldIcon size={14} />} selectLabel={t("detail.select")} />
-                <Input label={t("field.creditRatingExternal", "External Rating")} value={form.credit_rating_external} onChange={v => setField("credit_rating_external", v)} placeholder="D&B / S&P" icon={<AwardIcon size={14} />} />
+                <TagEditor label={t("field.creditRatingExternal", "External Rating")} values={form.credit_rating_external ? form.credit_rating_external.split(/\s*,\s*/).filter(Boolean) : []} onChange={v => setField("credit_rating_external", v.join(", "))} placeholder="D&B / S&P / Moody's…" icon={<AwardIcon size={14} />} suggestions={EXTERNAL_RATINGS} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Input label={t("field.creditApprovedBy", "Limit Approved By")} value={form.credit_limit_approved_by} onChange={v => setField("credit_limit_approved_by", v)} placeholder={t("field.name")} icon={<UserCheckIcon size={14} />} />
@@ -9080,7 +9201,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           <FormSection title={t("section.logisticsTrade", "Logistics & Trade Operations")} icon={<TruckIcon size={14} />}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <Input label={t("field.portOfEntry", "Port of Entry")} value={form.port_of_entry} onChange={v => setField("port_of_entry", v)} placeholder="Jebel Ali / Shanghai" icon={<ShipIcon size={14} />} />
+                <ComboInput label={t("field.portOfEntry", "Port of Entry")} value={form.port_of_entry} onChange={v => setField("port_of_entry", v)} placeholder={form.country ? t("placeholder.portForCountry", "Search ports…") : "Jebel Ali / Shanghai"} icon={<ShipIcon size={14} />} options={portsForCountry(form.country_code)} />
                 <SelectInput label={t("field.containerPreference", "Container Preference")} value={form.container_preference} onChange={v => setField("container_preference", v)} options={CONTAINER_PREFERENCES} icon={<BoxesIcon size={14} />} selectLabel={t("detail.select")} />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -9119,6 +9240,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 onChange={v => setField("preferred_carriers", v)}
                 placeholder={t("placeholder.carrier", "Maersk / DHL / …")}
                 icon={<TruckIcon size={14} />}
+                suggestions={CARRIERS}
               />
               <TagEditor
                 label={t("field.certificationsRequired", "Certifications Required")}
