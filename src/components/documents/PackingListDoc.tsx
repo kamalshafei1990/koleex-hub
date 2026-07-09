@@ -234,7 +234,9 @@ export default function PackingListDoc({ onBack }: { onBack: () => void }) {
               </div>
             </div>
 
-            {/* Packing table */}
+            {/* Packing table — wrapped so the outer corners round (like the
+                quotation/invoice items table), via border + radius + overflow. */}
+            <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
               <colgroup>{COLS.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
               <thead>
@@ -309,6 +311,7 @@ export default function PackingListDoc({ onBack }: { onBack: () => void }) {
                 </tr>
               </tbody>
             </table>
+            </div>
 
             {/* Row controls (screen only) */}
             <div className="no-print" style={{ display: "flex", gap: 8, marginTop: 10 }}>
