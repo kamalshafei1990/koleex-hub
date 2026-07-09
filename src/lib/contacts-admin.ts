@@ -346,24 +346,19 @@ export async function fetchContactsByType(
       const json = (await res.json()) as { contacts: ContactRow[] };
       return json.contacts;
     }
-    if (res.status === 401 || res.status === 403) return [];
+    // 401/403 or any other non-2xx → empty. There is deliberately NO legacy
+    // Supabase-client fallback: the `contacts` table is service-role-only, so a
+    // browser-client read always fails RLS — it could only ever add a second
+    // error to the console. The caller (loadContacts) keeps the cached view.
+    return [];
   } catch (e) {
-    console.error("[Contacts] API fetchByType failed:", e);
-  }
-
-  // Legacy fallback
-  let q = supabase
-    .from("contacts")
-    .select("*")
-    .eq("contact_type", type)
-    .order("first_name", { ascending: true });
-  if (ctx?.tenant_id) q = q.eq("tenant_id", ctx.tenant_id);
-  const { data, error } = await q;
-  if (error) {
-    console.error("[Contacts] FetchByType fallback:", error.message);
+    /* Network / HMR blip. Background revalidation (fresh) swallows it silently —
+       the caller keeps the current list, and logging here would spam the console
+       (Next.js Dev Tools counts every console.error as an "issue"). A cold load
+       warns once for observability; it's rare and the caller degrades gracefully. */
+    if (!opts?.fresh) console.warn("[Contacts] list fetch failed — keeping prior view:", e instanceof Error ? e.message : e);
     return [];
   }
-  return (data as ContactRow[]) || [];
 }
 
 export async function createContact(obj: Record<string, unknown>): Promise<{ data: ContactRow | null; error: string | null }> {
