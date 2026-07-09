@@ -87,8 +87,11 @@ const COLS = ["16%", "16%", "8%", "7%", "7%", "6%", "6%", "10%", "9%", "9%"];
 function headBlack(extra?: React.CSSProperties): React.CSSProperties {
   return { border: `1px solid ${T.border}`, background: T.black, color: "#fff", padding: "5px 6px", fontSize: 9, fontWeight: 700, textAlign: "center", textTransform: "uppercase", letterSpacing: "0.04em", ...extra };
 }
-const subCell: React.CSSProperties = { border: `1px solid ${T.border}`, padding: "3px 6px", fontSize: 8.5, textAlign: "center", color: T.inkSoft, fontWeight: 600, textTransform: "uppercase" };
-const zhCell: React.CSSProperties = { border: `1px solid ${T.border}`, padding: "3px 6px", fontSize: 9, textAlign: "center", color: T.inkGhost, fontWeight: 500 };
+/* The two sub-header rows (units + Chinese) sit under the black group header —
+   taller, on a dark-gray band with light text. */
+const SUBHEAD_BG = "#3A3A3A";
+const subCell: React.CSSProperties = { border: `1px solid ${T.border}`, background: SUBHEAD_BG, padding: "8px 6px", fontSize: 9.5, textAlign: "center", color: "#F3F4F6", fontWeight: 600, textTransform: "uppercase" };
+const zhCell: React.CSSProperties = { border: `1px solid ${T.border}`, background: SUBHEAD_BG, padding: "8px 6px", fontSize: 10, textAlign: "center", color: "#D1D5DB", fontWeight: 500 };
 const bodyTd: React.CSSProperties = { border: `1px solid ${T.border}`, padding: 0, verticalAlign: "middle" };
 const compTd: React.CSSProperties = { border: `1px solid ${T.border}`, padding: "4px 6px", fontSize: 10, textAlign: "center", color: T.ink, background: T.surface, minHeight: 24 };
 
