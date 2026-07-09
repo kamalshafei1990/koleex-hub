@@ -5087,6 +5087,67 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
   useEffect(() => { loadContacts(); }, [loadContacts]);
 
+  /* ── Always-live directory: keep the list current without a manual refresh.
+        `contacts` is served only through the server API (the table is
+        service-role-only, so a browser Supabase-Realtime subscription would get
+        nothing), so we revalidate against that API instead: on tab focus, on the
+        tab becoming visible again, and on a light background interval while the
+        tab is open. The instant cache paint still handles the first render — this
+        just silently replaces it with fresh data (no spinner, no logo flicker). */
+  const contactsRef = useRef<ContactRow[]>(contacts);
+  useEffect(() => { contactsRef.current = contacts; }, [contacts]);
+
+  const silentRefresh = useCallback(async () => {
+    if (!scopeCtx || !filterType) return;
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+    let data: ContactRow[];
+    try { data = await fetchContactsByType(filterType, scopeCtx); }
+    catch { return; }
+    // Empty almost always means a transient blip (expired session / network) —
+    // keep what the user is looking at rather than blanking a live directory.
+    if (!data.length) return;
+    const slim = data.filter(c => c.contact_type !== "employee");
+    // Preserve avatars we've already streamed in so the list never flickers.
+    const prevById = new Map(contactsRef.current.map(c => [c.id, c]));
+    const merged = slim.map(c => {
+      const p = prevById.get(c.id);
+      return p && (p.logo_url || p.photo_url)
+        ? { ...c, logo_url: c.logo_url ?? p.logo_url, photo_url: c.photo_url ?? p.photo_url }
+        : c;
+    });
+    setContacts(merged);
+    try {
+      const json = JSON.stringify(slim);
+      if (json.length < 2_500_000) sessionStorage.setItem(`kx_contacts_v1:${scopeCtx?.tenant_id || "anon"}:${filterType || "all"}`, json);
+    } catch { /* quota → next visit cold-loads */ }
+    // Fetch logos only for genuinely new rows (avoids per-poll avatar churn).
+    const missing = merged.filter(c => !c.logo_url && !c.photo_url).map(c => c.id);
+    if (missing.length) {
+      fetchContactAvatars(missing).then((map) => {
+        if (!map || Object.keys(map).length === 0) return;
+        setContacts(prev => prev.map(c => map[c.id]
+          ? { ...c, logo_url: map[c.id].logo_url ?? c.logo_url, photo_url: map[c.id].photo_url ?? c.photo_url }
+          : c));
+      }).catch(() => {});
+    }
+  }, [scopeCtx, filterType]);
+
+  useEffect(() => {
+    if (!scopeCtx || !filterType) return;
+    const onFocus = () => { void silentRefresh(); };
+    const onVisible = () => { if (document.visibilityState === "visible") void silentRefresh(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+    const id = window.setInterval(() => {
+      if (document.visibilityState === "visible") void silentRefresh();
+    }, 20000);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.clearInterval(id);
+    };
+  }, [scopeCtx, filterType, silentRefresh]);
+
   /* ── Deep link handler: /customers?selected=<contactId> auto-opens the detail view.
         This is how the CRM (and any other app) can hand off to us. ── */
   useEffect(() => {
