@@ -17,17 +17,23 @@ import QuotationA4Preview, {
   type QuotationItem,
 } from "@/components/quotations/QuotationA4Preview";
 import { numberToWords, PRINT_AND_DOC_STYLES } from "@/components/quotations/Quotations";
+import PackingListDoc from "@/components/documents/PackingListDoc";
 import DocumentsIcon from "@/components/icons/DocumentsIcon";
 import QuoteIcon from "@/components/icons/ui/QuoteIcon";
 import ReceiptIcon from "@/components/icons/ui/ReceiptIcon";
+import PackageIcon from "@/components/icons/ui/PackageIcon";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PrinterIcon from "@/components/icons/ui/PrinterIcon";
 
+/* "quotation" | "invoice" share the QuotationA4Preview renderer (docKind);
+   "packing" has its own renderer (different columns). */
 type DocKind = "quotation" | "invoice";
+type OpenKind = DocKind | "packing";
 
-const TEMPLATES: { kind: DocKind; title: string; subtitle: string; icon: ReactNode }[] = [
-  { kind: "quotation", title: "Quotation", subtitle: "Commercial quotation to a customer", icon: <QuoteIcon size={18} /> },
-  { kind: "invoice",   title: "Invoice",   subtitle: "Commercial invoice / proforma",     icon: <ReceiptIcon size={18} /> },
+const TEMPLATES: { kind: OpenKind; title: string; subtitle: string; icon: ReactNode }[] = [
+  { kind: "quotation", title: "Quotation",    subtitle: "Commercial quotation to a customer", icon: <QuoteIcon size={18} /> },
+  { kind: "invoice",   title: "Invoice",      subtitle: "Commercial invoice / proforma",      icon: <ReceiptIcon size={18} /> },
+  { kind: "packing",   title: "Packing List", subtitle: "Carton / weight / volume packing list", icon: <PackageIcon size={18} /> },
 ];
 
 /* ── Blank document factory ─────────────────────────────────────────────── */
@@ -184,8 +190,9 @@ function BlankTemplate({ kind, onBack }: { kind: DocKind; onBack: () => void }) 
 
 /* ── Gallery ────────────────────────────────────────────────────────────── */
 export default function DocumentsApp() {
-  const [openKind, setOpenKind] = useState<DocKind | null>(null);
+  const [openKind, setOpenKind] = useState<OpenKind | null>(null);
 
+  if (openKind === "packing") return <PackingListDoc onBack={() => setOpenKind(null)} />;
   if (openKind) return <BlankTemplate kind={openKind} onBack={() => setOpenKind(null)} />;
 
   return (
