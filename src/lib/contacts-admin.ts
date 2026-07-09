@@ -331,11 +331,16 @@ export async function fetchContactAvatars(
 export async function fetchContactsByType(
   type: string,
   ctx?: ScopeContext | null,
+  opts?: { fresh?: boolean },
 ): Promise<ContactRow[]> {
   try {
+    /* The API response carries `Cache-Control: max-age=30, stale-while-revalidate`
+       for fast navigation. Background revalidation (focus / interval) passes
+       `fresh` so it bypasses that HTTP cache and always reads the true count —
+       otherwise the browser would keep answering from the stale cached body. */
     const res = await fetch(
       `/api/contacts?type=${encodeURIComponent(type)}`,
-      { credentials: "include" },
+      { credentials: "include", ...(opts?.fresh ? { cache: "no-store" as RequestCache } : {}) },
     );
     if (res.ok) {
       const json = (await res.json()) as { contacts: ContactRow[] };

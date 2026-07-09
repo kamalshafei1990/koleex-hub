@@ -5101,7 +5101,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     if (!scopeCtx || !filterType) return;
     if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
     let data: ContactRow[];
-    try { data = await fetchContactsByType(filterType, scopeCtx); }
+    try { data = await fetchContactsByType(filterType, scopeCtx, { fresh: true }); }
     catch { return; }
     // Empty almost always means a transient blip (expired session / network) —
     // keep what the user is looking at rather than blanking a live directory.
