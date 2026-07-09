@@ -131,6 +131,10 @@ export default function PackingListDoc({ onBack }: { onBack: () => void }) {
     <div className="min-h-screen bg-[var(--bg-primary)]">
       <style>{PRINT_AND_DOC_STYLES}</style>
       <style>{`
+        /* The editor stylesheet pads .quot-a4-stack 360px each side for its
+           side gutters; the Documents templates have none, so drop it and
+           center the A4 sheet. */
+        .quot-a4-stack { min-width: 0 !important; padding-inline: 0 !important; margin-inline: auto !important; }
         @media print {
           .no-print { display: none !important; }
           html, body { background: #fff !important; }
@@ -149,7 +153,7 @@ export default function PackingListDoc({ onBack }: { onBack: () => void }) {
         </button>
       </div>
 
-      <div className="flex justify-center py-6 px-4 overflow-x-auto">
+      <div className="py-6 px-4 overflow-x-auto">
         <div className="quot-a4-stack">
           <div className="quot-a4-doc" ref={printedRef} style={{ fontFamily: "Inter, system-ui, sans-serif", color: T.ink }}>
             {/* Header: logo + PACKING LIST title */}

@@ -130,6 +130,10 @@ function BlankTemplate({ kind, onBack }: { kind: DocKind; onBack: () => void }) 
           the doc renders against browser defaults. */}
       <style>{PRINT_AND_DOC_STYLES}</style>
       <style>{`
+        /* The editor's stylesheet pads .quot-a4-stack by 360px each side to
+           make room for its side-gutter panels. The Documents templates have
+           no gutter, so drop that padding and center the A4 sheet on screen. */
+        .quot-a4-stack { min-width: 0 !important; padding-inline: 0 !important; margin-inline: auto !important; }
         @media print {
           .no-print { display: none !important; }
           html, body { background: #fff !important; }
@@ -159,7 +163,7 @@ function BlankTemplate({ kind, onBack }: { kind: DocKind; onBack: () => void }) 
       </div>
 
       {/* The blank A4 document, in the exact Koleex design */}
-      <div className="flex justify-center py-6 px-4 overflow-x-auto">
+      <div className="py-6 px-4 overflow-x-auto">
         <div className="quot-a4-stack">
           <QuotationA4Preview
             current={current}
