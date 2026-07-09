@@ -190,7 +190,7 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "purchase",         tKey: "app.purchase",         name: "Purchases",         icon: PurchaseIcon,  route: "/purchase",         active: true,  newSince: "2026-05-26" },
   { id: "landed-cost",      tKey: "app.landed-cost",      name: "Landed Cost",       icon: LandedCostIcon, route: "/landed-cost",     active: true  },
   { id: "catalogs",         tKey: "app.catalogs",         name: "Catalogs",          icon: CatalogsIcon,  route: "/catalogs",         active: true,  ready: "2026-06-04" },
-  { id: "documents",        tKey: "app.documents",        name: "Documents",         icon: DocumentsIcon, route: "/documents",        active: false },
+  { id: "documents",        tKey: "app.documents",        name: "Documents",         icon: DocumentsIcon, route: "/documents",        active: true,  newSince: "2026-07-09" },
 
   /* ── Commercial ── */
   { id: "sales",            tKey: "app.sales",            name: "Sales",             icon: SalesIcon,     route: "/sales",            active: true,  newSince: "2026-05-04" },
