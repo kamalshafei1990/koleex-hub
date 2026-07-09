@@ -284,14 +284,14 @@ export async function fetchUnreadCount(accountId: string): Promise<number> {
     .is("read_at", null)
     .is("archived_at", null);
   if (error) {
-    /* Don't log every transient network failure — this is on a 60 s
-       poller and a single offline window would otherwise spam the
-       console. warnOnce surfaces the first occurrence so it's
-       diagnosable, no more. */
-    if (!isMissingTable(error.message) && !isTransientFetch(error.message)) {
-      console.error("[Inbox] Unread count:", error.message);
-    } else if (isTransientFetch(error.message)) {
-      warnOnce("inbox-unread-transient", "[Inbox] unread count: network unavailable (silenced; will retry)");
+    /* This runs on a 60 s poller, so a single offline window (or a platform
+       incident that returns an unfamiliar / empty error message) would spam the
+       console — and Next.js Dev Tools counts every console.error as an "issue".
+       An unread-count blip is non-critical, so NEVER escalate to console.error:
+       surface the first occurrence via warnOnce (diagnosable) and silence the
+       rest. Missing-table stays fully silent. */
+    if (!isMissingTable(error.message)) {
+      warnOnce("inbox-unread-error", `[Inbox] unread count unavailable (silenced; will retry): ${error.message || "unknown error"}`);
     }
     return 0;
   }
