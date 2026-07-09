@@ -31,7 +31,21 @@ const T = {
   inkGhost: "#9CA3AF",
   border: "#E5E7EB",
   surface: "#F5F5F5",
+  mono: "ui-monospace, SFMono-Regular, Menlo, monospace",
 } as const;
+
+/* Meta-strip cell — mirrors the quotation/invoice's black-label + value stack. */
+function MetaStripCell({ label, isFirst, isLast, children }: { label: string; isFirst?: boolean; isLast?: boolean; children: React.ReactNode }) {
+  return (
+    <div style={{ borderLeft: isFirst ? "none" : `1px solid ${T.border}` }}>
+      <div style={{ background: T.black, color: "#fff", padding: "5px 12px", fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", borderTopLeftRadius: isFirst ? 12 : 0, borderTopRightRadius: isLast ? 12 : 0 }}>
+        {label}
+      </div>
+      <div style={{ padding: "7px 12px", minHeight: 28 }}>{children}</div>
+    </div>
+  );
+}
+const labelSpan: React.CSSProperties = { color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" };
 
 const COMPANY = {
   name: "KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO., LTD.",
@@ -80,7 +94,12 @@ const compTd: React.CSSProperties = { border: `1px solid ${T.border}`, padding: 
 
 export default function PackingListDoc({ onBack }: { onBack: () => void }) {
   const [rows, setRows] = useState<PackingRow[]>(() => Array.from({ length: 8 }, blankRow));
-  const [meta, setMeta] = useState({ to: "", add: "", piNo: "", invoiceNo: "", date: "" });
+  const [meta, setMeta] = useState({
+    date: "", invoiceNo: "", clientNo: "",
+    companyName: "", toAddress: "", toAcid: "", contactPerson: "",
+    toPhone: "", toMobile: "", toEmail: "", toWebsite: "",
+  });
+  const setM = (k: keyof typeof meta, v: string) => setMeta((m) => ({ ...m, [k]: v }));
   const printedRef = useRef<HTMLDivElement | null>(null);
 
   const set = (i: number, key: keyof PackingRow, v: string) =>
@@ -150,29 +169,64 @@ export default function PackingListDoc({ onBack }: { onBack: () => void }) {
               </div>
             </div>
 
-            {/* Company address line */}
-            <div style={{ textAlign: "center", fontSize: 8.5, color: T.inkSoft, lineHeight: 1.5, marginBottom: 14 }}>
-              <div>{COMPANY.address}</div>
-              <div style={{ marginTop: 2 }}>TEL: {COMPANY.tel}&nbsp;&nbsp;·&nbsp;&nbsp;{COMPANY.web}</div>
+            {/* Meta strip — Date · Invoice No · Client No (same as the invoice) */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
+              <MetaStripCell label="Date" isFirst>
+                <input value={meta.date} onChange={(e) => setM("date", e.target.value)} placeholder="DD/MM/YYYY" style={{ ...inputReset, fontSize: 11, fontVariantNumeric: "tabular-nums" }} />
+              </MetaStripCell>
+              <MetaStripCell label="Invoice No">
+                <input value={meta.invoiceNo} onChange={(e) => setM("invoiceNo", e.target.value)} placeholder="—" style={{ ...inputReset, fontSize: 11, fontFamily: T.mono, letterSpacing: "0.02em" }} />
+              </MetaStripCell>
+              <MetaStripCell label="Client No" isLast>
+                <input value={meta.clientNo} onChange={(e) => setM("clientNo", e.target.value)} placeholder="—" style={{ ...inputReset, fontSize: 11, fontVariantNumeric: "tabular-nums" }} />
+              </MetaStripCell>
             </div>
 
-            {/* Meta: To / ADD (left) · PI No / Invoice No / Date (right) */}
-            <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
-              <div style={{ flex: "1 1 58%", border: `1px solid ${T.border}`, borderRadius: 8, overflow: "hidden" }}>
-                {([["To:", "to"], ["ADD:", "add"]] as const).map(([label, key]) => (
-                  <div key={key} style={{ display: "flex", alignItems: "center", borderBottom: key === "to" ? `1px solid ${T.border}` : "none" }}>
-                    <div style={{ width: 56, background: T.black, color: "#fff", fontSize: 10, fontWeight: 700, padding: "6px 10px", flexShrink: 0 }}>{label}</div>
-                    <input value={meta[key]} onChange={(e) => setMeta((m) => ({ ...m, [key]: e.target.value }))} style={{ ...inputReset, fontSize: 11, padding: "6px 10px" }} />
+            {/* FROM (Koleex) / INVOICE TO (customer) — identical to the invoice */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 14 }}>
+              {/* FROM */}
+              <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+                <div style={{ background: T.black, color: "#fff", padding: "6px 12px", fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>From</div>
+                <div style={{ padding: "10px 14px" }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: T.ink, marginBottom: 4, letterSpacing: "0.01em" }}>{COMPANY.name}</div>
+                  <div style={{ fontSize: 10, lineHeight: 1.5, color: T.inkSoft, marginBottom: 8 }}>{COMPANY.address}</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "55px 1fr", rowGap: 3, columnGap: 8, fontSize: 10 }}>
+                    <span style={labelSpan}>Phone</span><span style={{ fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }}>{COMPANY.tel}</span>
+                    <span style={labelSpan}>Mobile</span><span style={{ fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }}>+86 130 7380 0720</span>
+                    <span style={labelSpan}>Email</span><span style={{ color: T.ink }}>info@koleexgroup.com</span>
+                    <span style={labelSpan}>Web</span><span style={{ color: T.ink }}>{COMPANY.web}</span>
                   </div>
-                ))}
+                </div>
               </div>
-              <div style={{ flex: "1 1 42%", border: `1px solid ${T.border}`, borderRadius: 8, overflow: "hidden" }}>
-                {([["PI NO.:", "piNo"], ["INVOICE NO.:", "invoiceNo"], ["DATE:", "date"]] as const).map(([label, key], i) => (
-                  <div key={key} style={{ display: "flex", alignItems: "center", borderBottom: i < 2 ? `1px solid ${T.border}` : "none" }}>
-                    <div style={{ width: 96, background: T.black, color: "#fff", fontSize: 10, fontWeight: 700, padding: "6px 10px", flexShrink: 0 }}>{label}</div>
-                    <input value={meta[key]} onChange={(e) => setMeta((m) => ({ ...m, [key]: e.target.value }))} style={{ ...inputReset, fontSize: 11, padding: "6px 10px" }} />
+
+              {/* INVOICE TO */}
+              <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+                <div style={{ background: T.black, color: "#fff", padding: "6px 12px", fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>Invoice To</div>
+                <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
+                  <input value={meta.companyName} onChange={(e) => setM("companyName", e.target.value)} placeholder="Company name" style={{ ...inputReset, fontSize: 12, fontWeight: 700, color: T.ink, letterSpacing: "0.01em" }} />
+                  <textarea
+                    ref={(el) => { if (!el) return; el.style.height = "auto"; el.style.height = `${el.scrollHeight}px`; }}
+                    rows={2}
+                    value={meta.toAddress}
+                    onChange={(e) => { setM("toAddress", e.target.value); e.target.style.height = "auto"; e.target.style.height = `${e.target.scrollHeight}px`; }}
+                    placeholder="Address"
+                    style={{ ...inputReset, fontSize: 10, lineHeight: 1.5, color: T.inkSoft, resize: "none", overflow: "hidden", minHeight: 28 }}
+                  />
+                  <div style={{ display: "grid", gridTemplateColumns: "105px 1fr", rowGap: 3, columnGap: 8, fontSize: 10 }}>
+                    <span style={labelSpan}>ACID No.</span>
+                    <input value={meta.toAcid} onChange={(e) => setM("toAcid", e.target.value)} placeholder="NAFEZA ACID number" style={{ ...inputReset, fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }} />
+                    <span style={labelSpan}>Contact Person:</span>
+                    <input value={meta.contactPerson} onChange={(e) => setM("contactPerson", e.target.value)} placeholder="Contact person" style={{ ...inputReset, fontWeight: 700, color: T.ink }} />
+                    <span style={labelSpan}>Phone</span>
+                    <input value={meta.toPhone} onChange={(e) => setM("toPhone", e.target.value)} placeholder="—" style={{ ...inputReset, fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }} />
+                    <span style={labelSpan}>Mobile</span>
+                    <input value={meta.toMobile} onChange={(e) => setM("toMobile", e.target.value)} placeholder="—" style={{ ...inputReset, fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }} />
+                    <span style={labelSpan}>Email</span>
+                    <input value={meta.toEmail} onChange={(e) => setM("toEmail", e.target.value)} placeholder="email@example.com" style={{ ...inputReset, color: T.ink }} />
+                    <span style={labelSpan}>Web</span>
+                    <input value={meta.toWebsite} onChange={(e) => setM("toWebsite", e.target.value)} placeholder="www.example.com" style={{ ...inputReset, color: T.ink }} />
                   </div>
-                ))}
+                </div>
               </div>
             </div>
 
