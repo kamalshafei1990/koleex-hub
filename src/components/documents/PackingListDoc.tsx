@@ -54,13 +54,16 @@ const COMPANY = {
   web: "www.koleexgroup.com",
 };
 
-type PackingRow = { description: string; model: string; cbm: string; nw: string; gw: string; pcs: string; ctn: string };
+/* tVol/tNw/tGw = optional manual OVERRIDES of the auto-computed Total columns
+   (value × ctn). Blank = use the auto value; typed = use the override, like the
+   red hand-edited totals on Koleex's real packing list. */
+type PackingRow = { description: string; model: string; cbm: string; nw: string; gw: string; pcs: string; ctn: string; tVol: string; tNw: string; tGw: string };
 type PackingMeta = {
   date: string; invoiceNo: string; clientNo: string;
   companyName: string; toAddress: string; toAcid: string; contactPerson: string;
   toPhone: string; toMobile: string; toEmail: string; toWebsite: string;
 };
-const blankRow = (): PackingRow => ({ description: "", model: "", cbm: "", nw: "", gw: "", pcs: "", ctn: "" });
+const blankRow = (): PackingRow => ({ description: "", model: "", cbm: "", nw: "", gw: "", pcs: "", ctn: "", tVol: "", tNw: "", tGw: "" });
 const blankMeta = (): PackingMeta => ({
   date: "", invoiceNo: "", clientNo: "",
   companyName: "", toAddress: "", toAcid: "", contactPerson: "",
@@ -150,15 +153,22 @@ export default function PackingListDoc({
   const setM = (k: keyof PackingMeta, v: string) => setMeta((m) => ({ ...m, [k]: v }));
   const set = (i: number, key: keyof PackingRow, v: string) => setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, [key]: v } : r)));
 
+  /* Per-row Total = manual override if typed, else auto (per-carton × ctn). */
+  const rowTotal = (r: PackingRow, key: "vol" | "nw" | "gw"): number => {
+    const c = num(r.ctn);
+    if (key === "vol") return (r.tVol ?? "") !== "" ? num(r.tVol) : num(r.cbm) * c;
+    if (key === "nw") return (r.tNw ?? "") !== "" ? num(r.tNw) : num(r.nw) * c;
+    return (r.tGw ?? "") !== "" ? num(r.tGw) : num(r.gw) * c;
+  };
+
   const totals = useMemo(() => {
     let pcs = 0, ctn = 0, vol = 0, nw = 0, gw = 0;
     for (const r of rows) {
-      const c = num(r.ctn);
       pcs += num(r.pcs);
-      ctn += c;
-      vol += num(r.cbm) * c;
-      nw += num(r.nw) * c;
-      gw += num(r.gw) * c;
+      ctn += num(r.ctn);
+      vol += rowTotal(r, "vol");
+      nw += rowTotal(r, "nw");
+      gw += rowTotal(r, "gw");
     }
     return { pcs, ctn, vol, nw, gw };
   }, [rows]);
@@ -209,7 +219,7 @@ export default function PackingListDoc({
         const c = num(r.ctn);
         return [
           r.description || "", r.model || "", r.cbm || "", r.nw || "", r.gw || "",
-          num(r.pcs) || "", c || "", fmt(num(r.cbm) * c), fmt(num(r.nw) * c), fmt(num(r.gw) * c),
+          num(r.pcs) || "", c || "", fmt(rowTotal(r, "vol")), fmt(rowTotal(r, "nw")), fmt(rowTotal(r, "gw")),
         ];
       });
     dataRows.push(["TOTAL", "", "", "", "", totals.pcs || "", totals.ctn || "", fmt(totals.vol), fmt(totals.nw), fmt(totals.gw)]);
@@ -274,6 +284,22 @@ export default function PackingListDoc({
       style={{ ...inputReset, textAlign: align, fontSize: 11, lineHeight: 1.55, color: T.ink, padding: "12px 8px" }}
     />
   );
+
+  /* Total cell = EDITABLE with an auto default: shows (value × ctn) until the
+     operator types an override (bold, like the hand-edited totals on the real
+     Koleex packing list). Clearing the override restores the auto value. */
+  const totInput = (i: number, key: "tVol" | "tNw" | "tGw", auto: number) => {
+    const override = rows[i][key] ?? "";
+    return (
+      <input
+        value={override !== "" ? override : (auto ? fmt(auto) : "")}
+        onChange={(e) => set(i, key, e.target.value)}
+        inputMode="decimal"
+        title={override !== "" ? "Manual override — clear to restore the auto total (value × ctn)" : undefined}
+        style={{ ...inputReset, textAlign: "center", fontSize: 11, lineHeight: 1.55, color: T.ink, fontWeight: override !== "" ? 700 : 400, padding: "12px 8px", background: "transparent" }}
+      />
+    );
+  };
 
   /* Description = an auto-growing textarea: long text wraps to a new line and
      the row grows, instead of being clipped inside a single-line input. */
@@ -458,9 +484,9 @@ export default function PackingListDoc({
                         <td style={bodyTd}>{numInput(i, "gw")}</td>
                         <td style={bodyTd}>{numInput(i, "pcs")}</td>
                         <td style={bodyTd}>{numInput(i, "ctn")}</td>
-                        <td style={compTd}>{fmt(num(r.cbm) * c)}</td>
-                        <td style={compTd}>{fmt(num(r.nw) * c)}</td>
-                        <td style={compTd}>{fmt(num(r.gw) * c)}</td>
+                        <td style={{ ...compTd, padding: 0 }}>{totInput(i, "tVol", num(r.cbm) * c)}</td>
+                        <td style={{ ...compTd, padding: 0 }}>{totInput(i, "tNw", num(r.nw) * c)}</td>
+                        <td style={{ ...compTd, padding: 0 }}>{totInput(i, "tGw", num(r.gw) * c)}</td>
                       </tr>
                     );
                   })}
