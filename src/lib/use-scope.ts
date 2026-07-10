@@ -90,6 +90,11 @@ export interface PermissionCheck {
   /** The underlying ScopeContext, exposed so pages don't need to call
    *  useScopeContext separately when they already have usePermission. */
   ctx: ScopeContext | null;
+  /** True when the bootstrap fetch FAILED to load (timeout / network / 5xx)
+   *  rather than the viewer genuinely lacking the module. A real
+   *  no-permission user always gets a payload, so a missing payload always
+   *  means "couldn't load" — the gate shows a Retry, never "no access". */
+  failed: boolean;
 }
 
 /**
@@ -111,54 +116,61 @@ export function usePermission(module_name: string): PermissionCheck {
   const [permState, setPermState] = useState<{
     allowed: boolean;
     loading: boolean;
-  }>({ allowed: false, loading: true });
+    failed: boolean;
+  }>({ allowed: false, loading: true, failed: false });
 
   useEffect(() => {
-    // Never fall through to a denied state while bootstrap is still
-    // loading — otherwise a race between the legacy loadScopeContext
-    // fallback (which hits RLS-gated tables and can return empty data)
-    // and the real bootstrap payload would briefly flash the "No
-    // access" screen to Super Admins on hard refresh.
-    if (bootstrapLoading) {
-      setPermState({ allowed: false, loading: true });
-      return;
-    }
-
-    // Super Admin comes straight from the authoritative bootstrap —
-    // takes precedence over ctx because ctx can be stale for a tick
-    // when the page is rehydrating.
-    if (bootstrap?.isSuperAdmin) {
-      setPermState({ allowed: true, loading: false });
-      return;
-    }
-
-    // Type C modules are always allowed (for own data). The fetch layer
-    // enforces that non-SA users only see their own records.
-    if (TYPE_C_MODULES.has(module_name)) {
-      setPermState({ allowed: true, loading: false });
-      return;
-    }
-
-    // If we have bootstrap data, use its permittedModules list directly.
+    // 1. If we ALREADY hold a bootstrap payload — whether freshly fetched or
+    //    warm-started from localStorage while a background revalidation runs —
+    //    decide access from it IMMEDIATELY. We deliberately do NOT block on
+    //    `bootstrapLoading` here: the payload is the viewer's own last-known
+    //    module list, enforcement is still server-side on every API call, and
+    //    revalidation updates us within ~1s. This removes the spinner on every
+    //    revisit (the main cause of the "takes a long time to load" report).
     if (bootstrap) {
+      if (bootstrap.isSuperAdmin) {
+        setPermState({ allowed: true, loading: false, failed: false });
+        return;
+      }
+      if (TYPE_C_MODULES.has(module_name)) {
+        setPermState({ allowed: true, loading: false, failed: false });
+        return;
+      }
       setPermState({
         allowed: bootstrap.permittedModules.includes(module_name),
         loading: false,
+        failed: false,
       });
       return;
     }
 
-    // Bootstrap finished with no payload (network error). Fall back to
-    // ctx if available — but only to determine SA status; anything less
-    // certain stays denied.
-    if (ctx?.is_super_admin) {
-      setPermState({ allowed: true, loading: false });
+    // 2. No payload yet. Type C modules (personal tools) are always allowed
+    //    even before bootstrap lands.
+    if (TYPE_C_MODULES.has(module_name)) {
+      setPermState({ allowed: true, loading: false, failed: false });
       return;
     }
-    setPermState({ allowed: false, loading: false });
+
+    // 3. Still fetching (and nothing cached) → keep the loading state.
+    if (bootstrapLoading) {
+      setPermState({ allowed: false, loading: true, failed: false });
+      return;
+    }
+
+    // 4. Bootstrap finished with NO payload. A user who genuinely lacks the
+    //    module still receives a payload (with permittedModules that omit it),
+    //    so a null payload here can ONLY mean the fetch FAILED (timeout / cold
+    //    server / flaky network). Fall back to ctx for Super-Admin; otherwise
+    //    flag it as a load FAILURE so the gate shows "couldn't load — retry",
+    //    never the misleading "you don't have access".
+    if (ctx?.is_super_admin) {
+      setPermState({ allowed: true, loading: false, failed: false });
+      return;
+    }
+    setPermState({ allowed: false, loading: false, failed: true });
   }, [bootstrap, bootstrapLoading, ctx, module_name]);
 
-  return { allowed: permState.allowed, loading: permState.loading, ctx };
+  return { allowed: permState.allowed, loading: permState.loading, failed: permState.failed, ctx };
 }
 
 /* ==========================================================================
