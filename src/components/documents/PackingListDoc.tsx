@@ -313,7 +313,7 @@ export default function PackingListDoc({
       meta.companyName || "",
       meta.toAddress || "",
       meta.contactPerson ? `Attn:  ${meta.contactPerson}` : "",
-      meta.toAcid ? `ACID No.:  ${meta.toAcid}` : "",
+      meta.dischargeCountry === "Egypt" && meta.toAcid ? `ACID No.:  ${meta.toAcid}` : "",
       meta.toPhone ? `Phone:  ${meta.toPhone}` : "",
       meta.toEmail ? `Email:  ${meta.toEmail}` : "",
     ].filter((l) => l.trim() !== "");
@@ -546,8 +546,14 @@ export default function PackingListDoc({
                     style={{ ...inputReset, fontSize: 10, lineHeight: 1.5, color: T.inkSoft, resize: "none", overflow: "hidden", minHeight: 28 }}
                   />
                   <div style={{ display: "grid", gridTemplateColumns: "105px 1fr", rowGap: 3, columnGap: 8, fontSize: 10 }}>
-                    <span style={labelSpan}>ACID No.</span>
-                    <input value={meta.toAcid} onChange={(e) => setM("toAcid", e.target.value)} placeholder="NAFEZA ACID number" style={{ ...inputReset, fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }} />
+                    {/* ACID No. is Egypt's NAFEZA advance-cargo number — only relevant
+                        when the goods are discharged in Egypt. */}
+                    {meta.dischargeCountry === "Egypt" && (
+                      <>
+                        <span style={labelSpan}>ACID No.</span>
+                        <input value={meta.toAcid} onChange={(e) => setM("toAcid", e.target.value)} placeholder="NAFEZA ACID number" style={{ ...inputReset, fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }} />
+                      </>
+                    )}
                     <span style={labelSpan}>Contact Person:</span>
                     <input value={meta.contactPerson} onChange={(e) => setM("contactPerson", e.target.value)} placeholder="Contact person" style={{ ...inputReset, fontWeight: 700, color: T.ink }} />
                     <span style={labelSpan}>Phone</span>
