@@ -54,16 +54,13 @@ const COMPANY = {
   web: "www.koleexgroup.com",
 };
 
-/* tVol/tNw/tGw = optional manual OVERRIDES of the auto-computed Total columns
-   (value × ctn). Blank = use the auto value; typed = use the override, like the
-   red hand-edited totals on Koleex's real packing list. */
-type PackingRow = { description: string; model: string; cbm: string; nw: string; gw: string; pcs: string; ctn: string; tVol: string; tNw: string; tGw: string };
+type PackingRow = { description: string; model: string; cbm: string; nw: string; gw: string; pcs: string; ctn: string };
 type PackingMeta = {
   date: string; invoiceNo: string; clientNo: string;
   companyName: string; toAddress: string; toAcid: string; contactPerson: string;
   toPhone: string; toMobile: string; toEmail: string; toWebsite: string;
 };
-const blankRow = (): PackingRow => ({ description: "", model: "", cbm: "", nw: "", gw: "", pcs: "", ctn: "", tVol: "", tNw: "", tGw: "" });
+const blankRow = (): PackingRow => ({ description: "", model: "", cbm: "", nw: "", gw: "", pcs: "", ctn: "" });
 const blankMeta = (): PackingMeta => ({
   date: "", invoiceNo: "", clientNo: "",
   companyName: "", toAddress: "", toAcid: "", contactPerson: "",
@@ -123,8 +120,8 @@ const SUBLABELS: { en: string; zh: string }[] = [
   { en: "kgs", zh: "毛重" },
 ];
 const bodyTd: React.CSSProperties = { borderRight: cell, borderBottom: cell, padding: 0, verticalAlign: "middle" };
-/* Auto-computed Total cells — same type size + row height as the input cells. */
-const compTd: React.CSSProperties = { borderRight: cell, borderBottom: cell, padding: "12px 8px", fontSize: 11, textAlign: "center", color: T.ink, background: T.surface };
+/* Auto-computed Total cells — read-only, BOLD, same row height as input cells. */
+const compTd: React.CSSProperties = { borderRight: cell, borderBottom: cell, padding: "12px 8px", fontSize: 11, fontWeight: 700, textAlign: "center", color: T.ink, background: T.surface };
 
 export default function PackingListDoc({
   initial,
@@ -153,12 +150,12 @@ export default function PackingListDoc({
   const setM = (k: keyof PackingMeta, v: string) => setMeta((m) => ({ ...m, [k]: v }));
   const set = (i: number, key: keyof PackingRow, v: string) => setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, [key]: v } : r)));
 
-  /* Per-row Total = manual override if typed, else auto (per-carton × ctn). */
+  /* Per-row Total = auto (per-carton value × cartons). Read-only. */
   const rowTotal = (r: PackingRow, key: "vol" | "nw" | "gw"): number => {
     const c = num(r.ctn);
-    if (key === "vol") return (r.tVol ?? "") !== "" ? num(r.tVol) : num(r.cbm) * c;
-    if (key === "nw") return (r.tNw ?? "") !== "" ? num(r.tNw) : num(r.nw) * c;
-    return (r.tGw ?? "") !== "" ? num(r.tGw) : num(r.gw) * c;
+    if (key === "vol") return num(r.cbm) * c;
+    if (key === "nw") return num(r.nw) * c;
+    return num(r.gw) * c;
   };
 
   const totals = useMemo(() => {
@@ -285,21 +282,6 @@ export default function PackingListDoc({
     />
   );
 
-  /* Total cell = EDITABLE with an auto default: shows (value × ctn) until the
-     operator types an override (bold, like the hand-edited totals on the real
-     Koleex packing list). Clearing the override restores the auto value. */
-  const totInput = (i: number, key: "tVol" | "tNw" | "tGw", auto: number) => {
-    const override = rows[i][key] ?? "";
-    return (
-      <input
-        value={override !== "" ? override : (auto ? fmt(auto) : "")}
-        onChange={(e) => set(i, key, e.target.value)}
-        inputMode="decimal"
-        title={override !== "" ? "Manual override — clear to restore the auto total (value × ctn)" : undefined}
-        style={{ ...inputReset, textAlign: "center", fontSize: 11, lineHeight: 1.55, color: T.ink, fontWeight: override !== "" ? 700 : 400, padding: "12px 8px", background: "transparent" }}
-      />
-    );
-  };
 
   /* Description = an auto-growing textarea: long text wraps to a new line and
      the row grows, instead of being clipped inside a single-line input. */
@@ -484,9 +466,9 @@ export default function PackingListDoc({
                         <td style={bodyTd}>{numInput(i, "gw")}</td>
                         <td style={bodyTd}>{numInput(i, "pcs")}</td>
                         <td style={bodyTd}>{numInput(i, "ctn")}</td>
-                        <td style={{ ...compTd, padding: 0 }}>{totInput(i, "tVol", num(r.cbm) * c)}</td>
-                        <td style={{ ...compTd, padding: 0 }}>{totInput(i, "tNw", num(r.nw) * c)}</td>
-                        <td style={{ ...compTd, padding: 0 }}>{totInput(i, "tGw", num(r.gw) * c)}</td>
+                        <td style={compTd}>{fmt(num(r.cbm) * c)}</td>
+                        <td style={compTd}>{fmt(num(r.nw) * c)}</td>
+                        <td style={compTd}>{fmt(num(r.gw) * c)}</td>
                       </tr>
                     );
                   })}
