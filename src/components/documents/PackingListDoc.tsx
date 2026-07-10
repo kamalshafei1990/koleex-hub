@@ -84,6 +84,13 @@ const num = (s: string) => {
   return Number.isFinite(n) ? n : 0;
 };
 const fmt = (n: number) => (n ? String(Math.round(n * 1000) / 1000) : "");
+/* Local (not UTC) today as an ISO yyyy-mm-dd string — used as the default
+   packing-list date (the day it's created) and as the <input type="date"> value. */
+function todayISO(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
 
 function KoleexLogo() {
   return (
@@ -162,7 +169,12 @@ export default function PackingListDoc({
   const [rows, setRowsState] = useState<PackingRow[]>(() =>
     seed.rows && seed.rows.length ? seed.rows.map((r) => ({ ...blankRow(), ...r })) : Array.from({ length: 8 }, blankRow),
   );
-  const [meta, setMetaState] = useState<PackingMeta>(() => ({ ...blankMeta(), ...(seed.meta ?? {}) }));
+  const [meta, setMetaState] = useState<PackingMeta>(() => {
+    const base = { ...blankMeta(), ...(seed.meta ?? {}) };
+    // New packing list → default the date to today (the day it's created).
+    if (!base.date) base.date = todayISO();
+    return base;
+  });
   const [docId, setDocId] = useState<string | null>(initial?.id ?? null);
   const [version, setVersion] = useState<number>(initial?.version ?? 0);
   const [status, setStatus] = useState<string>(initial?.status ?? "draft");
@@ -460,7 +472,7 @@ export default function PackingListDoc({
             {/* Meta strip — Date · Invoice No · Client No */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
               <MetaStripCell label="Date" isFirst>
-                <input value={meta.date} onChange={(e) => setM("date", e.target.value)} placeholder="DD/MM/YYYY" style={{ ...inputReset, fontSize: 11, fontVariantNumeric: "tabular-nums" }} />
+                <input type="date" value={meta.date} onChange={(e) => setM("date", e.target.value)} style={{ ...inputReset, fontSize: 11, fontVariantNumeric: "tabular-nums", colorScheme: "light", cursor: "pointer" }} />
               </MetaStripCell>
               <MetaStripCell label="Invoice No">
                 <input value={meta.invoiceNo} onChange={(e) => setM("invoiceNo", e.target.value)} placeholder="—" style={{ ...inputReset, fontSize: 11, fontFamily: T.mono, letterSpacing: "0.02em" }} />
