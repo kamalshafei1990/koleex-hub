@@ -66,6 +66,7 @@ type PackingRow = { description: string; model: string; hs: string; l: string; w
 type PackingMeta = {
   date: string; invoiceNo: string; clientNo: string;
   portLoading: string; portDischarge: string; dischargeCountry: string; containerSeal: string;
+  countryOrigin: string; totalPackagesWords: string;
   companyName: string; toAddress: string; toAcid: string; contactPerson: string;
   toPhone: string; toMobile: string; toEmail: string; toWebsite: string;
   /* Electronic stamp + signature — tenant-saved image URLs, attached per doc
@@ -76,6 +77,7 @@ const blankRow = (): PackingRow => ({ description: "", model: "", hs: "", l: "",
 const blankMeta = (): PackingMeta => ({
   date: "", invoiceNo: "", clientNo: "",
   portLoading: "", portDischarge: "", dischargeCountry: "", containerSeal: "",
+  countryOrigin: "China", totalPackagesWords: "",
   companyName: "", toAddress: "", toAcid: "", contactPerson: "",
   toPhone: "", toMobile: "", toEmail: "", toWebsite: "",
 });
@@ -84,6 +86,25 @@ const num = (s: string) => {
   return Number.isFinite(n) ? n : 0;
 };
 const fmt = (n: number) => (n ? String(Math.round(n * 1000) / 1000) : "");
+
+/* Integer → English words (for the "Total Packages in words" line). Handles
+   0–999,999 — far beyond any realistic carton count. */
+const NUM_ONES = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+const NUM_TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+function under1000ToWords(x: number): string {
+  let s = "";
+  if (x >= 100) { s += NUM_ONES[Math.floor(x / 100)] + " Hundred"; x %= 100; if (x) s += " "; }
+  if (x >= 20) { s += NUM_TENS[Math.floor(x / 10)]; x %= 10; if (x) s += "-" + NUM_ONES[x]; }
+  else if (x > 0) { s += NUM_ONES[x]; }
+  return s;
+}
+function numberToWords(n: number): string {
+  if (!n || n < 0) return "";
+  let s = "";
+  if (n >= 1000) { s += under1000ToWords(Math.floor(n / 1000)) + " Thousand"; n %= 1000; if (n) s += " "; }
+  s += under1000ToWords(n);
+  return s.trim();
+}
 /* Local (not UTC) today as an ISO yyyy-mm-dd string — used as the default
    packing-list date (the day it's created) and as the <input type="date"> value. */
 function todayISO(): string {
@@ -326,9 +347,11 @@ export default function PackingListDoc({
         ["DATE", meta.date || ""],
         ["INVOICE NO", meta.invoiceNo || ""],
         ["CLIENT NO", meta.clientNo || ""],
+        ["COUNTRY OF ORIGIN", meta.countryOrigin || ""],
         ["PORT OF LOADING", meta.portLoading || ""],
         ["PORT OF DISCHARGE", meta.portDischarge || ""],
         ["CONTAINER / SEAL NO.", meta.containerSeal || ""],
+        ["TOTAL PACKAGES", meta.totalPackagesWords || (totals.ctn ? `${numberToWords(totals.ctn)} (${totals.ctn}) ${totals.ctn === 1 ? "Carton" : "Cartons"}` : "")],
       ],
       toLines,
       columns: [
@@ -469,16 +492,19 @@ export default function PackingListDoc({
               </div>
             </div>
 
-            {/* Meta strip — Date · Invoice No · Client No */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
+            {/* Meta strip — Date · Invoice No · Client No · Country of Origin */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
               <MetaStripCell label="Date" isFirst>
                 <input type="date" value={meta.date} onChange={(e) => setM("date", e.target.value)} style={{ ...inputReset, fontSize: 11, fontVariantNumeric: "tabular-nums", colorScheme: "light", cursor: "pointer" }} />
               </MetaStripCell>
               <MetaStripCell label="Invoice No">
                 <input value={meta.invoiceNo} onChange={(e) => setM("invoiceNo", e.target.value)} placeholder="—" style={{ ...inputReset, fontSize: 11, fontFamily: T.mono, letterSpacing: "0.02em" }} />
               </MetaStripCell>
-              <MetaStripCell label="Client No" isLast>
+              <MetaStripCell label="Client No">
                 <input value={meta.clientNo} onChange={(e) => setM("clientNo", e.target.value)} placeholder="—" style={{ ...inputReset, fontSize: 11, fontVariantNumeric: "tabular-nums" }} />
+              </MetaStripCell>
+              <MetaStripCell label="Country of Origin" isLast>
+                <input value={meta.countryOrigin} onChange={(e) => setM("countryOrigin", e.target.value)} placeholder="e.g. China" style={{ ...inputReset, fontSize: 11, color: T.ink }} />
               </MetaStripCell>
             </div>
 
@@ -638,6 +664,19 @@ export default function PackingListDoc({
                   </tr>
                 </tbody>
               </table>
+
+            {/* Total Packages in words — auto-derived from the cartons total
+                (e.g. "Sixty-Nine (69) Cartons"), but fully editable: type to
+                override, clear to fall back to the auto text. */}
+            <div style={{ display: "flex", alignItems: "stretch", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", marginTop: 14 }}>
+              <div style={{ background: T.black, color: "#fff", padding: "8px 14px", fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>Total Packages</div>
+              <input
+                value={meta.totalPackagesWords || (totals.ctn ? `${numberToWords(totals.ctn)} (${totals.ctn}) ${totals.ctn === 1 ? "Carton" : "Cartons"}` : "")}
+                onChange={(e) => setM("totalPackagesWords", e.target.value)}
+                placeholder="—"
+                style={{ ...inputReset, flex: 1, fontSize: 11, fontWeight: 700, color: T.ink, padding: "8px 14px", letterSpacing: "0.01em" }}
+              />
+            </div>
 
             {/* Row controls (screen only) */}
             <div className="no-print" style={{ display: "flex", gap: 8, marginTop: 10 }}>
