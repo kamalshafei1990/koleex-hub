@@ -105,8 +105,7 @@ function headBlack(extra?: React.CSSProperties): React.CSSProperties {
    A clean light-gray band (between the black header block and the white body). */
 const SUBHEAD_BG = "#F3F4F6";
 const dualCell: React.CSSProperties = { borderRight: cell, borderBottom: cell, background: SUBHEAD_BG, padding: "7px 6px", textAlign: "center" };
-const dualEn: React.CSSProperties = { fontSize: 9, color: "#6B7280", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", lineHeight: 1.2 };
-const dualZh: React.CSSProperties = { fontSize: 10, color: T.ink, fontWeight: 500, lineHeight: 1.3, marginTop: 1 };
+const dualEn: React.CSSProperties = { fontSize: 9.5, color: "#4B5563", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", lineHeight: 1.2 };
 /* Column sub-labels: English unit + Chinese field name (was two rows). */
 const SUBLABELS: { en: string; zh: string }[] = [
   { en: "N/M", zh: "描述无标记" },
@@ -410,7 +409,6 @@ export default function PackingListDoc({
                     {SUBLABELS.map((c, i) => (
                       <td key={i} style={dualCell}>
                         {c.en && <div style={dualEn}>{c.en}</div>}
-                        <div style={dualZh}>{c.zh}</div>
                       </td>
                     ))}
                   </tr>
