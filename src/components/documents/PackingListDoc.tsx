@@ -297,10 +297,23 @@ export default function PackingListDoc({
       <style>{PRINT_AND_DOC_STYLES}</style>
       <style>{`
         .quot-a4-stack { min-width: 0 !important; padding-inline: 0 !important; margin-inline: auto !important; }
+        /* Let the sheet GROW with the table instead of clipping at a fixed
+           270mm page — a long table then simply continues onto the next A4
+           page when printed, exactly like the quotation/invoice. */
+        .quot-a4-doc { height: auto !important; min-height: 270mm; max-height: none !important; }
+        /* The table's own border draws the outer frame + rounded corners, so
+           drop each cell's outermost (right) border to avoid a doubled line. */
+        .pl-tbl { border-collapse: separate; border-spacing: 0; }
+        .pl-tbl td:last-child, .pl-tbl th:last-child { border-right: none !important; }
         @media print {
           .no-print { display: none !important; }
           html, body { background: #fff !important; }
-          @page { size: auto; margin: 0; }
+          @page { size: A4; margin: 10mm; }
+          .quot-a4-doc { box-shadow: none !important; margin: 0 !important; padding: 0 !important; width: auto !important; }
+          /* Repeat the table header on every printed page + never split a row
+             across the page break. */
+          .pl-tbl thead { display: table-header-group; }
+          .pl-tbl tr { break-inside: avoid; page-break-inside: avoid; }
         }
       `}</style>
 
@@ -402,8 +415,10 @@ export default function PackingListDoc({
             </div>
 
             {/* Packing table */}
-            <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-              <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed" }}>
+            {/* The table itself carries the border + rounded corners (no
+                overflow:hidden wrapper) so it can fragment across A4 pages
+                when printed — an overflow:hidden box would block that. */}
+            <table className="pl-tbl" style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed", border: `1px solid ${T.border}`, borderRadius: 12 }}>
                 <colgroup>{COLS.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
                 <thead>
                   <tr>
@@ -459,7 +474,6 @@ export default function PackingListDoc({
                   </tr>
                 </tbody>
               </table>
-            </div>
 
             {/* Row controls (screen only) */}
             <div className="no-print" style={{ display: "flex", gap: 8, marginTop: 10 }}>
