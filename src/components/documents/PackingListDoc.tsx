@@ -23,7 +23,7 @@ import { saveDocument, removeDocument, type DocumentRow } from "@/lib/documents-
 import { downloadDocXlsx } from "@/lib/excel-export";
 import { useScopeContext } from "@/lib/use-scope";
 import { humanizeError } from "@/lib/ui/humanize-error";
-import { CHINA_PORTS, PORTS_BY_COUNTRY, PORT_COUNTRIES } from "@/lib/ports";
+import { CHINA_PORTS, PORTS_BY_COUNTRY, PORT_COUNTRIES, COUNTRY_FLAG } from "@/lib/ports";
 import { PortCombobox } from "@/components/documents/PortCombobox";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import MinusIcon from "@/components/icons/ui/MinusIcon";
@@ -500,6 +500,7 @@ export default function PackingListDoc({
                     onChange={(v) => setMeta((m) => ({ ...m, dischargeCountry: v, portDischarge: "" }))}
                     options={PORT_COUNTRIES}
                     placeholder="Select country…"
+                    optionIcon={(c) => COUNTRY_FLAG[c]}
                   />
                   <PortCombobox
                     value={meta.portDischarge}

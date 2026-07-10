@@ -30,6 +30,7 @@ export function PortCombobox({
   placeholder,
   disabled,
   allowCustom = false,
+  optionIcon,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -38,6 +39,9 @@ export function PortCombobox({
   disabled?: boolean;
   /** When true, the typed query itself can be committed (for ports not on the list). */
   allowCustom?: boolean;
+  /** Optional leading glyph (e.g. a flag emoji) shown next to each option in the
+   *  dropdown ONLY. The committed value (trigger + document) stays plain text. */
+  optionIcon?: (option: string) => string | undefined;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -181,7 +185,7 @@ export function PortCombobox({
               <div style={{ padding: "10px 12px", fontSize: 12, color: T.inkGhost }}>No matches</div>
             )}
             {filtered.map((o) => (
-              <Option key={o} label={o} selected={o === value} onClick={() => commit(o)} />
+              <Option key={o} label={o} icon={optionIcon?.(o)} selected={o === value} onClick={() => commit(o)} />
             ))}
           </div>
         </div>,
@@ -191,7 +195,7 @@ export function PortCombobox({
   );
 }
 
-function Option({ label, selected, muted, onClick }: { label: string; selected?: boolean; muted?: boolean; onClick: () => void }) {
+function Option({ label, icon, selected, muted, onClick }: { label: string; icon?: string; selected?: boolean; muted?: boolean; onClick: () => void }) {
   const [hover, setHover] = useState(false);
   return (
     <button
@@ -202,7 +206,9 @@ function Option({ label, selected, muted, onClick }: { label: string; selected?:
       style={{
         all: "unset",
         boxSizing: "border-box",
-        display: "block",
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
         width: "100%",
         padding: "8px 10px",
         borderRadius: 7,
@@ -215,7 +221,8 @@ function Option({ label, selected, muted, onClick }: { label: string; selected?:
         ...(selected ? { color: "#fff" } : null),
       }}
     >
-      {label}
+      {icon && <span style={{ fontSize: 15, lineHeight: 1, flexShrink: 0 }}>{icon}</span>}
+      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
     </button>
   );
 }
