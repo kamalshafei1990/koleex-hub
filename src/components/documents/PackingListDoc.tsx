@@ -86,7 +86,7 @@ function KoleexLogo() {
 }
 
 const inputReset: React.CSSProperties = { border: "none", outline: "none", background: "transparent", font: "inherit", color: "inherit", width: "100%", padding: 0, margin: 0 };
-const COLS = ["16%", "16%", "8%", "7%", "7%", "6%", "6%", "10%", "9%", "9%"];
+const COLS = ["26%", "12%", "8%", "7%", "7%", "6%", "6%", "10%", "9%", "9%"];
 
 /* Grid lines via right+bottom borders only (single source per internal line);
    the wrapper's border + radius + overflow:hidden draws the outer rounded edge.
@@ -270,8 +270,25 @@ export default function PackingListDoc({
     <input
       value={rows[i][key]}
       onChange={(e) => set(i, key, e.target.value)}
-      inputMode={key === "description" || key === "model" ? "text" : "decimal"}
+      inputMode={key === "model" ? "text" : "decimal"}
       style={{ ...inputReset, textAlign: align, fontSize: 11, lineHeight: 1.55, color: T.ink, padding: "12px 8px" }}
+    />
+  );
+
+  /* Description = an auto-growing textarea: long text wraps to a new line and
+     the row grows, instead of being clipped inside a single-line input. */
+  const autoGrow = (el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  };
+  const descInput = (i: number) => (
+    <textarea
+      ref={autoGrow}
+      rows={1}
+      value={rows[i].description}
+      onChange={(e) => { set(i, "description", e.target.value); autoGrow(e.target); }}
+      style={{ ...inputReset, textAlign: "left", fontSize: 11, lineHeight: 1.55, color: T.ink, padding: "12px 8px", resize: "none", overflow: "hidden", whiteSpace: "pre-wrap", wordBreak: "break-word", display: "block" }}
     />
   );
 
@@ -419,7 +436,7 @@ export default function PackingListDoc({
                     const c = num(r.ctn);
                     return (
                       <tr key={i}>
-                        <td style={bodyTd}>{numInput(i, "description", "left")}</td>
+                        <td style={bodyTd}>{descInput(i)}</td>
                         <td style={bodyTd}>{numInput(i, "model", "left")}</td>
                         <td style={bodyTd}>{numInput(i, "cbm")}</td>
                         <td style={bodyTd}>{numInput(i, "nw")}</td>
