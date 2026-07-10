@@ -123,7 +123,7 @@ const SUBLABELS: { en: string; zh: string }[] = [
   { en: "kgs", zh: "毛重" },
   { en: "pcs", zh: "件" },
   { en: "ctn", zh: "数量" },
-  { en: "ctn/wooden", zh: "体积" },
+  { en: "ctn/wdn", zh: "体积" },
   { en: "kgs", zh: "净重" },
   { en: "kgs", zh: "毛重" },
 ];
