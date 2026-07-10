@@ -106,6 +106,13 @@ const cell = `1px solid ${T.border}`;
 function headBlack(extra?: React.CSSProperties): React.CSSProperties {
   return { borderRight: darkLine, borderBottom: darkLine, background: T.black, color: "#fff", padding: "5px 6px", fontSize: 9, fontWeight: 700, textAlign: "center", verticalAlign: "middle", textTransform: "uppercase", letterSpacing: "0.04em", ...extra };
 }
+/* Second header row (per-column sub-labels: L/W/H, N.W, pcs, ...): a lighter
+   gray tier so the black group titles above read as the primary header. */
+const HEAD_SUB_BG = "#4A4A4A";
+const headSubLine = "1px solid #5A5A5A";
+function headSub(extra?: React.CSSProperties): React.CSSProperties {
+  return { ...headBlack({ background: HEAD_SUB_BG, color: "#F2F2F2", borderRight: headSubLine, borderBottom: headSubLine }), ...extra };
+}
 /* One combined sub-header row per column: English unit on top, Chinese under it.
    A clean light-gray band (between the black header block and the white body). */
 const SUBHEAD_BG = "#F3F4F6";
@@ -472,16 +479,16 @@ export default function PackingListDoc({
                     <th colSpan={3} style={headBlack({ borderTopRightRadius: 11 })}>Total</th>
                   </tr>
                   <tr>
-                    <th style={headBlack()}>L</th>
-                    <th style={headBlack()}>W</th>
-                    <th style={headBlack()}>H</th>
-                    <th style={headBlack()}>N.W</th>
-                    <th style={headBlack()}>G.W</th>
-                    <th style={headBlack()}>pcs</th>
-                    <th style={headBlack()}>ctn</th>
-                    <th style={headBlack()}>Volume</th>
-                    <th style={headBlack()}>N.W</th>
-                    <th style={headBlack()}>G.W</th>
+                    <th style={headSub()}>L</th>
+                    <th style={headSub()}>W</th>
+                    <th style={headSub()}>H</th>
+                    <th style={headSub()}>N.W</th>
+                    <th style={headSub()}>G.W</th>
+                    <th style={headSub()}>pcs</th>
+                    <th style={headSub()}>ctn</th>
+                    <th style={headSub()}>Volume</th>
+                    <th style={headSub()}>N.W</th>
+                    <th style={headSub()}>G.W</th>
                   </tr>
                   <tr>
                     {SUBLABELS.map((c, i) => (
