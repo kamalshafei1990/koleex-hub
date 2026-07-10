@@ -108,8 +108,8 @@ function headBlack(extra?: React.CSSProperties): React.CSSProperties {
 }
 /* Second header row (per-column sub-labels: L/W/H, N.W, pcs, ...): a lighter
    gray tier so the black group titles above read as the primary header. */
-const HEAD_SUB_BG = "#4A4A4A";
-const headSubLine = "1px solid #5A5A5A";
+const HEAD_SUB_BG = "#2A2A2A";
+const headSubLine = "1px solid #3A3A3A";
 function headSub(extra?: React.CSSProperties): React.CSSProperties {
   return { ...headBlack({ background: HEAD_SUB_BG, color: "#F2F2F2", borderRight: headSubLine, borderBottom: headSubLine }), ...extra };
 }
