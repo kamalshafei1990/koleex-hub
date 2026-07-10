@@ -201,11 +201,15 @@ export default function DocumentsApp() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
-      <PageHeader
-        title="Documents"
-        subtitle="Koleex document formats — open a blank template to fill and print"
-        icon={<DocumentsIcon size={20} />}
-      />
+      {/* Standard app spacing: pad the header off the main top nav (matches
+          Invoices/Sales/ERP consumers of PageHeader). */}
+      <div className="px-4 md:px-6 pt-5 sm:pt-6">
+        <PageHeader
+          title="Documents"
+          subtitle="Koleex document formats — open a blank template to fill and print"
+          icon={<DocumentsIcon size={20} />}
+        />
+      </div>
       <div className="px-4 md:px-6 py-6 max-w-5xl mx-auto w-full">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {TEMPLATES.map((t) => (
