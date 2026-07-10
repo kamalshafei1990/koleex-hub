@@ -54,13 +54,16 @@ const COMPANY = {
   web: "www.koleexgroup.com",
 };
 
-type PackingRow = { description: string; model: string; cbm: string; nw: string; gw: string; pcs: string; ctn: string };
+/* l/w/h = carton dimensions in cm. cbm auto-computes as L×W×H/1,000,000 but the
+   cbm cell stays editable (typing a dimension recomputes it; typing cbm directly
+   overrides until a dimension changes again). */
+type PackingRow = { description: string; model: string; l: string; w: string; h: string; cbm: string; nw: string; gw: string; pcs: string; ctn: string };
 type PackingMeta = {
   date: string; invoiceNo: string; clientNo: string;
   companyName: string; toAddress: string; toAcid: string; contactPerson: string;
   toPhone: string; toMobile: string; toEmail: string; toWebsite: string;
 };
-const blankRow = (): PackingRow => ({ description: "", model: "", cbm: "", nw: "", gw: "", pcs: "", ctn: "" });
+const blankRow = (): PackingRow => ({ description: "", model: "", l: "", w: "", h: "", cbm: "", nw: "", gw: "", pcs: "", ctn: "" });
 const blankMeta = (): PackingMeta => ({
   date: "", invoiceNo: "", clientNo: "",
   companyName: "", toAddress: "", toAcid: "", contactPerson: "",
@@ -86,7 +89,9 @@ function KoleexLogo() {
 }
 
 const inputReset: React.CSSProperties = { border: "none", outline: "none", background: "transparent", font: "inherit", color: "inherit", width: "100%", padding: 0, margin: 0 };
-const COLS = ["26%", "12%", "8%", "7%", "7%", "6%", "6%", "10%", "9%", "9%"];
+/* 13 columns: Description, Model, Dimensions[L,W,H], Volume(cbm), Weight[N.W,G.W],
+   Quantity[pcs,ctn], Total[Vol,N.W,G.W]. */
+const COLS = ["21%", "11%", "5%", "5%", "5%", "7%", "6%", "6%", "5%", "5%", "8%", "8%", "8%"];
 
 /* Grid lines via right+bottom borders only (single source per internal line);
    the wrapper's border + radius + overflow:hidden draws the outer rounded edge.
@@ -110,6 +115,9 @@ const dualEn: React.CSSProperties = { fontSize: 8.5, color: "#4B5563", fontWeigh
 const SUBLABELS: { en: string; zh: string }[] = [
   { en: "N/M", zh: "描述无标记" },
   { en: "", zh: "型号" },
+  { en: "cm", zh: "长" },
+  { en: "cm", zh: "宽" },
+  { en: "cm", zh: "高" },
   { en: "cbm", zh: "体积立方米" },
   { en: "kgs", zh: "净重" },
   { en: "kgs", zh: "毛重" },
@@ -149,6 +157,18 @@ export default function PackingListDoc({
   const setMeta = (updater: (p: PackingMeta) => PackingMeta) => { setMetaState(updater); setDirty(true); };
   const setM = (k: keyof PackingMeta, v: string) => setMeta((m) => ({ ...m, [k]: v }));
   const set = (i: number, key: keyof PackingRow, v: string) => setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, [key]: v } : r)));
+
+  /* Typing a dimension (L/W/H, cm) recomputes CBM = L×W×H / 1,000,000 (cm³→m³)
+     and writes it into the editable cbm cell. */
+  const setDim = (i: number, key: "l" | "w" | "h", v: string) =>
+    setRows((prev) =>
+      prev.map((r, idx) => {
+        if (idx !== i) return r;
+        const nr = { ...r, [key]: v };
+        nr.cbm = fmt((num(nr.l) * num(nr.w) * num(nr.h)) / 1_000_000);
+        return nr;
+      }),
+    );
 
   /* Per-row Total = auto (per-carton value × cartons). Read-only. */
   const rowTotal = (r: PackingRow, key: "vol" | "nw" | "gw"): number => {
@@ -215,11 +235,11 @@ export default function PackingListDoc({
       .map((r) => {
         const c = num(r.ctn);
         return [
-          r.description || "", r.model || "", r.cbm || "", r.nw || "", r.gw || "",
+          r.description || "", r.model || "", r.l || "", r.w || "", r.h || "", r.cbm || "", r.nw || "", r.gw || "",
           num(r.pcs) || "", c || "", fmt(rowTotal(r, "vol")), fmt(rowTotal(r, "nw")), fmt(rowTotal(r, "gw")),
         ];
       });
-    dataRows.push(["TOTAL", "", "", "", "", totals.pcs || "", totals.ctn || "", fmt(totals.vol), fmt(totals.nw), fmt(totals.gw)]);
+    dataRows.push(["TOTAL", "", "", "", "", "", "", "", totals.pcs || "", totals.ctn || "", fmt(totals.vol), fmt(totals.nw), fmt(totals.gw)]);
 
     const toLines = [
       meta.companyName || "",
@@ -243,6 +263,9 @@ export default function PackingListDoc({
       columns: [
         { header: "DESCRIPTION", width: 26 },
         { header: "MODEL", width: 16 },
+        { header: "L (cm)", width: 7, align: "center" },
+        { header: "W (cm)", width: 7, align: "center" },
+        { header: "H (cm)", width: 7, align: "center" },
         { header: "VOLUME (cbm)", width: 12, align: "center" },
         { header: "N.W (kgs)", width: 10, align: "center" },
         { header: "G.W (kgs)", width: 10, align: "center" },
@@ -275,10 +298,20 @@ export default function PackingListDoc({
 
   const numInput = (i: number, key: keyof PackingRow, align: "left" | "center" = "center") => (
     <input
-      value={rows[i][key]}
+      value={rows[i][key] ?? ""}
       onChange={(e) => set(i, key, e.target.value)}
       inputMode={key === "model" ? "text" : "decimal"}
       style={{ ...inputReset, textAlign: align, fontSize: 11, lineHeight: 1.55, color: T.ink, padding: "12px 8px" }}
+    />
+  );
+
+  /* L/W/H dimension input — typing recomputes the CBM cell live (via setDim). */
+  const dimInput = (i: number, key: "l" | "w" | "h") => (
+    <input
+      value={rows[i][key] ?? ""}
+      onChange={(e) => setDim(i, key, e.target.value)}
+      inputMode="decimal"
+      style={{ ...inputReset, textAlign: "center", fontSize: 11, lineHeight: 1.55, color: T.ink, padding: "12px 6px" }}
     />
   );
 
@@ -432,12 +465,16 @@ export default function PackingListDoc({
                   <tr>
                     <th rowSpan={2} style={headBlack({ borderTopLeftRadius: 11 })}>Description</th>
                     <th rowSpan={2} style={headBlack()}>Model</th>
+                    <th colSpan={3} style={headBlack()}>Dimensions</th>
                     <th rowSpan={2} style={headBlack()}>Volume</th>
                     <th colSpan={2} style={headBlack()}>Weight</th>
                     <th colSpan={2} style={headBlack()}>Quantity</th>
                     <th colSpan={3} style={headBlack({ borderTopRightRadius: 11 })}>Total</th>
                   </tr>
                   <tr>
+                    <th style={headBlack()}>L</th>
+                    <th style={headBlack()}>W</th>
+                    <th style={headBlack()}>H</th>
                     <th style={headBlack()}>N.W</th>
                     <th style={headBlack()}>G.W</th>
                     <th style={headBlack()}>pcs</th>
@@ -461,6 +498,9 @@ export default function PackingListDoc({
                       <tr key={i}>
                         <td style={bodyTd}>{descInput(i)}</td>
                         <td style={bodyTd}>{numInput(i, "model", "left")}</td>
+                        <td style={bodyTd}>{dimInput(i, "l")}</td>
+                        <td style={bodyTd}>{dimInput(i, "w")}</td>
+                        <td style={bodyTd}>{dimInput(i, "h")}</td>
                         <td style={bodyTd}>{numInput(i, "cbm")}</td>
                         <td style={bodyTd}>{numInput(i, "nw")}</td>
                         <td style={bodyTd}>{numInput(i, "gw")}</td>
