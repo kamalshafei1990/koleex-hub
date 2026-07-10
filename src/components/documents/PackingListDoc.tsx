@@ -57,13 +57,13 @@ const COMPANY = {
 /* l/w/h = carton dimensions in cm. cbm auto-computes as L×W×H/1,000,000 but the
    cbm cell stays editable (typing a dimension recomputes it; typing cbm directly
    overrides until a dimension changes again). */
-type PackingRow = { description: string; model: string; l: string; w: string; h: string; cbm: string; nw: string; gw: string; pcs: string; ctn: string };
+type PackingRow = { description: string; model: string; hs: string; l: string; w: string; h: string; cbm: string; nw: string; gw: string; pcs: string; ctn: string };
 type PackingMeta = {
   date: string; invoiceNo: string; clientNo: string;
   companyName: string; toAddress: string; toAcid: string; contactPerson: string;
   toPhone: string; toMobile: string; toEmail: string; toWebsite: string;
 };
-const blankRow = (): PackingRow => ({ description: "", model: "", l: "", w: "", h: "", cbm: "", nw: "", gw: "", pcs: "", ctn: "" });
+const blankRow = (): PackingRow => ({ description: "", model: "", hs: "", l: "", w: "", h: "", cbm: "", nw: "", gw: "", pcs: "", ctn: "" });
 const blankMeta = (): PackingMeta => ({
   date: "", invoiceNo: "", clientNo: "",
   companyName: "", toAddress: "", toAcid: "", contactPerson: "",
@@ -89,9 +89,9 @@ function KoleexLogo() {
 }
 
 const inputReset: React.CSSProperties = { border: "none", outline: "none", background: "transparent", font: "inherit", color: "inherit", width: "100%", padding: 0, margin: 0 };
-/* 13 columns: Description, Model, Dimensions[L,W,H], Volume(cbm), Weight[N.W,G.W],
-   Quantity[pcs,ctn], Total[Vol,N.W,G.W]. */
-const COLS = ["21%", "11%", "5%", "5%", "5%", "7%", "6%", "6%", "5%", "5%", "8%", "8%", "8%"];
+/* 14 columns (landscape A4): Description, Model, HS Code, Dimensions[L,W,H],
+   Volume(cbm), Weight[N.W,G.W], Quantity[pcs,ctn], Total[Vol,N.W,G.W]. */
+const COLS = ["18%", "10%", "8%", "4.5%", "4.5%", "4.5%", "6.5%", "5.5%", "5.5%", "4.5%", "4.5%", "8%", "8%", "8%"];
 
 /* Grid lines via right+bottom borders only (single source per internal line);
    the wrapper's border + radius + overflow:hidden draws the outer rounded edge.
@@ -122,6 +122,7 @@ const dualEn: React.CSSProperties = { fontSize: 8.5, color: "#4B5563", fontWeigh
 const SUBLABELS: { en: string; zh: string }[] = [
   { en: "N/M", zh: "描述无标记" },
   { en: "", zh: "型号" },
+  { en: "", zh: "海关编码" },
   { en: "cm", zh: "长" },
   { en: "cm", zh: "宽" },
   { en: "cm", zh: "高" },
@@ -242,11 +243,11 @@ export default function PackingListDoc({
       .map((r) => {
         const c = num(r.ctn);
         return [
-          r.description || "", r.model || "", r.l || "", r.w || "", r.h || "", r.cbm || "", r.nw || "", r.gw || "",
+          r.description || "", r.model || "", r.hs || "", r.l || "", r.w || "", r.h || "", r.cbm || "", r.nw || "", r.gw || "",
           num(r.pcs) || "", c || "", fmt(rowTotal(r, "vol")), fmt(rowTotal(r, "nw")), fmt(rowTotal(r, "gw")),
         ];
       });
-    dataRows.push(["TOTAL", "", "", "", "", "", "", "", totals.pcs || "", totals.ctn || "", fmt(totals.vol), fmt(totals.nw), fmt(totals.gw)]);
+    dataRows.push(["TOTAL", "", "", "", "", "", "", "", "", totals.pcs || "", totals.ctn || "", fmt(totals.vol), fmt(totals.nw), fmt(totals.gw)]);
 
     const toLines = [
       meta.companyName || "",
@@ -270,6 +271,7 @@ export default function PackingListDoc({
       columns: [
         { header: "DESCRIPTION", width: 26 },
         { header: "MODEL", width: 16 },
+        { header: "HS CODE", width: 12, align: "center" },
         { header: "L (cm)", width: 7, align: "center" },
         { header: "W (cm)", width: 7, align: "center" },
         { header: "H (cm)", width: 7, align: "center" },
@@ -307,7 +309,7 @@ export default function PackingListDoc({
     <input
       value={rows[i][key] ?? ""}
       onChange={(e) => set(i, key, e.target.value)}
-      inputMode={key === "model" ? "text" : "decimal"}
+      inputMode={key === "model" || key === "hs" ? "text" : "decimal"}
       style={{ ...inputReset, textAlign: align, fontSize: 11, lineHeight: 1.55, color: T.ink, padding: "12px 8px" }}
     />
   );
@@ -345,10 +347,11 @@ export default function PackingListDoc({
       <style>{PRINT_AND_DOC_STYLES}</style>
       <style>{`
         .quot-a4-stack { min-width: 0 !important; padding-inline: 0 !important; margin-inline: auto !important; }
-        /* Let the sheet GROW with the table instead of clipping at a fixed
-           270mm page — a long table then simply continues onto the next A4
-           page when printed, exactly like the quotation/invoice. */
-        .quot-a4-doc { height: auto !important; min-height: 270mm; max-height: none !important; }
+        /* LANDSCAPE A4 for the packing list — the table is wide (14 columns incl.
+           HS Code + Dimensions), so the sheet is rotated to 297mm wide. The sheet
+           also GROWS with the table: a long list continues onto the next
+           landscape page when printed. */
+        .quot-a4-doc { width: 297mm !important; height: auto !important; min-height: 190mm; max-height: none !important; }
         /* The table's own border draws the outer frame + rounded corners, so
            drop each cell's outermost (right) border to avoid a doubled line. */
         .pl-tbl { border-collapse: separate; border-spacing: 0; }
@@ -356,7 +359,7 @@ export default function PackingListDoc({
         @media print {
           .no-print { display: none !important; }
           html, body { background: #fff !important; }
-          @page { size: A4; margin: 10mm; }
+          @page { size: A4 landscape; margin: 10mm; }
           .quot-a4-doc { box-shadow: none !important; margin: 0 !important; padding: 0 !important; width: auto !important; }
           /* Repeat the table header on every printed page + never split a row
              across the page break. */
@@ -472,6 +475,7 @@ export default function PackingListDoc({
                   <tr>
                     <th rowSpan={2} style={headBlack({ borderTopLeftRadius: 11 })}>Description</th>
                     <th rowSpan={2} style={headBlack()}>Model</th>
+                    <th rowSpan={2} style={headBlack()}>HS Code</th>
                     <th colSpan={3} style={headBlack()}>Dimensions</th>
                     <th rowSpan={2} style={headBlack()}>Volume</th>
                     <th colSpan={2} style={headBlack()}>Weight</th>
@@ -505,6 +509,7 @@ export default function PackingListDoc({
                       <tr key={i}>
                         <td style={bodyTd}>{descInput(i)}</td>
                         <td style={bodyTd}>{numInput(i, "model", "left")}</td>
+                        <td style={bodyTd}>{numInput(i, "hs", "center")}</td>
                         <td style={bodyTd}>{dimInput(i, "l")}</td>
                         <td style={bodyTd}>{dimInput(i, "w")}</td>
                         <td style={bodyTd}>{dimInput(i, "h")}</td>
@@ -520,7 +525,7 @@ export default function PackingListDoc({
                     );
                   })}
                   <tr>
-                    <td colSpan={8} style={{ ...headBlack({ textAlign: "right", fontSize: 10, borderBottom: "none", borderBottomLeftRadius: 11 }) }}>TOTAL</td>
+                    <td colSpan={9} style={{ ...headBlack({ textAlign: "right", fontSize: 10, borderBottom: "none", borderBottomLeftRadius: 11 }) }}>TOTAL</td>
                     <td style={{ ...compTd, borderBottom: "none", fontWeight: 700, background: "#EDEDED" }}>{totals.pcs || ""}</td>
                     <td style={{ ...compTd, borderBottom: "none", fontWeight: 700, background: "#EDEDED" }}>{totals.ctn || ""}</td>
                     <td style={{ ...compTd, borderBottom: "none", fontWeight: 700, background: "#EDEDED" }}>{fmt(totals.vol)}</td>
