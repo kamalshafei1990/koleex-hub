@@ -91,14 +91,19 @@ const COLS = ["16%", "16%", "8%", "7%", "7%", "6%", "6%", "10%", "9%", "9%"];
 /* Grid lines via right+bottom borders only (single source per internal line);
    the wrapper's border + radius + overflow:hidden draws the outer rounded edge.
    The table MUST be border-collapse:separate for the wrapper to clip the corners
-   — collapsed-border tables ignore a rounded parent's overflow:hidden. */
+   — collapsed-border tables ignore a rounded parent's overflow:hidden.
+
+   Two line colours, exactly like the quotation items table: the dark header
+   region uses a subtle #333 line (light hairlines would read as harsh white
+   lines on black), and the white body cells use the light T.border hairline. */
+const darkLine = "1px solid #333";
 const cell = `1px solid ${T.border}`;
 function headBlack(extra?: React.CSSProperties): React.CSSProperties {
-  return { borderRight: cell, borderBottom: cell, background: T.black, color: "#fff", padding: "5px 6px", fontSize: 9, fontWeight: 700, textAlign: "center", textTransform: "uppercase", letterSpacing: "0.04em", ...extra };
+  return { borderRight: darkLine, borderBottom: darkLine, background: T.black, color: "#fff", padding: "5px 6px", fontSize: 9, fontWeight: 700, textAlign: "center", textTransform: "uppercase", letterSpacing: "0.04em", ...extra };
 }
 const SUBHEAD_BG = "#3A3A3A";
-const subCell: React.CSSProperties = { borderRight: cell, borderBottom: cell, background: SUBHEAD_BG, padding: "8px 6px", fontSize: 9.5, textAlign: "center", color: "#F3F4F6", fontWeight: 600, textTransform: "uppercase" };
-const zhCell: React.CSSProperties = { borderRight: cell, borderBottom: cell, background: SUBHEAD_BG, padding: "8px 6px", fontSize: 10, textAlign: "center", color: "#D1D5DB", fontWeight: 500 };
+const subCell: React.CSSProperties = { borderRight: darkLine, borderBottom: darkLine, background: SUBHEAD_BG, padding: "8px 6px", fontSize: 9.5, textAlign: "center", color: "#F3F4F6", fontWeight: 600, textTransform: "uppercase" };
+const zhCell: React.CSSProperties = { borderRight: darkLine, borderBottom: darkLine, background: SUBHEAD_BG, padding: "8px 6px", fontSize: 10, textAlign: "center", color: "#D1D5DB", fontWeight: 500 };
 const bodyTd: React.CSSProperties = { borderRight: cell, borderBottom: cell, padding: 0, verticalAlign: "middle" };
 const compTd: React.CSSProperties = { borderRight: cell, borderBottom: cell, padding: "4px 6px", fontSize: 10, textAlign: "center", color: T.ink, background: T.surface, minHeight: 24 };
 
