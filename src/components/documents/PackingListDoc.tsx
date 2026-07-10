@@ -15,11 +15,14 @@
    'packing_list') via the shared DocToolbar.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PRINT_AND_DOC_STYLES } from "@/components/quotations/Quotations";
+import { StampSignatureBox, StampSignatureActions } from "@/components/quotations/QuotationA4Preview";
 import DocToolbar, { type SaveState } from "@/components/documents/DocToolbar";
 import { saveDocument, removeDocument, type DocumentRow } from "@/lib/documents-store";
 import { downloadDocXlsx } from "@/lib/excel-export";
+import { useScopeContext } from "@/lib/use-scope";
+import { humanizeError } from "@/lib/ui/humanize-error";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import MinusIcon from "@/components/icons/ui/MinusIcon";
 
@@ -63,6 +66,9 @@ type PackingMeta = {
   portLoading: string; portDischarge: string; containerSeal: string;
   companyName: string; toAddress: string; toAcid: string; contactPerson: string;
   toPhone: string; toMobile: string; toEmail: string; toWebsite: string;
+  /* Electronic stamp + signature — tenant-saved image URLs, attached per doc
+     (same mechanism as Quotations / Invoices via /api/quotations/saved-assets). */
+  stampUrl?: string; signatureUrl?: string;
 };
 const blankRow = (): PackingRow => ({ description: "", model: "", hs: "", l: "", w: "", h: "", cbm: "", nw: "", gw: "", pcs: "", ctn: "" });
 const blankMeta = (): PackingMeta => ({
@@ -163,9 +169,47 @@ export default function PackingListDoc({
   const [dirty, setDirty] = useState(false);
   const printedRef = useRef<HTMLDivElement | null>(null);
 
+  /* Electronic stamp + signature — only a Super Admin can attach/upload; the
+     tenant's saved assets come from the same endpoint the Quotation/Invoice use. */
+  const scope = useScopeContext();
+  const isSuperAdmin = !!scope?.is_super_admin;
+  const [savedStampUrl, setSavedStampUrl] = useState<string | null>(null);
+  const [savedSignatureUrl, setSavedSignatureUrl] = useState<string | null>(null);
+
   const setRows = (updater: (p: PackingRow[]) => PackingRow[]) => { setRowsState(updater); setDirty(true); };
   const setMeta = (updater: (p: PackingMeta) => PackingMeta) => { setMetaState(updater); setDirty(true); };
   const setM = (k: keyof PackingMeta, v: string) => setMeta((m) => ({ ...m, [k]: v }));
+  const setMedia = (k: "stampUrl" | "signatureUrl", v: string | undefined) => setMeta((m) => ({ ...m, [k]: v }));
+
+  /* Load the tenant's saved stamp / signature once on mount so the "Use saved"
+     button can attach them with one click. Non-fatal on failure (upload still works). */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/quotations/saved-assets", { credentials: "include" });
+        if (!res.ok) return;
+        const json = (await res.json()) as { stampUrl: string | null; signatureUrl: string | null };
+        if (cancelled) return;
+        setSavedStampUrl(json.stampUrl);
+        setSavedSignatureUrl(json.signatureUrl);
+      } catch { /* buttons degrade to upload-only */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const uploadAsset = useCallback(async (kind: "stamp" | "signature", file: File) => {
+    const form = new FormData();
+    form.append("kind", kind);
+    form.append("file", file);
+    try {
+      const res = await fetch("/api/quotations/saved-assets", { method: "POST", credentials: "include", body: form });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); alert(`Upload failed: ${humanizeError(j.error)}`); return; }
+      const json = (await res.json()) as { kind: string; url: string };
+      if (kind === "stamp") { setSavedStampUrl(json.url); setMedia("stampUrl", json.url); }
+      else { setSavedSignatureUrl(json.url); setMedia("signatureUrl", json.url); }
+    } catch (e) { alert(`Upload failed: ${humanizeError(e)}`); }
+  }, []);
   const set = (i: number, key: keyof PackingRow, v: string) => setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, [key]: v } : r)));
 
   /* Typing a dimension (L/W/H, cm) recomputes CBM = L×W×H / 1,000,000 (cm³→m³)
@@ -563,19 +607,28 @@ export default function PackingListDoc({
               </button>
             </div>
 
-            {/* Signature + Company Stamp — same card grammar as Quotations / Invoices.
-                Left over for the operator to sign + stamp on the printed copy. */}
+            {/* Electronic Signature + Company Stamp — same mechanism + card grammar
+                as Quotations / Invoices. A Super Admin attaches the tenant's saved
+                asset or uploads a new one; it's stamped onto this doc and persists. */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 18, breakInside: "avoid", pageBreakInside: "avoid" }}>
               <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column" }}>
                 <div style={{ background: T.black, color: "#fff", padding: "6px 12px", fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>Authorised Signature</div>
-                <div style={{ padding: 12, height: 120, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-                  <div style={{ width: "80%", borderTop: `1px solid ${T.border}`, textAlign: "center", paddingTop: 6, fontSize: 9, color: T.inkGhost, letterSpacing: "0.04em", textTransform: "uppercase" }}>Name · Signature · Date</div>
+                <div style={{ padding: 12, flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <StampSignatureBox imageUrl={meta.signatureUrl} placeholder="Sign Here" onClear={() => setMedia("signatureUrl", undefined)} isEditable={isSuperAdmin}>
+                    {!meta.signatureUrl && isSuperAdmin && (
+                      <StampSignatureActions label="signature" savedUrl={savedSignatureUrl} onUseSaved={savedSignatureUrl ? () => setMedia("signatureUrl", savedSignatureUrl) : undefined} onUpload={(f) => uploadAsset("signature", f)} />
+                    )}
+                  </StampSignatureBox>
                 </div>
               </div>
               <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column" }}>
                 <div style={{ background: T.black, color: "#fff", padding: "6px 12px", fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>Company Stamp</div>
-                <div style={{ padding: 12, height: 120, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <div style={{ fontSize: 9, color: T.inkGhost, letterSpacing: "0.04em", textTransform: "uppercase" }}>Stamp Here</div>
+                <div style={{ padding: 12, flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <StampSignatureBox imageUrl={meta.stampUrl} placeholder="Stamp Here" onClear={() => setMedia("stampUrl", undefined)} isEditable={isSuperAdmin} aspectSquare>
+                    {!meta.stampUrl && isSuperAdmin && (
+                      <StampSignatureActions label="stamp" savedUrl={savedStampUrl} onUseSaved={savedStampUrl ? () => setMedia("stampUrl", savedStampUrl) : undefined} onUpload={(f) => uploadAsset("stamp", f)} />
+                    )}
+                  </StampSignatureBox>
                 </div>
               </div>
             </div>

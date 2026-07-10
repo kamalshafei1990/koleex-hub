@@ -7574,7 +7574,7 @@ function PictureCell({
    only appears when an image is set AND the viewer is allowed to
    edit (super admin). It's no-print so it never appears in the
    exported PDF. */
-function StampSignatureBox({
+export function StampSignatureBox({
   imageUrl,
   placeholder,
   onClear,
@@ -7690,7 +7690,7 @@ function StampSignatureBox({
    to /api/quotations/saved-assets (which both saves it tenant-wide
    AND fills it onto this quote). Wrapped in .no-print so the PDF
    never captures the buttons. */
-function StampSignatureActions({
+export function StampSignatureActions({
   label,
   savedUrl,
   onUseSaved,
