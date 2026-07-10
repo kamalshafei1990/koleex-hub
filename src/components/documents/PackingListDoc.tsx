@@ -520,7 +520,7 @@ export default function PackingListDoc({
                     );
                   })}
                   <tr>
-                    <td colSpan={5} style={{ ...headBlack({ textAlign: "right", fontSize: 10, borderBottom: "none", borderBottomLeftRadius: 11 }) }}>TOTAL</td>
+                    <td colSpan={8} style={{ ...headBlack({ textAlign: "right", fontSize: 10, borderBottom: "none", borderBottomLeftRadius: 11 }) }}>TOTAL</td>
                     <td style={{ ...compTd, borderBottom: "none", fontWeight: 700, background: "#EDEDED" }}>{totals.pcs || ""}</td>
                     <td style={{ ...compTd, borderBottom: "none", fontWeight: 700, background: "#EDEDED" }}>{totals.ctn || ""}</td>
                     <td style={{ ...compTd, borderBottom: "none", fontWeight: 700, background: "#EDEDED" }}>{fmt(totals.vol)}</td>
