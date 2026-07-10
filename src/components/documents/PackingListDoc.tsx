@@ -99,12 +99,12 @@ const COLS = ["26%", "12%", "8%", "7%", "7%", "6%", "6%", "10%", "9%", "9%"];
 const darkLine = "1px solid #333";
 const cell = `1px solid ${T.border}`;
 function headBlack(extra?: React.CSSProperties): React.CSSProperties {
-  return { borderRight: darkLine, borderBottom: darkLine, background: T.black, color: "#fff", padding: "5px 6px", fontSize: 9, fontWeight: 700, textAlign: "center", textTransform: "uppercase", letterSpacing: "0.04em", ...extra };
+  return { borderRight: darkLine, borderBottom: darkLine, background: T.black, color: "#fff", padding: "5px 6px", fontSize: 9, fontWeight: 700, textAlign: "center", verticalAlign: "middle", textTransform: "uppercase", letterSpacing: "0.04em", ...extra };
 }
 /* One combined sub-header row per column: English unit on top, Chinese under it.
    A clean light-gray band (between the black header block and the white body). */
 const SUBHEAD_BG = "#F3F4F6";
-const dualCell: React.CSSProperties = { borderRight: cell, borderBottom: cell, background: SUBHEAD_BG, padding: "7px 6px", textAlign: "center" };
+const dualCell: React.CSSProperties = { borderRight: cell, borderBottom: cell, background: SUBHEAD_BG, padding: "7px 6px", textAlign: "center", verticalAlign: "middle" };
 const dualEn: React.CSSProperties = { fontSize: 9.5, color: "#4B5563", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", lineHeight: 1.2 };
 /* Column sub-labels: English unit + Chinese field name (was two rows). */
 const SUBLABELS: { en: string; zh: string }[] = [
