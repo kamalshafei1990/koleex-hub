@@ -120,7 +120,8 @@ const SUBLABELS: { en: string; zh: string }[] = [
   { en: "kgs", zh: "毛重" },
 ];
 const bodyTd: React.CSSProperties = { borderRight: cell, borderBottom: cell, padding: 0, verticalAlign: "middle" };
-const compTd: React.CSSProperties = { borderRight: cell, borderBottom: cell, padding: "4px 6px", fontSize: 10, textAlign: "center", color: T.ink, background: T.surface, minHeight: 24 };
+/* Auto-computed Total cells — same type size + row height as the input cells. */
+const compTd: React.CSSProperties = { borderRight: cell, borderBottom: cell, padding: "12px 8px", fontSize: 11, textAlign: "center", color: T.ink, background: T.surface };
 
 export default function PackingListDoc({
   initial,
@@ -270,7 +271,7 @@ export default function PackingListDoc({
       value={rows[i][key]}
       onChange={(e) => set(i, key, e.target.value)}
       inputMode={key === "description" || key === "model" ? "text" : "decimal"}
-      style={{ ...inputReset, textAlign: align, fontSize: 10, padding: "5px 5px" }}
+      style={{ ...inputReset, textAlign: align, fontSize: 11, lineHeight: 1.55, color: T.ink, padding: "12px 8px" }}
     />
   );
 
