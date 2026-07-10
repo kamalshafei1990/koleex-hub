@@ -338,7 +338,7 @@ export default function PackingListDoc({
       rows={1}
       value={rows[i].description}
       onChange={(e) => { set(i, "description", e.target.value); autoGrow(e.target); }}
-      style={{ ...inputReset, textAlign: "left", fontSize: 11, lineHeight: 1.55, color: T.ink, padding: "12px 8px", resize: "none", overflow: "hidden", whiteSpace: "pre-wrap", wordBreak: "break-word", display: "block" }}
+      style={{ ...inputReset, textAlign: "center", fontSize: 11, lineHeight: 1.55, color: T.ink, padding: "12px 8px", resize: "none", overflow: "hidden", whiteSpace: "pre-wrap", wordBreak: "break-word", display: "block" }}
     />
   );
 
@@ -508,7 +508,7 @@ export default function PackingListDoc({
                     return (
                       <tr key={i}>
                         <td style={bodyTd}>{descInput(i)}</td>
-                        <td style={bodyTd}>{numInput(i, "model", "left")}</td>
+                        <td style={bodyTd}>{numInput(i, "model", "center")}</td>
                         <td style={bodyTd}>{numInput(i, "hs", "center")}</td>
                         <td style={bodyTd}>{dimInput(i, "l")}</td>
                         <td style={bodyTd}>{dimInput(i, "w")}</td>
