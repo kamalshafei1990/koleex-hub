@@ -102,8 +102,23 @@ function headBlack(extra?: React.CSSProperties): React.CSSProperties {
   return { borderRight: darkLine, borderBottom: darkLine, background: T.black, color: "#fff", padding: "5px 6px", fontSize: 9, fontWeight: 700, textAlign: "center", textTransform: "uppercase", letterSpacing: "0.04em", ...extra };
 }
 const SUBHEAD_BG = "#3A3A3A";
-const subCell: React.CSSProperties = { borderRight: darkLine, borderBottom: darkLine, background: SUBHEAD_BG, padding: "8px 6px", fontSize: 9.5, textAlign: "center", color: "#F3F4F6", fontWeight: 600, textTransform: "uppercase" };
-const zhCell: React.CSSProperties = { borderRight: darkLine, borderBottom: darkLine, background: SUBHEAD_BG, padding: "8px 6px", fontSize: 10, textAlign: "center", color: "#D1D5DB", fontWeight: 500 };
+/* One combined sub-header row per column: English unit on top, Chinese under it. */
+const dualCell: React.CSSProperties = { borderRight: darkLine, borderBottom: darkLine, background: SUBHEAD_BG, padding: "7px 6px", textAlign: "center" };
+const dualEn: React.CSSProperties = { fontSize: 9, color: "#F3F4F6", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", lineHeight: 1.2 };
+const dualZh: React.CSSProperties = { fontSize: 10, color: "#D1D5DB", fontWeight: 500, lineHeight: 1.3, marginTop: 1 };
+/* Column sub-labels: English unit + Chinese field name (was two rows). */
+const SUBLABELS: { en: string; zh: string }[] = [
+  { en: "N/M", zh: "描述无标记" },
+  { en: "", zh: "型号" },
+  { en: "cbm", zh: "体积立方米" },
+  { en: "kgs", zh: "净重" },
+  { en: "kgs", zh: "毛重" },
+  { en: "pcs", zh: "件" },
+  { en: "ctn", zh: "数量" },
+  { en: "ctn/wooden", zh: "体积" },
+  { en: "kgs", zh: "净重" },
+  { en: "kgs", zh: "毛重" },
+];
 const bodyTd: React.CSSProperties = { borderRight: cell, borderBottom: cell, padding: 0, verticalAlign: "middle" };
 const compTd: React.CSSProperties = { borderRight: cell, borderBottom: cell, padding: "4px 6px", fontSize: 10, textAlign: "center", color: T.ink, background: T.surface, minHeight: 24 };
 
@@ -391,28 +406,12 @@ export default function PackingListDoc({
                     <th style={headBlack()}>G.W</th>
                   </tr>
                   <tr>
-                    <td style={subCell}>N/M</td>
-                    <td style={subCell} />
-                    <td style={subCell}>cbm</td>
-                    <td style={subCell}>kgs</td>
-                    <td style={subCell}>kgs</td>
-                    <td style={subCell}>pcs</td>
-                    <td style={subCell}>ctn</td>
-                    <td style={subCell}>ctn/wooden</td>
-                    <td style={subCell}>kgs</td>
-                    <td style={subCell}>kgs</td>
-                  </tr>
-                  <tr>
-                    <td style={zhCell}>描述无标记</td>
-                    <td style={zhCell}>型号</td>
-                    <td style={zhCell}>体积立方米</td>
-                    <td style={zhCell}>净重</td>
-                    <td style={zhCell}>毛重</td>
-                    <td style={zhCell}>件</td>
-                    <td style={zhCell}>数量</td>
-                    <td style={zhCell}>体积</td>
-                    <td style={zhCell}>净重</td>
-                    <td style={zhCell}>毛重</td>
+                    {SUBLABELS.map((c, i) => (
+                      <td key={i} style={dualCell}>
+                        {c.en && <div style={dualEn}>{c.en}</div>}
+                        <div style={dualZh}>{c.zh}</div>
+                      </td>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
