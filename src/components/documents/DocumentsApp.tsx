@@ -35,7 +35,7 @@ import {
 } from "@/lib/documents-store";
 import { downloadDocXlsx, money } from "@/lib/excel-export";
 import DocumentsIcon from "@/components/icons/DocumentsIcon";
-import QuoteIcon from "@/components/icons/ui/QuoteIcon";
+import FileBadge2Icon from "@/components/icons/ui/FileBadge2Icon";
 import ReceiptIcon from "@/components/icons/ui/ReceiptIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
@@ -44,13 +44,13 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 type OpenKind = DocKind; // "quotation" | "invoice" | "packing_list"
 
 const TEMPLATES: { kind: OpenKind; title: string; subtitle: string; icon: ReactNode }[] = [
-  { kind: "quotation", title: "Quotation", subtitle: "Commercial quotation to a customer", icon: <QuoteIcon size={18} /> },
+  { kind: "quotation", title: "Quotation", subtitle: "Commercial quotation to a customer", icon: <FileBadge2Icon size={18} /> },
   { kind: "invoice", title: "Invoice", subtitle: "Commercial invoice / proforma", icon: <ReceiptIcon size={18} /> },
   { kind: "packing_list", title: "Packing List", subtitle: "Carton / weight / volume packing list", icon: <PackageIcon size={18} /> },
 ];
 
 const KIND_META: Record<OpenKind, { label: string; icon: ReactNode }> = {
-  quotation: { label: "Quotation", icon: <QuoteIcon size={14} /> },
+  quotation: { label: "Quotation", icon: <FileBadge2Icon size={14} /> },
   invoice: { label: "Invoice", icon: <ReceiptIcon size={14} /> },
   packing_list: { label: "Packing List", icon: <PackageIcon size={14} /> },
 };
