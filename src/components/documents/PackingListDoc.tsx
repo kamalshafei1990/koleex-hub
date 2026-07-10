@@ -492,25 +492,25 @@ export default function PackingListDoc({
               </div>
             </div>
 
-            {/* Meta strip — Date · Invoice No · Client No · Country of Origin */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
+            {/* Meta strip — Date · Invoice No · Client No */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
               <MetaStripCell label="Date" isFirst>
                 <input type="date" value={meta.date} onChange={(e) => setM("date", e.target.value)} style={{ ...inputReset, fontSize: 11, fontVariantNumeric: "tabular-nums", colorScheme: "light", cursor: "pointer" }} />
               </MetaStripCell>
               <MetaStripCell label="Invoice No">
                 <input value={meta.invoiceNo} onChange={(e) => setM("invoiceNo", e.target.value)} placeholder="—" style={{ ...inputReset, fontSize: 11, fontFamily: T.mono, letterSpacing: "0.02em" }} />
               </MetaStripCell>
-              <MetaStripCell label="Client No">
+              <MetaStripCell label="Client No" isLast>
                 <input value={meta.clientNo} onChange={(e) => setM("clientNo", e.target.value)} placeholder="—" style={{ ...inputReset, fontSize: 11, fontVariantNumeric: "tabular-nums" }} />
-              </MetaStripCell>
-              <MetaStripCell label="Country of Origin" isLast>
-                <input value={meta.countryOrigin} onChange={(e) => setM("countryOrigin", e.target.value)} placeholder="e.g. China" style={{ ...inputReset, fontSize: 11, color: T.ink }} />
               </MetaStripCell>
             </div>
 
             {/* Shipment strip — Port of Loading · Port of Discharge · Container / Seal No. */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
-              <MetaStripCell label="Port of Loading" isFirst>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
+              <MetaStripCell label="Country of Origin" isFirst>
+                <input value={meta.countryOrigin} onChange={(e) => setM("countryOrigin", e.target.value)} placeholder="e.g. China" style={{ ...inputReset, fontSize: 11, color: T.ink }} />
+              </MetaStripCell>
+              <MetaStripCell label="Port of Loading">
                 <PortCombobox
                   value={meta.portLoading}
                   onChange={(v) => setM("portLoading", v)}
