@@ -24,6 +24,7 @@ import { downloadDocXlsx } from "@/lib/excel-export";
 import { useScopeContext } from "@/lib/use-scope";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { CHINA_PORTS, PORTS_BY_COUNTRY, PORT_COUNTRIES } from "@/lib/ports";
+import { PortCombobox } from "@/components/documents/PortCombobox";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import MinusIcon from "@/components/icons/ui/MinusIcon";
 
@@ -472,25 +473,29 @@ export default function PackingListDoc({
             {/* Shipment strip — Port of Loading · Port of Discharge · Container / Seal No. */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
               <MetaStripCell label="Port of Loading" isFirst>
-                <input list="pl-china-ports" value={meta.portLoading} onChange={(e) => setM("portLoading", e.target.value)} placeholder="Search Chinese port…" style={{ ...inputReset, fontSize: 11, color: T.ink }} />
+                <PortCombobox
+                  value={meta.portLoading}
+                  onChange={(v) => setM("portLoading", v)}
+                  options={CHINA_PORTS.map((p) => `${p}, China`)}
+                  placeholder="Select Chinese port…"
+                  allowCustom
+                />
               </MetaStripCell>
               <MetaStripCell label="Port of Discharge">
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <select
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <PortCombobox
                     value={meta.dischargeCountry}
-                    onChange={(e) => setMeta((m) => ({ ...m, dischargeCountry: e.target.value, portDischarge: "" }))}
-                    style={{ ...inputReset, fontSize: 11, color: meta.dischargeCountry ? T.ink : T.inkGhost, cursor: "pointer", appearance: "auto" as React.CSSProperties["appearance"] }}
-                  >
-                    <option value="">Select country…</option>
-                    {PORT_COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                  <input
-                    list="pl-discharge-ports"
+                    onChange={(v) => setMeta((m) => ({ ...m, dischargeCountry: v, portDischarge: "" }))}
+                    options={PORT_COUNTRIES}
+                    placeholder="Select country…"
+                  />
+                  <PortCombobox
                     value={meta.portDischarge}
-                    onChange={(e) => setM("portDischarge", e.target.value)}
+                    onChange={(v) => setM("portDischarge", v)}
+                    options={(PORTS_BY_COUNTRY[meta.dischargeCountry] ?? []).map((p) => `${p}, ${meta.dischargeCountry}`)}
                     placeholder={meta.dischargeCountry ? "Select port…" : "Choose a country first"}
                     disabled={!meta.dischargeCountry}
-                    style={{ ...inputReset, fontSize: 11, color: T.ink, opacity: meta.dischargeCountry ? 1 : 0.5 }}
+                    allowCustom
                   />
                 </div>
               </MetaStripCell>
@@ -498,13 +503,6 @@ export default function PackingListDoc({
                 <input value={meta.containerSeal} onChange={(e) => setM("containerSeal", e.target.value)} placeholder="Container No. / Seal No." style={{ ...inputReset, fontSize: 11, fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }} />
               </MetaStripCell>
             </div>
-            {/* Port option sources for the datalist-backed inputs above. */}
-            <datalist id="pl-china-ports">
-              {CHINA_PORTS.map((p) => <option key={p} value={`${p}, China`} />)}
-            </datalist>
-            <datalist id="pl-discharge-ports">
-              {(PORTS_BY_COUNTRY[meta.dischargeCountry] ?? []).map((p) => <option key={p} value={`${p}, ${meta.dischargeCountry}`} />)}
-            </datalist>
 
             {/* FROM (Koleex) / INVOICE TO (customer) */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 14 }}>
