@@ -60,12 +60,14 @@ const COMPANY = {
 type PackingRow = { description: string; model: string; hs: string; l: string; w: string; h: string; cbm: string; nw: string; gw: string; pcs: string; ctn: string };
 type PackingMeta = {
   date: string; invoiceNo: string; clientNo: string;
+  portLoading: string; portDischarge: string; containerSeal: string;
   companyName: string; toAddress: string; toAcid: string; contactPerson: string;
   toPhone: string; toMobile: string; toEmail: string; toWebsite: string;
 };
 const blankRow = (): PackingRow => ({ description: "", model: "", hs: "", l: "", w: "", h: "", cbm: "", nw: "", gw: "", pcs: "", ctn: "" });
 const blankMeta = (): PackingMeta => ({
   date: "", invoiceNo: "", clientNo: "",
+  portLoading: "", portDischarge: "", containerSeal: "",
   companyName: "", toAddress: "", toAcid: "", contactPerson: "",
   toPhone: "", toMobile: "", toEmail: "", toWebsite: "",
 });
@@ -266,6 +268,9 @@ export default function PackingListDoc({
         ["DATE", meta.date || ""],
         ["INVOICE NO", meta.invoiceNo || ""],
         ["CLIENT NO", meta.clientNo || ""],
+        ["PORT OF LOADING", meta.portLoading || ""],
+        ["PORT OF DISCHARGE", meta.portDischarge || ""],
+        ["CONTAINER / SEAL NO.", meta.containerSeal || ""],
       ],
       toLines,
       columns: [
@@ -419,6 +424,19 @@ export default function PackingListDoc({
               </MetaStripCell>
             </div>
 
+            {/* Shipment strip — Port of Loading · Port of Discharge · Container / Seal No. */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
+              <MetaStripCell label="Port of Loading" isFirst>
+                <input value={meta.portLoading} onChange={(e) => setM("portLoading", e.target.value)} placeholder="e.g. Shanghai, China" style={{ ...inputReset, fontSize: 11, color: T.ink }} />
+              </MetaStripCell>
+              <MetaStripCell label="Port of Discharge">
+                <input value={meta.portDischarge} onChange={(e) => setM("portDischarge", e.target.value)} placeholder="e.g. Alexandria, Egypt" style={{ ...inputReset, fontSize: 11, color: T.ink }} />
+              </MetaStripCell>
+              <MetaStripCell label="Container / Seal No." isLast>
+                <input value={meta.containerSeal} onChange={(e) => setM("containerSeal", e.target.value)} placeholder="Container No. / Seal No." style={{ ...inputReset, fontSize: 11, fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }} />
+              </MetaStripCell>
+            </div>
+
             {/* FROM (Koleex) / INVOICE TO (customer) */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 14 }}>
               <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
@@ -543,6 +561,23 @@ export default function PackingListDoc({
               <button type="button" onClick={() => setRows((p) => (p.length > 1 ? p.slice(0, -1) : p))} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: T.inkSoft, border: `1px dashed ${T.border}`, borderRadius: 8, padding: "5px 10px", background: "#fff" }}>
                 <MinusIcon size={12} /> Remove row
               </button>
+            </div>
+
+            {/* Signature + Company Stamp — same card grammar as Quotations / Invoices.
+                Left over for the operator to sign + stamp on the printed copy. */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 18, breakInside: "avoid", pageBreakInside: "avoid" }}>
+              <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                <div style={{ background: T.black, color: "#fff", padding: "6px 12px", fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>Authorised Signature</div>
+                <div style={{ padding: 12, height: 120, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+                  <div style={{ width: "80%", borderTop: `1px solid ${T.border}`, textAlign: "center", paddingTop: 6, fontSize: 9, color: T.inkGhost, letterSpacing: "0.04em", textTransform: "uppercase" }}>Name · Signature · Date</div>
+                </div>
+              </div>
+              <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                <div style={{ background: T.black, color: "#fff", padding: "6px 12px", fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>Company Stamp</div>
+                <div style={{ padding: 12, height: 120, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <div style={{ fontSize: 9, color: T.inkGhost, letterSpacing: "0.04em", textTransform: "uppercase" }}>Stamp Here</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
