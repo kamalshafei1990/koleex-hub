@@ -369,12 +369,12 @@ export default function PackingListDoc({
                 <colgroup>{COLS.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
                 <thead>
                   <tr>
-                    <th rowSpan={2} style={headBlack()}>Description</th>
+                    <th rowSpan={2} style={headBlack({ borderTopLeftRadius: 11 })}>Description</th>
                     <th rowSpan={2} style={headBlack()}>Model</th>
                     <th rowSpan={2} style={headBlack()}>Volume</th>
                     <th colSpan={2} style={headBlack()}>Weight</th>
                     <th colSpan={2} style={headBlack()}>Quantity</th>
-                    <th colSpan={3} style={headBlack()}>Total</th>
+                    <th colSpan={3} style={headBlack({ borderTopRightRadius: 11 })}>Total</th>
                   </tr>
                   <tr>
                     <th style={headBlack()}>N.W</th>
@@ -429,12 +429,12 @@ export default function PackingListDoc({
                     );
                   })}
                   <tr>
-                    <td colSpan={5} style={{ ...headBlack({ textAlign: "right", fontSize: 10 }) }}>TOTAL</td>
-                    <td style={{ ...compTd, fontWeight: 700, background: "#EDEDED" }}>{totals.pcs || ""}</td>
-                    <td style={{ ...compTd, fontWeight: 700, background: "#EDEDED" }}>{totals.ctn || ""}</td>
-                    <td style={{ ...compTd, fontWeight: 700, background: "#EDEDED" }}>{fmt(totals.vol)}</td>
-                    <td style={{ ...compTd, fontWeight: 700, background: "#EDEDED" }}>{fmt(totals.nw)}</td>
-                    <td style={{ ...compTd, fontWeight: 700, background: "#EDEDED" }}>{fmt(totals.gw)}</td>
+                    <td colSpan={5} style={{ ...headBlack({ textAlign: "right", fontSize: 10, borderBottom: "none", borderBottomLeftRadius: 11 }) }}>TOTAL</td>
+                    <td style={{ ...compTd, borderBottom: "none", fontWeight: 700, background: "#EDEDED" }}>{totals.pcs || ""}</td>
+                    <td style={{ ...compTd, borderBottom: "none", fontWeight: 700, background: "#EDEDED" }}>{totals.ctn || ""}</td>
+                    <td style={{ ...compTd, borderBottom: "none", fontWeight: 700, background: "#EDEDED" }}>{fmt(totals.vol)}</td>
+                    <td style={{ ...compTd, borderBottom: "none", fontWeight: 700, background: "#EDEDED" }}>{fmt(totals.nw)}</td>
+                    <td style={{ ...compTd, borderRight: "none", borderBottom: "none", fontWeight: 700, background: "#EDEDED", borderBottomRightRadius: 11 }}>{fmt(totals.gw)}</td>
                   </tr>
                 </tbody>
               </table>
