@@ -18,7 +18,6 @@ import type { AccountWithLinks } from "@/types/supabase";
 import { withDefaults } from "@/lib/access-control";
 import type { ProfilePrefs } from "@/lib/access-control";
 import { updateAccountAvatar, updateAccountPreferences } from "@/lib/accounts-admin";
-import ProfileCompletenessBar from "@/components/ui/ProfileCompletenessBar";
 import AddressAutocomplete from "@/components/suppliers/AddressAutocomplete";
 import UserIcon from "@/components/icons/ui/UserIcon";
 import CameraIcon from "@/components/icons/ui/CameraIcon";
@@ -128,15 +127,6 @@ export default function ProfileTab({
     );
   const dirty = peopleDirty || profDirty;
 
-  /* ── Completeness meter ── */
-  const tracked: (string | null)[] = [
-    form.full_name, form.display_name, form.job_title, avatarUrl,
-    form.phone || form.mobile, form.email, form.notes,
-    form.city, form.country, prof.pronouns ?? "",
-    (prof.links?.linkedin || prof.links?.website || prof.links?.wechat || prof.links?.whatsapp) || "",
-  ];
-  const filled = tracked.filter((v) => (v ?? "").toString().trim().length > 0).length;
-
   async function save() {
     const personId = account.person?.id;
     setSaving(true); setError(null);
@@ -214,8 +204,6 @@ export default function ProfileTab({
 
   return (
     <div className="space-y-4 pb-2">
-      <ProfileCompletenessBar filled={filled} total={tracked.length} />
-
       {/* ── Identity ── */}
       <Card title="Identity" subtitle="How you appear across the hub.">
         {/* Avatar */}
