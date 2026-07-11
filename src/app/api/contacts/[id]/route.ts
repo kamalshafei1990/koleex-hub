@@ -47,7 +47,44 @@ export async function GET(
   const deny = await requireModuleAccess(auth, moduleForType((data as { contact_type?: string }).contact_type));
   if (deny) return deny;
 
-  return NextResponse.json({ contact: data });
+  /* Identity consolidation P3 — read-through. When this contact is linked to a
+     shared person record, the person is the source of truth for identity
+     (name/contact/address); overlay those onto the returned contact and attach
+     a `linked_person` marker so the UI can show "identity from person record".
+     Business/CRM fields stay on the contact. Dormant when person_id is null. */
+  const withPerson = await overlayLinkedPerson(data as Record<string, unknown>);
+  return NextResponse.json({ contact: withPerson });
+}
+
+/** Overlay the linked person's identity fields onto a contact row (P3). */
+async function overlayLinkedPerson(
+  contact: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const personId = contact.person_id;
+  if (typeof personId !== "string" || !personId) return contact;
+  const { data: person } = await supabaseServer
+    .from("people")
+    .select("id, full_name, first_name, last_name, email, phone, mobile, address_line1, address_line2, city, state, country, postal_code")
+    .eq("id", personId)
+    .maybeSingle();
+  if (!person) return contact;
+  const p = person as Record<string, unknown>;
+  const keep = (v: unknown, fallback: unknown) =>
+    v === null || v === undefined || v === "" ? fallback : v;
+  return {
+    ...contact,
+    full_name: keep(p.full_name, contact.full_name),
+    first_name: keep(p.first_name, contact.first_name),
+    last_name: keep(p.last_name, contact.last_name),
+    email: keep(p.email, contact.email),
+    phone: keep(p.phone, contact.phone),
+    city: keep(p.city, contact.city),
+    country: keep(p.country, contact.country),
+    province: keep(p.state, contact.province),
+    linked_person: {
+      id: p.id, full_name: p.full_name, email: p.email, phone: p.phone,
+    },
+  };
 }
 
 export async function PATCH(
@@ -93,6 +130,12 @@ export async function PATCH(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  /* Identity consolidation P3 — write-through. If this contact is linked to a
+     person, mirror any identity fields from the patch onto the shared people
+     record so the edit shows up in Settings / Accounts / HR too. Dormant when
+     the contact isn't linked. Business/CRM fields are never mirrored. */
+  await mirrorIdentityToPerson(id, patch);
+
   /* Mirror catalogue changes into the Catalogs app so a catalogue uploaded
      from the supplier form shows up there too. Only when catalogues changed. */
   if (existing.contact_type === "supplier" && "catalogues" in patch) {
@@ -125,6 +168,38 @@ export async function PATCH(
   }
 
   return NextResponse.json({ ok: true });
+}
+
+/** Mirror identity fields from a contact patch onto its linked person (P3). */
+async function mirrorIdentityToPerson(
+  contactId: string,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  const { data: row } = await supabaseServer
+    .from("contacts")
+    .select("person_id")
+    .eq("id", contactId)
+    .maybeSingle();
+  const personId = (row as { person_id?: string | null } | null)?.person_id;
+  if (!personId) return;
+
+  /* contact field → people column. Only identity; never business/CRM. */
+  const map: Record<string, string> = {
+    full_name: "full_name", first_name: "first_name", last_name: "last_name",
+    email: "email", phone: "phone", city: "city", country: "country",
+    province: "state",
+  };
+  const personPatch: Record<string, unknown> = {};
+  for (const [contactKey, peopleCol] of Object.entries(map)) {
+    if (contactKey in patch) personPatch[peopleCol] = patch[contactKey];
+  }
+  if (Object.keys(personPatch).length === 0) return;
+
+  const { error } = await supabaseServer
+    .from("people")
+    .update(personPatch)
+    .eq("id", personId);
+  if (error) console.error("[api/contacts/[id] PATCH] person mirror", error.message);
 }
 
 export async function DELETE(
