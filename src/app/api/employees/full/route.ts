@@ -172,8 +172,14 @@ export async function POST(req: Request) {
       company_id: null,
       job_title: null,
       mobile: null,
-      address_line1: null, address_line2: null,
-      city: null, state: null, country: null, postal_code: null,
+      /* Identity consolidation P1: the home address is part of the shared
+         person record, not a separate HR "private address". */
+      address_line1: str(body, "private_address_line1"),
+      address_line2: str(body, "private_address_line2"),
+      city: str(body, "private_city"),
+      state: str(body, "private_state"),
+      country: str(body, "private_country"),
+      postal_code: str(body, "private_postal_code"),
       created_by: auth.account_id,
     })
     .select()
@@ -266,12 +272,14 @@ export async function POST(req: Request) {
       work_location: str(body, "work_location") || "office",
       manager_id: str(body, "manager_id"),
       notes: null,
-      private_address_line1: str(body, "private_address_line1"),
-      private_address_line2: str(body, "private_address_line2"),
-      private_city: str(body, "private_city"),
-      private_state: str(body, "private_state"),
-      private_country: str(body, "private_country"),
-      private_postal_code: str(body, "private_postal_code"),
+      /* Identity consolidation P1: address now lives on the person record
+         (people.address_*) above — these HR columns are retired. */
+      private_address_line1: null,
+      private_address_line2: null,
+      private_city: null,
+      private_state: null,
+      private_country: null,
+      private_postal_code: null,
       emergency_contact_name: str(body, "emergency_contact_name"),
       emergency_contact_phone: str(body, "emergency_contact_phone"),
       emergency_contact_relationship: str(body, "emergency_contact_relationship"),
