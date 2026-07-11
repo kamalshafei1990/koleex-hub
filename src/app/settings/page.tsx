@@ -46,13 +46,18 @@ import RegionTab from "@/components/settings/tabs/RegionTab";
 import AboutTab from "@/components/settings/tabs/AboutTab";
 import NotificationsTab from "@/components/settings/tabs/NotificationsTab";
 import LoginHistoryTab from "@/components/settings/tabs/LoginHistoryTab";
+import StampSignatureTab from "@/components/settings/tabs/StampSignatureTab";
+import AdminTab from "@/components/settings/tabs/AdminTab";
 import PaletteIcon from "@/components/icons/ui/PaletteIcon";
 import GlobeIcon from "@/components/icons/ui/GlobeIcon";
 import InfoIcon from "@/components/icons/ui/InfoIcon";
 import LockIcon from "@/components/icons/ui/LockIcon";
+import FileBadge2Icon from "@/components/icons/ui/FileBadge2Icon";
+import ShieldIcon from "@/components/icons/ui/ShieldIcon";
+import { useMeBootstrap } from "@/lib/me-bootstrap";
 import type { AccountWithLinks } from "@/types/supabase";
 
-type Tab = "profile" | "preferences" | "calendar" | "display" | "region" | "notifications" | "security" | "about";
+type Tab = "profile" | "preferences" | "calendar" | "display" | "region" | "notifications" | "security" | "assets" | "admin" | "about";
 
 type SectionDef = {
   id: Tab; label: string; subtitle: string;
@@ -99,6 +104,8 @@ function capitalize(s: string) {
    --------------------------------------------------------------------------- */
 function SettingsContent() {
   const { account, refresh } = useCurrentAccount();
+  const { data: boot } = useMeBootstrap();
+  const isSA = !!boot?.isSuperAdmin;
   const [tab, setTab] = useState<Tab>("profile");
   /* Mobile only: false → show the list, true → show the pushed detail. */
   const [mobileDetail, setMobileDetail] = useState(false);
@@ -157,6 +164,19 @@ function SettingsContent() {
       icon: <LockIcon className="h-3.5 w-3.5" />,
       node: <LoginHistoryTab account={account} />,
     },
+    /* Super-admin-only sections. */
+    ...(isSA ? [
+      {
+        id: "assets" as Tab, label: "Signature & stamp", subtitle: "Company seal for documents",
+        icon: <FileBadge2Icon className="h-3.5 w-3.5" />,
+        node: <StampSignatureTab account={account} />,
+      },
+      {
+        id: "admin" as Tab, label: "Admin tools", subtitle: "Activity, roles, accounts",
+        icon: <ShieldIcon className="h-3.5 w-3.5" />,
+        node: <AdminTab account={account} />,
+      },
+    ] : []),
     {
       id: "about", label: "About", subtitle: "Version, device, support",
       icon: <InfoIcon className="h-3.5 w-3.5" />,
@@ -169,6 +189,8 @@ function SettingsContent() {
   const displayItems = (["display", "region"] as Tab[]).map(byId);
   const notificationsItem = byId("notifications");
   const securityItems = (["security"] as Tab[]).map(byId);
+  const workspaceItems = isSA ? (["assets"] as Tab[]).map(byId) : [];
+  const adminItems = isSA ? (["admin"] as Tab[]).map(byId) : [];
   const aboutItems = (["about"] as Tab[]).map(byId);
 
   return (
@@ -239,6 +261,16 @@ function SettingsContent() {
 
             {/* Security */}
             <MasterGroup label="Security" items={securityItems} activeTab={tab} mobileDetail={mobileDetail} onOpen={openSection} />
+
+            {/* Workspace (super-admin) */}
+            {workspaceItems.length > 0 && (
+              <MasterGroup label="Workspace" items={workspaceItems} activeTab={tab} mobileDetail={mobileDetail} onOpen={openSection} />
+            )}
+
+            {/* Admin (super-admin) */}
+            {adminItems.length > 0 && (
+              <MasterGroup label="Admin" items={adminItems} activeTab={tab} mobileDetail={mobileDetail} onOpen={openSection} />
+            )}
 
             {/* About */}
             <MasterGroup label="About" items={aboutItems} activeTab={tab} mobileDetail={mobileDetail} onOpen={openSection} />
