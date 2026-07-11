@@ -46,6 +46,7 @@ import RegionTab from "@/components/settings/tabs/RegionTab";
 import AboutTab from "@/components/settings/tabs/AboutTab";
 import NotificationsTab from "@/components/settings/tabs/NotificationsTab";
 import LoginHistoryTab from "@/components/settings/tabs/LoginHistoryTab";
+import PrivacyTab from "@/components/settings/tabs/PrivacyTab";
 import StampSignatureTab from "@/components/settings/tabs/StampSignatureTab";
 import AdminTab from "@/components/settings/tabs/AdminTab";
 import PaletteIcon from "@/components/icons/ui/PaletteIcon";
@@ -57,7 +58,7 @@ import ShieldIcon from "@/components/icons/ui/ShieldIcon";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import type { AccountWithLinks } from "@/types/supabase";
 
-type Tab = "profile" | "preferences" | "calendar" | "display" | "region" | "notifications" | "security" | "assets" | "admin" | "about";
+type Tab = "profile" | "preferences" | "calendar" | "display" | "region" | "notifications" | "security" | "privacy" | "assets" | "admin" | "about";
 
 type SectionDef = {
   id: Tab; label: string; subtitle: string;
@@ -164,6 +165,11 @@ function SettingsContent() {
       icon: <LockIcon className="h-3.5 w-3.5" />,
       node: <LoginHistoryTab account={account} />,
     },
+    {
+      id: "privacy", label: "Privacy & data", subtitle: "Download your data",
+      icon: <ShieldIcon className="h-3.5 w-3.5" />,
+      node: <PrivacyTab account={account} />,
+    },
     /* Super-admin-only sections. */
     ...(isSA ? [
       {
@@ -188,7 +194,7 @@ function SettingsContent() {
   const personalItems = (["profile", "preferences", "calendar"] as Tab[]).map(byId);
   const displayItems = (["display", "region"] as Tab[]).map(byId);
   const notificationsItem = byId("notifications");
-  const securityItems = (["security"] as Tab[]).map(byId);
+  const securityItems = (["security", "privacy"] as Tab[]).map(byId);
   const workspaceItems = isSA ? (["assets"] as Tab[]).map(byId) : [];
   const adminItems = isSA ? (["admin"] as Tab[]).map(byId) : [];
   const aboutItems = (["about"] as Tab[]).map(byId);
