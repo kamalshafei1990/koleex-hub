@@ -47,6 +47,8 @@ import AboutTab from "@/components/settings/tabs/AboutTab";
 import NotificationsTab from "@/components/settings/tabs/NotificationsTab";
 import LoginHistoryTab from "@/components/settings/tabs/LoginHistoryTab";
 import PrivacyTab from "@/components/settings/tabs/PrivacyTab";
+import PasswordTab from "@/components/settings/tabs/PasswordTab";
+import KeyIcon from "@/components/icons/ui/KeyIcon";
 import StampSignatureTab from "@/components/settings/tabs/StampSignatureTab";
 import AdminTab from "@/components/settings/tabs/AdminTab";
 import PaletteIcon from "@/components/icons/ui/PaletteIcon";
@@ -58,7 +60,7 @@ import ShieldIcon from "@/components/icons/ui/ShieldIcon";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import type { AccountWithLinks } from "@/types/supabase";
 
-type Tab = "profile" | "preferences" | "calendar" | "display" | "region" | "notifications" | "security" | "privacy" | "assets" | "admin" | "about";
+type Tab = "profile" | "preferences" | "calendar" | "display" | "region" | "notifications" | "password" | "security" | "privacy" | "assets" | "admin" | "about";
 
 type SectionDef = {
   id: Tab; label: string; subtitle: string;
@@ -161,6 +163,11 @@ function SettingsContent() {
       node: <NotificationsTab account={account} onChanged={onChanged} />,
     },
     {
+      id: "password", label: "Password", subtitle: "Change your password",
+      icon: <KeyIcon className="h-3.5 w-3.5" />,
+      node: <PasswordTab account={account} />,
+    },
+    {
       id: "security", label: "Login history", subtitle: "Recent sign-ins",
       icon: <LockIcon className="h-3.5 w-3.5" />,
       node: <LoginHistoryTab account={account} />,
@@ -194,7 +201,7 @@ function SettingsContent() {
   const personalItems = (["profile", "preferences", "calendar"] as Tab[]).map(byId);
   const displayItems = (["display", "region"] as Tab[]).map(byId);
   const notificationsItem = byId("notifications");
-  const securityItems = (["security", "privacy"] as Tab[]).map(byId);
+  const securityItems = (["password", "security", "privacy"] as Tab[]).map(byId);
   const workspaceItems = isSA ? (["assets"] as Tab[]).map(byId) : [];
   const adminItems = isSA ? (["admin"] as Tab[]).map(byId) : [];
   const aboutItems = (["about"] as Tab[]).map(byId);
