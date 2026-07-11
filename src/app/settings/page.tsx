@@ -26,7 +26,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import AuthGate from "@/components/admin/AuthGate";
-import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import PageHeader from "@/components/ui/PageHeader";
 import SettingsIcon from "@/components/icons/SettingsIcon";
 import UserIcon from "@/components/icons/ui/UserIcon";
 import CameraIcon from "@/components/icons/ui/CameraIcon";
@@ -130,40 +130,15 @@ function SettingsContent() {
   const active = sections.find((s) => s.id === tab) ?? sections[0];
 
   return (
-    <div
-      className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
-      style={{ height: "calc(100dvh - 3.5rem)" }}
-    >
-      {/* Header — title on the list, section name + back chevron once pushed (mobile). */}
-      <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] z-10 w-full">
-        <div className="max-w-[1100px] mx-auto px-4 md:px-6 h-14 flex items-center gap-2.5">
-          {mobileDetail ? (
-            <button
-              type="button"
-              onClick={() => setMobileDetail(false)}
-              className="md:hidden h-8 -ml-1 pr-1 inline-flex items-center gap-1 text-[13px] font-medium text-[var(--accent-blue,#0066FF)]"
-            >
-              <Chevron className="rotate-180" /> Settings
-            </button>
-          ) : (
-            <Link
-              href="/"
-              className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
-            >
-              <ArrowLeftIcon className="h-4 w-4" />
-            </Link>
-          )}
-          <div className="flex items-center gap-2 min-w-0">
-            {!mobileDetail && (
-              <span className="hidden md:flex h-7 w-7 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] items-center justify-center text-[var(--text-dim)] shrink-0">
-                <SettingsIcon className="h-3.5 w-3.5" />
-              </span>
-            )}
-            <h1 className="text-[17px] md:text-[19px] font-bold tracking-tight truncate">
-              {mobileDetail ? active.label : "Settings"}
-            </h1>
-          </div>
-        </div>
+    <div className="h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full max-w-[100vw]">
+      {/* Canonical Koleex app header — identical to every other app. */}
+      <div className="shrink-0 px-4 sm:px-5 pt-4 sm:pt-5">
+        <PageHeader
+          title="Settings"
+          subtitle="Your profile, preferences, and calendar defaults"
+          icon={<SettingsIcon className="h-5 w-5" />}
+          backHref="/"
+        />
       </div>
 
       {/* Body */}
@@ -171,7 +146,7 @@ function SettingsContent() {
         <div className="mx-auto max-w-[1100px] h-full px-4 md:px-6 py-5 md:grid md:grid-cols-[300px_minmax(0,1fr)] md:gap-7">
 
           {/* Master list — sidebar on iPad, full screen on iPhone. */}
-          <aside className={`${mobileDetail ? "hidden" : "block"} md:block h-full md:overflow-y-auto no-scrollbar space-y-4`}>
+          <aside className={`${mobileDetail ? "hidden" : "block"} md:block h-full overflow-y-auto no-scrollbar space-y-4`}>
             {/* Account card (Apple-ID style) */}
             <button
               type="button"
@@ -227,7 +202,15 @@ function SettingsContent() {
           </aside>
 
           {/* Detail pane */}
-          <main className={`${mobileDetail ? "block" : "hidden"} md:block h-full md:overflow-y-auto no-scrollbar`}>
+          <main className={`${mobileDetail ? "block" : "hidden"} md:block h-full overflow-y-auto no-scrollbar`}>
+            {/* Mobile-only back to the settings list (iOS push nav). */}
+            <button
+              type="button"
+              onClick={() => setMobileDetail(false)}
+              className="md:hidden mb-3 -ml-1 inline-flex items-center gap-1 text-[13px] font-medium text-[var(--accent-blue,#0066FF)]"
+            >
+              <Chevron className="rotate-180" /> All settings
+            </button>
             <div className="max-w-[720px] pb-8">
               {active.node}
             </div>
