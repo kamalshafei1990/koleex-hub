@@ -44,12 +44,15 @@ import CalendarTab from "@/components/admin/accounts/tabs/CalendarTab";
 import DisplayTab from "@/components/settings/tabs/DisplayTab";
 import RegionTab from "@/components/settings/tabs/RegionTab";
 import AboutTab from "@/components/settings/tabs/AboutTab";
+import NotificationsTab from "@/components/settings/tabs/NotificationsTab";
+import LoginHistoryTab from "@/components/settings/tabs/LoginHistoryTab";
 import PaletteIcon from "@/components/icons/ui/PaletteIcon";
 import GlobeIcon from "@/components/icons/ui/GlobeIcon";
 import InfoIcon from "@/components/icons/ui/InfoIcon";
+import LockIcon from "@/components/icons/ui/LockIcon";
 import type { AccountWithLinks } from "@/types/supabase";
 
-type Tab = "profile" | "preferences" | "calendar" | "display" | "region" | "about";
+type Tab = "profile" | "preferences" | "calendar" | "display" | "region" | "notifications" | "security" | "about";
 
 type SectionDef = {
   id: Tab; label: string; subtitle: string;
@@ -145,6 +148,16 @@ function SettingsContent() {
       node: <RegionTab account={account} onChanged={onChanged} />,
     },
     {
+      id: "notifications", label: "Notification preferences", subtitle: "Channels and per-activity",
+      icon: <BellIcon className="h-3.5 w-3.5" />,
+      node: <NotificationsTab account={account} onChanged={onChanged} />,
+    },
+    {
+      id: "security", label: "Login history", subtitle: "Recent sign-ins",
+      icon: <LockIcon className="h-3.5 w-3.5" />,
+      node: <LoginHistoryTab account={account} />,
+    },
+    {
       id: "about", label: "About", subtitle: "Version, device, support",
       icon: <InfoIcon className="h-3.5 w-3.5" />,
       node: <AboutTab account={account} />,
@@ -154,6 +167,8 @@ function SettingsContent() {
   const byId = (id: Tab) => sections.find((s) => s.id === id)!;
   const personalItems = (["profile", "preferences", "calendar"] as Tab[]).map(byId);
   const displayItems = (["display", "region"] as Tab[]).map(byId);
+  const notificationsItem = byId("notifications");
+  const securityItems = (["security"] as Tab[]).map(byId);
   const aboutItems = (["about"] as Tab[]).map(byId);
 
   return (
@@ -201,10 +216,17 @@ function SettingsContent() {
             {/* Display */}
             <MasterGroup label="Display" items={displayItems} activeTab={tab} mobileDetail={mobileDetail} onOpen={openSection} />
 
-            {/* Notifications — links to the existing push page. */}
+            {/* Notifications — preferences (in-pane) + link to the push page. */}
             <div>
               <p className="text-[11px] text-[var(--text-faint)] uppercase tracking-wider px-3 mb-1.5">Notifications</p>
               <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] overflow-hidden">
+                <SettingsRow
+                  active={!mobileDetail && tab === "notifications"}
+                  onClick={() => openSection("notifications")}
+                  icon={notificationsItem.icon}
+                  label={notificationsItem.label}
+                  subtitle={notificationsItem.subtitle}
+                />
                 <SettingsRow
                   href="/settings/notifications"
                   icon={<BellIcon className="h-3.5 w-3.5" />}
@@ -214,6 +236,9 @@ function SettingsContent() {
                 />
               </div>
             </div>
+
+            {/* Security */}
+            <MasterGroup label="Security" items={securityItems} activeTab={tab} mobileDetail={mobileDetail} onOpen={openSection} />
 
             {/* About */}
             <MasterGroup label="About" items={aboutItems} activeTab={tab} mobileDetail={mobileDetail} onOpen={openSection} />
