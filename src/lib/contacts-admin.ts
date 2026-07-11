@@ -9,6 +9,10 @@ import type { ScopeContext } from "./scope";
 
 export interface ContactRow {
   id: string;
+  /** Identity consolidation P2: optional link to the shared people record.
+   *  When set, name/contact can read through people; NULL = standalone
+   *  legacy contact (default, unchanged behaviour). */
+  person_id?: string | null;
   contact_type: string;
   entity_type: string | null;
   photo_url: string | null;
