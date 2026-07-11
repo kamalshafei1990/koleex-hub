@@ -11,12 +11,21 @@
 -- Prereqs before running:
 --   1. Duplicate contacts have been reviewed and linked to their person via
 --      POST /api/contacts/[id]/link-person (see GET /api/contacts/link-candidates).
+--      (2026-07-12: link-candidates returns 0 — nothing to dedupe.)
 --   2. You have confirmed no code still reads koleex_employees.private_address_*.
+--      ⚠️ 2026-07-12: NOT YET TRUE. These columns are still actively read AND
+--      written by the Accounts app HR editor (components/admin/accounts/tabs/
+--      PrivateTab.tsx) and shown on employees/[id]. Dropping now WOULD BREAK the
+--      HR private-address editor. First rewire PrivateTab + employees/[id] +
+--      employees/new to read/write people.address_*, then drop. The row DATA is
+--      already safe on people (see identity_p1b_backfill...), so no data is at
+--      risk — this is purely a code-rewire prerequisite.
 --   3. You have a backup / are on a branch.
 -- ----------------------------------------------------------------------------
 
--- (A) Drop the retired employee private-address columns (Phase 1 finished the
---     rewire; these have been empty and unused since). IRREVERSIBLE.
+-- (A) Drop the retired employee private-address columns. IRREVERSIBLE.
+--     BLOCKED until PrivateTab.tsx (+ employees/[id], employees/new) stop
+--     reading/writing these columns (see prereq 2).
 -- ALTER TABLE public.koleex_employees
 --   DROP COLUMN IF EXISTS private_address_line1,
 --   DROP COLUMN IF EXISTS private_address_line2,
