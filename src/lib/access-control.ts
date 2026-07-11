@@ -303,6 +303,21 @@ export interface CalendarPrefs {
   out_of_office?: OutOfOfficePrefs;
 }
 
+/** Optional professional / social links surfaced on the Settings → Profile
+ *  card. Stored in the preferences JSON bag — no dedicated columns. */
+export interface ProfileLinks {
+  linkedin?: string;
+  website?: string;
+  wechat?: string;
+  whatsapp?: string;
+}
+
+/** Personal profile extras that don't have a `people` column of their own. */
+export interface ProfilePrefs {
+  pronouns?: string;
+  links?: ProfileLinks;
+}
+
 export interface AccountPreferences {
   language?: LanguagePref;
   theme?: ThemePref;
@@ -310,6 +325,7 @@ export interface AccountPreferences {
   email_signature?: string;
   notifications?: NotificationPrefs;
   calendar?: CalendarPrefs;
+  profile?: ProfilePrefs;
 }
 
 /**
@@ -323,6 +339,7 @@ export const DEFAULT_PREFERENCES: Required<
   language: "en",
   theme: "system",
   email_signature: "",
+  profile: { pronouns: "", links: {} },
   notifications: {
     email: true,
     in_app: true,
@@ -365,6 +382,15 @@ export function withDefaults(
     language: p.language ?? DEFAULT_PREFERENCES.language,
     theme:    p.theme    ?? DEFAULT_PREFERENCES.theme,
     email_signature: p.email_signature ?? DEFAULT_PREFERENCES.email_signature,
+    profile: {
+      pronouns: p.profile?.pronouns ?? DEFAULT_PREFERENCES.profile.pronouns,
+      links: {
+        linkedin: p.profile?.links?.linkedin ?? "",
+        website:  p.profile?.links?.website  ?? "",
+        wechat:   p.profile?.links?.wechat   ?? "",
+        whatsapp: p.profile?.links?.whatsapp ?? "",
+      },
+    },
     notifications: {
       email:  p.notifications?.email  ?? DEFAULT_PREFERENCES.notifications.email,
       in_app: p.notifications?.in_app ?? DEFAULT_PREFERENCES.notifications.in_app,

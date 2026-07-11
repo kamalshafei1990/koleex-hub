@@ -23,22 +23,17 @@
    "editingSelf OR super_admin", so there's no new privilege surface.
    --------------------------------------------------------------------------- */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import AuthGate from "@/components/admin/AuthGate";
 import PageHeader from "@/components/ui/PageHeader";
 import SettingsIcon from "@/components/icons/SettingsIcon";
 import UserIcon from "@/components/icons/ui/UserIcon";
-import CameraIcon from "@/components/icons/ui/CameraIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
-import CheckIcon from "@/components/icons/ui/CheckIcon";
-import PhoneIcon from "@/components/icons/ui/PhoneIcon";
-import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
 import Settings2Icon from "@/components/icons/ui/Settings2Icon";
 import CalendarIcon from "@/components/icons/ui/CalendarRawIcon";
 import BellIcon from "@/components/icons/ui/BellIcon";
 import { useCurrentAccount, notifyIdentityChanged } from "@/lib/identity";
-import { updateAccountAvatar } from "@/lib/accounts-admin";
 import PreferencesTab from "@/components/admin/accounts/tabs/PreferencesTab";
 import CalendarTab from "@/components/admin/accounts/tabs/CalendarTab";
 import DisplayTab from "@/components/settings/tabs/DisplayTab";
@@ -48,6 +43,7 @@ import NotificationsTab from "@/components/settings/tabs/NotificationsTab";
 import LoginHistoryTab from "@/components/settings/tabs/LoginHistoryTab";
 import PrivacyTab from "@/components/settings/tabs/PrivacyTab";
 import PasswordTab from "@/components/settings/tabs/PasswordTab";
+import ProfileTab from "@/components/settings/tabs/ProfileTab";
 import KeyIcon from "@/components/icons/ui/KeyIcon";
 import StampSignatureTab from "@/components/settings/tabs/StampSignatureTab";
 import AdminTab from "@/components/settings/tabs/AdminTab";
@@ -135,7 +131,7 @@ function SettingsContent() {
     {
       id: "profile", label: "Profile", subtitle: "Photo, name, contact",
       icon: <UserIcon size={15} />,
-      node: <ProfileSection account={account} onChanged={onChanged} />,
+      node: <ProfileTab account={account} onChanged={onChanged} />,
     },
     {
       id: "preferences", label: "Preferences", subtitle: "Language, theme, notifications",
@@ -385,265 +381,3 @@ function SettingsRow({
   );
 }
 
-/* ─────────────── Profile section ─────────────── */
-
-function ProfileSection({
-  account, onChanged,
-}: {
-  account: AccountWithLinks;
-  onChanged: () => void;
-}) {
-  /* Everything here writes to the caller's own records through
-     routes that enforce editingSelf-OR-super_admin. */
-  const person = account.person;
-  const [displayName, setDisplayName] = useState(person?.full_name ?? "");
-  const [phone, setPhone] = useState(person?.phone ?? "");
-  const [email, setEmail] = useState(person?.email ?? "");
-  const [saving, setSaving] = useState(false);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    setDisplayName(person?.full_name ?? "");
-    setPhone(person?.phone ?? "");
-    setEmail(person?.email ?? "");
-  }, [person]);
-
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3000);
-    return () => clearTimeout(t);
-  }, [toast]);
-
-  const avatarUrl = account.avatar_url || person?.avatar_url || null;
-  const initials = useMemo(() => {
-    const name = person?.full_name || account.username || "";
-    return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
-  }, [person?.full_name, account.username]);
-
-  const dirty =
-    displayName !== (person?.full_name ?? "") ||
-    phone !== (person?.phone ?? "") ||
-    email !== (person?.email ?? "");
-
-  async function save() {
-    if (!person?.id) return;
-    setSaving(true); setError(null);
-    try {
-      const res = await fetch(`/api/people/${person.id}`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          full_name: displayName.trim() || null,
-          phone: phone.trim() || null,
-          email: email.trim() || null,
-        }),
-      });
-      if (!res.ok) {
-        const json = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(json.error || `Save failed (${res.status})`);
-        return;
-      }
-      setToast("Profile updated");
-      onChanged();
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handlePhoto(file: File) {
-    if (!file.type.startsWith("image/")) {
-      setError("Please choose an image file.");
-      return;
-    }
-    if (file.size > 8 * 1024 * 1024) {
-      setError("Image too large — max 8 MB.");
-      return;
-    }
-    setUploadingAvatar(true); setError(null);
-    try {
-      const dataUrl = await resizeToDataUrl(file);
-      const ok = await updateAccountAvatar(account.id, dataUrl);
-      if (!ok) {
-        setError("Couldn't save the photo. Please try again.");
-        return;
-      }
-      setToast("Photo updated");
-      onChanged();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Photo upload failed");
-    } finally {
-      setUploadingAvatar(false);
-      if (fileRef.current) fileRef.current.value = "";
-    }
-  }
-
-  async function removePhoto() {
-    setUploadingAvatar(true);
-    const ok = await updateAccountAvatar(account.id, null);
-    setUploadingAvatar(false);
-    if (!ok) { setError("Couldn't remove the photo."); return; }
-    setToast("Photo removed");
-    onChanged();
-  }
-
-  return (
-    <section className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6">
-      <h2 className="text-[14px] font-bold text-[var(--text-primary)] mb-1">Profile</h2>
-      <p className="text-[12px] text-[var(--text-dim)] mb-5">
-        How you appear across the hub.
-      </p>
-
-      {/* Avatar */}
-      <div className="flex items-center gap-4 mb-6">
-        <button
-          type="button"
-          onClick={() => fileRef.current?.click()}
-          disabled={uploadingAvatar}
-          className="group relative h-20 w-20 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center overflow-hidden hover:border-[var(--border-focus)] transition-colors disabled:opacity-60"
-          title="Change photo"
-        >
-          {avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <span className="text-[22px] font-semibold text-[var(--text-dim)]">{initials || "·"}</span>
-          )}
-          {uploadingAvatar ? (
-            <span className="absolute inset-0 bg-black/60 flex items-center justify-center">
-              <SpinnerIcon className="h-5 w-5 text-white animate-spin" />
-            </span>
-          ) : (
-            <span className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-              <CameraIcon size={18} className="text-white" />
-            </span>
-          )}
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void handlePhoto(f);
-            }}
-          />
-        </button>
-        <div>
-          <p className="text-[13px] text-[var(--text-primary)] font-medium">Profile photo</p>
-          <p className="text-[11px] text-[var(--text-dim)] mt-0.5">PNG, JPG, or WebP. Square works best.</p>
-          {avatarUrl && (
-            <button
-              type="button"
-              onClick={removePhoto}
-              disabled={uploadingAvatar}
-              className="mt-2 text-[11px] text-red-400 hover:text-red-300"
-            >
-              Remove photo
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Fields */}
-      <div className="space-y-4">
-        <Field
-          label="Display name"
-          icon={<UserIcon size={14} />}
-          value={displayName}
-          onChange={setDisplayName}
-          placeholder="Your name as shown across the hub"
-        />
-        <Field
-          label="Personal phone"
-          icon={<PhoneIcon size={14} />}
-          value={phone}
-          onChange={setPhone}
-          type="tel"
-          placeholder="+1 234 567 890"
-        />
-        <Field
-          label="Personal email"
-          icon={<EnvelopeIcon size={14} />}
-          value={email}
-          onChange={setEmail}
-          type="email"
-          placeholder="your-personal@example.com"
-        />
-        <p className="text-[11px] text-[var(--text-faint)]">
-          Username, login email, password, role, and HR data are managed by your administrator.
-        </p>
-      </div>
-
-      {/* Status + save */}
-      <div className="mt-5 pt-4 border-t border-[var(--border-faint)] flex items-center justify-end gap-3">
-        {error && <span className="text-[12px] text-red-400 flex-1">{error}</span>}
-        {toast && !error && <span className="text-[12px] text-emerald-400 flex-1 flex items-center gap-1.5"><CheckIcon size={12} />{toast}</span>}
-        <button
-          type="button"
-          onClick={save}
-          disabled={!dirty || saving}
-          className="h-10 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
-        >
-          {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <CheckIcon size={14} />}
-          {saving ? "Saving…" : "Save changes"}
-        </button>
-      </div>
-    </section>
-  );
-}
-
-function Field({
-  label, icon, value, onChange, placeholder, type = "text",
-}: {
-  label: string; icon: React.ReactNode;
-  value: string; onChange: (v: string) => void;
-  placeholder?: string; type?: string;
-}) {
-  return (
-    <div>
-      <label className="block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5">
-        <span className="inline-flex items-center gap-1.5">{icon} {label}</span>
-      </label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full h-10 px-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--border-focus)] transition-colors"
-      />
-    </div>
-  );
-}
-
-/* Image resize — same crop-to-square logic AccountDetail uses so
-   avatars stay under ~30 KB as data URLs. The sync triggers mirror
-   the value into people.avatar_url so every avatar surface picks
-   it up. */
-function resizeToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Failed to read file"));
-    reader.onload = () => {
-      const img = new Image();
-      img.onerror = () => reject(new Error("Failed to decode image"));
-      img.onload = () => {
-        const size = 256;
-        const canvas = document.createElement("canvas");
-        canvas.width = size; canvas.height = size;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) { reject(new Error("Canvas not available")); return; }
-        const sourceSide = Math.min(img.naturalWidth, img.naturalHeight);
-        const sx = (img.naturalWidth - sourceSide) / 2;
-        const sy = (img.naturalHeight - sourceSide) / 2;
-        ctx.drawImage(img, sx, sy, sourceSide, sourceSide, 0, 0, size, size);
-        resolve(canvas.toDataURL("image/jpeg", 0.85));
-      };
-      img.src = reader.result as string;
-    };
-    reader.readAsDataURL(file);
-  });
-}
