@@ -41,9 +41,20 @@ import { useCurrentAccount, notifyIdentityChanged } from "@/lib/identity";
 import { updateAccountAvatar } from "@/lib/accounts-admin";
 import PreferencesTab from "@/components/admin/accounts/tabs/PreferencesTab";
 import CalendarTab from "@/components/admin/accounts/tabs/CalendarTab";
+import DisplayTab from "@/components/settings/tabs/DisplayTab";
+import RegionTab from "@/components/settings/tabs/RegionTab";
+import AboutTab from "@/components/settings/tabs/AboutTab";
+import PaletteIcon from "@/components/icons/ui/PaletteIcon";
+import GlobeIcon from "@/components/icons/ui/GlobeIcon";
+import InfoIcon from "@/components/icons/ui/InfoIcon";
 import type { AccountWithLinks } from "@/types/supabase";
 
-type Tab = "profile" | "preferences" | "calendar";
+type Tab = "profile" | "preferences" | "calendar" | "display" | "region" | "about";
+
+type SectionDef = {
+  id: Tab; label: string; subtitle: string;
+  icon: React.ReactNode; node: React.ReactNode;
+};
 
 export default function SettingsPage() {
   return (
@@ -107,10 +118,7 @@ function SettingsContent() {
     .split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
   const roleLine = account.role?.name || capitalize(account.user_type);
 
-  const sections: {
-    id: Tab; label: string; subtitle: string;
-    icon: React.ReactNode; node: React.ReactNode;
-  }[] = [
+  const sections: SectionDef[] = [
     {
       id: "profile", label: "Profile", subtitle: "Photo, name, contact",
       icon: <UserIcon size={15} />,
@@ -126,8 +134,27 @@ function SettingsContent() {
       icon: <CalendarIcon className="h-3.5 w-3.5" />,
       node: <CalendarTab account={account} onChanged={onChanged} />,
     },
+    {
+      id: "display", label: "Display & accessibility", subtitle: "Text size, motion, contrast",
+      icon: <PaletteIcon className="h-3.5 w-3.5" />,
+      node: <DisplayTab account={account} onChanged={onChanged} />,
+    },
+    {
+      id: "region", label: "Language & region", subtitle: "Date, time, number formats",
+      icon: <GlobeIcon className="h-3.5 w-3.5" />,
+      node: <RegionTab account={account} onChanged={onChanged} />,
+    },
+    {
+      id: "about", label: "About", subtitle: "Version, device, support",
+      icon: <InfoIcon className="h-3.5 w-3.5" />,
+      node: <AboutTab account={account} />,
+    },
   ];
   const active = sections.find((s) => s.id === tab) ?? sections[0];
+  const byId = (id: Tab) => sections.find((s) => s.id === id)!;
+  const personalItems = (["profile", "preferences", "calendar"] as Tab[]).map(byId);
+  const displayItems = (["display", "region"] as Tab[]).map(byId);
+  const aboutItems = (["about"] as Tab[]).map(byId);
 
   return (
     <div className="h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full max-w-[100vw]">
@@ -168,25 +195,13 @@ function SettingsContent() {
               <Chevron className="text-[var(--text-faint)] shrink-0" />
             </button>
 
-            {/* Personal group */}
-            <div>
-              <p className="text-[11px] text-[var(--text-faint)] uppercase tracking-wider px-3 mb-1.5">Personal</p>
-              <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] overflow-hidden">
-                {sections.map((s, i) => (
-                  <SettingsRow
-                    key={s.id}
-                    active={!mobileDetail && tab === s.id}
-                    onClick={() => openSection(s.id)}
-                    icon={s.icon}
-                    label={s.label}
-                    subtitle={s.subtitle}
-                    isLast={i === sections.length - 1}
-                  />
-                ))}
-              </div>
-            </div>
+            {/* Personal */}
+            <MasterGroup label="Personal" items={personalItems} activeTab={tab} mobileDetail={mobileDetail} onOpen={openSection} />
 
-            {/* Notifications group — links to the existing push page. */}
+            {/* Display */}
+            <MasterGroup label="Display" items={displayItems} activeTab={tab} mobileDetail={mobileDetail} onOpen={openSection} />
+
+            {/* Notifications — links to the existing push page. */}
             <div>
               <p className="text-[11px] text-[var(--text-faint)] uppercase tracking-wider px-3 mb-1.5">Notifications</p>
               <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] overflow-hidden">
@@ -199,6 +214,9 @@ function SettingsContent() {
                 />
               </div>
             </div>
+
+            {/* About */}
+            <MasterGroup label="About" items={aboutItems} activeTab={tab} mobileDetail={mobileDetail} onOpen={openSection} />
           </aside>
 
           {/* Detail pane */}
@@ -216,6 +234,34 @@ function SettingsContent() {
             </div>
           </main>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────── Grouped master-list block ─────────────── */
+
+function MasterGroup({
+  label, items, activeTab, mobileDetail, onOpen,
+}: {
+  label: string; items: SectionDef[]; activeTab: Tab;
+  mobileDetail: boolean; onOpen: (t: Tab) => void;
+}) {
+  return (
+    <div>
+      <p className="text-[11px] text-[var(--text-faint)] uppercase tracking-wider px-3 mb-1.5">{label}</p>
+      <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] overflow-hidden">
+        {items.map((s, i) => (
+          <SettingsRow
+            key={s.id}
+            active={!mobileDetail && activeTab === s.id}
+            onClick={() => onOpen(s.id)}
+            icon={s.icon}
+            label={s.label}
+            subtitle={s.subtitle}
+            isLast={i === items.length - 1}
+          />
+        ))}
       </div>
     </div>
   );

@@ -711,3 +711,51 @@ input[type="number"]:not(.kx-spinner) {
   border-color: rgba(10, 138, 74, 0.85) !important;
   box-shadow: 0 0 0 1px rgba(10, 138, 74, 0.45) !important;
 }
+
+
+/* ===========================================================================
+   User display preferences — applied to <html> by DisplayPreferencesApplier
+   (src/lib/display-prefs.tsx). Each block is opt-in via a root class/var so
+   defaults are untouched.
+   =========================================================================== */
+
+/* Text size — scales rem-based text. --kx-font-scale defaults to 1.
+   Applied on :root so all rem units (Tailwind text-sm/base/lg, prose, inputs)
+   scale together. !important guards against Tailwind preflight. */
+:root { --kx-font-scale: 1; }
+html { font-size: calc(16px * var(--kx-font-scale, 1)) !important; }
+
+/* Reduce motion — neutralize transitions/animations app-wide. */
+.kx-reduce-motion *,
+.kx-reduce-motion *::before,
+.kx-reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Reduce transparency — kill blur/translucency for legibility. */
+.kx-reduce-transparency *,
+.kx-reduce-transparency *::before,
+.kx-reduce-transparency *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* High contrast — strengthen borders + secondary text in both themes.
+   Selector doubles the class+attribute so it beats the base [data-theme] vars. */
+.kx-high-contrast[data-theme="dark"] {
+  --border-subtle: #5a5a5a;
+  --border-faint: #4a4a4a;
+  --border-color: #6a6a6a;
+  --text-dim: #cfcfcf;
+  --text-faint: #a8a8a8;
+}
+.kx-high-contrast[data-theme="light"] {
+  --border-subtle: #8a8a8a;
+  --border-faint: #9a9a9a;
+  --border-color: #6a6a6a;
+  --text-dim: #333333;
+  --text-faint: #555555;
+}

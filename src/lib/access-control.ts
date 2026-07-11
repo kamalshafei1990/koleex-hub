@@ -237,6 +237,46 @@ export type NotificationChannel = "email" | "in_app" | "both";
 export interface NotificationPrefs {
   email: boolean;
   in_app: boolean;
+  /* ── Per-activity toggles (optional; default on) ──
+     Let a user silence specific event types without turning off a whole
+     channel. Consumed by the notification dispatcher when present. */
+  mentions?: boolean;
+  approvals?: boolean;
+  assignments?: boolean;
+  tasks_due?: boolean;
+  quotation_activity?: boolean;
+  low_stock?: boolean;
+  qa_reports?: boolean;
+  price_fx?: boolean;
+}
+
+/* ── Display / appearance / region preferences ──
+   All persisted inside accounts.preferences (jsonb) — no migration. The
+   visual ones (theme, text size, reduce motion, high contrast, reduce
+   transparency) are applied to <html> by DisplayPreferencesApplier; the
+   format ones are consumed by src/lib/format-prefs.ts. */
+export type TextSizePref = "small" | "default" | "large" | "xlarge";
+export type DensityPref = "comfortable" | "compact";
+export type DateFormatPref = "dmy" | "mdy" | "iso";
+export type TimeFormatPref = "12h" | "24h";
+export type NumberFormatPref = "comma_dot" | "dot_comma" | "space_comma";
+export type UnitsPref = "metric" | "imperial";
+export type CurrencyDisplayPref = "symbol" | "code";
+/** 0 = Sunday, 1 = Monday, 6 = Saturday. */
+export type WeekStartPref = 0 | 1 | 6;
+
+export interface DisplayPrefs {
+  text_size: TextSizePref;
+  density: DensityPref;
+  reduce_motion: boolean;
+  high_contrast: boolean;
+  reduce_transparency: boolean;
+  date_format: DateFormatPref;
+  time_format: TimeFormatPref;
+  number_format: NumberFormatPref;
+  units: UnitsPref;
+  currency_display: CurrencyDisplayPref;
+  week_start: WeekStartPref;
 }
 
 export interface WorkingHoursPrefs {
@@ -266,6 +306,7 @@ export interface CalendarPrefs {
 export interface AccountPreferences {
   language?: LanguagePref;
   theme?: ThemePref;
+  display?: DisplayPrefs;
   email_signature?: string;
   notifications?: NotificationPrefs;
   calendar?: CalendarPrefs;
@@ -282,7 +323,31 @@ export const DEFAULT_PREFERENCES: Required<
   language: "en",
   theme: "system",
   email_signature: "",
-  notifications: { email: true, in_app: true },
+  notifications: {
+    email: true,
+    in_app: true,
+    mentions: true,
+    approvals: true,
+    assignments: true,
+    tasks_due: true,
+    quotation_activity: true,
+    low_stock: true,
+    qa_reports: true,
+    price_fx: true,
+  },
+  display: {
+    text_size: "default",
+    density: "comfortable",
+    reduce_motion: false,
+    high_contrast: false,
+    reduce_transparency: false,
+    date_format: "dmy",
+    time_format: "24h",
+    number_format: "comma_dot",
+    units: "metric",
+    currency_display: "symbol",
+    week_start: 1,
+  },
   calendar: {
     timezone: "Asia/Dubai",
     working_hours: { start: "09:00", end: "18:00", days: [1, 2, 3, 4, 5] },
@@ -303,6 +368,27 @@ export function withDefaults(
     notifications: {
       email:  p.notifications?.email  ?? DEFAULT_PREFERENCES.notifications.email,
       in_app: p.notifications?.in_app ?? DEFAULT_PREFERENCES.notifications.in_app,
+      mentions: p.notifications?.mentions ?? DEFAULT_PREFERENCES.notifications.mentions,
+      approvals: p.notifications?.approvals ?? DEFAULT_PREFERENCES.notifications.approvals,
+      assignments: p.notifications?.assignments ?? DEFAULT_PREFERENCES.notifications.assignments,
+      tasks_due: p.notifications?.tasks_due ?? DEFAULT_PREFERENCES.notifications.tasks_due,
+      quotation_activity: p.notifications?.quotation_activity ?? DEFAULT_PREFERENCES.notifications.quotation_activity,
+      low_stock: p.notifications?.low_stock ?? DEFAULT_PREFERENCES.notifications.low_stock,
+      qa_reports: p.notifications?.qa_reports ?? DEFAULT_PREFERENCES.notifications.qa_reports,
+      price_fx: p.notifications?.price_fx ?? DEFAULT_PREFERENCES.notifications.price_fx,
+    },
+    display: {
+      text_size: p.display?.text_size ?? DEFAULT_PREFERENCES.display.text_size,
+      density: p.display?.density ?? DEFAULT_PREFERENCES.display.density,
+      reduce_motion: p.display?.reduce_motion ?? DEFAULT_PREFERENCES.display.reduce_motion,
+      high_contrast: p.display?.high_contrast ?? DEFAULT_PREFERENCES.display.high_contrast,
+      reduce_transparency: p.display?.reduce_transparency ?? DEFAULT_PREFERENCES.display.reduce_transparency,
+      date_format: p.display?.date_format ?? DEFAULT_PREFERENCES.display.date_format,
+      time_format: p.display?.time_format ?? DEFAULT_PREFERENCES.display.time_format,
+      number_format: p.display?.number_format ?? DEFAULT_PREFERENCES.display.number_format,
+      units: p.display?.units ?? DEFAULT_PREFERENCES.display.units,
+      currency_display: p.display?.currency_display ?? DEFAULT_PREFERENCES.display.currency_display,
+      week_start: p.display?.week_start ?? DEFAULT_PREFERENCES.display.week_start,
     },
     calendar: {
       timezone: p.calendar?.timezone ?? DEFAULT_PREFERENCES.calendar.timezone,
