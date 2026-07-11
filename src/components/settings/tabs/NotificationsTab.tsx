@@ -5,7 +5,7 @@
    Instant-apply, iOS-style. The device/push management stays on the
    dedicated /settings/notifications page. */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { AccountWithLinks } from "@/types/supabase";
 import { withDefaults } from "@/lib/access-control";
@@ -31,11 +31,17 @@ export default function NotificationsTab({ account, onChanged }: {
 }) {
   const [n, setN] = useState<NotificationPrefs>(() => withDefaults(account.preferences).notifications as NotificationPrefs);
 
+  /* Re-sync when the account refreshes so this tab reflects saves from
+     elsewhere and merges onto fresh values. */
+  useEffect(() => {
+    setN(withDefaults(account.preferences).notifications as NotificationPrefs);
+  }, [account.preferences]);
+
   function patch(next: Partial<NotificationPrefs>) {
     const merged = { ...n, ...next };
     setN(merged);
-    const prefs = { ...withDefaults(account.preferences), notifications: merged };
-    void updateAccountPreferences(account.id, prefs).then((ok) => { if (ok) onChanged(); });
+    // Persist ONLY the notifications slice; the server merges it onto the rest.
+    void updateAccountPreferences(account.id, { notifications: merged }).then((ok) => { if (ok) onChanged(); });
   }
 
   return (

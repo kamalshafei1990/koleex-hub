@@ -9,25 +9,17 @@ import { getServerAuth } from "@/lib/server/auth";
    service-role-only public.login_attempts table (recorded by the auth
    layer) and returns a trimmed, self-scoped list — never other users'.
 
-   Scope: match on account_id first; fall back to the account's own
-   identifiers (username / login_email) for rows recorded before an
-   account_id was resolved (e.g. an early failed attempt). */
+   Scoped strictly by account_id (a UUID parameterized by the query builder)
+   rather than interpolating the account's username/email into a PostgREST
+   .or() string, which a comma/paren in the value could break. */
 export async function GET() {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
-  const identifiers = [auth.username, auth.login_email]
-    .filter(Boolean)
-    .map((s) => String(s).trim().toLowerCase());
-
-  // account_id match OR identifier match (self only).
-  const orParts = [`account_id.eq.${auth.account_id}`];
-  for (const id of identifiers) orParts.push(`identifier.eq.${id}`);
-
   const { data, error } = await supabaseServer
     .from("login_attempts")
     .select("ip_address, user_agent, outcome, created_at")
-    .or(orParts.join(","))
+    .eq("account_id", auth.account_id)
     .order("created_at", { ascending: false })
     .limit(25);
 

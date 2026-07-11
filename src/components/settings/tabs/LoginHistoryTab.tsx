@@ -6,6 +6,9 @@
 import { useEffect, useState } from "react";
 import type { AccountWithLinks } from "@/types/supabase";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { withDefaults } from "@/lib/access-control";
+import type { DisplayPrefs } from "@/lib/access-control";
+import { formatDatePref, formatTimePref } from "@/lib/display-prefs";
 
 interface Attempt {
   ip_address: string;
@@ -38,12 +41,15 @@ const OUTCOME: Record<Attempt["outcome"], { label: string; color: string }> = {
   unknown_user: { label: "Unknown user",  color: "var(--text-faint)" },
 };
 
-function fmt(ts: string): string {
+/* Respect the user's Language & region date/time format (from Settings). */
+function fmt(ts: string, disp: DisplayPrefs): string {
   const d = new Date(ts);
-  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString();
+  if (Number.isNaN(d.getTime())) return "—";
+  return `${formatDatePref(d, disp.date_format)} · ${formatTimePref(d, disp.time_format)}`;
 }
 
-export default function LoginHistoryTab(_props: { account: AccountWithLinks }) {
+export default function LoginHistoryTab({ account }: { account: AccountWithLinks }) {
+  const disp = withDefaults(account.preferences).display as DisplayPrefs;
   const [rows, setRows] = useState<Attempt[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,7 +73,7 @@ export default function LoginHistoryTab(_props: { account: AccountWithLinks }) {
       <section className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6">
         <h2 className="text-[14px] font-bold text-[var(--text-primary)]">Recent sign-ins</h2>
         <p className="text-[12px] text-[var(--text-dim)] mt-0.5 mb-4">
-          The last 25 attempts on your account. Something you don't recognize? Change your password with your administrator.
+          The last 25 attempts on your account. Something you don&apos;t recognize? Change your password in the Password tab.
         </p>
 
         {rows === null && !error && (
@@ -91,7 +97,7 @@ export default function LoginHistoryTab(_props: { account: AccountWithLinks }) {
                     <div className="text-[13px] text-[var(--text-primary)] truncate">
                       {deviceLabel(a.user_agent)} <span className="text-[var(--text-faint)]">· {a.ip_address}</span>
                     </div>
-                    <div className="text-[11px] text-[var(--text-dim)]">{fmt(a.created_at)}</div>
+                    <div className="text-[11px] text-[var(--text-dim)]">{fmt(a.created_at, disp)}</div>
                   </div>
                   <span className="text-[11px] font-medium shrink-0" style={{ color: oc.color }}>{oc.label}</span>
                 </li>
@@ -102,7 +108,7 @@ export default function LoginHistoryTab(_props: { account: AccountWithLinks }) {
       </section>
 
       <p className="text-[11px] text-[var(--text-faint)] px-1">
-        Password, two-factor, and active sessions are managed by your administrator.
+        Change your password in the Password tab. Two-factor and remote sign-out are managed by your administrator.
       </p>
     </div>
   );

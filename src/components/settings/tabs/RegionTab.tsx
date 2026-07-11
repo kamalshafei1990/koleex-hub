@@ -1,10 +1,12 @@
 "use client";
 
 /* Settings → Language & region. Date / time / number / units / currency
-   format, persisted in accounts.preferences.display and consumed by
-   src/lib/format-prefs helpers (formatDatePref, formatNumberPref, …). */
+   format, persisted in accounts.preferences.display. The format helpers live
+   in src/lib/display-prefs (formatDatePref/formatTimePref/formatNumberPref);
+   Login history already renders through them, and new date/number surfaces
+   should adopt them too. */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { AccountWithLinks } from "@/types/supabase";
 import { withDefaults } from "@/lib/access-control";
 import type {
@@ -23,12 +25,19 @@ export default function RegionTab({ account, onChanged }: {
   const [d, setD] = useState<DisplayPrefs>(() => withDefaults(account.preferences).display as DisplayPrefs);
   const now = useMemo(() => new Date(), []);
 
+  /* Keep in sync with the shared `display` slice when the account refreshes
+     (e.g. after Display & accessibility saved), so format edits don't
+     overwrite a just-changed text size. */
+  useEffect(() => {
+    setD(withDefaults(account.preferences).display as DisplayPrefs);
+  }, [account.preferences]);
+
   function patch(next: Partial<DisplayPrefs>) {
     const merged = { ...d, ...next };
     setD(merged);
     cacheDisplayPreferences(merged);
-    const prefs = { ...withDefaults(account.preferences), display: merged };
-    void updateAccountPreferences(account.id, prefs).then((ok) => { if (ok) onChanged(); });
+    // Persist ONLY the display slice; the server merges it onto the rest.
+    void updateAccountPreferences(account.id, { display: merged }).then((ok) => { if (ok) onChanged(); });
   }
 
   return (

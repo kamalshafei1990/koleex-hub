@@ -26,9 +26,25 @@ export async function PATCH(
     preferences: Record<string, unknown>;
   };
 
+  /* Shallow-merge the incoming top-level slices (profile / display /
+     notifications / calendar / …) onto whatever is already stored, rather
+     than full-replacing. This lets each Settings tab persist only the slice
+     it owns and prevents one instant-save tab from clobbering another tab's
+     slice with a stale snapshot (the tabs render from a shared account cache
+     that only reconciles after an async refetch). */
+  const { data: existing } = await supabaseServer
+    .from("accounts")
+    .select("preferences")
+    .eq("id", id)
+    .eq("tenant_id", auth.tenant_id)
+    .maybeSingle();
+
+  const current = (existing?.preferences ?? {}) as Record<string, unknown>;
+  const merged = { ...current, ...(preferences ?? {}) };
+
   const { error } = await supabaseServer
     .from("accounts")
-    .update({ preferences })
+    .update({ preferences: merged })
     .eq("id", id)
     .eq("tenant_id", auth.tenant_id);
   if (error) {

@@ -3,7 +3,7 @@
 /* Settings → Display & Accessibility. Edits accounts.preferences.display
    (jsonb) and applies instantly to <html> — no Save button, iOS-style. */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { AccountWithLinks } from "@/types/supabase";
 import { withDefaults } from "@/lib/access-control";
 import type { DisplayPrefs, TextSizePref } from "@/lib/access-control";
@@ -16,13 +16,19 @@ export default function DisplayTab({ account, onChanged }: {
 }) {
   const [d, setD] = useState<DisplayPrefs>(() => withDefaults(account.preferences).display as DisplayPrefs);
 
+  /* Re-sync local state whenever the account refreshes (e.g. after another
+     tab saved the shared `display` slice) so edits merge onto fresh values. */
+  useEffect(() => {
+    setD(withDefaults(account.preferences).display as DisplayPrefs);
+  }, [account.preferences]);
+
   function patch(next: Partial<DisplayPrefs>) {
     const merged = { ...d, ...next };
     setD(merged);
     applyDisplayPreferences(merged);       // live, whole-app
     cacheDisplayPreferences(merged);
-    const prefs = { ...withDefaults(account.preferences), display: merged };
-    void updateAccountPreferences(account.id, prefs).then((ok) => { if (ok) onChanged(); });
+    // Persist ONLY the display slice; the server merges it onto the rest.
+    void updateAccountPreferences(account.id, { display: merged }).then((ok) => { if (ok) onChanged(); });
   }
 
   return (
