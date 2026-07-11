@@ -36,6 +36,7 @@ import PhoneIcon from "@/components/icons/ui/PhoneIcon";
 import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
 import Settings2Icon from "@/components/icons/ui/Settings2Icon";
 import CalendarIcon from "@/components/icons/ui/CalendarRawIcon";
+import BellIcon from "@/components/icons/ui/BellIcon";
 import { useCurrentAccount, notifyIdentityChanged } from "@/lib/identity";
 import { updateAccountAvatar } from "@/lib/accounts-admin";
 import PreferencesTab from "@/components/admin/accounts/tabs/PreferencesTab";
@@ -55,11 +56,38 @@ export default function SettingsPage() {
   );
 }
 
+/* Small chevron used for the iOS-style disclosure rows. */
+function Chevron({ className = "" }: { className?: string }) {
+  return (
+    <svg className={className} width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+      <path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function capitalize(s: string) {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
+
+/* ---------------------------------------------------------------------------
+   Settings shell — iOS / iPadOS style.
+
+     · iPad / desktop (md+): two-pane master-detail. A left "sidebar" with the
+       account card + grouped disclosure rows, and a right detail pane that
+       renders the selected section. The selected row stays highlighted.
+     · iPhone / mobile: a single grouped list. Tapping a row "pushes" to the
+       section (back chevron in the header returns to the list), mirroring the
+       iOS Settings navigation.
+
+   Sections are unchanged (Profile / Preferences / Calendar) — this is a
+   layout-only reshape. Monochrome tiles per the Koleex brand; the accent is
+   reserved for the active back control.
+   --------------------------------------------------------------------------- */
 function SettingsContent() {
   const { account, refresh } = useCurrentAccount();
-  /* Settings is now purely personal — profile, preferences, calendar.
-     Company-wide configuration moved into the Commercial Setup app. */
   const [tab, setTab] = useState<Tab>("profile");
+  /* Mobile only: false → show the list, true → show the pushed detail. */
+  const [mobileDetail, setMobileDetail] = useState(false);
 
   if (!account) {
     return (
@@ -69,89 +97,187 @@ function SettingsContent() {
     );
   }
 
+  const onChanged = () => { notifyIdentityChanged(); refresh(); };
+  const openSection = (t: Tab) => { setTab(t); setMobileDetail(true); };
+
+  const person = account.person;
+  const avatarUrl = account.avatar_url || person?.avatar_url || null;
+  const displayName = person?.full_name || account.username || "—";
+  const initials = (person?.full_name || account.username || "")
+    .split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+  const roleLine = account.role?.name || capitalize(account.user_type);
+
+  const sections: {
+    id: Tab; label: string; subtitle: string;
+    icon: React.ReactNode; node: React.ReactNode;
+  }[] = [
+    {
+      id: "profile", label: "Profile", subtitle: "Photo, name, contact",
+      icon: <UserIcon size={15} />,
+      node: <ProfileSection account={account} onChanged={onChanged} />,
+    },
+    {
+      id: "preferences", label: "Preferences", subtitle: "Language, theme, notifications",
+      icon: <Settings2Icon className="h-3.5 w-3.5" />,
+      node: <PreferencesTab account={account} onChanged={onChanged} />,
+    },
+    {
+      id: "calendar", label: "Calendar", subtitle: "Timezone, hours, availability",
+      icon: <CalendarIcon className="h-3.5 w-3.5" />,
+      node: <CalendarTab account={account} onChanged={onChanged} />,
+    },
+  ];
+  const active = sections.find((s) => s.id === tab) ?? sections[0];
+
   return (
     <div
       className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
       style={{ height: "calc(100dvh - 3.5rem)" }}
     >
-      {/* Header */}
+      {/* Header — title on the list, section name + back chevron once pushed (mobile). */}
       <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] z-10 w-full">
-        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8">
-          <div className="flex flex-wrap items-center gap-3 pt-5 pb-1">
+        <div className="max-w-[1100px] mx-auto px-4 md:px-6 h-14 flex items-center gap-2.5">
+          {mobileDetail ? (
+            <button
+              type="button"
+              onClick={() => setMobileDetail(false)}
+              className="md:hidden h-8 -ml-1 pr-1 inline-flex items-center gap-1 text-[13px] font-medium text-[var(--accent-blue,#0066FF)]"
+            >
+              <Chevron className="rotate-180" /> Settings
+            </button>
+          ) : (
             <Link
               href="/"
               className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
             >
               <ArrowLeftIcon className="h-4 w-4" />
             </Link>
-            <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-                <SettingsIcon className="h-4 w-4" />
-              </div>
-              <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
-                Settings
-              </h1>
-            </div>
+          )}
+          <div className="flex items-center gap-2 min-w-0">
+            {!mobileDetail && (
+              <span className="hidden md:flex h-7 w-7 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] items-center justify-center text-[var(--text-dim)] shrink-0">
+                <SettingsIcon className="h-3.5 w-3.5" />
+              </span>
+            )}
+            <h1 className="text-[17px] md:text-[19px] font-bold tracking-tight truncate">
+              {mobileDetail ? active.label : "Settings"}
+            </h1>
           </div>
-          <p className="text-[12px] text-[var(--text-dim)] mb-4 ml-0 md:ml-11">
-            Your profile, preferences, and calendar defaults. Signed in as <span className="text-[var(--text-primary)] font-medium">@{account.username}</span>.
-          </p>
-
-          {/* Personal account tabs. */}
-          <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar -mx-1 px-1 pb-1">
-            <TabButton active={tab === "profile"} onClick={() => setTab("profile")} icon={<UserIcon size={14} />} label="Profile" />
-            <TabButton active={tab === "preferences"} onClick={() => setTab("preferences")} icon={<Settings2Icon className="h-3.5 w-3.5" />} label="Preferences" />
-            <TabButton active={tab === "calendar"} onClick={() => setTab("calendar")} icon={<CalendarIcon className="h-3.5 w-3.5" />} label="Calendar" />
-          </nav>
         </div>
       </div>
 
-      {/* Body — 900px column; account forms read best at this width. */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto px-4 md:px-6 lg:px-8 py-6 w-full space-y-4 max-w-[900px]">
-          {tab === "profile" && (
-            <ProfileSection
-              account={account}
-              onChanged={() => { notifyIdentityChanged(); refresh(); }}
-            />
-          )}
-          {tab === "preferences" && (
-            <PreferencesTab
-              account={account}
-              onChanged={() => { notifyIdentityChanged(); refresh(); }}
-            />
-          )}
-          {tab === "calendar" && (
-            <CalendarTab
-              account={account}
-              onChanged={() => { notifyIdentityChanged(); refresh(); }}
-            />
-          )}
+      {/* Body */}
+      <div className="flex-1 min-h-0">
+        <div className="mx-auto max-w-[1100px] h-full px-4 md:px-6 py-5 md:grid md:grid-cols-[300px_minmax(0,1fr)] md:gap-7">
+
+          {/* Master list — sidebar on iPad, full screen on iPhone. */}
+          <aside className={`${mobileDetail ? "hidden" : "block"} md:block h-full md:overflow-y-auto no-scrollbar space-y-4`}>
+            {/* Account card (Apple-ID style) */}
+            <button
+              type="button"
+              onClick={() => openSection("profile")}
+              className="w-full flex items-center gap-3 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-3 text-left hover:border-[var(--border-focus)] transition-colors"
+            >
+              <span className="h-12 w-12 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] overflow-hidden flex items-center justify-center shrink-0">
+                {avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-[15px] font-semibold text-[var(--text-dim)]">{initials || "·"}</span>
+                )}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[14px] font-semibold text-[var(--text-primary)] truncate">{displayName}</span>
+                <span className="block text-[11px] text-[var(--text-dim)] truncate">{roleLine} · @{account.username}</span>
+              </span>
+              <Chevron className="text-[var(--text-faint)] shrink-0" />
+            </button>
+
+            {/* Personal group */}
+            <div>
+              <p className="text-[11px] text-[var(--text-faint)] uppercase tracking-wider px-3 mb-1.5">Personal</p>
+              <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] overflow-hidden">
+                {sections.map((s, i) => (
+                  <SettingsRow
+                    key={s.id}
+                    active={!mobileDetail && tab === s.id}
+                    onClick={() => openSection(s.id)}
+                    icon={s.icon}
+                    label={s.label}
+                    subtitle={s.subtitle}
+                    isLast={i === sections.length - 1}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Notifications group — links to the existing push page. */}
+            <div>
+              <p className="text-[11px] text-[var(--text-faint)] uppercase tracking-wider px-3 mb-1.5">Notifications</p>
+              <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] overflow-hidden">
+                <SettingsRow
+                  href="/settings/notifications"
+                  icon={<BellIcon className="h-3.5 w-3.5" />}
+                  label="Push notifications"
+                  subtitle="Devices and alerts"
+                  isLast
+                />
+              </div>
+            </div>
+          </aside>
+
+          {/* Detail pane */}
+          <main className={`${mobileDetail ? "block" : "hidden"} md:block h-full md:overflow-y-auto no-scrollbar`}>
+            <div className="max-w-[720px] pb-8">
+              {active.node}
+            </div>
+          </main>
         </div>
       </div>
     </div>
   );
 }
 
-/* ─────────────── Tab button ─────────────── */
+/* ─────────────── iOS-style disclosure row ─────────────── */
 
-function TabButton({
-  active, onClick, icon, label,
+function SettingsRow({
+  active, onClick, href, icon, label, subtitle, isLast,
 }: {
-  active: boolean; onClick: () => void; icon: React.ReactNode; label: string;
+  active?: boolean; onClick?: () => void; href?: string;
+  icon: React.ReactNode; label: string; subtitle?: string; isLast?: boolean;
 }) {
+  const inner = (
+    <>
+      <span
+        className={`h-8 w-8 rounded-[10px] flex items-center justify-center shrink-0 border transition-colors ${
+          active
+            ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
+            : "bg-[var(--bg-surface)] text-[var(--text-dim)] border-[var(--border-subtle)]"
+        }`}
+      >
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[13px] font-medium text-[var(--text-primary)] truncate">{label}</span>
+        {subtitle && <span className="block text-[11px] text-[var(--text-dim)] truncate">{subtitle}</span>}
+      </span>
+      <Chevron className="text-[var(--text-faint)] shrink-0" />
+    </>
+  );
+  const cls = `w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
+    active ? "bg-[var(--bg-surface-subtle)]" : "hover:bg-[var(--bg-surface-subtle)]"
+  } ${!isLast ? "border-b border-[var(--border-faint)]" : ""}`;
+
+  if (href) {
+    return (
+      <Link href={href} className={cls}>
+        {inner}
+      </Link>
+    );
+  }
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`h-9 px-4 rounded-lg text-[12px] font-medium transition-colors flex items-center gap-2 shrink-0 ${
-        active
-          ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
-          : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
-      }`}
-    >
-      {icon}
-      {label}
+    <button type="button" onClick={onClick} className={cls}>
+      {inner}
     </button>
   );
 }
