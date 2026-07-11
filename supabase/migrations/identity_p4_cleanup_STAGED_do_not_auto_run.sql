@@ -1,0 +1,35 @@
+-- ============================================================================
+-- Identity consolidation Phase 4 — DESTRUCTIVE cleanup. STAGED, NOT APPLIED.
+-- ============================================================================
+-- ⚠️  DO NOT run this automatically. Every statement below is irreversible on
+--     production data (drops columns / deletes rows). Run only after a manual
+--     review and an explicit go, ideally on a Supabase branch first, with a
+--     fresh backup. The safe, reversible parts of Phase 4 (link/unlink API,
+--     people search, duplicate-candidate finder) are already live; this file
+--     is ONLY the irreversible tail.
+--
+-- Prereqs before running:
+--   1. Duplicate contacts have been reviewed and linked to their person via
+--      POST /api/contacts/[id]/link-person (see GET /api/contacts/link-candidates).
+--   2. You have confirmed no code still reads koleex_employees.private_address_*.
+--   3. You have a backup / are on a branch.
+-- ----------------------------------------------------------------------------
+
+-- (A) Drop the retired employee private-address columns (Phase 1 finished the
+--     rewire; these have been empty and unused since). IRREVERSIBLE.
+-- ALTER TABLE public.koleex_employees
+--   DROP COLUMN IF EXISTS private_address_line1,
+--   DROP COLUMN IF EXISTS private_address_line2,
+--   DROP COLUMN IF EXISTS private_city,
+--   DROP COLUMN IF EXISTS private_state,
+--   DROP COLUMN IF EXISTS private_country,
+--   DROP COLUMN IF EXISTS private_postal_code;
+
+-- (B) Hard-dedupe: after duplicate contacts are linked to a person, if you
+--     decide a linked contact is a pure duplicate of another record, delete it
+--     MANUALLY, one id at a time, after confirming nothing references it
+--     (accounts.contact_id, catalogs.contact_id, quotations, invoices, ...).
+--     There is deliberately NO bulk auto-delete here — deleting customer /
+--     supplier rows in bulk is exactly the operation that must stay manual.
+-- Example (fill in a specific, reviewed id):
+-- DELETE FROM public.contacts WHERE id = '<reviewed-duplicate-contact-id>';

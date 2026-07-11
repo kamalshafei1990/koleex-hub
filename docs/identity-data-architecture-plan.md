@@ -134,10 +134,25 @@ read/write path, and never drop a column until its replacement has been live and
 - Unlinked contacts behave exactly as today (full backward compat).
 
 ### Phase 4 — Dedupe & cleanup (highest care — separate sign-off)
-- Merge tool for "this contact and this person are the same human."
-- After dedupe is stable: drop the retired `koleex_employees.private_address_*` columns.
-- Optional: a unified **People / Directory** view that shows a person with their roles
-  (employee, customer contact, account) in one place.
+**Shipped (safe, reversible):**
+- `GET /api/people/search?q=` — pick a person to link (tenant-scoped, sanitized).
+- `POST /api/contacts/[id]/link-person` — link/unlink a contact ↔ person (the only
+  supported way to set `person_id`; validates tenant + edit permission; reversible).
+- `GET /api/contacts/link-candidates` — read-only finder of likely duplicate
+  contact↔person pairs (by email/name) for human review. Merges/deletes nothing.
+
+**Staged, NOT run (irreversible — needs explicit go):**
+`supabase/migrations/identity_p4_cleanup_STAGED_do_not_auto_run.sql` holds the
+destructive tail: dropping the retired `koleex_employees.private_address_*` columns
+and any hard-delete of reviewed duplicate contact rows. These are left commented and
+manual on purpose — deleting/merging production customer/supplier rows or dropping
+columns is the one category not run autonomously.
+
+**Optional later:** a unified **People / Directory** view showing a person with all
+their roles (employee, customer contact, account) in one place.
+
+> Status (2026-07-12): P0–P3 shipped and applied to prod. P4 safe enablers shipped;
+> P4 destructive cleanup staged pending sign-off.
 
 ---
 
