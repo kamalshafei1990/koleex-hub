@@ -208,8 +208,10 @@ function SettingsContent() {
 
   return (
     <div className="h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full max-w-[100vw]">
-      {/* Canonical Koleex app header — identical to every other app. */}
-      <div className="shrink-0 px-4 sm:px-5 pt-4 sm:pt-5">
+      {/* Canonical Koleex app header — identical to every other app.
+          Shares the body's max-width + padding so the title aligns with the
+          master list below and the whole page fills the desktop viewport. */}
+      <div className="shrink-0 w-full mx-auto max-w-[1600px] px-4 md:px-6 pt-4 sm:pt-5">
         <PageHeader
           title="Settings"
           subtitle="Your profile, preferences, and calendar defaults"
@@ -220,7 +222,7 @@ function SettingsContent() {
 
       {/* Body */}
       <div className="flex-1 min-h-0">
-        <div className="mx-auto max-w-[1100px] h-full px-4 md:px-6 py-5 md:grid md:grid-cols-[300px_minmax(0,1fr)] md:gap-7">
+        <div className="mx-auto max-w-[1600px] h-full px-4 md:px-6 py-5 md:grid md:grid-cols-[320px_minmax(0,1fr)] md:gap-8">
 
           {/* Master list — sidebar on iPad, full screen on iPhone. */}
           <aside className={`${mobileDetail ? "hidden" : "block"} md:block h-full overflow-y-auto no-scrollbar space-y-4`}>
@@ -299,7 +301,9 @@ function SettingsContent() {
             >
               <Chevron className="rotate-180" /> All settings
             </button>
-            <div className="max-w-[720px] pb-8">
+            {/* Fill the detail pane on desktop; cap only so ultra-wide
+                monitors don't stretch forms to unreadable line lengths. */}
+            <div className="max-w-[1040px] pb-8">
               {active.node}
             </div>
           </main>
