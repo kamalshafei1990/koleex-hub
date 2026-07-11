@@ -19,6 +19,7 @@ import { withDefaults } from "@/lib/access-control";
 import type { ProfilePrefs } from "@/lib/access-control";
 import { updateAccountAvatar, updateAccountPreferences } from "@/lib/accounts-admin";
 import AddressAutocomplete from "@/components/suppliers/AddressAutocomplete";
+import IdentitySourceNote from "@/components/ui/IdentitySourceNote";
 import UserIcon from "@/components/icons/ui/UserIcon";
 import CameraIcon from "@/components/icons/ui/CameraIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -204,6 +205,8 @@ export default function ProfileTab({
 
   return (
     <div className="space-y-4 pb-2">
+      <IdentitySourceNote text="Your name, contact, and address are one shared person record — the same details also shown in the Accounts app and your HR profile. Editing here updates them everywhere." />
+
       {/* ── Identity ── */}
       <Card title="Identity" subtitle="How you appear across the hub.">
         {/* Avatar */}

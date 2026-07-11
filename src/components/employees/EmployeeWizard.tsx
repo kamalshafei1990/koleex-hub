@@ -25,6 +25,7 @@ import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import RefreshCcwIcon from "@/components/icons/ui/RefreshCcwIcon";
 import CameraIcon from "@/components/icons/ui/CameraIcon";
 import ProfileCompletenessBar from "@/components/ui/ProfileCompletenessBar";
+import IdentitySourceNote from "@/components/ui/IdentitySourceNote";
 import {
   emptyWizardData,
   generateEmployeeNumber,
@@ -392,6 +393,8 @@ function Step1Personal({
       <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>
         Basic personal information for the employee record.
       </p>
+      <IdentitySourceNote text="Name, personal contact, and address form this person's shared record — the same identity used by their Account and their Settings profile. HR-only details (salary, visa, emergency contacts) stay in the employee record." />
+
 
       {/* Photo + Name row */}
       <div className="flex gap-4">

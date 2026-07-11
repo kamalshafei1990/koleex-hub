@@ -35,6 +35,7 @@ import type {
   CustomerLevel,
 } from "@/types/supabase";
 import { tabCardClass, tabSectionTitle } from "./shared";
+import IdentitySourceNote from "@/components/ui/IdentitySourceNote";
 
 const levelColors: Record<CustomerLevel, string> = {
   silver: "bg-slate-400/15 text-slate-300 border-slate-400/25",
@@ -140,6 +141,10 @@ export default function OverviewTab({ account }: Props) {
             <UserCircle2Icon className="h-3.5 w-3.5" />
             {t("acc.overview.contactProfile")}
           </h2>
+          <IdentitySourceNote
+            className="mb-4"
+            text="This is the shared person record — the same name, contact, and address this user sees in their Settings profile and in their HR record. Edits sync across all three."
+          />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <InfoField
               icon={<UserCircle2Icon className="h-3.5 w-3.5" />}
