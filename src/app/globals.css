@@ -719,14 +719,66 @@ input[type="number"]:not(.kx-spinner) {
    defaults are untouched.
    =========================================================================== */
 
-/* Text size — scales the whole interface. --kx-font-scale defaults to 1.
-   The hub's type is authored in fixed pixels (text-[13px] …, ~6.8k usages),
-   which `font-size`/rem scaling can't touch — so we use CSS `zoom`, which
-   scales px, spacing and icons proportionally (broadly supported: Chromium,
-   Safari, Firefox 126+). Applied to <body> so fixed headers/modals still work.
-   Keep the rem base too, for the handful of rem-based bits. */
+/* Text size — scales ONLY text, not spacing/icons/layout. --kx-font-scale
+   defaults to 1. The hub authors type in fixed px (text-[13px] …) plus a few
+   named Tailwind sizes, so we redefine those font-size utilities as
+   `calc(base * var(--kx-font-scale))`. Spacing/gaps/icon sizes are left alone,
+   so only the letters grow. (Generated block below — keep in sync with the
+   distinct text-[Npx] sizes in use.) */
 :root { --kx-font-scale: 1; }
-body { zoom: var(--kx-font-scale, 1); }
+
+/* Named Tailwind sizes (rem bases). */
+.text-xs   { font-size: calc(0.75rem  * var(--kx-font-scale)); }
+.text-sm   { font-size: calc(0.875rem * var(--kx-font-scale)); }
+.text-base { font-size: calc(1rem     * var(--kx-font-scale)); }
+.text-lg   { font-size: calc(1.125rem * var(--kx-font-scale)); }
+.text-xl   { font-size: calc(1.25rem  * var(--kx-font-scale)); }
+.text-2xl  { font-size: calc(1.5rem   * var(--kx-font-scale)); }
+.text-3xl  { font-size: calc(1.875rem * var(--kx-font-scale)); }
+.text-4xl  { font-size: calc(2.25rem  * var(--kx-font-scale)); }
+.text-5xl  { font-size: calc(3rem     * var(--kx-font-scale)); }
+.text-6xl  { font-size: calc(3.75rem  * var(--kx-font-scale)); }
+
+/* Fixed-pixel sizes used across the hub. */
+.text-\[7px\]     { font-size: calc(7px    * var(--kx-font-scale)); }
+.text-\[8px\]     { font-size: calc(8px    * var(--kx-font-scale)); }
+.text-\[8\.5px\]  { font-size: calc(8.5px  * var(--kx-font-scale)); }
+.text-\[9px\]     { font-size: calc(9px    * var(--kx-font-scale)); }
+.text-\[9\.5px\]  { font-size: calc(9.5px  * var(--kx-font-scale)); }
+.text-\[10px\]    { font-size: calc(10px   * var(--kx-font-scale)); }
+.text-\[10\.5px\] { font-size: calc(10.5px * var(--kx-font-scale)); }
+.text-\[11px\]    { font-size: calc(11px   * var(--kx-font-scale)); }
+.text-\[11\.5px\] { font-size: calc(11.5px * var(--kx-font-scale)); }
+.text-\[12px\]    { font-size: calc(12px   * var(--kx-font-scale)); }
+.text-\[12\.5px\] { font-size: calc(12.5px * var(--kx-font-scale)); }
+.text-\[13px\]    { font-size: calc(13px   * var(--kx-font-scale)); }
+.text-\[13\.5px\] { font-size: calc(13.5px * var(--kx-font-scale)); }
+.text-\[14px\]    { font-size: calc(14px   * var(--kx-font-scale)); }
+.text-\[14\.5px\] { font-size: calc(14.5px * var(--kx-font-scale)); }
+.text-\[15px\]    { font-size: calc(15px   * var(--kx-font-scale)); }
+.text-\[16px\]    { font-size: calc(16px   * var(--kx-font-scale)); }
+.text-\[17px\]    { font-size: calc(17px   * var(--kx-font-scale)); }
+.text-\[18px\]    { font-size: calc(18px   * var(--kx-font-scale)); }
+.text-\[19px\]    { font-size: calc(19px   * var(--kx-font-scale)); }
+.text-\[20px\]    { font-size: calc(20px   * var(--kx-font-scale)); }
+.text-\[22px\]    { font-size: calc(22px   * var(--kx-font-scale)); }
+.text-\[24px\]    { font-size: calc(24px   * var(--kx-font-scale)); }
+.text-\[26px\]    { font-size: calc(26px   * var(--kx-font-scale)); }
+.text-\[28px\]    { font-size: calc(28px   * var(--kx-font-scale)); }
+.text-\[30px\]    { font-size: calc(30px   * var(--kx-font-scale)); }
+.text-\[32px\]    { font-size: calc(32px   * var(--kx-font-scale)); }
+.text-\[34px\]    { font-size: calc(34px   * var(--kx-font-scale)); }
+.text-\[36px\]    { font-size: calc(36px   * var(--kx-font-scale)); }
+.text-\[40px\]    { font-size: calc(40px   * var(--kx-font-scale)); }
+.text-\[42px\]    { font-size: calc(42px   * var(--kx-font-scale)); }
+.text-\[44px\]    { font-size: calc(44px   * var(--kx-font-scale)); }
+.text-\[48px\]    { font-size: calc(48px   * var(--kx-font-scale)); }
+.text-\[52px\]    { font-size: calc(52px   * var(--kx-font-scale)); }
+.text-\[56px\]    { font-size: calc(56px   * var(--kx-font-scale)); }
+.text-\[58px\]    { font-size: calc(58px   * var(--kx-font-scale)); }
+.text-\[60px\]    { font-size: calc(60px   * var(--kx-font-scale)); }
+.text-\[64px\]    { font-size: calc(64px   * var(--kx-font-scale)); }
+.text-\[68px\]    { font-size: calc(68px   * var(--kx-font-scale)); }
 
 /* Reduce motion — neutralize transitions/animations app-wide. */
 .kx-reduce-motion *,
