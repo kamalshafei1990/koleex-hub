@@ -798,6 +798,49 @@ input[type="number"]:not(.kx-spinner) {
   -webkit-backdrop-filter: none !important;
 }
 
+/* Bold text — heavier weight everywhere for legibility (iOS-style). Skip
+   elements that are already bold so nothing gets *lighter*. */
+.kx-bold-text p,
+.kx-bold-text span,
+.kx-bold-text a,
+.kx-bold-text li,
+.kx-bold-text label,
+.kx-bold-text button,
+.kx-bold-text input,
+.kx-bold-text textarea,
+.kx-bold-text td,
+.kx-bold-text th,
+.kx-bold-text div { font-weight: 500; }
+.kx-bold-text .font-medium { font-weight: 600 !important; }
+.kx-bold-text .font-semibold,
+.kx-bold-text .font-bold { font-weight: 700 !important; }
+
+/* Underline links — clearer affordance for links (accessibility). */
+.kx-underline-links a[href] { text-decoration: underline; text-underline-offset: 2px; }
+
+/* Always-visible focus ring — strong keyboard-focus outline everywhere. */
+.kx-focus-ring *:focus-visible {
+  outline: 2px solid #0066FF !important;
+  outline-offset: 2px !important;
+  border-radius: 3px;
+}
+
+/* Compact density — tighten the common vertical rhythm so more fits on screen.
+   Ancestor-scoped so it naturally wins over the base utilities without
+   !important; only the padding shrinks, text/borders stay. */
+[data-density="compact"] .py-1\.5 { padding-top: 4px;  padding-bottom: 4px; }
+[data-density="compact"] .py-2   { padding-top: 6px;  padding-bottom: 6px; }
+[data-density="compact"] .py-2\.5{ padding-top: 7px;  padding-bottom: 7px; }
+[data-density="compact"] .py-3   { padding-top: 8px;  padding-bottom: 8px; }
+[data-density="compact"] .py-4   { padding-top: 11px; padding-bottom: 11px; }
+[data-density="compact"] .py-6   { padding-top: 16px; padding-bottom: 16px; }
+[data-density="compact"] .p-4    { padding: 12px; }
+[data-density="compact"] .p-5    { padding: 14px; }
+[data-density="compact"] .p-6    { padding: 16px; }
+[data-density="compact"] .gap-4  { gap: 12px; }
+[data-density="compact"] .h-10   { height: 36px; }
+[data-density="compact"] .h-9    { height: 32px; }
+
 /* High contrast — strengthen borders + secondary text in both themes.
    Selector doubles the class+attribute so it beats the base [data-theme] vars. */
 .kx-high-contrast[data-theme="dark"] {

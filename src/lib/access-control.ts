@@ -271,6 +271,9 @@ export interface DisplayPrefs {
   reduce_motion: boolean;
   high_contrast: boolean;
   reduce_transparency: boolean;
+  bold_text: boolean;
+  underline_links: boolean;
+  focus_ring: boolean;
   date_format: DateFormatPref;
   time_format: TimeFormatPref;
   number_format: NumberFormatPref;
@@ -358,6 +361,9 @@ export const DEFAULT_PREFERENCES: Required<
     reduce_motion: false,
     high_contrast: false,
     reduce_transparency: false,
+    bold_text: false,
+    underline_links: false,
+    focus_ring: false,
     date_format: "dmy",
     time_format: "24h",
     number_format: "comma_dot",
@@ -409,6 +415,9 @@ export function withDefaults(
       reduce_motion: p.display?.reduce_motion ?? DEFAULT_PREFERENCES.display.reduce_motion,
       high_contrast: p.display?.high_contrast ?? DEFAULT_PREFERENCES.display.high_contrast,
       reduce_transparency: p.display?.reduce_transparency ?? DEFAULT_PREFERENCES.display.reduce_transparency,
+      bold_text: p.display?.bold_text ?? DEFAULT_PREFERENCES.display.bold_text,
+      underline_links: p.display?.underline_links ?? DEFAULT_PREFERENCES.display.underline_links,
+      focus_ring: p.display?.focus_ring ?? DEFAULT_PREFERENCES.display.focus_ring,
       date_format: p.display?.date_format ?? DEFAULT_PREFERENCES.display.date_format,
       time_format: p.display?.time_format ?? DEFAULT_PREFERENCES.display.time_format,
       number_format: p.display?.number_format ?? DEFAULT_PREFERENCES.display.number_format,

@@ -6,13 +6,17 @@
    live document, plus format helpers that read the region prefs.
 
    Visual prefs applied to <html>:
-     · text_size          → --kx-font-scale CSS var (globals.css applies it as
-                            `body { zoom }`, since the hub's type is fixed-px —
-                            rem/font-size scaling wouldn't touch it)
-     · density            → data-density attribute
+     · text_size          → --kx-font-scale CSS var. globals.css multiplies each
+                            fixed-px / named text size by this var (the hub's type
+                            is fixed-px, so rem/root font-size scaling wouldn't
+                            touch it — and it's text-only, not a whole-page zoom)
+     · density            → data-density attribute (compact tightens padding)
      · reduce_motion      → .kx-reduce-motion class (globals.css kills anim)
      · high_contrast      → .kx-high-contrast class
      · reduce_transparency→ .kx-reduce-transparency class
+     · bold_text          → .kx-bold-text class (heavier weights)
+     · underline_links    → .kx-underline-links class
+     · focus_ring         → .kx-focus-ring class (always-visible focus outline)
 
    Theme is intentionally NOT handled here — it stays on the existing
    MainHeader localStorage("koleex-theme") mechanism so the header toggle and
@@ -51,10 +55,30 @@ export function applyDisplayPreferences(d: DisplayPrefs): void {
   root.classList.toggle("kx-reduce-motion", !!d.reduce_motion);
   root.classList.toggle("kx-high-contrast", !!d.high_contrast);
   root.classList.toggle("kx-reduce-transparency", !!d.reduce_transparency);
+  root.classList.toggle("kx-bold-text", !!d.bold_text);
+  root.classList.toggle("kx-underline-links", !!d.underline_links);
+  root.classList.toggle("kx-focus-ring", !!d.focus_ring);
 }
 
 export function cacheDisplayPreferences(d: DisplayPrefs): void {
   try { localStorage.setItem(CACHE_KEY, JSON.stringify(d)); } catch { /* ignore */ }
+}
+
+/* ── Theme ── the app's existing binary light/dark mechanism (localStorage
+   "koleex-theme" + data-theme + a "themechange" event). Kept separate from the
+   display bag so the header toggle and Settings drive the exact same switch. */
+export type ThemeMode = "light" | "dark";
+
+export function getTheme(): ThemeMode {
+  if (typeof window === "undefined") return "dark";
+  return window.localStorage.getItem("koleex-theme") === "light" ? "light" : "dark";
+}
+
+export function setTheme(theme: ThemeMode): void {
+  if (typeof document === "undefined") return;
+  document.documentElement.setAttribute("data-theme", theme);
+  try { localStorage.setItem("koleex-theme", theme); } catch { /* ignore */ }
+  window.dispatchEvent(new CustomEvent("themechange", { detail: theme }));
 }
 
 function readCachedDisplay(): DisplayPrefs | null {

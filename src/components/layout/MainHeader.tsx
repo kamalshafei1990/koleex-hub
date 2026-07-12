@@ -69,6 +69,17 @@ export default function MainHeader() {
     window.dispatchEvent(new CustomEvent("themechange", { detail: theme }));
   }, [theme]);
 
+  /* Stay in sync if the theme is changed elsewhere (e.g. Settings → Display).
+     Same-value updates are a no-op, so this never loops with the effect above. */
+  useEffect(() => {
+    const onThemeChange = (e: Event) => {
+      const t = (e as CustomEvent<"light" | "dark">).detail;
+      if (t === "light" || t === "dark") setTheme(t);
+    };
+    window.addEventListener("themechange", onThemeChange);
+    return () => window.removeEventListener("themechange", onThemeChange);
+  }, []);
+
   useEffect(() => {
     document.documentElement.setAttribute("lang", lang);
     document.documentElement.setAttribute("dir", lang === "ar" ? "rtl" : "ltr");
