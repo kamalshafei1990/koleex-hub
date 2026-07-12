@@ -798,8 +798,10 @@ input[type="number"]:not(.kx-spinner) {
   -webkit-backdrop-filter: none !important;
 }
 
-/* Bold text — heavier weight everywhere for legibility (iOS-style). Skip
-   elements that are already bold so nothing gets *lighter*. */
+/* Bold text — heavier weight everywhere for legibility (iOS-style). The hub's
+   type is already mostly weighted (labels=500, headings=700), so a small bump
+   is invisible; push every tier up a clear step while preserving hierarchy:
+   400→600, 500→700, 600→800, 700/900→900. */
 .kx-bold-text p,
 .kx-bold-text span,
 .kx-bold-text a,
@@ -810,10 +812,20 @@ input[type="number"]:not(.kx-spinner) {
 .kx-bold-text textarea,
 .kx-bold-text td,
 .kx-bold-text th,
-.kx-bold-text div { font-weight: 500; }
-.kx-bold-text .font-medium { font-weight: 600 !important; }
-.kx-bold-text .font-semibold,
-.kx-bold-text .font-bold { font-weight: 700 !important; }
+.kx-bold-text h1,
+.kx-bold-text h2,
+.kx-bold-text h3,
+.kx-bold-text h4,
+.kx-bold-text h5,
+.kx-bold-text h6,
+.kx-bold-text div { font-weight: 600; }
+.kx-bold-text .font-light,
+.kx-bold-text .font-normal { font-weight: 600 !important; }
+.kx-bold-text .font-medium { font-weight: 700 !important; }
+.kx-bold-text .font-semibold { font-weight: 800 !important; }
+.kx-bold-text .font-bold,
+.kx-bold-text .font-extrabold,
+.kx-bold-text .font-black { font-weight: 900 !important; }
 
 /* Underline links — clearer affordance for links (accessibility). */
 .kx-underline-links a[href] { text-decoration: underline; text-underline-offset: 2px; }
