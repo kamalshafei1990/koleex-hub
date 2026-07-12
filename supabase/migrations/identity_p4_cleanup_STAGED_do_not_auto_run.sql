@@ -1,44 +1,18 @@
 -- ============================================================================
--- Identity consolidation Phase 4 — DESTRUCTIVE cleanup. STAGED, NOT APPLIED.
+-- Identity consolidation Phase 4 — cleanup status.
 -- ============================================================================
--- ⚠️  DO NOT run this automatically. Every statement below is irreversible on
---     production data (drops columns / deletes rows). Run only after a manual
---     review and an explicit go, ideally on a Supabase branch first, with a
---     fresh backup. The safe, reversible parts of Phase 4 (link/unlink API,
---     people search, duplicate-candidate finder) are already live; this file
---     is ONLY the irreversible tail.
+-- (A) Drop retired employee private-address columns — ✅ DONE 2026-07-12
+--     (applied via identity_p4_drop_employee_private_address.sql after the
+--     P1b backfill + full code rewire). Nothing further to do here.
 --
--- Prereqs before running:
---   1. Duplicate contacts have been reviewed and linked to their person via
---      POST /api/contacts/[id]/link-person (see GET /api/contacts/link-candidates).
---      (2026-07-12: link-candidates returns 0 — nothing to dedupe.)
---   2. You have confirmed no code still reads koleex_employees.private_address_*.
---      ⚠️ 2026-07-12: NOT YET TRUE. These columns are still actively read AND
---      written by the Accounts app HR editor (components/admin/accounts/tabs/
---      PrivateTab.tsx) and shown on employees/[id]. Dropping now WOULD BREAK the
---      HR private-address editor. First rewire PrivateTab + employees/[id] +
---      employees/new to read/write people.address_*, then drop. The row DATA is
---      already safe on people (see identity_p1b_backfill...), so no data is at
---      risk — this is purely a code-rewire prerequisite.
---   3. You have a backup / are on a branch.
--- ----------------------------------------------------------------------------
-
--- (A) Drop the retired employee private-address columns. IRREVERSIBLE.
---     BLOCKED until PrivateTab.tsx (+ employees/[id], employees/new) stop
---     reading/writing these columns (see prereq 2).
--- ALTER TABLE public.koleex_employees
---   DROP COLUMN IF EXISTS private_address_line1,
---   DROP COLUMN IF EXISTS private_address_line2,
---   DROP COLUMN IF EXISTS private_city,
---   DROP COLUMN IF EXISTS private_state,
---   DROP COLUMN IF EXISTS private_country,
---   DROP COLUMN IF EXISTS private_postal_code;
-
--- (B) Hard-dedupe: after duplicate contacts are linked to a person, if you
---     decide a linked contact is a pure duplicate of another record, delete it
---     MANUALLY, one id at a time, after confirming nothing references it
---     (accounts.contact_id, catalogs.contact_id, quotations, invoices, ...).
---     There is deliberately NO bulk auto-delete here — deleting customer /
---     supplier rows in bulk is exactly the operation that must stay manual.
+-- (B) Hard-dedupe duplicate contacts — NOT NEEDED right now.
+--     GET /api/contacts/link-candidates returns 0 confident duplicates, so
+--     there is nothing to merge or delete. If, in future, contacts get linked
+--     to people and a linked contact turns out to be a pure duplicate of
+--     another record, delete it MANUALLY, one reviewed id at a time, after
+--     confirming nothing references it (accounts.contact_id, catalogs.contact_id,
+--     quotations, invoices, ...). There is deliberately NO bulk auto-delete —
+--     deleting customer/supplier rows in bulk must stay a manual, per-row
+--     decision.
 -- Example (fill in a specific, reviewed id):
 -- DELETE FROM public.contacts WHERE id = '<reviewed-duplicate-contact-id>';
