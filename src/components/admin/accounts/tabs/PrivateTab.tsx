@@ -1,13 +1,15 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   PrivateTab — private HR data on koleex_employees.
+   PrivateTab — private HR data.
 
-   Fields (all stored on koleex_employees):
-     - Private Address      — address_line1/2, city, state, country, postal_code
-     - Emergency Contact    — name, phone, relationship
-     - Identity             — birth_date, marital_status, nationality
-     - Documents            — identification_id, passport_number, visa_number, visa_expiry_date
+   Fields:
+     - Home Address         — the SHARED person record (people.address_*), so it
+                              stays in sync with Settings / the account. Saved
+                              via PATCH /api/people/[id].
+     - Emergency Contact    — koleex_employees (name, phone, relationship)
+     - Identity             — koleex_employees (birth_date, marital_status, nationality)
+     - Documents            — koleex_employees (id/passport/visa)
 
    Only shown for internal accounts. If no koleex_employees record exists yet,
    the tab auto-creates one on save via upsertEmployeeByAccountId.
@@ -42,15 +44,9 @@ interface Props {
   onChanged?: (employee: EmployeeRow) => void;
 }
 
-/** All editable private-HR fields on koleex_employees. */
+/** Editable HR-only fields on koleex_employees (address lives on people now). */
 type PrivateFields = Pick<
   EmployeeRow,
-  | "private_address_line1"
-  | "private_address_line2"
-  | "private_city"
-  | "private_state"
-  | "private_country"
-  | "private_postal_code"
   | "emergency_contact_name"
   | "emergency_contact_phone"
   | "emergency_contact_relationship"
@@ -63,14 +59,18 @@ type PrivateFields = Pick<
   | "visa_expiry_date"
 >;
 
+/** The home address — the shared person record is the source of truth. */
+type AddressFields = {
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  postal_code: string | null;
+};
+
 function emptyPrivateFields(): PrivateFields {
   return {
-    private_address_line1: null,
-    private_address_line2: null,
-    private_city: null,
-    private_state: null,
-    private_country: null,
-    private_postal_code: null,
     emergency_contact_name: null,
     emergency_contact_phone: null,
     emergency_contact_relationship: null,
@@ -87,12 +87,6 @@ function emptyPrivateFields(): PrivateFields {
 function pickPrivateFields(emp: EmployeeRow | null): PrivateFields {
   if (!emp) return emptyPrivateFields();
   return {
-    private_address_line1: emp.private_address_line1,
-    private_address_line2: emp.private_address_line2,
-    private_city: emp.private_city,
-    private_state: emp.private_state,
-    private_country: emp.private_country,
-    private_postal_code: emp.private_postal_code,
     emergency_contact_name: emp.emergency_contact_name,
     emergency_contact_phone: emp.emergency_contact_phone,
     emergency_contact_relationship: emp.emergency_contact_relationship,
@@ -106,16 +100,30 @@ function pickPrivateFields(emp: EmployeeRow | null): PrivateFields {
   };
 }
 
+function pickAddress(person: AccountWithLinks["person"]): AddressFields {
+  return {
+    address_line1: person?.address_line1 ?? null,
+    address_line2: person?.address_line2 ?? null,
+    city: person?.city ?? null,
+    state: person?.state ?? null,
+    country: person?.country ?? null,
+    postal_code: person?.postal_code ?? null,
+  };
+}
+
 export default function PrivateTab({ account, onChanged }: Props) {
   const { t } = useTranslation(accountsT);
   const initial = useMemo(() => pickPrivateFields(account.employee), [account.employee]);
+  const initialAddr = useMemo(() => pickAddress(account.person), [account.person]);
 
   const [fields, setFields] = useState<PrivateFields>(initial);
+  const [addr, setAddr] = useState<AddressFields>(initialAddr);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => setFields(initial), [initial]);
+  useEffect(() => setAddr(initialAddr), [initialAddr]);
 
   useEffect(() => {
     if (!toast) return;
@@ -134,10 +142,16 @@ export default function PrivateTab({ account, onChanged }: Props) {
     );
   }
 
-  const dirty = JSON.stringify(fields) !== JSON.stringify(initial);
+  const dirty =
+    JSON.stringify(fields) !== JSON.stringify(initial) ||
+    JSON.stringify(addr) !== JSON.stringify(initialAddr);
 
   function set<K extends keyof PrivateFields>(key: K, value: PrivateFields[K]) {
     setFields((f) => ({ ...f, [key]: value }));
+  }
+
+  function setAddress<K extends keyof AddressFields>(key: K, value: AddressFields[K]) {
+    setAddr((a) => ({ ...a, [key]: value }));
   }
 
   function blank(v: string) {
@@ -147,6 +161,24 @@ export default function PrivateTab({ account, onChanged }: Props) {
   async function save() {
     setSaving(true);
     setError(null);
+
+    /* Address is part of the shared person record — save it there so it stays
+       in sync with Settings / the account. HR-only fields stay on the employee. */
+    const addrChanged = JSON.stringify(addr) !== JSON.stringify(initialAddr);
+    if (addrChanged && account.person_id) {
+      const res = await fetch(`/api/people/${account.person_id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(addr),
+      });
+      if (!res.ok) {
+        setSaving(false);
+        setError(t("acc.err.privateFailed"));
+        return;
+      }
+    }
+
     const updated = await upsertEmployeeByAccountId(
       account.id,
       account.person_id,
@@ -185,8 +217,8 @@ export default function PrivateTab({ account, onChanged }: Props) {
             <label className={labelClass}>{t("acc.private.addressLine1")}</label>
             <input
               className={inputClass}
-              value={fields.private_address_line1 ?? ""}
-              onChange={(e) => set("private_address_line1", blank(e.target.value))}
+              value={addr.address_line1 ?? ""}
+              onChange={(e) => setAddress("address_line1", blank(e.target.value))}
               placeholder={t("acc.private.addressPlaceholder1")}
             />
           </div>
@@ -194,8 +226,8 @@ export default function PrivateTab({ account, onChanged }: Props) {
             <label className={labelClass}>{t("acc.private.addressLine2")}</label>
             <input
               className={inputClass}
-              value={fields.private_address_line2 ?? ""}
-              onChange={(e) => set("private_address_line2", blank(e.target.value))}
+              value={addr.address_line2 ?? ""}
+              onChange={(e) => setAddress("address_line2", blank(e.target.value))}
               placeholder={t("acc.private.addressPlaceholder2")}
             />
           </div>
@@ -203,32 +235,32 @@ export default function PrivateTab({ account, onChanged }: Props) {
             <label className={labelClass}>{t("acc.private.city")}</label>
             <input
               className={inputClass}
-              value={fields.private_city ?? ""}
-              onChange={(e) => set("private_city", blank(e.target.value))}
+              value={addr.city ?? ""}
+              onChange={(e) => setAddress("city", blank(e.target.value))}
             />
           </div>
           <div>
             <label className={labelClass}>{t("acc.private.state")}</label>
             <input
               className={inputClass}
-              value={fields.private_state ?? ""}
-              onChange={(e) => set("private_state", blank(e.target.value))}
+              value={addr.state ?? ""}
+              onChange={(e) => setAddress("state", blank(e.target.value))}
             />
           </div>
           <div>
             <label className={labelClass}>{t("acc.private.country")}</label>
             <input
               className={inputClass}
-              value={fields.private_country ?? ""}
-              onChange={(e) => set("private_country", blank(e.target.value))}
+              value={addr.country ?? ""}
+              onChange={(e) => setAddress("country", blank(e.target.value))}
             />
           </div>
           <div>
             <label className={labelClass}>{t("acc.private.postalCode")}</label>
             <input
               className={inputClass}
-              value={fields.private_postal_code ?? ""}
-              onChange={(e) => set("private_postal_code", blank(e.target.value))}
+              value={addr.postal_code ?? ""}
+              onChange={(e) => setAddress("postal_code", blank(e.target.value))}
             />
           </div>
         </div>

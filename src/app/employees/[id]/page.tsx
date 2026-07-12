@@ -422,8 +422,8 @@ export default function EmployeeProfilePage({
               <div>
                 <InfoRow label="Work email" value={employee.work_email} />
                 <InfoRow label="Work phone" value={employee.work_phone} />
-                <InfoRow label="Address" value={[employee.private_address_line1, employee.private_address_line2, employee.private_city, employee.private_state, employee.private_country].filter(Boolean).join(", ")} />
-                <InfoRow label="Postal code" value={employee.private_postal_code} />
+                <InfoRow label="Address" value={[person.address_line1, person.address_line2, person.city, person.state, person.country].filter(Boolean).join(", ")} />
+                <InfoRow label="Postal code" value={person.postal_code} />
               </div>
             </section>
 

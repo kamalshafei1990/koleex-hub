@@ -603,12 +603,9 @@ export interface EmployeeRow {
   notes: string | null;
 
   // Private HR fields (added in accounts v2 phase 1)
-  private_address_line1: string | null;
-  private_address_line2: string | null;
-  private_city: string | null;
-  private_state: string | null;
-  private_country: string | null;
-  private_postal_code: string | null;
+  // NOTE: private_address_* removed (identity consolidation) — the home address
+  // now lives on the shared people record (people.address_*). See
+  // docs/identity-data-architecture-plan.md.
   emergency_contact_name: string | null;
   emergency_contact_phone: string | null;
   emergency_contact_relationship: string | null;

@@ -272,14 +272,8 @@ export async function POST(req: Request) {
       work_location: str(body, "work_location") || "office",
       manager_id: str(body, "manager_id"),
       notes: null,
-      /* Identity consolidation P1: address now lives on the person record
-         (people.address_*) above — these HR columns are retired. */
-      private_address_line1: null,
-      private_address_line2: null,
-      private_city: null,
-      private_state: null,
-      private_country: null,
-      private_postal_code: null,
+      /* Identity consolidation: home address lives on the person record
+         (people.address_*, set above) — the private_address_* columns are gone. */
       emergency_contact_name: str(body, "emergency_contact_name"),
       emergency_contact_phone: str(body, "emergency_contact_phone"),
       emergency_contact_relationship: str(body, "emergency_contact_relationship"),
