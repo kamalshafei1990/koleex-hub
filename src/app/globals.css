@@ -719,13 +719,14 @@ input[type="number"]:not(.kx-spinner) {
    defaults are untouched.
    =========================================================================== */
 
-/* Text size — scales rem-based text. --kx-font-scale defaults to 1.
-   Applied on :root so all rem units (Tailwind text-sm/base/lg, prose, inputs)
-   scale together. !important guards against Tailwind preflight. */
+/* Text size — scales the whole interface. --kx-font-scale defaults to 1.
+   The hub's type is authored in fixed pixels (text-[13px] …, ~6.8k usages),
+   which `font-size`/rem scaling can't touch — so we use CSS `zoom`, which
+   scales px, spacing and icons proportionally (broadly supported: Chromium,
+   Safari, Firefox 126+). Applied to <body> so fixed headers/modals still work.
+   Keep the rem base too, for the handful of rem-based bits. */
 :root { --kx-font-scale: 1; }
-/* Multiply the user's own browser/OS base font size (100%) rather than
-   hardcoding 16px, so this respects their OS accessibility text-size setting. */
-html { font-size: calc(100% * var(--kx-font-scale, 1)) !important; }
+body { zoom: var(--kx-font-scale, 1); }
 
 /* Reduce motion — neutralize transitions/animations app-wide. */
 .kx-reduce-motion *,

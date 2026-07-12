@@ -6,7 +6,9 @@
    live document, plus format helpers that read the region prefs.
 
    Visual prefs applied to <html>:
-     · text_size          → --kx-font-scale CSS var (scales rem-based text)
+     · text_size          → --kx-font-scale CSS var (globals.css applies it as
+                            `body { zoom }`, since the hub's type is fixed-px —
+                            rem/font-size scaling wouldn't touch it)
      · density            → data-density attribute
      · reduce_motion      → .kx-reduce-motion class (globals.css kills anim)
      · high_contrast      → .kx-high-contrast class
