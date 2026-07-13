@@ -20,13 +20,15 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { hasProductDataAccess } from "@/lib/server/product-access";
+import { hasProductCostAccess } from "@/lib/server/product-access";
 
 export async function GET(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
 
-  if (!(await hasProductDataAccess(auth))) {
+  /* Cost history is pure COST data — needs can_view_private, not just
+     Product Data membership (same policy as model cost_price). */
+  if (!(await hasProductCostAccess(auth))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

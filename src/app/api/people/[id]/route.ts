@@ -2,11 +2,18 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAction } from "@/lib/server/auth";
+import { requireAuth } from "@/lib/server/auth";
+import { callerMayEditPeople } from "@/lib/server/people-access";
 
 /* PATCH /api/people/[id] — update a person row.
-   Dual-use: a signed-in user may edit their OWN person profile (Settings
-   self-service); editing anyone else's record is an Accounts-admin action. */
+
+   ACCESS POLICY (access-architecture vision, 2026-07-13): employee identity
+   data is COMPANY data. Regular users may NOT edit their own person record —
+   only callers whose role can edit Employees or Accounts (or the Super
+   Admin) may modify people rows, including their own. Self-service in
+   Settings is limited to account PREFERENCES (language/theme/pronouns/
+   links), which live on accounts.preferences, not here. */
+
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -15,16 +22,17 @@ export async function PATCH(
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
 
-  // Self-service exemption: allow editing your own linked person row.
-  const { data: me } = await supabaseServer
-    .from("accounts")
-    .select("person_id")
-    .eq("id", auth.account_id)
-    .maybeSingle();
-  const isSelf = (me as { person_id?: string | null } | null)?.person_id === id;
-  if (!isSelf) {
-    const deny = await requireModuleAction(auth, "Accounts", "edit");
-    if (deny) return deny;
+  /* Identity edits require HR (Employees) or Accounts edit rights — for
+     EVERY row, including the caller's own. An employee's information is
+     company data maintained by the managers whose position allows it. */
+  if (!(await callerMayEditPeople(auth))) {
+    return NextResponse.json(
+      {
+        error:
+          "Your information is maintained by HR. Contact your manager to update it.",
+      },
+      { status: 403 },
+    );
   }
 
   // Tenant check.

@@ -2,16 +2,17 @@
 
 /* Settings → Profile.
 
-   Self-service profile editor. Everything here writes to the caller's OWN
-   records through routes that enforce "editing self OR Accounts-admin", so
-   there's no new privilege surface:
+   ACCESS POLICY (access-architecture vision): employee identity data is
+   COMPANY data. Identity/contact/address fields are EDITABLE only when the
+   caller's role can edit Employees or Accounts (GET /api/me/can-edit-profile,
+   same rule the server enforces on PATCH /api/people/[id]) — everyone else
+   sees them read-only with a "maintained by HR" note. Personal touches stay
+   self-service for everyone:
 
-     · people row      → PATCH /api/people/[id]   (name, title, contact, address)
      · avatar          → updateAccountAvatar       (accounts.avatar_url)
      · pronouns/links   → accounts.preferences.profile (JSON bag, no migration)
 
-   Work identity (role, department, employee no., dates) is shown read-only —
-   it stays admin-managed, we only surface it so the profile feels complete. */
+   Work identity (role, department, employee no., dates) is always read-only. */
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AccountWithLinks } from "@/types/supabase";
@@ -92,6 +93,18 @@ export default function ProfileTab({
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  /* May this user edit identity fields? Fail-closed: fields stay locked
+     until the server says yes (same rule as PATCH /api/people/[id]). */
+  const [canEditIdentity, setCanEditIdentity] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/me/can-edit-profile", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : { allowed: false }))
+      .then((j: { allowed?: boolean }) => { if (!cancelled) setCanEditIdentity(j.allowed === true); })
+      .catch(() => { /* stay locked */ });
+    return () => { cancelled = true; };
+  }, []);
+
   /* Re-sync when the account refreshes (avatar save, prefs save elsewhere). */
   useEffect(() => { setForm(peopleFrom(account)); }, [account]);
   useEffect(() => {
@@ -120,7 +133,9 @@ export default function ProfileTab({
     () => withDefaults(account.preferences).profile as ProfilePrefs,
     [account.preferences],
   );
-  const peopleDirty = (Object.keys(form) as (keyof PeopleForm)[]).some((k) => form[k] !== base[k]);
+  const peopleDirty =
+    canEditIdentity &&
+    (Object.keys(form) as (keyof PeopleForm)[]).some((k) => form[k] !== base[k]);
   const profDirty =
     (prof.pronouns ?? "") !== (baseProf.pronouns ?? "") ||
     (["linkedin", "website", "wechat", "whatsapp"] as const).some(
@@ -203,9 +218,17 @@ export default function ProfileTab({
 
   const roleLine = account.role?.name || capitalize(account.user_type);
 
+  const ro = !canEditIdentity; // read-only identity fields
+
   return (
     <div className="space-y-4 pb-2">
-      <IdentitySourceNote text="Your name, contact, and address are one shared person record — the same details also shown in the Accounts app and your HR profile. Editing here updates them everywhere." />
+      <IdentitySourceNote
+        text={
+          canEditIdentity
+            ? "Your name, contact, and address are one shared person record — the same details also shown in the Accounts app and your HR profile. Editing here updates them everywhere."
+            : "Your name, contact, and address are company records maintained by HR — contact your manager to update them. Your photo, pronouns, and links are yours to change."
+        }
+      />
 
       {/* ── Identity ── */}
       <Card title="Identity" subtitle="How you appear across the hub.">
@@ -253,28 +276,28 @@ export default function ProfileTab({
         </div>
 
         <Grid>
-          <Field label="Full name" icon={<UserIcon size={14} />} value={form.full_name} onChange={set("full_name")} placeholder="Your legal / full name" />
-          <Field label="Preferred name" value={form.display_name} onChange={set("display_name")} placeholder="What people call you" />
-          <Field label="Name in native script" value={form.name_alt} onChange={set("name_alt")} placeholder="الاسم / 姓名" dir="auto" />
-          <Field label="Job title" icon={<BriefcaseIcon size={14} />} value={form.job_title} onChange={set("job_title")} placeholder="e.g. Operations Manager" />
+          <Field label="Full name" icon={<UserIcon size={14} />} value={form.full_name} onChange={set("full_name")} placeholder="Your legal / full name" disabled={ro} />
+          <Field label="Preferred name" value={form.display_name} onChange={set("display_name")} placeholder="What people call you" disabled={ro} />
+          <Field label="Name in native script" value={form.name_alt} onChange={set("name_alt")} placeholder="الاسم / 姓名" dir="auto" disabled={ro} />
+          <Field label="Job title" icon={<BriefcaseIcon size={14} />} value={form.job_title} onChange={set("job_title")} placeholder="e.g. Operations Manager" disabled={ro} />
           <Field label="Pronouns" value={prof.pronouns ?? ""} onChange={(v) => setProf((p) => ({ ...p, pronouns: v }))} placeholder="e.g. he/him" />
           <Select label="Preferred language" icon={<GlobeIcon size={14} />} value={form.language} onChange={set("language")}
-            options={[{ v: "", l: "Not set" }, { v: "en", l: "English" }, { v: "ar", l: "العربية" }, { v: "zh", l: "中文" }]} />
+            options={[{ v: "", l: "Not set" }, { v: "en", l: "English" }, { v: "ar", l: "العربية" }, { v: "zh", l: "中文" }]} disabled={ro} />
         </Grid>
 
         <div className="mt-4">
-          <TextArea label="About" value={form.notes} onChange={set("notes")} placeholder="A short line about your role or focus — shown on your profile card." />
+          <TextArea label="About" value={form.notes} onChange={set("notes")} placeholder="A short line about your role or focus — shown on your profile card." disabled={ro} />
         </div>
       </Card>
 
       {/* ── Contact & address ── */}
       <Card title="Contact & address">
         <Grid>
-          <Field label="Personal phone" icon={<PhoneIcon size={14} />} value={form.phone} onChange={set("phone")} type="tel" placeholder="+1 234 567 890" />
-          <Field label="Mobile" icon={<PhoneIcon size={14} />} value={form.mobile} onChange={set("mobile")} type="tel" placeholder="Cell number" />
+          <Field label="Personal phone" icon={<PhoneIcon size={14} />} value={form.phone} onChange={set("phone")} type="tel" placeholder="+1 234 567 890" disabled={ro} />
+          <Field label="Mobile" icon={<PhoneIcon size={14} />} value={form.mobile} onChange={set("mobile")} type="tel" placeholder="Cell number" disabled={ro} />
         </Grid>
         <div className="mt-4">
-          <Field label="Personal email" icon={<EnvelopeIcon size={14} />} value={form.email} onChange={set("email")} type="email" placeholder="your-personal@example.com" />
+          <Field label="Personal email" icon={<EnvelopeIcon size={14} />} value={form.email} onChange={set("email")} type="email" placeholder="your-personal@example.com" disabled={ro} />
         </div>
 
         {/* Links */}
@@ -288,31 +311,35 @@ export default function ProfileTab({
 
         {/* Address */}
         <p className="mt-6 mb-2 text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider flex items-center gap-1.5"><MapPinIcon size={13} /> Address</p>
-        <AddressAutocomplete
-          label="Search address"
-          placeholder="Start typing an address…"
-          hint="Picks fill country / province / city below."
-          onSelect={(g) => setForm((f) => ({
-            ...f,
-            address_line1: g.formatted || f.address_line1,
-            country: g.country || f.country,
-            state: g.province || f.state,
-            city: g.city || f.city,
-          }))}
-        />
+        {!ro && (
+          <AddressAutocomplete
+            label="Search address"
+            placeholder="Start typing an address…"
+            hint="Picks fill country / province / city below."
+            onSelect={(g) => setForm((f) => ({
+              ...f,
+              address_line1: g.formatted || f.address_line1,
+              country: g.country || f.country,
+              state: g.province || f.state,
+              city: g.city || f.city,
+            }))}
+          />
+        )}
         <div className="mt-3 space-y-4">
-          <Field label="Address line 1" value={form.address_line1} onChange={set("address_line1")} placeholder="Street address" />
-          <Field label="Address line 2" value={form.address_line2} onChange={set("address_line2")} placeholder="Apt, suite, unit (optional)" />
+          <Field label="Address line 1" value={form.address_line1} onChange={set("address_line1")} placeholder="Street address" disabled={ro} />
+          <Field label="Address line 2" value={form.address_line2} onChange={set("address_line2")} placeholder="Apt, suite, unit (optional)" disabled={ro} />
           <Grid>
-            <Field label="City" value={form.city} onChange={set("city")} />
-            <Field label="State / province" value={form.state} onChange={set("state")} />
-            <Field label="Country" value={form.country} onChange={set("country")} />
-            <Field label="Postal code" value={form.postal_code} onChange={set("postal_code")} />
+            <Field label="City" value={form.city} onChange={set("city")} disabled={ro} />
+            <Field label="State / province" value={form.state} onChange={set("state")} disabled={ro} />
+            <Field label="Country" value={form.country} onChange={set("country")} disabled={ro} />
+            <Field label="Postal code" value={form.postal_code} onChange={set("postal_code")} disabled={ro} />
           </Grid>
         </div>
 
         <p className="mt-5 text-[11px] text-[var(--text-faint)]">
-          Username, login email, password, role, and HR data are managed by your administrator.
+          {ro
+            ? "Name, contact, and address are maintained by HR. Username, login email, password, role, and HR data are managed by your administrator."
+            : "Username, login email, password, role, and HR data are managed by your administrator."}
         </p>
       </Card>
 
@@ -378,10 +405,10 @@ function Label({ icon, children }: { icon?: React.ReactNode; children: React.Rea
 }
 
 function Field({
-  label, icon, value, onChange, placeholder, type = "text", dir,
+  label, icon, value, onChange, placeholder, type = "text", dir, disabled,
 }: {
   label: string; icon?: React.ReactNode; value: string; onChange: (v: string) => void;
-  placeholder?: string; type?: string; dir?: "auto" | "ltr" | "rtl";
+  placeholder?: string; type?: string; dir?: "auto" | "ltr" | "rtl"; disabled?: boolean;
 }) {
   return (
     <div>
@@ -392,14 +419,15 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full h-10 px-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--border-focus)] transition-colors"
+        disabled={disabled}
+        className="w-full h-10 px-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--border-focus)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
       />
     </div>
   );
 }
 
-function TextArea({ label, value, onChange, placeholder }: {
-  label: string; value: string; onChange: (v: string) => void; placeholder?: string;
+function TextArea({ label, value, onChange, placeholder, disabled }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; disabled?: boolean;
 }) {
   return (
     <div>
@@ -409,15 +437,16 @@ function TextArea({ label, value, onChange, placeholder }: {
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         rows={2}
-        className="w-full px-3 py-2.5 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--border-focus)] transition-colors resize-y"
+        disabled={disabled}
+        className="w-full px-3 py-2.5 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--border-focus)] transition-colors resize-y disabled:opacity-60 disabled:cursor-not-allowed"
       />
     </div>
   );
 }
 
-function Select({ label, icon, value, onChange, options }: {
+function Select({ label, icon, value, onChange, options, disabled }: {
   label: string; icon?: React.ReactNode; value: string; onChange: (v: string) => void;
-  options: { v: string; l: string }[];
+  options: { v: string; l: string }[]; disabled?: boolean;
 }) {
   return (
     <div>
@@ -425,7 +454,8 @@ function Select({ label, icon, value, onChange, options }: {
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full h-10 px-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-focus)] transition-colors"
+        disabled={disabled}
+        className="w-full h-10 px-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-focus)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {options.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
       </select>

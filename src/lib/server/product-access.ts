@@ -18,6 +18,7 @@ import "server-only";
 
 import { supabaseServer } from "./supabase-server";
 import { requireModuleAction, type ModuleAction, type ServerAuthContext } from "./auth";
+import { canViewPrivate } from "./sensitive-columns";
 import type { NextResponse } from "next/server";
 
 /** Granular write gate for every product-data mutation. Honors the role's
@@ -178,4 +179,16 @@ export async function hasProductDataAccess(auth: ServerAuthContext): Promise<boo
      semantics exactly — same gate, different return shape. */
   if (override.data !== null) return override.data?.can_view === true;
   return rolePerm.data?.can_view === true;
+}
+
+/** Does the caller see COST-side product data (model cost_price, supplier,
+ *  moq, cost history)? Stricter than hasProductDataAccess: opening the
+ *  Product Data app lets you browse/edit the catalogue, but the purchase
+ *  cost relationship needs the role's `can_view_private` flag (or SA).
+ *  This is the "Finance Manager sees cost price, Sales doesn't" gate —
+ *  managed per-role in Roles & Permissions. Mirrors the AI agent's
+ *  SENSITIVE_FIELDS policy so REST and AI answers can never disagree. */
+export async function hasProductCostAccess(auth: ServerAuthContext): Promise<boolean> {
+  if (!canViewPrivate(auth)) return false;
+  return hasProductDataAccess(auth);
 }

@@ -17,14 +17,16 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { hasProductDataAccess, PUBLIC_PRODUCT_COLUMNS } from "@/lib/server/product-access";
+import { hasProductCostAccess, hasProductDataAccess, PUBLIC_PRODUCT_COLUMNS } from "@/lib/server/product-access";
 
 export async function GET() {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
   const canSeeSecrets = await hasProductDataAccess(auth);
+  /* Supplier names on models are COST-side data — stricter gate. */
+  const canSeeCosts = canSeeSecrets && (await hasProductCostAccess(auth));
 
-  const modelCols = canSeeSecrets
+  const modelCols = canSeeCosts
     ? `product_id, supplier, model_name, "order"`
     : `product_id, model_name, "order"`;
 
@@ -59,12 +61,12 @@ export async function GET() {
     if (row.model_name && !primaryModelNames[row.product_id]) {
       primaryModelNames[row.product_id] = row.model_name;
     }
-    if (canSeeSecrets && row.supplier) {
+    if (canSeeCosts && row.supplier) {
       if (!suppliers[row.product_id]) suppliers[row.product_id] = [];
       if (!suppliers[row.product_id].includes(row.supplier)) {
+        supplierSet.add(row.supplier);
         suppliers[row.product_id].push(row.supplier);
       }
-      supplierSet.add(row.supplier);
     }
   }
 

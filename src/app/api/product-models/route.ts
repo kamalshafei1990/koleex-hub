@@ -21,7 +21,7 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { hasProductDataAccess, PUBLIC_MODEL_COLUMNS, requireProductDataAction } from "@/lib/server/product-access";
+import { hasProductCostAccess, PUBLIC_MODEL_COLUMNS, requireProductDataAction } from "@/lib/server/product-access";
 
 export async function GET(req: Request) {
   const auth = await requireAuth();
@@ -30,7 +30,10 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const productId = url.searchParams.get("product_id");
   const wantSummary = url.searchParams.get("summary") === "1";
-  const canSeeSecrets = await hasProductDataAccess(auth);
+  /* Model secrets = COST-side data (cost_price / supplier / moq). Stricter
+     than plain Product Data membership: requires can_view_private too, so a
+     Sales role browsing the catalogue never receives purchase costs. */
+  const canSeeSecrets = await hasProductCostAccess(auth);
 
   if (wantSummary) {
     /* Counts are safe for everyone; supplier names are admin-only.

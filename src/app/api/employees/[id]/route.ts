@@ -2,7 +2,13 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAction } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
+import {
+  EMPLOYEE_PRIVATE_COLUMNS,
+  canViewPrivate,
+  sanitizeAccountRow,
+  sanitizeEmployeeRow,
+} from "@/lib/server/sensitive-columns";
 
 /* GET /api/employees/[id] — full profile joined across tables.
  *
@@ -17,6 +23,12 @@ export async function GET(
   const { id } = await params;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
+
+  /* Employee profiles are company data — require the Employees module.
+     Without this, ANY signed-in account (including customer logins) could
+     pull full HR rows by id. Fail-closed like every other module gate. */
+  const deny = await requireModuleAccess(auth, "Employees");
+  if (deny) return deny;
 
   const { data: emp, error: empErr } = await supabaseServer
     .from("koleex_employees")
@@ -62,10 +74,15 @@ export async function GET(
     position = pos;
   }
 
+  /* Column-level policy (shared registry, same rules as Koleex AI):
+     · salary / banking / legal-ID columns need can_view_private (or SA)
+     · account login secrets (password_hash etc.) never leave the server */
   return NextResponse.json({
     person,
-    employee: emp,
-    account: (accountRes as { data: unknown }).data ?? null,
+    employee: sanitizeEmployeeRow(auth, emp as Record<string, unknown>),
+    account: sanitizeAccountRow(
+      ((accountRes as { data: unknown }).data ?? null) as Record<string, unknown> | null,
+    ),
     assignment,
     department,
     position,
@@ -92,6 +109,13 @@ export async function PATCH(
   const patch = (await req.json()) as Record<string, unknown>;
   delete patch.id;
   delete patch.tenant_id;
+
+  /* Can't-read → can't-write: without can_view_private the GET never sent
+     salary/bank/legal-ID columns, so drop them from the patch rather than
+     let a blanked form field overwrite real HR data. */
+  if (!canViewPrivate(auth)) {
+    for (const c of EMPLOYEE_PRIVATE_COLUMNS) delete patch[c];
+  }
 
   const { error } = await supabaseServer
     .from("koleex_employees")

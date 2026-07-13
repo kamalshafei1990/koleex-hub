@@ -27,6 +27,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { sanitizeContactRows } from "@/lib/server/sensitive-columns";
 import { persistContactImages } from "@/lib/server/persist-contact-images";
 
 /* Map contact_type → ERP module name. Unknown / missing types fall
@@ -93,7 +94,12 @@ export async function GET(req: Request) {
     return r;
   });
 
-  return NextResponse.json({ contacts: slim }, {
+  /* Column-level policy: credit limits, payment terms, margins-adjacent
+     commercial data need can_view_private — module access alone lets a
+     user browse the directory, not the credit relationship. */
+  const visible = sanitizeContactRows(auth, slim);
+
+  return NextResponse.json({ contacts: visible }, {
     headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300" },
   });
 }

@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "validate:access": "tsx scripts/validate-access.ts",
     "validate:session-codec": "tsx scripts/validate-session-codec.ts",
     "validate:apply-scope": "tsx scripts/validate-apply-scope.ts",
     "validate:ai-quotation-guard": "tsx scripts/validate-ai-quotation-guard.ts",

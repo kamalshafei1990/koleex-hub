@@ -5,6 +5,11 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { deptsFromFields, recordSectionEdits } from "@/lib/suppliers/section-audit";
 import { persistContactImages } from "@/lib/server/persist-contact-images";
+import {
+  CONTACT_PRIVATE_COLUMNS,
+  canViewPrivate,
+  sanitizeContactRow,
+} from "@/lib/server/sensitive-columns";
 
 /* PATCH /api/contacts/[id] — update a contact. Tenant-enforced.
    DELETE /api/contacts/[id] — remove a contact. Tenant-enforced.
@@ -53,7 +58,9 @@ export async function GET(
      a `linked_person` marker so the UI can show "identity from person record".
      Business/CRM fields stay on the contact. Dormant when person_id is null. */
   const withPerson = await overlayLinkedPerson(data as Record<string, unknown>);
-  return NextResponse.json({ contact: withPerson });
+  /* Column-level policy (shared registry): credit limits / payment terms /
+     commercial margins need can_view_private, not just directory access. */
+  return NextResponse.json({ contact: sanitizeContactRow(auth, withPerson) });
 }
 
 /** Overlay the linked person's identity fields onto a contact row (P3). */
@@ -107,6 +114,14 @@ export async function PATCH(
   delete patch.id;
   delete patch.tenant_id;
   delete patch.created_at;
+
+  /* Can't-read → can't-write. Callers without can_view_private never receive
+     the credit/commercial columns (GET strips them), so any value they submit
+     for those columns is either blind or a blanked form field — drop them from
+     the patch instead of overwriting real data. */
+  if (!canViewPrivate(auth)) {
+    for (const c of CONTACT_PRIVATE_COLUMNS) delete patch[c];
+  }
 
   /* Root-cause guard: move any inline base64 avatar into Storage so an edit
      saves a short URL, never re-introducing multi-KB base64 into the row. */
