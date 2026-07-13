@@ -8,7 +8,6 @@
    estimate of MTD earned commission across won opportunities. */
 
 import { useEffect, useMemo, useState } from "react";
-import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import type { SalesModuleProps } from "../SalesApp";
 import { cardCls, formatMoney, sectionTitleCls } from "../shared";
 import LineChartIcon from "@/components/icons/ui/LineChartIcon";
@@ -34,19 +33,16 @@ export default function CommissionsModule({ t }: SalesModuleProps) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [tR, wR] = await Promise.all([
-        supabase
-          .from("commercial_commission_tiers")
-          .select("id,code,name,rate_percent,applies_to,sort_order,is_active")
-          .order("sort_order", { ascending: true, nullsFirst: false }),
-        supabase
-          .from("crm_opportunities")
-          .select("id,expected_revenue,won_at")
-          .not("won_at", "is", null),
-      ]);
+      /* RLS-5: gated tenant-scoped read (was direct anon-client queries —
+         the crm_opportunities one was already RLS-blocked and returned [],
+         so the MTD estimate works for the first time via this route). */
+      const res = await fetch("/api/sales/commercial-tiers?view=commissions", { credentials: "include" });
+      const j = res.ok
+        ? ((await res.json()) as { tiers?: Tier[]; won?: WonOpp[] })
+        : { tiers: [], won: [] };
       if (cancelled) return;
-      setTiers((tR.data ?? []) as Tier[]);
-      setWon((wR.data ?? []) as WonOpp[]);
+      setTiers(j.tiers ?? []);
+      setWon(j.won ?? []);
       setLoading(false);
     })();
     return () => { cancelled = true; };

@@ -6,7 +6,6 @@
    so buyers can renegotiate before lapse. */
 
 import { useEffect, useMemo, useState } from "react";
-import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import type { PurchaseModuleProps } from "../shared";
 import { cardCls, formatMoney, formatDate, sectionTitleCls } from "../shared";
 import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
@@ -36,18 +35,15 @@ export default function ContractsModule({ t }: PurchaseModuleProps) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [r, c] = await Promise.all([
-        supabase
-          .from("supplier_contracts")
-          .select("id,contract_no,title,supplier_id,start_date,end_date,total_value,currency,status")
-          .order("created_at", { ascending: false })
-          .limit(30),
-        supabase.from("contacts").select("id,display_name,company_name,full_name").eq("contact_type", "supplier"),
-      ]);
+      /* RLS-5: gated tenant-scoped read (was a direct anon-client query). */
+      const res = await fetch("/api/purchase/list?resource=contracts", { credentials: "include" });
+      const j = res.ok
+        ? ((await res.json()) as { rows?: Contract[]; suppliers?: { id: string; display_name: string | null; company_name: string | null; full_name: string | null }[] })
+        : { rows: [], suppliers: [] };
       if (cancelled) return;
-      setRows((r.data ?? []) as Contract[]);
+      setRows(j.rows ?? []);
       const m = new Map<string, string>();
-      for (const x of (c.data ?? []) as { id: string; display_name: string | null; company_name: string | null; full_name: string | null }[]) {
+      for (const x of j.suppliers ?? []) {
         m.set(x.id, x.company_name || x.display_name || x.full_name || "—");
       }
       setSupplierName(m);

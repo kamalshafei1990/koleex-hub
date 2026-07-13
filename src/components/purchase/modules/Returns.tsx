@@ -5,7 +5,6 @@
    PO / receipt / bill the return offsets. */
 
 import { useEffect, useState } from "react";
-import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import type { PurchaseModuleProps } from "../shared";
 import { cardCls, formatMoney, formatDate, sectionTitleCls } from "../shared";
 import CornerUpLeftIcon from "@/components/icons/ui/CornerUpLeftIcon";
@@ -35,18 +34,15 @@ export default function ReturnsModule({ t }: PurchaseModuleProps) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [rR, cR] = await Promise.all([
-        supabase
-          .from("purchase_returns")
-          .select("id,return_no,status,supplier_id,reason,total_value,refund_amount,currency,return_date,created_at")
-          .order("created_at", { ascending: false })
-          .limit(30),
-        supabase.from("contacts").select("id,display_name,company_name,full_name").eq("contact_type", "supplier"),
-      ]);
+      /* RLS-5: gated tenant-scoped read (was a direct anon-client query). */
+      const res = await fetch("/api/purchase/list?resource=returns", { credentials: "include" });
+      const j = res.ok
+        ? ((await res.json()) as { rows?: Return[]; suppliers?: { id: string; display_name: string | null; company_name: string | null; full_name: string | null }[] })
+        : { rows: [], suppliers: [] };
       if (cancelled) return;
-      setRows((rR.data ?? []) as Return[]);
+      setRows(j.rows ?? []);
       const m = new Map<string, string>();
-      for (const c of (cR.data ?? []) as { id: string; display_name: string | null; company_name: string | null; full_name: string | null }[]) {
+      for (const c of j.suppliers ?? []) {
         m.set(c.id, c.company_name || c.display_name || c.full_name || "—");
       }
       setSupplierName(m);

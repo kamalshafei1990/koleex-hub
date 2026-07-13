@@ -8,7 +8,6 @@
      · commercial_volume_discount_tiers — order-size-based bands */
 
 import { useEffect, useState } from "react";
-import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import type { SalesModuleProps } from "../SalesApp";
 import { cardCls, formatMoney, sectionTitleCls } from "../shared";
 import LineChartIcon from "@/components/icons/ui/LineChartIcon";
@@ -36,17 +35,14 @@ export default function DiscountsModule({ t }: SalesModuleProps) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [d, v] = await Promise.all([
-        supabase.from("commercial_discount_tiers")
-          .select("id,code,label,min_percent,max_percent,approver_role,sort_order,is_active")
-          .order("sort_order", { ascending: true, nullsFirst: false }),
-        supabase.from("commercial_volume_discount_tiers")
-          .select("id,code,name,min_order_usd,max_order_usd,discount_min_percent,discount_max_percent,sort_order,is_active")
-          .order("sort_order", { ascending: true, nullsFirst: false }),
-      ]);
+      /* RLS-5: gated tenant-scoped read (was direct anon-client queries). */
+      const res = await fetch("/api/sales/commercial-tiers?view=discounts", { credentials: "include" });
+      const j = res.ok
+        ? ((await res.json()) as { tiers?: DiscountTier[]; volumes?: VolumeTier[] })
+        : { tiers: [], volumes: [] };
       if (cancelled) return;
-      setTiers((d.data ?? []) as DiscountTier[]);
-      setVols((v.data ?? []) as VolumeTier[]);
+      setTiers(j.tiers ?? []);
+      setVols(j.volumes ?? []);
       setLoading(false);
     })();
     return () => { cancelled = true; };

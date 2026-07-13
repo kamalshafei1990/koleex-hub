@@ -65,6 +65,21 @@ const RESOURCES: Record<string, Spec> = {
     select: "id,code,name,kind,description,is_active",
     order: [{ col: "kind" }, { col: "name" }],
   },
+  /* RLS-5: Returns + Contracts module tabs (previously anon-client reads). */
+  returns: {
+    table: "purchase_returns",
+    select: "id,return_no,status,supplier_id,reason,total_value,refund_amount,currency,return_date,created_at",
+    order: [{ col: "created_at", ascending: false }],
+    limit: 30,
+    withSuppliers: true,
+  },
+  contracts: {
+    table: "supplier_contracts",
+    select: "id,contract_no,title,supplier_id,start_date,end_date,total_value,currency,status",
+    order: [{ col: "created_at", ascending: false }],
+    limit: 30,
+    withSuppliers: true,
+  },
 };
 
 const SUPP_MIN = "id,display_name,company_name,full_name";
