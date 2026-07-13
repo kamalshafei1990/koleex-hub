@@ -30,14 +30,16 @@ const RESOURCES: Record<string, Spec> = {
     table: "purchase_orders",
     select: "id,po_no,status,supplier_id,total,currency,order_date,expected_delivery_date,created_at",
     order: [{ col: "created_at", ascending: false }],
-    limit: 30,
+    /* 200 (was 30): the create-dialogs' "Linked PO" pickers reuse this
+       resource and previously loaded 200 via the anon client (RLS-4). */
+    limit: 200,
     withSuppliers: true,
   },
   bills: {
     table: "vendor_bills",
     select: "id,bill_no,supplier_invoice_no,status,supplier_id,total,balance,currency,bill_date,due_date,created_at",
     order: [{ col: "created_at", ascending: false }],
-    limit: 30,
+    limit: 200,
     withSuppliers: true,
   },
   requisitions: {
@@ -174,6 +176,35 @@ export async function GET(req: Request) {
   const tid = auth.tenant_id;
 
   const key = new URL(req.url).searchParams.get("resource") ?? "";
+
+  /* RLS-4 picker resources for the create-dialogs (anon-client replacements). */
+  if (key === "supplier_options") {
+    return NextResponse.json({ rows: await suppliersAll(tid) });
+  }
+  if (key === "nextnos") {
+    /* Suggested next doc numbers for all five dialogs in one call. */
+    const yr = new Date().getFullYear();
+    const nextNo = async (table: string, col: string, prefix: string) => {
+      const { data } = await supabaseServer
+        .from(table)
+        .select(col)
+        .eq("tenant_id", tid)
+        .ilike(col, `${prefix}-${yr}-%`)
+        .order(col, { ascending: false })
+        .limit(1);
+      const last = ((data?.[0] ?? {}) as Record<string, unknown>)[col] as string | undefined;
+      const n = last ? (Number(last.split("-").pop()) || 0) + 1 : 1;
+      return `${prefix}-${yr}-${String(n).padStart(4, "0")}`;
+    };
+    const [pr, po, gr, bill, pay] = await Promise.all([
+      nextNo("purchase_requisitions", "pr_no", "PR"),
+      nextNo("purchase_orders", "po_no", "PO"),
+      nextNo("purchase_receipts", "gr_no", "GR"),
+      nextNo("vendor_bills", "bill_no", "BILL"),
+      nextNo("vendor_payments", "payment_no", "PAY"),
+    ]);
+    return NextResponse.json({ pr, po, gr, bill, pay });
+  }
 
   const composite = await buildComposite(key, tid);
   if (composite) return NextResponse.json(composite);

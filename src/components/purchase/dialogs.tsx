@@ -20,8 +20,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Modal from "@/components/admin/form-sections/Modal";
-import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import { dialog } from "@/lib/ui-dialog";
+
+/* RLS-4: every read/write in this file goes through the gated Purchase API
+   (/api/purchase/list pickers + POST /api/purchase/create) instead of the
+   anon Supabase client, so the purchase and vendor tables can be locked
+   to service_role. */
 
 /* ─── Form primitives ─────────────────────────────────────────────── */
 
@@ -42,26 +46,28 @@ interface CategoryOption { id: string; label: string; kind: string }
 interface ProductOption  { id: string; label: string }
 
 /* ─── Numbering helper ────────────────────────────────────────────────
-   Generates the next "PREFIX-YYYY-NNNN" doc number by reading the
-   last existing one. Good enough for single-buyer ops; if two
-   admins click "New" at the exact same second the last one wins
-   (next save bumps to NNN+1 because the unique constraint catches
-   the dupe and we re-suggest). */
-async function suggestNextDocNo(table: string, col: string, prefix: string): Promise<string> {
-  const yr = new Date().getFullYear();
-  const { data } = await supabase
-    .from(table)
-    .select(col)
-    .ilike(col, `${prefix}-${yr}-%`)
-    .order(col, { ascending: false })
-    .limit(1);
-  const row = (data?.[0] ?? {}) as Record<string, unknown>;
-  const last = row[col] as string | undefined;
-  if (last) {
-    const n = Number(last.split("-").pop()) || 0;
-    return `${prefix}-${yr}-${String(n + 1).padStart(4, "0")}`;
-  }
-  return `${prefix}-${yr}-0001`;
+   Suggests the next "PREFIX-YYYY-NNNN" doc number via the gated
+   nextnos resource (server computes it tenant-scoped). The create
+   route re-generates on save if the field was cleared, so a race
+   between two admins resolves server-side. */
+type NextNoKind = "pr" | "po" | "gr" | "bill" | "pay";
+async function suggestNextDocNo(kind: NextNoKind): Promise<string> {
+  try {
+    const res = await fetch("/api/purchase/list?resource=nextnos", { credentials: "include" });
+    if (!res.ok) return "";
+    const j = (await res.json()) as Record<NextNoKind, string>;
+    return j[kind] ?? "";
+  } catch { return ""; }
+}
+
+/** Shared list-resource fetch for the picker hooks below. */
+async function fetchListRows<T>(resource: string): Promise<T[]> {
+  try {
+    const res = await fetch(`/api/purchase/list?resource=${resource}`, { credentials: "include" });
+    if (!res.ok) return [];
+    const j = (await res.json()) as { rows?: T[] };
+    return Array.isArray(j.rows) ? j.rows : [];
+  } catch { return []; }
 }
 
 /* Hooks for the option lists used across multiple dialogs. Each
@@ -73,17 +79,13 @@ function useSuppliers(open: boolean): SupplierOption[] {
     if (!open) return;
     let cancelled = false;
     (async () => {
-      const r = await supabase
-        .from("contacts")
-        .select("id,display_name,company_name,full_name")
-        .eq("contact_type", "supplier")
-        .order("company_name", { ascending: true, nullsFirst: false })
-        .limit(500);
+      const rows = await fetchListRows<{ id: string; display_name: string | null; company_name: string | null; full_name: string | null }>("supplier_options");
       if (cancelled) return;
-      const opts = (r.data ?? []).map((c: { id: string; display_name: string | null; company_name: string | null; full_name: string | null }) => ({
+      const opts = rows.map((c) => ({
         id: c.id,
         label: c.company_name || c.full_name || c.display_name || "(unnamed)",
       }));
+      opts.sort((a, b) => a.label.localeCompare(b.label));
       setList(opts);
     })();
     return () => { cancelled = true; };
@@ -97,21 +99,39 @@ function useCategories(open: boolean): CategoryOption[] {
     if (!open) return;
     let cancelled = false;
     (async () => {
-      const r = await supabase
-        .from("purchase_categories")
-        .select("id,code,name,kind")
-        .order("kind").order("name");
+      const rows = await fetchListRows<{ id: string; code: string | null; name: string; kind: string }>("categories");
       if (cancelled) return;
-      const opts = (r.data ?? []).map((c: { id: string; code: string | null; name: string; kind: string }) => ({
+      setList(rows.map((c) => ({
         id: c.id,
         label: c.code ? `${c.code} · ${c.name}` : c.name,
         kind: c.kind,
-      }));
-      setList(opts);
+      })));
     })();
     return () => { cancelled = true; };
   }, [open]);
   return list;
+}
+
+/** POST to the gated create route. Returns null on success, or an error
+ *  message the dialog should show. */
+async function createPurchaseDoc(
+  kind: "requisition" | "order" | "receipt" | "bill" | "payment",
+  doc: Record<string, unknown>,
+  item?: Record<string, unknown> | null,
+): Promise<string | null> {
+  try {
+    const res = await fetch("/api/purchase/create", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, doc, item: item ?? null }),
+    });
+    if (res.ok) return null;
+    const j = (await res.json().catch(() => ({}))) as { error?: string };
+    return j.error || `Save failed (${res.status})`;
+  } catch (e) {
+    return e instanceof Error ? e.message : "Network error";
+  }
 }
 
 function useProducts(open: boolean): ProductOption[] {
@@ -191,7 +211,7 @@ export function NewRequisitionDialog({ open, onClose, onCreated }: DialogProps) 
 
   useEffect(() => {
     if (!open) return;
-    suggestNextDocNo("purchase_requisitions", "pr_no", "PR").then(setPrNo);
+    suggestNextDocNo("pr").then(setPrNo);
     setDepartment(""); setPriority("1"); setNeededBy(""); setJustification(""); setCurrency("USD");
     setProductId(""); setDescription(""); setCategoryId(""); setQty("1"); setUnit("pc"); setEstimatedPrice("");
   }, [open]);
@@ -209,38 +229,28 @@ export function NewRequisitionDialog({ open, onClose, onCreated }: DialogProps) 
     }
     setSaving(true);
 
-    const { data: created, error: err } = await supabase
-      .from("purchase_requisitions")
-      .insert({
-        pr_no: prNo,
-        department: department || null,
-        priority: Number(priority) || 1,
-        needed_by: neededBy || null,
-        justification: justification || null,
-        currency,
-        total_estimated: totalEstimated,
-        status: "draft",
-      })
-      .select("id")
-      .single();
-
-    if (err || !created) {
-      setSaving(false);
-      await dialog.alert({ title: "Couldn't create requisition", message: err?.message || "Unknown error." });
-      return;
-    }
-
-    await supabase.from("purchase_requisition_items").insert({
-      requisition_id: created.id,
-      product_id: productId || null,
-      description: description || null,
-      category_id: categoryId || null,
+    const err = await createPurchaseDoc("requisition", {
+      pr_no: prNo,
+      department,
+      priority: Number(priority) || 1,
+      needed_by: neededBy,
+      justification,
+      currency,
+      total_estimated: totalEstimated,
+    }, {
+      product_id: productId,
+      description,
+      category_id: categoryId,
       qty: Number(qty) || 0,
       unit,
       estimated_price: Number(estimatedPrice) || 0,
     });
 
     setSaving(false);
+    if (err) {
+      await dialog.alert({ title: "Couldn't create requisition", message: err });
+      return;
+    }
     onCreated?.();
     onClose();
   };
@@ -361,7 +371,7 @@ export function NewPurchaseOrderDialog({ open, onClose, onCreated }: DialogProps
 
   useEffect(() => {
     if (!open) return;
-    suggestNextDocNo("purchase_orders", "po_no", "PO").then(setPoNo);
+    suggestNextDocNo("po").then(setPoNo);
     setSupplierId(""); setOrderDate(new Date().toISOString().slice(0, 10));
     setExpectedDelivery(""); setCurrency("USD"); setPaymentTerms("Net 30"); setIncoterms("");
     setShipTo(""); setNotes("");
@@ -381,44 +391,31 @@ export function NewPurchaseOrderDialog({ open, onClose, onCreated }: DialogProps
     }
     setSaving(true);
 
-    const { data: created, error: err } = await supabase
-      .from("purchase_orders")
-      .insert({
-        po_no: poNo,
-        supplier_id: supplierId,
-        order_date: orderDate || new Date().toISOString().slice(0, 10),
-        expected_delivery_date: expectedDelivery || null,
-        currency,
-        payment_terms: paymentTerms || null,
-        incoterms: incoterms || null,
-        ship_to_address: shipTo || null,
-        category_id: categoryId || null,
-        notes: notes || null,
-        subtotal: lineTotal,
-        total: lineTotal,
-        status: "draft",
-      })
-      .select("id")
-      .single();
-
-    if (err || !created) {
-      setSaving(false);
-      await dialog.alert({ title: "Couldn't create PO", message: err?.message || "Unknown error." });
-      return;
-    }
-
-    await supabase.from("purchase_order_items").insert({
-      po_id: created.id,
-      product_id: productId || null,
-      description: description || null,
-      category_id: categoryId || null,
+    const err = await createPurchaseDoc("order", {
+      po_no: poNo,
+      supplier_id: supplierId,
+      order_date: orderDate,
+      expected_delivery_date: expectedDelivery,
+      currency,
+      payment_terms: paymentTerms,
+      incoterms,
+      ship_to_address: shipTo,
+      category_id: categoryId,
+      notes,
+    }, {
+      product_id: productId,
+      description,
+      category_id: categoryId,
       qty: Number(qty) || 0,
       unit,
       unit_cost: Number(unitCost) || 0,
-      line_total: lineTotal,
     });
 
     setSaving(false);
+    if (err) {
+      await dialog.alert({ title: "Couldn't create PO", message: err });
+      return;
+    }
     onCreated?.();
     onClose();
   };
@@ -548,18 +545,14 @@ export function NewReceiptDialog({ open, onClose, onCreated }: DialogProps) {
 
   useEffect(() => {
     if (!open) return;
-    suggestNextDocNo("purchase_receipts", "gr_no", "GR").then(setGrNo);
+    suggestNextDocNo("gr").then(setGrNo);
     setPoId(""); setSupplierId(""); setReceivedAt(new Date().toISOString().slice(0, 10));
     setCarrier(""); setTrackingNo(""); setNotes(""); setStatusValue("complete");
     setQtyReceived(""); setQtyAccepted(""); setQtyRejected("");
 
     (async () => {
-      const r = await supabase
-        .from("purchase_orders")
-        .select("id,po_no,supplier_id")
-        .order("created_at", { ascending: false })
-        .limit(200);
-      setPoList((r.data ?? []).map((p: { id: string; po_no: string | null; supplier_id: string | null }) => ({
+      const rows = await fetchListRows<{ id: string; po_no: string | null; supplier_id: string | null }>("orders");
+      setPoList(rows.map((p) => ({
         id: p.id, label: p.po_no || p.id.slice(0, 8), supplier_id: p.supplier_id,
       })));
     })();
@@ -580,37 +573,26 @@ export function NewReceiptDialog({ open, onClose, onCreated }: DialogProps) {
     }
     setSaving(true);
 
-    const { data: created, error: err } = await supabase
-      .from("purchase_receipts")
-      .insert({
-        gr_no: grNo,
-        po_id: poId || null,
-        supplier_id: supplierId || null,
-        received_at: receivedAt ? new Date(receivedAt).toISOString() : null,
-        carrier: carrier || null,
-        tracking_no: trackingNo || null,
-        notes: notes || null,
-        status: statusValue as "draft" | "partial" | "complete" | "cancelled",
-      })
-      .select("id")
-      .single();
-
-    if (err || !created) {
-      setSaving(false);
-      await dialog.alert({ title: "Couldn't create receipt", message: err?.message || "Unknown error." });
-      return;
-    }
-
-    if (Number(qtyReceived) > 0) {
-      await supabase.from("purchase_receipt_items").insert({
-        receipt_id: created.id,
-        qty_received: Number(qtyReceived) || 0,
-        qty_accepted: Number(qtyAccepted || qtyReceived) || 0,
-        qty_rejected: Number(qtyRejected) || 0,
-      });
-    }
+    const err = await createPurchaseDoc("receipt", {
+      gr_no: grNo,
+      po_id: poId,
+      supplier_id: supplierId,
+      received_at: receivedAt,
+      carrier,
+      tracking_no: trackingNo,
+      notes,
+      status: statusValue,
+    }, {
+      qty_received: Number(qtyReceived) || 0,
+      qty_accepted: Number(qtyAccepted || qtyReceived) || 0,
+      qty_rejected: Number(qtyRejected) || 0,
+    });
 
     setSaving(false);
+    if (err) {
+      await dialog.alert({ title: "Couldn't create receipt", message: err });
+      return;
+    }
     onCreated?.();
     onClose();
   };
@@ -716,7 +698,7 @@ export function NewBillDialog({ open, onClose, onCreated }: DialogProps) {
 
   useEffect(() => {
     if (!open) return;
-    suggestNextDocNo("vendor_bills", "bill_no", "BILL").then(setBillNo);
+    suggestNextDocNo("bill").then(setBillNo);
     setSupplierInvoiceNo(""); setSupplierId(""); setPoId("");
     setBillDate(new Date().toISOString().slice(0, 10));
     const due = new Date(); due.setDate(due.getDate() + 30);
@@ -725,12 +707,8 @@ export function NewBillDialog({ open, onClose, onCreated }: DialogProps) {
     setDescription(""); setCategoryId(""); setQty("1"); setUnit("pc"); setUnitPrice("");
 
     (async () => {
-      const r = await supabase
-        .from("purchase_orders")
-        .select("id,po_no,supplier_id")
-        .order("created_at", { ascending: false })
-        .limit(200);
-      setPoList((r.data ?? []).map((p: { id: string; po_no: string | null; supplier_id: string | null }) => ({
+      const rows = await fetchListRows<{ id: string; po_no: string | null; supplier_id: string | null }>("orders");
+      setPoList(rows.map((p) => ({
         id: p.id, label: p.po_no || p.id.slice(0, 8), supplier_id: p.supplier_id,
       })));
     })();
@@ -755,42 +733,28 @@ export function NewBillDialog({ open, onClose, onCreated }: DialogProps) {
     }
     setSaving(true);
 
-    const { data: created, error: err } = await supabase
-      .from("vendor_bills")
-      .insert({
-        bill_no: billNo,
-        supplier_invoice_no: supplierInvoiceNo || null,
-        supplier_id: supplierId,
-        po_id: poId || null,
-        bill_date: billDate || new Date().toISOString().slice(0, 10),
-        due_date: dueDate || null,
-        currency,
-        payment_terms: paymentTerms || null,
-        subtotal: lineTotal,
-        total: lineTotal,
-        balance: lineTotal,
-        status: "posted",
-      })
-      .select("id")
-      .single();
-
-    if (err || !created) {
-      setSaving(false);
-      await dialog.alert({ title: "Couldn't post bill", message: err?.message || "Unknown error." });
-      return;
-    }
-
-    await supabase.from("vendor_bill_items").insert({
-      bill_id: created.id,
-      description: description || null,
-      category_id: categoryId || null,
+    const err = await createPurchaseDoc("bill", {
+      bill_no: billNo,
+      supplier_invoice_no: supplierInvoiceNo,
+      supplier_id: supplierId,
+      po_id: poId,
+      bill_date: billDate,
+      due_date: dueDate,
+      currency,
+      payment_terms: paymentTerms,
+    }, {
+      description,
+      category_id: categoryId,
       qty: Number(qty) || 0,
       unit,
       unit_price: Number(unitPrice) || 0,
-      line_total: lineTotal,
     });
 
     setSaving(false);
+    if (err) {
+      await dialog.alert({ title: "Couldn't post bill", message: err });
+      return;
+    }
     onCreated?.();
     onClose();
   };
@@ -908,18 +872,13 @@ export function NewPaymentDialog({ open, onClose, onCreated }: DialogProps) {
 
   useEffect(() => {
     if (!open) return;
-    suggestNextDocNo("vendor_payments", "payment_no", "PAY").then(setPaymentNo);
+    suggestNextDocNo("pay").then(setPaymentNo);
     setSupplierId(""); setBillId(""); setAmount(""); setCurrency("USD"); setMethod("bank_transfer");
     setReference(""); setPaidAt(new Date().toISOString().slice(0, 10)); setNotes("");
 
     (async () => {
-      const r = await supabase
-        .from("vendor_bills")
-        .select("id,bill_no,supplier_id,balance,total,status")
-        .neq("status", "paid")
-        .order("created_at", { ascending: false })
-        .limit(200);
-      setBills((r.data ?? []).map((b: { id: string; bill_no: string | null; supplier_id: string | null; balance: number | null; total: number | null }) => ({
+      const rows = await fetchListRows<{ id: string; bill_no: string | null; supplier_id: string | null; balance: number | null; total: number | null; status: string | null }>("bills");
+      setBills(rows.filter((b) => b.status !== "paid").map((b) => ({
         id: b.id, label: b.bill_no || b.id.slice(0, 8), supplier_id: b.supplier_id,
         balance: b.balance ?? b.total,
         total: b.total ?? b.balance,
@@ -947,49 +906,26 @@ export function NewPaymentDialog({ open, onClose, onCreated }: DialogProps) {
     }
     setSaving(true);
 
-    const { error: err } = await supabase
-      .from("vendor_payments")
-      .insert({
-        payment_no: paymentNo,
-        bill_id: billId || null,
-        supplier_id: supplierId,
-        amount: amt,
-        currency,
-        method,
-        reference: reference || null,
-        paid_at: paidAt || new Date().toISOString().slice(0, 10),
-        notes: notes || null,
-      });
-
-    if (err) {
-      setSaving(false);
-      await dialog.alert({ title: "Couldn't record payment", message: err.message });
-      return;
-    }
-
-    /* If a bill was selected, update its balance + status. We only
-       handle the simple case (full + partial); refunds and FX
-       adjustments live outside this lightweight modal. */
-    if (billId) {
-      const b = bills.find((x) => x.id === billId);
-      const newBalance = Math.max(0, (b?.balance ?? 0) - amt);
-      const next = newBalance <= 0 ? "paid" : "partial";
-      /* Cumulative amount_paid = bill total − remaining balance. (The old
-         formula used `balance` in place of `total`, which double-counted
-         the payment, e.g. a 40 payment on a 100 bill stored 80 paid.) */
-      const billTotal = Number(b?.total ?? b?.balance ?? 0);
-      await supabase
-        .from("vendor_bills")
-        .update({
-          balance: newBalance,
-          amount_paid: Math.max(0, billTotal - newBalance),
-          status: next,
-          paid_at: newBalance <= 0 ? new Date().toISOString() : null,
-        })
-        .eq("id", billId);
-    }
+    /* Bill settlement (balance/amount_paid/status) happens SERVER-side in
+       the create route from the DB's own figures — no client-computed
+       balances cross the wire anymore. */
+    const err = await createPurchaseDoc("payment", {
+      payment_no: paymentNo,
+      bill_id: billId,
+      supplier_id: supplierId,
+      amount: amt,
+      currency,
+      method,
+      reference,
+      paid_at: paidAt,
+      notes,
+    });
 
     setSaving(false);
+    if (err) {
+      await dialog.alert({ title: "Couldn't record payment", message: err });
+      return;
+    }
     onCreated?.();
     onClose();
   };
