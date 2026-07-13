@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
+import { preserveQuotationDocCosts, sanitizeQuotationDoc } from "@/lib/server/sensitive-columns";
 import { resolveBaseCurrency } from "@/lib/finance/currency";
 import {
   applyScope,
@@ -174,7 +175,9 @@ export async function GET(req: Request) {
     // Strip created_by (selected only for DS1a shadow eval) so the response
     // shape is byte-identical to before DS1a.
     const { created_by: _createdBy, ...rowOut } = row as Record<string, unknown>;
-    return { ...rowOut, doc: rest };
+    /* Column-level policy: the doc embeds supplier costs / pricing automation
+       (standTablePrice, fxRate, default pricing) — can_view_private only. */
+    return { ...rowOut, doc: sanitizeQuotationDoc(auth, rest) };
   });
 
   return NextResponse.json({ quotations: slim }, {
@@ -222,12 +225,21 @@ export async function POST(req: Request) {
        This does NOT modify any data. */
     const { data: cur, error: curErr } = await supabaseServer
       .from("quotations")
-      .select("version, updated_by_name, updated_at")
+      .select("version, updated_by_name, updated_at, doc")
       .eq("id", body.id)
       .eq("tenant_id", auth.tenant_id)
       .maybeSingle();
     if (curErr) return NextResponse.json({ error: curErr.message }, { status: 500 });
     if (!cur) return NextResponse.json({ error: "Quotation not found" }, { status: 404 });
+
+    /* Can't-read → can't-write for the doc's embedded cost keys: a caller
+       without can_view_private got a stripped doc on load, so merge the
+       existing row's cost data back into their save instead of losing it. */
+    const savedDoc = preserveQuotationDocCosts(
+      auth,
+      (body.doc ?? {}) as Record<string, unknown>,
+      (cur as { doc?: Record<string, unknown> }).doc ?? null,
+    );
 
     const currentVersion = typeof cur.version === "number" ? cur.version : 1;
 
@@ -261,7 +273,7 @@ export async function POST(req: Request) {
         issue_date: body.issue_date ?? new Date().toISOString().slice(0, 10),
         valid_till: body.valid_till ?? null,
         total: body.total ?? 0,
-        doc: body.doc ?? {},
+        doc: savedDoc,
         version: guardVersion + 1,
         updated_by: auth.account_id,
         updated_by_name: auth.username,
@@ -293,7 +305,12 @@ export async function POST(req: Request) {
         { status: 409 },
       );
     }
-    return NextResponse.json({ quotation: data });
+    return NextResponse.json({
+      quotation: {
+        ...(data as Record<string, unknown>),
+        doc: sanitizeQuotationDoc(auth, (data as { doc?: Record<string, unknown> }).doc ?? {}),
+      },
+    });
   }
 
   const quote_no =
@@ -310,7 +327,9 @@ export async function POST(req: Request) {
       issue_date: body.issue_date ?? new Date().toISOString().slice(0, 10),
       valid_till: body.valid_till ?? null,
       total: body.total ?? 0,
-      doc: body.doc ?? {},
+      /* Create by a non-private caller: no existing doc to preserve, but any
+         cost keys in the payload are untrusted — strip them. */
+      doc: preserveQuotationDocCosts(auth, (body.doc ?? {}) as Record<string, unknown>, null),
       created_by: auth.account_id,
       updated_by: auth.account_id,
       updated_by_name: auth.username,
@@ -318,5 +337,10 @@ export async function POST(req: Request) {
     .select("*")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ quotation: data });
+  return NextResponse.json({
+    quotation: {
+      ...(data as Record<string, unknown>),
+      doc: sanitizeQuotationDoc(auth, (data as { doc?: Record<string, unknown> }).doc ?? {}),
+    },
+  });
 }

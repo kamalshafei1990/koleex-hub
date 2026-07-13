@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/server/audit";
 import { assertScopeShadowForRow, toScopeContext } from "@/lib/server/apply-scope";
 import { getScopeMode } from "@/lib/server/scope-flags";
 import { isCustomerEnforced, ownsQuotation } from "@/lib/server/customer-quotation-guard";
+import { sanitizeQuotationDoc } from "@/lib/server/sensitive-columns";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
@@ -59,7 +60,16 @@ export async function GET(_req: Request, { params }: RouteCtx) {
     });
   }
 
-  return NextResponse.json({ quotation: data });
+  /* Column-level policy: the doc embeds supplier costs + pricing automation
+     (costHead per line, standTablePrice, fxRate, margin defaults). Stripped
+     unless the caller's role has can_view_private — the editor's cost gutter
+     simply stays empty for them; a save merges existing costs back server-side. */
+  return NextResponse.json({
+    quotation: {
+      ...(data as Record<string, unknown>),
+      doc: sanitizeQuotationDoc(auth, (data as { doc?: Record<string, unknown> }).doc ?? {}),
+    },
+  });
 }
 
 export async function DELETE(req: Request, { params }: RouteCtx) {

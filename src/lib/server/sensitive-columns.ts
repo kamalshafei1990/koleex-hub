@@ -132,3 +132,107 @@ export function sanitizeAccountRow<T extends Record<string, unknown>>(
 ): T | null {
   return stripColumns(row, ACCOUNT_SECRET_COLUMNS);
 }
+
+/* ── quotations.doc (jsonb) — the editor embeds supplier costs + pricing
+   automation inside the document payload. Doc-level and per-line keys are
+   editor-gutter-only ("never printed") but the API used to ship them to any
+   Quotations viewer. Strip on read; on write by a non-private editor, merge
+   the EXISTING row's cost keys back in so their save can't wipe cost data
+   they never saw. ── */
+
+export const QUOTATION_DOC_PRIVATE_KEYS: readonly string[] = [
+  "standTablePrice",       // shared stand & table supplier cost
+  "fxRate",                // RMB→quote-currency rate used by cost math
+  "defaultPricingMethod",  // margin/fixed automation default
+  "defaultPricingValue",
+];
+
+export const QUOTATION_ITEM_PRIVATE_KEYS: readonly string[] = [
+  "costHead",   // supplier cost of the machine head
+  "costMode",
+  "sellMethod", // margin-% / fixed markup automation per line
+  "sellValue",
+];
+
+type QuotationDocLike = Record<string, unknown> & { items?: unknown };
+
+/** Remove cost/pricing-automation keys from a quotation doc unless the
+ *  caller may view private data. Non-mutating; null-safe. */
+export function sanitizeQuotationDoc<T extends QuotationDocLike>(
+  auth: ServerAuthContext,
+  doc: T | null | undefined,
+): T | null {
+  if (!doc || typeof doc !== "object") return doc ?? null;
+  if (canViewPrivate(auth)) return doc;
+  const out = { ...doc } as QuotationDocLike;
+  for (const k of QUOTATION_DOC_PRIVATE_KEYS) delete out[k];
+  if (Array.isArray(out.items)) {
+    out.items = (out.items as Record<string, unknown>[]).map((it) => {
+      if (!it || typeof it !== "object") return it;
+      const clean = { ...it };
+      for (const k of QUOTATION_ITEM_PRIVATE_KEYS) delete clean[k];
+      return clean;
+    });
+  }
+  return out as T;
+}
+
+/** For SAVES by a non-private editor: re-attach cost keys from the existing
+ *  doc so a stripped payload can't erase them. Doc-level keys copy straight
+ *  across; line keys match by (model, description) — falling back to the
+ *  same index when the model matches — so ordinary edits keep every line's
+ *  cost. (A non-private editor who fully rewrites a line loses its cost,
+ *  which is correct: they never saw it and can't vouch for it.) */
+export function preserveQuotationDocCosts<T extends QuotationDocLike>(
+  auth: ServerAuthContext,
+  incoming: T,
+  existing: QuotationDocLike | null | undefined,
+): T {
+  if (canViewPrivate(auth)) return incoming;
+  if (!incoming || typeof incoming !== "object") return incoming;
+
+  const out = { ...incoming } as QuotationDocLike;
+
+  // Never trust incoming cost keys from a caller who can't see them.
+  for (const k of QUOTATION_DOC_PRIVATE_KEYS) delete out[k];
+
+  if (existing && typeof existing === "object") {
+    for (const k of QUOTATION_DOC_PRIVATE_KEYS) {
+      if (existing[k] !== undefined) out[k] = existing[k];
+    }
+  }
+
+  const exItems: Record<string, unknown>[] = Array.isArray(existing?.items)
+    ? (existing!.items as Record<string, unknown>[])
+    : [];
+  if (Array.isArray(out.items)) {
+    // Queue existing lines by identity so duplicates pair off in order.
+    const pool = new Map<string, Record<string, unknown>[]>();
+    for (const it of exItems) {
+      if (!it || typeof it !== "object") continue;
+      const key = `${String(it.model ?? "")}|${String(it.description ?? "")}`;
+      const q = pool.get(key) ?? [];
+      q.push(it);
+      pool.set(key, q);
+    }
+    out.items = (out.items as Record<string, unknown>[]).map((it, i) => {
+      if (!it || typeof it !== "object") return it;
+      const clean = { ...it };
+      for (const k of QUOTATION_ITEM_PRIVATE_KEYS) delete clean[k];
+      const key = `${String(it.model ?? "")}|${String(it.description ?? "")}`;
+      const q = pool.get(key);
+      let src: Record<string, unknown> | undefined = q?.shift();
+      if (!src) {
+        const sameIndex = exItems[i];
+        if (sameIndex && String(sameIndex.model ?? "") === String(it.model ?? "")) src = sameIndex;
+      }
+      if (src) {
+        for (const k of QUOTATION_ITEM_PRIVATE_KEYS) {
+          if (src[k] !== undefined) clean[k] = src[k];
+        }
+      }
+      return clean;
+    });
+  }
+  return out as T;
+}
