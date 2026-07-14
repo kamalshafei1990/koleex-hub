@@ -24,6 +24,43 @@ export interface CoverImage {
   dataUrl: string;
   width: number;
   height: number;
+  /** 1-based PDF page the image was embedded on (logos live on page 1). */
+  page: number;
+  /** Extraction order within its page (header logos tend to come first). */
+  order: number;
+}
+
+/**
+ * Score the extracted cover images and return the single most logo-like one
+ * (SCAT-5 — auto-detect the supplier logo so the user just confirms). A logo is
+ * typically on page 1, square-to-wide (not a tall banner or ultra-wide strip),
+ * moderate in size (not a tiny decorative mark, not a full-page product photo),
+ * and near the top of the page's paint order. Returns null when nothing scores
+ * like a logo, so the UI falls back to "None" rather than guessing badly.
+ */
+export function pickBestLogo(covers: CoverImage[]): string | null {
+  if (!covers.length) return null;
+  const scored = covers.map((c) => {
+    const ar = c.width / Math.max(1, c.height); // aspect ratio (w / h)
+    const area = c.width * c.height;
+    let score = 0;
+    // Page: logos live on the cover / letterhead.
+    score += c.page === 1 ? 100 : c.page === 2 ? 25 : 0;
+    // Aspect ratio: square-to-wide reads as a logo; extremes read as
+    // banners / dividers / background strips.
+    if (ar >= 0.8 && ar <= 5) score += 40;
+    else if (ar >= 0.5 && ar <= 8) score += 10;
+    else score -= 40;
+    // Size sweet spot: not a tiny icon, not a full-page image.
+    if (area >= 4_000 && area <= 600_000) score += 30;
+    else if (area < 4_000) score -= 20;
+    else if (area > 2_000_000) score -= 35;
+    // Paint order: the header mark is usually one of the first images drawn.
+    score += Math.max(0, 15 - c.order * 3);
+    return { url: c.dataUrl, score };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  return scored[0] && scored[0].score > 0 ? scored[0].url : null;
 }
 
 /** Convert unpdf's raw pixel buffer (1/3/4 channels) to a PNG data URL. */
@@ -75,13 +112,14 @@ export async function extractCoverImages(file: File): Promise<CoverImage[]> {
       } catch {
         continue;
       }
+      let order = 0;
       for (const img of imgs) {
         const { width, height } = img;
         if (width < 24 || height < 24) continue; // icon noise only — keep big images (logos can be large)
         const dataUrl = rawToDataUrl(img);
         if (!dataUrl || seen.has(dataUrl)) continue;
         seen.add(dataUrl);
-        out.push({ dataUrl, width, height });
+        out.push({ dataUrl, width, height, page: p, order: order++ });
         if (out.length >= 12) break;
       }
       if (out.length >= 12) break;

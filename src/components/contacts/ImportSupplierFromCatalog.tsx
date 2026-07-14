@@ -19,7 +19,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useRef, useState } from "react";
-import { extractCatalogText, extractCoverImages, renderCoverPages, type CoverImage } from "@/lib/catalog-client";
+import { extractCatalogText, extractCoverImages, renderCoverPages, pickBestLogo, type CoverImage } from "@/lib/catalog-client";
 import { createContact } from "@/lib/contacts-admin";
 import { uploadCatalogFile, createCatalog } from "@/lib/catalogs-admin";
 import { uploadToStorage } from "@/lib/storage-client";
@@ -107,7 +107,14 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated, on
     setFile(f); setError(null); setPhase("reading"); setProgress("Reading PDF…");
     // Cover images + rendered cover pages load in parallel with the text.
     const coversP = extractCoverImages(f).catch(() => [] as CoverImage[]);
-    coversP.then(setLogos);
+    coversP.then((covers) => {
+      setLogos(covers);
+      // SCAT-5: auto-detect the most logo-like cover image and pre-select it,
+      // so the user just confirms. Only fills the slot if still empty — never
+      // overrides a manual pick that landed first.
+      const best = pickBestLogo(covers);
+      if (best) setLogo((cur) => cur ?? best);
+    });
     renderCoverPages(f, 2).then(setCoverPages).catch(() => setCoverPages([]));
 
     let draft: SupplierDraft = EMPTY;
@@ -132,7 +139,8 @@ export default function ImportSupplierFromCatalog({ open, onClose, onCreated, on
     // Suppliers app: hand the data to the REAL New Supplier form (pre-filled).
     if (onPrefill) {
       const imgs = await coversP;
-      onPrefill(draftToOverrides(draft, imgs[0]?.dataUrl || ""), f);
+      // SCAT-5: hand the auto-detected logo to the pre-filled New Supplier form.
+      onPrefill(draftToOverrides(draft, pickBestLogo(imgs) || imgs[0]?.dataUrl || ""), f);
       close();
       return;
     }
