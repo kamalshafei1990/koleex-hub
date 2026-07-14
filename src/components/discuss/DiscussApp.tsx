@@ -780,38 +780,48 @@ export default function DiscussApp() {
 
   /* Safety net: even with a healthy realtime stream the WebSocket can
      stall on flaky networks, be closed by Safari's aggressive sleep
-     policy, or miss events due to Supabase queue hiccups. To guarantee
-     the user never has to hit "reload" to see new messages we:
-       · refetch the open channel silently on window focus / tab
-         visibility change (cheap, single round-trip)
-       · poll the open channel every 5s while it's visible (still
-         silent; the silent loadMessages short-circuits React re-renders
-         when nothing changed, so the cost is just one SELECT)
-     Both run in addition to realtime — so when realtime is working
-     there's nothing to do except compare and keep the existing state
-     reference. When realtime is asleep, worst-case delivery is 3s. */
+     policy, or miss events due to Supabase queue hiccups. Realtime
+     broadcast is the primary delivery path (instant); this is purely a
+     fallback so the user never has to hit "reload":
+       · on window focus / tab-visibility change → full refresh (open
+         channel + sidebar), because the tab may have missed events while
+         backgrounded. This is the high-value, near-free case.
+       · a slow background poll (every 20s) that only re-reads the OPEN
+         channel — NOT the whole sidebar. The silent loadMessages keeps
+         the existing state reference when nothing changed, so a quiet
+         channel costs one SELECT and zero React re-renders.
+     Previously this polled every 3s AND reloaded the entire sidebar on
+     every tick, which — layered on top of realtime — flooded the network
+     and thrashed re-renders, making the app feel slow and unstable. */
   useEffect(() => {
     if (!selectedChannelId || !accountId) return;
     if (typeof window === "undefined") return;
 
     let cancelled = false;
-    const refresh = () => {
-      if (cancelled) return;
-      if (document.visibilityState === "hidden") return;
+    const visible = () =>
+      !cancelled && document.visibilityState !== "hidden";
+
+    /* Full refresh — only when the tab (re)gains focus, where catching up
+       on anything missed while backgrounded is worth two round-trips. */
+    const refreshAll = () => {
+      if (!visible()) return;
       void loadMessages(selectedChannelId, true);
       void loadChannels(true);
     };
+    /* Lightweight background tick — open channel only. */
+    const refreshMessages = () => {
+      if (!visible()) return;
+      void loadMessages(selectedChannelId, true);
+    };
 
-    const onFocus = () => refresh();
+    const onFocus = () => refreshAll();
     const onVisibility = () => {
-      if (document.visibilityState === "visible") refresh();
+      if (document.visibilityState === "visible") refreshAll();
     };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibility);
 
-    const pollId = window.setInterval(() => {
-      if (document.visibilityState === "visible") refresh();
-    }, 3000);
+    const pollId = window.setInterval(refreshMessages, 20000);
 
     return () => {
       cancelled = true;

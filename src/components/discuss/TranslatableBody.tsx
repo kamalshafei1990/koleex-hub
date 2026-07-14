@@ -75,51 +75,53 @@ export function TranslatableBody({
   const changed = translated !== undefined && translated.trim() !== body.trim();
   const displayText =
     translated !== undefined && !showOriginal ? translated : body;
-  const isTranslatedView = translated !== undefined && !showOriginal && changed;
+  /* A translation exists AND differs from the source → offer the original ⇄
+     translation toggle. Otherwise (not translated yet, or translation came back
+     identical) keep the plain "Translate" button so the control NEVER
+     disappears — the user can always re-trigger it. */
+  const canToggle = translated !== undefined && changed;
+
+  /* Shared pill style — a small, always-visible button under the message. */
+  const pill =
+    "inline-flex items-center gap-1 h-6 px-2 rounded-md text-[10.5px] font-medium " +
+    "border border-[var(--border-subtle)] text-[var(--text-dim)] " +
+    "hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors " +
+    "select-none";
 
   return (
     <div className={className}>
       {renderDiscussMarkdown(displayText, mentions, `mb-${messageId}`)}
-      <div className="mt-0.5 flex items-center gap-2 text-[10.5px] not-italic whitespace-normal">
+      <div className="mt-1 flex items-center gap-2 not-italic whitespace-normal">
         {loading ? (
-          <span className="inline-flex items-center gap-1 text-[var(--text-dim)]">
+          <span className="inline-flex items-center gap-1 h-6 px-2 text-[10.5px] text-[var(--text-dim)]">
             <SpinnerIcon className="h-3 w-3 animate-spin" />
             {t("translate.working", "Translating…")}
           </span>
-        ) : translated === undefined ? (
+        ) : canToggle ? (
+          <button
+            type="button"
+            onClick={() => setShowOriginal((v) => !v)}
+            className={pill}
+          >
+            <LanguagesIcon className="h-3 w-3" />
+            {showOriginal
+              ? t("translate.showTranslation", "Show translation")
+              : t("translate.showOriginal", "Show original")}
+          </button>
+        ) : (
           <button
             type="button"
             onClick={() => void run()}
-            className="inline-flex items-center gap-1 text-[var(--text-dim)] hover:text-blue-400 transition-colors"
+            className={pill}
           >
             <LanguagesIcon className="h-3 w-3" />
             {t("translate.action", "Translate")}
           </button>
-        ) : !changed ? null : isTranslatedView ? (
-          <>
-            <span className="text-[var(--text-dim)]">
-              {t("translate.translatedTo", "Translated · {lang}").replace(
-                "{lang}",
-                translateLangLabel(targetLang),
-              )}
-            </span>
-            <button
-              type="button"
-              onClick={() => setShowOriginal(true)}
-              className="text-[var(--text-muted)] hover:text-blue-400 transition-colors"
-            >
-              {t("translate.showOriginal", "Show original")}
-            </button>
-          </>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setShowOriginal(false)}
-            className="inline-flex items-center gap-1 text-[var(--text-dim)] hover:text-blue-400 transition-colors"
-          >
-            <LanguagesIcon className="h-3 w-3" />
-            {t("translate.showTranslation", "Show translation")}
-          </button>
+        )}
+        {canToggle && !showOriginal && (
+          <span className="text-[9.5px] text-[var(--text-dim)] uppercase tracking-wide">
+            {translateLangLabel(targetLang)}
+          </span>
         )}
       </div>
     </div>
