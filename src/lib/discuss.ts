@@ -34,7 +34,6 @@ import type {
   DiscussMessageRow,
   DiscussMessageWithAuthor,
   DiscussNotificationPref,
-  DiscussPinnedRow,
   DiscussReactionRow,
   DiscussReplyPreview,
   DiscussSearchResult,
@@ -45,9 +44,9 @@ const CHANNELS = "discuss_channels";
 const MEMBERS = "discuss_members";
 const MESSAGES = "discuss_messages";
 const REACTIONS = "discuss_reactions";
-const PINNED = "discuss_pinned";
-const STARRED = "discuss_starred";
-const DRAFTS = "discuss_drafts";
+/* discuss_pinned / discuss_starred / discuss_drafts are read via the gated
+   /api/discuss/state route and written via /api/discuss/mutate, so their table
+   names live server-side only (RLS: service_role). */
 const CONTACTS = "contacts";
 const BUCKET = "media";
 
@@ -93,6 +92,37 @@ async function discussMutate<T = unknown>(
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (!isTransientFetch(msg)) console.error("[Discuss] mutate", action, msg);
+    return { ok: false, error: msg };
+  }
+}
+
+/** GET companion to discussMutate for the gated read path (drafts / pinned /
+ *  starred). Identity comes from the session cookie server-side; the caller
+ *  never supplies an account id. Returns `data` (null/[] on any failure so
+ *  callers degrade gracefully, matching the old anon-read behaviour). */
+async function discussState<T = unknown>(
+  resource: string,
+  params: Record<string, string> = {},
+): Promise<{ ok: boolean; data?: T; error?: string }> {
+  try {
+    const qs = new URLSearchParams({ resource, ...params }).toString();
+    const res = await fetch(`/api/discuss/state?${qs}`, {
+      method: "GET",
+      credentials: "same-origin",
+    });
+    const json = (await res.json().catch(() => ({}))) as {
+      ok?: boolean;
+      data?: T;
+      error?: string;
+    };
+    if (!res.ok || !json.ok) {
+      console.error("[Discuss] state", resource, json.error ?? `HTTP ${res.status}`);
+      return { ok: false, error: json.error ?? `HTTP ${res.status}` };
+    }
+    return { ok: true, data: json.data };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!isTransientFetch(msg)) console.error("[Discuss] state", resource, msg);
     return { ok: false, error: msg };
   }
 }
@@ -448,21 +478,8 @@ export async function fetchMyChannels(
         Drafts view can re-use the sidebar query without re-fetching. */
   const draftChannelIds = new Set<string>();
   {
-    const { data: drafts } = await supabase
-      .from(DRAFTS)
-      .select("channel_id, body, metadata")
-      .eq("account_id", accountId)
-      .in("channel_id", channelIds);
-    for (const d of (drafts ?? []) as Array<{
-      channel_id: string;
-      body: string | null;
-      metadata: DiscussMessageMetadata | null;
-    }>) {
-      const hasBody = !!(d.body && d.body.trim());
-      const hasAttachments =
-        !!d.metadata?.attachments && d.metadata.attachments.length > 0;
-      if (hasBody || hasAttachments) draftChannelIds.add(d.channel_id);
-    }
+    const { data: ids } = await discussState<string[]>("draftChannels");
+    for (const id of ids ?? []) draftChannelIds.add(id);
   }
 
   /* 8. Stitch it all together. */
@@ -920,16 +937,8 @@ export async function fetchDraft(
   accountId: string,
   channelId: string,
 ): Promise<DiscussDraftRow | null> {
-  const { data, error } = await supabase
-    .from(DRAFTS)
-    .select("*")
-    .eq("account_id", accountId)
-    .eq("channel_id", channelId)
-    .maybeSingle();
-  if (error) {
-    console.error("[Discuss] Fetch draft:", error.message);
-    return null;
-  }
+  void accountId; // identity comes from the session server-side
+  const { data } = await discussState<DiscussDraftRow | null>("draft", { channelId });
   return (data as DiscussDraftRow) ?? null;
 }
 
@@ -1565,36 +1574,11 @@ export async function searchDiscussMessages(input: {
 export async function fetchAllDrafts(
   accountId: string,
 ): Promise<Array<DiscussDraftRow & { channel: DiscussChannelRow | null }>> {
-  const { data, error } = await supabase
-    .from(DRAFTS)
-    .select(
-      `
-      *,
-      channel:discuss_channels!discuss_drafts_channel_id_fkey ( * )
-      `,
-    )
-    .eq("account_id", accountId)
-    .order("updated_at", { ascending: false });
-  if (error) {
-    if (!isMissingTable(error.message)) {
-      console.error("[Discuss] Fetch all drafts:", error.message);
-    }
-    return [];
-  }
-  return ((data ?? []) as unknown as Array<
-    DiscussDraftRow & {
-      channel: DiscussChannelRow | DiscussChannelRow[] | null;
-    }
-  >)
-    .map((row) => {
-      const ch = Array.isArray(row.channel) ? row.channel[0] ?? null : row.channel;
-      return { ...row, channel: ch };
-    })
-    .filter(
-      (row) =>
-        (row.body && row.body.trim().length > 0) ||
-        !!row.metadata?.attachments?.length,
-    );
+  void accountId; // identity comes from the session server-side
+  const { data } = await discussState<
+    Array<DiscussDraftRow & { channel: DiscussChannelRow | null }>
+  >("allDrafts");
+  return data ?? [];
 }
 
 /** Fetch the pinned panel for a channel. Pinned → messages join so
@@ -1604,100 +1588,9 @@ export async function fetchPinnedMessages(
   channelId: string,
   currentAccountId: string,
 ): Promise<DiscussMessageWithAuthor[]> {
-  const { data: pinnedRows, error } = await supabase
-    .from(PINNED)
-    .select("message_id")
-    .eq("channel_id", channelId)
-    .order("pinned_at", { ascending: false });
-  if (error) {
-    if (!isMissingTable(error.message)) {
-      console.error("[Discuss] Fetch pinned:", error.message);
-    }
-    return [];
-  }
-  const ids = ((pinnedRows ?? []) as DiscussPinnedRow[]).map((r) => r.message_id);
-  if (ids.length === 0) return [];
-
-  const { data: msgs } = await supabase
-    .from(MESSAGES)
-    .select(
-      `
-      *,
-      author:accounts!discuss_messages_author_account_id_fkey (
-        id,
-        username,
-        avatar_url,
-        person:people ( full_name )
-      )
-      `,
-    )
-    .in("id", ids)
-    .is("deleted_at", null);
-
-  /* Reactions batch, same shape as fetchChannelMessages. */
-  const reactionsByMessage = new Map<
-    string,
-    DiscussMessageWithAuthor["reactions"]
-  >();
-  const { data: rxRows } = await supabase
-    .from(REACTIONS)
-    .select("*")
-    .in("message_id", ids);
-  for (const rx of (rxRows ?? []) as DiscussReactionRow[]) {
-    const bucket = reactionsByMessage.get(rx.message_id) ?? [];
-    const existing = bucket.find((b) => b.emoji === rx.emoji);
-    if (existing) {
-      existing.count += 1;
-      existing.account_ids.push(rx.account_id);
-      if (rx.account_id === currentAccountId) existing.reacted_by_me = true;
-    } else {
-      bucket.push({
-        emoji: rx.emoji,
-        count: 1,
-        account_ids: [rx.account_id],
-        reacted_by_me: rx.account_id === currentAccountId,
-      });
-    }
-    reactionsByMessage.set(rx.message_id, bucket);
-  }
-
-  return ((msgs ?? []) as unknown as Array<
-    DiscussMessageRow & {
-      author:
-        | {
-            id: string;
-            username: string;
-            avatar_url: string | null;
-            person: { full_name: string } | Array<{ full_name: string }> | null;
-          }
-        | Array<{
-            id: string;
-            username: string;
-            avatar_url: string | null;
-            person: { full_name: string } | Array<{ full_name: string }> | null;
-          }>
-        | null;
-    }
-  >).map((row) => {
-    const acc = Array.isArray(row.author) ? row.author[0] ?? null : row.author;
-    const person =
-      acc && (Array.isArray(acc.person) ? acc.person[0] ?? null : acc.person);
-    const author: DiscussAuthor | null = acc
-      ? {
-          id: acc.id,
-          username: acc.username,
-          avatar_url: acc.avatar_url,
-          full_name: person?.full_name ?? null,
-        }
-      : null;
-    return {
-      ...row,
-      author,
-      reactions: reactionsByMessage.get(row.id) ?? [],
-      reply_preview: null,
-      thread: null,
-    };
-  });
+  void currentAccountId; // reacted_by_me is resolved server-side from the session
+  const { data } = await discussState<DiscussMessageWithAuthor[]>("pinned", { channelId });
+  return data ?? [];
 }
 
 /** Fetch every message the current user has starred, most-recent first.
@@ -1705,76 +1598,9 @@ export async function fetchPinnedMessages(
 export async function fetchStarredMessages(
   accountId: string,
 ): Promise<DiscussMessageWithAuthor[]> {
-  const { data: starRows, error } = await supabase
-    .from(STARRED)
-    .select("message_id, starred_at")
-    .eq("account_id", accountId)
-    .order("starred_at", { ascending: false })
-    .limit(200);
-  if (error) {
-    if (!isMissingTable(error.message)) {
-      console.error("[Discuss] Fetch starred:", error.message);
-    }
-    return [];
-  }
-  const ids = ((starRows ?? []) as Array<{ message_id: string }>).map(
-    (r) => r.message_id,
-  );
-  if (ids.length === 0) return [];
-
-  const { data: msgs } = await supabase
-    .from(MESSAGES)
-    .select(
-      `
-      *,
-      author:accounts!discuss_messages_author_account_id_fkey (
-        id,
-        username,
-        avatar_url,
-        person:people ( full_name )
-      )
-      `,
-    )
-    .in("id", ids)
-    .is("deleted_at", null);
-
-  return ((msgs ?? []) as unknown as Array<
-    DiscussMessageRow & {
-      author:
-        | {
-            id: string;
-            username: string;
-            avatar_url: string | null;
-            person: { full_name: string } | Array<{ full_name: string }> | null;
-          }
-        | Array<{
-            id: string;
-            username: string;
-            avatar_url: string | null;
-            person: { full_name: string } | Array<{ full_name: string }> | null;
-          }>
-        | null;
-    }
-  >).map((row) => {
-    const acc = Array.isArray(row.author) ? row.author[0] ?? null : row.author;
-    const person =
-      acc && (Array.isArray(acc.person) ? acc.person[0] ?? null : acc.person);
-    const author: DiscussAuthor | null = acc
-      ? {
-          id: acc.id,
-          username: acc.username,
-          avatar_url: acc.avatar_url,
-          full_name: person?.full_name ?? null,
-        }
-      : null;
-    return {
-      ...row,
-      author,
-      reactions: [],
-      reply_preview: null,
-      thread: null,
-    };
-  });
+  void accountId; // identity comes from the session server-side
+  const { data } = await discussState<DiscussMessageWithAuthor[]>("starred");
+  return data ?? [];
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
