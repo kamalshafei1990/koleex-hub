@@ -891,25 +891,36 @@ export default function DiscussApp() {
     };
   }, [selectedChannelId, accountId, accountUsername]);
 
-  /* Auto-scroll to bottom when new messages arrive (or when the user
-     switches channels). We jump instantly on channel switch but smooth
-     on realtime inserts so the animation feels natural. */
+  /* Auto-scroll. The old version jumped to the bottom on `selectedChannelId`
+     change — but that fires BEFORE the channel's messages have loaded, so it
+     scrolled an empty list and left the user stuck at the top (they had to
+     scroll down to see the latest). Now we wait until the loaded messages
+     actually belong to the open channel, then jump to the newest ONCE; after
+     that we only auto-follow if the user is already near the bottom. */
+  const initialScrolledChannelRef = useRef<string | null>(null);
   useEffect(() => {
     const el = threadScrollRef.current;
-    if (!el) return;
-    /* Snap instantly after a channel switch, smooth for subsequent adds. */
-    el.scrollTo({ top: el.scrollHeight, behavior: "auto" });
-  }, [selectedChannelId]);
+    if (!el || !selectedChannelId) return;
+    const last = messages[messages.length - 1] as
+      | { channel_id?: string }
+      | undefined;
+    const belongsToChannel = !!last && last.channel_id === selectedChannelId;
+    if (!belongsToChannel) return;
 
-  useEffect(() => {
-    const el = threadScrollRef.current;
-    if (!el) return;
-    const shouldStickToBottom =
-      el.scrollHeight - (el.scrollTop + el.clientHeight) < 200;
-    if (shouldStickToBottom) {
-      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    if (initialScrolledChannelRef.current !== selectedChannelId) {
+      /* First render of this channel's messages → snap to the newest. Wait a
+         frame so the list has painted and scrollHeight is final. */
+      initialScrolledChannelRef.current = selectedChannelId;
+      requestAnimationFrame(() => {
+        const e = threadScrollRef.current;
+        if (e) e.scrollTo({ top: e.scrollHeight, behavior: "auto" });
+      });
+      return;
     }
-  }, [messages.length]);
+    const nearBottom =
+      el.scrollHeight - (el.scrollTop + el.clientHeight) < 200;
+    if (nearBottom) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [messages, selectedChannelId]);
 
   /* Mark the selected channel read whenever we render its latest message.
      Debounced so a burst of realtime inserts only triggers one write.

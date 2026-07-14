@@ -297,15 +297,23 @@ export async function markChannelRead(
  *  from top of viewport, then the UI scrolls to the bottom. */
 export async function fetchChannelMessages(
   channelId: string,
-  options: { currentAccountId: string; limit?: number; before?: string } = {
+  options: {
+    currentAccountId: string;
+    limit?: number;
+    before?: string;
+    /** ISO timestamp — return ONLY messages newer than this (lightweight
+     *  incremental fetch used by the realtime refresh). */
+    after?: string;
+  } = {
     currentAccountId: "",
   },
 ): Promise<DiscussMessageWithAuthor[]> {
-  const { limit, before } = options;
+  const { limit, before, after } = options;
   const data = await discussRead<DiscussMessageWithAuthor[]>("channelMessages", {
     channelId,
     limit,
     before,
+    after,
   });
   return data ?? [];
 }
@@ -555,23 +563,27 @@ export function subscribeToChannel(
   let closed = false;
   let refreshing = false;
   let primed = false;
-  const seen = new Map<string, { edited_at: string | null; deleted_at: string | null }>();
+  let latest = "1970-01-01T00:00:00+00:00"; // max created_at seen — incremental cursor
+  const seen = new Set<string>();
 
   const refresh = async () => {
     if (closed || refreshing) return;
     refreshing = true;
     try {
-      const msgs = await fetchChannelMessages(channelId, { currentAccountId: "" });
+      /* Prime once with a full fetch (no callbacks — don't replay history),
+         then every ping does a lightweight incremental fetch of ONLY messages
+         newer than the cursor, so a new message reaches the receiver in one
+         small query instead of re-pulling + diffing the whole channel. Edits /
+         reactions are reconciled by the parent's 5s full poll. */
+      const msgs = primed
+        ? await fetchChannelMessages(channelId, { currentAccountId: "", after: latest })
+        : await fetchChannelMessages(channelId, { currentAccountId: "" });
       if (closed) return;
       for (const m of msgs) {
-        const cur = { edited_at: m.edited_at ?? null, deleted_at: m.deleted_at ?? null };
-        const prev = seen.get(m.id);
-        if (!prev) {
-          seen.set(m.id, cur);
+        if (m.created_at && m.created_at > latest) latest = m.created_at;
+        if (!seen.has(m.id)) {
+          seen.add(m.id);
           if (primed) handlers.onMessageInsert?.(m as unknown as DiscussMessageRow);
-        } else if (prev.edited_at !== cur.edited_at || prev.deleted_at !== cur.deleted_at) {
-          seen.set(m.id, cur);
-          if (primed) handlers.onMessageUpdate?.(m as unknown as DiscussMessageRow);
         }
       }
       primed = true;

@@ -270,6 +270,32 @@ export async function GET(req: Request) {
         const scope = await myChannelIds(me);
         if (!scope.includes(channelId)) return NextResponse.json({ ok: true, data: [] });
 
+        /* Fast incremental path — used by the realtime refresh to fetch ONLY
+           messages newer than `after` (chronological). A single query, no
+           reactions/reply/thread assembly, so a just-arrived message reaches
+           the receiver almost as fast as the notification ping. The regular
+           full fetch (below) and the 5s poll reconcile reactions/edits. */
+        const after = url.searchParams.get("after");
+        if (after) {
+          const { data: incr } = await supabaseServer
+            .from(MESSAGES)
+            .select(AUTHOR_SELECT)
+            .eq("channel_id", channelId)
+            .gt("created_at", after)
+            .order("created_at", { ascending: true })
+            .limit(60);
+          const fresh = ((incr ?? []) as Array<
+            Record<string, unknown> & { id: string; author: AuthorJoin; reply_to_message_id: string | null }
+          >).map((row) => ({
+            ...row,
+            author: flattenAuthor(row.author),
+            reactions: [],
+            reply_preview: null,
+            thread: null,
+          }));
+          return NextResponse.json({ ok: true, data: fresh });
+        }
+
         const limit = Math.min(Number(url.searchParams.get("limit")) || 80, 200);
         const before = url.searchParams.get("before");
         let q = supabaseServer
