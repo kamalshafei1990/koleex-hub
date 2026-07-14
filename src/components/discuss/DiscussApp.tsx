@@ -108,6 +108,9 @@ import {
   TRANSLATE_LANGS,
   loadTranslatePrefs,
   saveTranslatePrefs,
+  prefetchTranslations,
+  isTranslateEngaged,
+  registerOnEngage,
   type TranslatePrefs,
 } from "@/lib/discuss-translate";
 import { useDiscussNotifications } from "./useDiscussNotifications";
@@ -373,9 +376,16 @@ export default function DiscussApp() {
     lang: "en",
   });
   const [translateMenuOpen, setTranslateMenuOpen] = useState(false);
+  /* Bumped the first time the user translates a message, so the pre-warm
+     effect below fires immediately (not just on the next message change). */
+  const [translateTick, setTranslateTick] = useState(0);
   /* Hydrate from localStorage after mount (avoids SSR mismatch). */
   useEffect(() => {
     setTranslatePrefs(loadTranslatePrefs());
+  }, []);
+  useEffect(() => {
+    registerOnEngage(() => setTranslateTick((n) => n + 1));
+    return () => registerOnEngage(null);
   }, []);
   const updateTranslatePrefs = useCallback((patch: Partial<TranslatePrefs>) => {
     setTranslatePrefs((prev) => {
@@ -821,7 +831,7 @@ export default function DiscussApp() {
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibility);
 
-    const pollId = window.setInterval(refreshMessages, 20000);
+    const pollId = window.setInterval(refreshMessages, 5000);
 
     return () => {
       cancelled = true;
@@ -830,6 +840,22 @@ export default function DiscussApp() {
       window.clearInterval(pollId);
     };
   }, [selectedChannelId, accountId, loadMessages, loadChannels]);
+
+  /* Pre-warm translations so the per-message "Translate" click (and
+     Auto-translate) resolve instantly from cache instead of waiting on a
+     provider round-trip. Runs only once the user shows intent — Auto-translate
+     on, or after their first manual translate (translateTick) — so a reader who
+     never translates costs zero AI calls. One batched request per change;
+     already-cached messages are skipped, so a quiet channel sends nothing. */
+  useEffect(() => {
+    if (!accountId) return;
+    if (!translatePrefs.auto && !isTranslateEngaged()) return;
+    const bodies = messages
+      .filter((m) => m.author_account_id !== accountId && !m.deleted_at && m.body)
+      .slice(-30)
+      .map((m) => m.body as string);
+    if (bodies.length > 0) void prefetchTranslations(bodies, translatePrefs.lang);
+  }, [messages, translatePrefs.auto, translatePrefs.lang, translateTick, accountId]);
 
   /* Presence + typing. Fresh channel each time the selection changes. */
   useEffect(() => {
