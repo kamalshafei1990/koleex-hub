@@ -25,6 +25,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { emitPings, pingChannelActivity, rtTopic } from "@/lib/server/realtime-broadcast";
 
 const CHANNELS = "discuss_channels";
 const MEMBERS = "discuss_members";
@@ -95,6 +96,16 @@ export async function POST(req: Request) {
     return (data as { channel_id: string; author_account_id: string } | null) ?? null;
   };
 
+  /* Active member account ids of a channel — recipients of a broadcast ping. */
+  const channelMemberIds = async (channelId: string): Promise<string[]> => {
+    const { data } = await supabaseServer
+      .from(MEMBERS)
+      .select("account_id")
+      .eq("channel_id", channelId)
+      .is("left_at", null);
+    return ((data ?? []) as Array<{ account_id: string }>).map((r) => r.account_id);
+  };
+
   const str = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
 
   try {
@@ -138,6 +149,7 @@ export async function POST(req: Request) {
           role: accountId === me ? "admin" : "member",
         }));
         await supabaseServer.from(MEMBERS).insert(rows);
+        await emitPings(Array.from(allMembers).map((id) => ({ topic: rtTopic.account(id) })));
         return NextResponse.json({ ok: true, data: channel });
       }
 
@@ -152,6 +164,7 @@ export async function POST(req: Request) {
         }
         const { error } = await supabaseServer.from(CHANNELS).update(clean).eq("id", channelId);
         if (error) return bad(error.message, 500);
+        await emitPings([{ topic: rtTopic.channel(channelId) }, ...(await channelMemberIds(channelId)).map((id) => ({ topic: rtTopic.account(id) }))]);
         return NextResponse.json({ ok: true });
       }
 
@@ -164,6 +177,7 @@ export async function POST(req: Request) {
           .update({ archived_at: new Date().toISOString() })
           .eq("id", channelId);
         if (error) return bad(error.message, 500);
+        await emitPings((await channelMemberIds(channelId)).map((id) => ({ topic: rtTopic.account(id) })));
         return NextResponse.json({ ok: true });
       }
 
@@ -182,6 +196,10 @@ export async function POST(req: Request) {
           .from(MEMBERS)
           .insert(rows, { count: "exact" });
         if (error && !/duplicate/i.test(error.message)) return bad(error.message, 500);
+        await emitPings([
+          { topic: rtTopic.channel(channelId) },
+          ...(await channelMemberIds(channelId)).map((id) => ({ topic: rtTopic.account(id) })),
+        ]);
         return NextResponse.json({ ok: true, data: count ?? accountIds.length });
       }
 
@@ -194,6 +212,10 @@ export async function POST(req: Request) {
           .eq("channel_id", channelId)
           .eq("account_id", me);
         if (error) return bad(error.message, 500);
+        await emitPings([
+          { topic: rtTopic.account(me) },
+          ...(await channelMemberIds(channelId)).map((id) => ({ topic: rtTopic.account(id) })),
+        ]);
         return NextResponse.json({ ok: true });
       }
 
@@ -228,6 +250,7 @@ export async function POST(req: Request) {
           .select("*")
           .single();
         if (error) return bad(error.message, 500);
+        await pingChannelActivity(channelId, await channelMemberIds(channelId), me);
         return NextResponse.json({ ok: true, data });
       }
 
@@ -246,6 +269,7 @@ export async function POST(req: Request) {
           })
           .eq("id", id);
         if (error) return bad(error.message, 500);
+        await emitPings([{ topic: rtTopic.channel(msg.channel_id) }]);
         return NextResponse.json({ ok: true });
       }
 
@@ -262,6 +286,7 @@ export async function POST(req: Request) {
           .update({ deleted_at: new Date().toISOString() })
           .eq("id", id);
         if (error) return bad(error.message, 500);
+        await pingChannelActivity(msg.channel_id, await channelMemberIds(msg.channel_id));
         return NextResponse.json({ ok: true });
       }
 
@@ -286,12 +311,14 @@ export async function POST(req: Request) {
           .maybeSingle();
         if (existing) {
           await supabaseServer.from(REACTIONS).delete().eq("id", (existing as { id: string }).id);
+          await emitPings([{ topic: rtTopic.channel(msg.channel_id) }]);
           return NextResponse.json({ ok: true, data: false });
         }
         const { error } = await supabaseServer
           .from(REACTIONS)
           .insert({ message_id: messageId, account_id: me, emoji });
         if (error) return bad(error.message, 500);
+        await emitPings([{ topic: rtTopic.channel(msg.channel_id) }]);
         return NextResponse.json({ ok: true, data: true });
       }
 
@@ -305,6 +332,7 @@ export async function POST(req: Request) {
           .from(PINNED)
           .insert({ channel_id: channelId, message_id: messageId, pinned_by: me });
         if (error && !/duplicate/i.test(error.message)) return bad(error.message, 500);
+        await emitPings([{ topic: rtTopic.channel(channelId) }]);
         return NextResponse.json({ ok: true });
       }
 
@@ -319,6 +347,7 @@ export async function POST(req: Request) {
           .eq("channel_id", channelId)
           .eq("message_id", messageId);
         if (error) return bad(error.message, 500);
+        await emitPings([{ topic: rtTopic.channel(channelId) }]);
         return NextResponse.json({ ok: true });
       }
 

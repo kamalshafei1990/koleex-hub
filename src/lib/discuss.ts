@@ -45,6 +45,10 @@ const CHANNELS = "discuss_channels";
 const CONTACTS = "contacts";
 const BUCKET = "media";
 
+/* Broadcast ping topics — MUST match src/lib/server/realtime-broadcast.ts. */
+const rtChannelTopic = (channelId: string) => `discuss:channel:${channelId}`;
+const rtAccountTopic = (accountId: string) => `discuss:account:${accountId}`;
+
 /** Silent fallback when a table hasn't been migrated yet. Matches the
  *  detection logic in inbox.ts so behavior is consistent. */
 function isMissingTable(message: string): boolean {
@@ -456,14 +460,77 @@ export async function uploadDiscussAttachment(
  *  We return a composite unsubscriber rather than the raw channel
  *  object because most callers only need "stop listening" — they
  *  never care about the underlying Supabase channel handle. */
-/** Unique-per-call topic suffix for realtime channels. We can't reuse
- *  topic names across subscribers because supabase-js de-dupes channels
- *  by topic and `.on("postgres_changes", …)` after `.subscribe()`
- *  throws. A short random id keeps each subscription fully isolated. */
-function uniqueChannelSuffix(): string {
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+/* ── Broadcast subscription manager (RLS realtime-lockdown P3) ──────────
+   The Discuss realtime tables are locked to service_role, so clients no longer
+   use anon postgres_changes. Instead the server emits a Broadcast "changed"
+   ping per channel/account topic after each write (see /api/discuss/mutate +
+   realtime-broadcast.ts). Broadcast needs no table access — same mechanism as
+   the typing/presence indicators. On a ping the client refetches through the
+   gated read endpoints, so message content only ever comes from an authorized
+   read.
+
+   supabase-js de-dupes channels by topic, and several components subscribe to
+   the SAME channel topic at once (DiscussApp + ThreadPane on the open channel;
+   DiscussApp + NotificationBell + FloatingPanel on the account topic). We keep
+   ONE shared realtime channel per topic and ref-count listeners so one
+   component unmounting never tears down another's subscription. */
+type PingPayload = { channelId?: string; authorId?: string | null } | undefined;
+const broadcastSubs = new Map<
+  string,
+  { channel: ReturnType<typeof supabase.channel>; listeners: Set<(p: PingPayload) => void> }
+>();
+
+function subscribeBroadcast(topic: string, onPing: (p: PingPayload) => void): () => void {
+  let entry = broadcastSubs.get(topic);
+  if (!entry) {
+    const channel = supabase.channel(topic);
+    const created = { channel, listeners: new Set<(p: PingPayload) => void>() };
+    channel
+      .on("broadcast", { event: "changed" }, (msg) => {
+        const payload = (msg?.payload ?? undefined) as PingPayload;
+        for (const l of created.listeners) {
+          try { l(payload); } catch { /* one bad listener must not break the rest */ }
+        }
+      })
+      .subscribe();
+    broadcastSubs.set(topic, created);
+    entry = created;
+  }
+  entry.listeners.add(onPing);
+  return () => {
+    const e = broadcastSubs.get(topic);
+    if (!e) return;
+    e.listeners.delete(onPing);
+    if (e.listeners.size === 0) {
+      try { supabase.removeChannel(e.channel); } catch { /* ignore */ }
+      broadcastSubs.delete(topic);
+    }
+  };
 }
 
+/** The signed-in account id, resolved once from the session bootstrap and
+ *  cached — needed to pick the caller's `discuss:account:<id>` ping topic. */
+let cachedAccountId: string | null = null;
+let accountIdPromise: Promise<string | null> | null = null;
+async function getMyAccountId(): Promise<string | null> {
+  if (cachedAccountId) return cachedAccountId;
+  if (!accountIdPromise) {
+    accountIdPromise = fetch("/api/me/bootstrap", { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        cachedAccountId = j?.auth?.account_id ?? null;
+        return cachedAccountId;
+      })
+      .catch(() => null);
+  }
+  return accountIdPromise;
+}
+
+/** Subscribe to a channel's live message stream. Broadcast ping → refetch the
+ *  channel and diff against a snapshot, firing onMessageInsert for genuinely
+ *  new messages and onMessageUpdate for edited/deleted ones. Reactions are
+ *  reconciled by the caller's existing focus / interval refetch (a few seconds),
+ *  so their granular callbacks are no longer driven from here. */
 export function subscribeToChannel(
   channelId: string,
   handlers: {
@@ -473,141 +540,56 @@ export function subscribeToChannel(
     onReactionDelete?: (rx: DiscussReactionRow) => void;
   },
 ): () => void {
-  /* We wrap channel creation in a helper so we can tear it down and
-     re-create it from scratch on CHANNEL_ERROR / TIMED_OUT without
-     losing the caller's handlers. The Supabase JS realtime client
-     will re-join on network blips, but it does NOT recreate a channel
-     after a server-side error — which Safari triggers surprisingly
-     often when the tab comes back from a long sleep.
-
-     IMPORTANT: every connect() invocation must use a UNIQUE topic.
-     `supabase.channel(topic)` returns the existing channel if one
-     with that topic is still in `client.channels`, and `removeChannel`
-     is async — so React strict-mode double-mounts (or two simultaneous
-     subscribers) handed back the same already-`subscribe()`-d channel,
-     and `.on("postgres_changes", …)` after subscribe throws. Suffixing
-     each call with a fresh random id sidesteps the cache entirely. */
-  let currentChannel: ReturnType<typeof supabase.channel> | null = null;
-  let reconnectTimer: number | null = null;
+  void handlers.onReactionInsert;
+  void handlers.onReactionDelete;
   let closed = false;
+  let refreshing = false;
+  let primed = false;
+  const seen = new Map<string, { edited_at: string | null; deleted_at: string | null }>();
 
-  const connect = () => {
-    if (closed) return;
-    const topic = `discuss:${channelId}:${uniqueChannelSuffix()}`;
-    const ch = supabase.channel(topic, {
-      config: { broadcast: { self: false } },
-    });
-    ch.on(
-      "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: "discuss_messages",
-        filter: `channel_id=eq.${channelId}`,
-      },
-      (payload) => {
-        handlers.onMessageInsert?.(payload.new as DiscussMessageRow);
-      },
-    )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "discuss_messages",
-          filter: `channel_id=eq.${channelId}`,
-        },
-        (payload) => {
-          handlers.onMessageUpdate?.(payload.new as DiscussMessageRow);
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "discuss_reactions",
-        },
-        (payload) => {
-          handlers.onReactionInsert?.(payload.new as DiscussReactionRow);
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "DELETE",
-          schema: "public",
-          table: "discuss_reactions",
-        },
-        (payload) => {
-          handlers.onReactionDelete?.(payload.old as DiscussReactionRow);
-        },
-      )
-      .subscribe((status) => {
-        if (typeof console !== "undefined") {
-          if (status === "SUBSCRIBED") {
-            console.info(
-              `[Discuss] channel ${channelId} realtime SUBSCRIBED ✓`,
-            );
-          }
+  const refresh = async () => {
+    if (closed || refreshing) return;
+    refreshing = true;
+    try {
+      const msgs = await fetchChannelMessages(channelId, { currentAccountId: "" });
+      if (closed) return;
+      for (const m of msgs) {
+        const cur = { edited_at: m.edited_at ?? null, deleted_at: m.deleted_at ?? null };
+        const prev = seen.get(m.id);
+        if (!prev) {
+          seen.set(m.id, cur);
+          if (primed) handlers.onMessageInsert?.(m as unknown as DiscussMessageRow);
+        } else if (prev.edited_at !== cur.edited_at || prev.deleted_at !== cur.deleted_at) {
+          seen.set(m.id, cur);
+          if (primed) handlers.onMessageUpdate?.(m as unknown as DiscussMessageRow);
         }
-        /* Reconnect only on the *abnormal* statuses. CLOSED is the
-           normal status emitted during teardown (we called
-           removeChannel) and during HMR / strict-mode double-mounts —
-           reconnecting on it produces an infinite reconnect loop. */
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          if (typeof console !== "undefined") {
-            console.warn(
-              `[Discuss] channel ${channelId} realtime ${status}, reconnecting…`,
-            );
-          }
-          if (!closed && reconnectTimer == null) {
-            reconnectTimer = window.setTimeout(() => {
-              reconnectTimer = null;
-              try {
-                if (currentChannel) supabase.removeChannel(currentChannel);
-              } catch {
-                /* ignore */
-              }
-              connect();
-            }, 1500);
-          }
-        }
-      });
-    currentChannel = ch;
+      }
+      primed = true;
+    } finally {
+      refreshing = false;
+    }
   };
 
-  connect();
+  // Prime the snapshot (no callbacks fired) so we don't replay existing messages.
+  void refresh();
+
+  const unsub = subscribeBroadcast(rtChannelTopic(channelId), () => {
+    void refresh();
+  });
 
   return () => {
     closed = true;
-    if (reconnectTimer != null) {
-      window.clearTimeout(reconnectTimer);
-      reconnectTimer = null;
-    }
-    if (currentChannel) {
-      try {
-        supabase.removeChannel(currentChannel);
-      } catch {
-        /* ignore */
-      }
-      currentChannel = null;
-    }
+    unsub();
   };
 }
 
-/** Subscribe to the "my channels" view — the sidebar wants a ping
- *  whenever any channel the user is in gets a new message (so we can
- *  bump `last_message_at`, increment the unread badge, and re-sort
- *  without a full refetch) and whenever a channel row is created or
- *  archived (so a new #channel or new DM appears instantly).
- *
- *  The handlers are intentionally split so callers can patch state
- *  in place for the hot path (`onMessageInsert`) and only trigger a
- *  full `loadChannels()` for the rare case where the channel list
- *  itself changed (`onChannelChange`). This removes the old pattern
- *  of refetching the entire sidebar on every message in the
- *  workspace — which was the main reason Discuss felt "refreshy". */
+/** Subscribe to the caller's "my channels" activity — a ping whenever any
+ *  channel they're in changes (new message, channel created / archived, member
+ *  added). On a ping we always trigger onChannelChange (a debounced sidebar
+ *  refetch that recomputes unread / previews / order correctly) and, when the
+ *  ping names a different author, also fire onMessageInsert with a minimal
+ *  synthetic row so the notification bell can chime / bump before the refetch
+ *  lands. The payload carries ids only — never message content. */
 export function subscribeToMyChannels(
   handlers:
     | (() => void)
@@ -616,93 +598,42 @@ export function subscribeToMyChannels(
         onChannelChange?: () => void;
       },
 ): () => void {
-  /* Backwards-compat: an old caller passed a single callback — run it
-     for both events so nothing silently breaks. */
   const onMessage =
     typeof handlers === "function"
       ? (_msg: DiscussMessageRow) => (handlers as () => void)()
       : handlers.onMessageInsert;
   const onChannel =
-    typeof handlers === "function"
-      ? (handlers as () => void)
-      : handlers.onChannelChange;
+    typeof handlers === "function" ? (handlers as () => void) : handlers.onChannelChange;
 
-  let currentChannel: ReturnType<typeof supabase.channel> | null = null;
-  let reconnectTimer: number | null = null;
   let closed = false;
+  let unsub: (() => void) | null = null;
 
-  const connect = () => {
-    if (closed) return;
-    /* See the long comment in subscribeToChannel: each subscriber needs
-       its own topic so NotificationBell + DiscussApp (which both call this)
-       and React strict-mode double-mounts don't collide on the cached
-       already-subscribed channel. */
-    const topic = `discuss:my-channels:${uniqueChannelSuffix()}`;
-    const ch = supabase
-      .channel(topic)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "discuss_messages" },
-        (payload) => {
-          onMessage?.(payload.new as DiscussMessageRow);
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "discuss_channels" },
-        () => onChannel?.(),
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "discuss_channels" },
-        () => onChannel?.(),
-      )
-      .subscribe((status) => {
-        if (typeof console !== "undefined") {
-          if (status === "SUBSCRIBED") {
-            console.info("[Discuss] my-channels realtime SUBSCRIBED ✓");
-          }
-        }
-        /* Same caveat as subscribeToChannel: never reconnect on CLOSED,
-           that's the normal teardown status and would loop forever. */
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          if (typeof console !== "undefined") {
-            console.warn(
-              `[Discuss] my-channels realtime ${status}, reconnecting…`,
-            );
-          }
-          if (!closed && reconnectTimer == null) {
-            reconnectTimer = window.setTimeout(() => {
-              reconnectTimer = null;
-              try {
-                if (currentChannel) supabase.removeChannel(currentChannel);
-              } catch {
-                /* ignore */
-              }
-              connect();
-            }, 1500);
-          }
-        }
-      });
-    currentChannel = ch;
-  };
-
-  connect();
+  void getMyAccountId().then((accountId) => {
+    if (closed || !accountId) return;
+    unsub = subscribeBroadcast(rtAccountTopic(accountId), (payload) => {
+      const authorId = payload?.authorId ?? null;
+      if (onMessage && authorId && authorId !== accountId) {
+        onMessage({
+          id: "",
+          channel_id: payload?.channelId ?? "",
+          author_account_id: authorId,
+          reply_to_message_id: null,
+          kind: "text",
+          body: null,
+          body_html: null,
+          metadata: {},
+          edited_at: null,
+          deleted_at: null,
+          created_at: new Date().toISOString(),
+        } as unknown as DiscussMessageRow);
+      }
+      onChannel?.();
+    });
+  });
 
   return () => {
     closed = true;
-    if (reconnectTimer != null) {
-      window.clearTimeout(reconnectTimer);
-      reconnectTimer = null;
-    }
-    if (currentChannel) {
-      try {
-        supabase.removeChannel(currentChannel);
-      } catch {
-        /* ignore */
-      }
-      currentChannel = null;
-    }
+    if (unsub) unsub();
   };
 }
 
