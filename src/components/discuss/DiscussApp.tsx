@@ -56,6 +56,7 @@ import HashtagIcon from "@/components/icons/ui/HashtagIcon";
 import ImageIcon from "@/components/icons/ui/PictureIcon";
 import InfoIcon from "@/components/icons/ui/InfoIcon";
 import LinkIcon from "@/components/icons/ui/LinkIcon";
+import LanguagesIcon from "@/components/icons/ui/LanguagesIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import LockIcon from "@/components/icons/ui/LockIcon";
 import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
@@ -102,7 +103,13 @@ import {
   uploadDiscussVoice,
   fetchMessageableAccounts,
 } from "@/lib/discuss";
-import { renderDiscussMarkdown } from "./markdown";
+import { TranslatableBody } from "./TranslatableBody";
+import {
+  TRANSLATE_LANGS,
+  loadTranslatePrefs,
+  saveTranslatePrefs,
+  type TranslatePrefs,
+} from "@/lib/discuss-translate";
 import { useDiscussNotifications } from "./useDiscussNotifications";
 import VoiceRecorder, { VoicePlaybackBubble } from "./VoiceRecorder";
 import {
@@ -355,6 +362,28 @@ export default function DiscussApp() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [customerChatOpen, setCustomerChatOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+
+  /* ── Translation ──────────────────────────────────────────────────
+     Multi-national teams: a sender writes in their own language and the
+     receiver reads it in theirs. `auto` renders every incoming message in
+     `lang` automatically; when off, each message still has a per-message
+     Translate toggle. Preference is per-device (localStorage). */
+  const [translatePrefs, setTranslatePrefs] = useState<TranslatePrefs>({
+    auto: false,
+    lang: "en",
+  });
+  const [translateMenuOpen, setTranslateMenuOpen] = useState(false);
+  /* Hydrate from localStorage after mount (avoids SSR mismatch). */
+  useEffect(() => {
+    setTranslatePrefs(loadTranslatePrefs());
+  }, []);
+  const updateTranslatePrefs = useCallback((patch: Partial<TranslatePrefs>) => {
+    setTranslatePrefs((prev) => {
+      const next = { ...prev, ...patch };
+      saveTranslatePrefs(next);
+      return next;
+    });
+  }, []);
 
   /* ── Phase B: message-level state ─────────────────────────────── */
   /** Message id currently being edited inline. Null when nothing is
@@ -1831,6 +1860,13 @@ export default function DiscussApp() {
                         )}
                   </div>
                 </div>
+                <TranslateControl
+                  prefs={translatePrefs}
+                  open={translateMenuOpen}
+                  onOpenChange={setTranslateMenuOpen}
+                  onChange={updateTranslatePrefs}
+                  t={t}
+                />
                 <button
                   type="button"
                   onClick={() => void handleToggleMute()}
@@ -1903,6 +1939,8 @@ export default function DiscussApp() {
                     onReply={handleStartReply}
                     onOpenThread={handleOpenThread}
                     onToggleReaction={handleToggleReaction}
+                    autoTranslate={translatePrefs.auto}
+                    targetLang={translatePrefs.lang}
                     t={t}
                   />
                 )}
@@ -2008,6 +2046,8 @@ export default function DiscussApp() {
               currentAccountId={accountId}
               channelId={selectedChannel.id}
               onClose={() => setThreadTarget(null)}
+              autoTranslate={translatePrefs.auto}
+              targetLang={translatePrefs.lang}
               t={t}
             />
           </aside>
@@ -2224,6 +2264,8 @@ type MessageListProps = {
   onReply: (msg: DiscussMessageWithAuthor) => void;
   onOpenThread: (msg: DiscussMessageWithAuthor) => void;
   onToggleReaction: (messageId: string, emoji: string) => void;
+  autoTranslate: boolean;
+  targetLang: string;
   t: (key: string, fallback?: string) => string;
 };
 
@@ -2343,6 +2385,8 @@ function MessageList(props: MessageListProps) {
             onReply={props.onReply}
             onOpenThread={props.onOpenThread}
             onToggleReaction={props.onToggleReaction}
+            autoTranslate={props.autoTranslate}
+            targetLang={props.targetLang}
             t={props.t}
           />
         );
@@ -2352,6 +2396,102 @@ function MessageList(props: MessageListProps) {
 }
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "🎉", "👀", "🙏"];
+
+/* Header control: turn Auto-translate on/off and pick the language every
+   incoming message is rendered in. Monochrome, matches the mute/info icons. */
+function TranslateControl({
+  prefs,
+  open,
+  onOpenChange,
+  onChange,
+  t,
+}: {
+  prefs: TranslatePrefs;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onChange: (patch: Partial<TranslatePrefs>) => void;
+  t: (key: string, fallback?: string) => string;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        onOpenChange(false);
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open, onOpenChange]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => onOpenChange(!open)}
+        className={`h-8 px-2 rounded-md flex items-center gap-1.5 transition-colors ${
+          prefs.auto
+            ? "text-blue-400 bg-blue-500/10 hover:bg-blue-500/15"
+            : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+        }`}
+        title={t("translate.title", "Translation")}
+      >
+        <LanguagesIcon className="h-4 w-4" />
+        <span className="text-[10.5px] font-semibold uppercase tracking-wide">
+          {prefs.lang}
+        </span>
+      </button>
+      {open && (
+        <div className="absolute end-0 top-full mt-1.5 z-30 w-64 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-xl p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="text-[12px] font-semibold text-[var(--text-primary)]">
+                {t("translate.auto", "Auto-translate")}
+              </div>
+              <div className="text-[10.5px] text-[var(--text-dim)] leading-snug">
+                {t(
+                  "translate.autoHint",
+                  "Show every incoming message in your language.",
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={prefs.auto}
+              onClick={() => onChange({ auto: !prefs.auto })}
+              className={`shrink-0 h-5 w-9 rounded-full transition-colors relative ${
+                prefs.auto ? "bg-blue-500" : "bg-[var(--bg-surface)] border border-[var(--border-subtle)]"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${
+                  prefs.auto ? "start-[18px]" : "start-0.5"
+                }`}
+              />
+            </button>
+          </div>
+          <div className="mt-3">
+            <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">
+              {t("translate.language", "Translate to")}
+            </label>
+            <select
+              value={prefs.lang}
+              onChange={(e) => onChange({ lang: e.target.value })}
+              className="mt-1 w-full h-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-2 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
+            >
+              {TRANSLATE_LANGS.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 type MessageBubbleProps = {
   msg: DiscussMessageWithAuthor;
@@ -2373,6 +2513,8 @@ type MessageBubbleProps = {
   onReply: (msg: DiscussMessageWithAuthor) => void;
   onOpenThread: (msg: DiscussMessageWithAuthor) => void;
   onToggleReaction: (messageId: string, emoji: string) => void;
+  autoTranslate: boolean;
+  targetLang: string;
   t: (key: string, fallback?: string) => string;
 };
 
@@ -2396,6 +2538,8 @@ function MessageBubble({
   onReply,
   onOpenThread,
   onToggleReaction,
+  autoTranslate,
+  targetLang,
   t,
 }: MessageBubbleProps) {
   const author = msg.author;
@@ -2502,13 +2646,14 @@ function MessageBubble({
               </div>
             ) : (
               msg.body && (
-                <div className="text-[13px] leading-relaxed text-[var(--text-primary)] whitespace-pre-wrap break-words">
-                  {renderDiscussMarkdown(
-                    msg.body,
-                    meta.mentions ?? [],
-                    `mb-${msg.id}`,
-                  )}
-                </div>
+                <TranslatableBody
+                  body={msg.body}
+                  messageId={msg.id}
+                  mentions={meta.mentions ?? []}
+                  autoTranslate={autoTranslate && !isSelf}
+                  targetLang={targetLang}
+                  t={t}
+                />
               )
             )}
 

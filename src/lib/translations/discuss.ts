@@ -60,6 +60,17 @@ export const discussT: Translations = {
   "header.archive":         { en: "Archive",               zh: "归档",                 ar: "أرشفة" },
   "header.settings":        { en: "Channel Settings",      zh: "频道设置",              ar: "إعدادات القناة" },
 
+  /* ── Translation ── */
+  "translate.title":        { en: "Translation",           zh: "翻译",                 ar: "الترجمة" },
+  "translate.auto":         { en: "Auto-translate",        zh: "自动翻译",              ar: "الترجمة التلقائية" },
+  "translate.autoHint":     { en: "Show every incoming message in your language.", zh: "以您的语言显示每条收到的消息。", ar: "اعرض كل رسالة واردة بلغتك." },
+  "translate.language":     { en: "Translate to",          zh: "翻译为",                ar: "الترجمة إلى" },
+  "translate.action":       { en: "Translate",             zh: "翻译",                 ar: "ترجمة" },
+  "translate.working":      { en: "Translating…",          zh: "翻译中…",               ar: "جارٍ الترجمة…" },
+  "translate.translatedTo": { en: "Translated · {lang}",   zh: "已翻译 · {lang}",        ar: "مترجم · {lang}" },
+  "translate.showOriginal": { en: "Show original",         zh: "显示原文",              ar: "عرض الأصل" },
+  "translate.showTranslation": { en: "Show translation",   zh: "显示翻译",              ar: "عرض الترجمة" },
+
   /* ═══════════════════════════════════════════════════════════════════════════
      MESSAGE THREAD
      ═══════════════════════════════════════════════════════════════════════════ */

@@ -37,7 +37,7 @@ import {
   toggleReaction,
   subscribeToChannel,
 } from "@/lib/discuss";
-import { renderDiscussMarkdown } from "./markdown";
+import { TranslatableBody } from "./TranslatableBody";
 import type { DiscussMessageWithAuthor } from "@/types/supabase";
 
 /* Quick-pick reactions shown in the hover row — matches Slack defaults. */
@@ -55,6 +55,9 @@ export interface ThreadPaneProps {
   /** Callback fired after a successful reply so the parent can refresh
    *  the thread indicator on the message bubble in the main channel. */
   onReplySent?: () => void;
+  /** Auto-translate incoming replies into `targetLang` (mirrors the channel). */
+  autoTranslate?: boolean;
+  targetLang?: string;
   /** i18n helper. */
   t: (key: string, fallback?: string) => string;
 }
@@ -65,6 +68,8 @@ export function ThreadPane({
   channelId,
   onClose,
   onReplySent,
+  autoTranslate = false,
+  targetLang = "en",
   t,
 }: ThreadPaneProps) {
   const [messages, setMessages] = useState<DiscussMessageWithAuthor[]>([]);
@@ -252,6 +257,9 @@ export function ThreadPane({
                 isParent={idx === 0}
                 currentAccountId={currentAccountId}
                 onToggleReaction={(emoji) => handleToggleReaction(m.id, emoji)}
+                autoTranslate={autoTranslate}
+                targetLang={targetLang}
+                t={t}
               />
             ))}
             {messages.length === 1 && (
@@ -316,11 +324,17 @@ function ThreadMessage({
   isParent,
   currentAccountId,
   onToggleReaction,
+  autoTranslate = false,
+  targetLang = "en",
+  t,
 }: {
   msg: DiscussMessageWithAuthor;
   isParent: boolean;
   currentAccountId: string;
   onToggleReaction: (emoji: string) => void;
+  autoTranslate?: boolean;
+  targetLang?: string;
+  t: (key: string, fallback?: string) => string;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const authorName =
@@ -381,13 +395,17 @@ function ThreadMessage({
               This message was deleted
             </div>
           ) : (
-            <div className="text-[12.5px] text-[var(--text-primary)] leading-relaxed mt-0.5 whitespace-pre-wrap break-words">
-              {renderDiscussMarkdown(
-                body ?? "",
-                msg.metadata?.mentions ?? [],
-                `tm-${msg.id}`,
-              )}
-            </div>
+            <TranslatableBody
+              body={body ?? ""}
+              messageId={`tm-${msg.id}`}
+              mentions={msg.metadata?.mentions ?? []}
+              autoTranslate={
+                autoTranslate && msg.author_account_id !== currentAccountId
+              }
+              targetLang={targetLang}
+              t={t}
+              className="text-[12.5px] text-[var(--text-primary)] leading-relaxed mt-0.5 whitespace-pre-wrap break-words"
+            />
           )}
 
           {/* Reactions row */}
