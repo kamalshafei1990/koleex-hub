@@ -16,6 +16,7 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { sendPushToAccounts } from "@/lib/server/web-push";
+import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
 
 export type AlertKind =
   | "login"
@@ -183,6 +184,7 @@ export async function notifySuperAdmins(alert: SaAlert): Promise<void> {
       }));
     if (rows.length === 0) return;
     await supabaseServer.from("inbox_messages").insert(rows);
+    await emitPings(rows.map((r) => ({ topic: rtTopic.inbox((r as { recipient_account_id: string }).recipient_account_id) })));
 
     // Also deliver as a Web Push to those recipients' devices (iPhone lock
     // screen / Notification Center, even when the app is closed). Best-effort;

@@ -48,6 +48,27 @@ async function inboxMutate(payload: Record<string, unknown>): Promise<{ ok: bool
   }
 }
 
+/* RLS realtime-lockdown P3-D: READS also go through a gated route now
+   (/api/inbox/feed, service-role + session recipient scope) so inbox_messages'
+   last public policy (SELECT) can be dropped. Freshness via Broadcast pings. */
+async function inboxFeed<T>(resource: string, params: Record<string, string> = {}): Promise<T | undefined> {
+  try {
+    const qs = new URLSearchParams({ resource, ...params }).toString();
+    const res = await fetch(`/api/inbox/feed?${qs}`, { method: "GET", credentials: "include" });
+    const j = (await res.json().catch(() => ({}))) as { ok?: boolean; data?: T; error?: string };
+    if (!res.ok || !j.ok) {
+      const msg = j.error ?? `HTTP ${res.status}`;
+      if (!isMissingTable(msg) && !isTransientFetch(msg)) warnOnce("inbox-feed-error", `[Inbox] feed unavailable (silenced): ${msg}`);
+      return undefined;
+    }
+    return j.data;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!isTransientFetch(msg)) warnOnce("inbox-feed-transient", `[Inbox] feed network error (silenced): ${msg}`);
+    return undefined;
+  }
+}
+
 /** True if the error shape looks like "relation does not exist" — we use
  *  this to silently fall back when the migration hasn't been applied. */
 function isMissingTable(message: string): boolean {
@@ -153,71 +174,11 @@ export async function fetchInboxMessages(
   options: { includeArchived?: boolean; limit?: number } = {},
 ): Promise<InboxMessageWithSender[]> {
   const { includeArchived = false, limit = 100 } = options;
-  let q = supabase
-    .from(INBOX)
-    .select(
-      `
-      *,
-      sender:accounts!inbox_messages_sender_account_id_fkey (
-        id,
-        username,
-        avatar_url,
-        person:people ( full_name )
-      )
-      `,
-    )
-    .eq("recipient_account_id", accountId)
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (!includeArchived) q = q.is("archived_at", null);
-
-  const { data, error } = await q;
-  if (error) {
-    if (!isMissingTable(error.message)) {
-      console.error("[Inbox] Fetch messages:", error.message);
-    }
-    return [];
-  }
-
-  /* Normalize the embedded sender into the flat `sender` shape the UI
-     expects — Supabase returns `sender` as either an object or array
-     depending on schema inference, and `person` is nested inside. */
-  const rows = (data as unknown as Array<
-    InboxMessageRow & {
-      sender:
-        | {
-            id: string;
-            username: string;
-            avatar_url: string | null;
-            person: { full_name: string } | Array<{ full_name: string }> | null;
-          }
-        | Array<{
-            id: string;
-            username: string;
-            avatar_url: string | null;
-            person: { full_name: string } | Array<{ full_name: string }> | null;
-          }>
-        | null;
-    }
-  >) ?? [];
-
-  return rows.map((row) => {
-    const raw = Array.isArray(row.sender) ? row.sender[0] ?? null : row.sender;
-    let sender: InboxMessageWithSender["sender"] = null;
-    if (raw) {
-      const person = Array.isArray(raw.person) ? raw.person[0] ?? null : raw.person;
-      sender = {
-        id: raw.id,
-        username: raw.username,
-        avatar_url: raw.avatar_url,
-        full_name: person?.full_name ?? null,
-      };
-    }
-    const { sender: _s, ...base } = row as InboxMessageRow & { sender: unknown };
-    void _s;
-    return { ...(base as InboxMessageRow), sender };
-  });
+  void accountId; // recipient scope comes from the session server-side
+  const params: Record<string, string> = { limit: String(limit) };
+  if (includeArchived) params.archived = "1";
+  const data = await inboxFeed<InboxMessageWithSender[]>("messages", params);
+  return data ?? [];
 }
 
 /* ── Realtime ────────────────────────────────────────────────────────
@@ -228,94 +189,68 @@ export async function fetchInboxMessages(
    collide on the same channel. Requires `inbox_messages` to be in the
    `supabase_realtime` publication — see the
    `add_inbox_messages_to_realtime` migration. */
-export function subscribeToInboxMessages(
-  accountId: string,
-  onInsert: (msg: InboxMessageRow) => void,
-): () => void {
-  let currentChannel: ReturnType<typeof supabase.channel> | null = null;
-  let reconnectTimer: number | null = null;
-  let closed = false;
-
-  const connect = () => {
-    if (closed) return;
-    const suffix = `${Date.now().toString(36)}-${Math.random()
-      .toString(36)
-      .slice(2, 8)}`;
-    const topic = `inbox:${accountId}:${suffix}`;
-    const ch = supabase
-      .channel(topic)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: INBOX,
-          filter: `recipient_account_id=eq.${accountId}`,
-        },
-        (payload) => {
-          onInsert(payload.new as InboxMessageRow);
-        },
-      )
-      .subscribe((status) => {
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          if (typeof console !== "undefined") {
-            console.warn(`[Inbox] realtime ${status}, reconnecting…`);
-          }
-          if (!closed && reconnectTimer == null) {
-            reconnectTimer = window.setTimeout(() => {
-              reconnectTimer = null;
-              try {
-                if (currentChannel) supabase.removeChannel(currentChannel);
-              } catch {
-                /* ignore */
-              }
-              connect();
-            }, 1500);
-          }
-        }
-      });
-    currentChannel = ch;
-  };
-
-  connect();
-
+/* Ref-counted shared Broadcast channel per inbox topic — NotificationBell and
+   the /inbox page both subscribe to inbox:account:<me>; one unmount must not
+   tear down the other. Mirrors the discuss.ts broadcast manager. */
+const inboxBroadcastSubs = new Map<
+  string,
+  { channel: ReturnType<typeof supabase.channel>; listeners: Set<() => void> }
+>();
+function subscribeInboxBroadcast(accountId: string, onPing: () => void): () => void {
+  const topic = `inbox:account:${accountId}`;
+  let entry = inboxBroadcastSubs.get(topic);
+  if (!entry) {
+    const channel = supabase.channel(topic);
+    const created = { channel, listeners: new Set<() => void>() };
+    channel.on("broadcast", { event: "changed" }, () => {
+      for (const l of created.listeners) { try { l(); } catch { /* isolate */ } }
+    }).subscribe();
+    inboxBroadcastSubs.set(topic, created);
+    entry = created;
+  }
+  entry.listeners.add(onPing);
   return () => {
-    closed = true;
-    if (reconnectTimer != null) {
-      window.clearTimeout(reconnectTimer);
-      reconnectTimer = null;
-    }
-    if (currentChannel) {
-      try {
-        supabase.removeChannel(currentChannel);
-      } catch {
-        /* ignore */
-      }
-      currentChannel = null;
+    const e = inboxBroadcastSubs.get(topic);
+    if (!e) return;
+    e.listeners.delete(onPing);
+    if (e.listeners.size === 0) {
+      try { supabase.removeChannel(e.channel); } catch { /* ignore */ }
+      inboxBroadcastSubs.delete(topic);
     }
   };
 }
 
-export async function fetchUnreadCount(accountId: string): Promise<number> {
-  const { count, error } = await supabase
-    .from(INBOX)
-    .select("*", { count: "exact", head: true })
-    .eq("recipient_account_id", accountId)
-    .is("read_at", null)
-    .is("archived_at", null);
-  if (error) {
-    /* This runs on a 60 s poller, so a single offline window (or a platform
-       incident that returns an unfamiliar / empty error message) would spam the
-       console — and Next.js Dev Tools counts every console.error as an "issue".
-       An unread-count blip is non-critical, so NEVER escalate to console.error:
-       surface the first occurrence via warnOnce (diagnosable) and silence the
-       rest. Missing-table stays fully silent. */
-    if (!isMissingTable(error.message)) {
-      warnOnce("inbox-unread-error", `[Inbox] unread count unavailable (silenced; will retry): ${error.message || "unknown error"}`);
+/** Subscribe to the caller's inbox. Server Broadcast ping on
+ *  inbox:account:<id> (see /api/inbox/mutate) -> refetch the recent inbox via
+ *  the gated feed, diff against a seen-set, and fire onInsert for new rows.
+ *  No anon table access; content comes only from the authorized feed. */
+export function subscribeToInboxMessages(
+  accountId: string,
+  onInsert: (msg: InboxMessageRow) => void,
+): () => void {
+  let closed = false;
+  let primed = false;
+  const seen = new Set<string>();
+  const refresh = async () => {
+    if (closed) return;
+    const msgs = await inboxFeed<InboxMessageWithSender[]>("messages", { limit: "30" });
+    if (closed || !msgs) return;
+    for (const m of [...msgs].reverse()) {
+      if (seen.has(m.id)) continue;
+      seen.add(m.id);
+      if (primed) onInsert(m as unknown as InboxMessageRow);
     }
-    return 0;
-  }
-  return count ?? 0;
+    primed = true;
+  };
+  void refresh(); // prime the seen-set (no callbacks fired)
+  const unsub = subscribeInboxBroadcast(accountId, () => { void refresh(); });
+  return () => { closed = true; unsub(); };
+}
+
+export async function fetchUnreadCount(accountId: string): Promise<number> {
+  void accountId; // recipient scope comes from the session server-side
+  const n = await inboxFeed<number>("unread");
+  return n ?? 0;
 }
 
 /** Count unread (not archived) TO-DO assignment notifications for one account.
@@ -326,21 +261,9 @@ export async function fetchUnreadCount(accountId: string): Promise<number> {
     the ones the todo fan-out tags with metadata.type = 'todo_assignment', so
     we filter on that to keep the badge strictly to-do related. */
 export async function fetchUnreadTaskCount(accountId: string): Promise<number> {
-  const { count, error } = await supabase
-    .from(INBOX)
-    .select("*", { count: "exact", head: true })
-    .eq("recipient_account_id", accountId)
-    .eq("category", "task")
-    .eq("metadata->>type", "todo_assignment")
-    .is("read_at", null)
-    .is("archived_at", null);
-  if (error) {
-    if (!isMissingTable(error.message) && !isTransientFetch(error.message)) {
-      console.error("[Inbox] Unread task count:", error.message);
-    }
-    return 0;
-  }
-  return count ?? 0;
+  void accountId; // recipient scope comes from the session server-side
+  const n = await inboxFeed<number>("unreadTasks");
+  return n ?? 0;
 }
 
 export async function markMessageRead(id: string): Promise<boolean> {

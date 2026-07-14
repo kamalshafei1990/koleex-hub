@@ -19,6 +19,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
+import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
 
 const INBOX = "inbox_messages";
 
@@ -83,6 +84,7 @@ export async function POST(req: Request) {
           .select("*")
           .single();
         if (error) throw new Error(error.message);
+        await emitPings([{ topic: rtTopic.inbox(body.recipientId) }]);
         return NextResponse.json({ ok: true, message: data });
       }
 
@@ -115,6 +117,7 @@ export async function POST(req: Request) {
         }));
         const { error: insErr } = await supabaseServer.from(INBOX).insert(rows);
         if (insErr) throw new Error(insErr.message);
+        await emitPings(target.map((row) => ({ topic: rtTopic.inbox((row as { id: string }).id) })));
         return NextResponse.json({ ok: true, count: rows.length });
       }
 
@@ -134,6 +137,7 @@ export async function POST(req: Request) {
         }));
         const { error } = await supabaseServer.from(INBOX).insert(rows);
         if (error) throw new Error(error.message);
+        await emitPings(ids.map((rid) => ({ topic: rtTopic.inbox(rid) })));
         return NextResponse.json({ ok: true, count: rows.length });
       }
 

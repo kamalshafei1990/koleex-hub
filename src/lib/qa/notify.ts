@@ -23,6 +23,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
 
 export type QaNotificationType =
   | "qa_issue_assigned"
@@ -123,6 +124,7 @@ export async function notifyIssue(ctx: NotifyContext, targets: NotifyTarget[]): 
 
   const { error } = await supabaseServer.from("inbox_messages").insert(rows);
   if (error) console.error("[qa notify]", error.message);
+  else await emitPings(recipientIds.map((id) => ({ topic: rtTopic.inbox(id) })));
 }
 
 /* ── Mentions ──────────────────────────────────────────────────────────────
