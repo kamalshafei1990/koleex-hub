@@ -18,8 +18,7 @@
 
 import { supabaseAdmin as supabase } from "./supabase-admin";
 import { uploadToStorage } from "./storage-client";
-import { isTransientFetch, warnOnce } from "./util/transient-fetch";
-import { loadDiscussDirectory } from "./discuss-directory";
+import { isTransientFetch } from "./util/transient-fetch";
 import type {
   DiscussAttachment,
   DiscussAuthor,
@@ -35,15 +34,11 @@ import type {
   DiscussMessageWithAuthor,
   DiscussNotificationPref,
   DiscussReactionRow,
-  DiscussReplyPreview,
   DiscussSearchResult,
   DiscussVoiceMeta,
 } from "@/types/supabase";
 
 const CHANNELS = "discuss_channels";
-const MEMBERS = "discuss_members";
-const MESSAGES = "discuss_messages";
-const REACTIONS = "discuss_reactions";
 /* discuss_pinned / discuss_starred / discuss_drafts are read via the gated
    /api/discuss/state route and written via /api/discuss/mutate, so their table
    names live server-side only (RLS: service_role). */
@@ -127,6 +122,38 @@ async function discussState<T = unknown>(
   }
 }
 
+/** GET companion for the gated realtime-table reads (channels / messages /
+ *  thread / members / search). Same contract as discussState: identity comes
+ *  from the session cookie server-side; returns `data` (falls back to a safe
+ *  empty value on any failure so callers degrade to "no data", matching the
+ *  old anon-read behaviour). */
+async function discussRead<T = unknown>(
+  resource: string,
+  params: Record<string, string | number | undefined> = {},
+): Promise<T | undefined> {
+  try {
+    const qs = new URLSearchParams({ resource });
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== "") qs.set(k, String(v));
+    }
+    const res = await fetch(`/api/discuss/read?${qs.toString()}`, {
+      method: "GET",
+      credentials: "same-origin",
+    });
+    const json = (await res.json().catch(() => ({}))) as { ok?: boolean; data?: T; error?: string };
+    if (!res.ok || !json.ok) {
+      const msg = json.error ?? `HTTP ${res.status}`;
+      if (!isTransientFetch(msg)) console.error("[Discuss] read", resource, msg);
+      return undefined;
+    }
+    return json.data;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!isTransientFetch(msg)) console.error("[Discuss] read", resource, msg);
+    return undefined;
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    Channels
    ═══════════════════════════════════════════════════════════════════════ */
@@ -192,309 +219,9 @@ export async function archiveChannel(channelId: string): Promise<boolean> {
 export async function fetchMyChannels(
   accountId: string,
 ): Promise<DiscussChannelWithState[]> {
-  /* 1. My active memberships — gives us the candidate channel ids + read cursors
-        + notification prefs (Phase D). */
-  const { data: memberships, error: memErr } = await supabase
-    .from(MEMBERS)
-    .select("channel_id, last_read_at, muted, notification_pref")
-    .eq("account_id", accountId)
-    .is("left_at", null);
-  if (memErr) {
-    /* Don't log noisy transient failures from background pollers.
-       The bell polls every 10s — a flaky 30 s outage would otherwise
-       flood the console with hundreds of identical errors and bury
-       real bugs. We still log the FIRST occurrence (via the warn-
-       once helper) so it's diagnosable but doesn't drown signal. */
-    if (!isMissingTable(memErr.message) && !isTransientFetch(memErr.message)) {
-      console.error("[Discuss] Fetch memberships:", memErr.message);
-    } else if (isTransientFetch(memErr.message)) {
-      warnOnce("discuss-memberships-transient", "[Discuss] memberships: network unavailable (silenced; will retry)");
-    }
-    return [];
-  }
-  const memRows = (memberships ?? []) as Array<{
-    channel_id: string;
-    last_read_at: string;
-    muted: boolean;
-    notification_pref: DiscussNotificationPref;
-  }>;
-  if (memRows.length === 0) return [];
-
-  const channelIds = memRows.map((m) => m.channel_id);
-  const readState = new Map(
-    memRows.map((m) => [
-      m.channel_id,
-      {
-        last_read_at: m.last_read_at,
-        muted: m.muted,
-        notification_pref: m.notification_pref ?? "all",
-      },
-    ]),
-  );
-
-  /* 2. The channel rows themselves. */
-  const { data: channels, error: chanErr } = await supabase
-    .from(CHANNELS)
-    .select("*")
-    .in("id", channelIds)
-    .is("archived_at", null)
-    .order("last_message_at", { ascending: false });
-  if (chanErr) {
-    // Same discipline as the membership fetch above: a background poller's
-    // transient "Failed to fetch" (offline / aborted nav) must not spam the
-    // console — Next's dev overlay even promotes console.error to an "Issue".
-    if (!isMissingTable(chanErr.message) && !isTransientFetch(chanErr.message)) {
-      console.error("[Discuss] Fetch channels:", chanErr.message);
-    } else if (isTransientFetch(chanErr.message)) {
-      warnOnce("discuss-channels-transient", "[Discuss] channels: network unavailable (silenced; will retry)");
-    }
-    return [];
-  }
-  const chanRows = (channels ?? []) as DiscussChannelRow[];
-  if (chanRows.length === 0) return [];
-
-  /* 3. For DMs, resolve the "other" member + their person/account info
-        in one shot. Group/channel kinds skip this. */
-  const directChannelIds = chanRows.filter((c) => c.kind === "direct").map((c) => c.id);
-  const otherByChannel = new Map<string, DiscussAuthor>();
-  if (directChannelIds.length > 0) {
-    const { data: otherMembers } = await supabase
-      .from(MEMBERS)
-      .select(
-        `
-        channel_id,
-        account_id,
-        account:accounts!discuss_members_account_id_fkey (
-          id,
-          username,
-          avatar_url,
-          person:people ( full_name )
-        )
-        `,
-      )
-      .in("channel_id", directChannelIds)
-      .neq("account_id", accountId);
-
-    // The embedded account join is null under anon RLS (accounts are
-    // service-role-only) — so we also keep the raw account_id and resolve the
-    // peer's name/avatar from the Discuss directory below.
-    const peerIdByChannel = new Map<string, string>();
-    for (const row of (otherMembers ?? []) as unknown as Array<{
-      channel_id: string;
-      account_id: string | null;
-      account:
-        | {
-            id: string;
-            username: string;
-            avatar_url: string | null;
-            person: { full_name: string } | Array<{ full_name: string }> | null;
-          }
-        | Array<{
-            id: string;
-            username: string;
-            avatar_url: string | null;
-            person: { full_name: string } | Array<{ full_name: string }> | null;
-          }>
-        | null;
-    }>) {
-      const acc = Array.isArray(row.account) ? row.account[0] ?? null : row.account;
-      if (acc) {
-        const person = Array.isArray(acc.person) ? acc.person[0] ?? null : acc.person;
-        otherByChannel.set(row.channel_id, {
-          id: acc.id,
-          username: acc.username,
-          avatar_url: acc.avatar_url,
-          full_name: person?.full_name ?? null,
-        });
-      } else if (row.account_id) {
-        peerIdByChannel.set(row.channel_id, row.account_id);
-      }
-    }
-
-    if (peerIdByChannel.size > 0) {
-      const dir = await loadDiscussDirectory();
-      for (const [channelId, peerId] of peerIdByChannel) {
-        const p = dir.get(peerId);
-        if (p) {
-          otherByChannel.set(channelId, {
-            id: p.id,
-            username: p.username,
-            avatar_url: p.avatar_url,
-            full_name: p.full_name,
-          });
-        }
-      }
-    }
-  }
-
-  /* 4. Last message preview per channel. We grab up to 50 most-recent
-        messages across the candidate channels, then pick the newest per
-        channel client-side — cheaper than N round-trips. */
-  const { data: recentMsgs } = await supabase
-    .from(MESSAGES)
-    .select(
-      `
-      id,
-      channel_id,
-      body,
-      kind,
-      author_account_id,
-      created_at,
-      author:accounts!discuss_messages_author_account_id_fkey ( username )
-      `,
-    )
-    .in("channel_id", channelIds)
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false })
-    .limit(Math.max(50, channelIds.length * 2));
-
-  const lastByChannel = new Map<
-    string,
-    DiscussChannelWithState["last_message"]
-  >();
-  for (const row of (recentMsgs ?? []) as unknown as Array<{
-    id: string;
-    channel_id: string;
-    body: string | null;
-    kind: DiscussMessageKind;
-    author_account_id: string | null;
-    created_at: string;
-    author:
-      | { username: string }
-      | Array<{ username: string }>
-      | null;
-  }>) {
-    if (lastByChannel.has(row.channel_id)) continue;
-    const author = Array.isArray(row.author) ? row.author[0] ?? null : row.author;
-    lastByChannel.set(row.channel_id, {
-      id: row.id,
-      body: row.body,
-      kind: row.kind,
-      author_username: author?.username ?? null,
-      created_at: row.created_at,
-    });
-  }
-
-  /* 5. Unread counts. A channel can only have unread messages if its
-        newest activity (`last_message_at` — the same canonical marker
-        that drives the sidebar ordering in step 2) is strictly newer
-        than our read cursor. So we skip the count query entirely for
-        any channel we've already read to the bottom — the common case
-        on a 10 s background poll where nothing changed. The channels we
-        skip are exactly the ones whose count query would have returned
-        0 (every message has created_at <= last_message_at <= cursor, so
-        none satisfy `created_at > cursor`), so unread totals are
-        identical. This turns the old N+1 (one head-count per channel,
-        every poll) into a count query ONLY for channels with genuinely
-        newer activity. Remaining counts use the same head-only query
-        (served from the (channel_id, created_at DESC) index), run in
-        parallel. Skipped channels issue zero queries. */
-  const unreadCounts = await Promise.all(
-    chanRows.map(async (ch) => {
-      const readCursor = readState.get(ch.id)?.last_read_at;
-      if (!readCursor) return [ch.id, 0] as const;
-      /* Provably-zero shortcut. Compare as epoch millis (robust to
-         timestamp string formatting). Skip ONLY when we're certain the
-         newest activity is at/before the cursor; any unparseable value
-         falls through to the exact count query so we never hide an
-         unread. */
-      const lastActivityMs = ch.last_message_at
-        ? new Date(ch.last_message_at).getTime()
-        : NaN;
-      const cursorMs = new Date(readCursor).getTime();
-      if (
-        Number.isFinite(lastActivityMs) &&
-        Number.isFinite(cursorMs) &&
-        lastActivityMs <= cursorMs
-      ) {
-        return [ch.id, 0] as const;
-      }
-      const { count } = await supabase
-        .from(MESSAGES)
-        .select("id", { count: "exact", head: true })
-        .eq("channel_id", ch.id)
-        .is("deleted_at", null)
-        .neq("author_account_id", accountId)
-        .gt("created_at", readCursor);
-      return [ch.id, count ?? 0] as const;
-    }),
-  );
-  const unreadMap = new Map(unreadCounts);
-
-  /* 6. Linked CRM contacts for customer-chat channels (Phase E).
-        Only fetch for `kind === 'customer'` rows so non-customer
-        workspaces pay zero cost. */
-  const customerRows = chanRows.filter(
-    (c) => c.kind === "customer" && c.linked_contact_id,
-  );
-  const contactByChannel = new Map<string, DiscussLinkedContact>();
-  if (customerRows.length > 0) {
-    const contactIds = Array.from(
-      new Set(customerRows.map((c) => c.linked_contact_id as string)),
-    );
-    const { data: contacts } = await supabase
-      .from(CONTACTS)
-      .select(
-        "id, display_name, full_name, first_name, last_name, company, email, phone, photo_url, contact_type",
-      )
-      .in("id", contactIds);
-    const contactById = new Map<string, DiscussLinkedContact>();
-    for (const row of (contacts ?? []) as Array<{
-      id: string;
-      display_name: string | null;
-      full_name: string | null;
-      first_name: string | null;
-      last_name: string | null;
-      company: string | null;
-      email: string | null;
-      phone: string | null;
-      photo_url: string | null;
-      contact_type: string | null;
-    }>) {
-      const displayName =
-        row.display_name ??
-        row.full_name ??
-        [row.first_name, row.last_name].filter(Boolean).join(" ") ??
-        "Unnamed contact";
-      contactById.set(row.id, {
-        id: row.id,
-        display_name: displayName || "Unnamed contact",
-        full_name: row.full_name,
-        company: row.company,
-        email: row.email,
-        phone: row.phone,
-        avatar_url: row.photo_url,
-        contact_type: row.contact_type,
-      });
-    }
-    for (const c of customerRows) {
-      const linked = contactById.get(c.linked_contact_id as string);
-      if (linked) contactByChannel.set(c.id, linked);
-    }
-  }
-
-  /* 7. Drafts the current user has open (Phase C). Surfaced as a
-        boolean flag per channel so the sidebar can badge it and the
-        Drafts view can re-use the sidebar query without re-fetching. */
-  const draftChannelIds = new Set<string>();
-  {
-    const { data: ids } = await discussState<string[]>("draftChannels");
-    for (const id of ids ?? []) draftChannelIds.add(id);
-  }
-
-  /* 8. Stitch it all together. */
-  return chanRows.map((ch) => ({
-    ...ch,
-    unread_count: unreadMap.get(ch.id) ?? 0,
-    last_read_at: readState.get(ch.id)?.last_read_at ?? null,
-    muted: readState.get(ch.id)?.muted ?? false,
-    notification_pref:
-      readState.get(ch.id)?.notification_pref ?? ("all" as DiscussNotificationPref),
-    other: otherByChannel.get(ch.id) ?? null,
-    linked_contact: contactByChannel.get(ch.id) ?? null,
-    last_message: lastByChannel.get(ch.id) ?? null,
-    has_draft: draftChannelIds.has(ch.id),
-  }));
+  void accountId; // identity comes from the session server-side
+  const data = await discussRead<DiscussChannelWithState[]>("myChannels");
+  return data ?? [];
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -529,72 +256,11 @@ export async function leaveChannel(
 export async function fetchChannelMembers(
   channelId: string,
 ): Promise<Array<DiscussMemberRow & { author: DiscussAuthor }>> {
-  const { data, error } = await supabase
-    .from(MEMBERS)
-    .select(
-      `
-      *,
-      account:accounts!discuss_members_account_id_fkey (
-        id,
-        username,
-        avatar_url,
-        person:people ( full_name )
-      )
-      `,
-    )
-    .eq("channel_id", channelId)
-    .is("left_at", null);
-  if (error) {
-    console.error("[Discuss] Fetch members:", error.message);
-    return [];
-  }
-  const members = ((data ?? []) as unknown as Array<
-    DiscussMemberRow & {
-      account:
-        | {
-            id: string;
-            username: string;
-            avatar_url: string | null;
-            person: { full_name: string } | Array<{ full_name: string }> | null;
-          }
-        | Array<{
-            id: string;
-            username: string;
-            avatar_url: string | null;
-            person: { full_name: string } | Array<{ full_name: string }> | null;
-          }>
-        | null;
-    }
-  >).map((row) => {
-    const acc = Array.isArray(row.account) ? row.account[0] ?? null : row.account;
-    const person = acc && (Array.isArray(acc.person) ? acc.person[0] ?? null : acc.person);
-    return {
-      ...row,
-      author: acc
-        ? {
-            id: acc.id,
-            username: acc.username,
-            avatar_url: acc.avatar_url,
-            full_name: person?.full_name ?? null,
-          }
-        : { id: "", username: "unknown", avatar_url: null, full_name: null },
-    };
-  });
-
-  // Backfill members whose embedded account join was blocked by anon RLS
-  // (accounts are service-role-only) using the Discuss directory.
-  if (members.some((m) => !m.author.id && m.account_id)) {
-    const dir = await loadDiscussDirectory();
-    for (const m of members) {
-      if (!m.author.id && m.account_id) {
-        const p = dir.get(m.account_id);
-        if (p) {
-          m.author = { id: p.id, username: p.username, avatar_url: p.avatar_url, full_name: p.full_name };
-        }
-      }
-    }
-  }
-  return members;
+  const data = await discussRead<Array<DiscussMemberRow & { author: DiscussAuthor }>>(
+    "members",
+    { channelId },
+  );
+  return data ?? [];
 }
 
 /** Update the read cursor for a (channel, member) pair. Called from
@@ -621,213 +287,13 @@ export async function fetchChannelMessages(
     currentAccountId: "",
   },
 ): Promise<DiscussMessageWithAuthor[]> {
-  const { limit = 80, before, currentAccountId } = options;
-
-  let q = supabase
-    .from(MESSAGES)
-    .select(
-      `
-      *,
-      author:accounts!discuss_messages_author_account_id_fkey (
-        id,
-        username,
-        avatar_url,
-        person:people ( full_name )
-      )
-      `,
-    )
-    .eq("channel_id", channelId)
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (before) q = q.lt("created_at", before);
-
-  const { data, error } = await q;
-  if (error) {
-    if (!isMissingTable(error.message)) {
-      console.error("[Discuss] Fetch messages:", error.message);
-    }
-    return [];
-  }
-
-  const rows = ((data ?? []) as unknown as Array<
-    DiscussMessageRow & {
-      author:
-        | {
-            id: string;
-            username: string;
-            avatar_url: string | null;
-            person: { full_name: string } | Array<{ full_name: string }> | null;
-          }
-        | Array<{
-            id: string;
-            username: string;
-            avatar_url: string | null;
-            person: { full_name: string } | Array<{ full_name: string }> | null;
-          }>
-        | null;
-    }
-  >).map((row) => {
-    const acc = Array.isArray(row.author) ? row.author[0] ?? null : row.author;
-    const person = acc && (Array.isArray(acc.person) ? acc.person[0] ?? null : acc.person);
-    const author: DiscussAuthor | null = acc
-      ? {
-          id: acc.id,
-          username: acc.username,
-          avatar_url: acc.avatar_url,
-          full_name: person?.full_name ?? null,
-        }
-      : null;
-    return { ...row, author };
+  const { limit, before } = options;
+  const data = await discussRead<DiscussMessageWithAuthor[]>("channelMessages", {
+    channelId,
+    limit,
+    before,
   });
-
-  /* accounts/people are service-role-only now, so the embedded author join
-     above returns null under anon RLS → "Unknown". Backfill author identity
-     from the Discuss directory (service-role API) for any unresolved row. */
-  if (rows.some((r) => !r.author && r.author_account_id)) {
-    const dir = await loadDiscussDirectory();
-    for (const r of rows) {
-      if (!r.author && r.author_account_id) {
-        const p = dir.get(r.author_account_id);
-        if (p) {
-          r.author = { id: p.id, username: p.username, avatar_url: p.avatar_url, full_name: p.full_name };
-        }
-      }
-    }
-  }
-
-  /* Reactions in one batched query so we don't N+1. */
-  const messageIds = rows.map((r) => r.id);
-  const reactionsByMessage = new Map<
-    string,
-    DiscussMessageWithAuthor["reactions"]
-  >();
-  if (messageIds.length > 0) {
-    const { data: rxRows } = await supabase
-      .from(REACTIONS)
-      .select("*")
-      .in("message_id", messageIds);
-    for (const rx of (rxRows ?? []) as DiscussReactionRow[]) {
-      const bucket = reactionsByMessage.get(rx.message_id) ?? [];
-      const existing = bucket.find((b) => b.emoji === rx.emoji);
-      if (existing) {
-        existing.count += 1;
-        existing.account_ids.push(rx.account_id);
-        if (rx.account_id === currentAccountId) existing.reacted_by_me = true;
-      } else {
-        bucket.push({
-          emoji: rx.emoji,
-          count: 1,
-          account_ids: [rx.account_id],
-          reacted_by_me: rx.account_id === currentAccountId,
-        });
-      }
-      reactionsByMessage.set(rx.message_id, bucket);
-    }
-  }
-
-  /* Reply previews (Phase B). For every message that has a
-     `reply_to_message_id`, grab the parent's author + body in one
-     batched select — same 1-round-trip pattern as reactions. */
-  const replyTargetIds = Array.from(
-    new Set(rows.map((r) => r.reply_to_message_id).filter(Boolean) as string[]),
-  );
-  const replyPreviewById = new Map<string, DiscussReplyPreview>();
-  if (replyTargetIds.length > 0) {
-    const { data: parents } = await supabase
-      .from(MESSAGES)
-      .select(
-        `
-        id,
-        body,
-        kind,
-        deleted_at,
-        author:accounts!discuss_messages_author_account_id_fkey (
-          username,
-          person:people ( full_name )
-        )
-        `,
-      )
-      .in("id", replyTargetIds);
-    for (const p of (parents ?? []) as unknown as Array<{
-      id: string;
-      body: string | null;
-      kind: DiscussMessageKind;
-      deleted_at: string | null;
-      author:
-        | {
-            username: string;
-            person: { full_name: string } | Array<{ full_name: string }> | null;
-          }
-        | Array<{
-            username: string;
-            person: { full_name: string } | Array<{ full_name: string }> | null;
-          }>
-        | null;
-    }>) {
-      const acc = Array.isArray(p.author) ? p.author[0] ?? null : p.author;
-      const person =
-        acc && (Array.isArray(acc.person) ? acc.person[0] ?? null : acc.person);
-      replyPreviewById.set(p.id, {
-        id: p.id,
-        body: p.body,
-        kind: p.kind,
-        deleted_at: p.deleted_at,
-        author_username: acc?.username ?? null,
-        author_full_name: person?.full_name ?? null,
-      });
-    }
-  }
-
-  /* Thread aggregation (Phase B). For every message in this page,
-     count how many OTHER messages reply to it and who participated.
-     We do this in a single group-by query so it's cheap even on
-     busy channels. */
-  const threadByParent = new Map<
-    string,
-    { reply_count: number; last_reply_at: string | null; participant_ids: string[] }
-  >();
-  if (messageIds.length > 0) {
-    const { data: childRows } = await supabase
-      .from(MESSAGES)
-      .select("reply_to_message_id, author_account_id, created_at")
-      .in("reply_to_message_id", messageIds)
-      .is("deleted_at", null);
-    for (const row of (childRows ?? []) as Array<{
-      reply_to_message_id: string;
-      author_account_id: string | null;
-      created_at: string;
-    }>) {
-      const key = row.reply_to_message_id;
-      const entry = threadByParent.get(key) ?? {
-        reply_count: 0,
-        last_reply_at: null as string | null,
-        participant_ids: [] as string[],
-      };
-      entry.reply_count += 1;
-      if (!entry.last_reply_at || row.created_at > entry.last_reply_at) {
-        entry.last_reply_at = row.created_at;
-      }
-      if (
-        row.author_account_id &&
-        !entry.participant_ids.includes(row.author_account_id)
-      ) {
-        entry.participant_ids.push(row.author_account_id);
-      }
-      threadByParent.set(key, entry);
-    }
-  }
-
-  return rows
-    .map((row) => ({
-      ...row,
-      reactions: reactionsByMessage.get(row.id) ?? [],
-      reply_preview: row.reply_to_message_id
-        ? replyPreviewById.get(row.reply_to_message_id) ?? null
-        : null,
-      thread: threadByParent.get(row.id) ?? null,
-    }))
-    .reverse(); // oldest first for render
+  return data ?? [];
 }
 
 /** Send a new message in a channel. Accepts the full metadata payload
@@ -1312,119 +778,11 @@ export async function fetchThreadMessages(
   parentMessageId: string,
   currentAccountId: string,
 ): Promise<DiscussMessageWithAuthor[]> {
-  const ids: string[] = [parentMessageId];
-
-  /* Parent first, then children ordered ascending by created_at. */
-  const { data: parentRow, error: parentErr } = await supabase
-    .from(MESSAGES)
-    .select(
-      `
-      *,
-      author:accounts!discuss_messages_author_account_id_fkey (
-        id,
-        username,
-        avatar_url,
-        person:people ( full_name )
-      )
-      `,
-    )
-    .eq("id", parentMessageId)
-    .maybeSingle();
-  if (parentErr) {
-    console.error("[Discuss] Fetch thread parent:", parentErr.message);
-    return [];
-  }
-  if (!parentRow) return [];
-
-  const { data: childRows, error: childErr } = await supabase
-    .from(MESSAGES)
-    .select(
-      `
-      *,
-      author:accounts!discuss_messages_author_account_id_fkey (
-        id,
-        username,
-        avatar_url,
-        person:people ( full_name )
-      )
-      `,
-    )
-    .eq("reply_to_message_id", parentMessageId)
-    .order("created_at", { ascending: true });
-  if (childErr) {
-    console.error("[Discuss] Fetch thread children:", childErr.message);
-    return [];
-  }
-
-  const all = [parentRow, ...(childRows ?? [])];
-  ids.push(...(childRows ?? []).map((r) => (r as { id: string }).id));
-
-  /* Reactions batch. */
-  const reactionsByMessage = new Map<
-    string,
-    DiscussMessageWithAuthor["reactions"]
-  >();
-  if (ids.length > 0) {
-    const { data: rxRows } = await supabase
-      .from(REACTIONS)
-      .select("*")
-      .in("message_id", ids);
-    for (const rx of (rxRows ?? []) as DiscussReactionRow[]) {
-      const bucket = reactionsByMessage.get(rx.message_id) ?? [];
-      const existing = bucket.find((b) => b.emoji === rx.emoji);
-      if (existing) {
-        existing.count += 1;
-        existing.account_ids.push(rx.account_id);
-        if (rx.account_id === currentAccountId) existing.reacted_by_me = true;
-      } else {
-        bucket.push({
-          emoji: rx.emoji,
-          count: 1,
-          account_ids: [rx.account_id],
-          reacted_by_me: rx.account_id === currentAccountId,
-        });
-      }
-      reactionsByMessage.set(rx.message_id, bucket);
-    }
-  }
-
-  return (all as unknown as Array<
-    DiscussMessageRow & {
-      author:
-        | {
-            id: string;
-            username: string;
-            avatar_url: string | null;
-            person: { full_name: string } | Array<{ full_name: string }> | null;
-          }
-        | Array<{
-            id: string;
-            username: string;
-            avatar_url: string | null;
-            person: { full_name: string } | Array<{ full_name: string }> | null;
-          }>
-        | null;
-    }
-  >).map((row) => {
-    const acc = Array.isArray(row.author) ? row.author[0] ?? null : row.author;
-    const person =
-      acc && (Array.isArray(acc.person) ? acc.person[0] ?? null : acc.person);
-    const author: DiscussAuthor | null = acc
-      ? {
-          id: acc.id,
-          username: acc.username,
-          avatar_url: acc.avatar_url,
-          full_name: person?.full_name ?? null,
-        }
-      : null;
-    return {
-      ...row,
-      author,
-      reactions: reactionsByMessage.get(row.id) ?? [],
-      reply_preview: null,
-      thread: null,
-    };
+  void currentAccountId; // reacted_by_me is resolved server-side from the session
+  const data = await discussRead<DiscussMessageWithAuthor[]>("thread", {
+    parentId: parentMessageId,
   });
+  return data ?? [];
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -1446,107 +804,46 @@ export async function searchDiscussMessages(input: {
 }): Promise<DiscussSearchResult[]> {
   const q = input.query.trim();
   if (q.length < 2) return [];
-  const limit = input.limit ?? 40;
-
-  /* 1. Restrict search to channels the current user is a member of —
-        otherwise we'd leak private messages from other DMs. */
-  const { data: memberships } = await supabase
-    .from(MEMBERS)
-    .select("channel_id")
-    .eq("account_id", input.accountId)
-    .is("left_at", null);
-  const scopeIds = ((memberships ?? []) as Array<{ channel_id: string }>)
-    .map((m) => m.channel_id)
-    .filter((id) => !input.channelId || id === input.channelId);
-  if (scopeIds.length === 0) return [];
-
-  /* 2. ILIKE pass — works even without the FTS index. We do a single
-        `%term%` match per word so multi-word queries behave intuitively.
-        Postgres will use the GIN index for this if the operators line up. */
-  const escaped = q.replace(/[%_]/g, (c) => `\\${c}`);
-  const { data, error } = await supabase
-    .from(MESSAGES)
-    .select(
-      `
-      id,
-      channel_id,
-      body,
-      created_at,
-      author:accounts!discuss_messages_author_account_id_fkey (
-        username,
-        avatar_url,
-        person:people ( full_name )
-      ),
-      channel:discuss_channels!discuss_messages_channel_id_fkey (
-        id,
-        name,
-        kind
-      )
-      `,
-    )
-    .in("channel_id", scopeIds)
-    .is("deleted_at", null)
-    .ilike("body", `%${escaped}%`)
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  if (error) {
-    console.error("[Discuss] Search:", error.message);
-    return [];
-  }
-
-  const results: DiscussSearchResult[] = [];
-  for (const row of (data ?? []) as unknown as Array<{
+  type Row = {
     id: string;
     channel_id: string;
     body: string | null;
     created_at: string;
     author:
-      | {
-          username: string;
-          avatar_url: string | null;
-          person: { full_name: string } | Array<{ full_name: string }> | null;
-        }
-      | Array<{
-          username: string;
-          avatar_url: string | null;
-          person: { full_name: string } | Array<{ full_name: string }> | null;
-        }>
+      | { username: string; avatar_url: string | null; person: { full_name: string } | Array<{ full_name: string }> | null }
+      | Array<{ username: string; avatar_url: string | null; person: { full_name: string } | Array<{ full_name: string }> | null }>
       | null;
     channel:
       | { id: string; name: string | null; kind: DiscussChannelKind }
       | Array<{ id: string; name: string | null; kind: DiscussChannelKind }>
       | null;
-  }>) {
-    const acc = Array.isArray(row.author) ? row.author[0] ?? null : row.author;
-    const person =
-      acc && (Array.isArray(acc.person) ? acc.person[0] ?? null : acc.person);
-    const ch = Array.isArray(row.channel) ? row.channel[0] ?? null : row.channel;
+  };
+  const rows = (await discussRead<Row[]>("search", {
+    q,
+    channelId: input.channelId,
+    limit: input.limit,
+  })) ?? [];
 
+  const results: DiscussSearchResult[] = [];
+  for (const row of rows) {
+    const acc = Array.isArray(row.author) ? row.author[0] ?? null : row.author;
+    const person = acc && (Array.isArray(acc.person) ? acc.person[0] ?? null : acc.person);
+    const ch = Array.isArray(row.channel) ? row.channel[0] ?? null : row.channel;
     const body = row.body ?? "";
-    /* Hand-rolled snippet: grab ~40 chars on either side of the match
-       so the UI has a usable preview without bloating the payload. */
     const idx = body.toLowerCase().indexOf(q.toLowerCase());
     let snippet = body;
     if (idx >= 0 && body.length > 100) {
       const start = Math.max(0, idx - 40);
       const end = Math.min(body.length, idx + q.length + 40);
       snippet =
-        (start > 0 ? "…" : "") +
-        body.slice(start, end) +
-        (end < body.length ? "…" : "");
+        (start > 0 ? "…" : "") + body.slice(start, end) + (end < body.length ? "…" : "");
     }
-    /* Wrap the match in <mark> so the UI can render it highlighted
-       without re-searching client-side. */
     try {
-      const re = new RegExp(
-        `(${q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
-        "gi",
-      );
+      const re = new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
       snippet = snippet.replace(re, "<mark>$1</mark>");
     } catch {
-      /* If the regex fails (weird unicode), fall back to plain snippet. */
+      /* fall back to plain snippet */
     }
-
     results.push({
       message_id: row.id,
       channel_id: row.channel_id,
