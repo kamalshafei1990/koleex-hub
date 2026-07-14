@@ -58,7 +58,10 @@ async function inboxFeed<T>(resource: string, params: Record<string, string> = {
     const j = (await res.json().catch(() => ({}))) as { ok?: boolean; data?: T; error?: string };
     if (!res.ok || !j.ok) {
       const msg = j.error ?? `HTTP ${res.status}`;
-      if (!isMissingTable(msg) && !isTransientFetch(msg)) warnOnce("inbox-feed-error", `[Inbox] feed unavailable (silenced): ${msg}`);
+      // Logged-out / bootstrapping windows are expected on the always-mounted
+      // bell — stay silent, like the old anon reads did.
+      const authNoise = /not signed in|unauthor|forbidden|\b401\b|\b403\b/i.test(msg);
+      if (!isMissingTable(msg) && !isTransientFetch(msg) && !authNoise) warnOnce("inbox-feed-error", `[Inbox] feed unavailable (silenced): ${msg}`);
       return undefined;
     }
     return j.data;

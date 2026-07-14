@@ -95,6 +95,15 @@ async function discussMutate<T = unknown>(
   }
 }
 
+/** A read failure that isn't a bug and must NOT be console.error'd — the
+ *  always-mounted bell/panel poll these gated reads, so a transient network
+ *  blip or an unauthenticated window (logged out / session still bootstrapping)
+ *  should degrade to "no data" silently, exactly as the old anon reads did.
+ *  Logging them spams the console and trips Next.js's dev issues overlay. */
+function isBenignReadError(msg: string): boolean {
+  return isTransientFetch(msg) || /not signed in|unauthor|forbidden|\b401\b|\b403\b/i.test(msg);
+}
+
 /** GET companion to discussMutate for the gated read path (drafts / pinned /
  *  starred). Identity comes from the session cookie server-side; the caller
  *  never supplies an account id. Returns `data` (null/[] on any failure so
@@ -115,13 +124,14 @@ async function discussState<T = unknown>(
       error?: string;
     };
     if (!res.ok || !json.ok) {
-      console.error("[Discuss] state", resource, json.error ?? `HTTP ${res.status}`);
-      return { ok: false, error: json.error ?? `HTTP ${res.status}` };
+      const m = json.error ?? `HTTP ${res.status}`;
+      if (!isBenignReadError(m)) console.error("[Discuss] state", resource, m);
+      return { ok: false, error: m };
     }
     return { ok: true, data: json.data };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (!isTransientFetch(msg)) console.error("[Discuss] state", resource, msg);
+    if (!isBenignReadError(msg)) console.error("[Discuss] state", resource, msg);
     return { ok: false, error: msg };
   }
 }
@@ -147,13 +157,13 @@ async function discussRead<T = unknown>(
     const json = (await res.json().catch(() => ({}))) as { ok?: boolean; data?: T; error?: string };
     if (!res.ok || !json.ok) {
       const msg = json.error ?? `HTTP ${res.status}`;
-      if (!isTransientFetch(msg)) console.error("[Discuss] read", resource, msg);
+      if (!isBenignReadError(msg)) console.error("[Discuss] read", resource, msg);
       return undefined;
     }
     return json.data;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (!isTransientFetch(msg)) console.error("[Discuss] read", resource, msg);
+    if (!isBenignReadError(msg)) console.error("[Discuss] read", resource, msg);
     return undefined;
   }
 }
