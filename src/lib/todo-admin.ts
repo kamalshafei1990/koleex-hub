@@ -330,20 +330,23 @@ export async function createTodo(input: {
   if (creatorId && assigneeIds.length > 0) {
     const recipientIds = assigneeIds.filter((id) => id !== creatorId);
     if (recipientIds.length > 0) {
-      const notifs = recipientIds.map((recipientId) => ({
-        recipient_account_id: recipientId,
-        sender_account_id: creatorId,
-        category: "task" as const,
-        subject: `New task: ${input.title}`,
-        body: input.description || input.title,
-        link: `/todo?task=${todo.id}`,
-        metadata: {
-          type: "todo_assignment",
-          todo_id: todo.id,
-          priority: input.priority ?? "medium",
-        },
-      }));
-      await supabase.from("inbox_messages").insert(notifs);
+      /* RLS realtime-lockdown P2: inbox writes go through the gated route
+         (service-role, session-scoped) — the sender is the session account,
+         so `creatorId` must equal it. */
+      await fetch("/api/inbox/mutate", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "notify",
+          recipientIds,
+          category: "task",
+          subject: `New task: ${input.title}`,
+          body: input.description || input.title,
+          link: `/todo?task=${todo.id}`,
+          metadata: { type: "todo_assignment", todo_id: todo.id, priority: input.priority ?? "medium" },
+        }),
+      }).catch((e) => console.error("[todo-admin] notify:", e));
 
       /* Kick NotificationBell to recount immediately — this covers
          the case where the sender is also a recipient, or where the

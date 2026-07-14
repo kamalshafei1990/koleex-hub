@@ -28,6 +28,26 @@ import type {
 const INBOX = "inbox_messages";
 const MEMBERSHIP_REQUESTS = "membership_requests";
 
+/* RLS realtime-lockdown P2: every WRITE to inbox_messages goes through the
+   gated /api/inbox/mutate route (service-role, session-scoped) so the table's
+   public policy can be downgraded to SELECT-only. Reads still use the anon
+   client (recipient-filtered) until P3. */
+async function inboxMutate(payload: Record<string, unknown>): Promise<{ ok: boolean; data?: unknown; error?: string }> {
+  try {
+    const res = await fetch("/api/inbox/mutate", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const j = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (res.ok) return { ok: true, data: j };
+    return { ok: false, error: (j.error as string) || `HTTP ${res.status}` };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Network error" };
+  }
+}
+
 /** True if the error shape looks like "relation does not exist" — we use
  *  this to silently fall back when the migration hasn't been applied. */
 function isMissingTable(message: string): boolean {
@@ -324,54 +344,30 @@ export async function fetchUnreadTaskCount(accountId: string): Promise<number> {
 }
 
 export async function markMessageRead(id: string): Promise<boolean> {
-  const { error } = await supabase
-    .from(INBOX)
-    .update({ read_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) {
-    console.error("[Inbox] Mark read:", error.message);
-    return false;
-  }
-  return true;
+  const r = await inboxMutate({ action: "markRead", id });
+  if (!r.ok) console.error("[Inbox] Mark read:", r.error);
+  return r.ok;
 }
 
 /** Clear `read_at` so the message shows up as unread again. Used by the
  *  list row's "mark unread" hover action. */
 export async function markMessageUnread(id: string): Promise<boolean> {
-  const { error } = await supabase
-    .from(INBOX)
-    .update({ read_at: null })
-    .eq("id", id);
-  if (error) {
-    console.error("[Inbox] Mark unread:", error.message);
-    return false;
-  }
-  return true;
+  const r = await inboxMutate({ action: "markUnread", id });
+  if (!r.ok) console.error("[Inbox] Mark unread:", r.error);
+  return r.ok;
 }
 
 export async function markAllRead(accountId: string): Promise<boolean> {
-  const { error } = await supabase
-    .from(INBOX)
-    .update({ read_at: new Date().toISOString() })
-    .eq("recipient_account_id", accountId)
-    .is("read_at", null);
-  if (error) {
-    console.error("[Inbox] Mark all read:", error.message);
-    return false;
-  }
-  return true;
+  void accountId; // identity comes from the session server-side
+  const r = await inboxMutate({ action: "markAllRead" });
+  if (!r.ok) console.error("[Inbox] Mark all read:", r.error);
+  return r.ok;
 }
 
 export async function archiveMessage(id: string): Promise<boolean> {
-  const { error } = await supabase
-    .from(INBOX)
-    .update({ archived_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) {
-    console.error("[Inbox] Archive:", error.message);
-    return false;
-  }
-  return true;
+  const r = await inboxMutate({ action: "archive", id });
+  if (!r.ok) console.error("[Inbox] Archive:", r.error);
+  return r.ok;
 }
 
 /** Structured attachment record stored in `inbox_messages.metadata.attachments`.
@@ -432,24 +428,20 @@ export async function sendMessage(input: {
   link?: string | null;
   metadata?: Record<string, unknown>;
 }): Promise<{ ok: true; message: InboxMessageRow } | { ok: false; error: string }> {
-  const { data, error } = await supabase
-    .from(INBOX)
-    .insert({
-      recipient_account_id: input.recipientId,
-      sender_account_id: input.senderId,
-      category: "message",
-      subject: input.subject,
-      body: input.body,
-      link: input.link ?? null,
-      metadata: input.metadata ?? {},
-    })
-    .select("*")
-    .single();
-  if (error) {
-    console.error("[Inbox] Send message:", error.message);
-    return { ok: false, error: error.message };
+  void input.senderId; // sender comes from the session server-side
+  const r = await inboxMutate({
+    action: "send",
+    recipientId: input.recipientId,
+    subject: input.subject,
+    body: input.body,
+    link: input.link ?? null,
+    metadata: input.metadata ?? {},
+  });
+  if (!r.ok) {
+    console.error("[Inbox] Send message:", r.error);
+    return { ok: false, error: r.error ?? "Send failed" };
   }
-  return { ok: true, message: data as InboxMessageRow };
+  return { ok: true, message: (r.data as { message: InboxMessageRow }).message };
 }
 
 /** Fan out one message to every active account matching a role name
@@ -464,41 +456,21 @@ export async function broadcastToRole(input: {
   excludeSelf?: boolean;
   metadata?: Record<string, unknown>;
 }): Promise<number> {
-  const { data: recipients, error: recipientErr } = await supabase
-    .from("accounts")
-    .select("id, role:roles(id,name)")
-    .eq("status", "active");
-  if (recipientErr) {
-    console.error("[Inbox] Broadcast lookup:", recipientErr.message);
-    return 0;
-  }
-
-  const target = (recipients ?? []).filter((row) => {
-    const r = row as { id: string; role: { name?: string } | Array<{ name?: string }> | null };
-    const role = Array.isArray(r.role) ? r.role[0] : r.role;
-    if (!role?.name) return false;
-    if (input.excludeSelf && r.id === input.senderId) return false;
-    return role.name.toLowerCase() === input.roleName.toLowerCase();
-  });
-
-  if (target.length === 0) return 0;
-
-  const rows = target.map((row) => ({
-    recipient_account_id: (row as { id: string }).id,
-    sender_account_id: input.senderId,
-    category: "message" as const,
+  void input.senderId; // sender + recipient resolution happen server-side
+  const r = await inboxMutate({
+    action: "broadcastToRole",
+    roleName: input.roleName,
     subject: input.subject,
     body: input.body,
     link: input.link ?? null,
+    excludeSelf: input.excludeSelf ?? false,
     metadata: input.metadata ?? {},
-  }));
-
-  const { error: insertErr } = await supabase.from(INBOX).insert(rows);
-  if (insertErr) {
-    console.error("[Inbox] Broadcast insert:", insertErr.message);
+  });
+  if (!r.ok) {
+    console.error("[Inbox] Broadcast:", r.error);
     return 0;
   }
-  return rows.length;
+  return ((r.data as { count?: number }).count) ?? 0;
 }
 
 /** Accounts that can receive messages — used by the compose picker.
