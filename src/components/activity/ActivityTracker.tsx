@@ -4,7 +4,7 @@
    ActivityTracker — headless presence + page tracking.
 
    Mounted once inside the authenticated shell. Responsibilities:
-     · Heartbeat the live-presence row every HEARTBEAT_MS (and on tab focus).
+     · Heartbeat the live-presence row (adaptive cadence: 30s active, 120s idle/hidden) (and on tab focus).
      · Track page views on route change (debounced).
      · Detect idle (no input for IDLE_MS) → status "idle"; resume → "active".
      · On tab close / navigation away → sendBeacon a session_end + offline.
@@ -19,7 +19,16 @@ import { usePathname } from "next/navigation";
 import { getDeviceId } from "@/lib/activity/device-id";
 import { routeToModule } from "@/lib/activity/modules";
 
-const HEARTBEAT_MS = 30_000; // presence ping cadence
+/* SW-2 (Phase 4): adaptive heartbeat cadence. An active, visible user still
+   pings every 30s (accurate presence + 30s revocation detection). An IDLE or
+   HIDDEN tab slows to 120s — it isn't doing anything, so 30s precision buys
+   nothing, and this cuts idle/backgrounded heartbeat writes ~4×. Safety is
+   preserved: we still ping (never false-offline), we ping IMMEDIATELY on
+   return-to-visible (instant revocation + presence on resume), and the
+   force-logout `revoked` signal still arrives — just at a bounded slower
+   cadence for users who aren't interacting. */
+const HEARTBEAT_ACTIVE_MS = 30_000; // visible + recent input
+const HEARTBEAT_SLOW_MS = 120_000;  // idle OR hidden
 const IDLE_MS = 60_000; // no input → idle
 
 export default function ActivityTracker() {
@@ -82,13 +91,29 @@ export default function ActivityTracker() {
     ];
     events.forEach((e) => window.addEventListener(e, onInput, { passive: true }));
 
-    // Heartbeat now, then on an interval. Also ping when the tab regains focus.
-    void sendHeartbeat();
-    const interval = window.setInterval(sendHeartbeat, HEARTBEAT_MS);
+    /* Self-scheduling loop so the cadence can adapt each tick: fast while the
+       user is visible + active, slow while idle or hidden. */
+    let timer: number | undefined;
+    const nextDelay = () => {
+      const hidden = typeof document !== "undefined" && document.visibilityState === "hidden";
+      const idle = Date.now() - lastInputRef.current > IDLE_MS;
+      return hidden || idle ? HEARTBEAT_SLOW_MS : HEARTBEAT_ACTIVE_MS;
+    };
+    const loop = async () => {
+      if (stopped) return;
+      await sendHeartbeat();
+      if (stopped) return;
+      timer = window.setTimeout(loop, nextDelay());
+    };
+    void loop();
     const onVisible = () => {
       if (document.visibilityState === "visible") {
         lastInputRef.current = Date.now();
+        /* Immediate catch-up ping on resume: instant revocation + presence,
+           then reschedule at the (now fast) active cadence. */
+        if (timer !== undefined) window.clearTimeout(timer);
         void sendHeartbeat();
+        timer = window.setTimeout(loop, HEARTBEAT_ACTIVE_MS);
       }
     };
     document.addEventListener("visibilitychange", onVisible);
@@ -110,7 +135,7 @@ export default function ActivityTracker() {
 
     return () => {
       stopped = true;
-      window.clearInterval(interval);
+      if (timer !== undefined) window.clearTimeout(timer);
       events.forEach((e) => window.removeEventListener(e, onInput));
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("pagehide", onLeave);
