@@ -1812,8 +1812,9 @@ function DeleteModal({ open, onClose, catalog, onConfirm, deleting }: {
    each catalog as its own column (cover + its info), then ONE full-width
    supplier info band at the bottom. Matches the requested layout.
    ═══════════════════════════ */
-function MergedSupplierCard({ group, divLogos, catLogos, selected, onToggleSelect, onPreview, onEdit, onDelete, onDownload }: {
+function MergedSupplierCard({ group, maxCols, divLogos, catLogos, selected, onToggleSelect, onPreview, onEdit, onDelete, onDownload }: {
   group: { key: string; name: string; nameCn: string | null; logo: string | null; contactId: string | null; items: CatalogEntry[] };
+  maxCols: number;
   divLogos: Record<string, string>;
   catLogos: Record<string, string>;
   selected: Set<string>;
@@ -1827,7 +1828,7 @@ function MergedSupplierCard({ group, divLogos, catLogos, selected, onToggleSelec
   const items = group.items;
   // Grow WIDER, not taller: the card spans one grid column per catalog (capped
   // at 4 so it never eats the whole row), and the catalogs sit side-by-side.
-  const n = Math.min(items.length, 4);
+  const n = Math.min(items.length, Math.max(1, maxCols));
   return (
     <div
       className="flex h-full flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 gap-3"
@@ -2726,6 +2727,20 @@ export default function CatalogsPage() {
   );
 
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  /* Column count that MIRRORS the Tailwind grid below (grid-cols-2 sm:3 lg:4
+     xl:5). A grouped supplier card must never span MORE columns than the grid
+     actually has, or the browser invents a phantom column and the whole grid
+     overflows / goes unstable on mobile. */
+  const [gridMaxCols, setGridMaxCols] = useState(5);
+  useEffect(() => {
+    const calc = () => {
+      const w = window.innerWidth;
+      setGridMaxCols(w >= 1280 ? 5 : w >= 1024 ? 4 : w >= 640 ? 3 : 2);
+    };
+    calc();
+    window.addEventListener("resize", calc);
+    return () => window.removeEventListener("resize", calc);
+  }, []);
   // Group-by-supplier (Option A): collapse the flat grid into per-supplier
   // sections so "this supplier has N catalogs" is obvious. Composes with the
   // grid/list view inside each section.
@@ -3241,7 +3256,7 @@ export default function CatalogsPage() {
           {catalogSuppliers.length > 0 && (
             <div className="relative">
               <select value={filterSupplier} onChange={(e) => setFilterSupplier(e.target.value)}
-                className="h-9 pl-3 pr-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] appearance-none cursor-pointer outline-none focus:border-blue-500/50">
+                className="h-9 min-w-0 max-w-[calc(100vw-2rem)] pl-3 pr-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] appearance-none cursor-pointer outline-none focus:border-blue-500/50">
                 <option value="all">{t("cat.allSuppliers")}</option>
                 {catalogSuppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
@@ -3407,7 +3422,7 @@ export default function CatalogsPage() {
                   );
                 }
                 return (
-                  <MergedSupplierCard key={g.key} group={g} divLogos={divLogos} catLogos={catLogos}
+                  <MergedSupplierCard key={g.key} group={g} maxCols={gridMaxCols} divLogos={divLogos} catLogos={catLogos}
                     selected={selected} onToggleSelect={toggleSelect}
                     onPreview={(c) => handlePreview(c)}
                     onDownload={(c) => bumpMetric(c.id, "download")}
