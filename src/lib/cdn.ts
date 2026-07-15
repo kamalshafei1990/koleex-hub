@@ -64,6 +64,10 @@ const snapQuality = (q: number) => (q >= 78 ? 78 : 75); // mirrors images.qualit
 export function cdnImage(url: string | null | undefined, opts: CdnImageOptions = {}): string {
   if (!url) return "";
   if (!url.includes(SUPABASE_OBJECT_PATH)) return url;
+  /* SVGs can't ride either transform pipeline: the Next optimizer rejects
+     them (dangerouslyAllowSVG is deliberately OFF — see STORAGE_SECURITY_MODEL)
+     and the Supabase render endpoint doesn't rasterize them. Pass through. */
+  if (/\.svg(\?|$)/i.test(url)) return url;
 
   if (FIRST_PARTY_IMAGES) {
     const w = snapWidth(opts.width ?? 1200);
