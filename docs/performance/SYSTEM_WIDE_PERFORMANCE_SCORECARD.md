@@ -57,3 +57,32 @@ Contacts (764 KB, 3 apps, search/filter in one tree) · ProductForm (303 KB form
 
 ## Top 10 cross-cutting risks
 1. No app-wide server-timing (can't see regressions). 2. Pollers unbounded by real event model. 3. Eager heavy components. 4. i18n dictionaries possibly multi-locale-eager. 5. Non-virtualized long lists (Discuss, big tables). 6. Per-keystroke re-render in giant search components. 7. Auth serial hops. 8. China WSS still degraded (mitigated by fallback). 9. Speed Insights not yet populated. 10. No route/bundle/request budgets in CI.
+
+---
+
+## Phase 4 Wave 2 — measured ranked scorecard (2026-07-16)
+
+Full detail + methodology + honesty table in **`PHASE_4_WAVE_2_BASELINE.md`**.
+Supporting audits: `API_WATERFALL_AUDIT.md`, `SHARED_LIST_SEARCH_AUDIT.md`,
+`ROUTE_BUNDLE_REPORT.md`, `REACT_RENDERING_AUDIT.md`. Ranked by **measured
+structural cost** (requests/action × payload × filter-locus × frequency), not
+file size. Real-user P50–P99 pending a Vercel-log window (no Vercel API access
+from the build env); the new `*.list` server-timing enables them.
+
+**Resolved since Wave 1:** risk #1 (app-wide server-timing) — `auth.resolve`
+universal + `contacts/products/quotations/accounts.list` now instrumented.
+`auth.resolve` measured **flat**: 1 DB round trip, 21–120 ms (risk #7 is a
+non-issue). #3 eager heavy components partly addressed (CRM/Discuss/ProductForm
+lazy in Wave 1; `ROUTE_BUNDLE_REPORT.md` ranks the next 8).
+
+**#1 platform liability (new, highest-leverage):** **8 of 10 directory apps
+download the entire tenant dataset and filter/sort/paginate client-side on every
+keystroke** — 0/10 paginate, 0/10 virtualize, 1/10 server-search, 1/10 cancel
+stale requests. The cached-read wrappers (`useApiQuery`, `cachedFetchJson`) are
+mounted but unused. → Wave 2A `useServerList` shared hook.
+
+**Top structural bottlenecks:** (1) Customers/Suppliers/Contacts list = 4 HTTP
++ 1 Supabase probe + avatar batches + a **20 s silent re-poll**, full-array
+client filter, 11.6k-line component; (2) FinanceDashboard **8-way** mount
+fan-out; (3) Quotations editor ~6 fetches with reference-list duplication;
+(4) CRM edit modal loads the whole contact book; (5) Catalogs ~6-load mount.

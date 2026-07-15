@@ -1,29 +1,73 @@
-# API Waterfall Audit (Phase 4)
+# API Waterfall & Payload Audit — Phase 4 Wave 2
 
-Per-request dependency shapes for the highest-traffic + highest-cost paths. Post-Tokyo each DB hop ≈ 1–5 ms, so waterfalls hurt via *count* and *volume*, not per-hop latency.
+Per-workflow request shapes (server sequential queries + client fetch fan-out),
+verified from source (file:line). Post-Tokyo each DB hop ≈ 1–5 ms, so waterfalls
+hurt via **request count** and **payload volume**, not per-hop latency.
+Ranking basis for the whole scorecard: `PHASE_4_WAVE_2_BASELINE.md`.
 
-## Every authenticated request (universal prefix)
-```
-getSessionAccountId (1 hop)  →  getViewAsAccountId (1 hop)  →  getViewAsRoleId (1 hop)
-     → Promise.all[ accounts, koleex_employees, realAccount, targetRole ]  (parallel, 1 hop)
-```
-- **3 serial hops** before the parallel batch. Fix: compose session+view-as into one query (SW-3). Saves ~2 hops on *every* API call platform-wide.
+---
 
-## `/api/discuss/read myChannels` (top request path)
-- membership → channels → per-channel unread `count(*)` (**N+1**, short-circuited when `last_message_at ≤ cursor`) → last-message previews → linked contacts. Bounded at ~4 channels today; grows with channel count. Already the Phase-1 P2-1 item.
+## Per-workflow fan-out
 
-## `/api/me/bootstrap` (shell)
-- `Promise.all[ accounts+person, koleex_permissions, overrides, targetRole ]` — already one parallel batch. ✅ Nothing to flatten.
+### Customers / Suppliers / Contacts directory (`Contacts.tsx`, one component, 3 routes)
+`customers/page.tsx:7` + `suppliers/page.tsx:7` render the same 11,597-line component via `filterType`.
+- **List mount:** `GET /api/accounts` (`Contacts.tsx:4842`) + `GET /api/me` (`:4863`) + `GET /api/contacts?type=…` (`:5044`→`contacts-admin.ts:345`) + a **direct browser-Supabase** setup probe `contacts.select("contact_type").limit(1)` (`contacts-admin.ts:259`, kicked `:5037`) + `GET /api/contacts/avatars` in **batches of 30** (`:5067`,`contacts-admin.ts:322-326`).
+- **Silent re-poll:** the list fetch repeats **every 20 s + on focus/visibility** (`:5088-5137`, fetch `:5092`).
+- **No pagination:** `contacts/route.ts:63-74` selects all tenant+type rows, **no `.limit()`/`.range()`**; base64 blobs stripped (`:88-110`) then re-fetched via avatars.
+- **Search/filter/sort 100% client-side** over the in-memory array (`:5166-5219`); server route has **no search param** (`route.ts:53-72`).
+- **Detail:** inline = 1 (`/api/contacts/{id}` `:5313`); edit form fans to ~8 (contacts/{id} + storage/list ×2 `:4958-4959` + team-members + bands + section-audit + Activity's quotations+invoices `:3279-3280` + Account's accounts+roles `:3044-3045`); dedicated `/customers/[id]` = 1 HTTP + **up to 8 direct-Supabase** (`customers-admin.ts:279/301/321/342/369` + 3 sequential linked-customer lookups `:141-169`).
 
-## `/api/inbox/feed` (badge, 60 s)
-- count query, SWR-cached 15 s. Could become event-driven off the existing `inbox:account` broadcast topic (same pattern as the bell in P3) — removes the poll.
+### Finance
+- **FinanceDashboard** — **8 parallel** `/api/finance/*` on mount (`FinanceDashboard.tsx:161-219`: dashboard, orders, payments, expenses, treasury, reconciliation/candidates?limit=200, bank-imports, treasury-plans). 7 return full datasets, grouped client-side. Period switch = 1 (guard `:209-218`).
+- **FinanceStatements** — ✅ tab-gated, **1 `/api/accounting/*` per active tab** (`:132-152`).
+- **ExecutiveDashboard** — ✅ 1 consolidated `/api/executive/snapshot`, no poll (`:209`).
 
-## `/api/activity/heartbeat` (30 s)
-- **2 UPDATEs** (user_devices + app_sessions) per tick per session — 9,405 + 9,410 calls in the window. Fix: single RPC updating both, or widen to 60 s. Deliberately NOT paused when hidden (would false-mark offline).
+### Quotations
+- **List mount:** 1 (`GET /api/quotations`, items stripped ✅ `docs-sync.ts:78-99`); stats/filter client-side over full array (`Quotations.tsx:2265-2277`).
+- **Editor bootstrap ≈ 6:** doc (`:1199`) + saved-assets (`:1979`) + payment-terms + incoterms + shipping-methods (`QuotationA4Preview.tsx:5770-5772`) + shipping-documents (`:6439`). **Duplicated** by on-demand modals (`:6685-6687`,`:7054`). Pickers pull **500 / 2000 rows** then client-filter (`CustomerPickerModal.tsx:60`, `ProductPickerModal.tsx:114`).
+- **Calc** = pure client (no fetch ✅). **Save** = 1 POST.
 
-## Cross-cutting waterfall opportunities (improve many apps)
-1. **Auth prefix flattening** — every route benefits.
-2. **List endpoints**: confirm each does its filter/sort/paginate in the DB, not the browser (Contacts already slim-projected; audit the rest once server-timing lands).
-3. **Server composition**: any UI page firing 2–3 sequential `/api/*` calls on mount should get one composed endpoint — identify these once app-wide timing exists (can't enumerate reliably without it).
+### CRM
+- **Board mount:** 2 (`/api/crm/stages` `crm.ts:70` + `/api/crm/opportunities` **limit=500** `:234-237`); filter/paginate client-side (`CRM.tsx:261-285`).
+- **Deal move:** 1 optimistic POST, no reload ✅ (`:337-342`).
+- **Edit modal open:** loads the **entire contact book** (`GET /api/contacts` `:1739`) + direct-Supabase activities (`:1777`); save = 1 write + 2 reload = 3.
 
-**Blocker to full enumeration:** without app-wide server-timing (SW-1), the exact multi-call mount waterfalls per app can't be measured — only inferred. SW-1 is therefore the prerequisite for a complete waterfall map.
+### Catalogs
+- **List mount ≈ 6:** catalogs + contacts + 2 taxonomy + 2 storage-list (`catalogs/page.tsx:2790-2817`); filter/sort/paginate client-side, infinite-scroll (`:2824-2857`).
+- **Viewer open:** 1 track POST + pdf.js **byte-range** GETs to `/api/files/catalog/{id}` (probe `:377` + N chunk GETs `:385`) — ✅ efficient range delivery.
+
+### Notifications
+- Shell bell: realtime-first + **two 60 s insurance polls** (discuss myChannels `:335`, inbox unread `:362`, hidden-skip `:366`); bell open = 3 fetches (`:408-426`). Full inbox page pulls **200 rows** (`inbox/page.tsx:297`). Ops bell = 1 `/api/operations/snapshot`, no poll ✅.
+
+### Products / Employees / Accounts lists
+- Products list: **6 fetches on mount** (`ProductList.tsx:238-247`), full-array client filter (`:540-543`), ✅ **AbortController** (`:233`) + `useDeferredValue` (`:191`). Employees/Accounts: 1 fetch, full-array client filter, **no debounce, no deferred value** (`employees/page.tsx:89`, `AccountsList.tsx:81`).
+
+---
+
+## Top waterfalls — ranked by (requests/action OR sequential-queries) × frequency
+
+| Rank | Workflow | Cost | Cite |
+|---|---|---|---|
+| 1 | Customers/Suppliers/Contacts list | 4 HTTP + 1 Supabase probe + N/30 avatars + **20 s re-poll**; no pagination; client filter | `Contacts.tsx:5044/5067/5088`, `route.ts:63-74` |
+| 2 | Finance dashboard | **8-way** parallel mount fan-out | `FinanceDashboard.tsx:161-219` |
+| 3 | `/customers/[id]` profile | 1 HTTP + **up to 8 direct-Supabase** (incl. 3 sequential) | `customers-admin.ts:141-169/279-369` |
+| 4 | Quotations editor bootstrap | ~6 fetches + reference-list **duplication** | `QuotationA4Preview.tsx:5770-5772`, dup `:6685` |
+| 5 | Catalogs list | ~6-load mount | `catalogs/page.tsx:2790-2817` |
+| 6 | Products list | 6-fetch mount | `ProductList.tsx:238-247` |
+| 7 | CRM edit modal | loads entire contact book on open | `CRM.tsx:1739` |
+| 8 | CRM board / quote pickers | 500 / 2000-row fetch then client filter | `crm.ts:234-237`, `ProductPickerModal.tsx:114` |
+| 9 | Notifications steady-state | 2 req/60 s per open tab + 3 per bell open | `NotificationBell.tsx:335/362/408` |
+| 10 | Employees / Accounts list | full dataset, client filter, no debounce | `AccountsList.tsx:81` |
+
+---
+
+## Cross-cutting patterns (highest-leverage shared fixes)
+
+1. **Wide-fetch-then-filter-in-browser** — CRM (500), Quotations list, Catalogs, Contacts, Products, Employees, Accounts: one wide server fetch of the full tenant set, then search/filter/sort/paginate in memory. **8/10 directory apps**; 0 paginate, 0 virtualize, 1 server-search, 1 cancels stale requests (`SHARED_LIST_SEARCH_AUDIT.md`). → shared `useServerList`.
+2. **Fixed multi-way mount fan-out** — FinanceDashboard's 8 parallel calls. → composed snapshot.
+3. **Reference-list duplication** — Quotations refetches payment-terms/incoterms/shipping ×2-3 across modals. → load once, share.
+4. **Full-book loads for a picker** — CRM edit modal + quotation pickers pull entire directories. → server-search pickers.
+5. **Silent background re-polls** — Contacts 20 s list re-poll; notifications 60 s insurance polls. → visibility/realtime-aware (Wave-1 heartbeat pattern).
+6. **Avatar/blob split** — Contacts strips base64 then re-fetches in N/30 batches (already a mitigation; the real fix is server pagination so fewer rows need avatars at once).
+
+Good patterns to preserve: FinanceStatements tab-gating, Executive/Operations single-snapshot, Quotations items-stripping, Catalogs pdf.js byte-range, Products AbortController + `useDeferredValue`.

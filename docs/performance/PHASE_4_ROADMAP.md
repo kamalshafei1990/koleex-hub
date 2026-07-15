@@ -35,3 +35,36 @@ Discuss attachment migration, Discuss retry UX, further Storage-category migrati
 - Per-route P50/P95 for ~475 routes (SW-1 fixes this).
 - Authenticated React Profiler sessions (owner/CI, not this environment).
 - Speed Insights percentiles (accumulate with real traffic).
+
+---
+
+## Wave 2 — measured application-specific optimization (2026-07-16)
+
+**Status: measurement + scorecard COMPLETE; implementation NOT started (awaiting approval).**
+Baseline + ranked scorecard: `PHASE_4_WAVE_2_BASELINE.md`. Audits:
+`API_WATERFALL_AUDIT.md`, `SHARED_LIST_SEARCH_AUDIT.md`, `ROUTE_BUNDLE_REPORT.md`,
+`REACT_RENDERING_AUDIT.md`.
+
+**Headline finding:** 8/10 directory apps download the full tenant dataset and
+filter/paginate client-side (0/10 paginate, 0/10 virtualize). React Compiler is
+**off**, so missing memoization is a real cost.
+
+**Proposed sequence (each independently reversible; security-preserving; separate commits):**
+- **Wave 2A (cross-app):** `useServerList` hook (server pagination + `q=` search +
+  cancellation + cache-first + warm-start) → Customers/Suppliers/Contacts first,
+  then Products/Employees/Accounts/Catalogs/Quotations-list; promote
+  `useDebouncedValue`; kill Contacts 20 s silent poll.
+- **Wave 2B (top workflows):** FinanceDashboard 8-way fan-out → composed snapshot;
+  Quotations editor reference-list dedupe; CRM edit-modal server-search picker.
+- **Wave 2C (measured React hotspots):** shared virtualized list primitive;
+  `useDeferredValue` in Accounts/Employees; QuotationA4Preview memoization.
+- **Deferred pilots:** Finance i18n active-locale (SW-5); lazy-loading preload
+  correction — only after the authenticated lazy-loading measurement.
+
+**Still deferred (evidence does not rank them above the above):** Discuss
+attachment migration, Discuss retry UX, further Storage-category migration,
+Supabase custom-domain experiment.
+
+**Measurement gaps to close during Wave 2:** real-user P50–P99 from a Vercel-log
+window (instrument now deployed); authenticated lazy-loading + React Profiler
+sessions; Mainland-China samples.
