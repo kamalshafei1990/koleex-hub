@@ -43,7 +43,8 @@ async function get(path, cookie, headers = {}) {
   return fetch(`${BASE}${path}`, { headers: { ...(cookie ? { Cookie: cookie } : {}), ...headers }, redirect: "manual" });
 }
 
-const CATALOG = args.catalog; // a real test catalog id
+const CATALOG = args.catalog; // a real test catalog id (caller's tenant)
+const FOREIGN = args.foreign; // a catalog id in ANOTHER tenant (cross-org regression)
 const DISCUSS = args.discuss; // a real test message id the admin probe can access
 const FAKE = "00000000-0000-0000-0000-000000000000";
 
@@ -79,6 +80,13 @@ const run = async () => {
     check("private cache header", /private/.test(full.headers.get("cache-control") ?? ""));
     check("nosniff", full.headers.get("x-content-type-options") === "nosniff");
   } else check("catalog scenarios", false, "SKIPPED — pass --catalog <testId>");
+
+  if (FOREIGN) {
+    /* Regression (cross-org isolation): a catalog in another tenant must be
+       404 even for a module-holder / super-admin. Fixed 2026-07-15. */
+    const f = await get(`/api/files/catalog/${FOREIGN}`, adminCookie);
+    check("cross-org foreign catalog → 404", f.status === 404, `got ${f.status}`);
+  } else check("cross-org scenario", false, "SKIPPED — pass --foreign <foreignTenantCatalogId>");
 
   check("forged id (auth) → 404", (await get(`/api/files/catalog/${FAKE}`, adminCookie)).status === 404);
   if (DISCUSS) {

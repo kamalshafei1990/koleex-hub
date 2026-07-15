@@ -95,10 +95,16 @@ type Resolved = { bucket: string; path: string; filename: string };
 async function resolveCatalog(auth: ServerAuthContext, id: string): Promise<Resolved | null> {
   const denied = await requireModuleAccess(auth, "catalogs");
   if (denied) return null; // uniform 404 upstream — no existence oracle
+  /* Tenant isolation (regression fix, R3 file-delivery authz validation): the
+     catalogs list route scopes by tenant, so this MUST too — otherwise a user
+     in another organization who happens to hold the Catalogs module could
+     fetch an Org-A catalog PDF by id. Scope to the caller's tenant exactly
+     like GET /api/catalogs does. */
   const { data } = await supabaseServer
     .from("catalogs")
     .select("file_path, file_url, file_name")
     .eq("id", id)
+    .eq("tenant_id", auth.tenant_id)
     .maybeSingle();
   if (!data) return null;
   const path = toObjectPath(data.file_path ?? data.file_url, "media");
