@@ -225,7 +225,15 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
       );
     };
     tick();
-    const id = setInterval(tick, 1000);
+    /* Phase 3E: no 1 Hz re-renders while the tab is hidden; the visibility
+       listener snaps the clock forward the instant the user returns. */
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") tick();
+    }, 1000);
+    const onClockVis = () => {
+      if (document.visibilityState === "visible") tick();
+    };
+    document.addEventListener("visibilitychange", onClockVis);
 
     /* Timezone label — e.g. "Dubai (GMT+4)" */
     try {
@@ -241,7 +249,10 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
       setTzLabel("");
     }
 
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onClockVis);
+    };
   }, []);
 
   return (
@@ -488,6 +499,7 @@ const AIGreeter = memo(function AIGreeter({
     let i = Math.floor(Date.now() / 45_000) % pool.length;
     setQuote(pool[i]);
     const id = setInterval(() => {
+      if (document.visibilityState !== "visible") return; // Phase 3E: idle tabs stay idle
       i = (i + 1) % pool.length;
       setQuote(pool[i]);
     }, 45_000);
