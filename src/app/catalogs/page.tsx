@@ -314,7 +314,7 @@ type ContactOption = {
 };
 
 /* ── PDF first-page thumbnail generator ── */
-const PDFJS_CDN = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174";
+const PDFJS_CDN = "/vendor/pdfjs/3.11.174"; // self-hosted (China R1) — was cdnjs.cloudflare.com
 
 let pdfjsLoaded = false;
 function ensurePdfJs(): Promise<void> {

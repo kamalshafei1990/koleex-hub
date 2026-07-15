@@ -6,7 +6,7 @@
    catalogue uploaded from the Supplier form gets the same first-page cover as
    one uploaded directly in the Catalogs app. */
 
-const PDFJS_CDN = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174";
+const PDFJS_CDN = "/vendor/pdfjs/3.11.174"; // self-hosted (China R1) — was cdnjs.cloudflare.com
 let pdfjsLoaded = false;
 
 function ensurePdfJs(): Promise<void> {
