@@ -46,3 +46,13 @@
 2. Storage assets NOT yet routed first-party (stages 2–7) still fail for the affected mainland cohort until wired.
 3. FCM web push (Android) blocked — documented, no code fix available.
 4. Per-endpoint mainland probes of `/_next/image` + `/api/files` pending next probe session.
+
+
+---
+
+## Stages 2–4 update (2026-07-15, commits `66771b9e` / `16e7308a` / `c5ae5d99`)
+- **Stage 2 DONE:** all 33 raw identity-image sites (20 components) wired through `fpAvatar()`; SVG passthrough guard added (SVGs deliberately excluded from the optimizer). Kill-switch unchanged.
+- **Stage 3 DONE:** Catalogs viewer/covers/downloads on `/api/files/catalog/<id>` — see `CATALOG_RANGE_DELIVERY_RESULTS.md`.
+- **Stage 4:** classification complete (`STORAGE_MIGRATION_MATRIX.md`); no populated manual/brochure documents exist yet beyond supplier catalogs (covered by stage 3); sensitive doc classes explicitly NOT treated as public.
+- **Guard:** `npm run validate:first-party` blocks new browser-direct storage refs; 4 retained sites allowlisted with reasons.
+- **Discuss attachments:** still gated on the authenticated matrix (`FILE_DELIVERY_AUTH_TEST_RESULTS.md`).

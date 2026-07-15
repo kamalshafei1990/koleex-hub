@@ -54,3 +54,6 @@ Notes: `example.com`/`x.test` hits are placeholders/tests, not dependencies. No 
 
 ## Storage inventory reference (R3 Step 1)
 Full bucket-by-bucket inventory, classifications, URL-generation and authorization paths moved to `FIRST_PARTY_STORAGE_ARCHITECTURE.md` §Step 1. Summary: 4 public buckets (media 500MB-limit workhorse, product-assets, product-images, todo-attachments) + 4 private (discuss-voice, finance-documents, project-attachments, qa-screenshots); all uploads already first-party via /api/storage/*; images centrally URL-built by src/lib/cdn.ts (the R3 stage-1 switch point).
+
+## Stage 2–4 rescan (2026-07-15)
+Browser-direct Supabase Storage references remaining in client code: **4, all intentional** (3 SVG icon builders with local fallbacks + software-center installers) — enumerated with reasons in `scripts/validate-first-party-assets.mjs` and `STORAGE_MIGRATION_MATRIX.md`. Everything else (identity images, product/catalog imagery, catalog PDFs) is first-party. Realtime WSS remains the one major browser→supabase.co dependency (custom-domain experiment pending approval).

@@ -1,0 +1,7 @@
+# Catalogs — First-Party Range Delivery Results (R3 stage 3)
+
+**Design:** viewer/range-transport/covers/downloads all use `/api/files/catalog/<id>` (`16e7308a`). Server: auth → Catalogs module → DB path resolution → service-key fetch with verbatim Range forward → streamed 206/200 passthrough (no full-file buffering), Content-Type/Length/Range/Accept-Ranges/ETag forwarded, nosniff, private cache, 200MB/50s caps, `[kx-file]` telemetry (category/id/bucket/status/bytes/duration). Client keeps the existing manual PDFDataRangeTransport (512KB chunks, disableAutoFetch) with the full-fetch fallback intact — same-origin delivery finally exposes Accept-Ranges/206 that the cross-origin path hid.
+
+**Measured now:** unauth 401 (live). **Pending real-session measurements** (requires an authenticated browser; this environment cannot sign in): first-page bytes (~1–2MB expected, unchanged mechanism), viewer-shell/first-page timing, distant-page jump, function duration on 206 streams. These will land in `[kx-file]` + `[kx-server-timing] op=files.stream` logs from the first real catalog opens — check Vercel Logs after use. **Proof that initial viewing avoids full download:** by construction (unchanged 512KB-chunk transport + disableAutoFetch) + will be confirmed by `bytes` values in `[kx-file]` lines being ≪ file size.
+
+**Mainland China:** endpoint on the hub origin (measured ~99% node success earlier today — labeled inheritance, not a per-endpoint probe; re-probe queued).

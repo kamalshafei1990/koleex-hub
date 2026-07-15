@@ -37,3 +37,6 @@ Applies to `/api/files/[...ref]` (private/file streaming) and the `/_next/image`
 | Cached private-file isolation | no shared cache key exists | by construction |
 
 "Code-verified" = enforced by the shipped implementation and reviewable in the route source; the authenticated end-to-end matrix requires the Phase 12 test harness (this environment cannot sign in — documented limitation since Phase 3).
+
+
+> **Harness:** the matrix above is now executable via `npm run validate:file-delivery` (see FILE_DELIVERY_AUTH_TEST_RESULTS.md for executed vs credential-blocked rows).
