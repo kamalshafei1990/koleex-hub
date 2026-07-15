@@ -13,6 +13,7 @@ import "server-only";
    route handlers need. They share the ScopeContext shape.
    --------------------------------------------------------------------------- */
 
+import { cache } from "react";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "./supabase-server";
 import { stageTimer } from "./perf";
@@ -59,7 +60,7 @@ export interface ServerAuthContext extends ScopeContext {
  * if no session, malformed cookie, disabled account, or DB miss. Never
  * throws — call sites decide how to respond.
  */
-export async function getServerAuth(): Promise<ServerAuthContext | null> {
+async function resolveServerAuth(): Promise<ServerAuthContext | null> {
   /* SW-1: measure the universal auth prefix (runs on every authenticated
      request → sampled by stageTimer). Stages are code-authored names; the
      only tags are the coarse outcome status — never account ids, emails, or
@@ -218,6 +219,32 @@ export async function getServerAuth(): Promise<ServerAuthContext | null> {
     view_as_role_id: roleModeActive ? overrideTargetRoleId : null,
   };
 }
+
+/**
+ * Request-local memoized auth resolution (SW-3, Phase 4).
+ *
+ * `getServerAuth` resolves the SAME request cookies to the SAME context every
+ * time it's called within a single request. If two code paths in one request
+ * both need auth (a route handler AND a shared helper it calls), React
+ * `cache()` lets them share ONE resolution + ONE `accounts` DB batch instead
+ * of repeating it. `cache()` is scoped to a single server request — a fresh
+ * cache per request, never shared across requests or users — so this changes
+ * NO authentication or permission semantics: identical inputs (this request's
+ * cookies) → identical output, discarded when the request ends.
+ *
+ * Safety notes:
+ *   · Every auth route (signin, view-as enter/exit, signout) mutates the
+ *     session/view-as cookie AFTER resolving auth and never re-reads it in the
+ *     same request, so memoization can't return a stale identity.
+ *   · The session/view-as cookie reads are already DB-free (HMAC only); the
+ *     one DB batch is the `accounts` load. Auth was already a single resolve
+ *     per request — this is a guard against accidental double-resolution and a
+ *     small win for the few routes that call a shared auth-reading helper.
+ *
+ * Reversible: `export const getServerAuth = resolveServerAuth;`
+ */
+export const getServerAuth: () => Promise<ServerAuthContext | null> =
+  cache(resolveServerAuth);
 
 /**
  * Convenience: get auth or return a 401 JSON Response. Route handlers
