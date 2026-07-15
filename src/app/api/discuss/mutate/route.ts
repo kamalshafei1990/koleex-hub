@@ -22,7 +22,7 @@ import "server-only";
    keeps delivering.
    --------------------------------------------------------------------------- */
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { emitPings, pingChannelActivity, rtTopic } from "@/lib/server/realtime-broadcast";
@@ -257,31 +257,59 @@ export async function POST(req: Request) {
           .single();
         if (error) return bad(error.message, 500);
         timing.mark("db_insert");
-        const memberIds = await channelMemberIds(channelId);
-        timing.mark("member_lookup");
-        await pingChannelActivity(channelId, memberIds, me);
-        timing.mark("rt_dispatch");
-        /* Best-effort phone / desktop push to every OTHER member who has
-           enabled notifications on a device. Never blocks or fails the send;
-           sendPushToAccounts only reaches accounts with an active device. */
-        try {
-          const recipients = memberIds.filter((id) => id !== me);
-          if (recipients.length) {
-            const preview = text.trim().replace(/\s+/g, " ").slice(0, 140);
-            await sendPushToAccounts(
-              recipients,
-              {
-                title: auth.username || "New message",
-                body: preview || "Sent you a message",
-                url: "/discuss",
-                tag: `discuss:${channelId}`,
-                kind: "discuss_message",
-              },
-              { actorAccountId: me },
-            );
-          }
-        } catch { /* push is best-effort */ }
-        timing.mark("push_dispatch");
+        /* ------------------------------------------------------------------
+           Phase 3B — acknowledge as soon as the message is DURABLE.
+           The insert above is the acceptance point: the canonical row exists
+           and the sender can reconcile its optimistic bubble. (A retried HTTP
+           request would still create a second row — client idempotency keys
+           are Phase 5, gated — deferring notifications changes nothing here.)
+
+           Member lookup + realtime ping + web-push run AFTER the response via
+           Next's after() — stable since 15.1 and backed by waitUntil on
+           Vercel, so the function stays alive until this settles. This is NOT
+           a naive fire-and-forget: the platform guarantees execution time,
+           and both dispatches keep their existing best-effort semantics
+           (client focus/reconcile refetch remains the delivery safety net,
+           exactly as before). Receiver timing is unaffected in practice —
+           after() begins as soon as the response is handed off, so the ping
+           fires at essentially the same wall-clock moment as the old inline
+           code, without the sender waiting behind the push fan-out.
+
+           Rollback without redeploy: set env KX_DISCUSS_INLINE_NOTIFY=1 to
+           restore the previous inline behavior. */
+        const notifyMembers = async () => {
+          const post = stageTimer("discuss.mutate.post_ack");
+          try {
+            const memberIds = await channelMemberIds(channelId);
+            post.mark("member_lookup");
+            await pingChannelActivity(channelId, memberIds, me);
+            post.mark("rt_dispatch");
+            try {
+              const recipients = memberIds.filter((id) => id !== me);
+              if (recipients.length) {
+                const preview = text.trim().replace(/\s+/g, " ").slice(0, 140);
+                await sendPushToAccounts(
+                  recipients,
+                  {
+                    title: auth.username || "New message",
+                    body: preview || "Sent you a message",
+                    url: "/discuss",
+                    tag: `discuss:${channelId}`,
+                    kind: "discuss_message",
+                  },
+                  { actorAccountId: me },
+                );
+              }
+            } catch { /* push is best-effort */ }
+            post.mark("push_dispatch");
+          } catch { /* notifications must never fail the send */ }
+          finally { post.done({ action: "sendMessage" }); }
+        };
+        if (process.env.KX_DISCUSS_INLINE_NOTIFY === "1") {
+          await notifyMembers();
+        } else {
+          after(notifyMembers);
+        }
         const { header } = timing.done({ action: "sendMessage" });
         return NextResponse.json({ ok: true, data }, { headers: { "Server-Timing": header } });
       }
