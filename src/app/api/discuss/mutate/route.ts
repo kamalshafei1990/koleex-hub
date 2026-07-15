@@ -26,6 +26,7 @@ import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { emitPings, pingChannelActivity, rtTopic } from "@/lib/server/realtime-broadcast";
+import { sendPushToAccounts } from "@/lib/server/web-push";
 
 const CHANNELS = "discuss_channels";
 const MEMBERS = "discuss_members";
@@ -250,7 +251,28 @@ export async function POST(req: Request) {
           .select("*")
           .single();
         if (error) return bad(error.message, 500);
-        await pingChannelActivity(channelId, await channelMemberIds(channelId), me);
+        const memberIds = await channelMemberIds(channelId);
+        await pingChannelActivity(channelId, memberIds, me);
+        /* Best-effort phone / desktop push to every OTHER member who has
+           enabled notifications on a device. Never blocks or fails the send;
+           sendPushToAccounts only reaches accounts with an active device. */
+        try {
+          const recipients = memberIds.filter((id) => id !== me);
+          if (recipients.length) {
+            const preview = text.trim().replace(/\s+/g, " ").slice(0, 140);
+            await sendPushToAccounts(
+              recipients,
+              {
+                title: auth.username || "New message",
+                body: preview || "Sent you a message",
+                url: "/discuss",
+                tag: `discuss:${channelId}`,
+                kind: "discuss_message",
+              },
+              { actorAccountId: me },
+            );
+          }
+        } catch { /* push is best-effort */ }
         return NextResponse.json({ ok: true, data });
       }
 
